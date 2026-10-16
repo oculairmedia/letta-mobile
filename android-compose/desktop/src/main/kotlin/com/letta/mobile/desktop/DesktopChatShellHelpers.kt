@@ -17,8 +17,6 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.shell.rail.ShellRailActivity
 import com.letta.mobile.ui.shell.rail.ShellRailMapping
 import com.letta.mobile.data.model.DisplayNames
-import com.letta.mobile.data.model.LlmModel
-import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.composer.AgentMentions
 import com.letta.mobile.data.composer.MentionKind
 import com.letta.mobile.data.composer.Mentionable
@@ -43,14 +41,6 @@ import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.data.memory.MemoryParityControllerState
 import com.letta.mobile.data.commands.AgentSlashCommand
 import kotlinx.coroutines.launch
-
-/** Model picker options: display label to route-stable selection token. */
-internal fun buildModelOptions(availableModels: List<LlmModel>): List<Pair<String, String>> =
-    availableModels.map { model ->
-        val label = model.displayNameOverride?.takeIf { it.isNotBlank() } ?: model.name
-        val value = ModelCatalog.selectionValue(availableModels, model)
-        label to value
-    }
 
 /**
  * Distinct agents (by id, since many agents share a display name) that have

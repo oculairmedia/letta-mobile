@@ -21,6 +21,29 @@ class AppServerTurnStackSpec(
     val autoAllowApprovals: Boolean = true,
 )
 
+/**
+ * letta-mobile-bzvro.13, ckmub.17.2 (moved from desktop): a stack whose runtimes start in [modes]'
+ * per-conversation choice, else [fallback], and report the mode in force back into it, so the
+ * composer's mode chip and `runtime_start` agree. Null [modes] runs every runtime in [fallback].
+ * Baking the mode in lets ensureRuntime's one runtime_start carry it.
+ */
+fun permissionGovernedTurnStackSpec(
+    modes: PermissionModeRegistry?,
+    clientInfo: AppServerRuntimeStartClientInfo = AppServerTurnStackSpec().clientInfo,
+    fallback: AppServerPermissionMode = RuntimePermissionDefaults.DEFAULT_MODE,
+    requestIdFactory: () -> String = AppServerTurnEngine.defaultRequestId,
+    externalToolRegistry: ExternalToolRegistry? = null,
+) = AppServerTurnStackSpec(
+    clientInfo = clientInfo,
+    permissionMode = fallback,
+    permissionModeProvider = { command ->
+        modes?.modeFor(AppServerRuntimeScope(command.agentId.value, command.conversationId.value)) ?: fallback
+    },
+    onPermissionModeInForce = { runtime, mode -> modes?.observed(runtime, mode) },
+    requestIdFactory = requestIdFactory,
+    externalToolRegistry = externalToolRegistry,
+)
+
 /** letta-mobile-by4vm.90: the client -> router -> engine stack of desktop, web and Android Iroh: attaches, then [turnEngine]. */
 fun AppServerRuntimeEventRouter.attachTurnStack(
     client: AppServerClient,
