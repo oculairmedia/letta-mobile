@@ -6,7 +6,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import com.letta.mobile.data.a2ui.A2uiAction
-import com.letta.mobile.data.a2ui.mayForwardAsUserAction
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
@@ -54,11 +53,15 @@ internal fun rememberDesktopShellContext(
     val router = remember(navigator, chatController, chatState) {
         DesktopShellRouter(navigator, chatController, chatState)
     }
+    // No transport carries A2UI card actions (the shim's user_action frame is gone, by4vm.111) and
+    // desktop has no registry-backed approval path (by4vm.2), so every card action is dropped, logged.
     val onA2uiAction: (A2uiAction) -> Unit = { action ->
-        val resolved = resolveA2uiAction(action, chatState.value.selectedConversationId)
-        // letta-mobile-by4vm.2: desktop has no registry-backed A2UI approval path, so a
-        // tool_approval_response is dropped (and logged) rather than matched by the server unchecked.
-        if (resolved.mayForwardAsUserAction()) core.sessionGraph.value.channelTransport.sendA2uiAction(resolved)
+        com.letta.mobile.util.Telemetry.event(
+            "DesktopA2ui", "action.unroutable",
+            "surfaceId" to action.surfaceId,
+            "name" to action.name,
+            level = com.letta.mobile.util.Telemetry.Level.WARN,
+        )
     }
     return DesktopShellContext(
         shell = shell,
@@ -72,12 +75,6 @@ internal fun rememberDesktopShellContext(
         sharedChat = rememberDesktopSharedChatWiring(chatController, onA2uiAction, core.bootstrap.dataBindings.modelControl?.catalog),
         imageIntake = rememberDesktopImageIntake(core, navigator),
     )
-}
-
-/** An action that names no conversation goes to the selected one. */
-private fun resolveA2uiAction(action: A2uiAction, selectedConversationId: String?): A2uiAction {
-    if (!action.conversationId.isNullOrBlank()) return action
-    return action.copy(conversationId = selectedConversationId)
 }
 
 @Composable

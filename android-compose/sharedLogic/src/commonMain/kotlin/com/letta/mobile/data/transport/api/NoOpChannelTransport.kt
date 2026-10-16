@@ -1,7 +1,5 @@
 package com.letta.mobile.data.transport.api
 
-import com.letta.mobile.data.a2ui.A2uiAction
-import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
@@ -47,9 +45,6 @@ open class NoOpChannelTransport : IChannelTransport, CronControlTransport {
     override suspend fun disconnect() {
         _state.value = ChannelTransportState.Disconnected(1000, "no-op disconnect")
     }
-
-    override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult =
-        A2uiActionDispatchResult.Failed
 
     override fun subscribe(runId: String, cursor: Long): Boolean = false
 

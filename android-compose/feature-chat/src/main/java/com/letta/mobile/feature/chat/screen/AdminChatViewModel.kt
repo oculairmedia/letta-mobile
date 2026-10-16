@@ -21,8 +21,6 @@ import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.chat.projection.withPendingApprovalDetails
-import com.letta.mobile.data.chat.projection.withQueuedApprovals
 import com.letta.mobile.data.model.toBackendLabel
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
@@ -109,6 +107,9 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.render.toConversationState
 import com.letta.mobile.ui.chat.render.ProjectChatContext
+import com.letta.mobile.ui.chat.session.currentHostApprovals
+import com.letta.mobile.ui.chat.session.hostApprovals
+import com.letta.mobile.ui.chat.session.withHostApprovals
 import com.letta.mobile.data.chat.runtime.ChatSessionState
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.send.QueuedSendId
@@ -329,12 +330,11 @@ internal class AdminChatViewModel @Inject constructor(
     @Composable
     private fun present(): ChatUiState {
         val state by _uiState.collectAsState()
-        // letta-mobile-bzvro.40: requests the Iroh host parked on the person draw as cards here.
-        val parked by approvalBinding.pendingDetails.collectAsState()
-        val queued by approvalBinding.queuedRequestIds.collectAsState()
-        return androidx.compose.runtime.remember(state, parked, queued) {
-            state.withPendingApprovalDetails(parked).withQueuedApprovals(queued)
-        }
+        // letta-mobile-bzvro.40/by4vm.93: the shared host-approval overlay desktop uses too - requests
+        // the Iroh host parked draw as cards, queued answers are marked, the answering row disables.
+        val source = chatApprovalController.approvals
+        val approvals by androidx.compose.runtime.remember(source) { source.hostApprovals() }.collectAsState(source.currentHostApprovals())
+        return androidx.compose.runtime.remember(state, approvals) { state.withHostApprovals(approvals) }
     }
 
     private val composerController: ChatComposerController = ChatComposerController(limits = attachmentLimits)
@@ -985,7 +985,6 @@ internal class AdminChatViewModel @Inject constructor(
     override fun onCleared() {
         publishedRunKey?.let(runPhases::clear)
         abandonTimelineObserver()
-        adminChatA2uiCoordinator.release()
         screenLifecycleCoordinator.onCleared()
     }
 
@@ -1047,7 +1046,7 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     fun interruptRun() {
-        if (!replacingSendRuntime) composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
+        if (!replacingSendRuntime) composerCoordinator.interruptRun()
     }
 
     /**

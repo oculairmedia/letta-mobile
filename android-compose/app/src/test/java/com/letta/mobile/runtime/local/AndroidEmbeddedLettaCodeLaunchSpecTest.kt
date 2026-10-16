@@ -119,6 +119,37 @@ class AndroidEmbeddedLettaCodeLaunchSpecTest {
         assertEquals("android-bridge-token", env["LETTA_ANDROID_NETWORK_BRIDGE_TOKEN"])
     }
 
+    @Test
+    fun `app server launch runs letta js behind the compat preloads with the device environment`() {
+        val baseDir = tempDir("letta-app-server-launch")
+        val project = preparedProject(baseDir, withNpm = false)
+
+        val launch = project.androidLocalAppServerLaunch(
+            networkBridge = AndroidNetworkBridgeEndpoint("http://127.0.0.1:4567", "android-bridge-token"),
+            toolInstaller = FakeToolInstaller(availableCommands = setOf("curl", "node", "git")),
+        )
+        val env = launch.environment
+
+        assertEquals(
+            "the host appends `server …`; node18-compat first, no device-tools preload",
+            listOf("node", "--max-old-space-size=512", "--max-semi-space-size=16") +
+                listOf("node18-compat.cjs", "regexp-polyfill.cjs", "android-network-polyfill.cjs")
+                    .flatMap { listOf("--require", File(project.projectDir, it).absolutePath) } +
+                project.entrypoint.absolutePath,
+            launch.command,
+        )
+        assertEquals(project.storageDirectory.absolutePath, launch.backendDir)
+        assertEquals(project.workingDirectory.absolutePath, launch.workingDirectory)
+        assertEquals("--max-old-space-size=512 --max-semi-space-size=16", env["NODE_OPTIONS"])
+        assertEquals(project.homeDirectory.absolutePath, env["HOME"])
+        assertEquals("http://127.0.0.1:4567", env["LETTA_ANDROID_NETWORK_BRIDGE_URL"])
+        assertEquals("android-bridge-token", env["LETTA_ANDROID_NETWORK_BRIDGE_TOKEN"])
+        assertEquals(File(baseDir, "bin").absolutePath, env["GIT_EXEC_PATH"])
+        assertEquals(File(baseDir, "tmp").absolutePath, env["TMPDIR"])
+        assertTrue(env.keys.none { it.startsWith("LMSTUDIO_") || it.startsWith("LETTA_ANDROID_ON_DEVICE_MODEL") })
+        assertNull("the host owns the backend variables", env["LETTA_LOCAL_BACKEND_DIR"])
+    }
+
     private fun assertStreamJsonArgs(
         request: LettaCodeNodeStartRequest,
         spec: AndroidEmbeddedLettaCodeLaunchSpec,

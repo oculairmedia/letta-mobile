@@ -212,6 +212,33 @@ class ControlCapabilityHandlersTest {
         )
     }
 
+    /**
+     * skills-honest-controls: a listed skill the host marked read-only (a real folder, a bundled
+     * or agent skill) is refused by the wrapper, naming why, without a doomed skill_disable; a
+     * controllable symlink still reaches letta-code.
+     */
+    @Test
+    fun skillUninstallRefusesAReadOnlySkillAndPassesAControllableOne() = runTest {
+        val catalog = NativeSkillsCatalog()
+        catalog.hydrateFromHost(
+            buildJsonArray {
+                add(buildJsonObject { put("name", "agent-council"); put("source", "global"); put("controllable", false) })
+                add(buildJsonObject { put("name", "linked"); put("source", "global"); put("controllable", true) })
+            },
+        )
+        val client = FakeControlClient()
+        val r = AdminRpcRouter()
+        SkillAdminHandlers.register(r, nativeClient = client, skillsListing = catalog.asListingSource())
+
+        val refused = dispatch(r, "skill.uninstall", mapOf("name" to "agent-council", "agent_id" to "agent-1"))
+        assertTrue(refused.contains("\"success\":false") && refused.contains("read_only: agent-council (global source)"), refused)
+        assertFalse(client.calls.any { it.startsWith("skill_disable:agent-council") }, "no doomed round-trip")
+
+        val disabled = dispatch(r, "skill.uninstall", mapOf("name" to "linked", "agent_id" to "agent-1"))
+        assertTrue(disabled.contains("\"disabled\":true"), disabled)
+        assertTrue("skill_disable:linked" in client.calls)
+    }
+
     @Test
     fun skillListReturnsEmptyUntilCatalogHydrated() = runTest {
         val catalog = NativeSkillsCatalog()

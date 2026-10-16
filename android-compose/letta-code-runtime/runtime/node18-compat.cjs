@@ -11,6 +11,9 @@
 'use strict';
 const trace = process.env.LETTA_COMPAT_TRACE === '1';
 const hit = new Set();
+function note(name) {
+  if (trace && !hit.has(name)) { hit.add(name); process.stderr.write(`[node18-compat] hit ${name}\n`); }
+}
 function traced(name, fn) {
   if (!trace) return fn;
   return function tracedShim(...args) {
@@ -31,6 +34,156 @@ if (globalThis.crypto === undefined) {
   installed.push('crypto');
   const { webcrypto } = require('node:crypto');
   Object.defineProperty(globalThis, 'crypto', { value: webcrypto, writable: true, configurable: true, enumerable: false });
+}
+
+// --- TextDecoder { fatal: true } without ICU. nodejs-mobile is built --with-intl=none, where
+// Node's own TextDecoder throws ERR_NO_ICU for `fatal` (lib/internal/encoding.js
+// makeTextDecoderJS). letta.js builds one at module init (src/utils/text-files), so this was the
+// first on-device crash of 0.34.14: `TypeError [ERR_NO_ICU]: "fatal" option is not supported`.
+// Decoding stays Node's; `fatal` is enforced here with buffer.isUtf8 (simdutf, Node >= 18.14, no
+// ICU). Only installed when the platform TextDecoder actually refuses `fatal`.
+(function installFatalTextDecoder() {
+  const Native = globalThis.TextDecoder;
+  if (typeof Native !== 'function') return;
+  try { new Native('utf-8', { fatal: true }); return; } catch (e) { if (!e || e.code !== 'ERR_NO_ICU') return; }
+  const { isUtf8 } = require('node:buffer');
+  installed.push('TextDecoder.fatal');
+  const invalid = () => Object.assign(new TypeError('The encoded data was not valid for encoding utf-8'), { code: 'ERR_ENCODING_INVALID_ENCODED_DATA' });
+  const bytesOf = (input) => {
+    if (input === undefined) return new Uint8Array(0);
+    if (ArrayBuffer.isView(input)) return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+    return new Uint8Array(input); // ArrayBuffer / SharedArrayBuffer; anything else: super.decode throws
+  };
+  // Bytes at the end that start a multi-byte sequence the chunk cuts off (kept for the next chunk).
+  const incompleteTail = (b) => {
+    for (let back = 1; back <= Math.min(3, b.length); back++) {
+      const c = b[b.length - back];
+      if ((c & 0xc0) === 0x80) continue; // continuation byte: keep looking for the lead
+      const need = c >= 0xf0 ? 4 : c >= 0xe0 ? 3 : c >= 0xc0 ? 2 : 1;
+      return need > back ? back : 0;
+    }
+    return 0;
+  };
+  class TextDecoder extends Native {
+    #fatal;
+    #pending = new Uint8Array(0);
+    constructor(label = 'utf-8', options = undefined) {
+      const fatal = Boolean(options && options.fatal);
+      super(label, fatal ? { ...options, fatal: false } : options);
+      // Node without ICU decodes utf-8 and utf-16le only; utf-16le fatal degrades to replacement.
+      this.#fatal = fatal && this.encoding === 'utf-8';
+      if (fatal) note(this.#fatal ? 'TextDecoder.fatal' : `TextDecoder.fatal(${this.encoding}) degraded to replacement`);
+    }
+
+    get fatal() { return this.#fatal || super.fatal; }
+
+    decode(input = undefined, options = undefined) {
+      if (!this.#fatal) return super.decode(input, options);
+      const chunk = bytesOf(input);
+      const all = new Uint8Array(this.#pending.length + chunk.length);
+      all.set(this.#pending); all.set(chunk, this.#pending.length);
+      const keep = options && options.stream ? incompleteTail(all) : 0;
+      this.#pending = all.slice(all.length - keep);
+      if (!isUtf8(all.subarray(0, all.length - keep))) {
+        this.#pending = new Uint8Array(0);
+        super.decode(); // drop the inner decoder's partial state, as a fatal error does
+        throw invalid();
+      }
+      return super.decode(input, options);
+    }
+  }
+  Object.defineProperty(globalThis, 'TextDecoder', { value: TextDecoder, writable: true, configurable: true, enumerable: false });
+  try { require('node:util').TextDecoder = TextDecoder; } catch { /* util is the same object everywhere */ }
+})();
+
+// --- Android: process start time without `ps -o lstart=`. letta-code reads a process's start
+// time from /proc/<pid>/stat when process.platform is 'linux' and from `ps -o lstart= -p <pid>`
+// otherwise (durable filesystem locks, process liveness). nodejs-mobile reports 'android', where
+// toybox ps rejects `lstart` and forking the app process to run it takes seconds, so the first
+// App Server connection on the device failed with "Timed out acquiring durable filesystem lock"
+// (2 s budget, 250 ms per probe). Answer exactly that query from /proc, as the linux branch does;
+// a gone pid throws like a failed ps, which every caller already maps to "unknown".
+if (process.platform === 'android') {
+  const childProcess = require('node:child_process');
+  const { promisify } = require('node:util');
+  const { readFileSync } = require('node:fs');
+  const isStartQuery = (file, args) =>
+    file === 'ps' && Array.isArray(args) && args.length === 4 && args[0] === '-o' && args[1] === 'lstart=' && args[2] === '-p';
+  const startOf = (pid) => {
+    const stat = readFileSync(`/proc/${Number(pid)}/stat`, 'utf8');
+    return `${stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19]}\n`;
+  };
+  const nativeSync = childProcess.execFileSync;
+  const execFileSync = traced('ps -o lstart= (execFileSync)', function execFileSync(file, args, options) {
+    const out = startOf(args[3]);
+    return options && options.encoding && options.encoding !== 'buffer' ? out : Buffer.from(out);
+  });
+  childProcess.execFileSync = function execFileSyncCompat(file, args, options) {
+    return isStartQuery(file, args) ? execFileSync.call(this, file, args, options) : nativeSync.apply(this, arguments);
+  };
+  const nativeExecFile = childProcess.execFile;
+  const nativePromised = nativeExecFile[promisify.custom];
+  const startAsync = traced('ps -o lstart= (execFile)', async (pid) => ({ stdout: startOf(pid), stderr: '' }));
+  function execFileCompat(...args) { return nativeExecFile.apply(this, args); }
+  Object.defineProperty(execFileCompat, promisify.custom, {
+    value: (file, args, options) => (isStartQuery(file, args) ? startAsync(args[3]) : nativePromised(file, args, options)),
+  });
+  childProcess.execFile = execFileCompat;
+  installed.push('android ps lstart');
+
+  // Android: no hard links for apps. SELinux denies `link` on app data files (avc: denied { link }
+  // ... app_data_file), so every fs.link fails with EACCES and the durable lock above spun until
+  // its timeout even with the start-time fix. letta-code links only to publish a file exclusively
+  // (EEXIST when the target exists): durable locks, the remote-settings and listener locks, channel
+  // routes. When the kernel refuses the link, publish an exclusive copy instead (COPYFILE_EXCL:
+  // EEXIST when the target exists). The lock's dev/ino checks only matter to a reader racing the
+  // install, which runs synchronously inside this one process.
+  const fs = require('node:fs');
+  const { COPYFILE_EXCL } = fs.constants;
+  const denied = (error) => Boolean(error) && (error.code === 'EACCES' || error.code === 'EPERM');
+  const nativeLinkSync = fs.linkSync;
+  fs.linkSync = function linkSync(existing, target) {
+    try { return nativeLinkSync(existing, target); } catch (error) {
+      if (!denied(error)) throw error;
+      note('fs.link -> exclusive copy');
+      return fs.copyFileSync(existing, target, COPYFILE_EXCL);
+    }
+  };
+  const nativeLink = fs.link;
+  fs.link = function link(existing, target, callback) {
+    nativeLink(existing, target, (error) => {
+      if (!denied(error)) { callback(error); return; }
+      note('fs.link -> exclusive copy');
+      fs.copyFile(existing, target, COPYFILE_EXCL, callback);
+    });
+  };
+  const nativeLinkPromise = fs.promises.link;
+  fs.promises.link = async function link(existing, target) {
+    try { return await nativeLinkPromise(existing, target); } catch (error) {
+      if (!denied(error)) throw error;
+      note('fs.link -> exclusive copy');
+      return fs.promises.copyFile(existing, target, COPYFILE_EXCL);
+    }
+  };
+  installed.push('android fs.link');
+
+  // Android: os.tmpdir() ignores TMPDIR. An app process is forked from zygote and inherits its
+  // AT_SECURE auxv flag, so Node's safeGetenv() refuses every variable and os.tmpdir() falls back
+  // to /tmp, which apps cannot write: the Bash tool failed with "EACCES: permission denied,
+  // mkdtemp '/tmp/letta-background-XXXXXX'". process.env itself is fine, so read TMPDIR/TMP/TEMP
+  // from it the way os.tmpdir() would. (NODE_OPTIONS is refused the same way, which is why the
+  // launch also puts the heap flags on argv.)
+  const os = require('node:os');
+  const nativeTmpdir = os.tmpdir;
+  os.tmpdir = function tmpdir() {
+    const fromEnv = process.env.TMPDIR || process.env.TMP || process.env.TEMP;
+    if (!fromEnv) return nativeTmpdir();
+    note('os.tmpdir from process.env');
+    return fromEnv.length > 1 && fromEnv.endsWith('/') ? fromEnv.slice(0, -1) : fromEnv;
+  };
+  installed.push('android os.tmpdir');
+  // letta.js imports these from node:fs / node:fs/promises / node:child_process / node:os as ESM.
+  require('node:module').syncBuiltinESMExports();
 }
 
 // --- File global (Node 20). The SDKs' toFile()/multipart paths throw without it on 18.

@@ -28,7 +28,8 @@ import re
 from dataclasses import dataclass, field
 
 from rml import (EASE_OUT, VM_STATE, anim_state, bool_transition, enum_transition,
-                 exit_transition, input_transition, layer_frame, trigger_transition, weighted)
+                 exit_transition, input_transition, layer_frame, transition, trigger_transition,
+                 weighted)
 from rig.seams import crossings, prop_name as _prop
 
 # The animation index every Layer.rml() validates against, when the caller has set one. It is
@@ -156,6 +157,31 @@ class OnInput:
 
 
 @dataclass(frozen=True)
+class When:
+    """A transition on several conditions at once (Rive ANDs them), built from rml.py's `when_*`
+    helpers - a trigger that only counts while `reduceMotion` is off, a park that needs two enum
+    values ruled out. `exit=True` also waits for the animation's end, like an Exit."""
+    to: str
+    conditions: tuple
+    ms: int = 0
+    bezier: str = None
+    exit: bool = False
+    weight: int = None
+    cut: bool = False
+    reason: str = None
+    hold: bool = False
+
+    def rml(self):
+        t = transition(self.to, self.ms, self.bezier, "\n".join(self.conditions), exit_time=self.exit)
+        return weighted(t, self.weight) if self.weight is not None else t
+
+
+def _waits_for_end(t):
+    """True for a transition that fires at its state's exit time: an Exit, or a When(exit=True)."""
+    return isinstance(t, Exit) or getattr(t, "exit", False)
+
+
+@dataclass(frozen=True)
 class Raw:
     """Escape hatch for a transition whose XML is built elsewhere (a hand-rolled condition pair).
     It still declares its target, so the layer's target and duplicate checks cover it."""
@@ -267,7 +293,7 @@ class Layer:
 
     def _check_exit_time(self, s, t):
         loops = (self.anim_loops or {}).get(s.anim) == "loop"
-        if loops and isinstance(t, Exit):
+        if loops and _waits_for_end(t):
             raise ValueError(f'layer "{self.name}": state {s.node} -> {t.to} is an '
                              f'exit-time transition, but animation {s.anim} loops and '
                              f'never reaches its exit time')

@@ -33,7 +33,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # `beat:Enter_error_listening` starts at error's held pose (letta-mobile-r4bbm).
 GOLDEN_SCENARIOS = ["enter-listening", "enter-thinking", "success", "error", "hover",
                     "beat:Enter_error_listening", "beat:IdleBounce", "beat:IdleStretch",
-                    "beat:WanderSpin"]
+                    "beat:WanderSpin",
+                    # te3n1.5: the new states, every reaction, petting and reduceMotion.
+                    "enter-working", "enter-dreaming", "poke", "dizzy", "sent", "toolStart",
+                    "toolDone", "land", "wake", "yawn", "trick0", "trick1", "trick2", "trick3",
+                    "petting", "reduce-motion-idle", "reduce-motion-poke"]
 
 PEAK_TOL = 0.05        # 5 % of the property's own range
 OVERSHOOT_TOL = 5.0    # percentage points
@@ -82,6 +86,31 @@ def _add_golden_tests():
 
 
 _add_golden_tests()
+
+
+class ReducedMotion(unittest.TestCase):
+    """te3n1.5: with reduceMotion on, 60 s of idle moves nothing the probes can see - no IdleVariety
+    beat, no Wander, no breath bob - while the same 60 s without it certainly does (the control,
+    so a probe that stopped reading cannot pass for a calm rig). A reaction collapses to a blink."""
+    FLAT = 1e-3
+
+    def _moving(self, name):
+        _s, table, sig = probe.probe(name, every=30, quiet=True)
+        self.assertFalse(table["missing"], table["missing"])
+        return {p: s["range"] for p, s in sig.items() if s["range"] > self.FLAT}
+
+    def test_sixty_seconds_of_reduced_motion_idle_hold_still(self):
+        self.assertEqual(self._moving("reduce-motion-idle"), {})
+
+    def test_the_control_moves(self):
+        moving = self._moving("idle-60s")
+        self.assertIn("Body.y", moving, "the breath bob is gone from plain idle too")
+        self.assertIn("Joystick.x", moving, "no idle look-around or wander beat in 60 s of plain idle")
+
+    def test_a_reduced_motion_poke_does_not_squash(self):
+        _s, _t, sig = probe.probe("reduce-motion-poke", quiet=True)
+        for p in ("Squash.scaleX", "Squash.scaleY", "Squash.rotation", "Squash.x"):
+            self.assertLess(sig[p]["range"], self.FLAT, f"{p} moved under reduceMotion")
 
 
 class ProbeDocument(unittest.TestCase):

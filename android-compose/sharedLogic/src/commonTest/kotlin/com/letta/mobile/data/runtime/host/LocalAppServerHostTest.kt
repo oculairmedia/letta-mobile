@@ -326,6 +326,44 @@ class LocalAppServerHostTest {
     }
 
     @Test
+    fun singleLaunchKeepsTheServerWhenTheLastLeaseCloses() = hosted(singleLaunch = true) { f ->
+        f.host.acquire().close()
+        runCurrent()
+
+        assertTrue(f.latest.alive, "an in-process server cannot be started again, so idle keeps it")
+        assertEquals("ws://127.0.0.1:40001", f.host.acquire().serverUrl)
+        assertEquals(1, f.launches.size)
+    }
+
+    @Test
+    fun singleLaunchGivesUpOnExitWithoutRestarting() = hosted(singleLaunch = true) { f ->
+        f.host.acquire()
+        f.latest.crash()
+        runCurrent()
+        advanceTimeBy(60_000)
+        runCurrent()
+
+        val health = f.host.health.value
+        assertEquals(1, f.launches.size, "no in-process restart")
+        assertTrue(health.gaveUp)
+        assertFalse(health.restartPending)
+        assertTrue(health.needsForceRestart)
+        assertEquals(LocalAppServerHost.RESTART_THE_APP, health.lastError)
+    }
+
+    @Test
+    fun singleLaunchForceRestartLeavesALiveServerAlone() = hosted(singleLaunch = true) { f ->
+        f.host.acquire()
+
+        f.host.forceRestart()
+        runCurrent()
+
+        assertTrue(f.latest.alive)
+        assertEquals(1, f.launches.size)
+        assertTrue(f.host.health.value.active)
+    }
+
+    @Test
     fun listenParserAcceptsOnlyLoopbackAnnouncements() {
         assertEquals("ws://127.0.0.1:4500", parseLocalAppServerListenUrl("Listening on ws://127.0.0.1:4500"))
         assertEquals("ws://localhost:4501", parseLocalAppServerListenUrl("Listening on ws://localhost:4501"))
@@ -341,7 +379,7 @@ class LocalAppServerHostTest {
         val token: String,
     )
 
-    private class Fixture(scope: TestScope) {
+    private class Fixture(scope: TestScope, singleLaunch: Boolean) {
         val starts = mutableListOf<Start>()
         val launches = mutableListOf<FakeProcess>()
         val log = mutableListOf<String>()
@@ -353,9 +391,13 @@ class LocalAppServerHostTest {
         val latest: FakeProcess get() = launches.last()
 
         val host = LocalAppServerHost(
-            launcher = { launch, tokenFile, token ->
-                starts += Start(launch.command, launch.environment, launch.workingDirectory, tokenFile, token)
-                nextProcess().also { launches += it }
+            launcher = object : LocalAppServerLauncher {
+                override val singleLaunch = singleLaunch
+
+                override fun start(launch: LocalAppServerLaunch, tokenFile: String, token: String): LocalAppServerProcess {
+                    starts += Start(launch.command, launch.environment, launch.workingDirectory, tokenFile, token)
+                    return nextProcess().also { launches += it }
+                }
             },
             launch = {
                 LocalAppServerLaunch(
@@ -386,7 +428,8 @@ class LocalAppServerHostTest {
         }
     }
 
-    private fun hosted(block: suspend TestScope.(Fixture) -> Unit) = runTest { block(Fixture(this)) }
+    private fun hosted(singleLaunch: Boolean = false, block: suspend TestScope.(Fixture) -> Unit) =
+        runTest { block(Fixture(this, singleLaunch)) }
 
     /**
      * [stdoutLines] null = a server that never writes or closes stdout; [exitCode] set = one that

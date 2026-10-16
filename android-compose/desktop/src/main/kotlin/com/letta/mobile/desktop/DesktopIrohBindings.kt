@@ -146,11 +146,10 @@ private fun <T> DesktopTransportLifecycleEffect(request: DesktopTransportLifecyc
  * letta-mobile-9v9nu: mode-authoritative Iroh transport gate.
  *
  * `Mode.LOCAL` always wins over `serverUrl`'s scheme. A persisted config can
- * carry a stale `iroh://` ticket left over from a prior remote session (the
- * store migrates this away on load — see `BackendConfigPolicy
- * .migrateStaleLocalServerUrl` — but this gate is the last line of defense so
- * an in-memory LOCAL config never binds the remote transport regardless of
- * what its `serverUrl` still says).
+ * carry an `iroh://` ticket (save-time `BackendConfigPolicy.normalize`
+ * blanks it, but this gate is the last line of defense so an in-memory LOCAL
+ * config never binds the remote transport regardless of what its `serverUrl`
+ * still says).
  */
 internal fun shouldBindIrohTransport(config: LettaConfig): Boolean =
     config.mode != LettaConfig.Mode.LOCAL && IrohChannelTransport.isIrohUrl(config.serverUrl)

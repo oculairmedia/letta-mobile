@@ -25,25 +25,72 @@ python ../../native/rivdump/check_contract.py . ../../src/commonMain/kotlin/com/
 
 ## What the app writes (do not rename)
 
-On the `Avatar` view model of the `Mascot` artboard, state machine `Avatar`:
+On the `Avatar` view model of the `Mascot` artboard, state machine `Avatar` - the list is
+`rig/contract.py`, and `test_contract.py` holds this table to it (the tunables are the review
+bench's, not the app's; `hovered` and `dragged` are written by the app and by the file's own
+pointer listeners):
 
 | Property | Type | Meaning |
 |---|---|---|
-| `state` | enum `AvatarState` | the **sustained** expression; keys `idle listening thinking waitingInput speaking error sleeping loading failed degraded` |
+| `state` | enum `AvatarState` | the **sustained** expression; keys `idle listening thinking waitingInput speaking error sleeping loading failed degraded working dreaming` |
+| `mouthOpen` | number 0..1 | speech amplitude, updated every frame while speaking |
+| `lookX` | number -1..1 | gaze; 0 is straight ahead |
+| `lookY` | number -1..1 | gaze; 0 is straight ahead |
+| `blink` | trigger | one blink (the eyes also blink on their own) |
+| `shape` | enum `MascotShape` | the identity's body, one of eight |
+| `color` | color | the agent's identity colour; body and glow must stay bound to it |
+| `hovered` | boolean | pointer over the mascot (app and file listeners) |
 | `success` | trigger | a task completed: the `Flash` layer plays the happy flash and returns on its own |
 | `error` | trigger | something failed: the sad flash; `state` then settles to `error` |
-| `dragged` | boolean | held while the pet is dragged; the file's own drag listeners write it too |
-| `mouthOpen` | number 0..1 | speech amplitude, updated every frame while speaking |
-| `lookX`, `lookY` | number -1..1 | gaze; 0,0 is straight ahead |
-| `blink` | trigger | one blink (the eyes also blink on their own) |
-| `color` | colour | the agent's identity colour; body and glow must stay bound to it |
-| `shape` | enum `MascotShape` | reserved; one body for now |
-| `hovered` | boolean | written by the file's own pointer listeners, not by the app |
+| `dragged` | boolean | held while the pet is dragged (app and file listeners) |
+| `tunePlate` | number 0..1 | bench: plate scale |
+| `tuneGlyph` | number 0..1 | bench: glyph scale |
+| `tuneMouth` | number 0..1 | bench: mouth scale |
+| `tuneMouthY` | number 0..1 | bench: mouth height |
+| `tuneScale` | number 0..1 | bench: whole-entity scale |
+| `turnX` | number -1..1 | head turn toward what the eyes look at |
+| `turnY` | number -1..1 | vertical head turn |
+| `shapeRotation` | number 0..360 | the identity's body turn, degrees |
+| `reduceMotion` | boolean | calm everything: reactions and flashes become a blink or a glyph change |
+| `petting` | boolean | held while petted: content glyph, side sway, purr |
+| `listenLevel` | number 0..1 | listening intensity: the face lifts and leans in |
+| `moveX` | number -1..1 | travel / drag velocity: the body leans about its feet |
+| `moveY` | number -1..1 | vertical travel: up stretches, down squashes |
+| `impact` | number 0..1 | how hard the next `land` is |
+| `trickId` | number 0..3 | which trick the next `trick` plays |
+| `poke` | trigger | squish, startled glyph, rebound |
+| `dizzy` | trigger | dizzy glyph, wobble |
+| `sent` | trigger | "got it" dip and lift |
+| `toolStart` | trigger | small hop, glance down |
+| `toolDone` | trigger | nod |
+| `land` | trigger | arrival squash scaled by `impact` |
+| `wake` | trigger | startle stretch |
+| `yawn` | trigger | yawn: closed eye, round mouth |
+| `trick` | trigger | trick `trickId`: spin-flip, jump-twirl, peekaboo, melt-and-reform |
 
 Inside the `Plate` component, keep the input names `expr` (number, the expression index:
 `idle listening dragged thinking waitingInput speaking success error sleeping loading failed
-degraded` = 0..11) and `blink` (trigger), and keep the timelines the root scrubs: `LookX`,
-`LookY`, `Open`. Their *content* is yours.
+degraded working dreaming content startled dizzy yawning trick` = 0..18; the last five are
+plate-only, shown by the `Pet` / `React` layers) and `blink` (trigger), and keep the timelines
+the root scrubs: `LookX`, `LookY`, `Open`. Their *content* is yours.
+
+## Placeholder glyphs waiting for art (letta-mobile-te3n1.7)
+
+These ship as clearly marked placeholders derived from existing glyphs (each SVG says so in a
+comment). Replace the SVG, keep the file name, the `-50..50` viewBox and one `#111111` path,
+regenerate, done - no rig change needed:
+
+| File | Shown for | Placeholder is |
+|---|---|---|
+| `glyph-dreaming.svg` | `state` dreaming | a copy of sleeping |
+| `glyph-thinkingOpen.svg` | `state` thinking, at rest (the squint beat swaps in `glyph-thinking.svg`) | idle at 55 % height |
+| `glyph-content.svg` | `petting` | success scaled 90 % x 60 % |
+| `glyph-startled.svg` | `poke`, `wake` | idle at 115 % |
+| `glyph-dizzy.svg` | `dizzy` | loading at 140 % (wants a spiral) |
+| `glyph-trick.svg` | `trick` | a copy of success |
+
+`glyph-working.svg` is real art (z4b83) and is now wired to `working`; `yawning` reuses the
+sleeping glyph with `MouthO`. No `-small` variants yet (the rig has no small profile).
 
 ## How it is built (so you know what you are editing)
 
@@ -60,21 +107,26 @@ sources are cited in `MOTION-REFERENCES.md`.
 - **Facing** is a `Joystick` (`Facing`, on the root): its x/y scrub the `TurnX`/`TurnY` pose
   ranges, which slide the `Turn` node (plate) ±70/±24 px across the body and foreshorten it at
   the edges. Nothing else keys `Turn`. Whoever wants the character to turn keys the joystick:
-  every state row has a facing (idle −0.15, thinking −0.6 away, listening 0 square-on, sleeping
-  down-and-away…), so a state change is a turn blended over the transition; the `Wander` layer
-  waits 6–12 s then plays a side glance, a peek, or rarely a spin; the `success` flash spins
+  every state row has a facing (idle −0.15, thinking −0.6 away, listening and working 0
+  square-on, sleeping and dreaming down-and-away…), so a state change is a turn blended over the
+  transition; the `Wander` layer waits 9.3–24 s then plays a side glance, a peek, or rarely a
+  spin (held while `working`, asleep or under `reduceMotion`); the `success` flash spins
   (0 → +1 → −1 → 0) with `Trail1`/`Trail2`, two ghost plates lagging 2 and 4 frames.
 - Root layers: `Shape` (identity), `Expression` (sustained states: root y/x motion on Body and
   Face together, plate rotation and offset on Face, tint, glyph index; **every state change
   goes through an `Enter_<from>_<to>` one-shot** that fires the plate blink at frame 0 and
-  flips the glyph at frame 3 while the eye is shut, turning the facing to the new state's;
-  the SPEC §3 pairs carry designed body/face motion, the rest hold and ease in on the hand-off.
+  flips the glyph at frame 6 while the eye is shut, turning the facing to the new state's;
+  the SPEC §3 pairs carry designed body/face motion, the rest travel the held pose to the next.
+  Each loop has a `Calm_<state>` twin - the same pose, held - that `reduceMotion` blends to.
   Inside `Plate`, glyph switches are instant cuts - the shutter is what hides them), `Flash` (`success` 800 ms / `error` 600 ms triggers per SPEC §2, self-returning),
-  `Drag` (boolean + the file's dragStart/dragEnd listeners), `IdleVariety` (random 4–7 s waits,
-  a glance), `Breath` (gloss opacity), `Blink`, `Hover` (one wiggle per enter).
+  `Drag` (boolean + the file's dragStart/dragEnd listeners), `IdleVariety` (four waits of
+  6.1–14 s, then one of nine beats), `Breath` (gloss opacity), `Blink`, `Hover` (perk-up, then an
+  attentive hold), and te3n1.5's `Pet` (side sway), `PetFace` (content glyph) and `React` (one
+  one-shot per reaction trigger, keyed on the `Squash` node at the feet and `Peek` in the face).
 - `Plate` is the one component: `Card` (120 px, radius 27) with a soft `Shadow`, a `Glyphs` Solo
   holding one shape per state glyph (`Idle`, `Listening`, `Thinking`, `WaitingInput`, `Speaking`,
-  `Success`, `Error`, `Sleeping`, `Loading`, `Failed`, `Degraded`, `Dragged` - the SVGs by name;
+  `Success`, `Error`, `Sleeping`, `Loading`, `Failed`, `Degraded`, `Dragged`, then `Working`,
+  `Dreaming`, `ThinkingOpen`, `Content`, `Startled`, `Dizzy`, `Trick` - the SVGs by name;
   the Solo's active child is keyed per `expr`), and three mouths below the plate: `Mouth` (morphs closed/half/open on the
   `Open` timeline from the three mouth SVGs), `MouthO` (waitingInput), `FrownLine` (error).
   `LookX`/`LookY` move the glyph ±23/±17 px; `Blink` squashes the `Glyphs` node (55/25/90 ms);

@@ -16,13 +16,12 @@ import org.automerge.ObjectId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
  * A board's Automerge history must grow with what changed, not with the size of the board times
  * the number of saves. A phone died in an OOM loop on a 62 MB snapshot of a ~112 KB board: every
- * save wrote the whole scene twice (`board` and `canvasSceneBase`).
+ * save wrote the whole scene twice (the board and a full-scene canvas base).
  */
 class NotebookCanvasStorageGrowthTest {
     /** Stroke `s[seed]`, [STROKE_POINTS] points long, shifted right by [dx]. */
@@ -286,43 +285,6 @@ class NotebookCanvasStorageGrowthTest {
         }.let { Run(it.lastScene, it.saves, directoryBytes(path)) }
         report("image moves", run, 0)
         assertTrue(run.storedBytes < imageData.length * 2L, "stored ${run.storedBytes} bytes for a ${imageData.length} byte image")
-    }
-
-    @Test
-    fun aLegacyDocumentReadsAndMovesToTheCompactForm() = runBlocking {
-        val path = Files.createTempDirectory("canvas-legacy-")
-        val canvasId = CanvasId("legacy")
-        val legacyScene = """{"bgColor":"#ffffffff","elements":[{"id":"a","type":"Path","points":["1,2"]}],"_documents":{"n":{"json":"{}"}}}"""
-        NotebookLocalStore(path, "legacy-peer").use { notebooks ->
-            val id = notebooks.create("Legacy")
-            // The old layout: the full scene in `board` and again in `canvasSceneBase`.
-            notebooks.open(id)!!.withDocument { document ->
-                document.startTransaction().use { tx ->
-                    val board = JsonObject(Json.parseToJsonElement(legacyScene).jsonObject + ("schema" to JsonPrimitive("notebook-board/1")))
-                    val elements = (tx.get(ObjectId.ROOT, "boardElements").orElseThrow() as AmValue.Map).id
-                    val a = tx.set(elements, "a", org.automerge.ObjectType.MAP)
-                    tx.set(a, "id", "\"a\"")
-                    tx.set(a, "type", "\"Path\"")
-                    tx.set(a, "points", "[\"1,2\"]")
-                    tx.set(ObjectId.ROOT, "board", board.toString())
-                    tx.set(ObjectId.ROOT, "canvasMetadata", Json.encodeToString(CanvasDocument.serializer(), CanvasDocument(canvasId, title = "Legacy", revision = 1)))
-                    tx.set(ObjectId.ROOT, "canvasSceneBase", legacyScene)
-                    tx.commit()
-                }
-            }.get(5, TimeUnit.SECONDS)
-            val store = NotebookCanvasDocumentStore(notebooks)
-            val legacy = store.get(canvasId)!!
-            assertEquals(Json.parseToJsonElement(legacyScene), Json.parseToJsonElement(legacy.sceneJson))
-            val moved = legacyScene.replace("\"1,2\"", "\"3,4\"")
-            assertTrue(store.upsertIfRevision(legacy.copy(revision = 2, sceneJson = moved), 1))
-            assertEquals(Json.parseToJsonElement(moved), Json.parseToJsonElement(store.get(canvasId)!!.sceneJson))
-            notebooks.open(id)!!.withDocument { document ->
-                assertNull(document.get(ObjectId.ROOT, "canvasSceneBase").orElse(null))
-                val raw = (document.get(ObjectId.ROOT, "board").orElseThrow() as AmValue.Str).value
-                assertEquals("""{"bgColor":"#ffffffff","elements":[{"id":"a"}],"_documents":{},"schema":"notebook-board/1"}""", raw)
-            }.get(5, TimeUnit.SECONDS)
-        }
-        Unit
     }
 
     /** A layout-2 board kept its notes inline in `board`; it reads as is and the next write moves them out. */

@@ -210,10 +210,7 @@ class DesktopLettaConfigStore(
         val fallback = defaultDesktopLettaConfig()
         val raw = readRawConfig(fallback)
         val restored = BackendConfigPolicy.restoreParkedRemoteBackend(raw)
-        val withFallbackUrl = applyFallbackUrl(restored, fallback)
-        val migrated = BackendConfigPolicy.migrateStaleLocalServerUrl(withFallbackUrl)
-        persistMigrationIfNeeded(raw, restored, withFallbackUrl, migrated)
-        return migrated
+        return applyFallbackUrl(restored, fallback)
     }
 
     private fun readRawConfig(fallback: LettaConfig): LettaConfig {
@@ -234,29 +231,6 @@ class DesktopLettaConfigStore(
         } else {
             restored.copy(serverUrl = restored.serverUrl.trim().ifBlank { fallback.serverUrl.trim() })
         }
-
-    private fun persistMigrationIfNeeded(
-        raw: LettaConfig,
-        restored: LettaConfig,
-        withFallbackUrl: LettaConfig,
-        migrated: LettaConfig,
-    ) {
-        if (restored !== raw || migrated !== withFallbackUrl) {
-            settingsStore.putString(KEY_SERVER_URL, migrated.serverUrl)
-        }
-        if (migrated.parkedServerUrl != raw.parkedServerUrl) {
-            migrated.parkedServerUrl
-                ?.takeIf { it.isNotBlank() }
-                ?.let { settingsStore.putString(KEY_PARKED_SERVER_URL, it) }
-                ?: settingsStore.remove(KEY_PARKED_SERVER_URL)
-        }
-        if (migrated.parkedAccessToken != raw.parkedAccessToken) {
-            migrated.parkedAccessToken
-                ?.takeIf { it.isNotBlank() }
-                ?.let { settingsStore.putString(KEY_PARKED_ACCESS_TOKEN, it) }
-                ?: settingsStore.remove(KEY_PARKED_ACCESS_TOKEN)
-        }
-    }
 
     private fun rememberBackend(serverUrl: String) {
         val next = (listOf(serverUrl) + recentBackends())

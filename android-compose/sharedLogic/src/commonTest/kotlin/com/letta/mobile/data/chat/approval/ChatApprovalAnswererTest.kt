@@ -28,12 +28,12 @@ class ChatApprovalAnswererTest {
         runCurrent()
 
         assertEquals(listOf("inFlight req-1", "accepted req-1 Submitted"), host.steps)
-        assertEquals(setOf("req-1"), answerer.submitting.value)
+        assertEquals(setOf("req-1"), answerer.submittingApprovals.value)
         assertEquals(emptySet(), answerer.reconcile(conversation, pendingRequests = setOf("req-1")))
         assertEquals(emptySet(), answerer.reconcile(ConversationId("conv-2"), pendingRequests = emptySet()), "another conversation decides nothing")
 
         assertEquals(setOf("req-1"), answerer.reconcile(conversation, pendingRequests = emptySet()))
-        assertTrue(answerer.submitting.value.isEmpty())
+        assertTrue(answerer.submittingApprovals.value.isEmpty())
     }
 
     @Test
@@ -43,7 +43,7 @@ class ChatApprovalAnswererTest {
         runCurrent()
 
         assertEquals("accepted req-1 Queued", host.steps.last())
-        assertEquals(setOf("req-1"), answerer.submitting.value)
+        assertEquals(setOf("req-1"), answerer.submittingApprovals.value)
     }
 
     @Test
@@ -53,7 +53,7 @@ class ChatApprovalAnswererTest {
         answerer.submit(submission(answer("req-2")) { error("socket closed") })
         runCurrent()
 
-        assertTrue(answerer.submitting.value.isEmpty())
+        assertTrue(answerer.submittingApprovals.value.isEmpty())
         assertTrue("rejected req-1 No active conversation available for approval" in host.steps)
         assertTrue("rejected req-2 socket closed" in host.steps)
     }
@@ -65,12 +65,12 @@ class ChatApprovalAnswererTest {
         val never = CompletableDeferred<ChatApprovalResult>()
         answerer.submit(submission(answer("req-1")) { never.await() })
         runCurrent()
-        assertEquals(setOf("req-1"), answerer.submitting.value)
+        assertEquals(setOf("req-1"), answerer.submittingApprovals.value)
 
         delivery.cancel()
         runCurrent()
 
-        assertTrue(answerer.submitting.value.isEmpty())
+        assertTrue(answerer.submittingApprovals.value.isEmpty())
         assertEquals("cancelled req-1", host.steps.last())
     }
 
@@ -81,10 +81,10 @@ class ChatApprovalAnswererTest {
         runCurrent()
 
         answerer.releaseAnsweredCalls(mapOf("A" to details("A"), "B" to details("B")))
-        assertEquals(setOf("req-1"), answerer.submitting.value, "A is still parked")
+        assertEquals(setOf("req-1"), answerer.submittingApprovals.value, "A is still parked")
 
         answerer.releaseAnsweredCalls(mapOf("B" to details("B")))
-        assertTrue(answerer.submitting.value.isEmpty(), "the card redrew for B")
+        assertTrue(answerer.submittingApprovals.value.isEmpty(), "the card redrew for B")
     }
 
     @Test
@@ -94,7 +94,7 @@ class ChatApprovalAnswererTest {
         runCurrent()
 
         answerer.releaseAnsweredCalls(emptyMap())
-        assertEquals(setOf("req-1"), answerer.submitting.value)
+        assertEquals(setOf("req-1"), answerer.submittingApprovals.value)
     }
 
     private fun TestScope.answerer() = ChatApprovalAnswerer(backgroundScope, host)
