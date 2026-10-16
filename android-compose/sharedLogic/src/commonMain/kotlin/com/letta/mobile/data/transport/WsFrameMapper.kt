@@ -37,16 +37,11 @@ object WsFrameMapper {
         is ServerFrame.ToolCallMessage -> frame.toLettaToolMessage()
         is ServerFrame.ToolReturnMessage -> frame.toModel()
 
-        is ServerFrame.Welcome,
         is ServerFrame.Error,
         is ServerFrame.TurnStarted,
         is ServerFrame.TurnDone,
         is ServerFrame.StopReason,
         is ServerFrame.UsageStatistics,
-        is ServerFrame.A2ui,
-        is ServerFrame.A2uiCapabilities,
-        is ServerFrame.UserActionAck,
-        is ServerFrame.UserActionOutcome,
         is ServerFrame.CronListResponse,
         is ServerFrame.CronAddResponse,
         is ServerFrame.CronGetResponse,

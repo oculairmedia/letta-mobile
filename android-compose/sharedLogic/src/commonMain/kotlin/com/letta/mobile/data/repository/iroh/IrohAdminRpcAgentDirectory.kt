@@ -22,7 +22,6 @@ import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
@@ -279,17 +278,12 @@ class IrohAdminRpcAgentDirectory(
         return decodeAgentBlockPage(result)
     }
 
-    private fun decodeAgentBlockPage(result: JsonElement): AgentBlockPage = when (result) {
-        is JsonArray -> AgentBlockPage(
-            blocks = json.decodeFromJsonElement(ListSerializer(Block.serializer()), result),
-            hasMore = false,
-        )
-        is JsonObject -> parseJsonObjectBlockPage(result)
-        else -> throw TimelineTransportHttpException(
+    /** The host always answers with the paged envelope `{blocks,total,offset,limit,has_more}`. */
+    private fun decodeAgentBlockPage(result: JsonElement): AgentBlockPage =
+        (result as? JsonObject)?.let(::parseJsonObjectBlockPage) ?: throw TimelineTransportHttpException(
             502,
             "block.list_agent returned an unsupported result: $result",
         )
-    }
 
     private fun parseJsonObjectBlockPage(obj: JsonObject): AgentBlockPage {
         val blocksElement = obj["blocks"]

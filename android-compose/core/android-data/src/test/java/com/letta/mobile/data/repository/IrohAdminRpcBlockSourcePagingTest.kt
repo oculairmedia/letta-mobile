@@ -16,8 +16,7 @@ import org.junit.Test
  * The store tier serves the union of every agent's memory files — ~1.83 MB on the
  * live host, over the 1 MiB Iroh admin_rpc frame cap — so it now windows by
  * limit/offset. This pins that the client actually sweeps the cursor (and does not
- * settle for page 1), and that it understands both wire shapes: the paged envelope
- * and the legacy bare array.
+ * settle for page 1) over the paged envelope.
  */
 class IrohAdminRpcBlockSourcePagingTest {
     private fun source(transport: FakeChannelTransport): IrohAdminRpcBlockSource {
@@ -84,26 +83,14 @@ class IrohAdminRpcBlockSourcePagingTest {
     }
 
     @Test
-    fun `a bare array is understood as the complete set`() = runTest {
-        // Back-compat: the server answers with the legacy shape when the whole
-        // union fits, and that must terminate the sweep in one round trip.
-        val transport = FakeChannelTransport().apply {
-            adminRpcHandler = { _, _, _ -> ok("""[${block("block-1")},${block("block-2")}]""") }
-        }
-
-        val blocks = source(transport).listAllBlocks()
-
-        assertEquals(2, blocks.size)
-        assertEquals(1, transport.adminRpcCalls.size)
-    }
-
-    @Test
     fun `a backend that ignores the cursor cannot spin the pager`() = runTest {
         // The pre-fix backend re-served page 1 for every offset. The dedup guard
         // must stop immediately instead of looping to the iteration cap.
         val page = (0 until IrohAdminRpcBlockSource.BLOCK_LIST_PAGE_SIZE).joinToString(",") { block("block-$it") }
         val transport = FakeChannelTransport().apply {
-            adminRpcHandler = { _, _, _ -> ok("[$page]") }
+            adminRpcHandler = { _, _, _ ->
+                ok("""{"blocks":[$page],"total":9999,"offset":0,"limit":50,"has_more":true}""")
+            }
         }
 
         val blocks = source(transport).listAllBlocks()

@@ -442,9 +442,6 @@ class WsFrameMapperTest : WordSpec({
 
         "return null for non-message frames so the bridge can route them elsewhere" {
             WsFrameMapper.toLettaMessage(
-                ServerFrame.Welcome(id = "f", ts = "t", serverId = "S", sessionId = "sess")
-            ).shouldBeNull()
-            WsFrameMapper.toLettaMessage(
                 ServerFrame.TurnStarted(id = "f", ts = "t", agentId = "a", conversationId = "c", turnId = "T", runId = "R")
             ).shouldBeNull()
             WsFrameMapper.toLettaMessage(

@@ -985,7 +985,6 @@ internal class AdminChatViewModel @Inject constructor(
     override fun onCleared() {
         publishedRunKey?.let(runPhases::clear)
         abandonTimelineObserver()
-        adminChatA2uiCoordinator.release()
         screenLifecycleCoordinator.onCleared()
     }
 
@@ -1047,7 +1046,7 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     fun interruptRun() {
-        if (!replacingSendRuntime) composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
+        if (!replacingSendRuntime) composerCoordinator.interruptRun()
     }
 
     /**

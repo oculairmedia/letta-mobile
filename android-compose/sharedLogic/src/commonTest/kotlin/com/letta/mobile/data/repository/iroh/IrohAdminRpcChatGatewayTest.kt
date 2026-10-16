@@ -1,6 +1,5 @@
 package com.letta.mobile.data.repository.iroh
 
-import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
@@ -17,7 +16,6 @@ import com.letta.mobile.data.repository.modelcontrol.ModelHandle
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
-import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
@@ -459,7 +457,7 @@ class IrohAdminRpcChatGatewayTest {
                 "{\"agent_id\":\"agent-1\",\"limit\":\"$pageSize\",\"offset\":\"0\"}",
                 call.body,
             )
-            ok("""[{"id":"block-1","label":"persona","value":"Helpful"}]""")
+            ok("""{"blocks":[{"id":"block-1","label":"persona","value":"Helpful"}],"total":1,"offset":0,"limit":50,"has_more":false}""")
         }
 
         val blocks = IrohAdminRpcAgentDirectory(transport).listAgentBlocks(AgentId("agent-1"))
@@ -504,7 +502,7 @@ class IrohAdminRpcChatGatewayTest {
     // letta-mobile-1105 (PR #1105 review): success=true with result=null must not be
     // silently coerced into "this agent has zero blocks". A route decoded through
     // adminRpcDecodedList() would return emptyList() here — a false-empty measurement.
-    // listAgentBlocks must throw loudly instead, so only an explicit JSON `[]` means
+    // listAgentBlocks must throw loudly instead, so only an explicit empty page means
     // measured empty.
     @Test
     fun directoryListAgentBlocksThrowsLoudlyOnNullResult() = runTest(UnconfinedTestDispatcher()) {
@@ -530,16 +528,16 @@ class IrohAdminRpcChatGatewayTest {
     }
 
     @Test
-    fun directoryListAgentBlocksReturnsEmptyListOnExplicitEmptyArray() = runTest(UnconfinedTestDispatcher()) {
+    fun directoryListAgentBlocksReturnsEmptyListOnExplicitEmptyPage() = runTest(UnconfinedTestDispatcher()) {
         val transport = FakeIrohTransport()
         transport.rpcResponder = { call ->
             assertEquals("block.list_agent", call.method)
-            ok("[]")
+            ok("""{"blocks":[],"total":0,"offset":0,"limit":50,"has_more":false}""")
         }
 
         val blocks = IrohAdminRpcAgentDirectory(transport).listAgentBlocks(AgentId("agent-1"))
 
-        assertTrue(blocks.isEmpty(), "explicit [] must decode as a measured empty list")
+        assertTrue(blocks.isEmpty(), "an explicit empty page must decode as a measured empty list")
         assertEquals(1, transport.rpcCalls.size)
     }
 
@@ -800,7 +798,6 @@ class IrohAdminRpcChatGatewayTest {
         override fun cancel(conversationId: String): Boolean = true
         override fun bye(): Boolean = true
         override suspend fun disconnect() = Unit
-        override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = A2uiActionDispatchResult.Sent("frame-1")
         override fun subscribe(runId: String, cursor: Long): Boolean = false
         override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
             val call = RpcCall(method, path, body)
