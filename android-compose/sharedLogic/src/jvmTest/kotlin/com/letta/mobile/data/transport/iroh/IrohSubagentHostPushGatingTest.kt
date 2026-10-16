@@ -28,9 +28,9 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * letta-mobile-fxoew.2: against a host that advertises the registry push, the
- * host is the one writer of subagent state. The client correlator stops
- * emitting, and the host's `subagents_updated` reaches the transport's events.
+ * letta-mobile-fxoew.2: the host is the one writer of subagent state. The
+ * client correlator never emits, and the host's `subagents_updated` reaches
+ * the transport's events.
  */
 class IrohSubagentHostPushGatingTest {
     private val clientScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -126,8 +126,8 @@ class IrohSubagentHostPushGatingTest {
      * frame for the dispatch has already been emitted. Returns how many
      * correlator (non-host) SubagentsUpdated frames there were.
      */
-    private suspend fun correlatorFramesAfterDispatch(capabilities: Set<String>): Int {
-        val transport = transport(capabilities)
+    private suspend fun correlatorFramesAfterDispatch(): Int {
+        val transport = transport(setOf(ControllerSubagentRegistrySource.PUSH_CAPABILITY))
         val frames = CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
@@ -145,18 +145,13 @@ class IrohSubagentHostPushGatingTest {
     private fun ServerFrame.isHostPush(): Boolean = this is ServerFrame.SubagentsUpdated && reason == "registry"
 
     @Test
-    fun `correlator stays silent when the host pushes the registry`() = runBlocking {
-        assertEquals(0, correlatorFramesAfterDispatch(setOf(IrohObserverIngestor.SUBAGENT_PUSH_CAPABILITY)))
-    }
-
-    @Test
-    fun `correlator still emits against a host without the push`() = runBlocking {
-        assertEquals(1, correlatorFramesAfterDispatch(setOf(IrohChannelTransport.SUBAGENT_RPC_CAPABILITY)))
+    fun `correlator stays silent and the host push is the only writer`() = runBlocking {
+        assertEquals(0, correlatorFramesAfterDispatch())
     }
 
     @Test
     fun `host subagents_updated push is republished with its terminal entry`() = runBlocking {
-        val transport = transport(setOf(IrohObserverIngestor.SUBAGENT_PUSH_CAPABILITY))
+        val transport = transport(setOf(ControllerSubagentRegistrySource.PUSH_CAPABILITY))
         val frames = CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
@@ -169,10 +164,5 @@ class IrohSubagentHostPushGatingTest {
             collector.cancel()
             transport.disconnect()
         }
-    }
-
-    @Test
-    fun `client push capability matches the host constant`() {
-        assertEquals(ControllerSubagentRegistrySource.PUSH_CAPABILITY, IrohObserverIngestor.SUBAGENT_PUSH_CAPABILITY)
     }
 }

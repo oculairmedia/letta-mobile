@@ -83,9 +83,7 @@ object BackendConfigPolicy {
      * stale remote backend even though the UI and stored mode both say
      * "Local runtime".
      *
-     * Applied on every load (desktop) and every save ([normalize]) so a
-     * config already stuck in this state self-heals without the user having
-     * to hand-edit their settings file. Every other mode, and LOCAL configs
+     * Applied on every save ([normalize]). Every other mode, and LOCAL configs
      * that already have a blank or local-placeholder `serverUrl`, pass
      * through unchanged.
      */

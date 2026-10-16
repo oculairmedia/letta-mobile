@@ -3,12 +3,10 @@ package com.letta.mobile.feature.chat.coordination
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.BackendKind
-import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.api.IMessageRepository
 import com.letta.mobile.data.repository.api.ISlashCommandRepository
 import com.letta.mobile.data.session.SessionManager
-import com.letta.mobile.feature.chat.send.ChatSendContext
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -21,14 +19,11 @@ import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -199,23 +194,19 @@ class AdminChatComposerCoordinatorTest {
     @Test
     fun `interruptRun does nothing if not streaming`() = runTest {
         uiState.value = ChatUiState(isStreaming = false)
-        val clearThinking = mockk<() -> Unit>(relaxed = true)
-        
-        coordinator.interruptRun(clearThinking)
-        
-        verify(exactly = 0) { clearThinking.invoke() }
+        coordinator.interruptRun()
+
+        verify(exactly = 0) { chatBannerController.beginCancelling() }
     }
     
     @Test
     fun `interruptRun cancels message if streaming and not shim`() {
         uiState.value = ChatUiState(isStreaming = true)
-        val clearThinking = mockk<() -> Unit>(relaxed = true)
         coEvery { messageRepository.cancelMessage(eq(AgentId("agent_123")), any()) } returns emptyMap()
         
-        coordinator.interruptRun(clearThinking)
+        coordinator.interruptRun()
         testScope.runCurrent()
-        
-        verify { clearThinking.invoke() }
+
         // letta-mobile-lgns8.19: the UI enters CANCELLING — it is NOT optimistically
         // cleared. The idle transition happens on the terminal frame instead.
         verify { chatBannerController.beginCancelling() }

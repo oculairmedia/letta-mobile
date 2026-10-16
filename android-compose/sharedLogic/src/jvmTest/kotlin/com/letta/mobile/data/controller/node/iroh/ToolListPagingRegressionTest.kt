@@ -80,9 +80,8 @@ class ToolListPagingRegressionTest {
 
     @Test
     fun omittingLimitAndOffsetReturnsTheFullCatalogAsBareArray() = runTest {
-        // Back-compat property: legacy clients that pass neither param still get
-        // the full list as a bare array (mirrors block.list's "the whole set fits"
-        // back-compat shape). Older clients must remain decodable.
+        // A client that passes neither param (IrohAdminRpcToolSource.listTools)
+        // gets the full list as a bare array.
         val router = AdminRpcRouter()
         ToolAdminHandlers.register(router, store = null, nativeClient = null)
 

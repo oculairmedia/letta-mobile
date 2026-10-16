@@ -78,11 +78,9 @@ dependencies {
     implementation(libs.ktor.client.websockets)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
-    // letta-mobile-bn008.6: the a2a wiring binds a SECOND Endpoint directly
-    // (so we can add `/letta/a2a/0` alongside the app-server ALPN). Mirrors
-    // sharedLogic's `implementation` of the same artifact — `implementation`
-    // here keeps the surface tight while still letting the A2aWiring helper
-    // reach Endpoint/EndpointOptions/SecretKey. It also covers the
+    // The wrapper touches iroh types directly (A2aWiring publishes the host
+    // EndpointAddr; letta-mobile-by4vm.112 removed its second Endpoint). Mirrors
+    // sharedLogic's `implementation` of the same artifact. It also covers the
     // distribution's runtime classpath (the KDoc on `irohNativeBindingIs
     // OnTheDistributionRuntimeClasspath` test pins this).
     //
@@ -107,11 +105,6 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-    // letta-mobile-bn008.6: forward the opt-in flag for the live-QUIC a2a
-    // build probe. Native bind through iroh-ffi is flaky in CI runners and
-    // never useful for the default gate; A2aWiringTest gates the loopback
-    // cases via JUnit Assume unless this is "true".
-    System.getProperty("runIrohNativeE2E")?.let { systemProperty("runIrohNativeE2E", it) }
 }
 
 // sharedLogic's KMP variants can contribute same-named resources; keep the

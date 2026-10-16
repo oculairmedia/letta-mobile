@@ -20,10 +20,18 @@ import java.io.File
  * catalog from that, so before this adapter existed `skill.list` answered
  * `hydrated=false` forever and the Skills screen stayed empty.
  *
- * Skills are, however, plainly on disk: letta-code loads them from the skills
- * root (`LETTA_SKILLS_DIR`, default `~/.letta/skills`), one directory per skill,
- * each containing a `SKILL.md`. That directory IS the authoritative enumeration,
- * so this reads it directly.
+ * Skills are, however, plainly on disk: letta-code loads its global skills from
+ * `<LETTA_HOME>/skills` (default `~/.letta/skills`), one directory per skill, each
+ * containing a `SKILL.md`. That directory IS the authoritative enumeration of the
+ * global source, so this reads it directly.
+ *
+ * ## Controllability (letta-mobile skills-honest-controls)
+ *
+ * letta-code's `skill_disable` only unlinks a SYMLINK at `<LETTA_HOME>/skills/<name>`
+ * and refuses a real directory; `skill_enable` creates such a symlink. So an entry is
+ * `controllable` iff it is a symlink directly inside that control root — the same
+ * lstat rule letta-code applies. A real folder (or any entry when the enumerated root
+ * is not the control root) is listed read-only, never as a toggle that cannot work.
  *
  * ## Format (verified against the live root, 2026-08-01)
  *
@@ -37,9 +45,9 @@ import java.io.File
  * ```
  *
  * Frontmatter is optional — several live skills have none and open straight on a
- * `# Heading`. Both shapes are supported: `name` falls back to the directory name
- * (which is what letta-code addresses the skill by), and `description` falls back
- * to the first prose paragraph after any heading.
+ * `# Heading`. Both shapes are supported: `name` is always the directory name
+ * (what `skill_disable` addresses), and `description` falls back to the first
+ * prose paragraph after any heading.
  *
  * ## Safety
  *
@@ -63,12 +71,22 @@ object HostSkillsEnumerator {
     /** Bound on a projected description so a page of skills cannot approach the frame cap. */
     private const val DESCRIPTION_MAX_CHARS = 500
 
+    /** letta-code's home override; `skill_enable` / `skill_disable` act on `<LETTA_HOME>/skills`. */
+    const val LETTA_HOME_ENV: String = "LETTA_HOME"
+
+    /** Wire `source` of a host-enumerated skill: letta-code's global skills source. */
+    const val GLOBAL_SOURCE: String = "global"
+
     /**
-     * Default skills root when neither the CLI option nor [SKILLS_DIR_ENV] is set.
-     * `~/.letta/skills` is letta-code's own default.
+     * letta-code's skill control root, resolved as its skill handler does:
+     * `LETTA_HOME` when set, else `~/.letta`, plus `skills`. Also the default
+     * enumeration root when neither the CLI option nor [SKILLS_DIR_ENV] is set.
      */
-    fun defaultSkillsDir(): String =
-        File(File(System.getProperty("user.home") ?: "", ".letta"), "skills").path
+    fun defaultSkillsDir(env: (String) -> String? = System::getenv): String {
+        val home = env(LETTA_HOME_ENV)?.takeIf { it.isNotBlank() }
+            ?: File(System.getProperty("user.home") ?: "", ".letta").path
+        return File(home, "skills").path
+    }
 
     /**
      * Resolve the configured skills root: explicit option wins, then the env var,
@@ -79,7 +97,7 @@ object HostSkillsEnumerator {
         env: (String) -> String? = System::getenv,
     ): String = explicit?.takeIf { it.isNotBlank() }
         ?: env(SKILLS_DIR_ENV)?.takeIf { it.isNotBlank() }
-        ?: defaultSkillsDir()
+        ?: defaultSkillsDir(env)
 
     /**
      * Enumerate the skills root.
@@ -88,62 +106,66 @@ object HostSkillsEnumerator {
      *   or `null` when the root is absent/unreadable — which the caller MUST treat
      *   as "no authoritative enumeration" and leave the catalog unhydrated.
      */
-    fun enumerate(skillsDir: String): JsonArray? = enumerate(File(skillsDir))
+    fun enumerate(skillsDir: String, controlRoot: String = defaultSkillsDir()): JsonArray? =
+        enumerate(File(skillsDir), File(controlRoot))
 
-    fun enumerate(root: File): JsonArray? {
+    /**
+     * @param controlRoot letta-code's `<LETTA_HOME>/skills`; entries are controllable only when
+     *   [root] IS that directory (compared without resolving links, as letta-code joins paths)
+     *   and the entry itself is a symlink.
+     */
+    fun enumerate(root: File, controlRoot: File = File(defaultSkillsDir())): JsonArray? {
         if (!runCatching { root.isDirectory }.getOrDefault(false)) return null
+        val isControlRoot = root.absoluteFile.normalize() == controlRoot.absoluteFile.normalize()
         val entries = runCatching {
             root.listFiles()
                 ?.filter { it.isDirectory }
                 // Deterministic order: the same catalog every restart, so a client
                 // diff after a reconnect is meaningful.
                 ?.sortedBy { it.name }
-                ?.mapNotNull { projectSkill(it) }
+                ?.mapNotNull { projectSkill(it, controls = isControlRoot) }
                 .orEmpty()
         }.getOrElse { return null }
         return buildJsonArray { entries.forEach { add(it) } }
     }
 
-    private fun projectSkill(dir: File): kotlinx.serialization.json.JsonObject? {
-        val manifest = File(dir, MANIFEST_FILE)
+    private fun projectSkill(dir: File, controls: Boolean): kotlinx.serialization.json.JsonObject? {
         // A directory without a SKILL.md is not a skill (e.g. a stray `scripts/`
-        // sibling); skipping it keeps the catalog honest.
-        if (!runCatching { manifest.isFile }.getOrDefault(false)) return null
-        val front = runCatching { parseManifest(manifest) }.getOrDefault(ManifestFields())
+        // sibling); skipping it keeps the catalog honest. letta-code matches the
+        // manifest name case-insensitively, so `skill.md` counts too.
+        val manifest = manifestOf(dir) ?: return null
+        val description = runCatching { parseManifest(manifest) }.getOrNull()
         return buildJsonObject {
-            put("name", front.name?.takeIf { it.isNotBlank() } ?: dir.name)
-            front.description?.takeIf { it.isNotBlank() }?.let { put("description", it.take(DESCRIPTION_MAX_CHARS)) }
-            // `skill_path` is what native `skill_enable` accepts, so the client can
-            // round-trip an entry from this catalog straight into skill.install.
+            // The directory (link) name, not the frontmatter name: it is what
+            // `skill_disable {name}` addresses under the control root.
+            put("name", dir.name)
+            description?.takeIf { it.isNotBlank() }?.let { put("description", it.take(DESCRIPTION_MAX_CHARS)) }
             put("skill_path", dir.path)
-            put("source", "host_enumeration")
-            // letta-code's skill_disable only unlinks a symlink under the skills root
-            // and refuses a real directory, so only a symlinked skill is removable.
-            put("removable", runCatching { java.nio.file.Files.isSymbolicLink(dir.toPath()) }.getOrDefault(false))
+            put("source", GLOBAL_SOURCE)
+            put("controllable", controls && runCatching { java.nio.file.Files.isSymbolicLink(dir.toPath()) }.getOrDefault(false))
         }
     }
 
-    private class ManifestFields(val name: String? = null, val description: String? = null)
+    private fun manifestOf(dir: File): File? = runCatching {
+        File(dir, MANIFEST_FILE).takeIf { it.isFile }
+            ?: dir.listFiles()?.firstOrNull { it.isFile && it.name.equals(MANIFEST_FILE, ignoreCase = true) }
+    }.getOrNull()
 
     /**
-     * Minimal, dependency-free YAML-frontmatter read. Only scalar `name:` /
-     * `description:` on the top level are needed; anything else is ignored rather
-     * than pulling a YAML parser into sharedLogic for two fields.
+     * Minimal, dependency-free YAML-frontmatter read. Only a top-level scalar
+     * `description:` is needed; anything else is ignored rather than pulling a YAML
+     * parser into sharedLogic for one field.
      */
-    private fun parseManifest(manifest: File): ManifestFields {
+    private fun parseManifest(manifest: File): String? {
         val lines = manifest.useLines { seq -> seq.take(DESCRIPTION_SCAN_LINES).toList() }
         if (lines.firstOrNull()?.trim() == "---") {
             val end = lines.drop(1).indexOfFirst { it.trim() == "---" }
             if (end >= 0) {
                 val front = lines.subList(1, end + 1)
-                return ManifestFields(
-                    name = scalar(front, "name"),
-                    description = scalar(front, "description")
-                        ?: firstProse(lines.drop(end + 2)),
-                )
+                return scalar(front, "description") ?: firstProse(lines.drop(end + 2))
             }
         }
-        return ManifestFields(name = null, description = firstProse(lines))
+        return firstProse(lines)
     }
 
     private fun scalar(front: List<String>, key: String): String? {
