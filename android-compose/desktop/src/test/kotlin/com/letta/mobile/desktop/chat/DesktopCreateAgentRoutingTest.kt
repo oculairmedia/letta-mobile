@@ -109,7 +109,6 @@ class DesktopCreateAgentRoutingTest {
             scope = this,
             gatewayFactory = { gateway },
             agentByIdProvider = { ids -> agentsById.filterKeys(ids::contains) },
-            timelinePersistence = noOpDesktopTimelinePersistence,
         )
 
     private fun TestScope.startAndCreate(
