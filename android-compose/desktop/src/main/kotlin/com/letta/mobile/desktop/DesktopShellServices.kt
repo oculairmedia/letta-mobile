@@ -25,9 +25,8 @@ import com.letta.mobile.desktop.canvas.rememberDesktopCanvasShell
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
-import com.letta.mobile.desktop.data.DesktopChatDockGeometryStore
+import com.letta.mobile.desktop.data.DesktopPreferences
 import com.letta.mobile.desktop.data.DesktopSessionGraph
-import com.letta.mobile.desktop.data.DesktopShellLayoutStore
 import com.letta.mobile.desktop.phone.LocalDesktopPhone
 import com.letta.mobile.desktop.phone.reducedMotionOr
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
@@ -135,8 +134,7 @@ internal fun rememberDesktopShellCore(): DesktopShellCore {
  */
 @Composable
 private fun rememberDesktopShellLayout(backendConfigId: String): DesktopShellLayout {
-    val store = remember { DesktopShellLayoutStore() }
-    val controller = rememberDesktopShellLayoutController(backendConfigId = backendConfigId, store = store)
+    val controller = rememberDesktopShellLayoutController(backendConfigId)
     // The phone preview brings its own reduced-motion preset; the desktop follows the OS.
     val reducedMotion = LocalDesktopPhone.current.reducedMotionOr(remember { desktopPrefersReducedMotion() })
     SidebarToggleKeyDispatcherEffect(
@@ -218,7 +216,7 @@ internal fun rememberDesktopShellPanels(core: DesktopShellCore, chatState: Deskt
         skills = skills,
         agentSlashCommands = agentSlashCommands,
         subagents = subagents,
-        chatDockGeometry = rememberChatDockGeometry(remember { DesktopChatDockGeometryStore().asLayoutPrefStorage() }),
+        chatDockGeometry = rememberChatDockGeometry(DesktopPreferences.chatDock),
         libraries = rememberDesktopLibraryControllers(
             sessionGraphId = sessionGraph.id,
             sessionGraphProvider = core.bootstrap.dataBindings.sessionGraphProvider,

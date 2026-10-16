@@ -30,7 +30,7 @@ internal class NotebookStorageHealth(
     private val lock: (() -> Unit) -> Unit,
     private val archive: NotebookHistoryArchive = NotebookHistoryArchive(storageRoot),
 ) : AutoCloseable {
-    val faults = NotebookStorageFaults()
+    val faults = CanvasStorageFaults()
     private val quarantined = ConcurrentHashMap.newKeySet<String>()
     private val canvases = ConcurrentHashMap<String, CanvasId>()
     private val budgetLevel = ConcurrentHashMap<String, BudgetLevel>()
@@ -223,7 +223,7 @@ internal class NotebookStorageHealth(
             val documentKey = retired.firstOrNull { archive.storageName(it) == name } ?: name
             if (retiredOffers.add(documentKey)) {
                 Telemetry.event(
-                    NotebookStorageFaults.TAG, "retired_document_refused",
+                    CanvasStorageFaults.TAG, "retired_document_refused",
                     "documentId" to documentKey,
                     "reason" to "moved to a new document; a peer's copy is not stored",
                     level = Telemetry.Level.WARN,

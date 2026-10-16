@@ -34,11 +34,10 @@ import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
+import com.letta.mobile.data.chat.display.ChatFontScale
 import com.letta.mobile.desktop.LocalDesktopChatFontScale
 import com.letta.mobile.desktop.LocalDesktopChatFontScaleSetter
 import com.letta.mobile.desktop.LocalDesktopOpenChatsOnCanvas
-import com.letta.mobile.desktop.MAX_CHAT_FONT_SCALE
-import com.letta.mobile.desktop.MIN_CHAT_FONT_SCALE
 import com.letta.mobile.desktop.OpenDesktopCanvasParams
 import com.letta.mobile.desktop.canvas.DesktopCanvasHostSync
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
@@ -223,7 +222,7 @@ private fun rememberDesktopChatAppearance(displayOptions: ChatDisplayOptions): C
             fontScale = fontScale,
             // The font-scale host already scales the window's text through density.
             fontScaleAppliedByHost = true,
-            fontScaleRange = MIN_CHAT_FONT_SCALE..MAX_CHAT_FONT_SCALE,
+            fontScaleRange = ChatFontScale.MIN..ChatFontScale.MAX,
         )
     }
 }

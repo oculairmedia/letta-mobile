@@ -22,7 +22,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.ProvideLettaHost
@@ -47,6 +46,7 @@ import com.letta.mobile.web.chat.WebSharedChatPage
 import com.letta.mobile.web.chat.rememberWebChatLoad
 import com.letta.mobile.web.data.WasmAppServerClientGateway
 import com.letta.mobile.web.data.WebSettingsStore
+import com.letta.mobile.web.storage.WebStorage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -56,17 +56,16 @@ import kotlin.time.Clock
  * shared navigation ([ShellNavDrawer]: the agent rail and the agent panel) beside the page, as the
  * desktop does; narrow ones put it in a modal drawer, as Android does. The pages are the shared chat
  * page and the shared Settings page. What stays web-side is the binding: the App Server gateway,
- * the browser's settings storage and the in-memory canvas store.
+ * and the browser's storage ([WebStorage]).
  */
 @Composable
 fun LettaWebApp() {
     val scope = rememberCoroutineScope()
     val gateway = remember { WasmAppServerClientGateway(scope) }
-    val settingsStore = remember { WebSettingsStore() }
-    val savedSettings = remember(settingsStore) { settingsStore.load() }
-    val shell = remember { WebShellState(savedSettings.config) }
-    // letta-mobile-o4ygk.4.5: boards live in memory for the tab's lifetime (no web persistence yet).
-    val canvas = remember { WebChatCanvas(InMemoryCanvasDocumentStore(), savedSettings.openChatsOnCanvas) }
+    val storage = remember { WebStorage() }
+    val settingsStore = remember { WebSettingsStore(storage.settings) }
+    val shell = remember { WebShellState(settingsStore.load()) }
+    val canvas = remember { storage.chatCanvas() }
     val connection by gateway.state.collectAsState()
     LoadRoster(gateway, shell)
     LaunchedEffect(Unit) { shell.openRoute(kotlinx.browser.window.location.hash.removePrefix("#")) }

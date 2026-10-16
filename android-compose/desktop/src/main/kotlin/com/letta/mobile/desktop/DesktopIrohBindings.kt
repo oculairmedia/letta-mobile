@@ -7,6 +7,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import com.letta.mobile.data.chat.runtime.ArchivedConversations
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.repository.SubagentRepository
@@ -30,7 +32,6 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 
 internal const val DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS = 30_000L
-internal const val ARCHIVED_CONVERSATION_IDS_KEY = "conversations.archived_ids"
 private const val DESKTOP_DEVICE_ID = "letta-desktop"
 
 private fun desktopIrohConnectConfig(config: LettaConfig): IrohConnectConfig =
@@ -270,6 +271,7 @@ private fun buildDesktopChatController(
     val agentRepository = {
         runtime.dataBindings.sessionGraphProvider.current.ifSupported(SessionRoute.AGENTS) { agentRepository }
     }
+    val archived = ArchivedConversations(bindings.secureSettingsStore)
     return DesktopChatController(
         bootstrapState = runtime.bootstrapState,
         scope = runtime.chatScope,
@@ -299,10 +301,8 @@ private fun buildDesktopChatController(
         agentByIdProvider = { agentIds ->
             agentRepository()?.let { resolveDesktopAgents(agentIds, it) }.orEmpty()
         },
-        loadArchivedConversationIds = { loadArchivedConversationIds(bindings.secureSettingsStore) },
-        persistArchivedConversationIds = { ids ->
-            persistArchivedConversationIds(bindings.secureSettingsStore, ids)
-        },
+        loadArchivedConversationIds = { archived.load().mapTo(mutableSetOf()) { it.value } },
+        persistArchivedConversationIds = { ids -> archived.save(ids.mapTo(mutableSetOf(), ::ConversationId)) },
         // Conversations created or changed on another device arrive as Meridian pushes.
         conversationChanges = bindings.irohTransport,
         conversationPrefs = com.letta.mobile.desktop.chat.DesktopConversationPrefs.from(bindings.secureSettingsStore),

@@ -1706,8 +1706,6 @@
     <ID>SpreadOperator:IrohAppServerTransport.kt$IrohAppServerTransport$("IrohTransport", "connect.ok", *IrohDiagnostics.connectionAttributes(connection).toTypedArray())</ID>
     <ID>SpreadOperator:IrohAppServerTransport.kt$IrohAppServerTransport.&lt;no name provided&gt;$( "IrohTransport", "path.event", "remoteEndpointId" to (attrs.firstOrNull { it.first == "remoteEndpointId" }?.second ?: ""), *IrohDiagnostics.pathEventAttributes(event).toTypedArray(), )</ID>
     <ID>SpreadOperator:IrohNodeConnection.kt$IrohNodeConnection$( "IrohNode", "connection.closed", "remoteEndpointId" to remoteEndpointId, "closeReason" to IrohDiagnostics.closeReason(connection), *IrohDiagnostics.connectionStatsAttributes(runCatching { connection.stats() }.getOrNull()).toTypedArray(), )</ID>
-    <ID>SpreadOperator:NotebookStorageFaults.kt$NotebookStorageFaults$(TAG, fault.kind.name.lowercase(), *attrs, level = level)</ID>
-    <ID>SpreadOperator:NotebookStorageFaults.kt$NotebookStorageFaults$(TAG, fault.kind.name.lowercase(), throwable, *attrs)</ID>
     <ID>SpreadOperator:PluginHostEvents.kt$PluginHostEvents$(TAG, event.eventName, *attrs, durationMs = durationMs, level = level)</ID>
     <ID>SpreadOperator:RosterNameTelemetry.kt$RosterNameTelemetry$( CATEGORY, "roster.completeness", *attrs.toTypedArray(), level = completenessLevel(outcome), )</ID>
     <ID>SpreadOperator:RosterNameTelemetry.kt$RosterNameTelemetry$( CATEGORY, "roster.sweepStopped", *attrs.toTypedArray(), level = stop.level, )</ID>

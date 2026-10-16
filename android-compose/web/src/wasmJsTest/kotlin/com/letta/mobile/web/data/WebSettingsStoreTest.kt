@@ -1,61 +1,42 @@
 package com.letta.mobile.web.data
 
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.storage.InMemorySecureSettingsStore
+import com.letta.mobile.web.storage.LocalStorageSettingsStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
-/** letta-mobile-o4ygk.4.5: the web's settings survive a reload, the access token does not. */
+/** letta-mobile-o4ygk.4.5: the web's backend survives a reload, the access token does not. */
 class WebSettingsStoreTest {
     @Test
     fun theBackendAddressSurvivesAReloadButTheTokenDoesNot() {
-        val slot = MemorySlot()
-        WebSettingsStore(slot).saveBackend(
+        val settings = InMemorySecureSettingsStore()
+        WebSettingsStore(settings).saveBackend(
             LettaConfig(id = "default", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "wss://example.test/ws", accessToken = "secret"),
         )
 
-        val config = WebSettingsStore(slot).load().config
+        val config = WebSettingsStore(settings).load()
 
         assertEquals("wss://example.test/ws", config.serverUrl)
         assertEquals(LettaConfig.Mode.SELF_HOSTED, config.mode)
         assertNull(config.accessToken)
-        assertFalse(slot.document?.json.orEmpty().contains("secret"))
     }
 
     @Test
-    fun conversationsOpenOnTheCanvasUntilTurnedOff() {
-        val store = WebSettingsStore(MemorySlot())
-        assertTrue(store.load().openChatsOnCanvas)
+    fun anUnknownStoredModeReadsAsTheDefault() {
+        val config = WebSettingsStore(InMemorySecureSettingsStore(mapOf("backend.mode" to "NOT_A_MODE"))).load()
 
-        store.save(store.load().copy(openChatsOnCanvas = false))
-
-        assertFalse(store.load().openChatsOnCanvas)
+        assertEquals(LettaConfig.Mode.SELF_HOSTED, config.mode)
     }
 
     @Test
-    fun savingTheBackendKeepsTheOtherSettings() {
-        val store = WebSettingsStore(MemorySlot())
-        store.save(WebSavedSettings(openChatsOnCanvas = false))
+    fun localStorageNeverHoldsATokenKey() {
+        val store = LocalStorageSettingsStore(prefix = "letta.web.test.")
+        store.putString("letta.config.accessToken", "secret")
 
-        store.saveBackend(LettaConfig(id = "default", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "ws://h/ws", accessToken = null))
-
-        assertEquals(WebSavedSettings(serverUrl = "ws://h/ws", openChatsOnCanvas = false), store.load())
-    }
-
-    @Test
-    fun unreadableStoredSettingsReadAsTheDefaults() {
-        val store = WebSettingsStore(MemorySlot(WebSettingsDocument("not json")))
-
-        assertEquals(WebSavedSettings(), store.load())
-    }
-
-    private class MemorySlot(var document: WebSettingsDocument? = null) : WebSettingsSlot {
-        override fun read(): WebSettingsDocument? = document
-
-        override fun write(document: WebSettingsDocument?) {
-            this.document = document
-        }
+        assertEquals("secret", store.getString("letta.config.accessToken"))
+        assertNull(kotlinx.browser.localStorage.getItem("letta.web.test.letta.config.accessToken"))
+        store.clear()
     }
 }
