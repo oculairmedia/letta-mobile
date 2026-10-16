@@ -17,6 +17,8 @@ class AppServerTurnStackSpec(
     val onPermissionModeInForce: (AppServerRuntimeScope, AppServerPermissionMode) -> AppServerPermissionMode? = { _, _ -> null },
     val requestIdFactory: () -> String = AppServerTurnEngine.defaultRequestId,
     val externalToolRegistry: ExternalToolRegistry? = null,
+    /** letta-mobile-jvctq: false leaves every approval to the person (a client that must never answer one). */
+    val autoAllowApprovals: Boolean = true,
 )
 
 /** letta-mobile-by4vm.90: the client -> router -> engine stack of desktop, web and Android Iroh: attaches, then [turnEngine]. */
@@ -44,4 +46,5 @@ fun AppServerRuntimeEventRouter.turnEngine(
     externalToolRegistry = spec.externalToolRegistry,
     eventRouter = this,
     connectionGenerationProvider = connectionGenerationProvider,
+    autoAllowApprovals = spec.autoAllowApprovals,
 ).also { engine -> engine.answerApprovalReplaysFrom(this, scope) }
