@@ -11,6 +11,7 @@ import com.letta.mobile.data.plugin.view.PluginViewPageRef
 import com.letta.mobile.data.plugin.view.PluginViewTransport
 import com.letta.mobile.data.plugin.view.PluginViewUnavailableException
 import com.letta.mobile.data.repository.IrohAdminRpcClient
+import com.letta.mobile.data.serialization.LettaJson
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.buildJsonObject
@@ -33,7 +34,8 @@ class AdminRpcPluginViewTransport(private val link: PluginAdminLink) : PluginVie
             put(PluginAdminRpc.PAGE_ID, page.pageId)
             put(PluginAdminRpc.VERSION, page.version)
         }
-        return link.call(PluginAdminRpc.PAGE_READ, params).read { PluginAdminRpc.json.decodeFromJsonElement(PluginPageWire.serializer(), it) }
+        return link.call(PluginAdminRpc.PAGE_READ, params)
+            .read { LettaJson.wire.decodeFromJsonElement(PluginPageWire.serializer(), it) }
     }
 
     override suspend fun readPage(page: PluginViewPageRef): ByteArray = when (val read = page(page)) {
@@ -44,9 +46,9 @@ class AdminRpcPluginViewTransport(private val link: PluginAdminLink) : PluginVie
     override suspend fun action(call: PluginViewActionCall): PluginViewActionOutcome {
         if (!link.supportsPlugins) return PluginViewActionOutcome.Unavailable(PLUGINS_UNSUPPORTED)
         val wire = PluginViewActionWire(call.pluginId, call.canvasId, call.elementId, call.action, call.input)
-        val params = PluginAdminRpc.json.encodeToJsonElement(PluginViewActionWire.serializer(), wire).jsonObject
+        val params = LettaJson.wire.encodeToJsonElement(PluginViewActionWire.serializer(), wire).jsonObject
         val answer = link.call(PluginAdminRpc.VIEW_ACTION, params)
-            .read { PluginAdminRpc.json.decodeFromJsonElement(PluginViewAnswerWire.serializer(), it) }
+            .read { LettaJson.wire.decodeFromJsonElement(PluginViewAnswerWire.serializer(), it) }
         return when (answer) {
             is PluginCatalogResult.Refused -> PluginViewActionOutcome.Failed(answer.reason)
             is PluginCatalogResult.Ok -> outcome(answer.value)

@@ -8,7 +8,6 @@ import com.letta.mobile.data.plugin.PluginPage
 import com.letta.mobile.data.plugin.PluginState
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -18,6 +17,10 @@ import kotlinx.serialization.json.JsonObject
  * disableAll) is admin-only; `plugins.page.read` and `plugins.view.action` are what a live view on
  * the canvas needs. A host with a plugin runtime advertises [CAPABILITY]; a client never sends
  * these to a host that does not.
+ *
+ * Both ends encode and decode these bodies with [com.letta.mobile.data.serialization.LettaJson.wire]
+ * (letta-mobile-by4vm.102): defaults and nulls are left out, unknown keys are ignored, and plugin
+ * states, health and runtimes say which they are with `"kind"` (declared on those types).
  */
 object PluginAdminRpc {
     const val CAPABILITY = "plugins_v1"
@@ -42,14 +45,6 @@ object PluginAdminRpc {
     const val SHA256 = "sha256"
     const val PAGE_ID = "page_id"
     const val VERSION = "version"
-
-    /** The wire's JSON: plugin states and health as `{"kind": ...}`, nulls and unknown keys tolerated. */
-    val json: Json = Json {
-        classDiscriminator = "kind"
-        encodeDefaults = true
-        explicitNulls = false
-        ignoreUnknownKeys = true
-    }
 }
 
 /** One installed plugin as the host reports it. */

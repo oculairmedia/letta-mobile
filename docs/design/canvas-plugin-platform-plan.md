@@ -240,6 +240,8 @@ Methods (`plugins.*`), authorised for peers the `IrohAuthPolicy` admits as owner
 | `plugins.health` | `{pluginId?}` → health per plugin |
 | `plugins.events.subscribe` | → a stream of registry changes (install/update/state/health) on the existing App Server event fan-out (`RuntimeEventFanout`) so the settings UI is live |
 
+Wire encoding (letta-mobile-by4vm.102): params and results are `LettaJson.wire` on both ends, so defaults and nulls are omitted, unknown keys ignored, and `PluginState`/`PluginHealth`/`PluginRuntime` carry a `"kind"` discriminator. `PluginAdminRpcWireBytesTest` pins the bytes; a change to them is a protocol change and needs the wrapper redeployed with the client.
+
 Package upload uses the relay's asset path (chunked, sha256-verified, 50 MiB cap) on a management topic (`plugins:<hostNodeId>`), so no new transport is needed. Audit: every management call is logged with the peer id.
 
 ---

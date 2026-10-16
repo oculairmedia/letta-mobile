@@ -12,6 +12,7 @@ import com.letta.mobile.data.plugin.catalog.PluginPluginsWire
 import com.letta.mobile.data.plugin.catalog.PluginSummary
 import com.letta.mobile.data.plugin.catalog.PluginSummaryWire
 import com.letta.mobile.data.repository.IrohAdminRpcClient
+import com.letta.mobile.data.serialization.LettaJson
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -92,11 +93,11 @@ class AdminRpcPluginCatalog(private val link: PluginAdminLink, private val uploa
 
     /** The registry in [answer] becomes [plugins]. */
     private fun listed(answer: PluginCatalogResult<JsonElement>): PluginCatalogResult<Unit> = answer.read { result ->
-        publish(PluginAdminRpc.json.decodeFromJsonElement(PluginPluginsWire.serializer(), result).plugins)
+        publish(LettaJson.wire.decodeFromJsonElement(PluginPluginsWire.serializer(), result).plugins)
     }
 
     private fun inspected(result: JsonElement): PluginInspectWire =
-        PluginAdminRpc.json.decodeFromJsonElement(PluginInspectWire.serializer(), result).also { publish(it.plugins) }
+        LettaJson.wire.decodeFromJsonElement(PluginInspectWire.serializer(), result).also { publish(it.plugins) }
 
     private fun publish(plugins: List<PluginSummaryWire>) {
         state.value = plugins.map(PluginSummaryWire::toSummary)

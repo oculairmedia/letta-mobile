@@ -1,16 +1,20 @@
 package com.letta.mobile.data.plugin
 
 import com.letta.mobile.data.model.PluginId
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonClassDiscriminator
 
 /**
  * Where an installed plugin is in its life (plan section 6.2): installed but off, enabled (its tools
  * advertised), active (its driver running), faulted (its actions answer with an error, its elements
  * stay as fallback cards), or updating (a new version staged, the old one kept for rollback).
  */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
+@JsonClassDiscriminator("kind")
 sealed interface PluginState {
     @Serializable @SerialName("installed")
     data object Installed : PluginState
@@ -32,7 +36,9 @@ sealed interface PluginState {
 }
 
 /** What the plugin last said about itself (`health()` / `plugin.health`). */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
+@JsonClassDiscriminator("kind")
 sealed interface PluginHealth {
     @Serializable @SerialName("unknown")
     data object Unknown : PluginHealth
@@ -124,7 +130,6 @@ data class PluginRegistryState(val plugins: List<InstalledPlugin> = emptyList())
 
     companion object {
         private val json = Json {
-            classDiscriminator = "kind"
             encodeDefaults = true
             explicitNulls = false
         }

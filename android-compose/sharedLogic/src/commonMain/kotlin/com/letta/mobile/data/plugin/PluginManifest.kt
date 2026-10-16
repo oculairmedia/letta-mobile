@@ -1,9 +1,11 @@
 package com.letta.mobile.data.plugin
 
 import com.letta.mobile.data.model.PluginId
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -48,7 +50,9 @@ data class PluginManifest(
 data class PluginContract(val version: Int)
 
 /** Where the plugin's code runs (plan section 1): in the host, as a subprocess, or as a service. */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
+@JsonClassDiscriminator("kind")
 sealed interface PluginRuntime {
     /** A jar implementing the Kotlin SPI, loaded by the host in an isolated class loader (R1: consented code). */
     @Serializable

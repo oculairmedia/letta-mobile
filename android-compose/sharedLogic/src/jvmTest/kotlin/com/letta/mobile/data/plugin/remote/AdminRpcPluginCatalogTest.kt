@@ -6,6 +6,7 @@ import com.letta.mobile.data.plugin.PluginState
 import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 import com.letta.mobile.data.plugin.catalog.PluginCatalogResult
 import com.letta.mobile.data.plugin.catalog.PluginSummary
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -83,7 +84,7 @@ class AdminRpcPluginCatalogTest {
             listOf(com.letta.mobile.data.plugin.catalog.PluginSummaryWire("letta.chart", "Chart", "1.2.0", PluginState.Active, manifest = manifest)),
         )
         val catalog = AdminRpcPluginCatalog(
-            CannedLink(PluginAdminRpc.json.encodeToJsonElement(com.letta.mobile.data.plugin.catalog.PluginPluginsWire.serializer(), wire)),
+            CannedLink(LettaJson.wire.encodeToJsonElement(com.letta.mobile.data.plugin.catalog.PluginPluginsWire.serializer(), wire)),
         ) { _, _ -> error("unused") }
 
         catalog.refresh()

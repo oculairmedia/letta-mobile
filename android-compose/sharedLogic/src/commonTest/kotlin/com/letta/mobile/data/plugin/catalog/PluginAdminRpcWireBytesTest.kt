@@ -1,9 +1,13 @@
 package com.letta.mobile.data.plugin.catalog
 
 import com.letta.mobile.data.plugin.PluginCapability
+import com.letta.mobile.data.plugin.PluginContract
 import com.letta.mobile.data.plugin.PluginHealth
+import com.letta.mobile.data.plugin.PluginManifest
 import com.letta.mobile.data.plugin.PluginPage
+import com.letta.mobile.data.plugin.PluginRuntime
 import com.letta.mobile.data.plugin.PluginState
+import com.letta.mobile.data.serialization.LettaJson
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -11,22 +15,17 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * letta-mobile-by4vm.76: the exact bytes the `plugins.*` admin RPCs put on the wire today, pinned
- * before anyone moves [PluginAdminRpc.json] to a canonical `LettaJson` instance. None of the
- * three matches it: they keep the default `"type"` discriminator, and only `persisted` writes
- * defaults, but it also writes nulls. A host and a client of different builds talk through these
- * shapes, so a change here is a protocol change, not a refactor.
- *
- * Pinned: states and health as `{"kind": ...}`, every default written (`"health":{"kind":"unknown"}`,
- * `"consented":false`, empty lists and maps, the page's default `csp` and `displayModes`), and
- * nulls left out (`last_fault`, `manifest`, an answer's unset `text`/`structured`).
+ * letta-mobile-by4vm.102: the exact bytes the `plugins.*` admin RPCs put on the wire, written and
+ * read back with [LettaJson.wire], the one Json both the host's handlers and the clients use.
+ * Plugin states, health and runtimes say which they are with `"kind"`; defaults and nulls are left
+ * out (a decoder fills them in). A host and a client talk through these shapes, so a change here
+ * is a protocol change: the wrapper is redeployed with it.
  */
 class PluginAdminRpcWireBytesTest {
     @Test
-    fun aSummaryWritesItsDefaultsAndLeavesOutItsNulls() {
+    fun aSummaryLeavesOutItsDefaultsAndNulls() {
         assertBytes(
-            """{"id":"letta.chart","name":"Chart","version":"1.2.0","state":{"kind":"faulted","reason":"exit 1"},""" +
-                """"health":{"kind":"unknown"},"consented":false}""",
+            """{"id":"letta.chart","name":"Chart","version":"1.2.0","state":{"kind":"faulted","reason":"exit 1"}}""",
             PluginSummaryWire.serializer(),
             summary(PluginState.Faulted("exit 1")),
         )
@@ -41,28 +40,37 @@ class PluginAdminRpcWireBytesTest {
         assertBytes(
             """{"plugin":$activeJson,""" +
                 """"request":{"id":"letta.chart","name":"Chart","version":"1.2.0","publisher":"Letta","sha256":"ab12",""" +
-                """"runtime_kind":"process","capabilities":["canvas:place"],"origins":[],"pages":[]},""" +
-                """"plugins":[$activeJson],"newly_installed":false}""",
+                """"runtime_kind":"process","capabilities":["canvas:place"]},"plugins":[$activeJson]}""",
             PluginInspectWire.serializer(),
             PluginInspectWire(active, request, listOf(active)),
         )
     }
 
     @Test
-    fun aPageWritesItsManifestEntryWithEveryDefault() {
+    fun aSummaryManifestNamesItsRuntimeByKind() {
+        val manifest = PluginManifest(1, "letta.chart", "Chart", "1.2.0", "Letta", PluginContract(1), PluginRuntime.Process("sh"))
         assertBytes(
-            """{"plugin_id":"letta.chart","version":"1.2.0","page_id":"main","document":"PGh0bWw+",""" +
-                """"page":{"html":"main.html","csp":{"connectDomains":[],"resourceDomains":[],"frameDomains":[]},""" +
-                """"permissions":[],"displayModes":["inline"]},"view_actions":{}}""",
+            """{"id":"letta.chart","name":"Chart","version":"1.2.0","state":{"kind":"installed"},"manifest":""" +
+                """{"manifestVersion":1,"id":"letta.chart","name":"Chart","version":"1.2.0","publisher":"Letta",""" +
+                """"contract":{"version":1},"runtime":{"kind":"process","command":"sh"}}}""",
+            PluginSummaryWire.serializer(),
+            summary(PluginState.Installed).copy(manifest = manifest),
+        )
+    }
+
+    @Test
+    fun aPageCarriesOnlyWhatDiffersFromTheManifestDefaults() {
+        assertBytes(
+            """{"plugin_id":"letta.chart","version":"1.2.0","page_id":"main","document":"PGh0bWw+","page":{"html":"main.html"}}""",
             PluginPageWire.serializer(),
             PluginPageWire("letta.chart", "1.2.0", "main", "PGh0bWw+", PluginPage("main.html")),
         )
     }
 
     @Test
-    fun aViewActionWritesAnEmptyInput() {
+    fun aViewActionLeavesOutAnEmptyInput() {
         assertBytes(
-            """{"plugin_id":"letta.chart","canvas_id":"canvas-1","element_id":"p-letta.chart-e1","action":"refresh","input":{}}""",
+            """{"plugin_id":"letta.chart","canvas_id":"canvas-1","element_id":"p-letta.chart-e1","action":"refresh"}""",
             PluginViewActionWire.serializer(),
             PluginViewActionWire("letta.chart", "canvas-1", "p-letta.chart-e1", "refresh"),
         )
@@ -82,17 +90,10 @@ class PluginAdminRpcWireBytesTest {
         )
     }
 
-    /** What a future switch to `encodeDefaults = false` relies on: a peer that leaves defaults out is read the same. */
-    @Test
-    fun aSummaryWithoutItsDefaultsDecodesToTheSameValue() {
-        val bare = """{"id":"letta.chart","name":"Chart","version":"1.2.0","state":{"kind":"installed"}}"""
-        assertEquals(summary(PluginState.Installed), PluginAdminRpc.json.decodeFromString(PluginSummaryWire.serializer(), bare))
-    }
-
     private fun summary(state: PluginState) = PluginSummaryWire("letta.chart", "Chart", "1.2.0", state)
 
     private fun <T> assertBytes(expected: String, serializer: KSerializer<T>, value: T) {
-        assertEquals(expected, PluginAdminRpc.json.encodeToString(serializer, value))
-        assertEquals(value, PluginAdminRpc.json.decodeFromString(serializer, expected))
+        assertEquals(expected, LettaJson.wire.encodeToString(serializer, value))
+        assertEquals(value, LettaJson.wire.decodeFromString(serializer, expected))
     }
 }

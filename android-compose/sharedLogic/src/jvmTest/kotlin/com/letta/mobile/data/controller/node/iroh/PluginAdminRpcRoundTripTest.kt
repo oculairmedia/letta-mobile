@@ -9,7 +9,11 @@ import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 import com.letta.mobile.data.plugin.catalog.PluginCatalogResult
 import com.letta.mobile.data.plugin.catalog.PluginGrants
 import com.letta.mobile.data.plugin.catalog.PluginInstallRequest
+import com.letta.mobile.data.plugin.catalog.PluginInspectWire
 import com.letta.mobile.data.plugin.catalog.PluginPageWire
+import com.letta.mobile.data.plugin.catalog.PluginPluginsWire
+import com.letta.mobile.data.plugin.catalog.PluginViewActionWire
+import com.letta.mobile.data.plugin.catalog.PluginViewAnswerWire
 import com.letta.mobile.data.plugin.host.FakeLcpPlugin
 import com.letta.mobile.data.plugin.host.PluginHostFixture
 import com.letta.mobile.data.plugin.host.PluginHostRuntime
@@ -23,6 +27,7 @@ import com.letta.mobile.data.plugin.view.PluginViewActionCall
 import com.letta.mobile.data.plugin.view.PluginViewActionOutcome
 import com.letta.mobile.data.plugin.view.PluginViewPageRef
 import com.letta.mobile.data.plugin.view.PluginViewUnavailableException
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.storage.InMemoryAssetStore
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -33,8 +38,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -171,6 +180,36 @@ class PluginAdminRpcRoundTripTest {
         assertTrue(link.calls.isEmpty(), "a host without plugins_v1 is never sent plugins.*")
     }
 
+    /**
+     * letta-mobile-by4vm.102: the client and the host agree on every `plugins.*` body. What the real
+     * host wrote, and what the client sent, read back with [LettaJson.wire] and write the very same
+     * JSON again, so neither end writes a default or a discriminator the other would not.
+     */
+    @Test
+    fun clientAndHostWriteTheSameWireShape() = withHost { host ->
+        val link = host.link(admin)
+        val catalog = AdminRpcPluginCatalog(link, host.uploader)
+        assertIs<PluginCatalogResult.Ok<*>>(catalog.install(PACKAGE, SHA256))
+        assertEquals(PluginCatalogResult.Ok(Unit), catalog.consent(id, grants))
+        assertEquals(PluginCatalogResult.Ok(Unit), catalog.enable(id))
+        val view = AdminRpcPluginViewTransport(link)
+        assertIs<PluginCatalogResult.Ok<*>>(view.page(PluginViewPageRef(PLUGIN, "1.0.0", PAGE)))
+        view.action(viewCall("toggle"))
+
+        assertAgrees(link.answers.getValue(PluginAdminRpc.INSTALL), PluginInspectWire.serializer())
+        assertAgrees(link.answers.getValue(PluginAdminRpc.ENABLE), PluginPluginsWire.serializer())
+        assertAgrees(link.answers.getValue(PluginAdminRpc.PAGE_READ), PluginPageWire.serializer())
+        assertAgrees(link.answers.getValue(PluginAdminRpc.VIEW_ACTION), PluginViewAnswerWire.serializer())
+        assertAgrees(link.sent.getValue(PluginAdminRpc.VIEW_ACTION), PluginViewActionWire.serializer())
+        val installed = link.answers.getValue(PluginAdminRpc.INSTALL).jsonObject.getValue("plugin").jsonObject
+        assertEquals(JsonObject(mapOf("kind" to JsonPrimitive("installed"))), installed["state"])
+        assertFalse("consented" in installed, "a default is left out")
+        assertFalse("input" in link.sent.getValue(PluginAdminRpc.VIEW_ACTION), "an empty input is left out")
+    }
+
+    private fun <T> assertAgrees(bytes: JsonElement, serializer: KSerializer<T>) =
+        assertEquals(bytes, LettaJson.wire.encodeToJsonElement(serializer, LettaJson.wire.decodeFromJsonElement(serializer, bytes)))
+
     private fun viewCall(action: String, input: JsonObject = JsonObject(emptyMap())) =
         PluginViewActionCall(PLUGIN, "canvas-1", "element-1", action, input)
 
@@ -211,10 +250,13 @@ class PluginAdminRpcRoundTripTest {
     /** The client's end of the connection: each call goes to [host]; [hostCapabilities] are what it advertised. */
     private class RelayLink(private val host: HostCall, override val hostCapabilities: Set<String>) : PluginAdminLink {
         val calls = mutableListOf<String>()
+        val sent = mutableMapOf<String, JsonObject>()
+        val answers = mutableMapOf<String, JsonElement>()
 
         override suspend fun adminRpc(method: String, params: JsonObject): AppServerInboundFrame.AdminRpcResponse {
             calls += method
-            return host(method, params)
+            sent[method] = params
+            return host(method, params).also { response -> response.result?.let { answers[method] = it } }
         }
     }
 

@@ -110,9 +110,6 @@ android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/pr
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/pairing/ScannedInvite.kt
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/PluginManifestParser.kt
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/PluginRegistryState.kt
-# plugin admin_rpc wire, classDiscriminator="kind" + encodeDefaults=true: no LettaJson equivalent;
-# bytes pinned by PluginAdminRpcWireBytesTest, migration is a protocol decision (by4vm.102)
-android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/catalog/PluginAdminRpc.kt
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/view/ViewHostContext.kt
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/CachedAgentRepository.kt
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/CachedSettingsRepository.kt

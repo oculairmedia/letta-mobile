@@ -2,7 +2,9 @@
 
 package com.letta.mobile.ui.settings
 
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
@@ -81,6 +83,33 @@ class SettingsSectionTest {
         state.value = section("Running")
 
         onNodeWithText("Running").assertExists()
+    }
+
+    /**
+     * Android rebuilds its contributions from the view model's state on every change, each a new
+     * [SettingsContribution] with no updates flow (letta-mobile-by4vm: the Hugging Face token field
+     * could not be typed into). The section must draw the newest contribution's model, so a
+     * controlled field shows every keystroke.
+     */
+    @Test
+    fun aRebuiltContributionDrawsItsOwnModelSoAControlledFieldTakesEachKeystroke() = runComposeUiTest {
+        val token = MutableStateFlow("")
+        setContent {
+            Frame {
+                val value = token.collectAsState().value
+                val row = SettingsRow.Text("token", "Token", value, onChange = { token.value = it })
+                val section = SettingsSectionModel("model", "Model", listOf(row))
+                SettingsContributionSection(SettingsContribution(SettingsGroup.Backend, section))
+            }
+        }
+        val field = onNodeWithTag(SettingsSectionTags.ROW_PREFIX + "token")
+
+        "hf_ab".forEachIndexed { index, char ->
+            field.performTextInput(char.toString())
+            val typed = "hf_ab".take(index + 1)
+            assertEquals(typed, token.value)
+            field.assertTextEquals(typed)
+        }
     }
 
     @Test
