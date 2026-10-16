@@ -1150,9 +1150,6 @@
     <ID>MaxLineLength:NativeAdminHandlersTest.kt$NativeAdminHandlersTest$val updated = resultOf(dispatchJson(r, "agent.update", buildJsonObject { put("agent_id", "agent-1"); put("name", "N2"); put("metadata", mascot) }))</ID>
     <ID>MaxLineLength:NotebookBoardLayoutTest.kt$NotebookBoardLayoutTest$assertEquals(false, store.upsertIfRevision(before.copy(revision = before.revision + 1, sceneJson = """{"elements":[]}"""), before.revision))</ID>
     <ID>MaxLineLength:NotebookBoardStorage.kt$NotebookBoardStorage$private</ID>
-    <ID>MaxLineLength:NotebookCanvasBridgeTest.kt$NotebookCanvasBridgeTest$assertEquals("asset-1", Json.parseToJsonElement(bridge.drawableScene(id)!!).jsonObject["elements"]!!.toString().let { if ("asset-1" in it) "asset-1" else "missing" })</ID>
-    <ID>MaxLineLength:NotebookCanvasBridgeTest.kt$NotebookCanvasBridgeTest$assertEquals(NotebookCanvasImportResult.CONFLICT, bridge.import(source.copy(sceneJson = """{"bgColor":"#ffffffff","elements":[]}"""), id))</ID>
-    <ID>MaxLineLength:NotebookCanvasBridgeTest.kt$NotebookCanvasBridgeTest$val scene = """{"bgColor":"#aabbccff","elements":[{"id":"image-1","type":"Image","zIndex":1,"points":["0,0","2,2"],"strokeColor":"#000000ff","strokeWidth":0,"imageRef":"asset-1"}],"documents":{"note-1":{"json":"note-body","frame":{"x":1}}},"images":{"asset-1":{"data":"payload"}},"bgPattern":{"kind":"dots"}}"""</ID>
     <ID>MaxLineLength:NotebookCanvasOwnerStorageTest.kt$NotebookCanvasOwnerStorageTest$CanvasDocumentWrite("cmp-weekend-plan-meals", """{"version":2,"blocks":[]}""", frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance)</ID>
     <ID>MaxLineLength:NotebookCanvasPluginElementStorageTest.kt$NotebookCanvasPluginElementStorageTest$assertEquals(listOf("pe-gone", fixtures.ID), read.keys(entries).orElseThrow().toList().sorted(), "the tombstone is an entry")</ID>
     <ID>MaxLineLength:NotebookCanvasPluginElementStorageTest.kt$NotebookCanvasPluginElementStorageTest$assertTrue(fields.all { it in setOf("props", "_clock", "_state", "_lamport", "_actorId", "_opId") }, "only what changed: $fields")</ID>
@@ -1162,15 +1159,11 @@
     <ID>MaxLineLength:NotebookCanvasStorageGrowthTest.kt$NotebookCanvasStorageGrowthTest$assertEquals("""{"bgColor":"#ffffffff","elements":[{"id":"a"}],"_documents":[{"id":"n1"},{"id":"n2"}],"schema":"notebook-board/1"}""", raw)</ID>
     <ID>MaxLineLength:NotebookCanvasStorageGrowthTest.kt$NotebookCanvasStorageGrowthTest$assertTrue((run.storedBytes - idle.storedBytes) / 500 &lt; 256, "a save with no board change cost ${(run.storedBytes - idle.storedBytes) / 500} bytes")</ID>
     <ID>MaxLineLength:NotebookCanvasStorageGrowthTest.kt$NotebookCanvasStorageGrowthTest$println("canvas growth [notes]: one note ~$oneNote bytes, all $NOTES notes ~$allNotes bytes; $perMove bytes/move, $perEdit bytes/edit")</ID>
-    <ID>MaxLineLength:NotebookCanvasStorageGrowthTest.kt$NotebookCanvasStorageGrowthTest$tx.set(ObjectId.ROOT, "canvasMetadata", Json.encodeToString(CanvasDocument.serializer(), CanvasDocument(canvasId, title = "Legacy", revision = 1)))</ID>
-    <ID>MaxLineLength:NotebookCanvasStorageGrowthTest.kt$NotebookCanvasStorageGrowthTest$val board = JsonObject(Json.parseToJsonElement(legacyScene).jsonObject + ("schema" to JsonPrimitive("notebook-board/1")))</ID>
-    <ID>MaxLineLength:NotebookCanvasStorageGrowthTest.kt$NotebookCanvasStorageGrowthTest$val legacyScene = """{"bgColor":"#ffffffff","elements":[{"id":"a","type":"Path","points":["1,2"]}],"_documents":{"n":{"json":"{}"}}}"""</ID>
     <ID>MaxLineLength:NotebookComposeStorageTest.kt$NotebookComposeStorageTest$session.applyOps(ops.map { it.withActor(CanvasSession.LOCAL_USER_ACTOR).withStamp(CanvasOpId("compose-${++lamport}"), lamport) }).revision</ID>
     <ID>MaxLineLength:NotebookFilesystemProjection.kt$NotebookFilesystemProjection.BoardYaml.Companion$require</ID>
     <ID>MaxLineLength:NotebookGraphTest.kt$NotebookGraphTest$assertFalse(mayUseNotebookAgentTool(item, contract, grant.copy(mayUseAgentTools = false, mayEdit = true, mayExecutePlugins = true), setOf("tool-id")))</ID>
     <ID>MaxLineLength:NotebookHistoryArchive.kt$NotebookHistoryArchive$val named = if (entry == null || "document" in entry) raw else JsonObject(entry + ("document" to JsonPrimitive(oldKey))).toString()</ID>
     <ID>MaxLineLength:NotebookHistoryArchive.kt$NotebookHistoryArchive.Move$val archived = NotebookBoardStorage.copyCurrentState(old, tx, setOf(HISTORY_ARCHIVE, PREVIOUS_DOCUMENT), restoreListBytes)</ID>
-    <ID>MaxLineLength:NotebookHistoryArchive.kt$NotebookHistoryArchive.Recovery$stamps.forEach { stamp -&gt; recoverLegacyStamp(directory.resolve("$stamp$LEGACY_FRESH_SUFFIX"), directory.resolve("$stamp$LEGACY_REPLACED_SUFFIX")) }</ID>
     <ID>MaxLineLength:NotebookLocalStore.kt$NotebookLocalStore$if (base == null) NotebookBoardStorage.writeBoard(tx, write.incoming) else NotebookBoardStorage.mergeCanvasBoard(tx, base, write.save)</ID>
     <ID>MaxLineLength:NotebookLocalStoreTest.kt$NotebookLocalStoreTest$Files.writeString(folder.resolve("board.yaml"), "schema: notebook-board/1\nboardVersion: 1\nboard: |-\n {\"schema\":\"notebook-board/1\",\"elements\":[1]}\n")</ID>
     <ID>MaxLineLength:NotebookLocalStoreTest.kt$NotebookLocalStoreTest$store.setBoard(id, """{"schema":"notebook-board/1","elements":[{"id":"a","extra":42},{"id":"b"}],"documents":{"note":"body"}}""")</ID>
@@ -1562,7 +1555,6 @@
     <ID>NestedBlockDepth:HeadlessTimelineReplay.kt$HeadlessTimelineReplaySession$private fun recordObservedFrame(frame: ServerFrame, frameJson: JsonObject)</ID>
     <ID>NestedBlockDepth:IrohFanoutServeTest.kt$IrohFanoutServeTest$private suspend fun interleaveTurns(vararg turns: Pair&lt;ConversationTurnFanout, List&lt;RuntimeEventPayload&gt;&gt;)</ID>
     <ID>NestedBlockDepth:IrohFrameCodec.kt$IrohFrameCodec.Decoder$fun feed(chunk: ByteArray): List&lt;String&gt;</ID>
-    <ID>NestedBlockDepth:NotebookCanvasMigration.kt$NotebookCanvasMappingStore$private fun &lt;T&gt; locked(action: (List&lt;Entry&gt;) -&gt; T): T</ID>
     <ID>NestedBlockDepth:NotebookLocalStore.kt$NotebookLocalStore$private fun &lt;T&gt; fileLock(action: () -&gt; T): T</ID>
     <ID>NestedBlockDepth:RealTurnFixturesStampTest.kt$RealTurnFixturesStampTest$@Test fun everyToolAndUserFrameInTheRealTurnsIsStampedAndDuplicatesShareIds()</ID>
     <ID>NestedBlockDepth:SseParser.kt$SseParser$private fun processEvent(event: String): ProcessedEvent</ID>
@@ -1647,8 +1639,6 @@
     <ID>ReturnCount:ModelHandleValidator.kt$ModelHandleValidator$fun validate(request: Request): Result</ID>
     <ID>ReturnCount:NotebookFilesystemProjection.kt$NotebookFilesystemProjection.SyncSession$private fun applyExternalImport(disk: Snapshot): NotebookProjectionResult</ID>
     <ID>ReturnCount:NotebookFilesystemProjection.kt$NotebookFilesystemProjection.SyncSession$private fun syncIncremental(previous: Baseline): NotebookProjectionResult</ID>
-    <ID>ReturnCount:NotebookLocalStore.kt$NotebookLocalStore$private fun checkAlreadyImported( tx: Transaction, marker: AmValue?, importData: CanvasImportData, ): Boolean</ID>
-    <ID>ReturnCount:NotebookLocalStore.kt$NotebookLocalStore$private fun isPristineDocument(tx: Transaction): Boolean</ID>
     <ID>ReturnCount:PairQrSigner.kt$PairQrEnvelope$fun decode(encoded: String): Decoded?</ID>
     <ID>ReturnCount:PendingToolApprovalRegistry.kt$PendingToolApprovalRegistry$private fun admitLocked(action: A2uiAction, conversation: ConversationId?): ToolApprovalAdmission</ID>
     <ID>ReturnCount:PluginInstalls.kt$PluginInstalls$fun stageUpdate(state: PluginRegistryState, command: PluginCommand.StageUpdate): PluginTransition</ID>
@@ -2208,7 +2198,6 @@
     <ID>UseCheckOrError:IrohEventSeqWireOrderTest.kt$IrohEventSeqWireOrderTest.&lt;no name provided&gt;$throw IllegalStateException("stream reset")</ID>
     <ID>UseCheckOrError:LocalBackendEmbeddedRecords.kt$LocalBackendEmbeddedRecords$throw IllegalStateException("Local conversation record for ${agentId.value} could not be created")</ID>
     <ID>UseCheckOrError:LocalBackendEmbeddedRecords.kt$LocalBackendEmbeddedRecords$throw IllegalStateException("Local conversation record for ${agentId.value} is unreadable")</ID>
-    <ID>UseCheckOrError:NotebookCanvasMigrationTest.kt$NotebookCanvasMigrationTest$throw IllegalStateException("interrupted after import")</ID>
     <ID>UseCheckOrError:PluginAdminLink.kt$&lt;no name provided&gt;$throw IllegalStateException("Not connected to a host")</ID>
     <ID>UseCheckOrError:SharedDocumentTest.kt$SharedDocumentTest.&lt;no name provided&gt;$throw IllegalStateException("disk full")</ID>
     <ID>UseCheckOrError:SharedDocumentTest.kt$SharedDocumentTest.&lt;no name provided&gt;$throw IllegalStateException("read-only volume")</ID>

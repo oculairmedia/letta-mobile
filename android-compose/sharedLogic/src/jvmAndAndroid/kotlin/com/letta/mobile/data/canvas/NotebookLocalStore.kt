@@ -153,12 +153,6 @@ class NotebookLocalStore(
     private fun projectionResult(block: () -> NotebookProjectionResult?): NotebookProjectionResult? =
         try { block() } catch (_: Exception) { NotebookProjectionResult.ERROR }
 
-    internal data class CanvasImportData(
-        val sourceId: String,
-        val title: String,
-        val board: String,
-    )
-
     internal fun replaceProjection(id: DocumentId, expected: NotebookDocument, content: NotebookContent): Boolean {
         val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
         return handle.writing(id) { document ->
@@ -277,7 +271,6 @@ class NotebookLocalStore(
             document.startTransaction().use { tx ->
                 tx.set(ObjectId.ROOT, "schema", "notebook/1")
                 tx.set(ObjectId.ROOT, "title", title)
-                tx.set(ObjectId.ROOT, "initialTitle", title)
                 tx.set(ObjectId.ROOT, "markdown", ObjectType.TEXT)
                 tx.set(ObjectId.ROOT, "boardVersion", 1)
                 tx.set(ObjectId.ROOT, "board", NotebookBoardStorage.EMPTY_BOARD)
@@ -298,66 +291,6 @@ class NotebookLocalStore(
     }
 
     private fun remember(id: DocumentId, doc: CanvasDocument) = health.rememberCanvas(id.stableKey(), doc.id)
-
-    private fun checkAlreadyImported(
-        tx: Transaction,
-        marker: AmValue?,
-        importData: CanvasImportData,
-    ): Boolean {
-        if ((marker as? AmValue.Str)?.value != importData.sourceId) return false
-        val importedBoard = (tx.get(ObjectId.ROOT, "importedBoard").orElse(null) as? AmValue.Str)?.value ?: return false
-        if (importedBoard != importData.board) return false
-        val currentBoard = boardFrom(tx)
-        if (Json.parseToJsonElement(importedBoard) != Json.parseToJsonElement(currentBoard)) return false
-        val currentTitle = (tx.get(ObjectId.ROOT, "title").orElseThrow() as AmValue.Str).value
-        if (currentTitle != importData.title) return false
-        val importedTitle = (tx.get(ObjectId.ROOT, "importedTitle").orElse(null) as? AmValue.Str)?.value
-        if (currentTitle != importedTitle) return false
-        val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
-        if (tx.text(textId).orElseThrow().isNotEmpty()) return false
-        val itemsId = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
-        return tx.keys(itemsId).orElseThrow().isEmpty()
-    }
-
-    private fun isPristineDocument(tx: Transaction): Boolean {
-        val initialTitle = (tx.get(ObjectId.ROOT, "initialTitle").orElse(null) as? AmValue.Str)?.value ?: return false
-        val currentTitle = (tx.get(ObjectId.ROOT, "title").orElseThrow() as AmValue.Str).value
-        if (initialTitle != currentTitle) return false
-        val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
-        if (tx.text(textId).orElseThrow().isNotEmpty()) return false
-        val itemsId = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
-        if (tx.keys(itemsId).orElseThrow().isNotEmpty()) return false
-        return NotebookBoardStorage.isPristine(tx)
-    }
-
-    /** Claim a pristine, caller-selected notebook; never infer its ID from the canvas ID. */
-    @Synchronized
-    internal fun importCanvasInto(id: DocumentId, importData: CanvasImportData): NotebookCanvasImportResult {
-        check(!closed) { "Notebook store is closed" }
-        val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
-        return handle.writing(id) { document ->
-            document.startTransaction().use { tx ->
-                val marker = tx.get(ObjectId.ROOT, "importedCanvasId").orElse(null)
-                if (marker != null) {
-                    return@writing if (checkAlreadyImported(tx, marker, importData)) {
-                        NotebookCanvasImportResult.ALREADY_IMPORTED
-                    } else {
-                        NotebookCanvasImportResult.CONFLICT
-                    }
-                }
-                if (!isPristineDocument(tx)) {
-                    return@writing NotebookCanvasImportResult.CONFLICT
-                }
-                tx.set(ObjectId.ROOT, "title", importData.title)
-                writeBoard(tx, importData.board)
-                tx.set(ObjectId.ROOT, "importedCanvasId", importData.sourceId)
-                tx.set(ObjectId.ROOT, "importedBoard", importData.board)
-                tx.set(ObjectId.ROOT, "importedTitle", importData.title)
-                tx.commit()
-                NotebookCanvasImportResult.IMPORTED
-            }
-        }
-    }
 
     /** Update one element without replacing other elements' Automerge registers. */
     fun putBoardElement(id: DocumentId, element: JsonObject) {
