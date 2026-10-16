@@ -11,17 +11,24 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class OnDeviceOpenAiBridgeTest {
     @Test
-    fun `models endpoint exposes selected model id`() {
-        val bridge = LocalOpenAiOnDeviceBridge(FakeEngine())
-        bridge.start(selection()).use { session ->
-            val response = get("${session.baseUrl}/models", session.authToken)
+    fun `models endpoint serves the id letta code looks up for the agent handle`() {
+        listOf("google/gemma-3n-E2B-it-litert-lm", "local/default").forEach { modelHandle ->
+            val selection = selection().copy(modelHandle = modelHandle)
+            LocalOpenAiOnDeviceBridge(FakeEngine()).start(selection).use { session ->
+                val response = get("${session.baseUrl}/models", session.authToken)
 
-            assertEquals(200, response.code)
-            assertTrue(response.body.contains("gemma-3n"))
-            assertTrue(response.body.contains("letta-mobile"))
+                assertEquals(200, response.code)
+                assertEquals(listOf(lettaCodeLookupId(selection.lettaCodeModelHandle)), response.modelIds())
+                assertEquals(listOf(selection.openAiModelId), response.modelIds())
+                assertTrue(response.body.contains("letta-mobile"))
+            }
         }
     }
 
@@ -365,6 +372,10 @@ class OnDeviceOpenAiBridgeTest {
         accelerator = "gpu",
         maxTokens = 4096,
     )
+
+    private fun Response.modelIds(): List<String> =
+        Json.parseToJsonElement(body).jsonObject.getValue("data").jsonArray
+            .map { it.jsonObject.getValue("id").jsonPrimitive.content }
 
     private fun get(url: String, bearerToken: String? = null): Response {
         val connection = URL(url).openConnection() as HttpURLConnection

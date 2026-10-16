@@ -65,7 +65,7 @@ class AndroidLocalAppServerLaunchSource @Inject constructor(
             } else {
                 onDeviceEndpoint(selection)
             }
-            project.storageDirectory.writeLocalProviderAuth(endpoint, selection)
+            project.storageDirectory.writeLocalProviderAuth(endpoint)
         }
         Log.i(TAG, "local provider: model=${selection.lettaCodeModelHandle} custom=${selection.isCustomProvider}")
         return project.storageDirectory

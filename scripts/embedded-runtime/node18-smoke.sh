@@ -12,6 +12,11 @@
 #                app-server-serve: loopback, capability token), one Bash tool turn on the agent
 #                from step 2 driven by the shared Kotlin AppServerClient (app-server-smoke)
 #
+# The model is resolved the way the device resolves it (letta-mobile-by4vm.121.1): the agent handle
+# is `lmstudio/<vendor>/<model>`, providers/auth.json carries no models[], and the fake serves the
+# id the on-device bridge serves (the handle minus `lmstudio/`, lettaCodeLookupId in the app) only on
+# /v1/models, so a letta-code bump that changes lmstudio model discovery fails here.
+#
 # On failure the first missing-API style error from the runtime's stderr is printed as a GitHub
 # error annotation and, with the stderr tail, into $GITHUB_STEP_SUMMARY.
 #
@@ -33,7 +38,8 @@ WORK=${WORK:-$(mktemp -d)}
 mkdir -p "$WORK"
 LETTA_JS="$PROJECT/node_modules/@letta-ai/letta-code/letta.js"
 LLM_PORT=${FAKE_LLM_PORT:-4711}
-MODEL=lmstudio/node18-model
+MODEL=lmstudio/ci/node18-model
+SERVED_MODEL=${MODEL#lmstudio/} # what OnDeviceOpenAiBridge advertises for this handle
 SUMMARY=${GITHUB_STEP_SUMMARY:-/dev/null}
 PIDS=()
 
@@ -100,8 +106,7 @@ cat > "$WORK/backend/providers/auth.json" <<EOF
 { "version": 1, "providers": { "lc-lmstudio": {
   "id": "local-provider-lc-lmstudio", "name": "lc-lmstudio", "provider_type": "lmstudio",
   "provider_category": "byok", "auth": { "type": "api", "key": "lm-studio" },
-  "base_url": "http://127.0.0.1:$LLM_PORT/v1",
-  "models": [ { "id": "node18-model", "contextWindow": 128000, "maxTokens": 4096, "input": ["text"], "cost": {"input":0,"output":0} } ] } } }
+  "base_url": "http://127.0.0.1:$LLM_PORT/v1" } } }
 EOF
 # The device environment (AndroidEmbeddedLettaCodeLaunch) minus the Android-only bridge/tool paths.
 export HOME="$WORK/home" TMPDIR="$WORK/tmp" TMP="$WORK/tmp" TEMP="$WORK/tmp" SHELL=/bin/sh NO_COLOR=1 \
@@ -112,7 +117,7 @@ export HOME="$WORK/home" TMPDIR="$WORK/tmp" TMP="$WORK/tmp" TEMP="$WORK/tmp" SHE
 NODE18_BIN=$(dirname "$(command -v "$NODE18")")
 export PATH="$NODE18_BIN:$PATH"
 
-FAKE_LLM_LOG="$WORK/llm.log" FAKE_LLM_PORT=$LLM_PORT "$NODE18" "$HERE/fake-llm.cjs" 2> "$WORK/llm.err" &
+FAKE_LLM_LOG="$WORK/llm.log" FAKE_LLM_PORT=$LLM_PORT FAKE_LLM_MODEL=$SERVED_MODEL "$NODE18" "$HERE/fake-llm.cjs" 2> "$WORK/llm.err" &
 PIDS+=($!)
 for _ in $(seq 50); do grep -q "fake llm on" "$WORK/llm.err" 2>/dev/null && break; sleep 0.1; done
 
