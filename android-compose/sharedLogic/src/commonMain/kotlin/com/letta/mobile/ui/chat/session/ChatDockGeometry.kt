@@ -216,8 +216,16 @@ object ChatDockGeometryMath {
 
     private fun collapsedWidth(frame: ChatDockFrame, area: Area): Float? {
         val width = frame.collapsedWidthDp?.takeIf { it.isFinite() && it > 0f } ?: return null
-        return width.coerceIn(area.minWidth, area.width)
+        // The person's own bar width (already kept to its range by its prefs) is not the panel's
+        // minimum: minimised, the bar may be narrower than the smallest open panel.
+        return width.coerceAtMost(area.width)
     }
+
+    /**
+     * How much taller the collapsed dock (its measured [ChatDockFrame.collapsedHeightDp]) may grow
+     * before it would leave the usable area: what a drag of the bar's top edge may add.
+     */
+    fun collapsedHeightRoom(frame: ChatDockFrame): Float = (Area(frame).height - frame.collapsedHeightDp).coerceAtLeast(0f)
 
     private fun barHeight(frame: ChatDockFrame, area: Area): Float = frame.collapsedHeightDp.coerceIn(0f, area.height)
 

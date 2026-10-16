@@ -17,15 +17,10 @@ import kotlinx.coroutines.sync.withLock
  * Host-side holder for the canonical route. A coordinator is bound to exactly one transport, and
  * Desktop resolves a different transport for default-shim conversations, so this keeps one runtime
  * per distinct transport rather than assuming a single one for the whole app.
- *
- * [isEnabled] is false unless the route is explicitly switched on, because the canonical route is
- * still read-only: sends and the live stream are not bound to the canonical writer yet
- * (bead letta-mobile-x13xi.12.1).
  */
 class DesktopCanonicalTimelineHost(
     private val backendId: String = DESKTOP_CANONICAL_BACKEND_ID,
     private val ledgerDirectory: Path = defaultDesktopTimelineLedgerDirectory(),
-    val isEnabled: Boolean = desktopCanonicalTimelineEnabled(),
 ) {
     private val mutex = Mutex()
     private val runtimes = mutableMapOf<TimelineTransport, DesktopCanonicalTimelineRuntime>()
@@ -40,24 +35,14 @@ class DesktopCanonicalTimelineHost(
     }
 
     private fun runtimeFor(transport: TimelineTransport): DesktopCanonicalTimelineRuntime =
-        runtimes.getOrPut(transport) {
-            checkNotNull(
-                createDesktopCanonicalTimelineRuntime(
-                    transport = transport,
-                    backendId = backendId,
-                    ledgerDirectory = ledgerDirectory,
-                    enabled = isEnabled,
-                ),
-            ) { "Canonical timeline route is disabled" }
-        }
+        runtimes.getOrPut(transport) { createDesktopCanonicalTimelineRuntime(transport, backendId, ledgerDirectory) }
 
     /**
-     * Routes the controller's conversation selection through this host. Only call it when the route
-     * is enabled: installing an opener makes the controller skip legacy whole-history hydration, so
-     * a host that cannot actually serve pages would leave the transcript empty.
+     * Routes the controller's conversation selection through this host. Only a backend whose frame
+     * source carries live turns (Iroh) can serve this route: the shared send coordinator sends over
+     * it, so on any other backend the controller keeps its in-memory timeline loop.
      */
     internal fun installOn(controller: DesktopChatController, send: DesktopCanonicalSendInstall) {
-        check(isEnabled) { "Cannot install a disabled canonical timeline route" }
         controller.canonicalEligible = ::servesConversation
         controller.canonicalOpen = { request -> open(request) }
         // Reading history and writing to it are installed together on purpose. A route that can
@@ -94,7 +79,7 @@ class DesktopCanonicalTimelineHost(
 
     /**
      * A default-shim conversation is addressed by a rewritten loop id, so a canonical scope built
-     * from its real id would not name the same history. Keep those on the legacy route.
+     * from its real id would not name the same history. Keep those on the in-memory loop.
      */
     internal fun servesConversation(conversationId: String): Boolean =
         !conversationId.startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX)
@@ -109,10 +94,6 @@ class DesktopCanonicalTimelineHost(
     }
 }
 
-/**
- * Distinct from the legacy snapshot backend id on purpose. The two stores are separate generations
- * of the same history, and sharing an id would let a scope built for one address the other.
- */
 const val DESKTOP_CANONICAL_BACKEND_ID: String = "desktop-canonical"
 
 private const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
@@ -127,7 +108,8 @@ private const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
  */
 internal class DesktopCanonicalSendInstall(
     val frameSource: IChannelTransport,
-    val conversationRepository: IConversationRepository,
+    /** Read when an agent's coordinator is first built, so it sees the rebuilt session graph. */
+    val conversationRepository: () -> IConversationRepository,
     val scope: CoroutineScope,
     val activeConfig: () -> LettaConfig?,
     val clientVersion: () -> String,

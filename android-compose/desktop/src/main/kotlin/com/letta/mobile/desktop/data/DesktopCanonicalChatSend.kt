@@ -14,7 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 internal class DesktopCanonicalSendBindings(
     val runtimeFor: (TimelineTransport) -> DesktopCanonicalTimelineRuntime,
     val bridge: WsChatBridge,
-    val conversationRepository: IConversationRepository,
+    val conversationRepository: () -> IConversationRepository,
     val scope: CoroutineScope,
     val activeConfig: () -> LettaConfig?,
     val surface: DesktopChatSendSurface,
@@ -54,7 +54,7 @@ internal class DesktopCanonicalChatSend(
             // The send lands in the same ledger the paginated list pages from. This single argument
             // is what makes the canonical route one subsystem rather than two agreeing ones.
             timelineRepository = bindings.runtimeFor(timelineTransport).writer(agentId, bindings.scope),
-            conversationRepository = bindings.conversationRepository,
+            conversationRepository = bindings.conversationRepository(),
             ui = DesktopChatSendUiSink(bindings.surface),
             clearComposerAfterSend = bindings.clearComposerAfterSend,
             activeConversationId = bindings.activeConversationId,

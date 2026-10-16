@@ -25,4 +25,6 @@ data class Skill(
     val author: String? = null,
     @SerialName("installed_count") val installedCount: Int? = null,
     val tags: List<String> = emptyList(),
+    /** False when the host can't remove it (letta-code only unlinks symlinked skills); remove is then hidden. */
+    val removable: Boolean = true,
 )

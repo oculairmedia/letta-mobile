@@ -6,11 +6,17 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -30,6 +36,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +46,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
@@ -47,6 +55,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -62,13 +72,17 @@ import com.letta.mobile.sharedui.resources.chat_surface_bubble_layout_always
 import com.letta.mobile.sharedui.resources.chat_surface_bubble_layout_auto
 import com.letta.mobile.sharedui.resources.chat_surface_bubble_layout_dp
 import com.letta.mobile.sharedui.resources.chat_surface_bubble_layout_full
+import com.letta.mobile.sharedui.resources.chat_surface_bubble_layout_height
 import com.letta.mobile.sharedui.resources.chat_surface_bubble_layout_hold
 import com.letta.mobile.sharedui.resources.chat_surface_bubble_layout_mascot
+import com.letta.mobile.sharedui.resources.chat_surface_bubble_layout_one_line
 import com.letta.mobile.sharedui.resources.chat_surface_bubble_layout_reset
 import com.letta.mobile.sharedui.resources.chat_surface_bubble_layout_resize
+import com.letta.mobile.sharedui.resources.chat_surface_bubble_layout_resize_height
 import com.letta.mobile.sharedui.resources.chat_surface_bubble_layout_seconds
 import com.letta.mobile.sharedui.resources.chat_surface_bubble_layout_width
 import com.letta.mobile.ui.canvas.LocalWheelZoomRegions
+import com.letta.mobile.ui.chat.surface.composer.MinimisedBarLayout
 import com.letta.mobile.ui.components.ResizeDirection
 import com.letta.mobile.ui.components.resizePointerIcon
 import com.letta.mobile.ui.theme.ChatSurfaceDimens
@@ -76,12 +90,14 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 
 /*
  * letta-mobile-zxk2n.29: the person's own layout for the minimised chat. Drag the bar's left or right
- * edge to set its width (it grows or shrinks about its centre); Ctrl/Cmd + wheel over the mascot sizes
- * it; the "Bubble layout" button beside the mascot holds the same as sliders, with how long a reply's
+ * edge to set its width (it grows or shrinks about its centre) and its top edge to make the prompt
+ * taller; Ctrl/Cmd + wheel over the mascot sizes it; the "Bubble layout" button beside the mascot
+ * (shown while the pointer is over the mascot) holds the same as sliders, with how long a reply's
  * bubble stays, and a Reset. Every change shows at once and glides there (or jumps, under reduced
  * motion); the host persists the values. A host that provides no prefs keeps today's sizes and no
  * controls.
@@ -121,28 +137,90 @@ internal fun animatedBubbleComposerWidth(state: ChatDockState): Float? {
     return width
 }
 
-/** Around the bar, for the bar's own width: an invisible strip just outside each side edge. */
+/**
+ * The minimised bar's prompt field height in dp, gliding to what the person set (exactly under a
+ * top-edge drag); null keeps the one-line bar.
+ */
 @Composable
-internal fun BoxScope.ComposerWidthHandles(state: ChatDockState, barHeight: Dp) {
-    val prefs = LocalCanvasBubbleLayoutPrefs.current ?: return
-    if (barHeight == Dp.Unspecified) return
+internal fun animatedBubbleComposerHeight(state: ChatDockState): Float? {
+    val layout = currentBubbleLayout()
+    val target = layout.composerHeightDp?.takeIf { layout.composerMultiLine } ?: return null
+    val height by animateFloatAsState(target, layoutSpec(following = state.layoutResizing), label = "bubbleComposerHeight")
+    return height
+}
+
+/**
+ * What the minimised dock tells its bar (see [MinimisedBarLayout]); null while the dock is open or
+ * the host provides no prefs. [handles] is false mid-fold: the strips show only at rest.
+ */
+@Composable
+internal fun rememberMinimisedBarLayout(state: ChatDockState, collapsed: Boolean, handles: Boolean): MinimisedBarLayout? {
+    val prefs = LocalCanvasBubbleLayoutPrefs.current
+    if (prefs == null || !collapsed) return null
+    val height = animatedBubbleComposerHeight(state)
+    val strips: @Composable BoxScope.() -> Unit = remember(state, prefs) { { MinimisedBarHandles(state, prefs) } }
+    return MinimisedBarLayout(fieldHeight = height?.dp, handles = strips.takeIf { handles })
+}
+
+/**
+ * Over the bar, for its own size: an invisible strip straddling each side edge (the width) and the
+ * top edge (the height), each showing its resize cursor.
+ */
+@Composable
+private fun BoxScope.MinimisedBarHandles(state: ChatDockState, prefs: CanvasBubbleLayoutPrefs) {
     val strip = BubbleLayoutDimens.edgeStrip
-    val label = stringResource(Res.string.chat_surface_bubble_layout_resize)
+    val heightLabel = stringResource(Res.string.chat_surface_bubble_layout_resize_height)
+    Box(
+        Modifier
+            .align(Alignment.TopCenter)
+            .offset(y = -strip / 2)
+            .fillMaxWidth()
+            .height(strip)
+            .pointerHoverIcon(resizePointerIcon(ResizeDirection.Vertical))
+            .composerTopEdgeDrag(state, prefs)
+            .semantics { contentDescription = heightLabel }
+            .testTag(BUBBLE_HEIGHT_HANDLE_TOP_TAG),
+    )
+    val widthLabel = stringResource(Res.string.chat_surface_bubble_layout_resize)
     for (side in listOf(-1f, 1f)) {
-        val align = if (side < 0f) Alignment.BottomStart else Alignment.BottomEnd
         Box(
             Modifier
-                .align(align)
-                .offset(x = strip * side)
+                .align(if (side < 0f) Alignment.CenterStart else Alignment.CenterEnd)
+                .offset(x = strip / 2 * side)
                 .width(strip)
-                .height(barHeight)
+                .fillMaxHeight()
                 .pointerHoverIcon(resizePointerIcon(ResizeDirection.Horizontal))
                 .composerEdgeDrag(state, prefs, side)
-                .semantics { contentDescription = label }
+                .semantics { contentDescription = widthLabel }
                 .testTag(if (side < 0f) BUBBLE_WIDTH_HANDLE_LEFT_TAG else BUBBLE_WIDTH_HANDLE_RIGHT_TAG),
         )
     }
 }
+
+/**
+ * Dragging the top edge up makes the field taller (down, shorter, back to one line at the bottom
+ * of the range). It never grows the dock past the canvas: the room left above it caps the drag.
+ */
+private fun Modifier.composerTopEdgeDrag(state: ChatDockState, prefs: CanvasBubbleLayoutPrefs): Modifier =
+    pointerInput(state, prefs) {
+        var start = 0f
+        var room = 0f
+        var travelled = 0f
+        detectVerticalDragGestures(
+            onDragStart = {
+                start = prefs.layout.value.composerHeightDp ?: CanvasBubbleLayout.COMPOSER_HEIGHT_MIN_DP
+                room = state.collapsedHeightRoomDp()
+                travelled = 0f
+                state.layoutResizing = true
+            },
+            onDragEnd = { state.layoutResizing = false },
+            onDragCancel = { state.layoutResizing = false },
+        ) { change, amount ->
+            change.consume()
+            travelled += amount.toDp().value
+            prefs.setComposerHeight((start - travelled).coerceAtMost(start + room))
+        }
+    }
 
 /**
  * Dragging an edge sets the bar's width about its centre: the far edge mirrors the near one, so the
@@ -205,13 +283,26 @@ internal fun rememberMascotWheelResize(): Modifier {
         }
 }
 
-/** The "Bubble layout" button beside the mascot and its sliders; nothing where the host provides no prefs. */
+/**
+ * The "Bubble layout" button beside the mascot and its sliders; nothing where the host provides no
+ * prefs. It stays out of sight until the pointer is over the mascot ([mascotHovered]) or the button
+ * itself, and lingers a moment after, so the pointer can travel from one to the other. Keyboard
+ * focus shows it too (it is always in the focus order and the accessibility tree), and on Touch,
+ * where nothing hovers, it is always shown.
+ */
 @Composable
-internal fun BubbleLayoutButton(modifier: Modifier = Modifier) {
+internal fun BubbleLayoutButton(mascotHovered: Boolean, modifier: Modifier = Modifier) {
     val prefs = LocalCanvasBubbleLayoutPrefs.current ?: return
     var open by remember { mutableStateOf(false) }
+    val interactions = remember { MutableInteractionSource() }
+    val revealed = rememberLayoutButtonReveal(LayoutButtonReveal(mascotHovered, interactions, menuOpen = open))
+    val alpha by animateFloatAsState(
+        targetValue = if (revealed) 1f else 0f,
+        animationSpec = if (LocalReducedMotion.current) snap() else tween(LettaMotionTokens.CONTENT_SIZE_MILLIS),
+        label = "bubbleLayoutButtonAlpha",
+    )
     val scheme = MaterialTheme.colorScheme
-    Box(modifier) {
+    Box(modifier.graphicsLayer { this.alpha = alpha }) {
         Surface(
             shape = CircleShape,
             color = scheme.surfaceContainer,
@@ -221,7 +312,11 @@ internal fun BubbleLayoutButton(modifier: Modifier = Modifier) {
         ) {
             IconButton(
                 onClick = { open = !open },
-                modifier = Modifier.size(BubbleLayoutDimens.control).testTag(BUBBLE_LAYOUT_BUTTON_TAG),
+                modifier = Modifier
+                    .size(BubbleLayoutDimens.control)
+                    .semantics { layoutButtonRevealed = revealed }
+                    .testTag(BUBBLE_LAYOUT_BUTTON_TAG),
+                interactionSource = interactions,
             ) {
                 Icon(
                     Lucide.SlidersHorizontal,
@@ -236,7 +331,36 @@ internal fun BubbleLayoutButton(modifier: Modifier = Modifier) {
     }
 }
 
-/** The menu's body: three sliders and a Reset, each a full touch target. */
+/** What shows the layout button: the pointer over the mascot or the button, its focus, its open menu. */
+@Immutable
+private class LayoutButtonReveal(val mascotHovered: Boolean, val button: InteractionSource, val menuOpen: Boolean)
+
+/**
+ * Whether the layout button shows: at once when anything in [reveal] wants it, and for
+ * [BubbleLayoutDimens.REVEAL_LINGER_MS] after the last of them lets go.
+ */
+@Composable
+private fun rememberLayoutButtonReveal(reveal: LayoutButtonReveal): Boolean {
+    val buttonHovered by reveal.button.collectIsHoveredAsState()
+    val focused by reveal.button.collectIsFocusedAsState()
+    val wanted = touchStyle() || reveal.mascotHovered || buttonHovered || focused || reveal.menuOpen
+    var lingering by remember { mutableStateOf(false) }
+    LaunchedEffect(wanted) {
+        if (wanted) {
+            lingering = true
+        } else if (lingering) {
+            delay(BubbleLayoutDimens.REVEAL_LINGER_MS)
+            lingering = false
+        }
+    }
+    return wanted || lingering
+}
+
+/** The layout button is showing (not faded out); read by tests. */
+internal val LayoutButtonRevealedKey = SemanticsPropertyKey<Boolean>("LayoutButtonRevealed")
+private var SemanticsPropertyReceiver.layoutButtonRevealed by LayoutButtonRevealedKey
+
+/** The menu's body: four sliders and a Reset, each a full touch target. */
 @Composable
 internal fun BubbleLayoutMenu(prefs: CanvasBubbleLayoutPrefs) {
     val layout by prefs.layout.collectAsState()
@@ -248,27 +372,7 @@ internal fun BubbleLayoutMenu(prefs: CanvasBubbleLayoutPrefs) {
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         Text(stringResource(Res.string.chat_surface_bubble_layout), style = MaterialTheme.typography.titleSmall)
-        LayoutSlider(
-            row = SliderRow(
-                label = stringResource(Res.string.chat_surface_bubble_layout_mascot),
-                value = layout.mascotSizeDp,
-                valueText = dpText(layout.mascotSizeDp),
-                range = CanvasBubbleLayout.MASCOT_MIN_DP..CanvasBubbleLayout.MASCOT_MAX_DP,
-                tag = BUBBLE_LAYOUT_MASCOT_SLIDER_TAG,
-            ),
-            onChange = prefs::setMascotSize,
-        )
-        val width = layout.composerWidthDp ?: CanvasBubbleLayout.COMPOSER_FULL_DP
-        LayoutSlider(
-            row = SliderRow(
-                label = stringResource(Res.string.chat_surface_bubble_layout_width),
-                value = width,
-                valueText = if (width >= CanvasBubbleLayout.COMPOSER_FULL_DP) stringResource(Res.string.chat_surface_bubble_layout_full) else dpText(width),
-                range = CanvasBubbleLayout.COMPOSER_MIN_DP..CanvasBubbleLayout.COMPOSER_FULL_DP,
-                tag = BUBBLE_LAYOUT_WIDTH_SLIDER_TAG,
-            ),
-            onChange = prefs::setComposerWidth,
-        )
+        LayoutSizeSliders(layout, prefs)
         LayoutSlider(
             row = SliderRow(
                 label = stringResource(Res.string.chat_surface_bubble_layout_hold),
@@ -286,6 +390,43 @@ internal fun BubbleLayoutMenu(prefs: CanvasBubbleLayoutPrefs) {
             modifier = Modifier.align(Alignment.End).heightIn(min = BubbleLayoutDimens.control).testTag(BUBBLE_LAYOUT_RESET_TAG),
         ) { Text(stringResource(Res.string.chat_surface_bubble_layout_reset)) }
     }
+}
+
+/** The sizes: the mascot, then the bar's width and height (the edge drags' keyboard and screen-reader equivalents). */
+@Composable
+private fun LayoutSizeSliders(layout: CanvasBubbleLayout, prefs: CanvasBubbleLayoutPrefs) {
+    LayoutSlider(
+        row = SliderRow(
+            label = stringResource(Res.string.chat_surface_bubble_layout_mascot),
+            value = layout.mascotSizeDp,
+            valueText = dpText(layout.mascotSizeDp),
+            range = CanvasBubbleLayout.MASCOT_MIN_DP..CanvasBubbleLayout.MASCOT_MAX_DP,
+            tag = BUBBLE_LAYOUT_MASCOT_SLIDER_TAG,
+        ),
+        onChange = prefs::setMascotSize,
+    )
+    val width = layout.composerWidthDp ?: CanvasBubbleLayout.COMPOSER_FULL_DP
+    LayoutSlider(
+        row = SliderRow(
+            label = stringResource(Res.string.chat_surface_bubble_layout_width),
+            value = width,
+            valueText = if (width >= CanvasBubbleLayout.COMPOSER_FULL_DP) stringResource(Res.string.chat_surface_bubble_layout_full) else dpText(width),
+            range = CanvasBubbleLayout.COMPOSER_MIN_DP..CanvasBubbleLayout.COMPOSER_FULL_DP,
+            tag = BUBBLE_LAYOUT_WIDTH_SLIDER_TAG,
+        ),
+        onChange = prefs::setComposerWidth,
+    )
+    val height = layout.composerHeightDp ?: CanvasBubbleLayout.COMPOSER_HEIGHT_MIN_DP
+    LayoutSlider(
+        row = SliderRow(
+            label = stringResource(Res.string.chat_surface_bubble_layout_height),
+            value = height,
+            valueText = if (layout.composerMultiLine) dpText(height) else stringResource(Res.string.chat_surface_bubble_layout_one_line),
+            range = CanvasBubbleLayout.COMPOSER_HEIGHT_MIN_DP..CanvasBubbleLayout.COMPOSER_HEIGHT_MAX_DP,
+            tag = BUBBLE_LAYOUT_HEIGHT_SLIDER_TAG,
+        ),
+        onChange = prefs::setComposerHeight,
+    )
 }
 
 @Composable
@@ -341,10 +482,13 @@ internal object BubbleLayoutDimens {
     /** The layout button, the slider rows and Reset: comfortable touch targets. */
     val control: Dp = 44.dp
 
-    /** The invisible strip outside each side of the bar that resizes it. */
-    val edgeStrip: Dp = 8.dp
+    /** The invisible strip straddling each side and the top of the bar that resizes it. */
+    val edgeStrip: Dp = 10.dp
 
     val menuWidth: Dp = 300.dp
+
+    /** How long the layout button stays once the pointer leaves the mascot: time to reach it. */
+    const val REVEAL_LINGER_MS: Long = 1_500L
 }
 
 /** Where the hold slider sits while the hold is automatic. */
@@ -354,7 +498,9 @@ internal const val BUBBLE_LAYOUT_BUTTON_TAG = "chat-bubble-layout-button"
 internal const val BUBBLE_LAYOUT_MENU_TAG = "chat-bubble-layout-menu"
 internal const val BUBBLE_LAYOUT_MASCOT_SLIDER_TAG = "chat-bubble-layout-mascot"
 internal const val BUBBLE_LAYOUT_WIDTH_SLIDER_TAG = "chat-bubble-layout-width"
+internal const val BUBBLE_LAYOUT_HEIGHT_SLIDER_TAG = "chat-bubble-layout-height"
 internal const val BUBBLE_LAYOUT_HOLD_SLIDER_TAG = "chat-bubble-layout-hold"
 internal const val BUBBLE_LAYOUT_RESET_TAG = "chat-bubble-layout-reset"
 internal const val BUBBLE_WIDTH_HANDLE_LEFT_TAG = "chat-bubble-width-left"
 internal const val BUBBLE_WIDTH_HANDLE_RIGHT_TAG = "chat-bubble-width-right"
+internal const val BUBBLE_HEIGHT_HANDLE_TOP_TAG = "chat-bubble-height-top"

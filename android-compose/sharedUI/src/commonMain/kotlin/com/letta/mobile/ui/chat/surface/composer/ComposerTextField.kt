@@ -81,6 +81,10 @@ internal data class ComposerFieldStyle(
     val imeSend: Boolean = false,
     /** The phone's placeholder copy ("Type a message…") when the owner gives none. */
     val touchPlaceholder: Boolean = false,
+    /** The field's least height; a minimised bar the person made taller holds it open at that. */
+    val minHeight: Dp = LettaDimens.Space.xl,
+    /** Where the text sits: mid-field on one line, from the top once the field is a box of lines. */
+    val textAlignment: Alignment = Alignment.CenterStart,
 ) {
     /** Touch's soft keyboard shows a Send action key; elsewhere the defaults. */
     fun keyboardOptions(): KeyboardOptions {
@@ -136,7 +140,7 @@ internal fun ComposerTextField(
         enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = LettaDimens.Space.xl, max = style.maxHeight)
+            .heightIn(min = style.minHeight, max = style.maxHeight)
             .testTag(style.testTag)
             .then(primaryFieldTargets(primary))
             .focusRequester(focusRequester)
@@ -151,7 +155,7 @@ internal fun ComposerTextField(
         keyboardActions = KeyboardActions(onSend = { sendFromKeyboard() }),
         decorationBox = { inner ->
             // Centred in the field's height, so a one-line bar's text sits mid-bar, not at its top.
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = style.textAlignment) {
                 if (fieldValue.text.isEmpty()) FieldPlaceholder(model, style, textStyle)
                 inner()
             }

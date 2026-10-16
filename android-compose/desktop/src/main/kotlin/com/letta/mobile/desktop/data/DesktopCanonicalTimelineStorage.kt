@@ -6,17 +6,11 @@ import com.letta.mobile.data.timeline.TimelineDurableCheckpointCodec
 import com.letta.mobile.data.timeline.TimelineTransport
 import java.nio.file.Path
 
-/**
- * Explicit dormant binding. The caller supplies a separately named ledger directory, never the
- * legacy snapshot directory. Construction performs no disk IO and does not acquire a conversation.
- * The enabled path has no ConfirmedTimelineStore dependency or whole-envelope fallback.
- */
+/** Construction performs no disk IO and does not acquire a conversation. */
 fun createDesktopCanonicalTimelineCoordinator(
     ledgerDirectory: Path,
     transport: TimelineTransport,
-    enabled: Boolean = false,
-): CanonicalTimelineCoordinator? {
-    if (!enabled) return null
+): CanonicalTimelineCoordinator {
     val codec = object : DesktopTimelineCheckpointCodec {
         override fun encode(value: TimelineDurableCheckpoint): ByteArray = TimelineDurableCheckpointCodec.encode(value)
         override fun decode(bytes: ByteArray): TimelineDurableCheckpoint = TimelineDurableCheckpointCodec.decode(bytes)

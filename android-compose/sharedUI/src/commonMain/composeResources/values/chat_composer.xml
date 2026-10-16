@@ -28,6 +28,7 @@
     <string name="composer_effort_default">Default</string>
     <string name="composer_context_label">Context %1$s</string>
     <string name="composer_context_title">Context window</string>
+    <string name="composer_context_show_breakdown">Show the context breakdown</string>
     <string name="composer_context_measuring">Measuring…</string>
     <string name="composer_context_empty">No context reading for this conversation yet.</string>
     <string name="composer_context_loading_value">…</string>

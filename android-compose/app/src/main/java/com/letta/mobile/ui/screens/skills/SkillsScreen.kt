@@ -68,6 +68,7 @@ private fun skillsPageActions(skills: SkillsViewModel, tools: AllToolsViewModel)
     onRefreshSkills = skills::refresh,
     onInstallSkill = skills::install,
     onUninstallSkill = skills::uninstall,
+    onDismissSkillActionError = skills::dismissActionError,
     onRefreshTools = tools::loadTools,
     onToolTagToggled = tools::toggleTag,
     onClearToolTags = tools::clearTags,
@@ -79,6 +80,7 @@ internal fun skillsPageState(catalog: SkillsCatalogState, tools: ToolLibraryStat
     installedSkillNames = catalog.installedSkillNames,
     skillsLoading = catalog.isLoading,
     skillsError = catalog.errorMessage,
+    skillActionError = catalog.actionError,
     canManageSkills = catalog.canManage,
     tools = tools,
 )

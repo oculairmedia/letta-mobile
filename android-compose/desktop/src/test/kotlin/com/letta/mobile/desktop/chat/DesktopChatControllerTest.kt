@@ -18,7 +18,6 @@ import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineNoActiveRunException
 import com.letta.mobile.data.timeline.TimelineStreamFrame
-import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
@@ -40,11 +39,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-
-internal val noOpDesktopTimelinePersistence = DesktopTimelinePersistence(
-    store = NoOpConfirmedTimelineStore,
-    backendId = "desktop-controller-test",
-)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DesktopChatControllerTest {
@@ -399,7 +393,6 @@ class DesktopChatControllerTest {
                 gatewayConstructed = true
                 FakeDesktopChatGateway()
             },
-            timelinePersistence = noOpDesktopTimelinePersistence,
         )
         controller.start()
         runCurrent()
@@ -644,7 +637,6 @@ class DesktopChatControllerTest {
             scope = this,
             gatewayFactory = { gateway },
             agentNamesByIdProvider = agentNamesByIdProvider,
-            timelinePersistence = noOpDesktopTimelinePersistence,
             loopFactory = loopFactory,
         )
 
@@ -657,7 +649,6 @@ class DesktopChatControllerTest {
             scope = this,
             gatewayFactory = { gateway },
             agentNamesByIdProvider = agentNamesByIdProvider,
-            timelinePersistence = noOpDesktopTimelinePersistence,
         )
 
     private fun TestScope.testController(
@@ -669,7 +660,6 @@ class DesktopChatControllerTest {
             scope = this,
             gatewayFactory = gatewayFactory,
             agentNamesByIdProvider = agentNamesByIdProvider,
-            timelinePersistence = noOpDesktopTimelinePersistence,
         )
 }
 

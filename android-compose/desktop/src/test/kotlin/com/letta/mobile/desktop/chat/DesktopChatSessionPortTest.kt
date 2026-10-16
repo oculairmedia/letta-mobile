@@ -449,6 +449,5 @@ class DesktopChatSessionPortTest {
             bootstrapState = defaultDesktopBootstrapState(),
             scope = this,
             gatewayFactory = { gateway },
-            timelinePersistence = noOpDesktopTimelinePersistence,
         )
 }
