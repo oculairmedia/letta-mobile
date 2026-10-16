@@ -159,9 +159,42 @@ class RiveAvatarRuntime(
         if (!ready()) return
         val trigger = rig.reactionTriggers[reaction]
         when {
-            trigger != null -> sink.fire(trigger)
+            trigger != null -> {
+                // The argument rides on its own input, written before the trigger reads it.
+                when (reaction) {
+                    AvatarReaction.LAND -> number(RiveAvatarContract.INPUT_IMPACT, arg.coerceIn(0f, 1f))
+                    AvatarReaction.TRICK -> number(RiveAvatarContract.INPUT_TRICK_ID, arg.coerceIn(0f, MAX_TRICK_ID))
+                    else -> Unit
+                }
+                sink.fire(trigger)
+            }
             reaction in rig.blinkFallback -> sink.fire(RiveAvatarContract.TRIGGER_BLINK)
         }
+    }
+
+    override fun setListenLevel(level: Float) = number(RiveAvatarContract.INPUT_LISTEN_LEVEL, level.coerceIn(0f, 1f))
+
+    override fun setHovered(hovered: Boolean) = boolean(RiveAvatarContract.INPUT_HOVERED, hovered)
+
+    override fun setPetting(petting: Boolean) = boolean(RiveAvatarContract.INPUT_PETTING, petting)
+
+    /** Mascot widths per second, eased onto the contract's -1..1 lean ([MOVE_FULL_SPEED] leans fully). */
+    override fun setMotion(vx: Float, vy: Float) {
+        number(RiveAvatarContract.INPUT_MOVE_X, (vx / MOVE_FULL_SPEED).coerceIn(-1f, 1f))
+        number(RiveAvatarContract.INPUT_MOVE_Y, (vy / MOVE_FULL_SPEED).coerceIn(-1f, 1f))
+    }
+
+    override fun setReducedMotion(reduced: Boolean) = boolean(RiveAvatarContract.INPUT_REDUCE_MOTION, reduced)
+
+    override val honorsReducedMotion: Boolean get() = rig.honorsReducedMotion
+
+    /** An optional input, written only when the loaded file declares it. */
+    private fun number(input: String, value: Float) {
+        if (ready() && input in rig.inputs) sink.setNumber(input, if (value.isNaN()) 0f else value)
+    }
+
+    private fun boolean(input: String, value: Boolean) {
+        if (ready() && input in rig.inputs) sink.setBoolean(input, value)
     }
 
     private fun ready(): Boolean = !disposed && _state.value is AvatarRuntimeState.Ready
@@ -169,6 +202,12 @@ class RiveAvatarRuntime(
     companion object {
         /** The gesture id the director fires for the idle blink schedule. */
         const val BLINK_GESTURE: String = "blink"
+
+        /** The highest trick id the rig plays (rig/contract.py `trickId` 0..3). */
+        private const val MAX_TRICK_ID = 3f
+
+        /** A travel speed, in mascot widths per second, that leans the body all the way. */
+        private const val MOVE_FULL_SPEED = 4f
 
         /**
          * What a flat mascot can actually do: expressions and gaze are state-machine inputs, so

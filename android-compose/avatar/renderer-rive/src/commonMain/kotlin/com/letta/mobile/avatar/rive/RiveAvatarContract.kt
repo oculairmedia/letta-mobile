@@ -72,6 +72,60 @@ object RiveAvatarContract {
      */
     const val INPUT_SHAPE_ROTATION: String = "shapeRotation"
 
+    // --- te3n1.5 rig inputs, written by the shared MascotDirector (te3n1.1) ----------------------
+    // The host interprets gestures and physics and writes these; the file owns every animation.
+
+    /** Boolean. Reduced motion: no idle beats, wander or breath bob; reactions shrink to a blink or glyph change. */
+    const val INPUT_REDUCE_MOTION: String = "reduceMotion"
+
+    /** Boolean. Held while the user pets the mascot. */
+    const val INPUT_PETTING: String = "petting"
+
+    /** Boolean. The pointer is over the mascot; the host is its writer (the file's listeners are a fallback). */
+    const val INPUT_HOVERED: String = "hovered"
+
+    /** Number, 0..1. Listening intensity: the user's typing cadence while LISTENING. */
+    const val INPUT_LISTEN_LEVEL: String = "listenLevel"
+
+    /** Number, -1..1. Horizontal travel / drag velocity: the body leans about its feet. */
+    const val INPUT_MOVE_X: String = "moveX"
+
+    /** Number, -1..1. Vertical travel velocity, + is down: up stretches, down squashes. */
+    const val INPUT_MOVE_Y: String = "moveY"
+
+    /** Number, 0..1. How hard the next [TRIGGER_LAND] lands. */
+    const val INPUT_IMPACT: String = "impact"
+
+    /** Number, 0..3. Which trick the next [TRIGGER_TRICK] plays. */
+    const val INPUT_TRICK_ID: String = "trickId"
+
+    /** Trigger. A poke: squish, startled glyph, rebound. */
+    const val TRIGGER_POKE: String = "poke"
+
+    /** Trigger. Poked too often: the dizzy glyph and a decaying wobble. */
+    const val TRIGGER_DIZZY: String = "dizzy"
+
+    /** Trigger. The user sent a message: a 'got it' catch-dip. */
+    const val TRIGGER_SENT: String = "sent"
+
+    /** Trigger. A tool started: a small hop with a glance down. */
+    const val TRIGGER_TOOL_START: String = "toolStart"
+
+    /** Trigger. A tool returned: a nod. */
+    const val TRIGGER_TOOL_DONE: String = "toolDone"
+
+    /** Trigger. Put down: an arrival squash scaled by [INPUT_IMPACT]. */
+    const val TRIGGER_LAND: String = "land"
+
+    /** Trigger. Woken out of sleeping / dreaming. */
+    const val TRIGGER_WAKE: String = "wake"
+
+    /** Trigger. Dozing off into sleeping / dreaming. */
+    const val TRIGGER_YAWN: String = "yawn"
+
+    /** Trigger. Plays trick [INPUT_TRICK_ID]. */
+    const val TRIGGER_TRICK: String = "trick"
+
     /** The enum key for [shape], matching a `DataEnumValue key` in the asset. A key, not an index, for the same reason as [stateKey]. */
     fun shapeKey(shape: MascotShape): String = when (shape) {
         MascotShape.CIRCLE -> "circle"
@@ -97,68 +151,76 @@ object RiveAvatarContract {
      * A key rather than an index on purpose. Rive delivers a custom enum's value as its position in
      * the declared list, so an index contract breaks silently the day someone reorders the art: the
      * build stays clean and the mascot simply plays the wrong state forever.
-     *
-     * A state the file does not declare ([RiveMascotCapabilities.states]) plays its nearest
-     * neighbour: WORKING the thinking state, DREAMING the sleeping one. The director and every
-     * non-Rive surface still know the difference; the rig slice (letta-mobile-te3n1.5) lights the
-     * real ones up by declaring them.
      */
-    fun stateKey(state: AvatarState, capabilities: RiveMascotCapabilities = RiveMascotCapabilities.CURRENT): String? =
-        when (state) {
-            AvatarState.IDLE -> "idle"
-            AvatarState.LISTENING -> "listening"
-            AvatarState.THINKING -> "thinking"
-            AvatarState.WORKING -> capabilities.stateOr(RiveMascotCapabilities.STATE_WORKING, fallback = "thinking")
-            AvatarState.WAITING_INPUT -> "waitingInput"
-            AvatarState.SPEAKING -> "speaking"
-            AvatarState.ERROR -> "error"
-            AvatarState.SLEEPING -> "sleeping"
-            AvatarState.DREAMING -> capabilities.stateOr(RiveMascotCapabilities.STATE_DREAMING, fallback = "sleeping")
-            AvatarState.LOADING -> "loading"
-            AvatarState.FAILED -> "failed"
-            AvatarState.DEGRADED -> "degraded"
-            // Momentary: written as a trigger / a boolean, never as the sustained enum.
-            AvatarState.SUCCESS, AvatarState.DRAGGED -> null
-        }
+    fun stateKey(state: AvatarState): String? = when (state) {
+        AvatarState.IDLE -> "idle"
+        AvatarState.LISTENING -> "listening"
+        AvatarState.THINKING -> "thinking"
+        AvatarState.WORKING -> "working"
+        AvatarState.WAITING_INPUT -> "waitingInput"
+        AvatarState.SPEAKING -> "speaking"
+        AvatarState.ERROR -> "error"
+        AvatarState.SLEEPING -> "sleeping"
+        AvatarState.DREAMING -> "dreaming"
+        AvatarState.LOADING -> "loading"
+        AvatarState.FAILED -> "failed"
+        AvatarState.DEGRADED -> "degraded"
+        // Momentary: written as a trigger / a boolean, never as the sustained enum.
+        AvatarState.SUCCESS, AvatarState.DRAGGED -> null
+    }
 }
 
 /**
- * What the loaded `.riv` can play beyond the base contract (letta-mobile-te3n1.1): the optional
- * sustained states its enum declares, the reactions it has a trigger for, and the reactions it
- * answers with a blink for want of its own animation. Every reaction outside both writes nothing,
- * so the director can fire the whole vocabulary against any file. The rig slice extends [CURRENT]
- * (or passes its own) as the art lands; nothing in the director changes.
+ * What the loaded `.riv` plays beyond the base contract (letta-mobile-te3n1.1): the reactions it
+ * has a trigger for, the reactions it answers with a blink for want of its own animation, and the
+ * optional host inputs it reads. A reaction outside both sets and an input outside [inputs] write
+ * nothing, so the director drives its whole vocabulary against any file and the renderer never
+ * writes a name the file does not declare.
  *
- * Every name here must already be in the file: a drifted name fails silently at runtime.
+ * Every name here must be in the file: rig/contract.py and the CI contract check hold
+ * [RiveAvatarContract]'s names to the built `.riv`.
  */
 data class RiveMascotCapabilities(
-    /** Optional sustained-state keys the file's `AvatarState` enum declares. */
-    val states: Set<String> = emptySet(),
     /** Reactions the file plays as a trigger of their own. */
     val reactionTriggers: Map<AvatarReaction, String> = emptyMap(),
     /** Reactions the file has no animation for that read well as a blink. */
     val blinkFallback: Set<AvatarReaction> = emptySet(),
+    /** Optional host inputs the file reads ([RiveAvatarContract.INPUT_REDUCE_MOTION] and friends). */
+    val inputs: Set<String> = emptySet(),
 ) {
-    internal fun stateOr(key: String, fallback: String): String = if (key in states) key else fallback
+    /** The file calms itself under reduced motion, so reactions need not shrink on the host side. */
+    val honorsReducedMotion: Boolean get() = RiveAvatarContract.INPUT_REDUCE_MOTION in inputs
 
     companion object {
-        /** The optional enum key for tool execution. */
-        const val STATE_WORKING: String = "working"
-
-        /** The optional enum key for a background dream. */
-        const val STATE_DREAMING: String = "dreaming"
-
         /**
-         * The mascot.riv shipped today: success and error are its only reaction triggers, and it
-         * has neither a working nor a dreaming state. A poke, a wake and a tool starting get a
-         * blink - a visible beat that tells a tool start from the steady thinking look.
+         * The mascot.riv shipped with the te3n1.5 rig: every reaction has its own trigger except an
+         * approval ask, whose sustained waitingInput state says it and which gets a blink as its beat.
          */
         val CURRENT: RiveMascotCapabilities = RiveMascotCapabilities(
             reactionTriggers = mapOf(
+                AvatarReaction.SENT to RiveAvatarContract.TRIGGER_SENT,
+                AvatarReaction.TOOL_START to RiveAvatarContract.TRIGGER_TOOL_START,
+                AvatarReaction.TOOL_DONE to RiveAvatarContract.TRIGGER_TOOL_DONE,
                 AvatarReaction.RUN_DONE to RiveAvatarContract.TRIGGER_SUCCESS,
                 AvatarReaction.RUN_FAILED to RiveAvatarContract.TRIGGER_ERROR,
+                AvatarReaction.POKE to RiveAvatarContract.TRIGGER_POKE,
+                AvatarReaction.DIZZY to RiveAvatarContract.TRIGGER_DIZZY,
+                AvatarReaction.LAND to RiveAvatarContract.TRIGGER_LAND,
+                AvatarReaction.WAKE to RiveAvatarContract.TRIGGER_WAKE,
+                AvatarReaction.YAWN to RiveAvatarContract.TRIGGER_YAWN,
+                AvatarReaction.TRICK to RiveAvatarContract.TRIGGER_TRICK,
             ),
-            blinkFallback = setOf(AvatarReaction.POKE, AvatarReaction.WAKE, AvatarReaction.TOOL_START),
+            blinkFallback = setOf(AvatarReaction.APPROVAL_ASK),
+            inputs = setOf(
+                RiveAvatarContract.INPUT_REDUCE_MOTION,
+                RiveAvatarContract.INPUT_PETTING,
+                RiveAvatarContract.INPUT_HOVERED,
+                RiveAvatarContract.INPUT_LISTEN_LEVEL,
+                RiveAvatarContract.INPUT_MOVE_X,
+                RiveAvatarContract.INPUT_MOVE_Y,
+                RiveAvatarContract.INPUT_IMPACT,
+                RiveAvatarContract.INPUT_TRICK_ID,
+            ),
         )
     }
 }

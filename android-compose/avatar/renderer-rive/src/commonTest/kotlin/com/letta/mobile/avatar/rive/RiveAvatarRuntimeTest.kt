@@ -19,20 +19,17 @@ class RiveAvatarRuntimeTest {
     fun everySustainedStateTheRigDeclaresHasItsOwnEnumKeyAndMomentaryOnesHaveNone() {
         val momentary = setOf(AvatarState.SUCCESS, AvatarState.DRAGGED)
         val sustained = AvatarState.entries - momentary
-        val full = RiveMascotCapabilities(states = setOf(RiveMascotCapabilities.STATE_WORKING, RiveMascotCapabilities.STATE_DREAMING))
-        val keys = sustained.map { checkNotNull(RiveAvatarContract.stateKey(it, full)) }
+        val keys = sustained.map { checkNotNull(RiveAvatarContract.stateKey(it)) }
 
         assertEquals(sustained.size, keys.toSet().size, "two states share an enum key, so the asset cannot tell them apart")
         momentary.forEach { assertEquals(null, RiveAvatarContract.stateKey(it), "$it is a trigger/boolean, not an enum value") }
     }
 
     @Test
-    fun aStateTheShippedRigLacksPlaysItsNearestNeighbour() {
-        // letta-mobile-te3n1.1: the shipped mascot.riv has no working or dreaming state yet (te3n1.5).
-        assertEquals("thinking", RiveAvatarContract.stateKey(AvatarState.WORKING))
-        assertEquals("sleeping", RiveAvatarContract.stateKey(AvatarState.DREAMING))
-        val withWorking = RiveMascotCapabilities(states = setOf(RiveMascotCapabilities.STATE_WORKING))
-        assertEquals("working", RiveAvatarContract.stateKey(AvatarState.WORKING, withWorking))
+    fun toolUseAndDreamingAreTheirOwnRigStates() {
+        // letta-mobile-te3n1.1 on the te3n1.5 rig: tool use no longer looks like thinking.
+        assertEquals("working", RiveAvatarContract.stateKey(AvatarState.WORKING))
+        assertEquals("dreaming", RiveAvatarContract.stateKey(AvatarState.DREAMING))
     }
 
     @Test
@@ -70,25 +67,75 @@ class RiveAvatarRuntimeTest {
     }
 
     @Test
-    fun reactionsWithoutAnimationBlinkOrWriteNothing() = runTest {
+    fun everyReactionReachesTheShippedRig() = runTest {
         val sink = RecordingSink()
         val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
         sink.writes.clear(); sink.fired.clear()
 
-        listOf(AvatarReaction.POKE, AvatarReaction.WAKE, AvatarReaction.TOOL_START).forEach(runtime::react)
-        assertEquals(List(3) { RiveAvatarContract.TRIGGER_BLINK }, sink.fired)
+        AvatarReaction.entries.forEach { runtime.react(it) }
+        assertEquals(AvatarReaction.entries.size, sink.fired.size, "one trigger per reaction: ${sink.fired}")
+        assertEquals(RiveAvatarContract.TRIGGER_BLINK, sink.fired[AvatarReaction.APPROVAL_ASK.ordinal], "an ask blinks; waitingInput says the rest")
+        assertEquals(RiveAvatarContract.TRIGGER_TOOL_START, sink.fired[AvatarReaction.TOOL_START.ordinal])
+    }
 
+    @Test
+    fun landAndTrickWriteTheirArgumentBeforeTheTrigger() = runTest {
+        val sink = RecordingSink()
+        val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
         sink.writes.clear()
-        val silent = AvatarReaction.entries - RiveMascotCapabilities.CURRENT.reactionTriggers.keys - RiveMascotCapabilities.CURRENT.blinkFallback
-        silent.forEach(runtime::react)
-        assertEquals(emptyList(), sink.writes, "wrote a name the shipped file does not declare: ${sink.writes}")
 
-        runtime.setListenLevel(1f)
+        runtime.react(AvatarReaction.LAND, 3f)
+        runtime.react(AvatarReaction.TRICK, 2f)
+        assertEquals(
+            listOf<Pair<String, Any>>(
+                RiveAvatarContract.INPUT_IMPACT to 1f,
+                RiveAvatarContract.TRIGGER_LAND to Unit,
+                RiveAvatarContract.INPUT_TRICK_ID to 2f,
+                RiveAvatarContract.TRIGGER_TRICK to Unit,
+            ),
+            sink.writes,
+        )
+    }
+
+    @Test
+    fun hostInputsAreWrittenClampedAndReducedMotionIsHonoured() = runTest {
+        val sink = RecordingSink()
+        val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
+        sink.writes.clear()
+
+        runtime.setListenLevel(2f)
         runtime.setHovered(true)
         runtime.setPetting(true)
+        runtime.setMotion(8f, -2f)
+        runtime.setReducedMotion(true)
+        assertEquals(
+            listOf<Pair<String, Any>>(
+                RiveAvatarContract.INPUT_LISTEN_LEVEL to 1f,
+                RiveAvatarContract.INPUT_HOVERED to true,
+                RiveAvatarContract.INPUT_PETTING to true,
+                RiveAvatarContract.INPUT_MOVE_X to 1f,
+                RiveAvatarContract.INPUT_MOVE_Y to -0.5f,
+                RiveAvatarContract.INPUT_REDUCE_MOTION to true,
+            ),
+            sink.writes,
+        )
+        assertTrue(runtime.honorsReducedMotion)
+    }
+
+    @Test
+    fun aFileWithoutTheOptionalContractWritesNothingForIt() = runTest {
+        // Capability-gated: a file that declares none of the te3n1.5 names is never written them.
+        val sink = RecordingSink()
+        val runtime = RiveAvatarRuntime(sink, rig = RiveMascotCapabilities()).also { it.load(model()) }
+        sink.writes.clear()
+
+        AvatarReaction.entries.forEach { runtime.react(it) }
+        runtime.setListenLevel(1f)
+        runtime.setHovered(true)
         runtime.setMotion(1f, 1f)
         runtime.setReducedMotion(true)
-        assertEquals(emptyList(), sink.writes, "the shipped file has none of these inputs yet")
+        assertEquals(emptyList(), sink.writes)
+        assertEquals(false, runtime.honorsReducedMotion, "the director will blink instead")
     }
 
     @Test

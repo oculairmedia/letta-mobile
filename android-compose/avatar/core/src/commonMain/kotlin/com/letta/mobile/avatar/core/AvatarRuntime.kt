@@ -93,6 +93,12 @@ interface AvatarRuntime {
     /** The platform asked for reduced motion; the asset holds still poses. Default no-op. */
     fun setReducedMotion(reduced: Boolean) {}
 
+    /**
+     * True when the asset calms its own reactions under [setReducedMotion]. When false the
+     * director plays every reaction as a single blink instead, so reduced motion holds on any asset.
+     */
+    val honorsReducedMotion: Boolean get() = false
+
     /** Advance renderer-side time (spring bones, blends, procedural idle). */
     fun update(deltaSeconds: Float)
 

@@ -233,6 +233,26 @@ class MascotDirectorTest {
     }
 
     @Test
+    fun anAssetThatCalmsItselfGetsTheRealReactionsUnderReducedMotion() = runTest {
+        val runtime = object : HeadlessAvatarRuntime() {
+            val reactions = mutableListOf<AvatarReaction>()
+            var reduced = false
+            override val honorsReducedMotion: Boolean get() = true
+            override fun react(reaction: AvatarReaction, arg: Float) {
+                reactions += reaction
+            }
+            override fun setReducedMotion(reduced: Boolean) {
+                this.reduced = reduced
+            }
+        }.also { it.load(AvatarModel(id = "m", displayName = "M", uri = "res://raw/mascot.riv")) }
+        val director = MascotDirector(runtime, Random(7))
+        director.setSignals(MascotSignals(reduceMotion = true, activity = AvatarActivity.THINKING))
+        director.onEvent(MascotEvent.Sent)
+        assertTrue(runtime.reduced)
+        assertEquals(listOf(AvatarReaction.SENT), runtime.reactions)
+    }
+
+    @Test
     fun aDragHoldsDraggedCarriesTheHostsVelocityAndLandsOnRelease() = runTest {
         // Option A: the host measures the drag; the director writes dragged and the motion.
         val rig = rig()

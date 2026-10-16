@@ -22,7 +22,9 @@ import kotlin.random.Random
  * - [AvatarReaction.SENT] never nods while the mascot shows an error;
  * - tool beats are rate-limited to one per working dwell, so a storm of tools reads as one;
  * - [AvatarReaction.RUN_DONE] fires for every completion, back to back included;
- * - under reduced motion every reaction is played as a single blink.
+ * - under reduced motion the asset is told ([AvatarRuntime.setReducedMotion]) and calms its own
+ *   reactions; an asset that cannot ([AvatarRuntime.honorsReducedMotion] false) gets a single
+ *   blink for each instead.
  */
 class MascotDirector(
     private val runtime: AvatarRuntime,
@@ -254,12 +256,12 @@ class MascotDirector(
         return true
     }
 
-    /** Fire [reaction] unless it is cooling down; reduced motion plays it as a blink. */
+    /** Fire [reaction] unless it is cooling down; reduced motion on an asset that cannot calm itself plays a blink. */
     private fun fire(reaction: AvatarReaction, arg: Float = 0f) {
         if (clock - lastFired[reaction.ordinal] < config.cooldownOf(reaction)) return
         lastFired[reaction.ordinal] = clock
         pending.add(reaction)
-        if (signals.reduceMotion) runtime.playGesture(BLINK) else runtime.react(reaction, arg)
+        if (signals.reduceMotion && !runtime.honorsReducedMotion) runtime.playGesture(BLINK) else runtime.react(reaction, arg)
     }
 
     private companion object {
