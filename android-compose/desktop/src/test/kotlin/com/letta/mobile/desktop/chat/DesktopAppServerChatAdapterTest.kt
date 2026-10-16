@@ -5,8 +5,7 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
-import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeLifecycle
-import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeLease
+import com.letta.mobile.data.runtime.host.LocalAppServerLease
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnEngine
@@ -28,13 +27,7 @@ class DesktopAppServerChatAdapterTest {
     @Test
     fun remoteHostDialsItsOwnAppServerAddress() = runBlocking {
         val runtime = FakeLocalRuntime()
-        var received: DesktopAppServerRuntimeConfig? = null
-        val gateway = createDefaultDesktopChatGateway(
-            config = LettaConfig("remote", LettaConfig.Mode.SELF_HOSTED, " ws://remote:4500 "),
-            appServerConfig = DesktopAppServerRuntimeConfig(),
-            appServerGatewayFactory = recordingFactory { received = it },
-            localRuntime = runtime,
-        )
+        val (gateway, received) = dialRecording(LettaConfig("remote", LettaConfig.Mode.SELF_HOSTED, " ws://remote:4500 "), runtime)
 
         assertEquals("ws://remote:4500", received?.serverUrl)
         assertEquals(0, runtime.acquireCount)
@@ -51,7 +44,7 @@ class DesktopAppServerChatAdapterTest {
                 config = config,
                 appServerConfig = DesktopAppServerRuntimeConfig(),
                 appServerGatewayFactory = DesktopAppServerChatGatewayBuilder(),
-                localRuntime = FakeLocalRuntime(),
+                acquireLocalRuntime = FakeLocalRuntime()::acquire,
             )
         }
         Unit
@@ -60,17 +53,12 @@ class DesktopAppServerChatAdapterTest {
     @Test
     fun localModeStartsBundledRuntimeAndPassesItsUrlToFactory() = runBlocking {
         val runtime = FakeLocalRuntime(url = "ws://127.0.0.1:43123")
-        var received: DesktopAppServerRuntimeConfig? = null
-        val gateway = createDefaultDesktopChatGateway(
-            config = LettaConfig("local", LettaConfig.Mode.LOCAL, "local://bundled"),
-            appServerConfig = DesktopAppServerRuntimeConfig(),
-            appServerGatewayFactory = recordingFactory { received = it },
-            localRuntime = runtime,
-        )
+        val (gateway, received) = dialRecording(LettaConfig("local", LettaConfig.Mode.LOCAL, "local://bundled"), runtime)
 
         assertEquals(1, runtime.acquireCount)
         assertEquals(0, runtime.closeCount)
         assertEquals("ws://127.0.0.1:43123", received?.serverUrl)
+        assertEquals("lease-token", received?.bearerToken, "the local dial carries the runtime's capability token")
         assertIs<AutoCloseable>(gateway).close()
         assertEquals(1, runtime.closeCount)
     }
@@ -82,19 +70,13 @@ class DesktopAppServerChatAdapterTest {
     @Test
     fun localModeStartsBundledRuntimeEvenWithStaleIrohServerUrlOnConfig() = runBlocking {
         val runtime = FakeLocalRuntime(url = "ws://127.0.0.1:43125")
-        var received: DesktopAppServerRuntimeConfig? = null
         val staleLocalConfig = LettaConfig(
             id = "desktop-361c792e",
             mode = LettaConfig.Mode.LOCAL,
             serverUrl = "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501",
         )
 
-        val gateway = createDefaultDesktopChatGateway(
-            config = staleLocalConfig,
-            appServerConfig = DesktopAppServerRuntimeConfig(),
-            appServerGatewayFactory = recordingFactory { received = it },
-            localRuntime = runtime,
-        )
+        val (gateway, received) = dialRecording(staleLocalConfig, runtime)
 
         assertEquals(1, runtime.acquireCount)
         assertEquals("ws://127.0.0.1:43125", received?.serverUrl)
@@ -105,12 +87,10 @@ class DesktopAppServerChatAdapterTest {
     @Test
     fun explicitOverrideWinsAndDoesNotAcquireBundledRuntime() = runBlocking {
         val runtime = FakeLocalRuntime()
-        var received: DesktopAppServerRuntimeConfig? = null
-        val gateway = createDefaultDesktopChatGateway(
+        val (gateway, received) = dialRecording(
             config = LettaConfig("local", LettaConfig.Mode.LOCAL, ""),
+            runtime = runtime,
             appServerConfig = DesktopAppServerRuntimeConfig(serverUrl = "ws://override:4500"),
-            appServerGatewayFactory = recordingFactory { received = it },
-            localRuntime = runtime,
         )
 
         assertEquals("ws://override:4500", received?.serverUrl)
@@ -127,7 +107,7 @@ class DesktopAppServerChatAdapterTest {
                 config = LettaConfig("local", LettaConfig.Mode.LOCAL, ""),
                 appServerConfig = DesktopAppServerRuntimeConfig(),
                 appServerGatewayFactory = DesktopAppServerChatGatewayFactory { _, _ -> error("dial failed") },
-                localRuntime = runtime,
+                acquireLocalRuntime = runtime::acquire,
             )
         }
         assertEquals(1, runtime.closeCount)
@@ -190,16 +170,28 @@ class DesktopAppServerChatAdapterTest {
         private fun unused(): Nothing = error("not used by the adapter tests")
     }
 
+    /** Builds the default gateway over [runtime], returning it and the config the factory received. */
+    private suspend fun dialRecording(
+        config: LettaConfig,
+        runtime: FakeLocalRuntime,
+        appServerConfig: DesktopAppServerRuntimeConfig = DesktopAppServerRuntimeConfig(),
+    ): Pair<DesktopChatGateway, DesktopAppServerRuntimeConfig?> {
+        var received: DesktopAppServerRuntimeConfig? = null
+        val gateway = createDefaultDesktopChatGateway(config, appServerConfig, recordingFactory { received = it }, runtime::acquire)
+        return gateway to received
+    }
+
     private class FakeLocalRuntime(
         private val url: String = "ws://127.0.0.1:49920",
-    ) : DesktopLocalRuntimeLifecycle {
+    ) {
         var acquireCount = 0
         var closeCount = 0
 
-        override fun acquire(): DesktopLocalRuntimeLease {
+        fun acquire(): LocalAppServerLease {
             acquireCount += 1
-            return object : DesktopLocalRuntimeLease {
+            return object : LocalAppServerLease {
                 override val serverUrl: String = url
+                override val bearerToken: String = "lease-token"
                 private var closed = false
                 override fun close() {
                     if (!closed) {
@@ -208,10 +200,6 @@ class DesktopAppServerChatAdapterTest {
                     }
                 }
             }
-        }
-
-        override fun close() {
-            closeCount += 1
         }
     }
 }

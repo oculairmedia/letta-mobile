@@ -34,6 +34,12 @@ internal data class DesktopRuntimeLaunchInputs(
     val inheritedPath: String? = null,
 )
 
+/** Extra environment and working directory for the next spawn (letta-mobile-bzvro.5, F05). */
+internal data class DesktopRuntimeLaunchContext(
+    val environment: Map<String, String> = emptyMap(),
+    val workingDirectory: File? = null,
+)
+
 /** letta-code's switch for automatic reflection (dreaming) on Windows (letta.js 0.34.8 L:451887). */
 internal const val WINDOWS_AUTO_REFLECTION_ENV = "LETTA_ENABLE_WINDOWS_AUTO_REFLECTION"
 

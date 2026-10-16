@@ -82,7 +82,7 @@ private fun rememberHostNotes(agentId: String, store: SecureSettingsStore): Drea
 /** The bundled runtime on Windows starts no automatic dream unless the user allowed it here. */
 @Composable
 private fun rememberWindowsNotes(store: SecureSettingsStore): DreamingHostNotes {
-    val health by DesktopLocalRuntimeHost.health.collectAsState()
+    val health by DesktopLocalRuntimeHost.appServer.health.collectAsState()
     var allowed by remember(store) { mutableStateOf(DesktopRuntimeLaunchSettings.readWindowsAutoReflection(store)) }
     val bundledOnWindows = health.active && DesktopIrohWorkspaceRelay.transport == null &&
         windowsBlocksAutoReflection(System.getProperty("os.name"), System.getenv())
@@ -92,7 +92,7 @@ private fun rememberWindowsNotes(store: SecureSettingsStore): DreamingHostNotes 
         onAllowWindowsAuto = {
             DesktopRuntimeLaunchSettings.saveWindowsAutoReflection(store, allowed = true)
             allowed = true
-            DesktopLocalRuntimeHost.forceRestart()
+            DesktopLocalRuntimeHost.appServer.forceRestart()
         },
     )
 }
