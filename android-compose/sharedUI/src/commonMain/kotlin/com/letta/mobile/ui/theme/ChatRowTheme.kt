@@ -81,13 +81,21 @@ object ChatRowSpacing {
 
     /**
      * A run's header (legacy RunActivityDisclosure): its floor, taller when it folds the run, and its
-     * inset; a settled run's body lifts [settledRunBodyLift] up under it, as the legacy RunBlock does.
+     * inset.
      */
     val runHeaderMinHeight: Dp = LettaDimens.Space.xxl
     val runHeaderToggleMinHeight: Dp = LettaDimens.Orb.railSlotHeight
     val runHeaderHorizontal: Dp = LettaDimens.Space.xs
     val runHeaderVertical: Dp = LettaDimens.Space.hair
-    val settledRunBodyLift: Dp = 22.dp
+
+    /**
+     * What a summary line's floor leaves under its one-line label (the floor less the label's line,
+     * halved): the plain line's [runHeaderMinHeight], and the folding line's [runHeaderToggleMinHeight].
+     * The run's body lifts this far plus its first step's beat, so the response under a showing line
+     * starts right under the label (the same distance as a paragraph break), not a section break below it.
+     */
+    val runHeaderFloor: Dp = LettaDimens.Space.sm
+    val runHeaderToggleFloor: Dp = LettaDimens.Space.md + LettaDimens.Space.hair
 
     /** The run summary line's status glyph (check, spinner, warning). */
     val runGlyphSize: Dp = LettaDimens.Control.iconSm
