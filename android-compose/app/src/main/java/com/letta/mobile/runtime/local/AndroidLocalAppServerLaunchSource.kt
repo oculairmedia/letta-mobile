@@ -1,6 +1,7 @@
 package com.letta.mobile.runtime.local
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.runtime.host.LocalAppServerHost
@@ -32,6 +33,8 @@ class AndroidLocalAppServerLaunchSource @Inject constructor(
     private val assetExtractor: EmbeddedLettaCodeAssetExtractor,
     private val networkBridge: AndroidNetworkBridge,
     private val onDeviceBridge: OnDeviceOpenAiBridge,
+    /** Where the host's lifecycle lines go too (letta-mobile-by4vm.121.11). */
+    val lifecycleLog: RuntimeLifecycleLog,
 ) {
     private val lock = Mutex()
     private var bridge: AndroidNetworkBridgeSession? = null
@@ -39,7 +42,9 @@ class AndroidLocalAppServerLaunchSource @Inject constructor(
 
     suspend fun launch(): LocalAppServerLaunch {
         check(LocalLettaCodeService.start(context)) { "Embedded LettaCode foreground service could not start." }
+        val extractBegan = SystemClock.elapsedRealtime()
         val project = assetExtractor.prepare()
+        lifecycleLog.line("[lifecycle] runtime assets ready in ${SystemClock.elapsedRealtime() - extractBegan} ms")
         val session = lock.withLock { bridge ?: networkBridge.start().also { bridge = it } }
         return project.androidLocalAppServerLaunch(
             networkBridge = AndroidNetworkBridgeEndpoint(session.baseUrl, session.authToken),
@@ -65,7 +70,7 @@ class AndroidLocalAppServerLaunchSource @Inject constructor(
             } else {
                 onDeviceEndpoint(selection)
             }
-            project.storageDirectory.writeLocalProviderAuth(endpoint, selection)
+            project.storageDirectory.writeLocalProviderAuth(endpoint)
         }
         Log.i(TAG, "local provider: model=${selection.lettaCodeModelHandle} custom=${selection.isCustomProvider}")
         return project.storageDirectory
@@ -105,7 +110,5 @@ fun androidLocalAppServerHost(
     launch = launchSource::launch,
     readyz = discovery::readyz,
     scope = scope,
-    logLine = { line -> Log.i(LOCAL_APP_SERVER_TAG, line) },
+    logLine = launchSource.lifecycleLog::line,
 )
-
-private const val LOCAL_APP_SERVER_TAG = "LocalAppServer"

@@ -2,8 +2,11 @@
 // Each turn: when the last message is the user's and a shell-like tool is offered, answer with ONE
 // tool call (exercises tool execution + child_process on Node 18); once the tool result is back (or
 // with no tool offered) answer with the text NODE18-OK. Requests are logged as JSON lines to
-// $FAKE_LLM_LOG, including any tool result text, so the caller can assert the tool really ran.
-// usage: FAKE_LLM_PORT=4711 FAKE_LLM_LOG=<log path> node fake-llm.cjs
+// $FAKE_LLM_LOG, including any tool result text, so the caller can assert the tool really ran, and
+// the number of images in the last user message (`images`), so it can assert an image arrived.
+// Routes mirror the on-device bridge (OnDeviceOpenAiBridge): GET /v1/models lists FAKE_LLM_MODEL,
+// POST /v1/chat/completions answers, anything else (LM Studio's /api/v0/models) is a 404.
+// usage: FAKE_LLM_PORT=4711 FAKE_LLM_LOG=<log path> FAKE_LLM_MODEL=<served id> node fake-llm.cjs
 'use strict';
 const http = require('http');
 const fs = require('fs');
@@ -11,7 +14,8 @@ const fs = require('fs');
 const port = Number(process.env.FAKE_LLM_PORT || 4711);
 const LOG = process.env.FAKE_LLM_LOG;
 if (!LOG) throw new Error('FAKE_LLM_LOG (the request log path) is required');
-const MODEL = 'node18-model';
+const MODEL = process.env.FAKE_LLM_MODEL;
+if (!MODEL) throw new Error('FAKE_LLM_MODEL (the id /v1/models lists) is required');
 const SHELL_TOOLS = ['Bash', 'bash', 'shell', 'Shell', 'ShellCommand', 'run_shell_command', 'exec_command'];
 const TOOL_ARGS = JSON.stringify({ command: 'echo NODE18-TOOL-$((6*7))', description: 'node18 smoke' });
 
@@ -23,13 +27,22 @@ function textOf(content) {
   return '';
 }
 
+// OpenAI chat parts (`image_url`), as letta-code sends images to an lmstudio provider.
+function imagesIn(content) {
+  return Array.isArray(content) ? content.filter((part) => part && (part.type === 'image_url' || part.type === 'image')).length : 0;
+}
+
 function plan(parsed) {
   const toolNames = (parsed.tools || []).map((t) => (t.function ? t.function.name : t.name));
   const msgs = parsed.messages || [];
   const last = msgs[msgs.length - 1] || {};
   const shellTool = SHELL_TOOLS.find((t) => toolNames.includes(t)) || null;
   const toolResult = last.role === 'tool' ? textOf(last.content).slice(0, 200) : null;
-  return { toolNames, lastRole: last.role, shellTool, toolResult, callTool: Boolean(shellTool) && last.role === 'user' };
+  const lastUser = [...msgs].reverse().find((m) => m.role === 'user') || {};
+  return {
+    toolNames, lastRole: last.role, shellTool, toolResult, images: imagesIn(lastUser.content),
+    callTool: Boolean(shellTool) && last.role === 'user',
+  };
 }
 
 function streamReply(res, id, step) {
@@ -67,9 +80,13 @@ http.createServer((req, res) => {
   let body = '';
   req.on('data', (c) => { body += c; });
   req.on('end', () => {
-    if (req.url.endsWith('/models')) {
+    if (req.url === '/v1/models') {
       res.writeHead(200, { 'content-type': 'application/json' });
       return res.end(JSON.stringify({ object: 'list', data: [{ id: MODEL, object: 'model', owned_by: 'ci' }] }));
+    }
+    if (req.url !== '/v1/chat/completions') {
+      res.writeHead(404, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ error: { type: 'not_found', message: `Unknown route: ${req.url}` } }));
     }
     let parsed = {};
     try { parsed = JSON.parse(body); } catch { /* logged below as an empty request */ }

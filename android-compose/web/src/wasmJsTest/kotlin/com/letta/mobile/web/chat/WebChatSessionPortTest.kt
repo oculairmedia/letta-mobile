@@ -1,6 +1,8 @@
 package com.letta.mobile.web.chat
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.transport.appserver.AppServerAdminMethod
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerTimelineConnection
@@ -14,8 +16,11 @@ import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
+import com.letta.mobile.ui.chat.session.ConversationModelBackend
 import com.letta.mobile.ui.chat.session.TimelineChatRunControls
 import com.letta.mobile.ui.chat.session.TimelineChatTarget
+import com.letta.mobile.ui.chat.session.TimelineChipSources
+import com.letta.mobile.ui.chat.session.TimelineModelSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -89,6 +94,31 @@ class WebChatSessionPortTest {
         assertEquals(false, bare.capabilities.value.modelSwitch)
         withControls.close()
         bare.close()
+    }
+
+    @Test
+    fun theSessionsChipsTurnOnTheModelChip() = runTest {
+        val transport = FakeAppServer(history = EMPTY_HISTORY).transport()
+        val chips = TimelineChipSources(
+            models = TimelineModelSource(
+                backend = ConversationModelBackend(
+                    list = { listOf(LlmModel(id = "sol", name = "Sol", handle = "openai/sol")) },
+                    setModel = { change -> Conversation(id = change.conversationId, agentId = AgentId("agent-1")) },
+                ),
+                conversation = { id -> Conversation(id = id, agentId = AgentId("agent-1"), model = "openai/sol") },
+                agentModel = null,
+            ),
+            permissionModes = null,
+        )
+        val port = WebChatSessionPort(WebChatBinding(target, transport, TimelineChatRunControls(), chips), scope)
+
+        val model = withContext(Dispatchers.Default) {
+            withTimeout(TIMEOUT_MS) { port.composer.first { it.model?.currentHandle == "openai/sol" }.model }
+        }
+
+        assertEquals("Sol", model?.currentLabel)
+        assertTrue(port.capabilities.value.modelSwitch)
+        port.close()
     }
 
     private suspend fun awaitState(port: WebChatSessionPort, predicate: (ChatUiState) -> Boolean) =

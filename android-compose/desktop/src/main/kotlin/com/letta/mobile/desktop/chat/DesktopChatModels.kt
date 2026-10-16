@@ -15,6 +15,8 @@ import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatSessionState
 import com.letta.mobile.data.chat.runtime.chatScreenStatusOf
 import com.letta.mobile.data.chat.runtime.groupConversationsByAgentName
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
@@ -23,6 +25,8 @@ import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.desktop.DesktopBootstrapState
+import com.letta.mobile.ui.chat.session.ConversationModelFocus
+import com.letta.mobile.ui.chat.session.ConversationModelUpdate
 
 typealias DesktopConversationSummary = ChatConversationSummary
 typealias DesktopChatConnectionState = ChatConnectionState
@@ -195,6 +199,19 @@ fun DesktopChatSurfaceState.withRuntimeState(runtimeState: ChatSessionState): De
         errorMessage = runtimeState.errorMessage,
         selectionGeneration = runtimeState.selectionGeneration,
     )
+
+/** The model chip's conversation: the selected one, with the label the surface shows for it. */
+internal fun modelFocusOf(state: DesktopChatSurfaceState): ConversationModelFocus = ConversationModelFocus(
+    conversationId = state.selectedConversationId?.let(::ConversationId),
+    agentId = state.selectedConversation?.agentId?.takeIf(String::isNotBlank)?.let(::AgentId),
+    label = state.composerModelLabel,
+)
+
+/** Applies a model chip change: its label only while that conversation is still selected, its error always. */
+internal fun DesktopChatSurfaceState.withModelUpdate(update: ConversationModelUpdate): DesktopChatSurfaceState {
+    val label = update.label?.takeIf { selectedConversationId == update.conversationId.value } ?: composerModelLabel
+    return copy(composerModelLabel = label, errorMessage = update.error ?: errorMessage)
+}
 
 /** Shows [message] as the composer's error (and, for the legacy page, the surface error). */
 internal fun DesktopChatSurfaceState.withComposerError(message: String): DesktopChatSurfaceState =

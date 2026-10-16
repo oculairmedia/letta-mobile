@@ -144,7 +144,7 @@ class RunPhaseReducerTest {
     fun aNewTurnForgetsTheLastTurnsSubagents() {
         feed(RuntimeEventPayload.LocalUserAppend("local-1", "fan out"))
         feed(toolCall("t1", "Task"))
-        state = RunPhaseReducer.withSubagents(state, 3, ++clock)
+        state = RunPhaseReducer.withSubagents(state, SubagentActivity(running = 3), ++clock)
         assertEquals(RunPhase.DELEGATING, state.phase)
         assertEquals(RunPhase.DONE, feed(lifecycle(RuntimeRunStatus.Completed)))
         // The next turn's first tool is plain WORKING until the subagent registry speaks again.
@@ -216,12 +216,12 @@ class RunPhaseReducerTest {
     fun subagentsUnderAToolCallReadAsDelegating() {
         feed(RuntimeEventPayload.LocalUserAppend("local-1", "fan out"))
         assertEquals(RunPhase.WORKING, feed(toolCall("t1", "Task")))
-        state = RunPhaseReducer.withSubagents(state, 3, ++clock)
+        state = RunPhaseReducer.withSubagents(state, SubagentActivity(running = 3), ++clock)
         assertEquals(RunPhase.DELEGATING, state.phase)
         assertEquals(3, state.subagentCount)
         // Still delegating while the tool runs; back to the gap when it returns.
         assertEquals(RunPhase.QUEUED, feed(toolReturn("t1")))
-        state = RunPhaseReducer.withSubagents(state, 0, ++clock)
+        state = RunPhaseReducer.withSubagents(state, SubagentActivity(running = 0), ++clock)
         assertEquals(RunPhase.QUEUED, state.phase)
     }
 

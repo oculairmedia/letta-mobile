@@ -13,6 +13,8 @@ import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.desktop.canvas.toCanvasArchiveFilter
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopBranchOrigin
@@ -58,7 +60,7 @@ internal data class DesktopSidebarInputs(
 
 /** The shared panel's state for the window: the focused agent, its page, its stack's chats and every canvas. */
 internal fun desktopSidebarPanelState(
-    navigator: DesktopShellNavigator,
+    navigator: ShellWorkspaceState,
     frame: DesktopShellFrame,
     inputs: DesktopSidebarInputs,
 ): ShellAgentPanelState {
@@ -135,7 +137,7 @@ internal fun desktopSidebarActions(
         onOpenSection = { navigator.navigate(lensNavTarget(navigator.workPlayMode, it).first) },
         onOpenSettings = { navigator.navigate(DesktopDestination.Settings) },
         onNewChat = { context.openNewChatForFocusedAgent(focus) },
-        onEditAgent = { navigator.editAgentId = focus.selectedAgentId },
+        onEditAgent = { navigator.editAgentId = focus.selectedAgentId?.let(::AgentId) },
         onArchiveFilterChange = { chatController.setArchiveFilter(it.toConversationArchiveFilter()) },
         onConversationSelected = { context.router.openConversation(ConversationId(it)) },
         onArchiveConversation = chatController::setConversationArchived,

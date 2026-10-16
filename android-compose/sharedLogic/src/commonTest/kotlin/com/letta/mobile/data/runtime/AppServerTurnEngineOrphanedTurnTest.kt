@@ -231,6 +231,17 @@ class AppServerTurnEngineOrphanedTurnTest {
         assertTrue(client.approvalResponses.isEmpty())
     }
 
+    /** letta-mobile-8fq4j: an unleased ExitPlanMode stays parked for the person, never auto-allowed. */
+    @Test
+    fun unleasedExitPlanModeStaysPending() = runTest {
+        val client = TurnEngineTestRecordingClient()
+        val engine = engine(client).also { it.ownRuntime() }
+        val outcome = engine.answerUnleasedControlRequest(TestApprovalTool.ExitPlanMode.controlRequest())
+
+        assertEquals(UnleasedApprovalOutcome.LeftPending, outcome)
+        assertTrue(client.approvalResponses.isEmpty())
+    }
+
     @Test
     fun unleasedApprovalStaysPendingOutsideUnrestricted() = runTest {
         val client = TurnEngineTestRecordingClient()

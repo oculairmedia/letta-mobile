@@ -6,7 +6,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -51,26 +50,17 @@ class AndroidEmbeddedLettaCodeLaunchSpecTest {
     }
 
     @Test
-    fun `local provider file points lc-lmstudio at the endpoint and lists the selected model`() {
+    fun `local provider file points lc-lmstudio at the endpoint without a models list`() {
         val backendDir = tempDir("letta-provider-auth")
-        val selection = EmbeddedLettaCodeModelSelection(
-            modelHandle = "google/gemma-3n-E2B-it-litert-lm",
-            modelPath = "/models/gemma.litertlm",
-            runtime = "litert-lm",
-            accelerator = "gpu",
-            maxTokens = 2048,
-        )
 
-        backendDir.writeLocalProviderAuth(ProviderEndpoint("http://127.0.0.1:3456/v1", "loopback-token"), selection)
+        backendDir.writeLocalProviderAuth(ProviderEndpoint("http://127.0.0.1:3456/v1", "loopback-token"))
 
         val provider = kotlinx.serialization.json.Json.parseToJsonElement(File(backendDir, "providers/auth.json").readText())
             .jsonObject.getValue("providers").jsonObject.getValue("lc-lmstudio").jsonObject
         assertEquals("lmstudio", provider.getValue("provider_type").jsonPrimitive.content)
         assertEquals("http://127.0.0.1:3456/v1", provider.getValue("base_url").jsonPrimitive.content)
         assertEquals("loopback-token", provider.getValue("auth").jsonObject.getValue("key").jsonPrimitive.content)
-        val model = provider.getValue("models").jsonArray.single().jsonObject
-        assertEquals("google/gemma-3n-E2B-it-litert-lm", model.getValue("id").jsonPrimitive.content)
-        assertEquals("lmstudio/google/gemma-3n-E2B-it-litert-lm", selection.lettaCodeModelHandle)
+        assertFalse(provider.containsKey("models"))
     }
 
     @Test
@@ -87,7 +77,7 @@ class AndroidEmbeddedLettaCodeLaunchSpecTest {
         assertEquals(
             "the host appends `server …`; node18-compat first, no device-tools preload",
             listOf("node", "--max-old-space-size=512", "--max-semi-space-size=16") +
-                listOf("node18-compat.cjs", "regexp-polyfill.cjs", "android-network-polyfill.cjs")
+                listOf("node18-compat.cjs", "regexp-polyfill.cjs", "android-network-polyfill.cjs", "child-node.cjs")
                     .flatMap { listOf("--require", File(project.projectDir, it).absolutePath) } +
                 project.entrypoint.absolutePath,
             launch.command,
@@ -100,6 +90,7 @@ class AndroidEmbeddedLettaCodeLaunchSpecTest {
         assertEquals("android-bridge-token", env["LETTA_ANDROID_NETWORK_BRIDGE_TOKEN"])
         assertEquals(File(baseDir, "bin").absolutePath, env["GIT_EXEC_PATH"])
         assertEquals(File(baseDir, "tmp").absolutePath, env["TMPDIR"])
+        assertEquals("helpers run on the node CLI, not app_process", File(baseDir, "bin/node").absolutePath, env[CHILD_NODE_ENV])
         assertTrue(env.keys.none { it.startsWith("LMSTUDIO_") || it.startsWith("LETTA_ANDROID_ON_DEVICE_MODEL") })
         assertNull("the host owns the backend variables", env["LETTA_LOCAL_BACKEND_DIR"])
     }

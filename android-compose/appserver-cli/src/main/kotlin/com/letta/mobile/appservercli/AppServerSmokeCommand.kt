@@ -3,13 +3,18 @@ package com.letta.mobile.appservercli
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.UsageError
 import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
+import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.clikt.parameters.types.long
 import com.letta.mobile.appserver.AppServerSmokeSpec
 import com.letta.mobile.appserver.runAppServerConcurrentSmokeTurns
 import com.letta.mobile.appserver.runAppServerSmokeTurn
+import com.letta.mobile.data.model.MessageContentPart
 import io.ktor.client.engine.cio.CIO
+import java.io.File
+import java.util.Base64
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 
@@ -60,6 +65,11 @@ internal class AppServerSmokeCommand : CliktCommand(
         help = "Agent for --second-conversation (defaults to --agent).",
     )
 
+    private val images by option(
+        "--image",
+        help = "Image file (png/jpeg/gif/webp) sent with the message as the app sends a photo; repeatable.",
+    ).file(mustExist = true, canBeDir = false).multiple()
+
     private val timeoutMs by option("--timeout-ms")
         .long()
         .default(120_000)
@@ -74,6 +84,7 @@ internal class AppServerSmokeCommand : CliktCommand(
             conversationId = conversationId,
             message = message,
             timeoutMs = timeoutMs,
+            images = images.map(::imagePart),
         )
         val second = secondConversationId
         if (second != null) {
@@ -96,4 +107,16 @@ internal class AppServerSmokeCommand : CliktCommand(
             emit = ::println,
         )
     }
+}
+
+/** [file] as the app's inline image part; the media type comes from the extension. */
+internal fun imagePart(file: File): MessageContentPart.Image {
+    val mediaType = when (file.extension.lowercase()) {
+        "png" -> "image/png"
+        "jpg", "jpeg" -> "image/jpeg"
+        "gif" -> "image/gif"
+        "webp" -> "image/webp"
+        else -> throw UsageError("--image ${file.name}: expected .png, .jpg, .jpeg, .gif or .webp")
+    }
+    return MessageContentPart.Image(base64 = Base64.getEncoder().encodeToString(file.readBytes()), mediaType = mediaType)
 }

@@ -1,13 +1,10 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.shell.ShellOverlays
 import com.letta.mobile.ui.shell.header.UnifiedSearchHit
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.shell.palette.CommandPalettePane
@@ -25,19 +22,10 @@ import com.letta.mobile.ui.host.LettaConfirmRequest
 /** Agents shown in the New conversation picker's "Recent" section. */
 internal const val NEW_CONVERSATION_RECENTS_LIMIT = 8
 
-/** Mutable visibility flags for the app-level overlay stack. */
-@Stable
-internal class DesktopOverlayVisibility : DesktopModelSurfaces {
-    override var modelPicker by mutableStateOf(false)
-
-    /** The "Models" exposure editor opened from the picker's "Edit Models…" (letta-mobile-w4q4p.6.1). */
-    override var modelsEditor by mutableStateOf(false)
-    var commandPalette by mutableStateOf(false)
-    var newConversation by mutableStateOf(false)
-    var irohResetConfirm by mutableStateOf(false)
-
-    /** letta-mobile-zxk2n.5: `/rename`'s dialog for the open chat. */
-    var renameChat by mutableStateOf(false)
+/** The model surfaces' flags are the shared overlay stack's (letta-mobile-ckmub.17.3). */
+private class SharedModelSurfaces(overlays: ShellOverlays) : DesktopModelSurfaces {
+    override var modelPicker by overlays::modelPicker
+    override var modelsEditor by overlays::modelsEditor
 }
 
 @Immutable
@@ -72,12 +60,12 @@ internal data class DesktopOverlayActions(
  */
 @Composable
 internal fun DesktopAppOverlays(
-    visibility: DesktopOverlayVisibility,
+    visibility: ShellOverlays,
     data: DesktopOverlayData,
     actions: DesktopOverlayActions,
 ) {
     DesktopModelControlOverlays(
-        surfaces = visibility,
+        surfaces = remember(visibility) { SharedModelSurfaces(visibility) },
         host = actions.modelControl,
         selectedValue = data.composerModelLabel,
         onOpenProviders = { actions.onNavigate(DesktopDestination.Providers) },

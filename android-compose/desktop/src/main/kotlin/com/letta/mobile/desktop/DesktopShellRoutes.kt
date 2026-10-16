@@ -1,37 +1,28 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.runtime.State
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.shell.ShellChatPort
+import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellOverlays
 import com.letta.mobile.data.shell.ShellPageKind
-import com.letta.mobile.data.shell.ShellSettingsSection
-import com.letta.mobile.data.shell.ShellSkillsSection
-import com.letta.mobile.data.shell.settingsSection
-import com.letta.mobile.data.shell.skillsSection
+import com.letta.mobile.data.shell.ShellWorkspaceNavigator
+import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.desktop.chat.DesktopChatConnectionState
+import com.letta.mobile.desktop.chat.DesktopChatController
+import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
+import com.letta.mobile.ui.shell.ShellChatSelection
+import com.letta.mobile.ui.shell.header.UnifiedSearchHit
+import com.letta.mobile.ui.shell.header.UnifiedSearchKind
 
 /**
- * letta-mobile-ckmub.3.4: the desktop's route model - the selected [DesktopDestination] (what the
- * rail, palette and saved state know) plus the selection that refines it - and its mapping to and
- * from the shared [ShellDestination]. The desktop shell only maps; the page is the shared ShellPage.
- *
- * The agent editor and a canvas are panels beside the conversation on the desktop, not pages:
- * [agentEditor] (an agent's, or the new-agent flow) and [canvasOpen] ride on the Conversations route.
+ * letta-mobile-ckmub.17.3: the desktop's window adapters over the shared [ShellWorkspaceState] - its
+ * rail/palette/saved-state vocabulary ([DesktopDestination]) mapped to and from the shared page, and
+ * the chat controller as the navigator's [ShellChatPort]. The state and the verbs are the shared ones.
  */
-internal data class DesktopShellRoute(
-    val destination: DesktopDestination,
-    val agentId: String? = null,
-    val conversationId: String? = null,
-    val agentEditor: ShellDestination.AgentEditor? = null,
-    val canvasOpen: Boolean = false,
-    val canvasId: String? = null,
-    val skillsSection: ShellSkillsSection = ShellSkillsSection.Skills,
-    val settingsSection: ShellSettingsSection? = null,
-) {
-    /** The page the main pane shows: the route without the panels beside it. */
-    val page: DesktopShellRoute get() = copy(agentEditor = null, canvasOpen = false, canvasId = null)
-
-    /** The agent whose editor is open beside the chat (null too while a new agent is being made). */
-    val editAgentId: String? get() = agentEditor?.agentId
-}
-
 private val DesktopDestinationByKind: Map<ShellPageKind, DesktopDestination> = mapOf(
     ShellPageKind.Home to DesktopDestination.Home,
     ShellPageKind.Chat to DesktopDestination.Conversations,
@@ -50,43 +41,109 @@ private val DesktopDestinationByKind: Map<ShellPageKind, DesktopDestination> = m
     ShellPageKind.Plugins to DesktopDestination.Plugins,
 )
 
-/** The desktop route that shows [this]. */
-internal fun ShellDestination.toDesktopRoute(): DesktopShellRoute {
-    val canvas = this as? ShellDestination.Canvas
-    return DesktopShellRoute(
-        destination = DesktopDestinationByKind.getValue(kind),
-        agentId = agentId,
-        conversationId = conversationId,
-        agentEditor = this as? ShellDestination.AgentEditor,
-        canvasOpen = canvas != null,
-        canvasId = canvas?.canvasId,
-        skillsSection = skillsSection,
-        settingsSection = settingsSection,
+private val ShellPageOfDesktop: Map<DesktopDestination, ShellDestination> = mapOf(
+    DesktopDestination.Home to ShellDestination.Home,
+    DesktopDestination.Overview to ShellDestination.Overview,
+    DesktopDestination.Agents to ShellDestination.Skills(),
+    DesktopDestination.Memory to ShellDestination.Memory(),
+    DesktopDestination.Schedules to ShellDestination.Schedules(),
+    DesktopDestination.Channels to ShellDestination.Channels,
+    DesktopDestination.Providers to ShellDestination.Providers,
+    DesktopDestination.Conversations to ShellDestination.Chat(),
+    DesktopDestination.Settings to ShellDestination.Settings(),
+    DesktopDestination.Runs to ShellDestination.Runs,
+    DesktopDestination.Templates to ShellDestination.Templates,
+    DesktopDestination.Projects to ShellDestination.Projects,
+    DesktopDestination.Plugins to ShellDestination.Plugins,
+)
+
+/** The desktop destination that shows [this]. */
+internal val ShellDestination.desktopDestination: DesktopDestination
+    get() = DesktopDestinationByKind.getValue(kind)
+
+/** The shared page [this] desktop destination shows, before the focus refines it. */
+internal val DesktopDestination.shellPage: ShellDestination get() = ShellPageOfDesktop.getValue(this)
+
+/** The rail's, palette's and saved state's view of the page; setting it leaves the editor as it is. */
+internal var ShellWorkspaceState.selectedDestination: DesktopDestination
+    get() = page.desktopDestination
+    set(value) = showPage(value.shellPage)
+
+/** Leaves any agent editor, then shows [destination]. */
+internal fun ShellWorkspaceState.navigate(destination: DesktopDestination) = navigate(destination.shellPage)
+
+/**
+ * Opens a unified-search pick, from the header search, the command palette or the quick-query bar
+ * alike: a message opens its conversation; a canvas goes to [openCanvas] (only the header's search
+ * lists canvases); a destination hit names a [DesktopDestination].
+ */
+internal fun ShellWorkspaceNavigator.openSearchHit(hit: UnifiedSearchHit, openCanvas: (CanvasId) -> Unit = {}) {
+    when (hit.kind) {
+        UnifiedSearchKind.Conversations, UnifiedSearchKind.Messages -> openConversation(ConversationId(hit.id))
+        UnifiedSearchKind.Agents -> openAgent(AgentId(hit.id))
+        UnifiedSearchKind.Canvases -> openCanvas(CanvasId(hit.id))
+        UnifiedSearchKind.Destinations ->
+            DesktopDestination.entries.firstOrNull { it.name == hit.id }?.let(state::navigate)
+    }
+}
+
+/** The overlay stack's flags: the shared workspace's. */
+internal val DesktopShellContext.overlays: ShellOverlays get() = navigator.overlays
+
+/** The main pane's page for this frame's focused agent and selected conversation. */
+internal fun ShellWorkspaceState.pageFor(frame: DesktopShellFrame): ShellDestination =
+    pageFor(frame.focus.selectedAgentId?.let(::AgentId), frame.chatState.selectedConversationId?.let(::ConversationId))
+
+/** The focused agent: the selected conversation's, else the workspace's while on the rail, else the rail's head. */
+internal fun ShellWorkspaceState.focusFor(chatState: DesktopChatSurfaceState, railAgents: List<Pair<String, String>>): String? =
+    focusFor(chatState.selectedConversation?.agentId?.let(::AgentId), railAgents.map { AgentId(it.first) })?.value
+
+/**
+ * What the chat shows, for the shared workspace's sync: the gateway's conversation list counts once
+ * it is Live or has reported none.
+ */
+internal fun DesktopChatSurfaceState.shellChatSelection(): ShellChatSelection {
+    val authoritative = connectionState == DesktopChatConnectionState.Live ||
+        connectionState == DesktopChatConnectionState.NoConversations
+    return ShellChatSelection(
+        session = sessionGraphId.toString(),
+        conversation = selectedConversationId?.let(::ConversationId),
+        agent = selectedConversation?.agentId?.let(::AgentId),
+        reported = if (authoritative) conversations.mapTo(mutableSetOf()) { ConversationId(it.id) } else null,
     )
 }
 
-/** Builds the shared destination of each desktop destination from the route's selection. */
-private val ShellDestinationOfDesktop: Map<DesktopDestination, (DesktopShellRoute) -> ShellDestination> = mapOf(
-    DesktopDestination.Home to { _ -> ShellDestination.Home },
-    DesktopDestination.Overview to { _ -> ShellDestination.Overview },
-    DesktopDestination.Agents to { r -> ShellDestination.Skills(r.agentId, r.skillsSection) },
-    DesktopDestination.Memory to { r -> ShellDestination.Memory(r.agentId) },
-    DesktopDestination.Schedules to { r -> ShellDestination.Schedules(r.agentId) },
-    DesktopDestination.Channels to { _ -> ShellDestination.Channels },
-    DesktopDestination.Providers to { _ -> ShellDestination.Providers },
-    DesktopDestination.Conversations to ::conversationsDestination,
-    DesktopDestination.Settings to { r -> ShellDestination.Settings(r.settingsSection) },
-    DesktopDestination.Runs to { _ -> ShellDestination.Runs },
-    DesktopDestination.Templates to { _ -> ShellDestination.Templates },
-    DesktopDestination.Projects to { _ -> ShellDestination.Projects },
-    DesktopDestination.Plugins to { _ -> ShellDestination.Plugins },
-)
+/** The desktop chat controller as the shell navigator's chat. [chatState] is read when a verb runs. */
+internal class DesktopShellChatPort(
+    private val controller: DesktopChatController,
+    private val chatState: State<DesktopChatSurfaceState>,
+) : ShellChatPort {
+    override fun conversations(): List<ShellConversationRef> = chatState.value.conversations.map {
+        ShellConversationRef(ConversationId(it.id), it.agentId?.let(::AgentId), it.updatedAtLabel)
+    }
 
-private fun conversationsDestination(route: DesktopShellRoute): ShellDestination {
-    route.agentEditor?.let { return it }
-    if (route.canvasOpen) return ShellDestination.Canvas(route.canvasId, route.conversationId, route.agentId)
-    return ShellDestination.Chat(route.agentId, route.conversationId)
+    override val selectedConversation: ConversationId?
+        get() = chatState.value.selectedConversationId?.let(::ConversationId)
+
+    override fun selectConversation(conversation: ConversationId) {
+        controller.selectConversation(conversation.value)
+    }
+
+    override fun createConversationForAgent(agent: AgentId, onCreated: (ConversationId) -> Unit) =
+        controller.createConversationForAgent(agent.value) { onCreated(ConversationId(it)) }
+
+    /**
+     * Targets the agent explicitly - for a roster-only agent, createConversation()'s
+     * conversation-derived agent would miss it. letta-mobile-zxk2n.5: a chat started here is pinned
+     * when "Pin new chats" is on.
+     */
+    override fun startNewChat(agent: AgentId?) {
+        val marks = controller.conversationManagement.marks
+        agent?.let { controller.createConversationForAgent(it.value, onCreated = marks::onConversationCreated) }
+            ?: controller.createConversation()
+    }
+
+    override fun send(conversation: ConversationId, text: String) = controller.replyFromNotification(conversation.value, text)
+
+    override fun stageComposerText(text: String) = controller.updateComposerText(text)
 }
-
-/** The shared destination this desktop route shows. */
-internal fun DesktopShellRoute.toShellDestination(): ShellDestination = ShellDestinationOfDesktop.getValue(destination)(this)

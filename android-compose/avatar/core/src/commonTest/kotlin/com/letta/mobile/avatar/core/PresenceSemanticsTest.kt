@@ -51,6 +51,7 @@ class PresenceSemanticsTest {
             AvatarState.LISTENING,
             AvatarState.DRAGGED,
             AvatarState.SLEEPING,
+            AvatarState.DREAMING,
             AvatarState.LOADING,
             AvatarState.FAILED,
             AvatarState.DEGRADED,

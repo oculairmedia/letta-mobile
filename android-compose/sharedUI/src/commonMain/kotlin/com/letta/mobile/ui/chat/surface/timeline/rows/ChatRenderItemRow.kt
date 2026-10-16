@@ -132,6 +132,8 @@ internal object ChatRowTestTags {
     const val APPROVAL_DIFF = "chat-approval-diff"
     const val APPROVAL_DIFF_SHOW_ALL = "chat-approval-diff-show-all"
     const val APPROVAL_ALWAYS_ALLOW = "chat-approval-always-allow"
+    /** The plan an approval proposes (ExitPlanMode, or a write to a plans file). */
+    const val APPROVAL_PLAN = "chat-approval-plan"
     const val IMAGE_GRID = "chat-image-grid"
     const val IMAGE_VIEWER = "chat-image-viewer"
     const val CLOCK = "chat-row-clock"

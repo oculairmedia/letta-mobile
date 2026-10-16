@@ -22,7 +22,7 @@ package com.letta.mobile.data.model
  * transport or picks a send path for it:
  *  - Android: `routedBackendKind` (session graph assembly and `SessionChannelTransportFactory`)
  *    and the chat `ChatSendStrategySelector`;
- *  - desktop: `routedBackendKind` in `DesktopRepositoryAdapters`, and
+ *  - desktop: `routedBackendKind` in `HostRepositoryAdapters`, and
  *    `DesktopAppServerChatGateways.createDefault`, which chooses on mode and address;
  *  - web: `WasmAppServerSession`, which still chooses on [isIrohBackendUrl] directly.
  *

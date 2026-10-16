@@ -21,7 +21,7 @@ import com.letta.mobile.data.runs.RunMonitorController
 import com.letta.mobile.data.session.ifSupported
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.templates.AgentTemplatesController
-import com.letta.mobile.desktop.data.DesktopSessionGraph
+import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
 import com.letta.mobile.ui.shell.ShellAdminPages
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.pages.projects.projectsPageActions
@@ -46,7 +46,7 @@ internal data class DesktopAdminNavigation(
  * capabilities), and where project pins are kept.
  */
 internal data class DesktopAdminBinding(
-    val graph: DesktopSessionGraph,
+    val graph: SharedSessionRepositoryGraph,
     val projectsAvailable: Boolean,
     val projectPins: ProjectPinStore,
     val navigation: DesktopAdminNavigation,
@@ -103,7 +103,7 @@ private fun desktopRunsPage(binding: DesktopAdminBinding) = ShellPageContent<She
 }
 
 @Composable
-private fun rememberAgentNames(graph: DesktopSessionGraph): Map<String, String> {
+private fun rememberAgentNames(graph: SharedSessionRepositoryGraph): Map<String, String> {
     val roster = graph.ifSupported(SessionRoute.AGENTS) { agentRepository.agents } ?: return emptyMap()
     val agents by roster.collectAsState()
     return remember(agents) { agents.associate { it.id.value to it.name.ifBlank { it.id.value } } }

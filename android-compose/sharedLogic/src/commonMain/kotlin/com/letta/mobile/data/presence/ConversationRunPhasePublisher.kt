@@ -1,5 +1,6 @@
 package com.letta.mobile.data.presence
 
+import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.runtime.RuntimeEventPayload
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -27,6 +28,9 @@ class ConversationRunPhasePublisher(
     private val lock = SynchronizedObject()
     private val states = mutableMapOf<String, ConversationRunState>()
 
+    /** The conversations the last [setSubagents] list touched, so the next one can clear those it drops. */
+    private var subagentScopes: Set<RunScope> = emptySet()
+
     /** Fold one runtime event for [conversationId] and publish the new phase. */
     fun onEvent(scope: RunScope, event: RuntimeEventPayload) {
         update(scope) { RunPhaseReducer.reduce(it, event, now()) }
@@ -46,9 +50,25 @@ class ConversationRunPhasePublisher(
         update(scope) { it.copy(userTyping = typing) }
     }
 
-    /** How many subagents are running under this conversation's current tool call. */
-    fun setSubagentCount(scope: RunScope, count: Int) {
-        update(scope) { RunPhaseReducer.withSubagents(it, count, now()) }
+    /**
+     * The whole current list from one subagent feed (the registry the platform already shows as
+     * chips). Each entry's own conversation gets its foreground count - a running tool with
+     * subagents under it is DELEGATING - and whether a dream is running there; a conversation this
+     * feed listed before and lists no longer goes back to none. This is the one way either
+     * platform tells the run registry about subagents.
+     */
+    fun setSubagents(entries: List<SubagentEntry>) {
+        val byScope = subagentsByConversation(entries)
+        val stale = synchronized(lock) {
+            val gone = subagentScopes - byScope.keys
+            subagentScopes = byScope.keys
+            gone
+        }
+        stale.forEach { scope -> update(scope) { RunPhaseReducer.withSubagents(it, SubagentActivity.NONE, now()) } }
+        byScope.forEach { (scope, scoped) ->
+            val activity = SubagentActivity.of(scoped)
+            update(scope) { RunPhaseReducer.withSubagents(it, activity, now()) }
+        }
     }
 
     /** The user asked to cancel; the terminal has not landed yet. */

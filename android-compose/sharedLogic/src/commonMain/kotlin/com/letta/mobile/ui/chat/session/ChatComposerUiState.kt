@@ -91,6 +91,8 @@ data class ChatModelUiState(
     val currentEffort: String? = null,
     val options: ImmutableList<ChatModelOption> = persistentListOf(),
     val isSwitching: Boolean = false,
+    /** Why no models could be listed (the runtime is down, say); the picker shows it instead of "no match". */
+    val unavailableReason: String? = null,
 )
 
 @Immutable

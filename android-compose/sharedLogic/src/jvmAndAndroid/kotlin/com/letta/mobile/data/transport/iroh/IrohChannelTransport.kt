@@ -4,7 +4,9 @@ import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.controller.SyncBudgetPolicy
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.transport.ChannelTransportState
+import com.letta.mobile.data.repository.DEBUG_FORCE_IROH_URL
 import com.letta.mobile.data.repository.api.SubagentParentScope
+import com.letta.mobile.data.repository.shouldUseIrohTransport
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.FrameCollectorOverflowAwareChannelTransport
@@ -795,6 +797,8 @@ class IrohChannelTransport(
         )
         is IrohConnectionState.Degraded -> ChannelTransportState.Disconnected(0, reason, willReconnect = true)
         is IrohConnectionState.AuthFailed -> ChannelTransportState.Disconnected(4001, reason, isAuthFailure = true, willReconnect = false)
+        // letta-mobile-by4vm.121.11: a terminal dial failure (the on-device runtime's one launch is over).
+        is IrohConnectionState.Failed -> ChannelTransportState.Disconnected(TERMINAL_FAILURE_CODE, reason, willReconnect = false)
         IrohConnectionState.Closed -> ChannelTransportState.Disconnected(1000, "closed")
     }
 
@@ -1094,6 +1098,8 @@ class IrohChannelTransport(
         // Bounded window to let the server's own terminal (from abort) arrive
         // before falling back to a synthetic cancelled TurnDone.
         internal const val SERVER_TERMINAL_WAIT_MS = 3_000L
+        /** The close code of a terminal dial failure (WebSocket 1011, "server error"): no redial follows. */
+        internal const val TERMINAL_FAILURE_CODE = 1011
         internal const val SUBAGENT_RPC_CAPABILITY = "subagent_registry_v1"
         private const val SUBAGENT_RPC_UNSUPPORTED = "subagent registry is unavailable on this Iroh node"
         private const val CRON_RPC_UNSUPPORTED = "cron scheduling is unavailable on this Iroh node"
@@ -1103,12 +1109,8 @@ class IrohChannelTransport(
         internal const val LIVENESS_PROBE_INTERVAL_MS = IrohLivenessProbe.INTERVAL_MS
         internal const val LIVENESS_PROBE_TIMEOUT_MS = IrohLivenessProbe.TIMEOUT_MS
         internal const val LIVENESS_PROBE_FAILURES_TO_DECLARE_DEAD = IrohLivenessProbe.FAILURES_TO_DECLARE_DEAD
-        // Debug override for local Iroh testing. MUST stay blank in committed
-        // code — a non-blank value forces EVERY backend through Iroh regardless
-        // of the active config (breaks REST/local-runtime selection). Set it
-        // only in a throwaway local build when dialing a hand-run wrapper.
-        private const val DEBUG_FORCE_IROH_URL = ""
-        fun shouldUseIroh(url: String?): Boolean = DEBUG_FORCE_IROH_URL.isNotBlank() || isIrohUrl(url)
+        // The debug force-Iroh override lives beside the commonMain predicate (letta-mobile-ckmub.17.1).
+        fun shouldUseIroh(url: String?): Boolean = shouldUseIrohTransport(url)
 
         internal val READ_ONLY_ADMIN_RPC_METHODS = IrohTransportSupport.READ_ONLY_ADMIN_RPC_METHODS
 

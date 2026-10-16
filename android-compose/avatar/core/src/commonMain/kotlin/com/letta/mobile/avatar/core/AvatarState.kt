@@ -10,8 +10,8 @@ package com.letta.mobile.avatar.core
  * **Behavior states** — the director *arbitrates* these from imperative input
  * signals ([AvatarDirector.setUserTyping], [AvatarDirector.setDragged], …) and
  * drives protocol commands for them per §6:
- * [IDLE], [LISTENING], [DRAGGED], [THINKING], [WAITING_INPUT], [SPEAKING],
- * [SUCCESS], [ERROR], [SLEEPING].
+ * [IDLE], [LISTENING], [DRAGGED], [THINKING], [WORKING], [WAITING_INPUT], [SPEAKING],
+ * [SUCCESS], [ERROR], [SLEEPING], [DREAMING].
  *
  * **Lifecycle states** — [LOADING], [FAILED], [DEGRADED] describe the avatar
  * *asset's* load status, not agent activity. They are fed in wholesale from the
@@ -22,10 +22,12 @@ package com.letta.mobile.avatar.core
  * by the surface host (P4), not the director. They live here so surfaces and
  * mods branch on a single [AvatarState] type.
  *
- * Arbitration priority when multiple behavior candidates are active:
- * `DRAGGED > ERROR > WAITING_INPUT > SPEAKING > SUCCESS > THINKING >
- * LISTENING > IDLE`. [SLEEPING] gates every behavior except [DRAGGED] and
- * [ERROR] (you can always grab the pet, and a failure always surfaces).
+ * Arbitration priority, exactly as [AvatarDirector] resolves it: lifecycle
+ * (`LOADING`/`FAILED`/`DEGRADED`) over everything, then
+ * `DRAGGED > ERROR > SLEEPING > WAITING_INPUT > SPEAKING > SUCCESS > WORKING >
+ * THINKING > LISTENING > DREAMING > IDLE`. [SLEEPING] gates every behavior below
+ * it (you can always grab the pet, and a failure always surfaces); [DREAMING]
+ * shows only when nothing in the foreground needs the mascot.
  */
 enum class AvatarState {
     /** Nothing happening — neutral face, occasional blinks (§6 IDLE). */
@@ -63,6 +65,13 @@ enum class AvatarState {
     /** Quiet hours — sleep pose, eyes closed, attention suppressed. */
     SLEEPING,
 
+    /**
+     * A background dream (reflection / memory upkeep) is running and nothing in the foreground
+     * needs the mascot (letta-mobile-iczm7). Distinct from quiet-hours [SLEEPING]: the agent is
+     * busy on its own, not off. Eyes closed, attention suppressed, like sleeping.
+     */
+    DREAMING,
+
     /** Lifecycle: the avatar asset is being fetched/parsed (surface chrome). */
     LOADING,
 
@@ -71,6 +80,10 @@ enum class AvatarState {
 
     /** Lifecycle: the avatar loaded but lacks capabilities (e.g. no expressions). */
     DEGRADED,
+    ;
+
+    /** Asleep, for any reason: eyes held closed, no blink loop, no attention to the pointer. */
+    val eyesClosed: Boolean get() = this == SLEEPING || this == DREAMING
 }
 
 /**

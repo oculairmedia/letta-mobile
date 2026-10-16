@@ -38,6 +38,20 @@ class MascotIdentityRegistry {
     /** Window-space message timeline; null when the chat list is not composed. */
     val timelineBounds = mutableStateOf<GazeRect?>(null)
 
+    /**
+     * Edits the primary composer has taken, counted for the life of the registry (letta-mobile-
+     * te3n1.1): the mascot being typed to listens harder the faster this climbs. A plain counter,
+     * not snapshot state, on purpose - it is read once per frame by the live mascot, and typing must
+     * not recompose every tile. UI thread only, like the composer that writes it.
+     */
+    var composerKeystrokes: Int = 0
+        private set
+
+    /** The composer took an edit. */
+    fun noteComposerKeystroke() {
+        composerKeystrokes++
+    }
+
     fun update(all: Map<String, MascotIdentity>) {
         identities.keys.retainAll(all.keys)
         identities.putAll(all)

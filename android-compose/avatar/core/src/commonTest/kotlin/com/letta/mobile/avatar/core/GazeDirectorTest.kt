@@ -30,6 +30,7 @@ class GazeDirectorTest {
             AvatarState.SUCCESS to GazeTarget.USER,
             AvatarState.ERROR to GazeTarget.AWAY,
             AvatarState.SLEEPING to GazeTarget.OWN,
+            AvatarState.DREAMING to GazeTarget.OWN,
             AvatarState.LOADING to GazeTarget.OWN,
         )
         for ((state, expected) in cases) {
@@ -158,7 +159,7 @@ class GazeDirectorTest {
         val behavior = listOf(
             AvatarState.IDLE, AvatarState.LISTENING, AvatarState.DRAGGED,
             AvatarState.THINKING, AvatarState.WAITING_INPUT, AvatarState.SPEAKING,
-            AvatarState.SUCCESS, AvatarState.ERROR, AvatarState.SLEEPING,
+            AvatarState.SUCCESS, AvatarState.ERROR, AvatarState.SLEEPING, AvatarState.DREAMING,
         )
         for (state in behavior) {
             val plan = GazePlan.forState(state)

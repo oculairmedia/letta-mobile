@@ -9,8 +9,8 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmConfig
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelSettings
-import com.letta.mobile.desktop.buildModelOptions
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
+import com.letta.mobile.ui.chat.session.chatModelOptions
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -44,7 +44,7 @@ class DesktopCreateAgentRoutingTest {
         val routes = duplicateRoutingModels()
         val gateway = RoutingGateway(routes)
         val controller = routingController(gateway)
-        val westSelection = buildModelOptions(routes).single { it.first.endsWith("West") }.second
+        val westSelection = chatModelOptions(routes).single { it.first.endsWith("West") }.second
         startAndCreate(
             controller,
             AgentCreateParams(name = "West agent", model = westSelection),

@@ -42,6 +42,7 @@ class AgentEditorController(
         combine(backend.agents, backend.models, backend.tools) { agents, models, tools ->
             Catalogs(agents, models, tools)
         }.onEach { catalogs -> _state.update { catalogs.applyTo(it) } }.launchIn(scope)
+        backend.modelsUnavailable.onEach { reason -> _state.update { it.copy(modelsUnavailable = reason) } }.launchIn(scope)
         scope.launch { backend.refreshCatalogs() }
         load()
     }

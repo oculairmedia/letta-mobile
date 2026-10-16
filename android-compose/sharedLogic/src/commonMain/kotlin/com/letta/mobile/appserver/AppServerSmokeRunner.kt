@@ -1,6 +1,9 @@
 package com.letta.mobile.appserver
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.buildContentParts
+import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
@@ -26,6 +29,8 @@ import kotlinx.coroutines.withTimeout
  * text, and the [timeoutMs] budget. These cohesive request parameters travel as
  * one value so the runner and its two CLI call sites thread an identical turn
  * shape (audit P1.6 / gn7kr.12 — CodeScene #1012 arg-count cleanup).
+ * [images] ride along as the content array the app sends for a photo, so a smoke
+ * can prove the runtime's image preparation (letta-mobile-by4vm.121.12).
  */
 data class AppServerSmokeSpec(
     val url: String,
@@ -34,7 +39,12 @@ data class AppServerSmokeSpec(
     val conversationId: String,
     val message: String,
     val timeoutMs: Long,
-)
+    val images: List<MessageContentPart.Image> = emptyList(),
+) {
+    /** The app's multimodal `content` array, or null for a text-only turn. */
+    val contentPartsJson: String?
+        get() = images.takeIf { it.isNotEmpty() }?.let { buildContentParts(message, it).toJsonArray().toString() }
+}
 
 /**
  * Send exactly one turn through a running Letta App Server and stream each
@@ -97,6 +107,7 @@ suspend fun runAppServerSmokeTurn(
                             input = TurnInput.UserMessage(
                                 localMessageId = "$identityPrefix-${newToken()}",
                                 text = spec.message,
+                                contentPartsJson = spec.contentPartsJson,
                             ),
                         ),
                     ).collect { event ->
@@ -200,7 +211,7 @@ suspend fun runAppServerConcurrentSmokeTurns(
 
 private fun RuntimeEventPayload.toCliLine(): String =
     when (this) {
-        is RuntimeEventPayload.RunLifecycleChanged -> "[lifecycle] $status"
+        is RuntimeEventPayload.RunLifecycleChanged -> "[lifecycle] $status" + reason?.let { ": $it" }.orEmpty()
         is RuntimeEventPayload.RemoteStreamFrame -> "[stream] ${body.take(MAX_FRAME_CHARS)}"
         is RuntimeEventPayload.ExternalTransportFrame -> "[frame] ${body.take(MAX_FRAME_CHARS)}"
         is RuntimeEventPayload.ToolCallObserved -> "[tool-call] ${toolName.value} ${toolCallId.value}"

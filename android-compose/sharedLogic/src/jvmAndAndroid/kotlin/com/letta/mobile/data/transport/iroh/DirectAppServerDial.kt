@@ -10,6 +10,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerWebSocketDial
+import com.letta.mobile.data.transport.appserver.appServerAdminRpcParams
 import com.letta.mobile.data.transport.appserver.applyAppServerFrameLimits
 import com.letta.mobile.data.transport.appserver.openAppServerWebSocket
 import io.ktor.client.HttpClient
@@ -75,7 +76,7 @@ suspend fun openDirectAppServerDial(
         connectionState = connection.connectionState,
         streamFrames = connection.streamFrames,
         hostCapabilities = router.featureCapabilities,
-        adminRpc = { method, path, body -> router.answer(method, adminRpcParams(path, body)) },
+        adminRpc = { method, path, body -> router.answer(method, appServerAdminRpcParams(path, body)) },
         close = { reason ->
             connection.close(reason)
             releaseAll()

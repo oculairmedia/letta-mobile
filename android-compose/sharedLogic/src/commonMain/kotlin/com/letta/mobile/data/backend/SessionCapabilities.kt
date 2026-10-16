@@ -94,10 +94,13 @@ object SessionRouteMatrix {
         BackendKind.IROH -> IROH_ADMIN
     }
 
-    /** Web: the chat page's agent list and conversation over the App Server; a browser has no runtime. */
+    /**
+     * Web: desktop's row (letta-mobile-ckmub.17.1: the browser builds desktop's session graph over its
+     * one App Server session), except that a browser has no embedded runtime.
+     */
     private fun web(kind: BackendKind?): Set<SessionRoute> = when (kind) {
         null, BackendKind.LOCAL_RUNTIME -> emptySet()
-        BackendKind.DIRECT_WS, BackendKind.IROH -> setOf(SessionRoute.AGENTS, SessionRoute.CONVERSATIONS)
+        BackendKind.DIRECT_WS, BackendKind.IROH -> desktop(kind)
     }
 
     /**
@@ -105,20 +108,19 @@ object SessionRouteMatrix {
      * fails when a cell disagrees without an entry here, or an entry no longer disagrees.
      */
     val DIVERGENCES: Map<Pair<BackendKind?, SessionRoute>, String> = buildMap {
-        val adminOnlyNative = "web has no admin pages; only the chat page is hosted (letta-mobile-o4ygk)"
-        for (route in IROH_ADMIN - SessionRoute.AGENTS) put(BackendKind.IROH to route, adminOnlyNative)
         put(BackendKind.IROH to SessionRoute.CONVERSATIONS, DESKTOP_CONVERSATIONS)
         put(BackendKind.IROH to SessionRoute.CONVERSATION_RECOMPILE, "only Android relays conversation.recompile (letta-mobile-by4vm.51)")
         // letta-mobile-by4vm.110.6: Android reaches a ws:// or on-device App Server through the same
         // channel and in-process admin router as an Iroh host; desktop and web bind fewer routes there.
         for (kind in listOf(BackendKind.LOCAL_RUNTIME, BackendKind.DIRECT_WS)) {
-            for (route in android(kind) - SessionRoute.AGENTS) put(kind to route, ANDROID_APP_SERVER_CHANNEL)
+            for (route in android(kind) - desktop(kind)) put(kind to route, ANDROID_APP_SERVER_CHANNEL)
         }
         put(BackendKind.LOCAL_RUNTIME to SessionRoute.AGENTS, NO_BROWSER_RUNTIME)
+        put(BackendKind.LOCAL_RUNTIME to SessionRoute.BLOCKS, NO_BROWSER_RUNTIME)
     }
 
     private const val DESKTOP_CONVERSATIONS =
-        "desktop lists conversations through its chat gateway, not the session's conversation repository"
+        "desktop and web list conversations through their chat gateway, not the session's conversation repository"
     private const val NO_BROWSER_RUNTIME = "a browser has no embedded runtime"
     private const val ANDROID_APP_SERVER_CHANNEL =
         "Android serves every App Server through its channel and the Iroh host's admin router; desktop and web bind fewer routes"
