@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.Step
 import com.letta.mobile.data.model.StepFeedbackUpdateParams
 import com.letta.mobile.data.model.StepListParams
 import com.letta.mobile.data.model.StepMetrics
+import kotlin.jvm.JvmInline
 
 /**
  * Step queries a non-App-Server backend would serve. letta-mobile-ckmub.4: this is the seam for

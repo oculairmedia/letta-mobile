@@ -3,11 +3,15 @@ package com.letta.mobile.web.data
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.backendKind
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.session.graph.HostSessionBinding
+import com.letta.mobile.data.session.graph.HostSessionGraphFactory
+import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
+import com.letta.mobile.data.session.graph.hostServedKind
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.data.transport.appserver.AppServerApprovalAnswer
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -30,9 +34,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.random.Random
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 class WasmAppServerClientGateway(
     private val scope: CoroutineScope,
@@ -40,13 +41,22 @@ class WasmAppServerClientGateway(
     private val httpClient = HttpClient(Js) { install(WebSockets) }
     private val mutableState = MutableStateFlow<BackendConnectionStatus>(BackendConnectionStatus.Unconfigured)
     private var activeSession: WasmAppServerSession? = null
+    private val mutableGraph = MutableStateFlow<SharedSessionRepositoryGraph?>(null)
+    private var nextBinding: HostSessionBinding? = null
+    private val graphFactory = HostSessionGraphFactory { checkNotNull(nextBinding) { "No App Server session to bind" } }
     private var connectionMonitor: Job? = null
     private val requestSessionId = Random.nextLong().toString()
     private var requestSequence = 0
 
     val state: StateFlow<BackendConnectionStatus> = mutableState.asStateFlow()
 
-    suspend fun listAgents(config: LettaConfig): List<AgentItemState> {
+    /**
+     * letta-mobile-ckmub.17.1: the live session's repository graph, built by the shared factory desktop
+     * uses; null while there is no connection.
+     */
+    val sessionGraph: StateFlow<SharedSessionRepositoryGraph?> = mutableGraph.asStateFlow()
+
+    suspend fun listAgents(config: LettaConfig): List<Agent> {
         unservedStatus(config)?.let { status ->
             close()
             mutableState.value = status
@@ -69,22 +79,11 @@ class WasmAppServerClientGateway(
             }
             check(auth.success) { auth.error ?: "App Server authentication failed" }
 
-            val response = bounded(REQUEST_TIMEOUT_MS, "Agent list timed out") {
-                session.client.adminRpc(
-                    AppServerCommand.AdminRpc(
-                        requestId = nextRequestId("agent-list"),
-                        method = "agent.list",
-                        params = buildJsonObject {
-                            put("limit", AGENT_LIMIT.toString())
-                            put("offset", "0")
-                        },
-                    ),
-                )
-            }
-            check(response.success) { response.error ?: "Agent list failed" }
+            val graph = openGraph(config, session)
+            bounded(REQUEST_TIMEOUT_MS, "Agent list timed out") { graph.agentRepository.refreshAgents() }
             mutableState.value = BackendConnectionStatus.Connected(session.label)
             monitor(session)
-            decodeWebAgents(response.result as? JsonArray ?: JsonArray(emptyList()))
+            graph.agentRepository.agents.value
         } catch (cancelled: CancellationException) {
             close()
             throw cancelled
@@ -100,6 +99,7 @@ class WasmAppServerClientGateway(
         activeSession = null
         connectionMonitor?.cancel()
         connectionMonitor = null
+        closeGraph()
         session?.close()
     }
 
@@ -108,20 +108,20 @@ class WasmAppServerClientGateway(
      * live session: the conversation (its most recent one, or a new one), a timeline transport over
      * the session's turn engine and `admin_rpc`, and the run controls (stop, approvals).
      */
-    suspend fun openChat(agent: AgentItemState): WebChatBinding {
+    suspend fun openChat(agent: Agent): WebChatBinding {
         val session = activeSession ?: error("Connect to an App Server first")
-        val conversationId = session.ensureConversation(agent.id, ::nextRequestId)
+        val conversationId = session.ensureConversation(agent.id.value, ::nextRequestId)
         val transport = AppServerTimelineTransport(
             AppServerTimelineConnection(
                 turnEngine = session.engine,
                 events = session.client.events,
                 isConnected = session.transport.isConnected,
                 admin = { method, params -> session.admin(method.value, params, ::nextRequestId) },
-                agentIdFor = { AgentId(agent.id) },
+                agentIdFor = { agent.id },
                 backendId = BackendId(WEB_BACKEND_ID),
             ),
         )
-        val target = TimelineChatTarget(agentId = agent.id, agentName = agent.name, conversationId = conversationId)
+        val target = TimelineChatTarget(agentId = agent.id.value, agentName = agent.name, conversationId = conversationId)
         return WebChatBinding(
             target = target,
             transport = transport,
@@ -135,6 +135,7 @@ class WasmAppServerClientGateway(
             session.transport.isConnected.first { connected -> !connected }
             if (activeSession === session) {
                 activeSession = null
+                closeGraph()
                 session.onTransportDisconnected()
                 val reason = (session.transport as? IrohWasmAppServerTransport)
                     ?.failureReason
@@ -147,26 +148,38 @@ class WasmAppServerClientGateway(
         }
     }
 
+    /** The shared session graph over [session], replacing the previous connection's. */
+    private fun openGraph(config: LettaConfig, session: WasmAppServerSession): SharedSessionRepositoryGraph {
+        closeGraph()
+        nextBinding = webSessionBinding(config, session.client, scope)
+        return graphFactory.create().also { mutableGraph.value = it }
+    }
+
+    private fun closeGraph() {
+        mutableGraph.value?.close()
+        mutableGraph.value = null
+        nextBinding = null
+    }
+
     private fun nextRequestId(prefix: String): String {
         requestSequence += 1
         return webRequestId(requestSessionId, prefix, requestSequence)
     }
 
     private companion object {
-        const val AGENT_LIMIT = 100
         const val WEB_BACKEND_ID = "web-app-server"
     }
 }
 
 /**
  * letta-mobile-by4vm.13: what a browser session serves — the web row of the
- * [com.letta.mobile.data.backend.SessionRouteMatrix] (the chat page's agents and conversation over an
- * App Server reached by ws:// or Iroh). A blank address is no backend.
+ * [com.letta.mobile.data.backend.SessionRouteMatrix], the same as desktop's for a ws:// or Iroh host
+ * (letta-mobile-ckmub.17.1). A blank address is no backend.
  */
 internal fun webSessionCapabilities(config: LettaConfig): SessionCapabilities =
     SessionCapabilities.forSession(
         platform = SessionPlatform.WEB,
-        kind = config.backendKind().takeUnless { config.serverUrl.isBlank() },
+        kind = hostServedKind(config),
     )
 
 private const val NO_BROWSER_ROUTE = "This backend has no route from a browser (a browser cannot run the on-device runtime)."

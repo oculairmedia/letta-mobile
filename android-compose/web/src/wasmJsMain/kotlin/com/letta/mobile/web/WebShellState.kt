@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.lens.LensDestination
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellRoute
@@ -17,7 +18,6 @@ import com.letta.mobile.ui.shell.ShellNavDrawerState
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
 import com.letta.mobile.ui.shell.sidebar.ShellPanelAgent
-import com.letta.mobile.web.data.AgentItemState
 import kotlin.time.Instant
 
 /**
@@ -32,7 +32,7 @@ import kotlin.time.Instant
 internal class WebShellState(initialConfig: LettaConfig) {
     var config by mutableStateOf(initialConfig)
     var destination by mutableStateOf<ShellDestination>(ShellDestination.Chat())
-    var agents by mutableStateOf<List<AgentItemState>>(emptyList())
+    var agents by mutableStateOf<List<Agent>>(emptyList())
         private set
     var selectedAgentId by mutableStateOf<String?>(null)
         private set
@@ -41,7 +41,7 @@ internal class WebShellState(initialConfig: LettaConfig) {
     var rosterRequest by mutableIntStateOf(0)
         private set
 
-    val selectedAgent: AgentItemState? get() = agents.firstOrNull { it.id == selectedAgentId }
+    val selectedAgent: Agent? get() = agents.firstOrNull { it.id.value == selectedAgentId }
 
     /** The canonical route of [destination]; the chat route carries the selected agent. */
     val route: String
@@ -66,9 +66,9 @@ internal class WebShellState(initialConfig: LettaConfig) {
     }
 
     /** A fresh roster keeps the selection when the agent is still there, else opens the first agent. */
-    fun rosterLoaded(fetched: List<AgentItemState>) {
+    fun rosterLoaded(fetched: List<Agent>) {
         agents = fetched
-        selectedAgentId = selectedAgentId?.takeIf { id -> fetched.any { it.id == id } } ?: fetched.firstOrNull()?.id
+        selectedAgentId = selectedAgentId?.takeIf { id -> fetched.any { it.id.value == id } } ?: fetched.firstOrNull()?.id?.value
     }
 
     fun rosterLost() {
@@ -92,9 +92,9 @@ internal fun WebShellState.navDrawerInput(): ShellNavDrawerInput {
         agent = ShellPanelAgent(
             name = selected?.name ?: "Letta",
             orbIndex = agents.indexOf(selected).coerceAtLeast(0),
-            agentId = selected?.id,
+            agentId = selected?.id?.value,
         ),
-        agents = agents.map { it.id to it.name },
+        agents = agents.map { it.id.value to it.name },
         recentAgentsPolicy = RecentAgentsPolicy(maxAgents = agents.size.coerceAtLeast(1), fillToCap = true),
         hiddenSections = WebHiddenSections,
     )

@@ -1,8 +1,9 @@
 package com.letta.mobile.web
 
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.shell.ShellDestination
-import com.letta.mobile.web.data.AgentItemState
 import com.letta.mobile.web.data.cleanBrowserErrorMessage
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,9 +16,9 @@ import kotlin.time.Instant
 class WebShellStateTest {
     private val config = LettaConfig(id = "default", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "")
     private val now = Instant.parse("2026-10-11T12:00:00Z")
-    private val nora = AgentItemState(id = "agent-1", name = "Nora")
-    private val ada = AgentItemState(id = "agent-2", name = "Ada")
-    private val tom = AgentItemState(id = "agent-3", name = "Tom")
+    private val nora = Agent(id = AgentId("agent-1"), name = "Nora")
+    private val ada = Agent(id = AgentId("agent-2"), name = "Ada")
+    private val tom = Agent(id = AgentId("agent-3"), name = "Tom")
 
     @Test
     fun aLoadedRosterOpensTheFirstAgentAndRailsTheRest() {
@@ -35,7 +36,7 @@ class WebShellStateTest {
     fun aRefreshKeepsTheSelectedAgentWhileItIsStillThere() {
         val shell = WebShellState(config)
         shell.rosterLoaded(listOf(nora, ada))
-        shell.selectAgent(ada.id)
+        shell.selectAgent(ada.id.value)
 
         shell.rosterLoaded(listOf(nora, ada, tom))
         assertEquals(ada.id, shell.selectedAgent?.id)
@@ -58,8 +59,8 @@ class WebShellStateTest {
         actions.rail.onHome()
         assertTrue(shell.navDrawerState(now).rail.homeSelected)
 
-        actions.rail.onAgentSelected(ada.id)
-        assertEquals(ShellDestination.Chat(ada.id), shell.destination)
+        actions.rail.onAgentSelected(ada.id.value)
+        assertEquals(ShellDestination.Chat(ada.id.value), shell.destination)
         assertEquals(ada.id, shell.selectedAgent?.id)
         assertEquals(3, closed)
     }
@@ -69,7 +70,7 @@ class WebShellStateTest {
     fun theRouteRoundTripsThroughTheUrlFragment() {
         val shell = WebShellState(config)
         shell.rosterLoaded(listOf(nora, ada))
-        shell.selectAgent(ada.id)
+        shell.selectAgent(ada.id.value)
         assertEquals("chat?agent=agent-2", shell.route)
 
         val reopened = WebShellState(config)
@@ -81,11 +82,11 @@ class WebShellStateTest {
         assertTrue(reopened.openRoute("settings"))
         assertEquals(ShellDestination.Settings(), reopened.destination)
         reopened.closeSettings()
-        assertEquals(ShellDestination.Chat(ada.id), reopened.destination)
+        assertEquals(ShellDestination.Chat(ada.id.value), reopened.destination)
 
         assertFalse(reopened.openRoute("nowhere"))
         assertFalse(reopened.openRoute(""))
-        assertEquals(ShellDestination.Chat(ada.id), reopened.destination)
+        assertEquals(ShellDestination.Chat(ada.id.value), reopened.destination)
     }
 
     @Test

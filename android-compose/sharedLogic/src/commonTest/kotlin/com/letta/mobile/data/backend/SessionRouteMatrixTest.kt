@@ -29,6 +29,18 @@ class SessionRouteMatrixTest {
     }
 
     @Test
+    fun theBrowserServesDesktopsRowForEveryHostItCanReach() {
+        // letta-mobile-ckmub.17.1: both build the one shared session graph.
+        for (kind in listOf(BackendKind.DIRECT_WS, BackendKind.IROH)) {
+            assertEquals(
+                SessionRouteMatrix.bound(SessionPlatform.DESKTOP, kind),
+                SessionRouteMatrix.bound(SessionPlatform.WEB, kind),
+                "$kind",
+            )
+        }
+    }
+
+    @Test
     fun noBackendConfiguredServesNoRouteOnAnyPlatform() {
         for (platform in SessionPlatform.entries) {
             assertTrue(SessionRouteMatrix.bound(platform, null).isEmpty(), "$platform")

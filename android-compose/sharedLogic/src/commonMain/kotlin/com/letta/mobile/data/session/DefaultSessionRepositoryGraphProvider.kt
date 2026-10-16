@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Platform-neutral session graph provider: rebuild closes the previous graph,
  * publishes the next generation, and surfaces create failures on [sessionError].
  *
- * Android `SessionManager` and desktop `DesktopSessionGraphProvider` both extend
+ * Android `SessionManager` and desktop/web `HostSessionGraphProvider` both extend
  * this type so rebuild / switch semantics stay identical across hosts.
  */
 open class DefaultSessionRepositoryGraphProvider<Graph : SessionRepositoryGraph>(

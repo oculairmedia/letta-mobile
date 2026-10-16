@@ -6,6 +6,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerTransport
+import com.letta.mobile.data.transport.appserver.appServerAdminRpcParams
 import computer.iroh.BiStream
 import computer.iroh.Connection
 import computer.iroh.Endpoint
@@ -31,10 +32,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
 import java.util.UUID
-import kotlinx.serialization.json.put
 import com.letta.mobile.util.Telemetry
 
 import kotlin.time.Duration.Companion.milliseconds
@@ -205,7 +203,7 @@ class IrohAppServerTransport(
     suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
         connectionReady.await()
         val requestId = "admin-${UUID.randomUUID()}"
-        val params = adminRpcParams(path = path, body = body)
+        val params = appServerAdminRpcParams(path = path, body = body)
         return try {
             adminRpcOverStream(requestId, method, path, params)
         } catch (cancelled: CancellationException) {
@@ -524,35 +522,6 @@ class IrohAppServerTransport(
         "health.check",
         "goal.get" -> true
         else -> false
-    }
-
-    private fun adminRpcParams(path: String, body: String?): JsonObject = buildJsonObject {
-        parseAdminRpcPath(path).forEach { (key, value) -> put(key, value) }
-        if (body != null) {
-            runCatching { AppServerProtocol.json.parseToJsonElement(body).jsonObject }
-                .getOrNull()
-                ?.forEach { (key, value) -> put(key, value) }
-        }
-    }
-
-    private fun parseAdminRpcPath(path: String): Map<String, String> {
-        val withoutPrefix = path.substringBefore('?').trim('/').split('/').filter { it.isNotBlank() }
-        val values = mutableMapOf<String, String>()
-        if (withoutPrefix.size >= 3 && withoutPrefix[0] == "v1" && withoutPrefix[1] == "conversations") {
-            values["conversation_id"] = withoutPrefix[2]
-            if (withoutPrefix.size >= 5 && withoutPrefix[3] == "messages") {
-                values["message_id"] = withoutPrefix[4]
-            }
-        }
-        path.substringAfter('?', missingDelimiterValue = "")
-            .split('&')
-            .filter { it.isNotBlank() }
-            .forEach { part ->
-                val key = part.substringBefore('=')
-                val value = part.substringAfter('=', missingDelimiterValue = "")
-                if (key.isNotBlank()) values[key] = value
-            }
-        return values
     }
 
     // protocol.decodeFrame is total: malformed frames surface as

@@ -28,7 +28,7 @@ import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.desktop.data.DesktopDataBindings
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.data.DesktopLettaConfigStore
-import com.letta.mobile.desktop.data.DesktopSessionGraphProvider
+import com.letta.mobile.data.session.graph.HostSessionGraphProvider
 import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
 import com.letta.mobile.data.memory.graph.MemoryPageController
 import com.letta.mobile.data.memory.memfs.MemfsPageController
@@ -134,7 +134,7 @@ internal class DesktopLibraryControllers(
 @Composable
 internal fun rememberDesktopLibraryControllers(
     sessionGraphId: Long,
-    sessionGraphProvider: DesktopSessionGraphProvider,
+    sessionGraphProvider: HostSessionGraphProvider,
     chatScope: CoroutineScope,
     settingsStore: SecureSettingsStore,
 ): DesktopLibraryControllers {
@@ -169,7 +169,7 @@ internal fun rememberDesktopLibraryControllers(
  * opens on "not served here" without calling the unavailable repository.
  */
 private fun desktopScheduleLibraryController(
-    sessionGraphProvider: DesktopSessionGraphProvider,
+    sessionGraphProvider: HostSessionGraphProvider,
     scope: CoroutineScope,
 ): ScheduleLibraryController {
     val graph = sessionGraphProvider.current

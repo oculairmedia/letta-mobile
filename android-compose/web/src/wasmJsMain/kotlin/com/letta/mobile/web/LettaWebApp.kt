@@ -162,7 +162,7 @@ private fun WebNavigation(
 @Composable
 private fun WebPage(shell: WebShellState, page: WebPageInputs, onShowAgents: (() -> Unit)?, modifier: Modifier) {
     val ready = page.chat as? WebChatLoad.Ready
-    val navigation = WebChatPageNavigation(onShowAgents ?: {}, agentNamesById = shell.agents.associate { it.id to it.name })
+    val navigation = WebChatPageNavigation(onShowAgents ?: {}, agentNamesById = shell.agents.associate { it.id.value to it.name })
     val deps = ShellPageDeps(
         chat = ready?.let { ShellPageContent { _, m -> WebSharedChatPage(it.port, page.canvas, navigation, m) } },
         settings = shellSettingsPage(SettingsPageState(shell.config, page.connection), page.settings, onBack = shell::closeSettings),

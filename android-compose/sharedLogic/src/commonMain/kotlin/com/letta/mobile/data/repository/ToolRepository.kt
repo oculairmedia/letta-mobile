@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Clock
 
 /**
  * The tool library: served by an Iroh host's `admin_rpc` relay (`tool.list` / `tool.get`).
@@ -161,11 +162,11 @@ private class ToolCatalogCache {
 
     fun replace(tools: List<Tool>) {
         catalog.value = tools
-        lastRefreshAtMillis = System.currentTimeMillis()
+        lastRefreshAtMillis = nowMillis()
     }
 
     fun isFresh(maxAgeMs: Long): Boolean =
-        catalog.value.isNotEmpty() && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
+        catalog.value.isNotEmpty() && nowMillis() - lastRefreshAtMillis <= maxAgeMs
 
     fun find(toolId: ToolId): Tool? = catalog.value.firstOrNull { it.id == toolId }
 
@@ -195,3 +196,5 @@ private class ToolCatalogCache {
         byAgent.update { current -> current.mapValues { (_, tools) -> tools.filterNot { it.id == toolId } } }
     }
 }
+
+private fun nowMillis(): Long = Clock.System.now().toEpochMilliseconds()

@@ -90,10 +90,13 @@ object SessionRouteMatrix {
         BackendKind.IROH -> IROH_ADMIN
     }
 
-    /** Web: the chat page's agent list and conversation over the App Server; a browser has no runtime. */
+    /**
+     * Web: desktop's row (letta-mobile-ckmub.17.1: the browser builds desktop's session graph over its
+     * one App Server session), except that a browser has no embedded runtime.
+     */
     private fun web(kind: BackendKind?): Set<SessionRoute> = when (kind) {
         null, BackendKind.LOCAL_RUNTIME -> emptySet()
-        BackendKind.DIRECT_WS, BackendKind.IROH -> setOf(SessionRoute.AGENTS, SessionRoute.CONVERSATIONS)
+        BackendKind.DIRECT_WS, BackendKind.IROH -> desktop(kind)
     }
 
     /**
@@ -101,21 +104,18 @@ object SessionRouteMatrix {
      * fails when a cell disagrees without an entry here, or an entry no longer disagrees.
      */
     val DIVERGENCES: Map<Pair<BackendKind?, SessionRoute>, String> = buildMap {
-        val adminOnlyNative = "web has no admin pages; only the chat page is hosted (letta-mobile-o4ygk)"
-        for (route in IROH_ADMIN - SessionRoute.AGENTS) put(BackendKind.IROH to route, adminOnlyNative)
         put(BackendKind.IROH to SessionRoute.CONVERSATIONS, DESKTOP_CONVERSATIONS)
         put(BackendKind.IROH to SessionRoute.CONVERSATION_RECOMPILE, "only Android relays conversation.recompile (letta-mobile-by4vm.51)")
         put(BackendKind.LOCAL_RUNTIME to SessionRoute.AGENTS, NO_BROWSER_RUNTIME)
-        put(BackendKind.LOCAL_RUNTIME to SessionRoute.BLOCKS, "Android's on-device runtime has no block source")
+        put(BackendKind.LOCAL_RUNTIME to SessionRoute.BLOCKS, "Android's on-device runtime has no block source; $NO_BROWSER_RUNTIME")
         put(BackendKind.LOCAL_RUNTIME to SessionRoute.CONVERSATIONS, "$DESKTOP_CONVERSATIONS; $NO_BROWSER_RUNTIME")
         put(BackendKind.LOCAL_RUNTIME to SessionRoute.MODELS, "desktop reads the bundled runtime's models through the chat gateway")
         put(BackendKind.DIRECT_WS to SessionRoute.AGENTS, ANDROID_NO_REST)
-        put(BackendKind.DIRECT_WS to SessionRoute.BLOCKS, "$ANDROID_NO_REST; web reads blocks through the chat page only")
-        put(BackendKind.DIRECT_WS to SessionRoute.CONVERSATIONS, "$ANDROID_NO_REST; $DESKTOP_CONVERSATIONS")
+        put(BackendKind.DIRECT_WS to SessionRoute.BLOCKS, ANDROID_NO_REST)
     }
 
     private const val DESKTOP_CONVERSATIONS =
-        "desktop lists conversations through its chat gateway, not the session's conversation repository"
+        "desktop and web list conversations through their chat gateway, not the session's conversation repository"
     private const val NO_BROWSER_RUNTIME = "a browser has no embedded runtime"
     private const val ANDROID_NO_REST =
         "Android binds no direct ws:// App Server repositories (letta-mobile-by4vm.24 shares desktop's)"

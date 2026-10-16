@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.data
 
+import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.chat.runtime.BackendConfigPolicy
 import com.letta.mobile.data.chat.runtime.BackendConfigStore
 import com.letta.mobile.data.chat.runtime.SecureTokenStore
@@ -7,6 +8,8 @@ import com.letta.mobile.data.health.IServerHealthRepository
 import com.letta.mobile.data.health.ServerHealthState
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
+import com.letta.mobile.data.session.graph.HostSessionGraphFactory
+import com.letta.mobile.data.session.graph.HostSessionGraphProvider
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
@@ -306,9 +309,8 @@ class DesktopServerHealthRepository(
 data class DesktopDataBindings(
     val secureSettingsStore: SecureSettingsStore,
     val healthRepository: IServerHealthRepository,
-    val sessionGraphFactory: DesktopSessionGraphFactory,
-    val sessionGraphProvider: DesktopSessionGraphProvider,
-    val chatSessionGraphFactory: DesktopChatSessionGraphFactory,
+    val sessionGraphFactory: HostSessionGraphFactory,
+    val sessionGraphProvider: HostSessionGraphProvider,
     /** letta-mobile-w4q4p: provider/model admin RPC over the current channel transport. */
     val modelControlRpc: com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker? = null,
     /**
@@ -334,7 +336,7 @@ fun createDefaultDesktopDataBindings(
     irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
     channelTransportProvider: () -> IChannelTransport? = { null },
 ): DesktopDataBindings {
-    val graphFactory = DesktopSessionGraphFactory(
+    val graphFactory = desktopSessionGraphFactory(
         configProvider = configProvider,
         channelTransportFactory = {
             channelTransportProvider() ?: NoOpChannelTransport()
@@ -349,12 +351,7 @@ fun createDefaultDesktopDataBindings(
         permissionModeSettings = permissionModeSettings,
         healthRepository = DesktopServerHealthRepository(),
         sessionGraphFactory = graphFactory,
-        sessionGraphProvider = DesktopSessionGraphProvider(graphFactory),
-        chatSessionGraphFactory = defaultDesktopChatSessionGraphFactory(
-            configProvider = configProvider,
-            repositoryGraphFactory = graphFactory,
-            permissionModeSettings = permissionModeSettings,
-        ),
+        sessionGraphProvider = HostSessionGraphProvider(graphFactory, SessionPlatform.DESKTOP),
         modelControlRpc = com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker.overTransport(channelTransportProvider),
         pluginViewsFactory = { com.letta.mobile.desktop.plugin.desktopPluginViewsModel(channelTransportProvider) },
     )

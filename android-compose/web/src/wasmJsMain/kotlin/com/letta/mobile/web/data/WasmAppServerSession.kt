@@ -175,5 +175,29 @@ internal suspend fun <T> bounded(timeoutMs: Long, message: String, block: suspen
     throw IllegalStateException(message, timeout)
 }
 
+/** Auth capability the browser Iroh binding honours by reassembling `frame_part` sequences. */
+internal const val FRAME_PART_CAPABILITY = "frame_part"
+
+/**
+ * The transport capabilities to advertise on auth for [serverUrl] (letta-mobile-yhq16). Over Iroh a
+ * reply larger than 1 MiB, such as a full agent list, only arrives when the server may split it into
+ * parts, which the browser binding reassembles. The WebSocket transport has no such framing.
+ */
+internal fun authCapabilitiesFor(serverUrl: String): List<String>? =
+    if (isIrohBackendUrl(serverUrl)) listOf(FRAME_PART_CAPABILITY) else null
+
+internal fun resolveWebSocketUrl(serverUrl: String): String {
+    val trimmed = serverUrl.trim().removeSuffix("/")
+    return when {
+        trimmed.startsWith("ws://") || trimmed.startsWith("wss://") -> {
+            val pathStart = trimmed.indexOf('/', startIndex = trimmed.indexOf("://") + 3)
+            if (pathStart < 0) "$trimmed/ws" else trimmed
+        }
+        trimmed.startsWith("http://") -> "ws://${trimmed.removePrefix("http://")}/ws"
+        trimmed.startsWith("https://") -> "wss://${trimmed.removePrefix("https://")}/ws"
+        else -> error("Server URL must use iroh, http, https, ws, or wss")
+    }
+}
+
 private const val CONNECT_TIMEOUT_MS = 15_000L
 internal const val REQUEST_TIMEOUT_MS = 20_000L

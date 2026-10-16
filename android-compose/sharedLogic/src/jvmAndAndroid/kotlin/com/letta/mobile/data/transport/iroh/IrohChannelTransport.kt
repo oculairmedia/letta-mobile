@@ -273,7 +273,7 @@ class IrohChannelTransport(
     }
 
     private suspend fun dialConnection(config: IrohConnectConfig): IrohConnectionHandle {
-        val forcedUrl = forcedIrohUrl.takeIf { it.isNotBlank() } ?: DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
+        val forcedUrl = forcedIrohUrl.takeIf { it.isNotBlank() } ?: com.letta.mobile.data.repository.DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
         return irohDialer.dial(
             config = config,
             effectiveUrlOverride = forcedUrl,
@@ -475,7 +475,7 @@ class IrohChannelTransport(
         Telemetry.event(
             "IrohTrace", "transport.connect.begin",
             "baseShimUrl" to baseShimUrl,
-            "forced" to DEBUG_FORCE_IROH_URL.isNotBlank(),
+            "forced" to com.letta.mobile.data.repository.DEBUG_FORCE_IROH_URL.isNotBlank(),
             "state" to state.value::class.simpleName,
         )
         supervisor.refreshConfig()
@@ -1109,12 +1109,8 @@ class IrohChannelTransport(
         internal const val LIVENESS_PROBE_INTERVAL_MS = IrohLivenessProbe.INTERVAL_MS
         internal const val LIVENESS_PROBE_TIMEOUT_MS = IrohLivenessProbe.TIMEOUT_MS
         internal const val LIVENESS_PROBE_FAILURES_TO_DECLARE_DEAD = IrohLivenessProbe.FAILURES_TO_DECLARE_DEAD
-        // Debug override for local Iroh testing. MUST stay blank in committed
-        // code — a non-blank value forces EVERY backend through Iroh regardless
-        // of the active config (breaks REST/local-runtime selection). Set it
-        // only in a throwaway local build when dialing a hand-run wrapper.
-        private const val DEBUG_FORCE_IROH_URL = ""
-        fun shouldUseIroh(url: String?): Boolean = DEBUG_FORCE_IROH_URL.isNotBlank() || isIrohUrl(url)
+        // The debug force-Iroh override lives beside the commonMain predicate (letta-mobile-ckmub.17.1).
+        fun shouldUseIroh(url: String?): Boolean = com.letta.mobile.data.repository.shouldUseIrohTransport(url)
 
         internal val READ_ONLY_ADMIN_RPC_METHODS = IrohTransportSupport.READ_ONLY_ADMIN_RPC_METHODS
 
