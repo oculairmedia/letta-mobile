@@ -230,12 +230,12 @@ internal fun rememberDesktopShellPanels(core: DesktopShellCore, chatState: Deskt
 
 /** The window's image source for the composer: drag-and-drop while the chat shows. */
 @Composable
-internal fun rememberDesktopImageIntake(core: DesktopShellCore, navigator: DesktopShellNavigator): DesktopImageIntake {
+internal fun rememberDesktopImageIntake(core: DesktopShellCore, chatShowing: Boolean): DesktopImageIntake {
     val chatController = core.chatController
     val loader = remember { DesktopImageAttachmentLoader() }
     val isDragActive = DesktopImageIngressEffect(
         DesktopImageIngressConfig(
-            enabled = navigator.selectedDestination == DesktopDestination.Conversations,
+            enabled = chatShowing,
             scope = core.chatScope,
             loader = loader,
             onImage = chatController::attachImage,

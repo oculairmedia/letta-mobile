@@ -2,20 +2,19 @@ package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.chat.runtime.displayTitle
-import com.letta.mobile.data.desktopshell.ConversationTabsReducer
 import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.ui.shell.rememberShellWorkspaceState
 import com.letta.mobile.ui.components.tabs.LettaTab
 import com.letta.mobile.ui.components.tabs.LettaTabStripActions
 import com.letta.mobile.ui.shell.header.SearchSlot
@@ -50,22 +49,18 @@ internal fun LettaDesktopApp(
 ) {
     // Launch on the fleet dashboard: it is the only view that says something
     // before a conversation is selected.
-    val selectedDestination = rememberSaveable { mutableStateOf(DesktopDestination.Home) }
-    // Spotify-style library toggle: icon rail <-> expanded names-and-spaces list.
-    val railExpanded = rememberSaveable { mutableStateOf(false) }
-    val navigator = remember { DesktopShellNavigator(selectedDestination, railExpanded) }
+    val navigator = rememberShellWorkspaceState(ShellDestination.Home)
     val context = rememberDesktopShellContext(shell, navigator)
     val chatState = context.chatState.value
-    val conversationTabs = remember(chatState.sessionGraphId) { mutableStateOf(ConversationTabsState()) }
     val frame = rememberDesktopShellFrame(context, chatState)
-    DesktopShellEffects(context, frame, conversationTabs)
+    DesktopShellEffects(context, frame)
     DesktopShellRoutingEffects(context, frame, onActiveTitleChange)
     val workingDirectory = context.core.chatController.workingDirectory.current.collectAsState().value?.path
     DesktopMaterialTheme {
         DesktopWorkspaceFileViewerHost(context.core.chatScope, workingDirectory) {
             DesktopShellWindowContent(context, frame)
         }
-        DesktopShellHeaderChrome(context, frame, conversationTabs, onHeaderChromeChange)
+        DesktopShellHeaderChrome(context, frame, onHeaderChromeChange)
     }
 }
 
@@ -78,7 +73,6 @@ internal fun LettaDesktopApp(
 private fun DesktopShellHeaderChrome(
     context: DesktopShellContext,
     frame: DesktopShellFrame,
-    tabs: MutableState<ConversationTabsState>,
     onHeaderChromeChange: (DesktopHeaderChromeState) -> Unit,
 ) {
     val router = context.router
@@ -91,12 +85,12 @@ private fun DesktopShellHeaderChrome(
         onToggleSidebar = { layout.controller.dispatch(ShellLayoutEvent.ToggleSidebar) },
         sidebarToggleFocusRequester = layout.sidebarToggleFocusRequester,
         sidebarOverflow = desktopSidebarOverflow(context, frame),
-        conversationTabs = rememberOpenTabs(tabs.value, frame.chatState.conversations),
+        conversationTabs = rememberOpenTabs(context.navigator.tabs, frame.chatState.conversations),
         activeConversationId = frame.chatState.selectedConversationId,
         conversationTabActions = LettaTabStripActions(
             onSelect = { router.openConversation(ConversationId(it)) },
-            onClose = { router.closeConversationTab(tabs, ConversationId(it)) },
-            onReorder = { id, index -> tabs.value = ConversationTabsReducer.reorder(tabs.value, id, index) },
+            onClose = { router.closeConversationTab(ConversationId(it)) },
+            onReorder = { id, index -> router.reorderConversationTab(ConversationId(id), index) },
             // Browser-style "+" on the strip: a new chat with the focused agent.
             onNew = { context.openNewChatForFocusedAgent(frame.focus) },
             newLabel = "New conversation tab",

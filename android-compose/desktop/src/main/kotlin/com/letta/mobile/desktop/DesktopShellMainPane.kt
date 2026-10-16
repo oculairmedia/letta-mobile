@@ -16,6 +16,7 @@ import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellHomePrompt
 import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.data.subagents.visibleRunningCount
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
@@ -105,7 +106,7 @@ private fun rememberDesktopShellChatHost(context: DesktopShellContext, frame: De
             chatScope = core.chatScope,
             onNavigate = { navigator.selectedDestination = it },
             onCreateAgent = navigator::openNewAgent,
-            onEditAgent = { navigator.editAgentId = it },
+            onEditAgent = { navigator.editAgentId = it?.let(::AgentId) },
             onCanvasSessionChange = { core.canvasShell.activeSession = it },
             showDockedCanvas = showDockedCanvas,
             client = DesktopClientCommandRoutes(
@@ -160,7 +161,7 @@ private fun desktopMainContentInputs(
         agentEditor = navigator.agentEditor,
         agentEditorPage = context.agentEditorPage(),
         selectedDestination = navigator.selectedDestination,
-        pageDestination = navigator.currentRoute(frame.chatState.selectedConversationId, frame.focus.selectedAgentId).page.toShellDestination(),
+        pageDestination = navigator.pageFor(frame),
         selectedConversationId = frame.chatState.selectedConversationId,
         destinationInputs = destinationContentInputs(context, frame),
         activeCanvasSession = core.canvasShell.activeSession,
@@ -280,12 +281,12 @@ private fun desktopHomeCallbacks(context: DesktopShellContext, frame: DesktopShe
         navigation = HomePageNavigation(
             onSubmitPrompt = { text ->
                 val rosterAgentId = focus.rosterAgents.firstOrNull()?.id?.value
-                router.submitHomePrompt(DesktopHomePrompt(text, focus.selectedAgentId, rosterAgentId))
+                router.submitHomePrompt(ShellHomePrompt(text, focus.selectedAgentId?.let(::AgentId), rosterAgentId?.let(::AgentId)))
             },
             onOpenConversation = { openConversation(it.conversationId) },
             onOpenAgent = { router.openAgent(AgentId(it)) },
             onOpenShortcut = { shortcut -> DesktopHome.destinationFor(shortcut)?.let(navigator::navigate) },
-            onConfigureAgent = { navigator.editAgentId = it },
+            onConfigureAgent = { navigator.editAgentId = AgentId(it) },
             onOpenMessage = { message -> message.conversationId?.let(openConversation) },
             onOpenTool = { navigator.navigate(ShellDestination.Skills(section = ShellSkillsSection.Tools)) },
             onOpenBlock = { navigator.navigate(DesktopDestination.Memory) },
@@ -339,7 +340,7 @@ private fun DesktopShellSharedChatPage(
             // The companion mascot brings the agent pane back and leaves any
             // editor; its pencil opens the editor.
             openAgentPane = { context.openAgentPane() },
-            editAgent = { navigator.editAgentId = focus.selectedAgentId },
+            editAgent = { navigator.editAgentId = focus.selectedAgentId?.let(::AgentId) },
             agentNamesById = page.host.agentNamesById,
             recentInteractions = rememberDesktopRecentInteractions(context, frame),
         ),
