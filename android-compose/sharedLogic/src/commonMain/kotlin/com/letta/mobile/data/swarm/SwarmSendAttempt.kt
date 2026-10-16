@@ -29,6 +29,14 @@ import kotlin.time.Duration
 import kotlin.time.TimeMark
 import com.letta.mobile.runtime.ConversationId as RuntimeConversationId
 
+/** A reply that has landed (it has messages) and did not change since the previous read. */
+internal fun SwarmReply?.isUnchangedReplyOf(previous: SwarmReply?): Boolean =
+    this != null && messageIds.isNotEmpty() && this == previous
+
+/** The same parked call, whether it arrived as a control request or as a streamed approval message. */
+internal fun PendingSwarmApproval.isSameRequestAs(other: PendingSwarmApproval): Boolean =
+    toolCallId == other.toolCallId || approvalId == other.approvalId
+
 /** How one dial of a send ended. */
 internal sealed interface AttemptOutcome {
     /** The send reported its final event. */
@@ -198,7 +206,7 @@ internal class SendAttempt(
         var quietFor = Duration.ZERO
         while (deadline.remaining() > Duration.ZERO) {
             val reply = (history.replyAfter(conversation, persisted) as? Lookup.Found)?.value
-            if (reply != null && reply.messageIds.isNotEmpty() && reply == last) {
+            if (reply.isUnchangedReplyOf(last)) {
                 quietFor += policy.pollInterval
                 if (quietFor >= policy.resumeQuiet) {
                     reporter.report(DeliveryReceipt.Processed(TurnTerminal.Unobserved, reply))
@@ -266,7 +274,7 @@ internal class SendAttempt(
 
         private suspend fun onApproval(approval: PendingSwarmApproval) {
             val known = approvals.value
-            if (known.any { it.toolCallId == approval.toolCallId || it.approvalId == approval.approvalId }) return
+            if (known.any(approval::isSameRequestAs)) return
             approvals.value = known + approval
             reporter.report(Activity.ApprovalRequested(approval))
             // Parallel tool calls park together: let their requests land before reporting the stop.

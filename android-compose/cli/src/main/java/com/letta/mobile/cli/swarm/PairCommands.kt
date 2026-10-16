@@ -29,25 +29,45 @@ class SwarmPairCommand(environment: SwarmCliEnvironment = SwarmCliEnvironment())
     private val yes by option("--yes", help = "Connect without asking to confirm the host id (required with --invite -).").flag()
 
     override fun run() = runBlocking {
-        if (profile.host() != null) {
-            echo("error: already paired; run `meridian unpair` first", err = true)
-            throw ProgramResult(SwarmExit.AlreadyPaired.code)
-        }
-        val fromStdin = invite == STDIN
-        if (fromStdin && !yes) throw UsageError("--invite - reads stdin, so the host cannot be confirmed interactively: add --yes")
-        val deviceName = SenderLabel.of(name)?.value ?: throw UsageError("--name has no printable characters")
-        val raw = if (fromStdin) readBounded(environment.stdin(), MAX_INVITE_CHARS) else invite
-        val flow = PairingFlow(
-            redeemer = environment.redeemer(profile),
-            store = profile.hostStore(deviceName, environment.nowMs),
-            deviceName = deviceName,
-            nowMs = environment.nowMs,
-        )
+        requireUnpaired()
+        val deviceName = deviceName()
+        val flow = pairingFlow(deviceName)
+        submit(flow, readInvite())
+        redeem(flow)
+    }
+
+    private suspend fun requireUnpaired() {
+        if (profile.host() == null) return
+        echo("error: already paired; run `meridian unpair` first", err = true)
+        throw ProgramResult(SwarmExit.AlreadyPaired.code)
+    }
+
+    private fun deviceName(): String = SenderLabel.of(name)?.value ?: throw UsageError("--name has no printable characters")
+
+    /** The invite, from stdin when `--invite -` (it then needs `--yes`: stdin cannot also answer the prompt). */
+    private fun readInvite(): String {
+        if (invite != STDIN) return invite
+        if (!yes) throw UsageError("--invite - reads stdin, so the host cannot be confirmed interactively: add --yes")
+        return readBounded(environment.stdin(), MAX_INVITE_CHARS)
+    }
+
+    private fun pairingFlow(deviceName: String) = PairingFlow(
+        redeemer = environment.redeemer(profile),
+        store = profile.hostStore(deviceName, environment.nowMs),
+        deviceName = deviceName,
+        nowMs = environment.nowMs,
+    )
+
+    /** Local format and expiry check, then the host confirmation; nothing is dialled before it. */
+    private fun submit(flow: PairingFlow, raw: String) {
         when (val read = flow.submit(raw.trim())) {
             is PairingState.ConfirmHost -> confirmHost(read)
             is PairingState.Failed -> pairingFailed(read)
             else -> pairingFailed(PairingState.Failed(PairingError.MALFORMED))
         }
+    }
+
+    private suspend fun redeem(flow: PairingFlow) {
         when (val result = flow.confirm()) {
             is PairingState.Paired -> paired(result)
             is PairingState.Failed -> pairingFailed(result)
@@ -74,7 +94,8 @@ class SwarmPairCommand(environment: SwarmCliEnvironment = SwarmCliEnvironment())
     }
 
     private fun pairingFailed(failed: PairingState.Failed): Nothing {
-        echo("error: pairing failed: ${failed.error.name.lowercase()}${if (failed.retryable) " (the same invite can be retried)" else ""}", err = true)
+        val retry = if (failed.retryable) " (the same invite can be retried)" else ""
+        echo("error: pairing failed: ${failed.error.name.lowercase()}$retry", err = true)
         throw ProgramResult(failed.error.exit.code)
     }
 

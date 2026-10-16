@@ -11,6 +11,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 /** One message to an agent. [text] is sent with [from]'s sender line on top. */
@@ -87,29 +88,42 @@ class SwarmMessenger(
     fun send(request: SwarmSendRequest): Flow<DeliveryEvent> = channelFlow {
         val reporter = DeliveryReporter(channel)
         val holder = admit(request, reporter) ?: return@channelFlow
-        val deadline = timeSource.markNow() + request.timeout
-        var failures = 0
-        while (true) {
-            if (deadline.hasPassedNow()) {
-                reporter.report(DeliveryFailure.TimedOut(reporter.reached))
-                return@channelFlow
+        SendLoop(request, holder, reporter, timeSource.markNow() + request.timeout).run()
+    }
+
+    /** One send's dial loop: each dial is an attempt; a link failure is retried with backoff or ends the send. */
+    private inner class SendLoop(
+        private val request: SwarmSendRequest,
+        private val holder: OutboxEntryHolder,
+        private val reporter: DeliveryReporter,
+        private val deadline: TimeMark,
+    ) {
+        private var failures = 0
+
+        suspend fun run() {
+            while (nextDial() == LoopStep.Continue) Unit
+        }
+
+        private suspend fun nextDial(): LoopStep =
+            if (deadline.hasPassedNow()) stop(DeliveryFailure.TimedOut(reporter.reached)) else dialOnce()
+
+        private suspend fun dialOnce(): LoopStep =
+            when (val result = link.withSession { SendAttempt(it, holder, request, policy, deadline, reporter).run() }) {
+                is LinkResult.Ok -> result.value.toLoopStep()
+                is LinkResult.Failed -> afterLinkFailure(result.failure)
             }
-            val result = link.withSession { session ->
-                SendAttempt(session, holder, request, policy, deadline, reporter).run()
-            }
-            when (result) {
-                is LinkResult.Ok -> if (result.value == AttemptOutcome.Finished) return@channelFlow
-                is LinkResult.Failed -> {
-                    failures += 1
-                    val retry = retryAfter(result.failure, failures)
-                    if (retry == null) {
-                        reporter.report(result.failure.toDeliveryFailure())
-                        return@channelFlow
-                    }
-                    reporter.report(Retrying(failures, result.failure.reasonText(), retry.inWholeMilliseconds))
-                    delay(retry)
-                }
-            }
+
+        private suspend fun afterLinkFailure(failure: LinkFailure): LoopStep {
+            failures += 1
+            val retry = retryAfter(failure, failures) ?: return stop(failure.toDeliveryFailure())
+            reporter.report(Retrying(failures, failure.reasonText(), retry.inWholeMilliseconds))
+            delay(retry)
+            return LoopStep.Continue
+        }
+
+        private suspend fun stop(failure: DeliveryFailure): LoopStep {
+            reporter.report(failure)
+            return LoopStep.Stop
         }
     }
 
@@ -167,16 +181,24 @@ class SwarmMessenger(
         require(text.length <= SwarmLimits.MAX_MESSAGE_CHARS) { "message exceeds ${SwarmLimits.MAX_MESSAGE_CHARS} characters" }
         val fresh = OutboxEntry(request.clientMessageId, request.agent, request.target, text, createdAtMs = nowMs())
         pruneTombstones()
-        val stored = outbox.get(request.clientMessageId)
+        val stored = outbox.get(request.clientMessageId) ?: return OutboxEntryHolder(outbox, fresh.also { outbox.put(it) })
         return when {
-            stored != null && !stored.sameMessageAs(fresh) -> null.also { reporter.report(DeliveryFailure.IdReused(fresh.id)) }
-            stored != null && !stored.isPastSending() && stored.isOlderThanTtl() -> {
+            !stored.sameMessageAs(fresh) -> refuse(reporter, DeliveryFailure.IdReused(fresh.id))
+            stored.isExpiredUnsent() -> {
                 outbox.remove(stored.id)
-                null.also { reporter.report(DeliveryFailure.Expired(stored.id)) }
+                refuse(reporter, DeliveryFailure.Expired(stored.id))
             }
-            else -> OutboxEntryHolder(outbox, stored ?: fresh.also { outbox.put(it) })
+            else -> OutboxEntryHolder(outbox, stored)
         }
     }
+
+    private suspend fun refuse(reporter: DeliveryReporter, failure: DeliveryFailure): OutboxEntryHolder? {
+        reporter.report(failure)
+        return null
+    }
+
+    /** A never-sent entry past its time to live: dropped, never sent late. */
+    private fun OutboxEntry.isExpiredUnsent(): Boolean = !isPastSending() && isOlderThanTtl()
 
     /** Delivered entries are kept for the time to live only. */
     private suspend fun pruneTombstones() {
@@ -212,6 +234,15 @@ class SwarmMessenger(
 /** [conversation], once [agent] is resolved in scope and owns it. */
 internal suspend fun SwarmDirectory.inScope(agent: AgentRef, conversation: ConversationId): Lookup<ConversationId> =
     resolve(agent).then { resolved -> conversationOf(resolved, conversation) }
+
+/** Whether the dial loop goes on after one dial. */
+internal enum class LoopStep { Continue, Stop }
+
+/** A finished attempt ends the send; a lost link dials again (the next attempt resumes). */
+internal fun AttemptOutcome.toLoopStep(): LoopStep = when (this) {
+    AttemptOutcome.Finished -> LoopStep.Stop
+    is AttemptOutcome.LinkLost -> LoopStep.Continue
+}
 
 internal fun LinkFailure.toDeliveryFailure(): DeliveryFailure = when (this) {
     LinkFailure.NotPaired -> DeliveryFailure.NotPaired
