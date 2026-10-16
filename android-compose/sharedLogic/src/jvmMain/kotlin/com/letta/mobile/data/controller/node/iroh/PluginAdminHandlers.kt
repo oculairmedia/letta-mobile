@@ -22,6 +22,7 @@ import com.letta.mobile.data.plugin.host.PluginViewCalls
 import com.letta.mobile.data.plugin.host.PluginViewRefusal
 import com.letta.mobile.data.plugin.view.PluginViewActionCall
 import com.letta.mobile.data.plugin.view.PluginViewActionOutcome
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.storage.AssetStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -104,7 +105,7 @@ class PluginAdminHandlers(private val runtime: PluginHostRuntime, private val as
 
     private suspend fun viewAction(params: JsonObject?): JsonElement {
         val wire = try {
-            PluginAdminRpc.json.decodeFromJsonElement(PluginViewActionWire.serializer(), params ?: JsonObject(emptyMap()))
+            LettaJson.wire.decodeFromJsonElement(PluginViewActionWire.serializer(), params ?: JsonObject(emptyMap()))
         } catch (e: SerializationException) {
             adminError("invalid_params: ${e.message}")
         }
@@ -158,6 +159,6 @@ class PluginAdminHandlers(private val runtime: PluginHostRuntime, private val as
             adminError("refused: ${e.message}")
         }
 
-        fun <T> encode(serializer: KSerializer<T>, value: T): JsonElement = PluginAdminRpc.json.encodeToJsonElement(serializer, value)
+        fun <T> encode(serializer: KSerializer<T>, value: T): JsonElement = LettaJson.wire.encodeToJsonElement(serializer, value)
     }
 }

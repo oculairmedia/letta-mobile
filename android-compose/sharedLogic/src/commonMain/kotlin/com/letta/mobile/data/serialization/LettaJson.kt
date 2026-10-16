@@ -12,7 +12,7 @@ import kotlinx.serialization.json.Json
  *
  * | Instance     | Bytes it handles                                   | Unknown keys | Lenient / coerce | Defaults | Nulls    |
  * |--------------|----------------------------------------------------|--------------|------------------|----------|----------|
- * | [wire]       | App Server `/ws` frames, Iroh-relayed turn frames  | ignored      | no / no          | omitted  | omitted  |
+ * | [wire]       | App Server `/ws`, Iroh turn frames, `plugins.*`    | ignored      | no / no          | omitted  | omitted  |
  * | [adminRpc]   | Letta REST bodies relayed over Iroh `admin_rpc`    | ignored      | yes / yes        | omitted  | omitted  |
  * | [persisted]  | Files and rows this app writes and reads back      | ignored      | no / no          | written  | written  |
  *

@@ -207,7 +207,6 @@
     <ID>MaxLineLength:AdminRpcContractTest.kt$AdminRpcContractTest$"Registered Admin RPC methods do not exactly match the expected contract. Did you add/remove a method? Update handlers and expected set."</ID>
     <ID>MaxLineLength:AdminRpcPluginCatalogTest.kt$AdminRpcPluginCatalogTest$listOf(com.letta.mobile.data.plugin.catalog.PluginSummaryWire("letta.chart", "Chart", "1.2.0", PluginState.Active, manifest = manifest))</ID>
     <ID>MaxLineLength:AdminRpcPluginCatalogTest.kt$AdminRpcPluginCatalogTest.CannedLink$return AppServerInboundFrame.AdminRpcResponse(requestId = "r", success = refusal == null, result = answer.takeIf { refusal == null }, error = refusal)</ID>
-    <ID>MaxLineLength:AdminRpcPluginViewTransport.kt$AdminRpcPluginViewTransport$return link.call(PluginAdminRpc.PAGE_READ, params).read { PluginAdminRpc.json.decodeFromJsonElement(PluginPageWire.serializer(), it) }</ID>
     <ID>MaxLineLength:AdminRpcRegistryTest.kt$AdminRpcRegistryTest$fail("Found '_error' in ${file.name}; handlers must throw an exception via adminError instead of wrapping success:true with _error.")</ID>
     <ID>MaxLineLength:AdmittedTimelineExternalWriter.kt$AdmittedTimelineExternalWriter$admission.admitted(conversationId) { delegate.cleanupAbandonedAssistantFragments(agentId, conversationId, runId, turnId, reason, candidateRunIds) }</ID>
     <ID>MaxLineLength:AdmittedTimelineExternalWriter.kt$AdmittedTimelineExternalWriter$admission.admitted(conversationId) { delegate.reconcileExternalTransportSend(conversationId, agentId, externalConversationId, otid) }</ID>

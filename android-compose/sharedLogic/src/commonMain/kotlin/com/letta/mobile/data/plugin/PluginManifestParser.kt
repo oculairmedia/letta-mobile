@@ -25,7 +25,6 @@ object PluginManifestParser {
     /** Strict: an unknown key is an error, never skipped. `runtime` is told apart by `kind`. */
     val json: Json = Json {
         ignoreUnknownKeys = false
-        classDiscriminator = "kind"
         explicitNulls = false
     }
 

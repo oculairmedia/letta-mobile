@@ -14,12 +14,13 @@ frame, a third turned a type change into a default value.
 
 | Instance | Bytes it handles | `ignoreUnknownKeys` | `isLenient` | `coerceInputValues` | `encodeDefaults` | `explicitNulls` |
 |---|---|---|---|---|---|---|
-| `LettaJson.wire` | App Server `/ws` frames, Iroh-relayed turn frames | true | false | false | false | false |
+| `LettaJson.wire` | App Server `/ws` frames, Iroh-relayed turn frames, the `plugins.*` admin_rpc bodies | true | false | false | false | false |
 | `LettaJson.adminRpc` | Letta REST bodies over Iroh `admin_rpc`, send-path decoder | true | true | true | false | false |
 | `LettaJson.persisted` | Files, Room JSON columns, preferences the app writes | true | false | false | true | true |
 
 All three keep the default `classDiscriminator = "type"`, which is what `AppServerInboundFrame` and
-`AppServerCommand` declare with `@JsonClassDiscriminator("type")`. The KDoc on each instance gives
+`AppServerCommand` declare with `@JsonClassDiscriminator("type")`. The plugin types on the
+`plugins.*` wire (`PluginState`, `PluginHealth`, `PluginRuntime`) declare `@JsonClassDiscriminator("kind")`. The KDoc on each instance gives
 the rationale for each flag. In short:
 
 - `wire` tolerates new fields from a newer App Server but fails on malformed frames or type
@@ -102,6 +103,7 @@ them from migrating.
 | main before this change | 161 | 171 |
 | `AppServerProtocol.json` and `lettaWireJson` aliased (adds `LettaJson.kt`) | 159 + `LettaJson.kt` | 169 + 3 canonical |
 | 11 admin_rpc files moved to `LettaJson.adminRpc` | 148 + `LettaJson.kt` | 157 + 3 canonical |
+| `PluginAdminRpc.json` removed: `plugins.*` on `LettaJson.wire` (by4vm.102, protocol change) | one file fewer | one fewer |
 
 Files moved to `LettaJson.adminRpc`, each with exactly `ignoreUnknownKeys`, `isLenient`,
 `explicitNulls = false` and `coerceInputValues` before the change:
