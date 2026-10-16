@@ -55,58 +55,109 @@ def load_contract(mascot_dir):
 
 
 # --- the file --------------------------------------------------------------------------------
+class _Surface:
+    """Walks the object stream once. Records arrive in document order, so an enum value belongs to
+    the enum declared before it and a property to the view model declared before it; one small
+    handler per record type keeps that bookkeeping out of a single long branch."""
+
+    def __init__(self):
+        self.enums, self.enum_order, self.models, self.machines = {}, [], {}, []
+        self.enum = self.model = None
+
+    def on_enum(self, o):
+        self.enum = o.props.get("name", f"enum{len(self.enum_order)}")
+        self.enum_order.append(self.enum)
+        self.enums[self.enum] = []
+
+    def on_enum_value(self, o):
+        if self.enum is not None:
+            self.enums[self.enum].append(o.props.get("key"))
+
+    def on_model(self, o):
+        self.model = o.props.get("name")
+        self.models[self.model] = []
+
+    def on_machine(self, o):
+        self.machines.append(o.props.get("name"))
+
+    def enum_of(self, o):
+        """The enum an enum property uses (its `enumId` is an index into the declared enums)."""
+        if o.type != "ViewModelPropertyEnumCustom":
+            return None
+        enum_id = o.props.get("enumId", 0)
+        return self.enum_order[enum_id] if enum_id < len(self.enum_order) else None
+
+    def on_property(self, o):
+        if self.model is not None:
+            self.models[self.model].append((o.props.get("name"), KINDS[o.type], self.enum_of(o)))
+
+    def take(self, o):
+        handler = _HANDLERS.get(o.type) or (_Surface.on_property if o.type in KINDS else None)
+        if handler:
+            handler(self, o)
+
+
+_HANDLERS = {"DataEnumCustom": _Surface.on_enum, "DataEnumValue": _Surface.on_enum_value,
+             "ViewModel": _Surface.on_model, "StateMachine": _Surface.on_machine}
+
+
 def file_surface(riv):
     """{view models: {name: [(prop, kind, enum name or None)]}, enums: {name: [keys]}, machines}."""
-    enums, enum_order, models, machines = {}, [], {}, []
-    current_enum = current_model = None
+    s = _Surface()
     for o in riv.objects:
-        if o.type == "DataEnumCustom":
-            current_enum = o.props.get("name", f"enum{len(enum_order)}")
-            enum_order.append(current_enum)
-            enums[current_enum] = []
-        elif o.type == "DataEnumValue" and current_enum is not None:
-            enums[current_enum].append(o.props.get("key"))
-        elif o.type == "ViewModel":
-            current_model = o.props.get("name")
-            models[current_model] = []
-        elif o.type in KINDS and current_model is not None:
-            enum_id = o.props.get("enumId", 0) if o.type == "ViewModelPropertyEnumCustom" else None
-            enum = (enum_order[enum_id] if enum_id is not None and enum_id < len(enum_order) else None)
-            models[current_model].append((o.props.get("name"), KINDS[o.type], enum))
-        elif o.type == "StateMachine":
-            machines.append(o.props.get("name"))
-    return {"models": models, "enums": enums, "machines": machines}
+        s.take(o)
+    return {"models": s.models, "enums": s.enums, "machines": s.machines}
+
+
+def _membership_problems(vm, have, want):
+    missing = [n for n in want if n not in have]
+    extra = [n for n in have if n not in want]
+    problems = [f"view model {vm!r} is missing documented properties: {missing}"] if missing else []
+    if extra:
+        problems.append(f"view model {vm!r} exposes undocumented properties: {extra}")
+    return problems
+
+
+def _type_problems(have, want):
+    problems = []
+    for name in (n for n in want if n in have):
+        p, (kind, enum) = want[name], have[name]
+        if kind != p.type:
+            problems.append(f"property {name!r} is a {kind} in the file, documented as {p.type}")
+        elif p.type == "enum" and enum != p.range:
+            problems.append(f"enum property {name!r} uses enum {enum!r}, documented as {p.range!r}")
+    return problems
+
+
+def _enum_problem(enum, keys, got):
+    if got is None:
+        return f"enum {enum!r} is missing"
+    if got != keys:
+        return (f"enum {enum!r} keys are {got}, documented as {keys} (order matters: "
+                f"Rive delivers an enum value as its index)")
+    return None
+
+
+def _enum_problems(surface, contract):
+    found = (_enum_problem(enum, keys, surface["enums"].get(enum)) for enum, keys in contract.ENUMS.items())
+    return [p for p in found if p]
+
+
+def _machine_problems(surface, contract):
+    if contract.STATE_MACHINE in surface["machines"]:
+        return []
+    return [f"state machine {contract.STATE_MACHINE!r} not found; have {surface['machines']}"]
 
 
 def file_problems(surface, contract):
     """Every way the built file differs from the documented contract."""
-    problems = []
     props = surface["models"].get(contract.VIEW_MODEL)
     if props is None:
         return [f"no view model {contract.VIEW_MODEL!r}; have {sorted(surface['models'])}"]
     have = {name: (kind, enum) for name, kind, enum in props}
     want = {p.name: p for p in contract.AVATAR}
-    missing = [n for n in want if n not in have]
-    extra = [n for n in have if n not in want]
-    if missing:
-        problems.append(f"view model {contract.VIEW_MODEL!r} is missing documented properties: {missing}")
-    if extra:
-        problems.append(f"view model {contract.VIEW_MODEL!r} exposes undocumented properties: {extra}")
-    for name, p in want.items():
-        if name in have and have[name][0] != p.type:
-            problems.append(f"property {name!r} is a {have[name][0]} in the file, documented as {p.type}")
-        if name in have and p.type == "enum" and have[name][1] != p.range:
-            problems.append(f"enum property {name!r} uses enum {have[name][1]!r}, documented as {p.range!r}")
-    for enum, keys in contract.ENUMS.items():
-        got = surface["enums"].get(enum)
-        if got is None:
-            problems.append(f"enum {enum!r} is missing")
-        elif got != keys:
-            problems.append(f"enum {enum!r} keys are {got}, documented as {keys} (order matters: "
-                            f"Rive delivers an enum value as its index)")
-    if contract.STATE_MACHINE not in surface["machines"]:
-        problems.append(f"state machine {contract.STATE_MACHINE!r} not found; have {surface['machines']}")
-    return problems
+    return (_membership_problems(contract.VIEW_MODEL, have, want) + _type_problems(have, want)
+            + _enum_problems(surface, contract) + _machine_problems(surface, contract))
 
 
 # --- the app ---------------------------------------------------------------------------------
@@ -122,31 +173,41 @@ def app_wants(kt):
     }
 
 
-def app_problems(want, contract):
-    """Every name the app writes that the contract does not offer it, or offers as another kind."""
-    problems = []
+def _name_problems(name, p, as_trigger):
+    """What is wrong with the app writing `name` (contract entry `p`) the way it does."""
+    if p is None:
+        return [f"RiveAvatarContract.kt writes {name!r}, which is not in the contract"]
+    problems = [f"RiveAvatarContract.kt writes {name!r}, a bench-only tunable"] if p.owner == "bench" else []
+    if as_trigger and p.type != "trigger":
+        problems.append(f"RiveAvatarContract.kt fires {name!r} as a trigger; the contract says {p.type}")
+    if not as_trigger and p.type == "trigger":
+        problems.append(f"RiveAvatarContract.kt writes {name!r} as an input; the contract says trigger")
+    return problems
+
+
+def _names_problems(want, contract):
     doc = contract.by_name()
-    for name in sorted(want["inputs"] | want["triggers"]):
-        p = doc.get(name)
-        if p is None:
-            problems.append(f"RiveAvatarContract.kt writes {name!r}, which is not in the contract")
-            continue
-        if p.owner == "bench":
-            problems.append(f"RiveAvatarContract.kt writes {name!r}, a bench-only tunable")
-        if name in want["triggers"] and p.type != "trigger":
-            problems.append(f"RiveAvatarContract.kt fires {name!r} as a trigger; the contract says {p.type}")
-        if name in want["inputs"] and p.type == "trigger":
-            problems.append(f"RiveAvatarContract.kt writes {name!r} as an input; the contract says trigger")
+    written = [(n, False) for n in sorted(want["inputs"])] + [(n, True) for n in sorted(want["triggers"])]
+    return [problem for name, trig in written for problem in _name_problems(name, doc.get(name), trig)]
+
+
+def _key_problems(want, contract):
+    problems = []
     if want["machine"] != contract.STATE_MACHINE:
         problems.append(f"RiveAvatarContract.kt names state machine {want['machine']!r}, "
                         f"the contract {contract.STATE_MACHINE!r}")
-    states = set(contract.ENUMS["AvatarState"])
-    if want["states"] - states:
-        problems.append(f"stateKey maps to keys AvatarState does not have: {sorted(want['states'] - states)}")
+    unknown = want["states"] - set(contract.ENUMS["AvatarState"])
+    if unknown:
+        problems.append(f"stateKey maps to keys AvatarState does not have: {sorted(unknown)}")
     shapes = set(contract.ENUMS["MascotShape"])
     if want["shapes"] != shapes:
         problems.append(f"shapeKey keys {sorted(want['shapes'])} differ from MascotShape {sorted(shapes)}")
     return problems
+
+
+def app_problems(want, contract):
+    """Every name the app writes that the contract does not offer it, or offers as another kind."""
+    return _names_problems(want, contract) + _key_problems(want, contract)
 
 
 # --- the shipped copies ----------------------------------------------------------------------

@@ -14,6 +14,7 @@ Rive rules that bite here:
 """
 import itertools
 import math
+from typing import NamedTuple
 from textwrap import indent
 
 import svgpath
@@ -281,18 +282,39 @@ def squint_animations():
     return out
 
 
-def band_beat_layer_rml(name, lid, expr_state, wait_anims, wait_nodes, beat_anim, beat_node, off_node):
-    """A plate layer that plays one beat on random waits while expr sits in `expr_state`'s band:
+class BandBeat(NamedTuple):
+    """One band-gated beat layer: its name and id, the expr state that enables it, its waits (the
+    animations and their state nodes), the beat and its node, and the parked Off node."""
+    name: str
+    lid: str
+    expr_state: str
+    wait_anims: list
+    wait_nodes: list
+    beat_anim: str
+    beat_node: str
+    off_node: str
+
+
+SQUINT = BandBeat("Squint", "7:14", "thinking", PLATE_SQUINT_WAITS, PLATE_SQUINT_WAIT_NODES,
+                  PLATE_SQUINT_ANIM, PLATE_SQUINT_NODE, PLATE_SQUINT_OFF_NODE)
+
+
+REM = BandBeat("Rem", "7:15", "dreaming", PLATE_REM_WAITS, PLATE_REM_WAIT_NODES,
+               PLATE_REM_ANIM, PLATE_REM_NODE, PLATE_REM_OFF_NODE)
+
+
+def band_beat_layer_rml(b):
+    """A plate layer that plays one beat on random waits while expr sits in `b.expr_state`'s band:
     Squint for thinking, Rem for dreaming (te3n1.5). Off parks it, and every state leaves for Off
     the moment expr is anywhere else, so a beat never outlives its state's glyph."""
-    leave = _outside(off_node, [expr_state])
-    states = [State(PLATE_SQUINT_OFF_ANIM, off_node, 0,
-                    transitions=[OnInput(wait_nodes[0], PLATE_IN_EXPR, EXPR[expr_state], 0)])]
-    states += [State(aid, nid, 1 + k, transitions=leave + [Exit(beat_node)])
-               for k, (aid, nid) in enumerate(zip(wait_anims, wait_nodes))]
-    states.append(State(beat_anim, beat_node, 1 + len(wait_nodes), reset=True, random=True,
-                        transitions=leave + [Exit(nid, weight=10) for nid in wait_nodes]))
-    return Layer(name, lid, off_node, states=states).rml()
+    leave = _outside(b.off_node, [b.expr_state])
+    states = [State(PLATE_SQUINT_OFF_ANIM, b.off_node, 0,
+                    transitions=[OnInput(b.wait_nodes[0], PLATE_IN_EXPR, EXPR[b.expr_state], 0)])]
+    states += [State(aid, nid, 1 + k, transitions=leave + [Exit(b.beat_node)])
+               for k, (aid, nid) in enumerate(zip(b.wait_anims, b.wait_nodes))]
+    states.append(State(b.beat_anim, b.beat_node, 1 + len(b.wait_nodes), reset=True, random=True,
+                        transitions=leave + [Exit(nid, weight=10) for nid in b.wait_nodes]))
+    return Layer(b.name, b.lid, b.off_node, states=states).rml()
 
 
 def plate_component():
@@ -328,10 +350,8 @@ def plate_component():
     saccade_layer = saccade_layer_rml()
     trigger_layer = blink_trigger_layer_rml()
     auto_layer = auto_blink_layer_rml()
-    squint_layer = band_beat_layer_rml("Squint", "7:14", "thinking", PLATE_SQUINT_WAITS, PLATE_SQUINT_WAIT_NODES,
-                                       PLATE_SQUINT_ANIM, PLATE_SQUINT_NODE, PLATE_SQUINT_OFF_NODE)
-    rem_layer = band_beat_layer_rml("Rem", "7:15", "dreaming", PLATE_REM_WAITS, PLATE_REM_WAIT_NODES,
-                                    PLATE_REM_ANIM, PLATE_REM_NODE, PLATE_REM_OFF_NODE)
+    squint_layer = band_beat_layer_rml(SQUINT)
+    rem_layer = band_beat_layer_rml(REM)
 
     glyphs = "\n".join(svgpath.path_rml(art(f"glyph-{n}.svg"), n[0].upper() + n[1:], GLYPH[n], INK)
                        for n in GLYPH_ORDER + NEW_GLYPHS)

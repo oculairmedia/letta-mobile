@@ -176,6 +176,11 @@ class When:
         return weighted(t, self.weight) if self.weight is not None else t
 
 
+def _waits_for_end(t):
+    """True for a transition that fires at its state's exit time: an Exit, or a When(exit=True)."""
+    return isinstance(t, Exit) or getattr(t, "exit", False)
+
+
 @dataclass(frozen=True)
 class Raw:
     """Escape hatch for a transition whose XML is built elsewhere (a hand-rolled condition pair).
@@ -288,7 +293,7 @@ class Layer:
 
     def _check_exit_time(self, s, t):
         loops = (self.anim_loops or {}).get(s.anim) == "loop"
-        if loops and (isinstance(t, Exit) or getattr(t, "exit", False)):
+        if loops and _waits_for_end(t):
             raise ValueError(f'layer "{self.name}": state {s.node} -> {t.to} is an '
                              f'exit-time transition, but animation {s.anim} loops and '
                              f'never reaches its exit time')
