@@ -25,14 +25,17 @@ data class AgentPresence(
     val toolName: String? = null,
     /**
      * letta-mobile-iczm7: a background dream (reflection) or memory-upkeep run is in flight for
-     * this agent. It is not a turn, so it never changes [activity]; an otherwise idle agent dozes.
+     * this agent. It is not a turn, so it never changes [activity]; the mascot's director decides
+     * when an otherwise quiet agent shows it.
      */
     val dreaming: Boolean = false,
+    /**
+     * letta-mobile-te3n1.1: the moments across this agent's conversations (sends, tool starts and
+     * ends, approvals, finishes, failures) as counts, so a reader that samples presence still sees
+     * each one. Summed over conversations; a conversation that is cleared takes its counts with it.
+     */
+    val edges: RunEdges = RunEdges.NONE,
 ) {
-    /** Nothing in the foreground and a dream in the background: the mascot sleeps it off. */
-    val dozing: Boolean
-        get() = dreaming && activity == AgentActivityKind.IDLE && !awaitingApproval && !userTyping && !error
-
     companion object {
         val IDLE = AgentPresence()
     }

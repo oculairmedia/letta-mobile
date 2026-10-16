@@ -3,7 +3,9 @@ package com.letta.mobile.feature.chat.screen
 import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.presence.ConversationRunRegistry
 import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.session.SessionGraph
 import com.letta.mobile.data.session.SessionManager
@@ -38,6 +40,10 @@ internal fun openedChatViewModel(
 internal data class FixtureSession(
     val tag: String,
     val contextReadings: ContextTokenReadings = ContextTokenReadings(),
+    /** The app-wide run registry the ViewModel publishes into. */
+    val runRegistry: ConversationRunRegistry = ConversationRunRegistry(),
+    /** The subagent registry the ViewModel's roster reads; relaxed (empty) by default. */
+    val subagentRepository: ISubagentRepository = mockk(relaxed = true),
 )
 
 internal fun openedChatViewModel(
@@ -59,7 +65,7 @@ internal fun openedChatViewModel(
     runtimeEventOutbox = mockk(relaxed = true),
     currentConversationTracker = mockk(relaxed = true),
     wsChatBridge = stubChatBridge(),
-    subagentRepository = mockk(relaxed = true),
+    subagentRepository = session.subagentRepository,
     slashCommandRepository = mockk(relaxed = true) {
         coEvery { listForAgent(any()) } returns Result.success(emptyList())
         coEvery { listGlobal() } returns Result.success(emptyList())
@@ -71,6 +77,7 @@ internal fun openedChatViewModel(
         every { llmModels } returns MutableStateFlow(emptyList())
     },
     pagingHost = pagingHost,
+    runRegistry = session.runRegistry,
 )
 
 /** Cached, so the ViewModel resolves the agent without suspending during construction. */
