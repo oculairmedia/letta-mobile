@@ -11,8 +11,7 @@ import kotlinx.coroutines.CoroutineScope
  * the scope it renders in. Detaching a Desktop view closes its viewport lease and never retires the
  * conversation writer or drops indexed durable rows.
  *
- * Enabled by the host only once the canonical external writer is gated on; the centered [target]
- * falls back to a usable tail (reported via [CanonicalTimelinePresentation.missingTarget]) rather
+ * The centered [target] falls back to a usable tail (reported via [CanonicalTimelinePresentation.missingTarget]) rather
  * than reverting to whole-history loading.
  */
 suspend fun openDesktopCanonicalPresentation(

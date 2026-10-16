@@ -46,7 +46,7 @@ class ControlCapabilityHandlersTest {
         savedFactory?.let { AdminProxyClient.defaultTransportFactory = it }
     }
 
-    private class FakeControlClient : AppServerClient {
+    private class FakeControlClient(private val refusal: String? = null) : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow()
         val calls = mutableListOf<String>()
 
@@ -73,12 +73,12 @@ class ControlCapabilityHandlersTest {
 
         override suspend fun skillEnable(command: AppServerCommand.SkillEnable): AppServerInboundFrame.SkillEnableResponse {
             calls += "skill_enable:${command.skillPath}"
-            return AppServerInboundFrame.SkillEnableResponse(requestId = command.requestId, success = true, skillName = "demo")
+            return AppServerInboundFrame.SkillEnableResponse(command.requestId, refusal == null, skillName = "demo", error = refusal)
         }
 
         override suspend fun skillDisable(command: AppServerCommand.SkillDisable): AppServerInboundFrame.SkillDisableResponse {
             calls += "skill_disable:${command.name}"
-            return AppServerInboundFrame.SkillDisableResponse(requestId = command.requestId, success = true)
+            return AppServerInboundFrame.SkillDisableResponse(command.requestId, refusal == null, error = refusal)
         }
     }
 
@@ -166,6 +166,22 @@ class ControlCapabilityHandlersTest {
         val disable = dispatch(r, "skill.uninstall", mapOf("name" to "demo", "agent_id" to "agent-1"))
         assertTrue(disable.contains("\"success\":true") && disable.contains("\"disabled\":true"))
         assertTrue("skill_disable:demo" in client.calls)
+    }
+
+    @Test
+    fun skillMutationRefusalSurfacesHostReasonWithoutTrippingBreaker() = runTest {
+        val client = FakeControlClient(refusal = "demo is not a symlink - refusing to delete")
+        val r = router(client = client)
+
+        repeat(2) {
+            val disable = dispatch(r, "skill.uninstall", mapOf("name" to "demo", "agent_id" to "agent-1"))
+            assertTrue(disable.contains("skill.uninstall failed: demo is not a symlink - refusing to delete"), disable)
+        }
+        // A host refusal is not a transport failure: the second call still reached the App Server.
+        assertTrue(client.calls.count { it == "skill_disable:demo" } == 2)
+
+        val enable = dispatch(r, "skill.install", mapOf("skill_path" to "/skills/demo"))
+        assertTrue(enable.contains("skill.install failed: demo is not a symlink"), enable)
     }
 
     @Test

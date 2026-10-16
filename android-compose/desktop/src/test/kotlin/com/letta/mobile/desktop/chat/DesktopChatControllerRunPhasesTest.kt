@@ -82,6 +82,5 @@ class DesktopChatControllerRunPhasesTest {
             bootstrapState = defaultDesktopBootstrapState(),
             scope = backgroundScope,
             gatewayFactory = { gateway },
-            timelinePersistence = noOpDesktopTimelinePersistence,
         )
 }

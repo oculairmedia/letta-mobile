@@ -159,7 +159,6 @@ class DesktopChatControllerConversationPushTest {
             bootstrapState = defaultDesktopBootstrapState(),
             scope = backgroundScope,
             gatewayFactory = { gateway },
-            timelinePersistence = noOpDesktopTimelinePersistence,
             conversationChanges = transport,
         )
 }
