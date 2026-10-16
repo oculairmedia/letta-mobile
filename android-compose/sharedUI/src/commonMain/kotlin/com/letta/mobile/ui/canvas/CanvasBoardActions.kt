@@ -6,6 +6,7 @@ import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasHistory
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.model.CanvasNoteId
 import com.letta.mobile.ui.canvas.plugin.PluginElementEdits
 import com.letta.mobile.ui.canvas.plugin.PluginElementFrames
 import io.ak1.drawbox.domain.model.Element
@@ -60,13 +61,13 @@ internal suspend fun CanvasBoard.recordingWithLastDrawing(label: String, block: 
 
 /** Deletes the note [id], as one undoable step. */
 internal fun CanvasBoard.deleteNote(id: String) {
-    scope.launch { recordingDocuments("deleting a note") { runCatching { session?.removeDocument(id) } } }
+    scope.launch { recordingDocuments("deleting a note") { runCatching { session?.removeDocument(CanvasNoteId(id)) } } }
 }
 
 /** Deletes the notes [ids], as one undoable step. */
 internal fun CanvasBoard.deleteNotes(ids: Set<String>) {
     scope.launch {
-        recordingDocuments("deleting notes") { ids.forEach { id -> runCatching { session?.removeDocument(id) } } }
+        recordingDocuments("deleting notes") { ids.forEach { id -> runCatching { session?.removeDocument(CanvasNoteId(id)) } } }
     }
 }
 
@@ -167,7 +168,7 @@ private fun CanvasBoard.storeDuplicate(copy: NoteDuplicate, s: CanvasSession) {
     val note = copy.note
     scope.launch {
         recordingDocuments("duplicating a note") {
-            runCatching { s.setDocument(copy.id, note.json, frame = copy.frame, color = note.color, style = note.style) }
+            runCatching { s.setDocument(CanvasNoteId(copy.id), note.json, frame = copy.frame, color = note.color, style = note.style) }
                 .onSuccess {
                     ui.activeNoteId = copy.id
                     ui.statusMessage = "Duplicated note"
@@ -264,7 +265,7 @@ internal fun CanvasBoard.addNoteAt(world: Offset) {
     val id = newNoteId()
     scope.launch {
         recordingDocuments("adding a note") {
-            runCatching { s.setDocument(id, "", frame = frame, color = NoteColors.first().hex) }
+            runCatching { s.setDocument(CanvasNoteId(id), "", frame = frame, color = NoteColors.first().hex) }
                 .onSuccess {
                     ui.activeNoteId = id
                     ui.focusRequest.documentId = id

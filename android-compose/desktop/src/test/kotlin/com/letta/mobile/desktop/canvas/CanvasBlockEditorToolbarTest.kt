@@ -3,6 +3,7 @@
 package com.letta.mobile.desktop.canvas
 
 import androidx.compose.ui.test.runComposeUiTest
+import com.letta.mobile.data.model.CanvasNoteId
 import com.letta.mobile.ui.canvas.BlockButtons
 import com.letta.mobile.ui.canvas.CanvasBlockEditor
 import com.letta.mobile.ui.canvas.NoteToolbar
@@ -18,7 +19,7 @@ class CanvasBlockEditorToolbarTest {
         val session = kotlinx.coroutines.runBlocking {
             com.letta.mobile.data.canvas.CanvasSession.create(store, com.letta.mobile.data.canvas.CanvasCreateOptions(title = "p"))
         }
-        kotlinx.coroutines.runBlocking { session.setDocument("n", "") }
+        kotlinx.coroutines.runBlocking { session.setDocument(CanvasNoteId("n"), "") }
         var toolbar: NoteToolbar? = null
         setContent {
             CanvasBlockEditor(session = session, documentId = "n", storedJson = "", active = true, onToolbar = { toolbar = it })

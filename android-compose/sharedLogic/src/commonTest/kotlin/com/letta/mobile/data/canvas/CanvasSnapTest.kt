@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasElementId
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -41,10 +42,10 @@ class CanvasSnapTest {
         val store = InMemoryCanvasDocumentStore()
         val session = CanvasSession.create(store = store, options = CanvasCreateOptions(title = "Bound", initialSceneJson = ""))
         val binding = CanvasArrowBinding(end = CanvasEndBinding("note-1", "left"))
-        session.bindArrow("arrow-1", binding)
+        session.bindArrow(CanvasElementId("arrow-1"), binding)
         assertEquals(binding, session.arrowBindings()["arrow-1"])
-        assertNull(session.bindArrow("arrow-1", binding), "same binding is a no-op")
-        session.bindArrow("arrow-1", CanvasArrowBinding())
+        assertNull(session.bindArrow(CanvasElementId("arrow-1"), binding), "same binding is a no-op")
+        session.bindArrow(CanvasElementId("arrow-1"), CanvasArrowBinding())
         assertEquals(CanvasArrowBinding(), session.arrowBindings()["arrow-1"])
 
         // Bindings survive drawing saves and never reach DrawBox.

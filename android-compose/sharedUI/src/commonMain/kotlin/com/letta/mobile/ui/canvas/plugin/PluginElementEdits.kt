@@ -7,6 +7,7 @@ import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.movePluginElement
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
 import com.letta.mobile.data.canvas.removePluginElement
+import com.letta.mobile.data.model.CanvasElementId
 
 /**
  * What a person does to a plugin element on the board, through the session's own plugin element
@@ -16,9 +17,9 @@ import com.letta.mobile.data.canvas.removePluginElement
  */
 internal object PluginElementEdits {
     suspend fun move(session: CanvasSession, id: String, frame: CanvasDocumentFrame): CanvasHistory.Step.Documents? =
-        session.movePluginElement(id, frame)
+        session.movePluginElement(CanvasElementId(id), frame)
 
-    suspend fun remove(session: CanvasSession, id: String): CanvasHistory.Step.Documents? = session.removePluginElement(id)
+    suspend fun remove(session: CanvasSession, id: String): CanvasHistory.Step.Documents? = session.removePluginElement(CanvasElementId(id))
 
     /** The plugin elements on [session]'s board. */
     fun elementsOf(session: CanvasSession): List<CanvasPluginElement> = CanvasOpProjector.pluginElementsOf(session.sceneJsonOrEmpty())

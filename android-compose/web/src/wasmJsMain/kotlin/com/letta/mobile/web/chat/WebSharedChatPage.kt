@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import com.letta.mobile.data.canvas.CanvasConversationOptions
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
@@ -82,7 +83,7 @@ private fun rememberConversationCanvas(store: CanvasDocumentStore, target: Timel
     val session by produceState<CanvasSession?>(null, store, target.conversationId) {
         value = CanvasSession.getOrCreateForConversation(
             store = store,
-            conversationId = target.conversationId,
+            conversationId = ConversationId(target.conversationId),
             options = CanvasConversationOptions(agentId = target.agentId, title = "Canvas (${target.agentName})"),
         )
     }

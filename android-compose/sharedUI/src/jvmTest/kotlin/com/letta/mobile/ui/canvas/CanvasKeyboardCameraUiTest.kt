@@ -28,6 +28,7 @@ import com.letta.mobile.data.canvas.CanvasCreateOptions
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
+import com.letta.mobile.data.model.CanvasNoteId
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.domain.usecase.UseCase
@@ -70,7 +71,7 @@ class CanvasKeyboardCameraUiTest {
             CanvasSession.create(
                 store = InMemoryCanvasDocumentStore(),
                 options = CanvasCreateOptions(title = "Board", initialSceneJson = ""),
-            ).also { it.setDocument(NOTE, "", frame = CanvasDocumentFrame(0f, 0f, NOTE_W, NOTE_H), color = "#FFF59D") }
+            ).also { it.setDocument(CanvasNoteId(NOTE), "", frame = CanvasDocumentFrame(0f, 0f, NOTE_W, NOTE_H), color = "#FFF59D") }
         }
         val board = Board(session, DrawBoxController(Reducer(UseCase())), StandInKeyboard())
         setContent {

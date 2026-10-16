@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
+import com.letta.mobile.data.model.CanvasNoteId
 import io.ak1.drawbox.domain.model.ResizeHandle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
@@ -327,7 +328,7 @@ private fun CanvasNoteCard(
                 // a box that grew with type that did not - and the second op runs even when the
                 // first has already failed.
                 runCatching {
-                    session.moveDocument(document.id, committed, style = scaledStyle)
+                    session.moveDocument(CanvasNoteId(document.id), committed, style = scaledStyle)
                 }
             }
         }
@@ -455,7 +456,7 @@ private fun CanvasNoteCard(
                             onRemove = {
                                 scope.launch {
                                     recorder.recordingOrJust("deleting a note") {
-                                        runCatching { session.removeDocument(document.id) }
+                                        runCatching { session.removeDocument(CanvasNoteId(document.id)) }
                                     }
                                 }
                             },

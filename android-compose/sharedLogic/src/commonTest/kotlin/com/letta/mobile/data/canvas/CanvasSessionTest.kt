@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.model.CanvasActorId
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -126,11 +127,11 @@ class CanvasSessionTest {
 
         val reopened = CanvasSession.getOrCreateForConversation(
             store = store,
-            conversationId = "conv-cp",
+            conversationId = ConversationId("conv-cp"),
             options = CanvasConversationOptions(),
         )
         reopened.saveScene("""{"elements":[{"id":"x"}]}""")
-        val again = CanvasSession.getOrCreateForConversation(store = store, conversationId = "conv-cp")
+        val again = CanvasSession.getOrCreateForConversation(store = store, conversationId = ConversationId("conv-cp"))
         assertEquals(1, again.checkpoints.value.size)
         assertEquals(2L, again.checkpoints.value.single().revision)
     }
@@ -142,7 +143,7 @@ class CanvasSessionTest {
 
         val sessionA = CanvasSession.getOrCreateForConversation(
             store = store,
-            conversationId = convId,
+            conversationId = ConversationId(convId),
             options = CanvasConversationOptions(
                 agentId = "agent-x",
                 title = "Conv Canvas",
@@ -154,7 +155,7 @@ class CanvasSessionTest {
         // Call getOrCreate again for same conversation
         val sessionB = CanvasSession.getOrCreateForConversation(
             store = store,
-            conversationId = convId,
+            conversationId = ConversationId(convId),
         )
 
         assertEquals(initialId, sessionB.canvasId)
