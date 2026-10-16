@@ -475,8 +475,13 @@ calls the same class):**
   should hold the node until identity has been applied - no startup flash.
 - Fit is `contain` on a fixed 500x500 artboard; the mascot is an element, not a layout, so the
   responsive `layout` fit does not apply.
-- The interaction logic (hover, drag, blink, wander, entries) lives in the file. The host only
-  writes the contract properties; it must not try to sequence transitions itself.
+- Ownership (user decision, epic te3n1 "Option A", 2026-10-16): the HOST interprets gestures and
+  pointer velocity and writes the contract inputs - `hovered`, `dragged`, `petting`,
+  `moveX`/`moveY`, `poke` / `trick` (+ `trickId`) and the other reaction triggers; the FILE owns
+  every animation (curves, poses, blink cadence, idle beats, wander, entries). The file's
+  hover/drag listeners stay only as a desktop fallback. Drag tilt is the `Travel` lean on
+  `moveX`/`moveY`, which applies whether or not `dragged` is set. The host must not try to
+  sequence transitions itself.
 
 ## Open items
 
