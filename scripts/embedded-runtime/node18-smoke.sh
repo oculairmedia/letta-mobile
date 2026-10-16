@@ -55,7 +55,7 @@ fail() { # fail <phase> <message> <log files...>
   local first; first=$(first_error "$@")
   echo "::error title=embedded-runtime-node18 ${phase}::${message}: ${first}"
   summary "### embedded-runtime-node18: ${phase} FAILED" "" "${message}" "" "First error: \`${first}\`" "" '```'
-  for log in "$@"; do [ -f "$log" ] && { echo "--- $log (tail)"; tail -n 40 "$log"; } | tee -a "$SUMMARY"; done
+  for log in "$@"; do [[ -f "$log" ]] && { echo "--- $log (tail)"; tail -n 40 "$log"; } | tee -a "$SUMMARY"; done
   summary '```'
   exit 1
 }
@@ -65,12 +65,12 @@ endphase() { echo "::endgroup::"; }
 
 # --- 0. preconditions --------------------------------------------------------------------------
 actual_node=$("$NODE18" --version)
-[ "$actual_node" = "$EXPECT_NODE_VERSION" ] ||
+[[ "$actual_node" = "$EXPECT_NODE_VERSION" ]] ||
   { echo "::error::node is $actual_node, the device ships $EXPECT_NODE_VERSION"; exit 1; }
-[ -f "$LETTA_JS" ] || { echo "::error::letta.js missing at $LETTA_JS (stage the tree first)"; exit 1; }
+[[ -f "$LETTA_JS" ]] || { echo "::error::letta.js missing at $LETTA_JS (stage the tree first)"; exit 1; }
 PRELOADS=("$HERE/android-platform-emulation.cjs")
 for preload in node18-compat.cjs regexp-polyfill.cjs android-network-polyfill.cjs device-tools-preload.cjs; do
-  [ -f "$PROJECT/$preload" ] || { echo "::error::shipped preload $preload missing from the staged tree"; exit 1; }
+  [[ -f "$PROJECT/$preload" ]] || { echo "::error::shipped preload $preload missing from the staged tree"; exit 1; }
   "$NODE18" --check "$PROJECT/$preload"
   PRELOADS+=("$PROJECT/$preload")
 done
@@ -89,7 +89,7 @@ summary "### embedded-runtime-node18" "" "| | |" "|---|---|" "| node | $actual_n
   "| staged tree (gzip) | ${gz_mb} MiB of ${BUDGET_MB} MiB |" "| staged tree (raw) | $((raw_kb / 1024)) MiB |"
 rm -f "$WORK/staged.tar.gz"
 endphase
-if [ "$gz_bytes" -gt $((BUDGET_MB * 1048576)) ]; then
+if [[ "$gz_bytes" -gt $((BUDGET_MB * 1048576)) ]]; then
   echo "::error title=embedded-runtime-node18 budget::staged tree is ${gz_mb} MiB gzip, over the ${BUDGET_MB} MiB budget"
   exit 1
 fi
@@ -146,9 +146,9 @@ result=$("$NODE18" -e '
   console.log([agent, conversation, result].join(" "));' "$WORK/headless.jsonl")
 read -r AGENT_ID CONVERSATION_ID headless_result <<< "$result"
 echo "headless: exit=$headless_exit result=${headless_result:-none} agent=${AGENT_ID:-?} conversation=${CONVERSATION_ID:-?} tool runs=$(tool_runs)"
-[ "$headless_result" = "success" ] || fail headless "headless turn did not end in result/success (exit $headless_exit)" "$WORK/headless.err" "$WORK/headless.jsonl"
-[ "$(tool_runs)" -ge 1 ] || fail headless "the Bash tool call never returned its output to the model" "$WORK/headless.err" "$WORK/llm.log"
-[ -n "$AGENT_ID" ] && [ -n "$CONVERSATION_ID" ] || fail headless "no agent_id/conversation_id in the stream-json output" "$WORK/headless.jsonl"
+[[ "$headless_result" = "success" ]] || fail headless "headless turn did not end in result/success (exit $headless_exit)" "$WORK/headless.err" "$WORK/headless.jsonl"
+[[ "$(tool_runs)" -ge 1 ]] || fail headless "the Bash tool call never returned its output to the model" "$WORK/headless.err" "$WORK/llm.log"
+[[ -n "$AGENT_ID" && -n "$CONVERSATION_ID" ]] || fail headless "no agent_id/conversation_id in the stream-json output" "$WORK/headless.jsonl"
 summary "| headless stream-json | result/success, Bash tool ran |"
 
 # --- 3. App Server through LocalAppServerHost, driven by the Kotlin client --------------------
@@ -164,10 +164,10 @@ PIDS+=("$SERVER_PID")
 url=""
 for _ in $(seq 120); do
   url=$(sed -n 's/^\[app-server\] ready at \(ws:\/\/[^ ]*\).*/\1/p' "$WORK/server.out" | head -n1)
-  [ -n "$url" ] || ! kill -0 "$SERVER_PID" 2>/dev/null || { sleep 0.5; continue; }
+  [[ -n "$url" ]] || ! kill -0 "$SERVER_PID" 2>/dev/null || { sleep 0.5; continue; }
   break
 done
-[ -n "$url" ] || { endphase; fail server "letta server never became ready" "$WORK/server.err" "$WORK/server.out"; }
+[[ -n "$url" ]] || { endphase; fail server "letta server never became ready" "$WORK/server.err" "$WORK/server.out"; }
 before=$(tool_runs)
 set +e
 APP_SERVER_TEST_TOKEN=$(cat "$WORK/backend/ws-token") cli app-server-smoke --url "$url" \
@@ -179,11 +179,11 @@ cat "$WORK/smoke.out"
 grep '\[node18-compat\]' "$WORK/server.err" || true
 kill "$SERVER_PID" 2>/dev/null || true
 endphase
-[ "$smoke_exit" -eq 0 ] || fail server "app-server-smoke exited $smoke_exit" "$WORK/server.err" "$WORK/smoke.err" "$WORK/smoke.out"
+[[ "$smoke_exit" -eq 0 ]] || fail server "app-server-smoke exited $smoke_exit" "$WORK/server.err" "$WORK/smoke.err" "$WORK/smoke.out"
 grep -q '^\[tool-return\]' "$WORK/smoke.out" || fail server "no tool return reached the Kotlin client" "$WORK/server.err" "$WORK/smoke.out"
 { grep -q '^\[lifecycle\] Completed' "$WORK/smoke.out" && grep -q '"stop_reason":"end_turn"' "$WORK/smoke.out"; } ||
   fail server "the turn never completed with end_turn" "$WORK/server.err" "$WORK/smoke.out"
-[ "$(tool_runs)" -gt "$before" ] || fail server "the Bash tool output never reached the model" "$WORK/server.err" "$WORK/llm.log"
+[[ "$(tool_runs)" -gt "$before" ]] || fail server "the Bash tool output never reached the model" "$WORK/server.err" "$WORK/llm.log"
 summary "| App Server (Kotlin client) | runtime_start, Bash tool, end_turn |" \
   "| node18-compat shims hit | $(grep -ho '\[node18-compat\] hit [^ ]*' "$WORK/headless.err" "$WORK/server.err" | awk '{print $3}' | sort -u | paste -sd' ' -) |"
 echo "embedded-runtime-node18: OK"

@@ -3,13 +3,14 @@
 // tool call (exercises tool execution + child_process on Node 18); once the tool result is back (or
 // with no tool offered) answer with the text NODE18-OK. Requests are logged as JSON lines to
 // $FAKE_LLM_LOG, including any tool result text, so the caller can assert the tool really ran.
-// usage: FAKE_LLM_PORT=4711 FAKE_LLM_LOG=/tmp/llm.log node fake-llm.cjs
+// usage: FAKE_LLM_PORT=4711 FAKE_LLM_LOG=<log path> node fake-llm.cjs
 'use strict';
 const http = require('http');
 const fs = require('fs');
 
 const port = Number(process.env.FAKE_LLM_PORT || 4711);
-const LOG = process.env.FAKE_LLM_LOG || '/tmp/fake-llm.log';
+const LOG = process.env.FAKE_LLM_LOG;
+if (!LOG) throw new Error('FAKE_LLM_LOG (the request log path) is required');
 const MODEL = 'node18-model';
 const SHELL_TOOLS = ['Bash', 'bash', 'shell', 'Shell', 'ShellCommand', 'run_shell_command', 'exec_command'];
 const TOOL_ARGS = JSON.stringify({ command: 'echo NODE18-TOOL-$((6*7))', description: 'node18 smoke' });
