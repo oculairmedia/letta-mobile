@@ -28,7 +28,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
-import com.letta.mobile.avatar.core.MascotBody
+import com.letta.mobile.avatar.core.MascotEntrance
 import com.letta.mobile.avatar.core.MascotBodyTune
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotStage
@@ -188,7 +188,7 @@ internal fun CompanionSeatOverlay(
                     // (TouchCompanionHiddenSeatTest). Appearing, it rises from the feet with one
                     // overshoot and a half-height rise; going, it sinks back the same way
                     // (letta-mobile-te3n1.3). Uniform: the layer reads the seat's bounds as a square.
-                    val appearScale = MascotBody.entranceScale(shown)
+                    val appearScale = MascotEntrance.scale(shown)
                     placeable.placeWithLayer(
                         (rect.center.x - placeable.width / 2f - placement.origin.x).roundToInt(),
                         (rect.center.y - placeable.height / 2f - placement.origin.y).roundToInt(),

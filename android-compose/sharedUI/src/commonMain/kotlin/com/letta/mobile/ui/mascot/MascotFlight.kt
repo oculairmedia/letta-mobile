@@ -9,11 +9,13 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.unit.IntOffset
-import com.letta.mobile.avatar.core.MascotBody
+import com.letta.mobile.avatar.core.MascotEntrance
 import kotlin.math.exp
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.nanoseconds
 
 /*
  * letta-mobile-te3n1.3: how a transported character moves between seats, read off its
@@ -95,8 +97,8 @@ internal fun MascotTransport.Flight.applyPose(scope: GraphicsLayerScope, seat: M
     val drawWidth = seat.drawWidth
     val flightScale = if (drawWidth > 0f) width(to) / drawWidth else 1f
     val shown = presence.value
-    val enter = if (reducedMotion) 1f else MascotBody.entranceScale(shown)
-    val enterDeform = if (reducedMotion) 0f else MascotBody.entranceDeform(shown, body.tune)
+    val enter = if (reducedMotion) 1f else MascotEntrance.scale(shown)
+    val enterDeform = if (reducedMotion) 0f else MascotEntrance.deform(shown)
     val bodyX = if (deform) body.scaleX else 1f
     val bodyY = if (deform) body.scaleY else 1f
     with(scope) {
@@ -129,7 +131,7 @@ internal suspend fun MascotTransport.Flight.drive(reducedMotion: Boolean, onLand
         while (!body.atRest) {
             val now = withFrameNanos { it }
             // A long frame slows the motion down instead of jumping it ahead.
-            val impact = body.step(((now - last) / NANOS_PER_SECOND).coerceAtMost(MAX_FRAME_SECONDS))
+            val impact = body.step((now - last).nanoseconds.coerceAtMost(MAX_FRAME))
             last = now
             frame++
             if (impact > 0f) onLanded(impact)
@@ -156,8 +158,7 @@ internal suspend fun MascotTransport.Flight.enter(reducedMotion: Boolean, onLand
 }
 
 private val FEET = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 1f)
-private const val NANOS_PER_SECOND = 1_000_000_000f
-private const val MAX_FRAME_SECONDS = 1f / 20f
+private val MAX_FRAME = 50.milliseconds
 
 /** A hop rises when it covers more than this many destination-seat widths. */
 private const val ARC_MIN_SEATS = 2f
@@ -166,7 +167,7 @@ private const val ARC_MIN_SEATS = 2f
 private const val ARC_FRACTION = 0.12f
 private const val ARC_MAX_SEATS = 0.5f
 
-/** The entrance's rise; the curve ([MascotBody.entranceScale]) shapes it, so it runs linear. */
+/** The entrance's rise; the curve ([MascotEntrance.scale]) shapes it, so it runs linear. */
 private const val ENTRANCE_MILLIS = 420
 private const val ENTRANCE_IMPACT = 0.45f
 

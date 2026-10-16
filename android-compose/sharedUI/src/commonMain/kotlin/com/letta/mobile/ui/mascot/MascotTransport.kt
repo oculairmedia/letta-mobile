@@ -47,6 +47,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import com.letta.mobile.avatar.core.MascotBody
 import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.MascotVector
 import com.letta.mobile.data.model.AgentId
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -369,7 +370,7 @@ private fun MascotTransport.beginHop(flight: MascotTransport.Flight, next: Masco
     val (from, destination) = ends
     flight.from = from
     val density = motion.density
-    flight.body.hop((destination.center.x - from.center.x) / density, (destination.center.y - from.center.y) / density)
+    flight.body.hop(MascotVector((destination.center.x - from.center.x) / density, (destination.center.y - from.center.y) / density))
     flight.wakes++
 }
 
@@ -435,12 +436,12 @@ private suspend fun PointerInputScope.seatDragGestures(handlers: SeatHandlers, f
                     // Smoothed, so one jittery event cannot fling the lean.
                     vx += (dxDp / seconds - vx) * DRAG_SMOOTHING
                     vy += (dyDp / seconds - vy) * DRAG_SMOOTHING
-                    flight.body.drag(vx, vy)
+                    flight.body.drag(MascotVector(vx, vy))
                     flight.wakes++
                 }
             }
         } finally {
-            flight.body.drag(0f, 0f)
+            flight.body.drag(null)
             flight.wakes++
         }
     }
