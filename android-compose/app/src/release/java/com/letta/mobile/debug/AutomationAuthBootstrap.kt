@@ -80,20 +80,6 @@ object AutomationAuthBootstrap {
             )
         }
 
-        fun toLettaConfig(): LettaConfig {
-            val resolvedMode = if (mode.isNullOrBlank()) {
-                LettaConfig.Mode.SELF_HOSTED
-            } else {
-                LettaConfig.Mode.entries.firstOrNull { it.name == mode.trim().uppercase() }
-                    ?: throw IllegalArgumentException("Unsupported automation mode: $mode")
-            }
-            return LettaConfig(
-                id = configId,
-                mode = resolvedMode,
-                serverUrl = serverUrl,
-                accessToken = if (resolvedMode == LettaConfig.Mode.LOCAL) null else accessToken,
-            )
-        }
-
+        fun toLettaConfig(): LettaConfig = automationLettaConfig(configId, mode, serverUrl, accessToken)
     }
 }
