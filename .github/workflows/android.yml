@@ -224,7 +224,9 @@ jobs:
     # a NEW finding fails this job. Not a required check (branch protection is
     # untouched), but it is no longer masked: a new finding shows red.
     # Covers the Android modules (app, core:android-data, designsystem,
-    # feature-chat) and quality:detekt-rules; KMP modules report NO-SOURCE.
+    # feature-chat), quality:detekt-rules and (letta-mobile-by4vm.65) every
+    # src/<sourceSet>/kotlin dir of sharedLogic, sharedUI, plugin-view, desktop
+    # and web (commonMain, jvmMain, androidMain, wasmJsMain, tests, ...).
     # The changed-file guardrailDetekt rules run inside the required `test` job.
     name: detekt
     # Keep non-required work out of the initial runner queue so required checks

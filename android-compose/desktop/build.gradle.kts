@@ -54,6 +54,7 @@ plugins {
     id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("io.gitlab.arturbosch.detekt")
     id("org.jetbrains.compose")
     id("dev.nucleusframework")
     // Kotzilla observability â€” JVM (Desktop) target. The plugin's
@@ -69,6 +70,12 @@ plugins {
 composeCompiler {
     reportsDestination = layout.buildDirectory.dir("compose_compiler")
     metricsDestination = layout.buildDirectory.dir("compose_compiler")
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom("$rootDir/detekt.yml")
+    parallel = true
 }
 
 java {

@@ -57,6 +57,14 @@ if (providers.gradleProperty("dependencyAnalysisAdvisory").orNull == "true") {
     }
 }
 
+/** Every `src/<sourceSet>/kotlin|java` directory, for detekt on KMP/JVM modules (letta-mobile-by4vm.65). */
+fun allSourceSetDirs(srcRoot: File): List<File> =
+    srcRoot.listFiles().orEmpty()
+        .filter(File::isDirectory)
+        .flatMap { sourceSet -> listOf(sourceSet.resolve("kotlin"), sourceSet.resolve("java")) }
+        .filter(File::isDirectory)
+        .sorted()
+
 // ---------------------------------------------------------------------------
 // Kotlin 2.4.x + Dagger/Hilt metadata compatibility (letta-mobile, 2026-06-24)
 // ---------------------------------------------------------------------------
@@ -80,6 +88,22 @@ subprojects {
         // `./gradlew detektBaseline` (JDK 21) when deliberately accepting debt.
         extensions.configure<DetektExtension> {
             baseline = file("detekt-baseline.xml")
+            // letta-mobile-by4vm.65: the plugin's plain `detekt` task only sees
+            // src/{main,test}/{java,kotlin}, so KMP modules (commonMain, jvmMain,
+            // androidMain, ...) and desktop's extra source sets reported NO-SOURCE.
+            // Every non-Android module analyses each src/<sourceSet>/kotlin|java dir
+            // instead. Android modules keep the plugin default (flavour dirs untouched).
+            // Evaluated lazily: the Android plugin may be applied after detekt.
+            val pluginDefaultSource = source.from.toList()
+            source.setFrom(
+                provider {
+                    if (plugins.hasPlugin("com.android.application") || plugins.hasPlugin("com.android.library")) {
+                        files(pluginDefaultSource)
+                    } else {
+                        files(allSourceSetDirs(layout.projectDirectory.dir("src").asFile))
+                    }
+                },
+            )
         }
         tasks.withType<Detekt>().configureEach {
             // Detekt 1.x supports JVM targets through 22; analysis does not need the Gradle runtime target.
