@@ -19,7 +19,7 @@ class IrohAdminRpcMcpSource(
     private val json: Json = LettaJson.adminRpc,
 ) : com.letta.mobile.data.repository.api.McpServerIrohSource {
     override fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        settingsRepository.activeBackendUsesChannel()
 
     override suspend fun listMcpServers(): List<McpServer> {
         val response = channelTransport.adminRpc(

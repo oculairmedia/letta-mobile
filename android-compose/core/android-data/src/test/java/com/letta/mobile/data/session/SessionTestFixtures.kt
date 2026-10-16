@@ -116,7 +116,6 @@ internal data class TestDefaultSessionRepositoryGraphFactoryBuilder(
     var stepApi: FakeStepApi = FakeStepApi(),
     var toolApi: FakeToolApi = FakeToolApi(),
     var settingsRepository: ISettingsRepository? = null,
-    var localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
     var appContext: android.content.Context = mockk(relaxed = true),
 ) {
     /** Tests own the graph's outer bound; production uses the process lifecycle. */
@@ -152,7 +151,6 @@ internal data class TestDefaultSessionRepositoryGraphFactoryBuilder(
         ),
         channelTransportFactory = SessionChannelTransportFactory(appContext = appContext),
         settingsRepository = settingsRepository,
-        localRuntimeOptions = localRuntimeOptions,
         graphParentScope = graphParentScope,
         cacheClearContext = cacheClearContext,
     )

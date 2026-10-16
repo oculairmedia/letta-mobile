@@ -39,7 +39,7 @@ open class IrohAdminRpcProjectSource(
     private val settingsRepository: ISettingsRepository,
     private val json: Json = LettaJson.adminRpc,
 ) : ProjectIrohSource {
-    override fun shouldUseIroh(): Boolean = settingsRepository.activeBackendIsIroh()
+    override fun shouldUseIroh(): Boolean = settingsRepository.activeBackendUsesChannel()
 
     suspend fun probeAvailability(): Boolean = try {
         refreshProjects(ProjectListLimit(1))

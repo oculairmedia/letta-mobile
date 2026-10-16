@@ -103,6 +103,9 @@ internal fun IrohConnectionState.sessionEndReason(): String? = when (this) {
 
 class IrohAuthFailure(message: String, cause: Throwable? = null) : IllegalStateException(message, cause)
 
+/** The default wait for a ready connection: a dial plus its handshake. */
+val DEFAULT_READY_TIMEOUT: kotlin.time.Duration = 30_000L.milliseconds
+
 class IrohConnectionSupervisor(
     private val scope: CoroutineScope,
     private val configProvider: () -> IrohConnectConfig?,
@@ -110,6 +113,8 @@ class IrohConnectionSupervisor(
     private val backoffPolicy: BackoffPolicy = BackoffPolicy(),
     private val randomJitterMs: (Long) -> Long = { bound -> if (bound <= 0) 0L else Random.nextLong(bound + 1) },
     private val onStateChanged: (IrohConnectionState) -> Unit = {},
+    /** How long [ready] waits by default; an on-device runtime's first start takes longer than a dial. */
+    private val readyTimeout: kotlin.time.Duration = DEFAULT_READY_TIMEOUT,
 ) {
     private val mutex = Mutex()
     private val _state = MutableStateFlow<IrohConnectionState>(IrohConnectionState.Disconnected)
@@ -126,7 +131,8 @@ class IrohConnectionSupervisor(
     private var authFailed = false
     private var failureCount = 0
 
-    suspend fun ready(timeoutMs: Long = 30_000): IrohConnectionHandle {
+    suspend fun ready(timeout: kotlin.time.Duration = readyTimeout): IrohConnectionHandle {
+        val timeoutMs = timeout.inWholeMilliseconds
         val deadline = System.currentTimeMillis() + timeoutMs
         var lastError: Throwable? = null
         while (System.currentTimeMillis() < deadline) {
@@ -139,7 +145,7 @@ class IrohConnectionSupervisor(
             lastError = result.exceptionOrNull()
         }
         val suffix = lastError?.message?.let { ": $it" }.orEmpty()
-        error("Iroh connection not ready after ${timeoutMs}ms$suffix")
+        error("App Server connection not ready after ${timeoutMs}ms$suffix")
     }
 
     suspend fun refreshConfig() {

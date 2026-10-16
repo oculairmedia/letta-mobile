@@ -16,7 +16,7 @@ import com.letta.mobile.data.chat.runtime.ConversationMarker
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.repository.activeBackendIsIroh
+import com.letta.mobile.data.repository.activeBackendUsesChannel
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.ui.shell.sidebar.ShellConversationMarkActions
@@ -76,7 +76,7 @@ internal class SharedNavDrawerViewModel @Inject constructor(
     fun setDisplayOptions(options: ChatDisplayOptions) = displayPrefs.update { options }
 
     /** Whether the active backend is Iroh, where `/recompile` has no route yet. */
-    val backendIsIroh: Boolean get() = settingsRepository.activeBackendIsIroh()
+    val backendIsIroh: Boolean get() = settingsRepository.activeBackendUsesChannel()
 
     /** Each fork's source conversation id, so a fork's row reads "Forked from …". */
     val conversationParents: StateFlow<Map<String, String>> =
@@ -145,7 +145,7 @@ internal class SharedNavDrawerViewModel @Inject constructor(
 
     /** The Iroh backend has no delete command, so a delete there only archives (it stays under Archived); the confirm dialog says so. */
     val deleteBehavior: ConversationDeleteBehavior
-        get() = if (settingsRepository.activeBackendIsIroh()) {
+        get() = if (settingsRepository.activeBackendUsesChannel()) {
             ConversationDeleteBehavior.MovesToArchived
         } else {
             ConversationDeleteBehavior.Permanent

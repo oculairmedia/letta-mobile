@@ -23,7 +23,6 @@ import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.runtime.BackendDescriptor
-import com.letta.mobile.runtime.LettaBackend
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -41,7 +40,6 @@ import kotlinx.coroutines.flow.StateFlow
 interface SessionRepositoryGraph {
     val id: Long
     val backendDescriptor: BackendDescriptor
-    val localRuntimeBackend: LettaBackend?
     val agentRepository: IAgentRepository
     val blockRepository: IAgentBlockRepository?
         get() = null

@@ -48,7 +48,6 @@ class DesktopSessionGraphAdaptersTest {
         assertEquals(BackendKind.RemoteLetta, graph.backendDescriptor.kind)
         assertEquals("http://localhost:8283", graph.backendDescriptor.label)
         assertEquals("desktop-remote-letta:desktop-self-hosted", graph.backendDescriptor.backendId.value)
-        assertNull(graph.localRuntimeBackend)
         assertIs<ChannelTransportState.Idle>(graph.channelTransport.state.value)
         assertTrue(graph.agentRepository.agents.value.isEmpty())
         assertFalse(graph.agentRepository.isRefreshing.value)

@@ -7,7 +7,6 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.SlashCommandIrohSource
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.api.IChannelTransport
-import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.backendUrlTelemetryDescriptor
 import kotlinx.serialization.json.Json
@@ -32,7 +31,7 @@ open class IrohAdminRpcSlashCommandSource(
         isLenient = true
     },
 ) : SlashCommandIrohSource {
-    override fun shouldUseIroh(): Boolean = settingsRepository.activeBackendIsIroh()
+    override fun shouldUseIroh(): Boolean = settingsRepository.activeBackendUsesChannel()
 
     override suspend fun listGlobal(): List<SlashCommand> =
         fetch(path = "/v1/slash-commands", method = "slash_command.list", agentId = null)
@@ -134,8 +133,8 @@ open class IrohAdminRpcSlashCommandSource(
         val config = settingsRepository.activeConfig.value
             ?: error("Iroh admin_rpc requested with no active backend config")
         val serverUrl = config.serverUrl
-        if (!IrohChannelTransport.shouldUseIroh(serverUrl)) {
-            error("Iroh admin_rpc requested while backend is not iroh://")
+        if (!settingsRepository.activeBackendUsesChannel()) {
+            error("admin_rpc requested with no backend configured")
         }
         Telemetry.event(
             "IrohTransport", "adminRpc.ensureConnected",

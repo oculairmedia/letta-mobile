@@ -15,7 +15,7 @@ class IrohAdminRpcPassageSource(
     private val json: Json = LettaJson.adminRpc,
 ) : com.letta.mobile.data.repository.api.PassageIrohSource {
     override fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        settingsRepository.activeBackendUsesChannel()
 
     override suspend fun listPassages(agentId: String): List<Passage> {
         val params = buildJsonObject { put("agent_id", agentId) }

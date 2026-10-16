@@ -82,8 +82,6 @@ interface IAgentRepository {
      */
     val supportsCreateAgent: Boolean get() = true
     suspend fun createAgent(params: AgentCreateParams): Agent
-    suspend fun createLocalAgent(params: AgentCreateParams): Agent =
-        throw UnsupportedOperationException("Local agent creation is not supported by this repository")
     suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent
     suspend fun updateAgent(id: String, params: AgentUpdateParams): Agent = updateAgent(AgentId(id), params)
     suspend fun deleteAgent(id: AgentId)

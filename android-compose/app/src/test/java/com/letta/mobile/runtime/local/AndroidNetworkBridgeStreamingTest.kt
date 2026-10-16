@@ -1,22 +1,5 @@
 package com.letta.mobile.runtime.local
 
-import androidx.test.core.app.ApplicationProvider
-import com.letta.mobile.runtime.actions.DeviceActionCommandRunner
-import com.letta.mobile.runtime.actions.InMemoryMobileActionAuditSink
-import com.letta.mobile.runtime.actions.MobileActionRegistry
-import com.letta.mobile.runtime.hardware.AudioStatus
-import com.letta.mobile.runtime.hardware.DeviceHardwareControlProvider
-import com.letta.mobile.runtime.hardware.DeviceHardwareControlTool
-import com.letta.mobile.runtime.hardware.FlashlightCapability
-import com.letta.mobile.runtime.hardware.HardwareCapabilities
-import com.letta.mobile.runtime.hardware.HardwareControlResponse
-import com.letta.mobile.runtime.hardware.HardwareControlStatus
-import com.letta.mobile.runtime.hardware.VibrationCapability
-import com.letta.mobile.runtime.mobileactions.AndroidProviderReadTool
-import com.letta.mobile.runtime.mobileactions.MobileIntentActionTool
-import com.letta.mobile.runtime.sensors.DeviceSensorSnapshot
-import com.letta.mobile.runtime.sensors.DeviceSensorSnapshotProvider
-import com.letta.mobile.runtime.sensors.DeviceSensorReadTool
 import com.sun.net.httpserver.HttpServer
 import java.io.OutputStream
 import java.net.InetSocketAddress
@@ -110,13 +93,7 @@ class AndroidNetworkBridgeStreamingTest {
 
     @Test
     fun `fetch still blocks loopback hosts by default`() {
-        LocalAndroidNetworkBridge(
-            sensorSnapshotProvider = sensorProvider(),
-            mobileActionRegistry = mobileActionRegistry(),
-            mobileIntentActionTool = mobileIntentTool(),
-            hardwareControlProvider = fakeHardwareProvider(),
-            deviceActionCommandRunner = commandRunner(),
-        ).start().use { session ->
+        LocalAndroidNetworkBridge().start().use { session ->
             Socket("127.0.0.1", java.net.URI(session.baseUrl).port).use { socket ->
                 postFetch(socket.getOutputStream(), session.authToken, "http://127.0.0.1:1/")
                 val response = socket.getInputStream().bufferedReader().readText()
@@ -154,13 +131,7 @@ class AndroidNetworkBridgeStreamingTest {
         }
     }
 
-    private fun bridge(): LocalAndroidNetworkBridge = LocalAndroidNetworkBridge(
-        sensorSnapshotProvider = sensorProvider(),
-        mobileActionRegistry = mobileActionRegistry(),
-        mobileIntentActionTool = mobileIntentTool(),
-        hardwareControlProvider = fakeHardwareProvider(),
-        deviceActionCommandRunner = commandRunner(),
-    )
+    private fun bridge(): LocalAndroidNetworkBridge = LocalAndroidNetworkBridge()
 
     private fun withLoopbackFetchAllowed(block: () -> Unit) {
         val property = "com.letta.mobile.androidNetworkBridge.allowLoopbackFetchForTests"
@@ -171,41 +142,5 @@ class AndroidNetworkBridgeStreamingTest {
         } finally {
             if (previous == null) System.clearProperty(property) else System.setProperty(property, previous)
         }
-    }
-
-    private fun sensorProvider(): DeviceSensorSnapshotProvider = object : DeviceSensorSnapshotProvider {
-        override fun snapshot(nowMillis: Long): DeviceSensorSnapshot = DeviceSensorSnapshot(capturedAtMillis = nowMillis)
-    }
-
-    private fun mobileActionRegistry(): MobileActionRegistry =
-        MobileActionRegistry(emptySet(), emptySet(), InMemoryMobileActionAuditSink())
-
-    private fun mobileIntentTool(): MobileIntentActionTool =
-        MobileIntentActionTool(ApplicationProvider.getApplicationContext())
-
-    private fun commandRunner(): DeviceActionCommandRunner = DeviceActionCommandRunner(
-        sensorReadTool = DeviceSensorReadTool(sensorProvider()),
-        mobileActionRegistry = mobileActionRegistry(),
-        mobileIntentActionTool = mobileIntentTool(),
-        hardwareControlTool = DeviceHardwareControlTool(fakeHardwareProvider()),
-        providerReadTool = AndroidProviderReadTool(ApplicationProvider.getApplicationContext()),
-    )
-
-    private fun fakeHardwareProvider(): DeviceHardwareControlProvider = object : DeviceHardwareControlProvider {
-        private val caps = HardwareCapabilities(
-            flashlight = FlashlightCapability(HardwareControlStatus.UnsupportedHardware, false, reason = "test"),
-            vibration = VibrationCapability(HardwareControlStatus.UnsupportedHardware, false, reason = "test"),
-            audio = AudioStatus(HardwareControlStatus.Available, currentMusicVolume = 1, maxMusicVolume = 10, ringerMode = "normal", fixedVolume = false, reason = "test"),
-        )
-
-        override fun capabilities(): HardwareCapabilities = caps
-        override fun setFlashlight(enabled: Boolean, dryRun: Boolean): HardwareControlResponse =
-            HardwareControlResponse("set_flashlight", HardwareControlStatus.UnsupportedHardware, false, "test", flashlight = caps.flashlight)
-        override fun vibrate(durationMs: Long?, patternMs: List<Long>?): HardwareControlResponse =
-            HardwareControlResponse("vibrate", HardwareControlStatus.UnsupportedHardware, false, "test")
-        override fun readAudioStatus(): HardwareControlResponse =
-            HardwareControlResponse("audio_status", HardwareControlStatus.Available, true, "test", audio = caps.audio)
-        override fun adjustMusicVolume(delta: Int?, level: Int?): HardwareControlResponse =
-            HardwareControlResponse("adjust_music_volume", HardwareControlStatus.Success, true, "test", audio = caps.audio)
     }
 }

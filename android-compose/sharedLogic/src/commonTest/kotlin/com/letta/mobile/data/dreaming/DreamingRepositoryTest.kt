@@ -81,7 +81,7 @@ class DreamingRepositoryTest {
     @Test
     fun aRuntimeWithoutDreamIsTooOldAndNothingIsSent() = runTest {
         val client = FakeClient(output = "unused")
-        // The embedded 0.26.1 / 0.32.3 command list (golden letta-code-0.32.3-live.jsonl:9).
+        // A pre-0.33 command list (golden letta-code-0.32.3-live.jsonl:9).
         val commands = listOf("clear", "doctor", "init", "remember", "compact", "reload", "context-limit")
         val outcome = AppServerDreamingRepository(client = { client }, supportedCommands = { commands }).runNow(onDefault)
         assertEquals(DreamOutcome.Unsupported(DreamUnsupportedReason.RuntimeTooOld), outcome)

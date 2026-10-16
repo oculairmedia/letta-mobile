@@ -4,6 +4,7 @@ import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.node.IrohRelayConfig
 import com.letta.mobile.data.model.HostId
 import com.letta.mobile.data.transport.iroh.IrohDiagnostics
+import com.letta.mobile.data.transport.iroh.IrohFailureLog
 import computer.iroh.Connection
 import computer.iroh.Endpoint
 import computer.iroh.Incoming
@@ -76,6 +77,9 @@ class IrohNodeEndpoint(
     // d6e8g.3: ONE verifier across every connection this endpoint accepts, so
     // per-NodeId auth-failure rate limiting survives redials.
     private val authVerifier = IrohBearerAuthVerifier(authPolicy)
+
+    /** letta-mobile-by4vm.112: a redialling peer repeats the same failure; count it, log it sparsely. */
+    private val handshakeFailures = IrohFailureLog("IrohNode", "incoming.handshake.failed")
 
     init {
         val alpns = listOf(alpn) + canvasRelay?.alpns.orEmpty() + protocolHandlers.map { it.alpn }
@@ -343,9 +347,11 @@ class IrohNodeEndpoint(
 
     /** Handshake and serve one accepted connection; failures are logged, never thrown into the accept loop. */
     private suspend fun serveIncoming(incoming: Incoming, controller: AppServerController, turnHost: NodeTurnHost) {
+        var offeredAlpn = ""
         try {
             val accepting = incoming.accept()
             val peerAlpn = accepting.alpn()
+            offeredAlpn = peerAlpn.decodeToString()
             val connection = withTimeout(HANDSHAKE_TIMEOUT_MS.milliseconds) { accepting.connect() }
             val remoteId = IrohDiagnostics.endpointIdHex(connection.remoteId())
             Telemetry.event("IrohNode", "incoming.connected", "remoteEndpointId" to remoteId)
@@ -367,12 +373,7 @@ class IrohNodeEndpoint(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Telemetry.event(
-                "IrohNode", "incoming.handshake.failed",
-                "error" to (e.message ?: e.toString()),
-                "class" to e::class.simpleName,
-                level = Telemetry.Level.WARN,
-            )
+            handshakeFailures.record(e, alpn = offeredAlpn, origin = IrohFailureLog.incomingRemote(incoming))
         }
     }
 

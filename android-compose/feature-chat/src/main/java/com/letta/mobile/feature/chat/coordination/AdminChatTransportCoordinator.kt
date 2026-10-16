@@ -9,8 +9,7 @@ import com.letta.mobile.ui.chat.render.ChatTransport
 import com.letta.mobile.ui.chat.render.ChatUiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -20,8 +19,6 @@ import kotlinx.coroutines.launch
  */
 internal class AdminChatTransportCoordinator(
     private val scope: CoroutineScope,
-    /** Iroh OR shim WS — both surface channel-transport state in the UI. */
-    private val usesChannelTransport: StateFlow<Boolean>,
     private val wsChatBridge: WsChatBridge,
     private val uiState: MutableStateFlow<ChatUiState>,
     /**
@@ -37,8 +34,8 @@ internal class AdminChatTransportCoordinator(
     fun startObserving() {
         startConnectionStateSurfacing()
         scope.launch {
-            combine(usesChannelTransport, wsChatBridge.connection) { isShim, wsState ->
-                if (!isShim) return@combine ChatTransport.Rest
+            // letta-mobile-by4vm.110.6: every Android backend is served by the channel.
+            wsChatBridge.connection.map { wsState ->
                 when (wsState) {
                     is WsConnectionState.Idle -> ChatTransport.WsIdle
                     is WsConnectionState.Connecting -> ChatTransport.WsConnecting
@@ -72,10 +69,6 @@ internal class AdminChatTransportCoordinator(
         scope.launch {
             var sawDisconnect = false
             wsChatBridge.state.collect { transportState ->
-                // Only the live channel transport backs this surface. On a REST
-                // backend the channel transport is inert, and its states must not
-                // be dressed up as chat-connection loss.
-                if (!usesChannelTransport.value) return@collect
                 when (transportState) {
                     is ChannelTransportState.Connected -> {
                         if (!sawDisconnect) return@collect
