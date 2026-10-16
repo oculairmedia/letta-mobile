@@ -15,6 +15,7 @@ import com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.AppServerTurnStackSpec
 import com.letta.mobile.data.runtime.attachTurnStack
+import com.letta.mobile.data.runtime.permissionGovernedTurnStackSpec
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.transport.appserver.AppServerReadinessExpectation
@@ -240,11 +241,9 @@ class DesktopAppServerChatGatewayBuilder(
 
 /**
  * Desktop runs every turn Unrestricted unless a permission mode was chosen (letta-mobile-bzvro.13:
- * the composer chip per conversation, the settings card for the default); the default stays
- * Unrestricted. Under Unrestricted a Standard-mode approval_request would stall the turn, so the
- * engine auto-allows instead (parity with the Android iroh engine). Baking the mode into the engine lets
- * ensureRuntime's single runtime_start carry it — no eager
- * controller.startRuntime, no double runtime_start on first send (#831 Codex P2).
+ * the composer chip per conversation, the settings card for the default), through the shared
+ * [permissionGovernedTurnStackSpec] (no eager controller.startRuntime, no double runtime_start on
+ * first send, #831 Codex P2).
  *
  * Context management is letta-code's (letta-mobile-4rxis): the engine never stamps a context
  * window or compacts before a turn. letta-code compacts from the agent's own compaction settings
@@ -253,14 +252,10 @@ class DesktopAppServerChatGatewayBuilder(
 internal fun desktopTurnStackSpec(
     externalToolRegistry: ExternalToolRegistry? = null,
     permissionModes: PermissionModeRegistry? = null,
-) = AppServerTurnStackSpec(
+): AppServerTurnStackSpec = permissionGovernedTurnStackSpec(
+    modes = permissionModes,
     clientInfo = DESKTOP_CLIENT_INFO,
-    permissionMode = AppServerPermissionMode.Unrestricted,
-    permissionModeProvider = { command ->
-        permissionModes?.modeFor(AppServerRuntimeScope(command.agentId.value, command.conversationId.value))
-            ?: AppServerPermissionMode.Unrestricted
-    },
-    onPermissionModeInForce = { runtime, mode -> permissionModes?.observed(runtime, mode) },
+    fallback = AppServerPermissionMode.Unrestricted,
     externalToolRegistry = externalToolRegistry,
 )
 

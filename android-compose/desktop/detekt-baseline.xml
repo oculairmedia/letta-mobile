@@ -94,7 +94,6 @@
     <ID>MaxLineLength:DesktopCanvasDocumentStoreTest.kt$DesktopCanvasDocumentStoreTest$val second = CanvasDocument(id = CanvasId("c-2"), conversationId = "conv-x", title = "Second", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 2L)</ID>
     <ID>MaxLineLength:DesktopCanvasLibrary.kt$internal</ID>
     <ID>MaxLineLength:DesktopCanvasToolRegistryTest.kt$DesktopCanvasToolRegistryTest$val names = desktopCanvasToolRegistry(isIroh = false, canvasSessions = CanvasSessionRegistry()).listAdvertisedTools().map { it.name }</ID>
-    <ID>MaxLineLength:DesktopChatController.kt$DesktopChatController$val agentModel = agentId.takeIf { agentLookup }?.let { id -&gt; runCatching { agentByIdProvider(setOf(id)) }.getOrNull()?.get(id)?.model }</ID>
     <ID>MaxLineLength:DesktopChatControllerSnapshotTest.kt$DesktopChatControllerSnapshotTest.PresentationStore.&lt;no name provided&gt;$override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int)</ID>
     <ID>MaxLineLength:DesktopChatModels.kt$content = "I also kept the A2UI payload as a contract-level card so desktop can display the generated surface even before the Android renderer is extracted."</ID>
     <ID>MaxLineLength:DesktopChatModels.kt$content = "The desktop chat shell now has a persistent conversation list, chronological detail pane, shared run-block rendering, tool cards, A2UI fallback cards, and a local composer queue. Live remote send/receive remains behind the desktop transport/repository follow-up."</ID>
@@ -103,8 +102,6 @@
     <ID>MaxLineLength:DesktopChatShellHelpers.kt$UnifiedSearchSources(conversations, focus.rosterAgents, canvases, focus.avatarStyleByAgentId, focus.selectedAgentId, destinations, messages)</ID>
     <ID>MaxLineLength:DesktopChatShellHelpers.kt$internal</ID>
     <ID>MaxLineLength:DesktopChatShellHelpers.kt$private val PaletteAdminDestinations = listOf(DesktopDestination.Runs, DesktopDestination.Templates, DesktopDestination.Projects, DesktopDestination.Plugins)</ID>
-    <ID>MaxLineLength:DesktopConversationModels.kt$DesktopConversationModels$chip(DesktopModelEffortInputs(loaded.value, rows, picks.choices.value, it.selectedConversationId, supportsReasoningEffort), it.composerModelLabel)</ID>
-    <ID>MaxLineLength:DesktopConversationModels.kt$DesktopConversationModels$val label = if (restored &amp;&amp; surface.selectedConversationId == conversationId) switch.previousLabel else surface.composerModelLabel</ID>
     <ID>MaxLineLength:DesktopDisclosureChevronContractTest.kt$DesktopDisclosureChevronContractTest.Companion$"""Icon\s*\(.*?(LettaIcons\.(ExpandMore|ExpandLess|ChevronDown|ChevronUp)|Lucide\.(ChevronDown|ChevronUp)|Icons\.[A-Za-z0-9_]+\.Expand)"""</ID>
     <ID>MaxLineLength:DesktopDisclosureChevronContractTest.kt$DesktopDisclosureChevronContractTest.Companion$"""import\s+(com\.composables\.icons\.lucide\.Chevron(Down|Up)|androidx\.compose\.material\.icons\.[A-Za-z0-9_.]*Expand(More|Less))"""</ID>
     <ID>MaxLineLength:DesktopLocalRuntimeController.kt$active -&gt; if (consecutiveCrashes &gt; 0) "Running (recovered from $consecutiveCrashes recent crash${if (consecutiveCrashes == 1) "" else "es"})." else "Running."</ID>
@@ -177,9 +174,7 @@
     <ID>TooGenericExceptionCaught:DesktopCanvasDocumentStore.kt$DesktopCanvasDocumentStore$unreadable: Exception</ID>
     <ID>TooGenericExceptionCaught:DesktopChatController.kt$DesktopChatController$failure: Exception</ID>
     <ID>TooGenericExceptionCaught:DesktopChatController.kt$DesktopChatController$t: Throwable</ID>
-    <ID>TooGenericExceptionCaught:DesktopChatModelCatalogHelper.kt$DesktopChatModelCatalogHelper$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:DesktopChatRemoteSender.kt$DesktopChatRemoteSender$t: Throwable</ID>
-    <ID>TooGenericExceptionCaught:DesktopConversationModels.kt$DesktopConversationModels$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:DesktopDirectAppServerSession.kt$DesktopDirectAppServerSession.Companion$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:DesktopIrohAgentResolve.kt$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:DesktopIrohGenerations.kt$DesktopIrohGenerationMinter$error: Throwable</ID>

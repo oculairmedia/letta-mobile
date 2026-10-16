@@ -6,10 +6,8 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationModelSettings
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
-import com.letta.mobile.data.repository.modelcontrol.CatalogModel
 import com.letta.mobile.data.repository.modelcontrol.ConversationEffortGateway
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelChange
-import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
 import com.letta.mobile.data.repository.modelcontrol.ModelHandle
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
@@ -153,28 +151,6 @@ class DesktopChatEffortTest {
         assertNotNull(model)
         assertTrue(model.options.all { it.reasoningEfforts.isEmpty() })
         controller.close()
-    }
-
-    @Test
-    fun effortsAreKeyedBySelectionValueAndOffOnlyWhereUnsupported() {
-        val catalog = listOf(CatalogModel(LlmModel(id = "sol", handle = SOL), exposed = true, reasoningEfforts = listOf("high")))
-        val inputs = DesktopModelEffortInputs(
-            models = chatModels,
-            catalog = catalog,
-            choices = ConversationModelChoices(efforts = mapOf("conv-1" to "high")),
-            selectedConversationId = "conv-1",
-            supported = true,
-        )
-
-        val efforts = desktopModelEfforts(inputs)
-        assertEquals(mapOf(SOL to listOf("high")), efforts.byValue)
-        assertEquals("high", efforts.current)
-        assertEquals(DesktopModelEfforts(), desktopModelEfforts(inputs.copy(supported = false)))
-
-        val ui = desktopChatModelUiState(SOL, listOf("Sol" to SOL, "MiniMax" to MINIMAX), efforts)
-        assertEquals("high", ui.currentEffort)
-        assertEquals(listOf("high"), ui.options.first().reasoningEfforts)
-        assertTrue(ui.options.last().reasoningEfforts.isEmpty())
     }
 
     private fun TestScope.startedPort(gateway: DesktopChatGateway): Pair<DesktopChatController, DesktopChatSessionPort> {
