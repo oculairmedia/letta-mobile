@@ -45,7 +45,6 @@ class TimelineSyncLoopDanglingToolTest {
             conversationId = "conv-dangle-1",
             scope = this,
             pendingLocalStore = NoOpPendingLocalStore,
-            conversationCursorStore = NoOpConversationCursorStore,
             startStreamSubscriber = false,
             confirmedTimelineStore = store,
             timelineScope = snapshotScope,
@@ -91,7 +90,6 @@ class TimelineSyncLoopDanglingToolTest {
             conversationId = "conv-dangle-3",
             scope = this,
             pendingLocalStore = NoOpPendingLocalStore,
-            conversationCursorStore = NoOpConversationCursorStore,
             startStreamSubscriber = false,
         )
 
@@ -163,7 +161,6 @@ class TimelineSyncLoopDanglingToolTest {
             conversationId = "conv-dangle-2",
             scope = this,
             pendingLocalStore = NoOpPendingLocalStore,
-            conversationCursorStore = NoOpConversationCursorStore,
             startStreamSubscriber = false,
         )
 
@@ -181,7 +178,6 @@ class TimelineSyncLoopDanglingToolTest {
         conversationId = conversationId,
         scope = this,
         pendingLocalStore = NoOpPendingLocalStore,
-        conversationCursorStore = NoOpConversationCursorStore,
         startStreamSubscriber = false,
     )
 

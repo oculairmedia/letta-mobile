@@ -92,7 +92,6 @@ class TimelineRepositorySingleFlightHydrationTest {
         TimelineRepository(
             transport,
             NoOpPendingLocalStore,
-            NoOpConversationCursorStore,
             repositoryScope = repositoryScope,
             startLoopStreamSubscribers = false,
         )

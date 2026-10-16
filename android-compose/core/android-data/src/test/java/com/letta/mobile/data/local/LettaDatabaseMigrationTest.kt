@@ -356,48 +356,26 @@ class LettaDatabaseMigrationTest {
         assertEquals(1, db.memFsDao().listCommitsAfter(0).size)
     }
 
+    /**
+     * letta-mobile-by4vm.15: v22 -> v23 drops the write-only legacy `conversation_cursors` table and
+     * leaves the backend-scoped cursors and conversation cache intact.
+     */
     @Test
-    fun `opens current v7 database and adds conversation cursor table`() = runBlocking {
-        createLegacyDatabase(version = 7) { db ->
-            createAgentsTable(db)
-            createProjectBugReportsTable(db)
-            createPendingLocalMessagesTable(db)
-            createConversationTables(db)
-            createRuntimeEventsTable(db)
-            createMemFsTables(db)
+    fun `migrates v22 to v23 dropping the legacy conversation cursor table`() = runBlocking {
+        createDatabaseAtVersion(22) { db ->
             db.execSQL(
-                """
-                INSERT INTO conversations (
-                    id, agentId, summary, createdAt, updatedAt, lastMessageAt,
-                    archived, archivedAt, inContextMessageIdsJson,
-                    isolatedBlockIdsJson, cachedAtEpochMs
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """.trimIndent(),
-                arrayOf<Any?>(
-                    "conversation-1",
-                    "agent-1",
-                    "Existing conversation",
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    "[]",
-                    "[]",
-                    1_000L,
-                ),
+                "INSERT INTO conversation_cursors (conv_id, highest_seen_seq, updated_at) VALUES ('conversation-1', 42, 1)",
+            )
+            db.execSQL(
+                "INSERT INTO backend_conversation_cursors (backendId, conversationId, highestSeenSeq) " +
+                    "VALUES ('backend-a', 'conversation-1', 7)",
             )
         }
 
         val db = openMigratedDatabase()
 
-        assertEquals(null, db.conversationCursorDao().getCursor("conversation-1"))
-        db.conversationCursorDao().upsertCursor(
-            conversationId = "conversation-1",
-            highestSeenSeq = 42L,
-            updatedAt = 2_000L,
-        )
-        assertEquals(42L, db.conversationCursorDao().getCursor("conversation-1")?.highestSeenSeq)
+        assertTrue("conversation_cursors survived the migration", tableNames(db).none { it == "conversation_cursors" })
+        assertEquals(7L, db.backendConversationCursorDao().get("backend-a", "conversation-1"))
     }
 
     @Test
@@ -440,7 +418,7 @@ class LettaDatabaseMigrationTest {
      */
     @Test
     fun `migrates v20 to v21 dropping canvas_documents and settling existing canvas ops`() = runBlocking {
-        createDatabaseAtVersion20 { db ->
+        createDatabaseAtVersion(20) { db ->
             db.execSQL(
                 "INSERT INTO canvas_documents (id, agentId, conversationId, title, revision, sceneJson, updatedAtEpochMs, aclJson) " +
                     "VALUES ('canvas-v20', 'agent-1', 'conv-1', 'Old', 1, '', 1, NULL)",
@@ -468,8 +446,8 @@ class LettaDatabaseMigrationTest {
         assertEquals(listOf("op-v21-1"), dao.getUnsettled("canvas-v20").map { it.opId })
     }
 
-    /** A database migrated from v1 to v20 by the real migrations, [seed]ed, and left at v20. */
-    private fun createDatabaseAtVersion20(seed: (androidx.sqlite.db.SupportSQLiteDatabase) -> Unit) {
+    /** A database migrated from v1 to [version] by the real migrations, [seed]ed, and left there. */
+    private fun createDatabaseAtVersion(version: Int, seed: (androidx.sqlite.db.SupportSQLiteDatabase) -> Unit) {
         createLegacyDatabase(version = 1) { db -> createAgentsTable(db) }
         val helper = androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory().create(
             androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
@@ -482,9 +460,9 @@ class LettaDatabaseMigrationTest {
         )
         try {
             val db = helper.writableDatabase
-            LettaDatabaseMigrations.ALL.filter { it.endVersion <= 20 }.forEach { it.migrate(db) }
+            LettaDatabaseMigrations.ALL.filter { it.endVersion <= version }.forEach { it.migrate(db) }
             seed(db)
-            db.version = 20
+            db.version = version
         } finally {
             helper.close()
         }

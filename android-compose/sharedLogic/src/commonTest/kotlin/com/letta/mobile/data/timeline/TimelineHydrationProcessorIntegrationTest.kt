@@ -18,18 +18,11 @@ import kotlin.test.assertTrue
 
 class TimelineHydrationProcessorIntegrationTest {
     @Test
-    fun delayedHydrationRebasesStreamAndPendingDiskRecordsAndRepairsCursorAfterPublication() = runTest {
+    fun delayedHydrationRebasesStreamAndPendingDiskRecords() = runTest {
         val gate = CompletableDeferred<Unit>()
         val transport = SequencedDelayedTransport(
             listOf(DelayedResponse(listOf(UserMessage("server", JsonPrimitive("history"), seqId = 7)), gate)),
         )
-        lateinit var loop: TimelineSyncLoop
-        val cursorStore = RecordingCursorStore { sequence ->
-            val confirmed = loop.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
-            assertEquals(setOf("server", "stream"), confirmed.map { it.serverId }.toSet())
-            assertTrue(loop.state.value.events.any { it.otid == "disk-local" })
-            "cursor:$sequence"
-        }
         val pendingStore = RecordingPendingStore(
             listOf(
                 PendingLocalRecord(
@@ -41,12 +34,11 @@ class TimelineHydrationProcessorIntegrationTest {
                 ),
             ),
         )
-        loop = TimelineSyncLoop(
+        val loop = TimelineSyncLoop(
             messageApi = transport,
             conversationId = "conversation",
             scope = backgroundScope,
             pendingLocalStore = pendingStore,
-            conversationCursorStore = cursorStore,
             startStreamSubscriber = false,
         )
 
@@ -60,7 +52,6 @@ class TimelineHydrationProcessorIntegrationTest {
             val events = loop.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
             assertEquals(setOf("server", "stream"), events.map { it.serverId }.toSet())
             assertTrue(loop.state.value.events.any { it.otid == "disk-local" })
-            assertEquals(listOf("cursor:7"), cursorStore.order)
         } finally {
             loop.close()
         }
@@ -209,16 +200,6 @@ class TimelineHydrationProcessorIntegrationTest {
         private val records: List<PendingLocalRecord>,
     ) : PendingLocalStore by NoOpPendingLocalStore {
         override suspend fun load(scope: PendingLocalScope): List<PendingLocalRecord> = records
-    }
-
-    private class RecordingCursorStore(
-        private val record: (Long) -> String,
-    ) : ConversationCursorStore by NoOpConversationCursorStore {
-        val order = mutableListOf<String>()
-
-        override suspend fun recordFrame(conversationId: String, seq: Long) {
-            order += record(seq)
-        }
     }
 
 }

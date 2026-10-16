@@ -342,33 +342,7 @@ class TimelineSyncLoopStreamingTest {
     }
 
     @Test
-    fun `ingested stream frame persists conversation cursor`() = runTest {
-        val api = FakeSyncApi()
-        val cursorStore = RecordingConversationCursorStore()
-        val dispatcher = UnconfinedTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(
-            messageApi = MessageApiTimelineTransport(api),
-            conversationId = "conv-cursor",
-            scope = scope,
-            conversationCursorStore = cursorStore,
-        )
-
-        sync.ingestStreamEvent(
-            AssistantMessage(
-                id = "assistant-cursor",
-                contentRaw = JsonPrimitive("cursor-bearing frame"),
-                seqId = 17,
-            )
-        )
-
-        assertEquals(listOf("conv-cursor" to 17L), cursorStore.records)
-        assertEquals(17L, cursorStore.getCursor("conv-cursor"))
-        scope.coroutineContext.job.cancel()
-    }
-
-    @Test
-    fun `cursor repair hydrate records hydrate-end cursor without duplicating events`() = runTest {
+    fun `cursor repair hydrate does not duplicate events`() = runTest {
         val api = FakeSyncApi()
         api.addStoredMessage(
             AssistantMessage(
@@ -384,20 +358,17 @@ class TimelineSyncLoopStreamingTest {
                 seqId = 12,
             )
         )
-        val cursorStore = RecordingConversationCursorStore()
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(
             messageApi = MessageApiTimelineTransport(api),
             conversationId = "conv-cursor-repair",
             scope = scope,
-            conversationCursorStore = cursorStore,
         )
 
         sync.hydrate(recordConversationCursor = true, fallbackCursorSeq = 10L)
         sync.hydrate(recordConversationCursor = true, fallbackCursorSeq = 12L)
 
-        assertEquals(12L, cursorStore.getCursor("conv-cursor-repair"))
         assertEquals(
             listOf("assistant-repair-1", "assistant-repair-2"),
             sync.state.value.events.map { (it as TimelineEvent.Confirmed).serverId },

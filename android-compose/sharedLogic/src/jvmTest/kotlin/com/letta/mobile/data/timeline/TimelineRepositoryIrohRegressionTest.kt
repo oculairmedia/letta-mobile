@@ -40,7 +40,6 @@ class TimelineRepositoryIrohRegressionTest {
         val repository = TimelineRepository(
             NoopTimelineTransport(),
             NoOpPendingLocalStore,
-            NoOpConversationCursorStore,
             repositoryScope = backgroundScope,
         )
         val unscoped = repository.observe(agentId = null, conversationId = "conv-alias")
@@ -72,7 +71,6 @@ class TimelineRepositoryIrohRegressionTest {
         val repository = TimelineRepository(
             NoopTimelineTransport(),
             NoOpPendingLocalStore,
-            NoOpConversationCursorStore,
             repositoryScope = backgroundScope,
         )
         val agentALoop = repository.getOrCreate("agent-a", "shared")
@@ -93,7 +91,6 @@ class TimelineRepositoryIrohRegressionTest {
         val repository = TimelineRepository(
             NoopTimelineTransport(),
             NoOpPendingLocalStore,
-            NoOpConversationCursorStore,
             repositoryScope = backgroundScope,
         )
         val unscoped = repository.getOrCreate(null, "promoted")

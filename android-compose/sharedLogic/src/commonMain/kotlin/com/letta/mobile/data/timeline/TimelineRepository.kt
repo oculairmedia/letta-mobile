@@ -43,7 +43,6 @@ private fun String.isProvisionalConversationId(): Boolean = IdFormats.isDefaultC
 open class TimelineRepository(
     private val timelineTransport: TimelineTransport,
     private val pendingLocalStore: PendingLocalStore,
-    private val conversationCursorStore: ConversationCursorStore,
     private val confirmedTimelineStore: ConfirmedTimelineStore = NoOpConfirmedTimelineStore,
     private val backendIdProvider: () -> String = { UNCONFIGURED_BACKEND_KEY },
     private val repositoryScope: CoroutineScope,
@@ -63,7 +62,6 @@ open class TimelineRepository(
     ) : this(
         timelineTransport,
         pendingLocalStore,
-        NoOpConversationCursorStore,
         repositoryScope = repositoryScope,
     ) {
         require(maxCachedLoops > 0) { "maxCachedLoops must be positive" }
@@ -495,7 +493,7 @@ open class TimelineRepository(
         val created = TimelineSyncLoop(
             messageApi = timelineTransport, conversationId = key.conversationId, agentId = key.agentId, scope = repositoryScope,
             ingestedListenerProvider = { ingestedListener }, pendingLocalStore = pendingLocalStore,
-            conversationCursorStore = conversationCursorStore, startStreamSubscriber = startLoopStreamSubscribers,
+            startStreamSubscriber = startLoopStreamSubscribers,
             confirmedTimelineStore = confirmedTimelineStore, timelineScope = timelineScope,
             initialTimeline = storedSnapshot?.let(TimelineSnapshotCodec::storedEnvelopeToTimeline),
             initialRevision = readResult.highWaterRevision,
@@ -875,7 +873,6 @@ open class TimelineRepository(
         conversationId: String,
         fallbackSeq: Long?,
     ) {
-        conversationCursorStore.clearCursor(conversationId)
         // letta-mobile-grrhq: creator path that bypasses getOrCreate. The
         // interface signature is deliberately unchanged (it has several
         // implementors and fakes), so provenance is minted here at the
