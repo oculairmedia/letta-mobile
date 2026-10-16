@@ -80,6 +80,18 @@ class HostSkillsEnumeratorTest {
     }
 
     @Test
+    fun onlySymlinkedSkillsAreRemovableBecauseLettaCodeOnlyUnlinksSymlinks() {
+        val root = root()
+        skill(root, "checked-in", "# checked-in\n\nprose\n")
+        val target = root().also { skill(it, "linked", "# linked\n\nprose\n") }
+        Files.createSymbolicLink(File(root, "linked").toPath(), File(target, "linked").toPath())
+        val removable = assertNotNull(HostSkillsEnumerator.enumerate(root)).associate {
+            it.jsonObject.getValue("name").jsonPrimitive.content to it.jsonObject.getValue("removable").jsonPrimitive.content
+        }
+        assertEquals(mapOf("checked-in" to "false", "linked" to "true"), removable)
+    }
+
+    @Test
     fun skipsDirectoriesWithoutASkillManifest() {
         val root = root()
         skill(root, "real", "# real\n\nprose\n")

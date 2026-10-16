@@ -236,7 +236,6 @@ class DesktopChatControllerConnectionLossTest {
         bootstrapState = defaultDesktopBootstrapState(),
         scope = this,
         gatewayFactory = gatewayFactory,
-        timelinePersistence = noOpDesktopTimelinePersistence,
     )
 }
 

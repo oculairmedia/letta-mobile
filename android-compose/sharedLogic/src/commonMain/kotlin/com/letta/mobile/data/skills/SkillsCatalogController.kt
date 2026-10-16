@@ -21,6 +21,8 @@ data class SkillsCatalogState(
     val agentId: String? = null,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
+    /** A failed install / remove, naming the skill; shown apart from [errorMessage] so the list stays. */
+    val actionError: String? = null,
     /** False when the active backend exposes no skill API: install / remove are hidden. */
     val available: Boolean = true,
 ) {
@@ -61,21 +63,25 @@ class SkillsCatalogController(
         }
     }
 
-    fun install(skillName: String) = mutate(skillName, INSTALL_FAILED) { api, agent -> api.installSkill(agent, skillName) }
+    fun install(skillName: String) = mutate(skillName, "install") { api, agent -> api.installSkill(agent, skillName) }
 
-    fun uninstall(skillName: String) = mutate(skillName, REMOVE_FAILED) { api, agent -> api.uninstallSkill(agent, skillName) }
+    fun uninstall(skillName: String) = mutate(skillName, "remove") { api, agent -> api.uninstallSkill(agent, skillName) }
 
-    private fun mutate(skillName: String, failure: String, action: suspend (SkillsApi, String) -> Unit) {
+    fun dismissActionError() = stateFlow.update { it.copy(actionError = null) }
+
+    private fun mutate(skillName: String, verb: String, action: suspend (SkillsApi, String) -> Unit) {
         val skillsApi = api ?: return
         val agent = stateFlow.value.agentId ?: return
         if (skillName.isBlank()) return
+        stateFlow.update { it.copy(actionError = null) }
         scope.launch {
             try {
                 action(skillsApi, agent)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                stateFlow.update { it.copy(errorMessage = e.message ?: failure) }
+                val reason = e.message?.let { ": $it" } ?: "."
+                stateFlow.update { it.copy(actionError = "Couldn't $verb $skillName$reason") }
                 return@launch
             }
             reload(agent)
@@ -88,8 +94,6 @@ class SkillsCatalogController(
 
     private companion object {
         const val LOAD_FAILED = "Could not load skills."
-        const val INSTALL_FAILED = "Could not install skill."
-        const val REMOVE_FAILED = "Could not remove skill."
     }
 }
 

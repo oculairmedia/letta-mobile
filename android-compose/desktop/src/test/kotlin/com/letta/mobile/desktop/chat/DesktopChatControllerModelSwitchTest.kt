@@ -70,7 +70,6 @@ class DesktopChatControllerModelSwitchTest {
                 agentLookup.await()
                 ids.associateWith { Agent(id = AgentId(it), name = it, model = "anthropic/old") }
             },
-            timelinePersistence = noOpDesktopTimelinePersistence,
         )
         controller.start()
         runCurrent()
@@ -110,7 +109,6 @@ class DesktopChatControllerModelSwitchTest {
             scope = backgroundScope,
             gatewayFactory = { FakeDesktopChatGateway() },
             agentByIdProvider = { ids -> ids.associateWith { Agent(id = AgentId(it), name = it, model = "anthropic/old") } },
-            timelinePersistence = noOpDesktopTimelinePersistence,
         )
         controller.start()
         runCurrent()
@@ -132,7 +130,6 @@ class DesktopChatControllerModelSwitchTest {
             scope = backgroundScope,
             gatewayFactory = { gateway },
             agentByIdProvider = { ids -> ids.associateWith { Agent(id = AgentId(it), name = it, model = agentModel) } },
-            timelinePersistence = noOpDesktopTimelinePersistence,
         )
 }
 

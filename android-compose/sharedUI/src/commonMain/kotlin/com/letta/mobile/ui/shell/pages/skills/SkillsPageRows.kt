@@ -20,6 +20,10 @@ internal sealed interface SkillsPageRow {
 
     data class Info(override val key: String, val message: String) : SkillsPageRow
 
+    data class ActionError(val message: String) : SkillsPageRow {
+        override val key: String get() = SkillsPageTags.ACTION_ERROR
+    }
+
     data class Group(val section: SkillsPageSection, val label: String) : SkillsPageRow {
         override val key: String get() = "group-${section.name}-$label"
     }
@@ -60,6 +64,7 @@ internal object SkillsPageRows {
         val skills = visibleSkills(state, filter)
         add(SkillsPageRow.SectionHeader(SkillsPageSection.Skills, skills.size))
         state.skillsError?.let { add(SkillsPageRow.Info("skills-error", "Couldn't load skills: $it")) }
+        state.skillActionError?.let { add(SkillsPageRow.ActionError(it)) }
         when {
             state.skillsLoading && state.skills.isEmpty() -> add(SkillsPageRow.Info("skills-loading", "Loading skills from the active backend."))
             skills.isEmpty() -> add(SkillsPageRow.Info("skills-empty", emptySkillsMessage(state, filter)))
