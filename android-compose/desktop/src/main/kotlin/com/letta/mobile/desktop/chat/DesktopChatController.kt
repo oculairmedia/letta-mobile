@@ -276,7 +276,7 @@ class DesktopChatController(
      * The window's active-subagent list (letta-mobile-te3n1.1): a tool with subagents under it
      * reads DELEGATING and a background dream makes its agent dream, through the shared publisher.
      */
-    fun publishSubagents(entries: List<com.letta.mobile.data.model.SubagentEntry>) = runPhases.publishSubagents(entries)
+    internal fun publishSubagents(entries: List<com.letta.mobile.data.model.SubagentEntry>) = runPhases.publishSubagents(entries)
 
     /**
      * Streaming/typing for the selected conversation through the shared presenter, so desktop and
