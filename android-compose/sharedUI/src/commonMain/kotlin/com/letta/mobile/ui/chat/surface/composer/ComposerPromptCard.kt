@@ -2,6 +2,7 @@ package com.letta.mobile.ui.chat.surface.composer
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -17,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
@@ -96,9 +98,19 @@ internal fun DockedComposerBar(model: ComposerModel, onAttachImage: () -> Unit) 
 
 @Composable
 private fun DockedComposerBarSurface(model: ComposerModel, onAttachImage: () -> Unit) {
+    val minimised = LocalMinimisedBarLayout.current
+    val fieldHeight = minimised?.fieldHeight
+    Box(Modifier.widthIn(max = composerBarMaxWidth()).fillMaxWidth()) {
+        DockedBarRow(model, onAttachImage, fieldHeight)
+        // Over the bar's own edges, so the strips are where the edge is drawn, however wide it runs.
+        minimised?.handles?.let { handles -> Box(Modifier.matchParentSize(), content = handles) }
+    }
+}
+
+@Composable
+private fun DockedBarRow(model: ComposerModel, onAttachImage: () -> Unit, fieldHeight: Dp?) {
     Surface(
         modifier = Modifier
-            .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
             .testTag(ComposerTestTags.DOCKED_BAR),
         shape = RoundedCornerShape(LettaDimens.Radius.lg),
@@ -112,11 +124,12 @@ private fun DockedComposerBarSurface(model: ComposerModel, onAttachImage: () -> 
         Row(
             modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-            verticalAlignment = Alignment.CenterVertically,
+            // A bar dragged taller keeps its buttons on the bottom line, by Send, like the full card.
+            verticalAlignment = if (fieldHeight == null) Alignment.CenterVertically else Alignment.Bottom,
         ) {
             ComposerExpandButton(onExpand = { model.onIntent(ChatSurfaceIntent.Expand) })
             ComposerPlusButton(model, onAttachImage)
-            ComposerTextField(model = model, style = DockedFieldStyle, modifier = Modifier.weight(1f))
+            ComposerTextField(model = model, style = dockedFieldStyle(DockedFieldStyle, fieldHeight), modifier = Modifier.weight(1f))
             ComposerVoiceButton(model)
             ComposerActionButton(model)
         }

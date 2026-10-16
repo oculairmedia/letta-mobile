@@ -92,6 +92,7 @@ import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.ChatPanelAmbientGlow
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchor
 import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
+import com.letta.mobile.ui.chat.surface.composer.LocalMinimisedBarLayout
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.ResizeDirection
 import com.letta.mobile.ui.components.movePointerIcon
@@ -173,6 +174,12 @@ internal class ChatDockState(initial: ChatDockGeometry) {
     internal fun collapsedBarWidthDp(): Float? {
         val frame = frame ?: return null
         return ChatDockGeometryMath.rect(geometry.copy(collapsed = true), frame).width
+    }
+
+    /** How much taller the minimised dock may grow inside the canvas as last laid out. */
+    internal fun collapsedHeightRoomDp(): Float {
+        val frame = frame ?: return 0f
+        return ChatDockGeometryMath.collapsedHeightRoom(frame)
     }
 
     /** The host's value as last seen. */
@@ -398,15 +405,18 @@ internal fun DockedChatPanel(
                 Box(panelTopsModifier(this, layers), contentAlignment = Alignment.BottomCenter) {
                     DockTops(state, content, layers, opennessValue)
                 }
+                // Minimised, the bar takes the person's size and, at rest, its own edges set it (letta-mobile-zxk2n.29).
+                val barLayout = rememberMinimisedBarLayout(state, collapsed, handles = layers.wrapHeight)
                 Box(Modifier.fillMaxWidth().onSizeChanged { state.barDp = with(density) { it.height.toDp().value } }) {
-                    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+                    CompositionLocalProvider(
+                        LocalContentColor provides MaterialTheme.colorScheme.onSurface,
+                        LocalMinimisedBarLayout provides barLayout,
+                    ) {
                         content.composer(collapsed)
                     }
                 }
             }
             if (layers.handles) Box(Modifier.matchParentSize()) { ResizeHandles(state) }
-            // Minimised at rest, the bar's own edges set its width (letta-mobile-zxk2n.29).
-            if (layers.wrapHeight && collapsed) Box(Modifier.matchParentSize()) { ComposerWidthHandles(state, composerBarHeight(state)) }
             // Over the panel, its handles and its surface's glow: the agent's avatar on the top edge.
             if (showPanel) {
                 PanelBadge(

@@ -7,9 +7,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -30,6 +34,8 @@ import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import kotlin.math.abs
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
@@ -117,6 +123,30 @@ class ComposerChipPlacementUiTest {
         onNodeWithTag(ComposerTestTags.CONTEXT_CHIP).performClick()
         waitUntilExactlyOneExists(hasTestTag(ComposerTestTags.CONTEXT_POPOVER))
     }
+
+    @Test
+    fun theContextIndicatorIsAPlainReadingNotADropdown() = runComposeUiTest {
+        showPanel()
+
+        waitUntilExactlyOneExists(chipIn(ComposerTestTags.CONTEXT_CHIP, ComposerTestTags.HINT_FOOTER))
+        // A picker chip still ends with its chevron (so the tag is real)...
+        waitUntil(timeoutMillis = WAIT_MILLIS) { countUnmerged(chevronIn(ComposerTestTags.MODEL_CHIP)) == 1 }
+        // ...the context indicator has none, and nothing announces it as a dropdown.
+        assertEquals(0, countUnmerged(chevronIn(ComposerTestTags.CONTEXT_CHIP)))
+        val indicator = onNodeWithTag(ComposerTestTags.CONTEXT_CHIP).fetchSemanticsNode()
+        assertNotEquals(Role.DropdownList, indicator.config.getOrNull(SemanticsProperties.Role))
+        onNodeWithTag(ComposerTestTags.CONTEXT_CHIP).assertTextContains("36", substring = true)
+
+        // Its breakdown is still a click away.
+        onNodeWithTag(ComposerTestTags.CONTEXT_CHIP).performClick()
+        waitUntilExactlyOneExists(hasTestTag(ComposerTestTags.CONTEXT_POPOVER))
+    }
+
+    private fun chevronIn(chip: String): SemanticsMatcher =
+        hasTestTag(ComposerTestTags.CHIP_CHEVRON) and hasAnyAncestor(hasTestTag(chip))
+
+    private fun ComposeUiTest.countUnmerged(matcher: SemanticsMatcher): Int =
+        onAllNodes(matcher, useUnmergedTree = true).fetchSemanticsNodes().size
 
     @Test
     fun theModeNoteStaysAboveTheCard() = runComposeUiTest {

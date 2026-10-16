@@ -24,7 +24,7 @@ class DesktopCanvasBubbleLayoutStoreTest {
 
     @Test
     fun aSavedLayoutRoundTrips() {
-        val layout = CanvasBubbleLayout(mascotSizeDp = 96f, composerWidthDp = 820f, replyHoldSeconds = 12f)
+        val layout = CanvasBubbleLayout(mascotSizeDp = 96f, composerWidthDp = 820f, replyHoldSeconds = 12f, composerHeightDp = 120f)
         DesktopCanvasBubbleLayoutStore(path).save(layout)
         assertEquals(layout, DesktopCanvasBubbleLayoutStore(path).load())
     }

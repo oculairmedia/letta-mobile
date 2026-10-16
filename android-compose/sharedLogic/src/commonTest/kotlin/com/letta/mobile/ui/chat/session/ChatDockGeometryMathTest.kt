@@ -238,6 +238,21 @@ class ChatDockGeometryMathTest {
         assertEquals(760f, ChatDockGeometryMath.rect(collapsed, frame()).width, EPS)
     }
 
+    @Test
+    fun aCollapsedWidthMayBeNarrowerThanTheSmallestOpenPanel() {
+        val collapsed = ChatDockGeometryMath.collapse(ChatDockGeometry.Default)
+        val bar = ChatDockGeometryMath.rect(collapsed, frame().copy(collapsedWidthDp = 260f))
+        assertEquals(260f, bar.width, EPS)
+        assertTrue(bar.width < limits.minWidthDp)
+    }
+
+    @Test
+    fun theCollapsedDockMayGrowOnlyAsFarAsTheAreaAllows() {
+        val area = 800f - 2 * limits.marginDp - limits.topInsetDp
+        assertEquals(area - 200f, ChatDockGeometryMath.collapsedHeightRoom(frame(collapsed = 200f)), EPS)
+        assertEquals(0f, ChatDockGeometryMath.collapsedHeightRoom(frame(collapsed = 5000f)), EPS)
+    }
+
     private companion object {
         const val EPS = 0.01f
     }
