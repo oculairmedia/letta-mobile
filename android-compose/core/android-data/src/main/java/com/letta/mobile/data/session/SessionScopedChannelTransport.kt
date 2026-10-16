@@ -1,7 +1,5 @@
 package com.letta.mobile.data.session
 
-import com.letta.mobile.data.a2ui.A2uiAction
-import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.transport.ServerFrame
@@ -331,7 +329,6 @@ class SessionScopedChannelTransport internal constructor(
     override suspend fun adminRpc(method: String, path: String, body: String?): com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse =
         sessionManager.withCurrentSession { it.channelTransport.adminRpc(method, path, body) }
     override suspend fun disconnect(): Unit = sessionManager.withCurrentSession { it.channelTransport.disconnect() }
-    override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = current.sendA2uiAction(action)
 
     override suspend fun sendCronList(
         agentId: String?,

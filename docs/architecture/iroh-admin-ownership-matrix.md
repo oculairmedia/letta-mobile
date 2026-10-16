@@ -126,9 +126,9 @@ approval.submit shim-fallback removal at cutover.
   measured 1447 blocks / ~1.83 MB on the live host — larger than
   `IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES` (1 MiB), so even once wired the
   response could not be delivered. The store tier honours `limit`/`offset`
-  (default 50, max 200) over a deterministic flat index, and answers
-  `{blocks, total, offset, limit, has_more}` when it windows; a bare array still
-  means "this is the complete set", which keeps older clients working.
+  (default 50, max 200) over a deterministic flat index, and always answers
+  `{blocks, total, offset, limit, has_more}` (the bare-array "complete set" shape
+  for older clients was removed in by4vm.111; `block.list_agent` matches).
 - **Crons leave the legacy WS path.** The Iroh transport currently stubs cron
   methods; lgns8.8 exposes native `cron_*` behind policy, and the legacy
   mobile-WS cron/subagent frames retire with the shim in lgns8.11.
@@ -148,9 +148,10 @@ approval.submit shim-fallback removal at cutover.
   `accessToken`/`syncAccessToken` — in **cleartext**, so these frames stay
   controller-internal, are never fanned out to viewers, and are never logged. Any
   VIEWER-facing channel surface still needs the lgns8.12 sensitive-capability
-  policy. Ships OFF (`--channels-host` / `LETTA_CHANNELS_HOST`); lettashim remains
-  the host until the maintenance-window cutover documented in the retirement
-  runbook — running both double-starts accounts.
+  policy. Always on since the 2026-08-01 cutover (the `--channels-host` flag was
+  removed by4vm.111): every wrapper is the channels host for the App Server it
+  wraps, so never point two wrappers at one App Server — the second re-wires
+  channel ingress to its own socket.
 
 ## Scope revisions for .7/.8/.9
 

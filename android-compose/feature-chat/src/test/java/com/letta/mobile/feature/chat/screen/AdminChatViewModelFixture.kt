@@ -95,7 +95,6 @@ private fun stubChatBridge() = mockk<WsChatBridge>(relaxed = true) {
     every { connection } returns emptyFlow()
     every { state } returns MutableStateFlow(mockk(relaxed = true))
     every { events } returns emptyFlow()
-    every { a2uiEvents } returns emptyFlow()
 }
 
 private fun stubSessionManager(session: FixtureSession) = mockk<SessionManager>(relaxed = true) {

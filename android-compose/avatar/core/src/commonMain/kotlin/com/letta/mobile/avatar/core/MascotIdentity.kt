@@ -108,16 +108,9 @@ data class MascotIdentity(
             return (channel(24) shl 24) or (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
         }
 
-        /**
-         * Reads a persisted identity. Accepts the legacy per-agent avatar style (a bare int
-         * indexing the old six gradient orbs) so existing agents keep a stable look: they become a
-         * circle in the palette colour at that index.
-         */
+        /** Reads a persisted identity written by [encode]; anything else is null. */
         fun decode(value: String?): MascotIdentity? {
             if (value.isNullOrBlank()) return null
-            value.toIntOrNull()?.let { legacy ->
-                return MascotIdentity(MascotShape.CIRCLE, MascotPalette.LEGACY_ORDER[legacy.mod(MascotPalette.LEGACY_ORDER.size)])
-            }
             val parts = value.split(':')
             if (parts.size !in 2..3) return null
             val shape = MascotShape.entries.firstOrNull { it.name.equals(parts[0], ignoreCase = true) } ?: return null

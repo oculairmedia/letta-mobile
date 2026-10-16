@@ -32,16 +32,6 @@ data class PendingToolCall(
 )
 
 @androidx.compose.runtime.Immutable
-data class A2uiDebugFrameUi(
-    val id: String,
-    val transport: String,
-    val messageType: String,
-    val surfaceId: String?,
-    val conversationId: String?,
-    val requestId: String?,
-)
-
-@androidx.compose.runtime.Immutable
 enum class ChatSnackbarDuration {
     Short,
     Indefinite;
@@ -292,7 +282,6 @@ data class ChatUiState(
     val isSearchActive: Boolean = false,
     val isSearching: Boolean = false,
     val searchResults: ImmutableList<ParsedSearchMessage> = persistentListOf(),
-    val a2uiDebugFrames: ImmutableList<A2uiDebugFrameUi> = persistentListOf(),
     val a2uiSurfaces: ImmutableMap<String, A2uiSurfaceState> = persistentMapOf(),
     val a2uiResolvedActionCounters: ImmutableMap<String, Int> = persistentMapOf(),
     val a2uiActionSnackbar: A2uiActionSnackbarUi? = null,
@@ -300,7 +289,6 @@ data class ChatUiState(
     val transport: ChatTransport = ChatTransport.Rest,
     val goalStatus: GoalStatusUi? = null,
     val isGoalStatusLoading: Boolean = false,
-    val a2uiFrameCount: Int = 0,
     /**
      * letta-mobile-lgns8.19: an abort has been REQUESTED for the in-flight turn
      * but the authoritative terminal frame has not landed yet.

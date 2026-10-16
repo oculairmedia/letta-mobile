@@ -12,7 +12,6 @@ import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
 import computer.iroh.PathChangeCallback
 import computer.iroh.PathEventCallback
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -25,8 +24,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
@@ -107,18 +104,8 @@ class IrohAppServerTransport(
     private var pathWatchJob: Job? = null
     private val selectedPathTelemetry = IrohSelectedPathTelemetry()
     private val readerExitReported = AtomicBoolean(false)
-    private val legacyAdminRpcResponsesMutex = Mutex()
-    private val legacyAdminRpcResponses = mutableMapOf<String, CompletableDeferred<AppServerInboundFrame.AdminRpcResponse>>()
     private val connectionReady = CompletableDeferred<Unit>()
     private val streamReady = CompletableDeferred<Unit>()
-
-    /**
-     * Whether the server advertised the `frame_part` capability in its
-     * auth_response (sniffed off the control channel). Until then all
-     * client-to-server frames stay plain, so pre-negotiation writes to old
-     * servers can never emit framing the peer cannot decode.
-     */
-    private val serverSupportsFrameParts = AtomicBoolean(false)
 
     @Volatile private var authCapabilities: Set<String> = emptySet()
 
@@ -206,32 +193,8 @@ class IrohAppServerTransport(
         connectionReady.await()
         val requestId = "admin-${UUID.randomUUID()}"
         val params = adminRpcParams(path = path, body = body)
-        return try {
-            adminRpcOverStream(requestId, method, path, params)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (streamError: Throwable) {
-            if (!method.isLegacyFallbackSafeAdminRpcMethod()) {
-                Telemetry.event(
-                    "IrohTransport", "admin_rpc.stream.fallback_skipped",
-                    "method" to method,
-                    "path" to path,
-                    "requestId" to requestId,
-                    "error" to (streamError.message ?: streamError.toString()),
-                    "class" to streamError::class.simpleName,
-                )
-                throw streamError
-            }
-            Telemetry.event(
-                "IrohTransport", "admin_rpc.stream.fallback_control",
-                "method" to method,
-                "path" to path,
-                "requestId" to requestId,
-                "error" to (streamError.message ?: streamError.toString()),
-                "class" to streamError::class.simpleName,
-            )
-            adminRpcOverControl(requestId, method, params)
-        }
+        // Every admin_rpc gets its own bi-stream (#792); a failure stays isolated to the request.
+        return adminRpcOverStream(requestId, method, path, params)
     }
 
     private suspend fun adminRpcOverStream(
@@ -246,7 +209,7 @@ class IrohAppServerTransport(
         Telemetry.event("IrohTransport", "admin_rpc.stream.open", "method" to method, "path" to path, "requestId" to requestId)
         try {
             val request = protocol.encodeCommand(AppServerCommand.AdminRpc(requestId = requestId, method = method, params = params))
-            IrohFrameCodec.write(sendStream, request, MAX_FRAME_BYTES, allowFrameParts = serverSupportsFrameParts.get())
+            IrohFrameCodec.write(sendStream, request, MAX_FRAME_BYTES, allowFrameParts = true)
             sendStream.finish()
             sendFinished = true
             val rawResponse = IrohFrameCodec.readOne(biStream.recv(), MAX_FRAME_BYTES)
@@ -265,22 +228,6 @@ class IrohAppServerTransport(
             }
         }
     } ?: error("admin_rpc timed out for method=$method path=$path")
-
-    private suspend fun adminRpcOverControl(
-        requestId: String,
-        method: String,
-        params: JsonObject,
-    ): AppServerInboundFrame.AdminRpcResponse {
-        val pending = CompletableDeferred<AppServerInboundFrame.AdminRpcResponse>()
-        legacyAdminRpcResponsesMutex.withLock { legacyAdminRpcResponses[requestId] = pending }
-        return try {
-            sendControl(AppServerCommand.AdminRpc(requestId = requestId, method = method, params = params))
-            withTimeoutOrNull(ADMIN_RPC_TIMEOUT_MS.milliseconds) { pending.await() }
-                ?: error("legacy admin_rpc timed out for method=$method")
-        } finally {
-            legacyAdminRpcResponsesMutex.withLock { legacyAdminRpcResponses.remove(requestId) }
-        }
-    }
 
     suspend fun close() {
         // letta-mobile-wxy4s: a closed transport is NOT connected. Without this,
@@ -344,7 +291,7 @@ class IrohAppServerTransport(
                 val json = protocol.encodeCommand(command)
                 val bytes = json.encodeToByteArray()
                 Telemetry.event("IrohTransport", "control.write", "command" to command::class.simpleName, "bytes" to bytes.size)
-                IrohFrameCodec.write(sendStream, json, allowFrameParts = serverSupportsFrameParts.get())
+                IrohFrameCodec.write(sendStream, json, allowFrameParts = true)
             }
         }
 
@@ -388,9 +335,6 @@ class IrohAppServerTransport(
                 val frame = decodeFrame(json, channel)
                 Telemetry.event("IrohTransport", "frame.recv", "channel" to channel.name, "type" to frame.frame.type)
                 recordServerCapabilities(frame)
-                if (channel == AppServerChannel.Control && completeLegacyAdminRpcIfPending(frame)) {
-                    return@readAll
-                }
                 sink.emit(frame)
             }
         } catch (error: IrohFrameCodec.ProtocolException) {
@@ -477,53 +421,14 @@ class IrohAppServerTransport(
     }
 
     /**
-     * letta-mobile-5purh follow-up: record the server's advertised transport
-     * capabilities from its auth_response so subsequent client writes may use
-     * frame_part chunking for >1MiB frames (e.g. user messages carrying
-     * base64 image attachments). Only a successful auth_response counts.
+     * Record the server's advertised capabilities from its auth_response ([serverCapabilities]).
+     * Only a successful auth_response counts. Client writes always may use frame_part chunking for
+     * >1MiB frames: every current host decodes it (by4vm.111 dropped the negotiation).
      */
     private fun recordServerCapabilities(frame: AppServerReceivedFrame) {
         val auth = frame.frame as? AppServerInboundFrame.AuthResponse ?: return
         if (!auth.success) return
         authCapabilities = auth.capabilities.orEmpty().toSet()
-        val supported = IrohFrameCodec.FRAME_PART_CAPABILITY in auth.capabilities.orEmpty()
-        val changed = serverSupportsFrameParts.getAndSet(supported) != supported
-        if (changed) {
-            Telemetry.event("IrohTransport", "capabilities.negotiated", "framePart" to supported)
-        }
-    }
-
-    private suspend fun completeLegacyAdminRpcIfPending(frame: AppServerReceivedFrame): Boolean {
-        val response = frame.frame as? AppServerInboundFrame.AdminRpcResponse ?: return false
-        val pending = legacyAdminRpcResponsesMutex.withLock { legacyAdminRpcResponses.remove(response.requestId) }
-        pending?.complete(response)
-        return pending != null
-    }
-
-    /**
-     * letta-mobile-k7yyc (P4 request isolation): the legacy control-channel
-     * fallback muxes a response onto the SHARED control stream. That is only
-     * ever safe for trivially-small, bounded payloads — a list-sized response
-     * (message.list / *.list / a single large message or tool_return body) on
-     * the control channel can starve or corrupt every other multiplexed frame.
-     *
-     * With #792 stream-per-request server support landed, every admin_rpc gets
-     * its own bi-stream, so the fallback is legacy-only. We keep it ONLY for the
-     * two tiny control-plane methods and let all list-sized reads hard-fail the
-     * single request (see [adminRpc]) instead of degrading to the control
-     * channel — failure stays isolated to the request, never the transport.
-     */
-    private fun String.isLegacyFallbackSafeAdminRpcMethod(): Boolean = when (this) {
-        // #822 review: agent.get / agent.list are deliberately NOT here. They
-        // return full Agent objects (system text, blocks, tools, metadata) that
-        // can exceed the unchunked control-frame budget; falling those back onto
-        // the shared control stream could take down unrelated traffic. Only small
-        // fixed-size reads belong on the legacy fallback. Agent-read retry-on-
-        // reconnect is handled by READ_ONLY_ADMIN_RPC_METHODS in
-        // IrohChannelTransport instead (stream-per-request, chunk-capable).
-        "health.check",
-        "goal.get" -> true
-        else -> false
     }
 
     private fun adminRpcParams(path: String, body: String?): JsonObject = buildJsonObject {
