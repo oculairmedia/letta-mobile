@@ -131,6 +131,45 @@ class CrashReporterTest {
         assertFalse(file.exists())
     }
 
+    @Test
+    fun `each crash is surfaced once across launches until a newer crash is persisted`() {
+        seedCrash(timestamp = 100L, message = "first")
+        reporter.install()
+        assertEquals("first", reporter.lastCrash.value?.message)
+
+        reporter.dismiss()
+
+        // Next process start: same record must not be published again.
+        val relaunched = CrashReporter(context)
+        relaunched.install()
+        assertNull(relaunched.lastCrash.value)
+        // ...but the diagnostic record is still readable.
+        assertEquals("first", relaunched.readDiagnosticRecord()?.message)
+        assertTrue(crashFile().exists())
+
+        // A newer crash is surfaced again.
+        seedCrash(timestamp = 200L, message = "second")
+        val afterNewCrash = CrashReporter(context)
+        afterNewCrash.install()
+        assertEquals("second", afterNewCrash.lastCrash.value?.message)
+    }
+
+    private fun seedCrash(timestamp: Long, message: String) {
+        val file = crashFile()
+        file.parentFile?.mkdirs()
+        file.writeText(
+            JSONObject()
+                .put("timestamp", timestamp)
+                .put("threadName", "main")
+                .put("type", "java.lang.IllegalArgumentException")
+                .put("message", message)
+                .put("stackHead", "at com.letta.mobile.Foo.bar")
+                .put("sentryEventId", JSONObject.NULL)
+                .put("schemaVersion", 1)
+                .toString()
+        )
+    }
+
     private fun crashFile(): File =
         File(File(context.filesDir, "crash"), "last.json")
 }
