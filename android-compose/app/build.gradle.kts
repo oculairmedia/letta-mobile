@@ -548,6 +548,9 @@ dependencies {
     androidTestImplementation(libs.androidx.test.core.ktx)
     // NotebookLocalStore exposes DocumentId in its API; instrumentation needs it to compile.
     androidTestImplementation(libs.automerge)
+    // LocalAppServerDeviceSmokeTest drives the shared App Server smoke, which sets a WebSocket
+    // maxFrameSize; Ktor's OkHttp engine rejects that (by4vm.110.5), CIO accepts it.
+    androidTestImplementation(libs.ktor.client.cio)
     // Align the app's dependency constraints with AndroidX Test 1.3/1.7.
     implementation(libs.androidx.concurrent.futures)
     implementation(libs.androidx.concurrent.futures.ktx)

@@ -15,6 +15,7 @@ import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import com.letta.mobile.data.transport.appserver.LettaCodeContract
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.websocket.WebSockets
 import java.io.File
@@ -90,7 +91,8 @@ class LocalAppServerDeviceSmokeTest {
             val (agentId, conversationId) = createAgentAndConversation(http, lease, "lmstudio/$model")
             val lines = mutableListOf<String>()
             runAppServerSmokeTurn(
-                engineFactory = OkHttp,
+                // CIO: the smoke sets a WebSocket maxFrameSize, which Ktor's OkHttp engine refuses.
+                engineFactory = CIO,
                 identityPrefix = "device",
                 spec = AppServerSmokeSpec(
                     url = lease.serverUrl,
@@ -108,6 +110,7 @@ class LocalAppServerDeviceSmokeTest {
             if (fake != null) {
                 assertTrue("tool call; fake served ${fake.requests}: $lines", lines.any { it.startsWith("[tool-call]") })
                 assertTrue("tool return: $lines", lines.any { it.startsWith("[tool-return]") })
+                assertTrue("the shell tool must succeed: $lines", lines.none { it.startsWith("[tool-return] Failed") })
             }
             assertTrue("the host is still serving", host.health.value.active)
             lease.close()

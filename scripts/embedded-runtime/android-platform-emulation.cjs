@@ -16,6 +16,13 @@
 // - V8 without i18n: String#normalize returns the string unchanged, localeCompare compares UTF-16
 //   code units, toLocaleUpperCase/LowerCase ignore the locale, Number/Date toLocale*String are
 //   toString/toDateString/toTimeString.
+// - Android app sandbox, not Node: SELinux denies `link` on app data files, so every fs.link*
+//   fails with EACCES; toybox `ps` has no `-o lstart=` and forking the app process to run it
+//   outlives letta-code's 250 ms probe. Together these made the first App Server connection on the
+//   phone fail with "Timed out acquiring durable filesystem lock".
+//   App processes also inherit zygote's AT_SECURE, so Node's safeGetenv() refuses every variable:
+//   os.tmpdir() is /tmp whatever TMPDIR says, and /tmp is not writable by apps (the Bash tool's
+//   mkdtemp failed with EACCES).
 // It cannot remove V8's ICU-backed \p{...} regex support, so property-escape coverage still needs
 // a device run (the shipped transform-unicode-property patch covers the bundle's literals).
 'use strict';
@@ -23,16 +30,21 @@ Object.defineProperty(process, 'platform', { value: 'android', configurable: tru
 try { delete globalThis.Intl; } catch { /* non-configurable on some builds: keep going */ }
 for (const key of ['icu', 'unicode', 'cldr', 'tz']) delete process.versions[key];
 
-const noIcu = (what) => Object.assign(new TypeError(`${what} is not supported on Node.js compiled without ICU`), { code: 'ERR_NO_ICU' });
-const notSupported = (label) => Object.assign(new RangeError(`The "${label}" encoding is not supported`), { code: 'ERR_ENCODING_NOT_SUPPORTED' });
+// Node's internal error shape: `.code`, and a stack that starts `TypeError [CODE]: message`.
+function nodeError(Type, code, message) {
+  const error = new Type(message);
+  error.code = code;
+  error.stack = error.stack.replace(Type.name, `${Type.name} [${code}]`);
+  return error;
+}
 
 const IcuTextDecoder = globalThis.TextDecoder;
 class TextDecoder extends IcuTextDecoder {
   constructor(label = 'utf-8', options = undefined) {
     // Resolve the label the WHATWG way first (bad labels throw the same error either way).
     const probe = new IcuTextDecoder(label);
-    if (probe.encoding !== 'utf-8' && probe.encoding !== 'utf-16le') throw notSupported(`${label}`);
-    if (options && options.fatal) throw noIcu('"fatal" option');
+    if (probe.encoding !== 'utf-8' && probe.encoding !== 'utf-16le') throw nodeError(RangeError, 'ERR_ENCODING_NOT_SUPPORTED', `The "${label}" encoding is not supported`);
+    if (options && options.fatal) throw nodeError(TypeError, 'ERR_NO_ICU', '"fatal" option is not supported on Node.js compiled without ICU');
     super(label, options);
   }
 }
@@ -61,3 +73,50 @@ define(BigInt.prototype, 'toLocaleString', function toLocaleString() { return Bi
 define(Date.prototype, 'toLocaleString', function toLocaleString() { return Date.prototype.toString.call(this); });
 define(Date.prototype, 'toLocaleDateString', function toLocaleDateString() { return Date.prototype.toDateString.call(this); });
 define(Date.prototype, 'toLocaleTimeString', function toLocaleTimeString() { return Date.prototype.toTimeString.call(this); });
+
+// --- Android app sandbox (see the header).
+const fs = require('node:fs');
+const childProcess = require('node:child_process');
+const { promisify } = require('node:util');
+const linkDenied = (existing, target) => Object.assign(new Error(`EACCES: permission denied, link '${existing}' -> '${target}'`), { code: 'EACCES' });
+fs.linkSync = function linkSync(existing, target) { throw Object.assign(linkDenied(existing, target), { errno: -13, syscall: 'link' }); };
+fs.link = function link(existing, target, callback) { process.nextTick(callback, Object.assign(linkDenied(existing, target), { errno: -13, syscall: 'link' })); };
+fs.promises.link = async function link(existing, target) { throw Object.assign(linkDenied(existing, target), { errno: -13, syscall: 'link' }); };
+
+const isStartQuery = (file, args) => file === 'ps' && Array.isArray(args) && args.includes('lstart=');
+const PS_PROBE_MS = 250; // the device's fork outlives letta-code's PROCESS_START_PROBE_TIMEOUT_MS
+const toyboxPs = () => Object.assign(new Error("Command failed: ps -o lstart=\nps: bad -o 'lstart='"), { status: 1, stderr: "ps: bad -o 'lstart='\n" });
+const nativeExecFileSync = childProcess.execFileSync;
+childProcess.execFileSync = function execFileSync(file, args, options) {
+  if (!isStartQuery(file, args)) return nativeExecFileSync.apply(this, arguments);
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, PS_PROBE_MS);
+  throw toyboxPs();
+};
+const nativeExecFile = childProcess.execFile;
+const nativePromised = nativeExecFile[promisify.custom];
+function execFile(...args) { return nativeExecFile.apply(this, args); }
+Object.defineProperty(execFile, promisify.custom, {
+  value: (file, args, options) => (isStartQuery(file, args)
+    ? new Promise((_, reject) => setTimeout(() => reject(toyboxPs()), PS_PROBE_MS))
+    : nativePromised(file, args, options)),
+});
+childProcess.execFile = execFile;
+
+const os = require('node:os');
+os.tmpdir = function tmpdir() { return '/tmp'; }; // safeGetenv('TMPDIR') is refused under AT_SECURE
+// The device's /tmp; a runner whose own TMPDIR lives under /tmp keeps that.
+const sandboxTmp = process.env.TMPDIR;
+const underTmp = (prefix) => typeof prefix === 'string' && (prefix === '/tmp' || prefix.startsWith('/tmp/')) &&
+  !(sandboxTmp && prefix.startsWith(`${sandboxTmp}/`));
+const tmpDenied = (prefix) => Object.assign(new Error(`EACCES: permission denied, mkdtemp '${prefix}XXXXXX'`), { code: 'EACCES', errno: -13, syscall: 'mkdtemp' });
+const nativeMkdtempSync = fs.mkdtempSync;
+fs.mkdtempSync = function mkdtempSync(prefix, options) { if (underTmp(prefix)) throw tmpDenied(prefix); return nativeMkdtempSync(prefix, options); };
+const nativeMkdtemp = fs.mkdtemp;
+fs.mkdtemp = function mkdtemp(prefix, options, callback) {
+  const cb = typeof options === 'function' ? options : callback;
+  if (underTmp(prefix)) { process.nextTick(cb, tmpDenied(prefix)); return; }
+  nativeMkdtemp.apply(this, arguments);
+};
+const nativeMkdtempPromise = fs.promises.mkdtemp;
+fs.promises.mkdtemp = async function mkdtemp(prefix, options) { if (underTmp(prefix)) throw tmpDenied(prefix); return nativeMkdtempPromise(prefix, options); };
+require('node:module').syncBuiltinESMExports();
