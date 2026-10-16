@@ -2,8 +2,9 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    // Dev-only on-device letta-code runtime: npm/libnode/NDK prep tasks, letta.js patches
-    // (../letta-code-runtime/), EMBEDDED_LETTACODE_* BuildConfig. See build-logic/.../embedded/.
+    // On-device letta-code runtime: npm/libnode/NDK prep tasks, letta.js patches
+    // (../letta-code-runtime/), EMBEDDED_LETTACODE_* BuildConfig. -PembedLettaCodeNative=true is the
+    // `full` release variant, off is `lite` (docs/RELEASE.md). See build-logic/.../embedded/.
     id("com.letta.mobile.embedded-runtime")
     // 16 KB realignment + ELF sanity check of the vendored Iroh/Nimbus JNI .so files, run before
     // every merge*JniLibFolders/merge*NativeLibs (realign16KbJniLibs, verifyJniLibSanity).
@@ -483,7 +484,8 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
-    // On-device LLM inference for explicitly constructed .litertlm engines.
+    // On-device LLM inference for explicitly constructed .litertlm engines. Its JNI ships only in the
+    // `full` variant (the embedded-runtime plugin excludes it when the runtime is off).
     implementation(libs.litertlm.android)
 
     // Drag-to-reorder for Compose

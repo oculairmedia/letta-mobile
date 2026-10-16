@@ -92,15 +92,28 @@ session, observability has regressed — block the release.
 
 ## 4. Build & packaging
 
-Standard. Covered by the usual gradle flow:
+Pushing a `v*` tag runs `.github/workflows/release.yml`, which attaches two Android APKs to the
+one GitHub release (letta-mobile-by4vm.110.8). Both are `playRelease` builds with the same package
+and signing key, so a phone switches variant by installing the other APK over it. One Gradle
+property selects the variant:
 
-```bash
-cd android-compose
-./gradlew app:bundleRelease app:assembleRelease
-```
+| Asset | Build | ABIs | Embedded letta-code runtime | LiteRT-LM on-device model | Size |
+|---|---|---|---|---|---|
+| `letta-mobile-<tag>-full.apk` | `-PembedLettaCodeNative=true -PembedLettaCodeAssets=true` | arm64-v8a | yes (libnode, git/bash/curl/node helpers, npm assets) | yes | ~95-105 MB (estimate from by4vm.107) |
+| `letta-mobile-<tag>-lite.apk` | no embed flags (the default) | arm64-v8a, armeabi-v7a, x86_64 | no | no | ~95 MB (measured 2026-10-16: `playBenchmark`, unstripped `.so`) |
 
-Verify the tag is set, the version bump lands, and the signed artifacts
-are uploaded.
+`lite` is what CI's `android.yml` builds (`root-debug` on PRs, `play-release` on `main`), so
+CI never pays for the runtime packaging; only `release.yml` builds `full`. With the runtime off,
+the embedded-runtime plugin also drops LiteRT-LM's JNI (it only serves the runtime's on-device
+model) and Settings hides the on-device runtime and its "Use embedded LettaCode" offer.
+`release.yml` checks per variant: `full` must be arm64-only and ship `libnode.so` and
+`liblitertlm_jni.so`, `lite` must ship neither; both check the Automerge JNI and 16 KiB `LOAD`
+alignment on their 64-bit ABIs.
+
+`release.yml` writes each APK's size into the run summary. Native libraries are most of `lite`
+(31 MB arm64-v8a, 23 MB armeabi-v7a, 30 MB x86_64), so an arm64-only `lite` would be ~42 MB. To
+build one locally: `./gradlew :app:assemblePlayRelease` (lite) or add the two flags (full; needs
+Node and the NDK helpers under `app/libs/embedded-*`).
 
 ## 4a. Orchestrated verify-release entrypoint
 

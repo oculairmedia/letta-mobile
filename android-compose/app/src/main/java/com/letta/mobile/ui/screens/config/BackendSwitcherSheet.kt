@@ -142,7 +142,8 @@ fun BackendSwitcherSheet(
                             )
                         }
                     }
-                    if (!state.data.hasEmbeddedLettaCodeConfig) {
+                    // Only the `full` variant ships the runtime (letta-mobile-by4vm.110.8).
+                    if (!state.data.hasEmbeddedLettaCodeConfig && state.data.embeddedRuntimeStatus.runnable) {
                         Spacer(modifier = Modifier.height(LettaDimens.Space.sm))
                         EmbeddedRuntimeConnectAction(
                             status = state.data.embeddedRuntimeStatus,
@@ -208,13 +209,7 @@ private fun EmbeddedRuntimeConnectAction(
             Text(stringResource(R.string.screen_config_embedded_runtime_connect))
         }
         Text(
-            text = stringResource(
-                if (status.runnable) {
-                    R.string.screen_config_embedded_runtime_enabled_placeholder
-                } else {
-                    R.string.screen_config_embedded_runtime_disabled_placeholder
-                }
-            ),
+            text = stringResource(R.string.screen_config_embedded_runtime_enabled_placeholder),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
