@@ -11,7 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 
 /** letta-mobile-by4vm.90: what a host varies in its App Server turn stack; every default is the engine's own. */
 class AppServerTurnStackSpec(
-    val clientInfo: AppServerRuntimeStartClientInfo = AppServerTurnEngine.DEFAULT_CLIENT_INFO,
+    val clientInfo: AppServerRuntimeStartClientInfo = AppServerRuntimeStartClientInfo(name = "letta-mobile", version = "0.1"),
     val permissionMode: AppServerPermissionMode = RuntimePermissionDefaults.DEFAULT_MODE,
     val permissionModeProvider: (TurnCommand) -> AppServerPermissionMode = { permissionMode },
     val onPermissionModeInForce: (AppServerRuntimeScope, AppServerPermissionMode) -> AppServerPermissionMode? = { _, _ -> null },

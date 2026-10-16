@@ -302,7 +302,9 @@ private fun NoteColourPanel(session: CanvasSession, document: CanvasSceneDocumen
         Text("Color", style = MaterialTheme.typography.titleSmall, color = onCard)
         SwatchRow(NoteColors, current = parseHexColor(document.color)) { picked ->
             scope.launch {
-                recorder.recordingOrJust("recolouring a note") { runCatching { session.recolorDocument(CanvasNoteId(document.id), picked.toHex()) } }
+                recorder.recordingOrJust("recolouring a note") {
+                    runCatching { session.recolorDocument(CanvasNoteId(document.id), picked.toHex()) }
+                }
             }
         }
         Text("Text", style = MaterialTheme.typography.titleSmall, color = onCard)

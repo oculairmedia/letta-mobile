@@ -64,7 +64,10 @@ import kotlinx.serialization.json.jsonPrimitive
 class AppServerTurnEngine(
     private val client: AppServerClient,
     private val mapper: AppServerRuntimeEventMapper = AppServerRuntimeEventMapper(),
-    private val clientInfo: AppServerRuntimeStartClientInfo = DEFAULT_CLIENT_INFO,
+    private val clientInfo: AppServerRuntimeStartClientInfo = AppServerRuntimeStartClientInfo(
+        name = "letta-mobile",
+        version = "0.1",
+    ),
     // letta-mobile-h5t1g: same default source as the controller — an engine built
     // without an explicit mode approves tool calls instead of parking the turn.
     private val permissionMode: AppServerPermissionMode = RuntimePermissionDefaults.DEFAULT_MODE,
@@ -1866,7 +1869,5 @@ class AppServerTurnEngine(
         const val WATCHDOG_PAUSE_RECHECK_MS: Long = 250L
 
         val defaultRequestId = AppServerRequestIdFactory("app-server")
-
-        val DEFAULT_CLIENT_INFO = AppServerRuntimeStartClientInfo(name = "letta-mobile", version = "0.1")
     }
 }

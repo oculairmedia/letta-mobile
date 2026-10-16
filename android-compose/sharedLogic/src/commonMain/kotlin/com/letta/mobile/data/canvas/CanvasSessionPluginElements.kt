@@ -53,7 +53,12 @@ suspend fun CanvasSession.removePluginElement(
     else CanvasOp.RemovePluginElementOp(CanvasOpDiffer.generateOpId("plugin"), actorId.value, lamport, elementId.value)
 }
 
-private fun pluginMove(id: CanvasElementId, frame: CanvasDocumentFrame, actorId: CanvasActorId, lamport: Long) = CanvasOp.SetPluginElementOp(
+private fun pluginMove(
+    id: CanvasElementId,
+    frame: CanvasDocumentFrame,
+    actorId: CanvasActorId,
+    lamport: Long,
+) = CanvasOp.SetPluginElementOp(
     opId = CanvasOpDiffer.generateOpId("plugin"),
     actorId = actorId.value,
     lamport = lamport,

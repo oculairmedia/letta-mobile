@@ -193,7 +193,11 @@ class DesktopAppServerChatGatewayBuilder(
             if (!spec.isIroh) leases += DesktopLocalAppServerClientRegistry.direct.install(opened.client)
             startStreamIntegrity(router, opened.client, clientScope, irohHostCapabilities = spec.irohHostCapabilities())
             // lgns8.22.3: one inbound collector per desktop gateway.
-            val turnEngine = router.attachTurnStack(opened.client, controllerScope, desktopTurnStackSpec(toolRegistry, spec.permissionModes))
+            val turnEngine = router.attachTurnStack(
+                opened.client,
+                controllerScope,
+                desktopTurnStackSpec(toolRegistry, spec.permissionModes),
+            )
             engine = turnEngine
             return DesktopAppServerChatGateway(
                 turnEngine = turnEngine,
