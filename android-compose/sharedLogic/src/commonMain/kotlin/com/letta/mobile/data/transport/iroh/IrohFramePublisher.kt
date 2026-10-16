@@ -142,8 +142,6 @@ private class BoundedOverflowBroadcast(
 }
 
 private fun ServerFrame.overflowConversationId(): String = (when (this) {
-    is ServerFrame.A2ui -> conversationId
-    is ServerFrame.UserActionOutcome -> conversationId
     is ServerFrame.Error -> conversationId
     is ServerFrame.TurnStarted -> conversationId
     is ServerFrame.UserMessage -> conversationId
@@ -155,8 +153,6 @@ private fun ServerFrame.overflowConversationId(): String = (when (this) {
 }).orEmpty()
 
 private fun ServerFrame.overflowFrameType(): String = when (this) {
-    is ServerFrame.A2ui -> type
-    is ServerFrame.UserActionOutcome -> type
     is ServerFrame.Error -> type
     is ServerFrame.TurnStarted -> type
     is ServerFrame.UserMessage -> type

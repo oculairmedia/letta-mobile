@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -36,7 +35,7 @@ import kotlin.test.assertTrue
 /** The shared Skills page with its Tools section, on desktop and a phone (letta-mobile-zxk2n.32). */
 class SkillsPageTest {
     private val github = Skill(name = "github", description = "Work with GitHub issues and PRs")
-    private val notion = Skill(name = "notion", description = "Read and write Notion pages")
+    private val notion = Skill(name = "notion", description = "Read and write Notion pages", source = "global", controllable = true)
     private val gitStatus = Tool(id = ToolId("tool-git"), name = "git_status", description = "Show the working tree status", toolType = "custom")
     private val sendEmail = Tool(id = ToolId("tool-mail"), name = "send_email", description = "Send an email")
 
@@ -137,11 +136,25 @@ class SkillsPageTest {
     }
 
     @Test
-    fun aSkillTheHostCannotRemoveOffersNoRemove() = runComposeUiTest {
+    fun aReadOnlySkillShowsItsSourceAndNoControlAtAll() = runComposeUiTest {
         val calls = mutableListOf<String>()
-        show(state(skills = listOf(notion.copy(removable = false))), SkillsPageActions(onUninstallSkill = { calls += it }))
-        onNodeWithTag(SkillsPageTags.skillToggle("notion")).assertIsNotEnabled()
+        val builtIn = notion.copy(source = "bundled", controllable = false)
+        show(state(skills = listOf(builtIn)), SkillsPageActions(onUninstallSkill = { calls += it }), frame = TestFrame(pointer = true))
+        onNodeWithTag(SkillsPageTags.skillToggle("notion")).assertDoesNotExist()
+        onNodeWithTag(SkillsPageTags.skillSource("notion"), useUnmergedTree = true).assertIsDisplayed()
+        onNodeWithText("Built-in", useUnmergedTree = true).assertIsDisplayed()
+        onNodeWithTag(SkillsPageTags.skill("notion")).performClick()
+        onNodeWithText("Remove").assertDoesNotExist()
+        onNodeWithText("Built into letta-code; it can't be turned off from here.").assertExists()
         assertEquals(emptyList(), calls)
+    }
+
+    @Test
+    fun anInstalledSkillWithoutAControllableFlagIsReadOnly() = runComposeUiTest {
+        // Fail closed: an entry that does not say it is controllable gets no toggle.
+        show(state(skills = listOf(Skill(name = "notion"))))
+        onNodeWithTag(SkillsPageTags.skillToggle("notion")).assertDoesNotExist()
+        onNodeWithText("Host", useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test

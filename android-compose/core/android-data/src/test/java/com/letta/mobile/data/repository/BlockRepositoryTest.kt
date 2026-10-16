@@ -331,7 +331,7 @@ class BlockRepositoryTest {
             AppServerInboundFrame.AdminRpcResponse(
                 requestId = "req",
                 success = true,
-                result = json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(Block.serializer()), blocks),
+                result = blockPage(json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(Block.serializer()), blocks)),
                 error = null,
             )
         }
@@ -371,9 +371,11 @@ class BlockRepositoryTest {
             AppServerInboundFrame.AdminRpcResponse(
                 requestId = "req",
                 success = true,
-                result = json.encodeToJsonElement(
-                    kotlinx.serialization.builtins.ListSerializer(Block.serializer()),
-                    blocks,
+                result = blockPage(
+                    json.encodeToJsonElement(
+                        kotlinx.serialization.builtins.ListSerializer(Block.serializer()),
+                        blocks,
+                    ),
                 ),
                 error = null,
             )
@@ -429,5 +431,14 @@ class BlockRepositoryTest {
         assertEquals(1, result.size)
         assertEquals("persona", result[0].label)
         assertTrue(fakeApi.calls.contains("listBlocks:agent-1"))
+    }
+
+    /** The host's paged `block.list` / `block.list_agent` envelope around [rows], all on one page. */
+    private fun blockPage(rows: kotlinx.serialization.json.JsonElement) = kotlinx.serialization.json.buildJsonObject {
+        put("blocks", rows)
+        put("total", kotlinx.serialization.json.JsonPrimitive((rows as kotlinx.serialization.json.JsonArray).size))
+        put("offset", kotlinx.serialization.json.JsonPrimitive(0))
+        put("limit", kotlinx.serialization.json.JsonPrimitive(rows.size))
+        put("has_more", kotlinx.serialization.json.JsonPrimitive(false))
     }
 }

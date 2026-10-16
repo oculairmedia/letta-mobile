@@ -58,8 +58,8 @@ class StreamIntegrityMonitor(
         /**
          * letta-mobile-by4vm.50: advertised in an Iroh host's `auth_response` when it draws every
          * frame's `event_seq` inside its stream write lock, so the per-connection sequence a client
-         * sees is contiguous and a jump is a lost frame. Clients enable gap detection on Iroh only
-         * when the host says so (see [StreamIntegrityBinding.bindIfHostOrdersEventSeq]).
+         * sees is contiguous and a jump is a lost frame. Every current host advertises it; clients
+         * no longer check it (by4vm.111) and always enable gap detection.
          */
         const val EVENT_SEQ_ORDERED_CAPABILITY: String = "event_seq_ordered_v1"
     }

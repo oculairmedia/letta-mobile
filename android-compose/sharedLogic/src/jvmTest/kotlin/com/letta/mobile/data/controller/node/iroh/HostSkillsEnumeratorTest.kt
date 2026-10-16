@@ -54,7 +54,7 @@ class HostSkillsEnumeratorTest {
             "Send a direct message to another Letta agent.",
             entry.getValue("description").jsonPrimitive.content,
         )
-        assertEquals("host_enumeration", entry.getValue("source").jsonPrimitive.content)
+        assertEquals("global", entry.getValue("source").jsonPrimitive.content)
         assertTrue(entry.getValue("skill_path").jsonPrimitive.content.endsWith("agent-messaging"))
     }
 
@@ -79,16 +79,58 @@ class HostSkillsEnumeratorTest {
         )
     }
 
+    private fun controllable(root: File, controlRoot: File = root): Map<String, String> =
+        assertNotNull(HostSkillsEnumerator.enumerate(root, controlRoot)).associate {
+            it.jsonObject.getValue("name").jsonPrimitive.content to it.jsonObject.getValue("controllable").jsonPrimitive.content
+        }
+
     @Test
-    fun onlySymlinkedSkillsAreRemovableBecauseLettaCodeOnlyUnlinksSymlinks() {
+    fun onlySymlinksInTheControlRootAreControllableBecauseLettaCodeOnlyUnlinksSymlinks() {
         val root = root()
         skill(root, "checked-in", "# checked-in\n\nprose\n")
-        val target = root().also { skill(it, "linked", "# linked\n\nprose\n") }
-        Files.createSymbolicLink(File(root, "linked").toPath(), File(target, "linked").toPath())
-        val removable = assertNotNull(HostSkillsEnumerator.enumerate(root)).associate {
-            it.jsonObject.getValue("name").jsonPrimitive.content to it.jsonObject.getValue("removable").jsonPrimitive.content
-        }
-        assertEquals(mapOf("checked-in" to "false", "linked" to "true"), removable)
+        val library = root().also { skill(it, "linked", "# linked\n\nprose\n") }
+        Files.createSymbolicLink(File(root, "linked").toPath(), File(library, "linked").toPath())
+        // A dangling link is what letta-code reports as "Skill not found": not listed at all.
+        Files.createSymbolicLink(File(root, "dangling").toPath(), File(library, "gone").toPath())
+        assertEquals(mapOf("checked-in" to "false", "linked" to "true"), controllable(root))
+    }
+
+    @Test
+    fun aRootThatIsNotLettaCodesControlRootIsEntirelyReadOnly() {
+        // Today's host layout: --skills-dir names the real library, so even a link inside it is
+        // nothing skill_disable can reach under <LETTA_HOME>/skills.
+        val root = root()
+        val library = root().also { skill(it, "linked", "# linked\n") }
+        Files.createSymbolicLink(File(root, "linked").toPath(), File(library, "linked").toPath())
+        assertEquals(mapOf("linked" to "false"), controllable(root, controlRoot = root()))
+    }
+
+    @Test
+    fun aControlRootThatIsItselfALinkToRealFoldersListsThemReadOnly() {
+        // The observed failure: ~/.letta/skills -> /opt/skills makes every skill a real folder.
+        val library = root().also { skill(it, "agent-council", "# agent-council\n") }
+        val home = root()
+        val linkedRoot = File(home, "skills")
+        Files.createSymbolicLink(linkedRoot.toPath(), library.toPath())
+        assertEquals(mapOf("agent-council" to "false"), controllable(linkedRoot))
+    }
+
+    @Test
+    fun theNameIsTheDirectoryNameSkillDisableAddressesNotTheFrontmatterName() {
+        val root = root()
+        skill(root, "agent-development", "---\nname: letta-development-guide\ndescription: guide\n---\n")
+        assertEquals(listOf("agent-development"), assertNotNull(HostSkillsEnumerator.enumerate(root, root)).map {
+            it.jsonObject.getValue("name").jsonPrimitive.content
+        })
+    }
+
+    @Test
+    fun aLowercaseManifestCountsAsLettaCodeMatchesItCaseInsensitively() {
+        val root = root()
+        File(root, "jellyfin").mkdirs()
+        File(File(root, "jellyfin"), "skill.md").writeText("# jellyfin\n\nMedia server.\n")
+        val entry = assertNotNull(HostSkillsEnumerator.enumerate(root, root)).single().jsonObject
+        assertEquals("Media server.", entry.getValue("description").jsonPrimitive.content)
     }
 
     @Test
@@ -175,6 +217,13 @@ class HostSkillsEnumeratorTest {
         assertTrue(
             HostSkillsEnumerator.resolveSkillsDir(null) { null }.replace('\\', '/').endsWith("/.letta/skills"),
             "the documented default is letta-code's own ~/.letta/skills",
+        )
+        assertEquals(
+            File("/srv/letta-home", "skills").path,
+            HostSkillsEnumerator.resolveSkillsDir(null) { key ->
+                if (key == HostSkillsEnumerator.LETTA_HOME_ENV) "/srv/letta-home" else null
+            },
+            "LETTA_HOME moves the root exactly as it moves letta-code's skill_enable / skill_disable",
         )
     }
 }

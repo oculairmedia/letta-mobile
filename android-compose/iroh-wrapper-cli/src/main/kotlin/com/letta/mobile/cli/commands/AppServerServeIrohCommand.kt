@@ -86,7 +86,6 @@ import kotlin.time.Duration.Companion.seconds
  */
 
 
-
 class AppServerServeIrohCommand : CliktCommand(
     name = "app-server-serve-iroh",
 ) {
@@ -201,24 +200,6 @@ class AppServerServeIrohCommand : CliktCommand(
     ).flag(default = false)
 
     /**
-     * lgns8.23: take channels-host ownership in the controller.
-     *
-     * OFF by default because production still runs lettashim as the channels
-     * host (SHIM_CHANNELS_ENABLED=1). Enabling both hosts would double-start the
-     * same accounts against the same homeserver. Cutover is a single maintenance
-     * step: set SHIM_CHANNELS_ENABLED=0 on lettashim, then start the wrapper with
-     * --channels-host. See docs/architecture/lettashim-retirement-deployment-runbook.md.
-     */
-    private val channelsHost by option(
-        "--channels-host",
-        envvar = "LETTA_CHANNELS_HOST",
-        help = "lgns8.23: restore enabled channel accounts (channels_list -> " +
-            "channel_accounts_list -> channel_start) on every App Server connect and " +
-            "reconnect, making this controller the channels host. Requires lettashim's " +
-            "SHIM_CHANNELS_ENABLED=0 — running both hosts double-starts accounts.",
-    ).flag(default = false)
-
-    /**
      * letta-mobile-7dm1q: the letta-code skills root, enumerated at startup to
      * hydrate the native skills catalog. Without it `skill.list` reports
      * `hydrated=false` forever, because letta-code 0.29.12 exposes no skill
@@ -227,9 +208,9 @@ class AppServerServeIrohCommand : CliktCommand(
     private val skillsDir by option(
         "--skills-dir",
         envvar = HostSkillsEnumerator.SKILLS_DIR_ENV,
-        help = "letta-code skills root to enumerate for skill.list " +
+        help = "letta-code global skills root to enumerate for skill.list " +
             "(one directory per skill, each with a SKILL.md). " +
-            "Defaults to ~/.letta/skills.",
+            "Defaults to letta-code's <LETTA_HOME>/skills; only symlinks there are controllable.",
     )
 
     /**
@@ -405,7 +386,6 @@ class AppServerServeIrohCommand : CliktCommand(
                 pluginRoutes = pluginHost?.let { com.letta.mobile.data.controller.node.iroh.PluginAdminHandlers(it, pluginCanvas.assets) },
             )
 
-            printChannelsHostBanner()
             startMeridianTools(scope, nativeAdminClient)
 
             // Start accepting connections
@@ -917,23 +897,12 @@ class AppServerServeIrohCommand : CliktCommand(
         emptyList()
     }
 
-    /** lgns8.23: announce channels-host ownership so a double-host misconfig is visible at start. */
-    private fun printChannelsHostBanner() {
-        if (!channelsHost) return
-        println(
-            "[iroh-app-server] channels-host ENABLED (lgns8.23): enabled channel accounts are " +
-                "restored on every App Server connect/reconnect. lettashim MUST run with " +
-                "SHIM_CHANNELS_ENABLED=0 — two hosts double-start the same accounts.",
-        )
-    }
-
     /**
-     * lgns8.23: flag-gated channels-host restore. No-op unless --channels-host is
-     * set, so the default deployment keeps lettashim as the sole channels host.
-     * Never fails recovery — a channel outage must not block runtime reattach.
+     * lgns8.23: this controller is the channels host. Restores enabled channel
+     * accounts on every App Server connect/reconnect. Never fails recovery — a
+     * channel outage must not block runtime reattach.
      */
     private suspend fun restoreChannels(client: AppServerClient) {
-        if (!channelsHost) return
         val result = com.letta.mobile.data.controller.channels.ChannelRestoreCoordinator(
             client = client,
             log = { System.err.println("[iroh-app-server] $it") },

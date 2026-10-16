@@ -169,6 +169,9 @@ object SkillsPageTags {
 
     fun skillToggle(name: String): String = "skills_skill_toggle_$name"
 
+    /** The source label a read-only skill shows in place of a toggle. */
+    fun skillSource(name: String): String = "skills_skill_source_$name"
+
     fun tool(id: String): String = "skills_tool_$id"
 }
 

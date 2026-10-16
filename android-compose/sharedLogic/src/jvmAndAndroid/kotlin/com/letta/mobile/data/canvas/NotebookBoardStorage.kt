@@ -68,7 +68,6 @@ internal object NotebookBoardStorage {
     private const val ELEMENTS = "boardElements"
     private const val TOMBSTONES = "boardTombstones"
     private const val DELETED = "boardDeletedElements"
-    private const val LEGACY_BASE = "canvasSceneBase"
     private const val BASE_BLANK = "canvasBaseBlank"
     private const val BASE_ELEMENTS = "canvasBaseElements"
     private const val BASE_FIELDS = "canvasBaseFields"
@@ -172,11 +171,6 @@ internal object NotebookBoardStorage {
         JsonObject(read.keys(map).orElseThrow().associateWith { field ->
             Json.parseToJsonElement((read.get(map, field).orElseThrow() as AmValue.Str).value)
         })
-
-    fun isPristine(read: Read): Boolean {
-        val raw = (read.get(ObjectId.ROOT, BOARD).orElseThrow() as AmValue.Str).value
-        return raw == EMPTY_BOARD
-    }
 
     fun deletedElements(read: Read): List<CanvasDeletedElement> {
         val snapshots = (read.get(ObjectId.ROOT, DELETED).orElse(null) as? AmValue.Map) ?: return emptyList()
@@ -347,8 +341,6 @@ internal object NotebookBoardStorage {
 
     // ---- canvas base ------------------------------------------------------------------------
 
-    fun sceneBaseOf(sceneJson: String): SceneBase = sceneBaseOf(sceneBoard(sceneJson), blank = sceneJson.isEmpty())
-
     /** The digests of [board], a scene as [sceneBoard] makes it. */
     fun sceneBaseOf(board: JsonObject, blank: Boolean): SceneBase = SceneBase(
         blank = blank,
@@ -357,16 +349,10 @@ internal object NotebookBoardStorage {
     )
 
     /** Whether the canvas's last write was a blank scene; null if the canvas never wrote. */
-    fun baseIsBlank(read: Read): Boolean? {
-        (read.get(ObjectId.ROOT, BASE_BLANK).orElse(null) as? AmValue.Bool)?.let { return it.value }
-        return (read.get(ObjectId.ROOT, LEGACY_BASE).orElse(null) as? AmValue.Str)?.value?.isEmpty()
-    }
+    fun baseIsBlank(read: Read): Boolean? = (read.get(ObjectId.ROOT, BASE_BLANK).orElse(null) as? AmValue.Bool)?.value
 
     fun readSceneBase(read: Read): SceneBase? {
-        val blank = (read.get(ObjectId.ROOT, BASE_BLANK).orElse(null) as? AmValue.Bool)?.value
-        if (blank == null) {
-            return (read.get(ObjectId.ROOT, LEGACY_BASE).orElse(null) as? AmValue.Str)?.value?.let(::sceneBaseOf)
-        }
+        val blank = baseIsBlank(read) ?: return null
         return SceneBase(blank, readDigests(read, BASE_ELEMENTS), readDigests(read, BASE_FIELDS))
     }
 
@@ -381,8 +367,6 @@ internal object NotebookBoardStorage {
         }
         writeDigests(tx, BASE_ELEMENTS, base.elements)
         writeDigests(tx, BASE_FIELDS, base.fields)
-        // The old form stored the whole scene again on every save; it is not written any more.
-        deleteIfPresent(tx, ObjectId.ROOT, LEGACY_BASE)
     }
 
     private fun writeDigests(tx: Transaction, key: String, digests: Map<String, String>) {
@@ -403,12 +387,11 @@ internal object NotebookBoardStorage {
      * - Deleted-element snapshots (the history view's restore list) past [restoreListBytes]. Kept
      *   ones are chosen smallest first, which keeps the most elements restorable; the store records
      *   no deletion times to keep the most recent instead.
-     * - The legacy full-scene copy of the canvas base; the base is written as digests.
      * Returns how many restore-list entries were left in the archive.
      */
     fun copyCurrentState(source: Read, tx: Transaction, skip: Set<String>, restoreListBytes: Long): Int {
         val copy = AutomergeTreeCopy(source, tx)
-        val handled = setOf(ELEMENTS, TOMBSTONES, DELETED, LEGACY_BASE, BASE_BLANK, BASE_ELEMENTS, BASE_FIELDS)
+        val handled = setOf(ELEMENTS, TOMBSTONES, DELETED, BASE_BLANK, BASE_ELEMENTS, BASE_FIELDS)
         source.keys(ObjectId.ROOT).orElseThrow().filter { it !in skip && it !in handled }
             .forEach { copy.copyEntry(ObjectId.ROOT, ObjectId.ROOT, it) }
         val hidden = keysOf(source, mapAt(source, ObjectId.ROOT, TOMBSTONES)).toSet()
