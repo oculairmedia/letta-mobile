@@ -327,7 +327,7 @@ private fun TransportedMascot(
         // Keyed on the flight's frame counter, so a body at rest asks for no frames.
         snapshotFlow { flight.observeFrame() }.collect { d.setMotion(flight.body.motionX, flight.body.motionY) }
     }
-    val landed = { impact: Float ->
+    val landed: (Float) -> Unit = { impact ->
         transport.landed(flight, impact)
         director?.onEvent(MascotEvent.Landed(impact))
     }
