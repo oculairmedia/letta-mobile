@@ -1,12 +1,18 @@
 package com.letta.mobile.desktop.avatar.rive
 
 import com.letta.mobile.avatar.rive.RiveInputSink
+import com.letta.mobile.ui.mascot.frame.RiveFrameScene
+import com.letta.mobile.ui.mascot.frame.RivePointer
 import com.sun.jna.Library
 import com.sun.jna.Memory
 import com.sun.jna.Native
 import kotlinx.coroutines.asCoroutineDispatcher
 import com.sun.jna.NativeLibrary
 import com.sun.jna.Pointer
+import org.jetbrains.skia.ColorAlphaType
+import org.jetbrains.skia.ColorType
+import org.jetbrains.skia.Image
+import org.jetbrains.skia.ImageInfo
 
 /**
  * letta-mobile-0s5bi spike: the C ABI of `rive_desktop_bridge.dll`
@@ -101,7 +107,14 @@ internal enum class BridgeExport(val symbol: String) {
  */
 data class RiveSceneTarget(val stateMachine: String? = null, val artboard: String? = null)
 
-enum class RivePointer(internal val code: Int) { MOVE(0), DOWN(1), UP(2), EXIT(3) }
+/** The bridge's `kind` argument for a pointer event. */
+private val RivePointer.code: Int
+    get() = when (this) {
+        RivePointer.MOVE -> 0
+        RivePointer.DOWN -> 1
+        RivePointer.UP -> 2
+        RivePointer.EXIT -> 3
+    }
 
 /**
  * The one thread every native scene is driven from. A D3D11 immediate context is single-threaded,
@@ -141,7 +154,7 @@ class RiveDesktopScene private constructor(
     private val native: RiveBridgeNative,
     private val handle: Pointer,
     val adapterName: String,
-) : AutoCloseable {
+) : RiveFrameScene(), AutoCloseable {
     private var buffer: Memory? = null
     private var pixels: ByteArray? = null
     @Volatile private var closed = false
@@ -168,21 +181,7 @@ class RiveDesktopScene private constructor(
         check(code == 0) { "rive_bridge_load failed ($code)" }
     }
 
-    fun advance(seconds: Float) = RiveThread.post { native.rive_bridge_advance(openHandle(), seconds) }
-
-    private var lastFrameNanos = 0L
-
-    /**
-     * Advances to the frame clock's [nowNanos] once per frame: a scene shared by several surfaces
-     * (the sidebar and the hero draw the same agent) would otherwise be advanced by each of them
-     * and run at a multiple of real time.
-     */
-    fun advanceTo(nowNanos: Long) {
-        if (nowNanos == lastFrameNanos) return
-        val dt = if (lastFrameNanos == 0L) 0f else ((nowNanos - lastFrameNanos) / 1e9f).coerceIn(0f, 0.1f)
-        lastFrameNanos = nowNanos
-        if (dt > 0f) advance(dt)
-    }
+    override fun advance(seconds: Float) = RiveThread.post { native.rive_bridge_advance(openHandle(), seconds) }
 
     /**
      * Renders into a reused native buffer and copies it into a reused byte array: premultiplied
@@ -199,7 +198,17 @@ class RiveDesktopScene private constructor(
         out
     }
 
-    fun pointer(kind: RivePointer, x: Float, y: Float) = RiveThread.post { native.rive_bridge_pointer(openHandle(), kind.code, x, y) }
+    /**
+     * One frame as a Skia image the caller owns, rasterised while the bytes are still this frame's
+     * (the scene reuses them): premultiplied RGBA, as the bridge renders it.
+     */
+    override fun renderImage(width: Int, height: Int): Image = RiveThread.call {
+        val info = ImageInfo(width, height, ColorType.RGBA_8888, ColorAlphaType.PREMUL)
+        Image.makeRaster(info, render(width, height), width * 4)
+    }
+
+    override fun pointer(kind: RivePointer, x: Float, y: Float) =
+        RiveThread.post { native.rive_bridge_pointer(openHandle(), kind.code, x, y) }
 
     fun fireTrigger(name: String): Boolean = RiveThread.call { native.rive_bridge_fire_trigger(openHandle(), name) == 0 }
 
@@ -225,7 +234,7 @@ class RiveDesktopScene private constructor(
     }
 
     /** The view-model path [com.letta.mobile.avatar.rive.RiveAvatarRuntime] writes through. */
-    val inputSink: RiveInputSink = object : RiveInputSink {
+    override val inputSink: RiveInputSink = object : RiveInputSink {
         override fun setNumber(input: String, value: Float) = RiveThread.post {
             if (!closed) native.rive_bridge_vm_set_number(handle, input, value)
         }

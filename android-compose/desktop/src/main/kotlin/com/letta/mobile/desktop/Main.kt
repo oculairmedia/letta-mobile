@@ -27,6 +27,7 @@ import androidx.compose.ui.window.rememberWindowState
 import com.letta.mobile.desktop.markdown.DesktopMermaidDiagramRenderer
 import com.letta.mobile.desktop.touch.DesktopTouchKeyboardHost
 import com.letta.mobile.ui.markdown.LocalMermaidDiagramRenderer
+import com.letta.mobile.ui.mascot.MascotCursorCapture
 import dev.nucleusframework.application.NucleusBackend
 import dev.nucleusframework.application.SingleInstanceRestoreEffect
 import dev.nucleusframework.application.nucleusApplication

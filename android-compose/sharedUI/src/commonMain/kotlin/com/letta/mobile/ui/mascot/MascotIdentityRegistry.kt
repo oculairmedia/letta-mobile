@@ -2,6 +2,9 @@ package com.letta.mobile.ui.mascot
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
+import com.letta.mobile.data.model.AgentId
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +64,19 @@ class MascotIdentityRegistry {
     fun clearPresence(agentId: String) {
         presence.remove(agentId)
     }
+}
+
+/**
+ * A registry kept current with [agents]' identities, each the generated one
+ * ([resolveMascotIdentity] with no chosen identity) - for a shell whose roster carries no agent
+ * metadata. A shell that knows the agents' metadata updates its own registry instead.
+ */
+@Composable
+fun rememberMascotRegistry(agents: List<AgentId>): MascotIdentityRegistry {
+    val registry = remember { MascotIdentityRegistry() }
+    val identities = remember(agents) { agents.associate { it.value to resolveMascotIdentity(it.value, agent = null, localValue = null) } }
+    SideEffect { registry.update(identities) }
+    return registry
 }
 
 /** Which host surface [Modifier.mascotGazeTarget] publishes into the registry. */

@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
     // jvmTarget 17 + catalog compileSdk/minSdk for the KMP targets (build-logic).
@@ -21,6 +23,13 @@ kotlin {
     // rive-runtime directly and binds the SAME common runtime this module exposes.
     jvm()
 
+    // letta-mobile-ckmub.17.6: the web client draws the same mascot through @rive-app/canvas-advanced
+    // (bound in :web); this target carries the shared contract and runtime it writes through.
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
+    }
+
     sourceSets {
         commonMain {
             dependencies {
@@ -40,6 +49,12 @@ kotlin {
             dependencies {
                 // The Compose compiler plugin applies to every target and refuses to run without a
                 // runtime on the classpath; only androidMain declared one.
+                implementation(compose.runtime)
+            }
+        }
+        wasmJsMain {
+            dependencies {
+                // As on jvm: the Compose compiler plugin needs a runtime on every target's classpath.
                 implementation(compose.runtime)
             }
         }
