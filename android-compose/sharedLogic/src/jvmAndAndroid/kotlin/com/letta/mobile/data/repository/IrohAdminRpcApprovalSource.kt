@@ -28,7 +28,7 @@ class IrohAdminRpcApprovalSource(
     private val json: Json = Json { ignoreUnknownKeys = true; isLenient = true },
 ) {
     fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        settingsRepository.activeBackendUsesChannel()
 
     suspend fun submitApproval(
         agentId: AgentId,

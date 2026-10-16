@@ -111,10 +111,6 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
      * so its tile drops out; [HomeStats.error] is raised only when every figure failed.
      */
     private suspend fun loadStats(graph: Graph) {
-        if (graph.localRuntimeBackend != null) {
-            statsFlow.value = HomeStats(loading = false, toolCount = 0, blockCount = 0, usage = HomeUsageCalculator.calculate(emptyList()))
-            return
-        }
         statsFlow.value = HomeStats(loading = true)
         // letta-mobile-by4vm.13: a figure the session does not serve is not asked for; its tile drops out.
         val tools = graph.ifSupported(SessionRoute.TOOLS) { toolRepository }

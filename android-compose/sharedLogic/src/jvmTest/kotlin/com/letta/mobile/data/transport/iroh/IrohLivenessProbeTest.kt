@@ -89,8 +89,7 @@ class IrohLivenessProbeTest {
         suspend fun answerLatency(call: ProbeCall) {
             if (call.session == hangHealthCheckOn && call.method == "health.check") {
                 // Black hole: never completes. The caller MUST impose its
-                // own bound (the legacy control-channel fallback would
-                // otherwise stretch this to 30s/60s).
+                // own bound (the transport's admin_rpc timeout is 30s).
                 delay(600_000L)
             }
             methodLatencyMs[call.method]?.let { delay(it) }
@@ -315,12 +314,11 @@ class IrohLivenessProbeTest {
     }
 
     // ============================================================
-    // 6. TRAP GUARD: health.check is in isLegacyFallbackSafeAdminRpcMethod,
-    //    so an unbounded probe call inherits the 30s legacy control-channel
-    //    timeout (worst case ~60s per probe). The probe MUST bound itself.
+    // 6. TRAP GUARD: an unbounded probe call inherits the transport's 30s
+    //    admin_rpc timeout. The probe MUST bound itself.
     // ============================================================
     @Test
-    fun probeTimeoutIsBoundedNotLegacyFallback() = runBlocking {
+    fun probeTimeoutIsBoundedByTheProbe() = runBlocking {
         val calls = CopyOnWriteArrayList<ProbeCall>()
         val dials = AtomicInteger(0)
         val transport = transportWith(ProbeScenario(calls, dials, hangHealthCheckOn = "session-1"))

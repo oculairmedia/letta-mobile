@@ -6,12 +6,15 @@ import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.routedBackendKind
+import com.letta.mobile.data.repository.usesAppServerChannel
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohConnectConfig
 import com.letta.mobile.data.transport.iroh.NotebookPeerProvisioning
-import com.letta.mobile.runtime.LocalLettaBackend
+import com.letta.mobile.data.transport.appserver.AppServerWebSocketDial
+import com.letta.mobile.data.transport.iroh.DirectAppServerDialer
+import com.letta.mobile.data.transport.iroh.openDirectAppServerDial
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -20,10 +23,13 @@ import kotlinx.coroutines.CoroutineScope
 /**
  * Hilt-owned transport binder for a session graph generation.
  *
- * Selects Iroh QUIC or NoOp via shared [routedBackendKind] — mode is
- * authoritative over leftover `iroh://` URLs (same policy as desktop). A
- * `ws://` (DIRECT_WS, dev/test seam) or local-runtime config gets a
- * [NoOpChannelTransport].
+ * Every Android backend is an App Server reached through one [IrohChannelTransport] (shared
+ * [routedBackendKind]; mode is authoritative over leftover `iroh://` URLs, as on desktop):
+ * - IROH dials the host over QUIC;
+ * - LOCAL_RUNTIME dials the on-device runtime's loopback server through [LocalRuntimeDialer]
+ *   (letta-mobile-by4vm.110.6);
+ * - DIRECT_WS dials the Settings "Remote host" ws:// address (the testability seam) directly.
+ * A missing config or an http(s) address (another backend family's seam) gets a [NoOpChannelTransport].
  */
 @Singleton
 class SessionChannelTransportFactory @Inject constructor(
@@ -32,11 +38,12 @@ class SessionChannelTransportFactory @Inject constructor(
     /** Shares canvases through the Iroh host; attached to each Iroh transport this makes. */
     private val canvasClient: com.letta.mobile.data.transport.iroh.IrohCanvasRelayClient? = null,
     private val notebookStore: com.letta.mobile.data.canvas.NotebookLocalStore? = null,
+    /** Lazy: resolving it builds the runtime host, which only the first LOCAL_RUNTIME dial needs. */
+    private val localRuntimeDialer: dagger.Lazy<LocalRuntimeDialer>? = null,
 ) {
     fun create(
         scope: CoroutineScope,
         activeConfig: LettaConfig?,
-        localRuntimeBackend: LocalLettaBackend?,
         settingsRepository: ISettingsRepository?,
     ): IChannelTransport {
         fun reportChoice(chosen: String) {
@@ -61,16 +68,7 @@ class SessionChannelTransportFactory @Inject constructor(
                     notebookPeers = {
                         NotebookPeerProvisioning.read(appContext.filesDir.toPath().resolve("notebooks/peers.json"))
                     },
-                    activeConfigProvider = {
-                        settingsRepository?.activeConfig?.value?.let { config ->
-                            IrohConnectConfig(
-                                baseShimUrl = config.serverUrl,
-                                token = config.accessToken.orEmpty(),
-                                deviceId = "android-letta-mobile",
-                                clientVersion = "android-iroh-active-config",
-                            )
-                        }
-                    },
+                    activeConfigProvider = { settingsRepository?.activeConfig?.value?.toConnectConfig() },
                 ).also { transport ->
                     // Canvases ride beside the App Server on the same host; ends with this graph.
                     canvasClient?.attach(transport.readyHandle, scope)
@@ -79,14 +77,39 @@ class SessionChannelTransportFactory @Inject constructor(
             BackendKind.LOCAL_RUNTIME -> {
                 // No Iroh host behind this backend: canvases stay on this device, and say so.
                 canvasClient?.detach()
-                reportChoice("noop-local")
-                NoOpChannelTransport()
+                reportChoice("local-runtime")
+                val dialer = localRuntimeDialer?.get() ?: return NoOpChannelTransport()
+                directTransport(scope, settingsRepository, dialer)
             }
             BackendKind.DIRECT_WS -> {
                 canvasClient?.detach()
-                reportChoice(if (localRuntimeBackend != null) "noop-local" else "noop-direct-ws")
-                NoOpChannelTransport()
+                // An http(s) address is another backend family's (the remote-source seam), not a socket.
+                val serverUrl = activeConfig?.serverUrl?.trim()?.takeIf { activeConfig.usesAppServerChannel() }
+                    ?: return NoOpChannelTransport().also { reportChoice("noop-no-app-server") }
+                reportChoice("direct-ws")
+                directTransport(scope, settingsRepository) { _ ->
+                    openDirectAppServerDial(AppServerWebSocketDial(serverUrl, activeConfig.accessToken), scope)
+                }
             }
         }
     }
+
+    /** The channel over a direct ws:// App Server: the same transport as Iroh, dialled by [dialer]. */
+    private fun directTransport(
+        scope: CoroutineScope,
+        settingsRepository: ISettingsRepository?,
+        dialer: DirectAppServerDialer,
+    ): IChannelTransport = IrohChannelTransport(
+        scope = scope,
+        externalToolRegistry = externalToolRegistry,
+        directDialer = dialer,
+        activeConfigProvider = { settingsRepository?.activeConfig?.value?.toConnectConfig() },
+    )
 }
+
+private fun LettaConfig.toConnectConfig() = IrohConnectConfig(
+    baseShimUrl = serverUrl,
+    token = accessToken.orEmpty(),
+    deviceId = "android-letta-mobile",
+    clientVersion = "android-iroh-active-config",
+)

@@ -41,7 +41,8 @@ from rml import (BACK_OUT, BACK_SOFT, ELASTIC_HEAVY, ELASTIC_SOFT, GRADIENT_OPAC
                  VM_SUCCESS, Y, anim_state, animation, bind, layer_frame)
 from rig.body import INFLATE_NODE, body, sine, squash
 from rig.constants import (DEFAULT_SHAPE, HOST_BODY_DEG, HOST_BODY_PX, HOST_LEAN_DEG, HOST_TURN_DEG,
-                           HOST_TURN_PX, HOST_TURN_PY, LEAN_BASE, TUNABLES, beat, frames, rad)
+                           HOST_TURN_PX, HOST_TURN_PY, LEAN_BASE, LISTEN_LIFT_PX, LISTEN_SCALE,
+                           MOVE_LEAN_DEG, MOVE_SPREAD, MOVE_STRETCH, TUNABLES, beat, frames, rad)
 from rig.face import face, turn_animations
 from rig.ids import (
     BLINK_ANIM, BLINK_REST_ANIM, BODY_NODE, BREATH_ANIM, CONV_BODY_ROT, CONV_BODY_X, CONV_DEGREES, CONV_LEAN,
@@ -49,12 +50,16 @@ from rig.ids import (
     ENUM_STATE, FACE, GLOSS, HOVER_ANIM, HOVER_HELD_ANIM, HOVER_REST_ANIM, JOYSTICK, LEAN_NODE,
     PLATE_BLINK, ROOT, SHAPES, SM, SUSTAINED, TURN_X_ANIM, TURN_Y_ANIM, VM_INSTANCE, VM_TUNE_SCALE,
     VM_SHAPE_ROTATION, VM_TURN_X, VM_TURN_Y, shape_enum_ids, state_enum_ids,
+    CONV_LISTEN_SCALE, CONV_LISTEN_Y, CONV_MOVE_LEAN, CONV_MOVE_SX, CONV_MOVE_SY, SQUASH_NODE,
+    TRAVEL_NODE, VM_NEW,
 )
+from rig.contract import AVATAR
 from rig.layers import set_animation_index
 from rig.machine import root_machine
 from rig.seams import animation_index
-from rig.motion import (enter_animations, idle_variety_animations, momentary_animations,
-                        shape_animations, sustained_animations, wander_animations)
+from rig.motion import (calm_animations, enter_animations, idle_variety_animations, momentary_animations,
+                        pet_animations, react_animations, shape_animations, sustained_animations,
+                        wander_animations)
 from rig.plate import plate_component
 
 
@@ -100,7 +105,8 @@ def root_artboard(solo=None):
         **{FACE: {Y: [(0, -5, SINE), (beat(1200), -7, SINE), (beat(2400), -5)], ROT: [(0, rad(-2))]},
            BODY_NODE: {ROT: [(0, rad(-2))]}}), "loop")
     anims = (shape_animations() + sustained_animations() + enter_animations() + momentary_animations() + idle_variety_animations()
-             + turn_animations() + wander_animations() + [breath, blink_rest, blink, hover_rest, hover, hover_held])
+             + turn_animations() + wander_animations() + [breath, blink_rest, blink, hover_rest, hover, hover_held]
+             + calm_animations() + pet_animations() + react_animations())
     # The blend policy (MOTION-PIPELINE step A): every animation this artboard plays, indexed by
     # its keyed ends, so root_machine()'s layers can refuse a 0 ms transition that tears a value.
     # The animations exist before the machine does, so the index is simply the XML just built.
@@ -114,11 +120,20 @@ def root_artboard(solo=None):
     <Node x="250" y="270" name="Entity" id="{ENTITY}">
         {bind(VM_TUNE_SCALE, SX, CONV_SCALE)}
         {bind(VM_TUNE_SCALE, SY, CONV_SCALE)}
-        <!-- Lean: pivot at the base; children sit LEAN_BASE above it so the centre stays put. -->
-        <Node x="0" y="{LEAN_BASE}" name="Lean" id="{LEAN_NODE}">
+        <!-- Travel, Squash and Lean all pivot at the base; children sit LEAN_BASE above it so the
+             centre stays put. Travel is bound to moveX/moveY (lean and stretch along the host's
+             travel), Squash is keyed by the Pet and React layers only, Lean by the host turn. -->
+        <Node x="0" y="{LEAN_BASE}" name="Travel" id="{TRAVEL_NODE}">
+            {bind(VM_NEW["moveX"], ROT, CONV_MOVE_LEAN)}
+            {bind(VM_NEW["moveY"], SY, CONV_MOVE_SY)}
+            {bind(VM_NEW["moveY"], SX, CONV_MOVE_SX)}
+        <Node x="0" y="0" name="Squash" id="{SQUASH_NODE}">
+        <Node x="0" y="0" name="Lean" id="{LEAN_NODE}">
             {bind(VM_TURN_X, ROT, CONV_LEAN)}
 {indent(face(), "            ")}
 {indent(body(), "            ")}
+        </Node>
+        </Node>
         </Node>
     </Node>
 
@@ -131,6 +146,25 @@ def root_artboard(solo=None):
     machine = indent(_solo_machine(_animation_id(board, solo)), "    ")
     return board.replace(f'defaultStateMachineId="{SM}"', f'defaultStateMachineId="{SOLO_SM}"', 1) \
                 .replace("\n</Artboard>", f"\n\n{machine}\n</Artboard>")
+
+
+_VM_TYPE = {"number": "ViewModelPropertyNumber", "boolean": "ViewModelPropertyBoolean",
+            "trigger": "ViewModelPropertyTrigger"}
+
+
+def _new_props():
+    """The contract properties te3n1.5 added, in contract order (rig/contract.py is the list)."""
+    return [p for p in AVATAR if p.name in VM_NEW]
+
+
+def _instance_value(p):
+    """A new property's value on the default instance: false, 0, or a bare trigger."""
+    pid = VM_NEW[p.name]
+    if p.type == "boolean":
+        return f'<ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="{pid}"/>'
+    if p.type == "number":
+        return f'<ViewModelInstanceNumber propertyValue="0" viewModelPropertyId="{pid}"/>'
+    return f'<ViewModelInstanceTrigger viewModelPropertyId="{pid}"/>'
 
 
 def data():
@@ -164,6 +198,16 @@ def data():
                           clampLower="true" clampUpper="true" name="TurnToLean" id="{CONV_LEAN}"/>
 <DataConverterRangeMapper minInput="0" maxInput="360" minOutput="0" maxOutput="{rad(360)}"
                           clampLower="false" clampUpper="false" name="DegreesToRadians" id="{CONV_DEGREES}"/>
+<DataConverterRangeMapper minInput="0" maxInput="1" minOutput="0" maxOutput="{-LISTEN_LIFT_PX}"
+                          clampLower="true" clampUpper="true" name="ListenToLift" id="{CONV_LISTEN_Y}"/>
+<DataConverterRangeMapper minInput="0" maxInput="1" minOutput="1" maxOutput="{LISTEN_SCALE}"
+                          clampLower="true" clampUpper="true" name="ListenToScale" id="{CONV_LISTEN_SCALE}"/>
+<DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="{rad(MOVE_LEAN_DEG)}" maxOutput="{rad(-MOVE_LEAN_DEG)}"
+                          clampLower="true" clampUpper="true" name="MoveToLean" id="{CONV_MOVE_LEAN}"/>
+<DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="{MOVE_STRETCH[0]}" maxOutput="{MOVE_STRETCH[1]}"
+                          clampLower="true" clampUpper="true" name="MoveToStretch" id="{CONV_MOVE_SY}"/>
+<DataConverterRangeMapper minInput="-1" maxInput="1" minOutput="{MOVE_SPREAD[0]}" maxOutput="{MOVE_SPREAD[1]}"
+                          clampLower="true" clampUpper="true" name="MoveToSpread" id="{CONV_MOVE_SX}"/>
 
 <ViewModel defaultInstanceId="{VM_INSTANCE}" name="Avatar" id="{VM}">
     <ViewModelPropertyEnumCustom enumId="{ENUM_STATE}" name="state" id="{VM_STATE}"/>
@@ -182,6 +226,7 @@ def data():
     <ViewModelPropertyNumber name="turnX" id="{VM_TURN_X}"/>
     <ViewModelPropertyNumber name="turnY" id="{VM_TURN_Y}"/>
     <ViewModelPropertyNumber name="shapeRotation" id="{VM_SHAPE_ROTATION}"/>
+{indent(chr(10).join(f'<{_VM_TYPE[p.type]} name="{p.name}" id="{VM_NEW[p.name]}"/>' for p in _new_props()), "    ")}
 
     <ViewModelInstance exports="true" name="Default" id="{VM_INSTANCE}">
 {indent(chr(10).join(f'<ViewModelInstanceNumber propertyValue="0.5" viewModelPropertyId="{t.vm_id}"/>' for t in TUNABLES.values()), "        ")}
@@ -200,6 +245,7 @@ def data():
         <ViewModelInstanceTrigger viewModelPropertyId="{VM_SUCCESS}"/>
         <ViewModelInstanceTrigger viewModelPropertyId="{VM_ERROR}"/>
         <ViewModelInstanceBoolean propertyValue="false" viewModelPropertyId="{VM_DRAGGED}"/>
+{indent(chr(10).join(_instance_value(p) for p in _new_props()), "        ")}
     </ViewModelInstance>
 </ViewModel>'''
 
@@ -221,6 +267,9 @@ def scene_document(solo=None):
           blink     - trigger -> the glyph squashes shut; it also blinks on its own
           color     - identity; body, soft edge and halo are bound to it
           shape     - identity; picks one of eight bodies on the Shape layer
+          and, since te3n1.5: reduceMotion, petting, listenLevel, moveX/Y, impact, trickId and
+          the reaction triggers poke dizzy sent toolStart toolDone land wake yawn trick.
+          The full list, with types and ranges, is rig/contract.py (MASCOT.md mirrors it).
     -->
 {indent(root_artboard(solo), "    ")}
 

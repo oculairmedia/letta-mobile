@@ -79,7 +79,6 @@ class DashboardViewModelTest {
         every { graph.toolRepository } returns tools
         every { graph.runRepository } returns CachedRunRepository(fakeRunApi.bound())
         every { graph.blockRepository } returns null
-        every { graph.localRuntimeBackend } returns null
         // letta-mobile-by4vm.13: an Iroh-shaped session serving every route the home reads.
         every { graph.capabilities } returns SessionCapabilities(SessionRoute.entries.toSet())
     }

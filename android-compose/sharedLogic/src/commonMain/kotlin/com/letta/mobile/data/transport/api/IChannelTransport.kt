@@ -1,7 +1,5 @@
 package com.letta.mobile.data.transport.api
 
-import com.letta.mobile.data.a2ui.A2uiAction
-import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.ChannelTransportDefaults
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -61,7 +59,6 @@ interface IChannelTransport {
     fun cancel(conversationId: String): Boolean
     fun bye(): Boolean
     suspend fun disconnect()
-    fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult
 
     /**
      * Replay + live-tail a Run's frame log starting after [cursor].

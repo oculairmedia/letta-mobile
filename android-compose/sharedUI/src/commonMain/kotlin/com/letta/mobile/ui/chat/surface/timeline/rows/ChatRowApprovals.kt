@@ -81,6 +81,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -270,6 +271,8 @@ internal fun ApprovalRequestCard(approval: UiApprovalRequest, decider: ApprovalD
     // and the question's card takes over once it resolves.
     val parkedOtherTool = approval.details?.let { !RuntimeUserInputTools.requiresUserInput(it.toolName) } == true
     if (!parkedOtherTool && AskUserQuestionCard(approval, decider)) return
+    // letta-mobile-8fq4j: the same precedence for ExitPlanMode's plan card.
+    if (!parkedOtherTool && ExitPlanModeCard(approval, decider)) return
     val actionable = decider.submit != null
     ApprovalChrome(icon = LettaIcons.CheckCircle, title = stringResource(Res.string.rows_approval_requested)) {
         ApprovalCardContent(approval, decider, actionable)
@@ -282,6 +285,7 @@ private fun ColumnScope.ApprovalCardContent(approval: UiApprovalRequest, decider
     // Android leads with what it asks, then the calls; desktop lists the calls first.
     if (touch && actionable) ApprovalBody()
     approval.toolCalls.forEach { if (touch) ApprovalToolCallCard(it) else ApprovalToolCallLine(it) }
+    approval.toolCalls.forEach { PlanWritePreview(it) }
     approval.details?.let { ApprovalOfferedDetails(it) }
     if (actionable) {
         if (!touch) ApprovalBody()
@@ -294,7 +298,7 @@ private fun ColumnScope.ApprovalCardContent(approval: UiApprovalRequest, decider
  * tool label's voice over the content with no card around it (the timeline row is the surface).
  */
 @Composable
-private fun ApprovalChrome(icon: ImageVector, title: String, content: @Composable ColumnScope.() -> Unit) {
+internal fun ApprovalChrome(icon: ImageVector, title: String, content: @Composable ColumnScope.() -> Unit) {
     if (!touchStyle()) {
         ArtifactCard(icon = icon, title = title, content = content)
         return
@@ -387,14 +391,38 @@ private fun RequestingInputChip() {
 /** Android's chip container alpha (ChatToolCallCards.ToolApprovalChip). */
 private const val REQUESTING_INPUT_CHIP_ALPHA = 0.72f
 
-/** Approve, or reject with an optional reason typed in a modal dialog (Android's TextInputDialog). */
+/** The always-allow rules the server offers, then [ApprovalDecisionButtons] for every call of [approval]. */
 @Composable
 private fun ApprovalActionRow(approval: UiApprovalRequest, decider: ApprovalDecider) {
     val toolCallIds = remember(approval) { approval.toolCalls.map { it.toolCallId } }
-    var rejecting by remember(approval.requestId) { mutableStateOf(false) }
+    approval.details?.let { AlwaysAllowButtons(it, decider) }
+    ApprovalDecisionButtons(toolCallIds, decider)
+}
+
+/** What the reject flow's dialog says: its title and the reason field's placeholder. */
+@Immutable
+internal class RejectCopy(val title: StringResource, val placeholder: StringResource) {
+    companion object {
+        val Approval = RejectCopy(Res.string.rows_reject_title, Res.string.rows_reject_reason_placeholder)
+    }
+}
+
+/**
+ * Approve (with [approveReason], the structured answer an approval may carry), or reject with an
+ * optional reason typed in a modal dialog (Android's TextInputDialog), for [toolCallIds].
+ */
+@Composable
+internal fun ApprovalDecisionButtons(
+    toolCallIds: List<String>,
+    decider: ApprovalDecider,
+    approveReason: String? = null,
+    rejectCopy: RejectCopy = RejectCopy.Approval,
+) {
+    var rejecting by remember(decider.requestId) { mutableStateOf(false) }
     val haptics = LocalHaptics.current
     if (rejecting) {
         RejectReasonDialog(
+            copy = rejectCopy,
             onReject = { reason ->
                 haptics.play(LettaHapticCue.Reject)
                 rejecting = false
@@ -403,7 +431,6 @@ private fun ApprovalActionRow(approval: UiApprovalRequest, decider: ApprovalDeci
             onDismiss = { rejecting = false },
         )
     }
-    approval.details?.let { AlwaysAllowButtons(it, decider) }
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         OutlinedButton(
             onClick = {
@@ -417,7 +444,7 @@ private fun ApprovalActionRow(approval: UiApprovalRequest, decider: ApprovalDeci
         Button(
             onClick = {
                 haptics.play(LettaHapticCue.Confirm)
-                decider.submit?.invoke(toolCallIds, true, null)
+                decider.submit?.invoke(toolCallIds, true, approveReason)
             },
             enabled = decider.enabled,
         ) {
@@ -431,7 +458,7 @@ private fun ApprovalActionRow(approval: UiApprovalRequest, decider: ApprovalDeci
  * Reject is always enabled; Cancel leaves the request pending. A blank reason rejects without one.
  */
 @Composable
-private fun RejectReasonDialog(onReject: (reason: String?) -> Unit, onDismiss: () -> Unit) {
+private fun RejectReasonDialog(copy: RejectCopy, onReject: (reason: String?) -> Unit, onDismiss: () -> Unit) {
     var reason by remember { mutableStateOf("") }
     val buttons = LettaPaneButtons(
         confirm = LettaPaneButton(
@@ -441,13 +468,13 @@ private fun RejectReasonDialog(onReject: (reason: String?) -> Unit, onDismiss: (
         ),
         dismiss = LettaPaneButton(stringResource(Res.string.rows_cancel), onDismiss),
     )
-    val spec = LettaAlertSpec(stringResource(Res.string.rows_reject_title), buttons, testTag = ChatRowTestTags.APPROVAL_REJECT_DIALOG)
+    val spec = LettaAlertSpec(stringResource(copy.title), buttons, testTag = ChatRowTestTags.APPROVAL_REJECT_DIALOG)
     LettaAlertPane(spec, onDismiss) {
         OutlinedTextField(
             value = reason,
             onValueChange = { reason = it },
             label = { Text(stringResource(Res.string.rows_reject_reason)) },
-            placeholder = { Text(stringResource(Res.string.rows_reject_reason_placeholder)) },
+            placeholder = { Text(stringResource(copy.placeholder)) },
             minLines = REJECT_REASON_MIN_LINES,
             modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.APPROVAL_REASON),
         )

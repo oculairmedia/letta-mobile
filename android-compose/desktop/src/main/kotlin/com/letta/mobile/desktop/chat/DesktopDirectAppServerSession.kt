@@ -7,12 +7,11 @@ import com.letta.mobile.data.controller.reconnect.ReconnectingClientListener
 import com.letta.mobile.data.controller.reconnect.ReconnectingClientState
 import com.letta.mobile.data.controller.reconnect.toChannelTransportState
 import com.letta.mobile.data.transport.ChannelTransportState
-import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.AppServerProbeResult
-import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
-import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
+import com.letta.mobile.data.transport.appserver.AppServerReadinessExpectation
+import com.letta.mobile.data.transport.appserver.AppServerWebSocketDial
+import com.letta.mobile.data.transport.appserver.openAppServerWebSocket
 import io.ktor.client.HttpClient
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -21,7 +20,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.job
 
 /** What the gateway exposes of a session that reconnects itself (letta-mobile-by4vm.9). */
 internal interface DesktopSelfReconnectingSession {
@@ -48,7 +46,7 @@ internal interface DesktopReconnectOwningGateway {
 internal class DesktopDirectDial(
     val serverUrl: String,
     val bearerToken: String?,
-    val readiness: DesktopAppServerReadinessExpectation,
+    val readiness: AppServerReadinessExpectation,
     /** HTTP `/app-server-info` before every dial; null for the bundled child we just started. */
     val preflight: (suspend () -> AppServerProbeResult)?,
 )
@@ -98,7 +96,14 @@ internal class DesktopDirectAppServerSession private constructor(
             scope = scope,
             listener = listener,
             dial = SessionDial(
-                mint = { mintGeneration(dial, httpClient, scope) },
+                // letta-mobile-by4vm.110.6: the ws:// open is the one Android and web share.
+                mint = {
+                    openAppServerWebSocket(
+                        AppServerWebSocketDial(dial.serverUrl, dial.bearerToken, dial.readiness),
+                        httpClient,
+                        scope,
+                    ).let { AppServerClientGeneration(it.client, it.connectionState, it.close) }
+                },
                 preflight = dial.preflight,
                 telemetryComponent = "DesktopAppServerReconnect",
                 releaseSteps = listOf { httpClient.close() },
@@ -141,36 +146,6 @@ internal class DesktopDirectAppServerSession private constructor(
                 .map { it.toChannelTransportState(serverId = serverId) }
                 .stateIn(scope, SharingStarted.Eagerly, client.state.value.toChannelTransportState(serverId))
             return DesktopDirectAppServerSession(client, status, supervisor, dial.releaseSteps)
-        }
-
-        /** One generation's job is a child of the session scope, closable on its own (as the wrapper's). */
-        @Suppress("NoDetachedCoroutineLifecycle")
-        private suspend fun mintGeneration(
-            dial: DesktopDirectDial,
-            httpClient: HttpClient,
-            scope: CoroutineScope,
-        ): AppServerClientGeneration {
-            val endpoint = AppServerEndpoint.fromWebSocketUrl(url = dial.serverUrl, bearerToken = dial.bearerToken)
-            val generationJob = Job(scope.coroutineContext.job)
-            val generationScope = CoroutineScope(scope.coroutineContext + generationJob)
-            val transport = KtorAppServerWebSocketTransport(
-                httpClient = httpClient,
-                baseUrl = endpoint.address,
-                scope = generationScope,
-                bearerToken = endpoint.bearerToken,
-            )
-            val client = DefaultAppServerClient(transport, parentScope = generationScope)
-            val close: (String?) -> Unit = { reason ->
-                client.failPendingRequests(reason ?: "App Server generation closed")
-                generationJob.cancel(CancellationException(reason ?: "App Server generation closed"))
-            }
-            try {
-                awaitDesktopAppServerReadiness(DesktopAppServerReadinessProbe(transport.connectionState, client, dial.readiness))
-            } catch (error: Throwable) {
-                close(error.message)
-                throw error
-            }
-            return AppServerClientGeneration(client, transport.connectionState, close)
         }
     }
 }

@@ -10,11 +10,8 @@ import kotlinx.coroutines.launch
  * to a local agent) or through the remote timeline. Formerly `Client` (client mode, removed in
  * letta-mobile-by4vm.26); renamed in by4vm.53.
  */
-internal enum class ConversationAccessMode { LocalRuntime, Timeline }
-
 internal enum class ResolutionAttempt { Initial, Subsequent }
 
-internal enum class DuplicateInitialMessagePolicy { StageFreshLocalRuntimeDuplicate, SuppressDuplicate }
 
 internal enum class HydrationAvailability { Hydrated, NeedsLoading }
 

@@ -120,8 +120,17 @@ The current code has several endpoint owners:
 
 - `IrohChannelTransport` binds client endpoints;
 - `IrohNodeEndpoint` owns the server accept loop;
-- desktop gateway factories can bind another endpoint; and
-- `A2aWiring` deliberately binds a second endpoint with the same key.
+- desktop gateway factories can bind another endpoint.
+
+`A2aWiring` used to bind a second endpoint with the host's key. That broke
+relay-routed App Server dials (letta-mobile-by4vm.112): the relay keeps one
+registration per node id, the newest, so a browser client's relay-only dial
+reached the a2a-only twin and failed TLS with `no_application_protocol`
+(error 120). A throwaway probe against the n0 relay reproduced it 5/5 when the
+a2a twin registered last, and 0/5 when the App Server endpoint did. The
+`/letta/a2a/0` receiver is now an `IrohNodeProtocolHandler` on the wrapper's
+one `IrohNodeEndpoint`, beside the App Server, canvas, and notebook ALPNs.
+Two endpoints must never share a secret key.
 
 Replication must not add another owner. First introduce an injected endpoint
 and protocol router that:
@@ -134,8 +143,9 @@ and protocol router that:
   ownership; and
 - owns ordered, idempotent shutdown.
 
-Adding an ALPN to `IrohNodeEndpoint` without routing is incorrect: its current
-accept loop sends every connection to `IrohNodeConnection`.
+`IrohNodeEndpoint` already routes by `Accepting.alpn()`: registered
+`protocolHandlers` (notebook, a2a) first, then the canvas relay, then the App
+Server. A new protocol goes in as a handler, never as another endpoint.
 
 ### Source-set boundary
 

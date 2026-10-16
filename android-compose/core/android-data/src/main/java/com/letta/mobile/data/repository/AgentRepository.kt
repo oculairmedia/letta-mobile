@@ -9,7 +9,6 @@ import com.letta.mobile.data.local.SessionCacheGate
 import com.letta.mobile.data.local.RoomAgentLocalCache
 import com.letta.mobile.data.repository.api.AgentRemoteSource
 import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.transport.api.IChannelTransport
 import dagger.Lazy
 import kotlinx.coroutines.CoroutineScope
@@ -17,7 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
 /**
- * Android binding for [CachedAgentRepository]: Room cache + the on-device runtime or an Iroh source.
+ * Android binding for [CachedAgentRepository]: Room cache + the session channel's admin_rpc source.
  *
  * letta-mobile-ckmub.4: [remote] is the seam for a non-App-Server backend; production binds no
  * route (the Letta REST backend was removed).
@@ -31,7 +30,6 @@ open class AgentRepository(
     remote: RemoteRoute<AgentRemoteSource> = RemoteRoute.Absent(SessionRoute.AGENTS),
     agentDao: Lazy<AgentDao>,
     repositoryScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-    localAgentSource: LocalRuntimeAgentSource? = null,
     settingsRepository: ISettingsRepository? = null,
     transport: IChannelTransport? = null,
     // letta-mobile-71orq: Iroh admin_rpc agent reads. When the active backend
@@ -48,8 +46,6 @@ open class AgentRepository(
     remote = remote,
     localCache = GatedDao(agentDao, cacheGate).let { dao -> { RoomAgentLocalCache(dao) } },
     repositoryScope = repositoryScope,
-    localAgentSource = localAgentSource,
-    settingsRepository = settingsRepository,
     transport = transport,
     irohAgentSource = irohAgentSource,
 ) {
@@ -58,8 +54,7 @@ open class AgentRepository(
         remote: AgentRemoteSource,
         agentDao: Lazy<AgentDao>,
         repositoryScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-        localAgentSource: LocalRuntimeAgentSource? = null,
-        settingsRepository: ISettingsRepository? = null,
+            settingsRepository: ISettingsRepository? = null,
         transport: IChannelTransport? = null,
         irohAgentSource: IrohAdminRpcAgentSource? =
             if (transport != null && settingsRepository != null) {
@@ -67,5 +62,5 @@ open class AgentRepository(
             } else {
                 null
             },
-    ) : this(remote.bound(), agentDao, repositoryScope, localAgentSource, settingsRepository, transport, irohAgentSource)
+    ) : this(remote.bound(), agentDao, repositoryScope, settingsRepository, transport, irohAgentSource)
 }

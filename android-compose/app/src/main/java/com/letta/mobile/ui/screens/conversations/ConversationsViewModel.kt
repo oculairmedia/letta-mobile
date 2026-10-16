@@ -5,9 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.repository.activeBackendIsIroh
+import com.letta.mobile.data.repository.activeBackendUsesChannel
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.isLettaCodeEphemeralWorker
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.ConversationInspectorMessage
@@ -108,7 +107,7 @@ class ConversationsViewModel @Inject constructor(
 
     /** The Iroh backend has no delete command, so a delete there only archives; the confirm dialog says so. */
     val deleteBehavior: ConversationDeleteBehavior
-        get() = if (settingsRepository.activeBackendIsIroh()) {
+        get() = if (settingsRepository.activeBackendUsesChannel()) {
             ConversationDeleteBehavior.MovesToArchived
         } else {
             ConversationDeleteBehavior.Permanent
@@ -184,12 +183,11 @@ class ConversationsViewModel @Inject constructor(
 
     /** Publishes [conversations] as the list now, named from the roster the app currently holds. */
     private fun publishSnapshot(conversations: List<Conversation>) {
-        val activeConfigIsLocalRuntime = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value)
-        val agents = displayAgents(agentRepository.agents.value, activeConfigIsLocalRuntime)
+        val agents = displayAgents(agentRepository.agents.value)
         if (agents.isNotEmpty()) {
             agentNameCache = agents.associate { it.id to it.name }.toMutableMap()
         }
-        val display = displayConversations(conversations, agents, activeConfigIsLocalRuntime)
+        val display = displayConversations(conversations)
         _uiState.value = _uiState.value.copy(
             conversations = applyPinnedState(display.map { it.toDisplay() }).toImmutableList(),
             agents = agents.toImmutableList(),
@@ -205,16 +203,12 @@ class ConversationsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isLoading = true)
             }
 
-            val activeConfigIsLocalRuntime = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value)
             val loadResult = supervisorScope {
                 val agents = async {
-                    // Local mode routes inside AgentRepository (on-device store).
                     agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS)
                     agentRepository.agents.value
                 }
                 val conversations = async {
-                    // Local mode routes inside the repository (on-device
-                    // letta.js store) — refresh unconditionally.
                     allConversationsRepository.refreshIfStale(LIST_CACHE_TTL_MS)
                     allConversationsRepository.conversations.value
                 }
@@ -225,15 +219,15 @@ class ConversationsViewModel @Inject constructor(
             }
 
             loadResult.agents.onSuccess { agents ->
-                agentNameCache = displayAgents(agents, activeConfigIsLocalRuntime).associate { it.id to it.name }.toMutableMap()
+                agentNameCache = displayAgents(agents).associate { it.id to it.name }.toMutableMap()
             }.onFailure { error ->
                 Log.w("ConversationsVM", "Agent load failed", error)
             }
 
             loadResult.conversations.onSuccess { conversations ->
                 val agents = loadResult.agents.getOrDefault(_uiState.value.agents)
-                val displayAgents = displayAgents(agents, activeConfigIsLocalRuntime)
-                val displayConversations = displayConversations(conversations, displayAgents, activeConfigIsLocalRuntime)
+                val displayAgents = displayAgents(agents)
+                val displayConversations = displayConversations(conversations)
                 _uiState.value = _uiState.value.copy(
                     conversations = applyPinnedState(displayConversations.map { it.toDisplay() }).toImmutableList(),
                     agents = displayAgents.toImmutableList(),
@@ -244,7 +238,7 @@ class ConversationsViewModel @Inject constructor(
                 Log.w("ConversationsVM", "Load failed", error)
                 val agents = loadResult.agents.getOrDefault(_uiState.value.agents)
                 _uiState.value = _uiState.value.copy(
-                    agents = displayAgents(agents, activeConfigIsLocalRuntime).toImmutableList(),
+                    agents = displayAgents(agents).toImmutableList(),
                     isLoading = false,
                     error = if (hadConversationsAtStart) null else error.message,
                 )
@@ -256,7 +250,6 @@ class ConversationsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isRefreshing = true)
             try {
-                val activeConfigIsLocalRuntime = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value)
                 allConversationsRepository.refresh()
                 // letta-mobile-i7qpp: a backend switch empties the roster
                 // (clearForBackendSwitch); refetch before reading agents.value
@@ -265,12 +258,8 @@ class ConversationsViewModel @Inject constructor(
                 // conversation list refresh.
                 runCatching { agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS) }
                     .onFailure { Log.w("ConversationsVM", "Agent refresh failed", it) }
-                val displayAgents = displayAgents(agentRepository.agents.value, activeConfigIsLocalRuntime)
-                val displayConversations = displayConversations(
-                    allConversationsRepository.conversations.value,
-                    displayAgents,
-                    activeConfigIsLocalRuntime,
-                )
+                val displayAgents = displayAgents(agentRepository.agents.value)
+                val displayConversations = displayConversations(allConversationsRepository.conversations.value)
                 agentNameCache = displayAgents.associate { it.id to it.name }.toMutableMap()
                 _uiState.value = _uiState.value.copy(
                     conversations = applyPinnedState(displayConversations.map { it.toDisplay() }).toImmutableList(),
@@ -571,27 +560,11 @@ class ConversationsViewModel @Inject constructor(
     /** Conversations with a run in flight, from the app-wide run registry (any transport). */
     private fun workingConversationIds(): Set<String> = runRegistry.runningConversationIds()
 
-    private fun displayAgents(
-        agents: List<Agent>,
-        activeConfigIsLocalRuntime: Boolean = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value),
-    ): List<Agent> = if (activeConfigIsLocalRuntime) {
-        agents.filter(AgentRuntimeBinding::isLocalBound)
-    } else {
-        agents
-    }
+    /** letta-mobile-by4vm.110.6: every agent the session's App Server lists is shown, on-device or not. */
+    private fun displayAgents(agents: List<Agent>): List<Agent> = agents
 
-    private fun displayConversations(
-        conversations: List<Conversation>,
-        agents: List<Agent>,
-        activeConfigIsLocalRuntime: Boolean = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value),
-    ): List<Conversation> {
-        val nonEphemeralConversations = conversations.filterNot { it.agentId.isLettaCodeEphemeralWorker() }
-        if (!activeConfigIsLocalRuntime) return nonEphemeralConversations
-        val localAgentIds = agents.map { it.id }.toSet()
-        return nonEphemeralConversations.filter { conversation ->
-            conversation.id.value.startsWith("local-conv-") || conversation.agentId in localAgentIds
-        }
-    }
+    private fun displayConversations(conversations: List<Conversation>): List<Conversation> =
+        conversations.filterNot { it.agentId.isLettaCodeEphemeralWorker() }
 
     private fun applyPinnedState(
         displays: List<ConversationDisplay>,

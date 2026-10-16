@@ -18,6 +18,7 @@ import com.letta.mobile.data.runtime.attachTurnStack
 import com.letta.mobile.data.runtime.permissionGovernedTurnStackSpec
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.PermissionModeSettings
+import com.letta.mobile.data.transport.appserver.AppServerReadinessExpectation
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
@@ -106,16 +107,13 @@ class DesktopAppServerChatGatewayBuilder(
      * default does not reach it.
      */
     private suspend fun createIrohGateway(serverUrl: String, lettaConfig: LettaConfig): DesktopAppServerChatGateway {
-        var generations: DesktopIrohGenerationSource? = null
         return createSessionGateway(
             SessionGatewaySpec(
                 isIroh = true,
                 local = lettaConfig.mode == LettaConfig.Mode.LOCAL,
                 permissionModes = null,
-                // letta-mobile-by4vm.50: gap detection only when this host advertises ordered event_seq.
-                irohHostCapabilities = { generations?.hostCapabilities.orEmpty() },
                 open = { scope, listener ->
-                    val source = irohGenerations(serverUrl, lettaConfig.accessToken, scope).also { generations = it }
+                    val source = irohGenerations(serverUrl, lettaConfig.accessToken, scope)
                     DesktopDirectAppServerSession.openWith(
                         serverId = serverUrl,
                         scope = scope,
@@ -144,7 +142,6 @@ class DesktopAppServerChatGatewayBuilder(
                 isIroh = false,
                 local = local,
                 permissionModes = permissionModes,
-                irohHostCapabilities = { null },
                 open = { scope, listener ->
                     DesktopDirectAppServerSession.open(
                         dial = DesktopDirectDial(
@@ -167,8 +164,6 @@ class DesktopAppServerChatGatewayBuilder(
         val isIroh: Boolean,
         val local: Boolean,
         val permissionModes: PermissionModeRegistry?,
-        /** Null on a direct socket; on Iroh, what the host advertised (read once the session is open). */
-        val irohHostCapabilities: () -> Set<String>?,
         val open: suspend (scope: CoroutineScope, listener: ReconnectingClientListener) -> DesktopDirectAppServerSession,
     )
 
@@ -198,7 +193,7 @@ class DesktopAppServerChatGatewayBuilder(
             session = opened
             if (spec.local) leases += DesktopLocalAppServerClientRegistry.shared.install(opened.client)
             if (!spec.isIroh) leases += DesktopLocalAppServerClientRegistry.direct.install(opened.client)
-            startStreamIntegrity(router, opened.client, clientScope, irohHostCapabilities = spec.irohHostCapabilities())
+            startStreamIntegrity(router, opened.client, clientScope)
             // lgns8.22.3: one inbound collector per desktop gateway.
             val turnEngine = router.attachTurnStack(
                 opened.client,
@@ -228,29 +223,20 @@ class DesktopAppServerChatGatewayBuilder(
     }
 
     /**
-     * letta-mobile-bzvro.6: on a direct App Server socket every frame of the connection reaches
-     * this client, so an `event_seq` gap is a lost frame: resync, and keep the watched runtimes on
-     * the busy/idle sync cadence. letta-mobile-by4vm.50: an Iroh dial ([irohHostCapabilities] not
-     * null) gets the same only when the host advertises ordered event_seq; an older host's relay
-     * can put its seq on the wire out of order, so it is left to the reconnect path. Desktop has no
-     * sync budget: the cadence always runs.
+     * letta-mobile-bzvro.6: an `event_seq` gap is a lost frame (a direct socket sees every frame;
+     * the Iroh host draws its seq in wire order, by4vm.50): resync, and keep the watched runtimes on
+     * the busy/idle sync cadence. Desktop has no sync budget: the cadence always runs.
      */
     private fun startStreamIntegrity(
         router: AppServerRuntimeEventRouter,
         client: AppServerClient,
         scope: CoroutineScope,
-        irohHostCapabilities: Set<String>?,
     ) {
-        val binding = StreamIntegrityBinding(client, { "desktop-sync-${UUID.randomUUID()}" })
-        if (irohHostCapabilities == null) {
-            binding.bindAndStart(router, detectGaps = true, scope = scope)
-        } else {
-            binding.bindIfHostOrdersEventSeq(router, irohHostCapabilities, scope)
-        }
+        StreamIntegrityBinding(client, { "desktop-sync-${UUID.randomUUID()}" }).bindAndStart(router, detectGaps = true, scope = scope)
     }
 
-    private fun readinessExpectationFor(lettaConfig: LettaConfig): DesktopAppServerReadinessExpectation =
-        if (lettaConfig.mode == LettaConfig.Mode.LOCAL) localDesktopAppServerExpectation else DesktopAppServerReadinessExpectation()
+    private fun readinessExpectationFor(lettaConfig: LettaConfig): AppServerReadinessExpectation =
+        if (lettaConfig.mode == LettaConfig.Mode.LOCAL) AppServerReadinessExpectation.LocalBackend else AppServerReadinessExpectation()
 }
 
 /**

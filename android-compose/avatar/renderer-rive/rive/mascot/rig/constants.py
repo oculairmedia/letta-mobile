@@ -52,7 +52,14 @@ BEAT_TEMPO = 1.4
 # it takes to let go again. A beat's keys sit on top of Breath and the host's turn on the same
 # nodes, so both ends are blends - a cut would snap those values (see rig/seams.py). One table
 # instead of the same numbers retyped per state in rig/machine.py.
-BLEND = {"beat_in": 160, "beat_out": 320, "wander_in": 200, "wander_out": 320, "hover_out": 260}
+BLEND = {"beat_in": 160, "beat_out": 320, "wander_in": 200, "wander_out": 320, "hover_out": 260,
+         # te3n1.5: a loop and its reduceMotion twin trade places over `calm`; the pet sway mixes
+         # in over `pet_in` and lets go over `pet_out`.
+         "calm": 300, "pet_in": 250, "pet_out": 320}
+
+
+# reduceMotion: an entry hands off to the calm twin over at most this many ms (te3n1.5).
+CALM_HANDOFF = 80
 
 
 def beat(ms):
@@ -151,6 +158,16 @@ HOST_LEAN_DEG, TURN_LEAN_DEG = 9, 5                      # lean at host turn +-1
 
 
 HOST_TURN_PX, HOST_TURN_PY, HOST_TURN_DEG, HOST_BODY_DEG = 48, 18, 10, 5
+
+
+# te3n1.5 host channels. listenLevel 0..1: the face lifts LISTEN_LIFT_PX and grows to LISTEN_SCALE.
+LISTEN_LIFT_PX, LISTEN_SCALE = 10, 1.05
+
+
+# moveX -1..1: the whole body leans about its feet, top trailing the travel, up to MOVE_LEAN_DEG.
+# moveY -1..1 (+ is down): (scale at -1, scale at +1) - travelling up stretches, down squashes.
+MOVE_LEAN_DEG = 8
+MOVE_STRETCH, MOVE_SPREAD = (1.06, 0.95), (0.96, 1.04)
 
 
 JX, JY = 299, 300  # Joystick x / y

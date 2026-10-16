@@ -81,7 +81,7 @@ class DreamingRepositoryTest {
     @Test
     fun aRuntimeWithoutDreamIsTooOldAndNothingIsSent() = runTest {
         val client = FakeClient(output = "unused")
-        // The embedded 0.26.1 / 0.32.3 command list (golden letta-code-0.32.3-live.jsonl:9).
+        // A pre-0.33 command list (golden letta-code-0.32.3-live.jsonl:9).
         val commands = listOf("clear", "doctor", "init", "remember", "compact", "reload", "context-limit")
         val outcome = AppServerDreamingRepository(client = { client }, supportedCommands = { commands }).runNow(onDefault)
         assertEquals(DreamOutcome.Unsupported(DreamUnsupportedReason.RuntimeTooOld), outcome)
@@ -141,11 +141,6 @@ class DreamingRepositoryTest {
         assertEquals(
             DreamOutcome.Unsupported(DreamUnsupportedReason.NoNativeAppServer),
             failing("capability_unavailable: 'reflection.get' has no injected 'native App Server client' service on this controller").settings(onDefault),
-        )
-        // The message hosts sent before this change.
-        assertEquals(
-            DreamOutcome.Unsupported(DreamUnsupportedReason.NoNativeAppServer),
-            failing("reflection settings require the native App Server client").settings(onDefault),
         )
         assertEquals(DreamOutcome.Unsupported(DreamUnsupportedReason.RuntimeTooOld), failing("capability_unavailable: this App Server has no /dream").runNow(onDefault))
         assertEquals(DreamOutcome.Unsupported(DreamUnsupportedReason.NoConnection), failing("admin_rpc is not supported by this transport").settings(onDefault))

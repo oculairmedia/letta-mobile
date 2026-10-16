@@ -20,7 +20,6 @@ import com.letta.mobile.ui.chat.session.TimelineChatTarget
 import com.letta.mobile.ui.chat.session.TimelineChipSources
 import com.letta.mobile.ui.chat.session.TimelineModelSource
 import com.letta.mobile.web.chat.WebChatBinding
-import com.letta.mobile.web.iroh.IrohWasmAppServerTransport
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.js.Js
 import io.ktor.client.plugins.websocket.WebSockets
@@ -118,7 +117,7 @@ class WasmAppServerClientGateway(
             AppServerTimelineConnection(
                 turnEngine = session.engine,
                 events = session.client.events,
-                isConnected = session.transport.isConnected,
+                isConnected = session.isConnected,
                 admin = { method, params -> session.admin(method.value, params, ::nextRequestId) },
                 agentIdFor = { AgentId(agent.id) },
                 backendId = BackendId(WEB_BACKEND_ID),
@@ -144,13 +143,11 @@ class WasmAppServerClientGateway(
     private fun monitor(session: WasmAppServerSession) {
         connectionMonitor?.cancel()
         connectionMonitor = scope.launch {
-            session.transport.isConnected.first { connected -> !connected }
+            session.isConnected.first { connected -> !connected }
             if (activeSession === session) {
                 activeSession = null
                 session.onTransportDisconnected()
-                val reason = (session.transport as? IrohWasmAppServerTransport)
-                    ?.failureReason
-                    ?.value
+                val reason = session.failureReason()
                     ?.takeIf { it.isNotBlank() }
                     ?.let(::cleanBrowserErrorMessage)
                     ?: "Connection closed"

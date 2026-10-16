@@ -598,9 +598,9 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
   restart-replay evidence is still the older **`0.29.12`** capture (it needs a live server +
   model provider to re-capture). The Android embedded runtime ships in the
   `full` release APK only (nodejs-mobile Node 18 plus the `node18-compat.cjs` preload, arm64-v8a
-  only, driven through the headless stream-json protocol until letta-mobile-by4vm.110.6; the
-  `lite` APK has none, `docs/RELEASE.md`), so anything "verified against a 0.33/0.34 server" is
-  desktop/remote-only until then. One table lists every pin:
+  only; since letta-mobile-by4vm.110.6 it is a loopback `letta server` the app dials over ws://
+  through the same channel as an Iroh host, with admin_rpc answered in process; the `lite` APK has
+  none, `docs/RELEASE.md`). One table lists every pin:
   `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`
   ("letta-code version pins"). Install the package under test at
   `~/letta-code-install/node_modules/@letta-ai/letta-code` (older VM snapshots carry 0.29.9 there;

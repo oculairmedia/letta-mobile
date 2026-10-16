@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-50 -50 100 100">
+  <!-- PLACEHOLDER glyph-dizzy (letta-mobile-te3n1.5): derived from glyph-loading.svg (scaled 140 %; wants a spiral). The art pass (letta-mobile-te3n1.7) replaces this file; keep the name, the -50..50 viewBox and one #111111 path. See ARTIST.md. -->
+  <path d="M 15.4 0 C 15.4 8.51 8.51 15.4 0 15.4 C -8.51 15.4 -15.4 8.51 -15.4 0 C -15.4 -8.51 -8.51 -15.4 0 -15.4 C 8.51 -15.4 15.4 -8.51 15.4 0 Z" fill="#111111"/>
+</svg>

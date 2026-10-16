@@ -1,6 +1,5 @@
 package com.letta.mobile.data.transport
 
-import com.letta.mobile.data.a2ui.decodeA2uiMessages
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -28,7 +27,6 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
     override fun selectDeserializer(element: JsonElement): DeserializationStrategy<ServerFrame> {
         val type = element.jsonObject["type"]?.jsonPrimitive?.content
         return when (type) {
-            "welcome" -> ServerFrame.Welcome.serializer()
             "error" -> ServerFrame.Error.serializer()
             "turn_started" -> ServerFrame.TurnStarted.serializer()
             "turn_done" -> ServerFrame.TurnDone.serializer()
@@ -40,13 +38,9 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
             "tool_call_message",
             "approval_request_message" -> ServerFrame.ToolCallMessage.serializer()
             "tool_return_message" -> ServerFrame.ToolReturnMessage.serializer()
-            "a2ui_frame" -> A2uiFrameDeserializer
-            "a2ui_capabilities" -> ServerFrame.A2uiCapabilities.serializer()
             "subscribe_frame" -> SubscribeFrameDeserializer
             "subscribe_done" -> ServerFrame.SubscribeDone.serializer()
             "turn_queued" -> ServerFrame.TurnQueued.serializer()
-            "user_action_ack" -> ServerFrame.UserActionAck.serializer()
-            "user_action_outcome" -> ServerFrame.UserActionOutcome.serializer()
             "cron_list_response" -> ServerFrame.CronListResponse.serializer()
             "cron_add_response" -> ServerFrame.CronAddResponse.serializer()
             "cron_get_response" -> ServerFrame.CronGetResponse.serializer()
@@ -66,44 +60,6 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
             else -> UnknownFrameDeserializer
         }
     }
-}
-
-private object A2uiFrameDeserializer : KSerializer<ServerFrame> {
-    override val descriptor: SerialDescriptor =
-        buildClassSerialDescriptor("ServerFrame.A2ui")
-
-    override fun deserialize(decoder: Decoder): ServerFrame {
-        val jsonDecoder = decoder as? JsonDecoder
-            ?: error("A2uiFrameDeserializer requires a JsonDecoder")
-        val element = jsonDecoder.decodeJsonElement().jsonObject
-        // Shim §2.2: payload lives under `a2ui` (single object or array
-        // of v0.9 messages). On `ok=false` the field may be absent.
-        val payload = element["a2ui"]
-        val ok = element["ok"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: true
-        val messages = payload?.let { decodeA2uiMessages(jsonDecoder.json, it) }.orEmpty()
-        return ServerFrame.A2ui(
-            v = element["v"]?.jsonPrimitive?.content?.toIntOrNull() ?: 1,
-            id = element["id"]?.jsonPrimitive?.content.orEmpty(),
-            ts = element["ts"]?.jsonPrimitive?.content.orEmpty(),
-            agentId = element["agent_id"]?.jsonPrimitive?.content,
-            conversationId = element["conversation_id"]?.jsonPrimitive?.content,
-            turnId = element["turn_id"]?.jsonPrimitive?.content,
-            runId = element["run_id"]?.jsonPrimitive?.content,
-            requestId = element["request_id"]?.jsonPrimitive?.content,
-            seq = element["seq"]?.jsonPrimitive?.content?.toLongOrNull(),
-            otid = element["otid"]?.jsonPrimitive?.content,
-            ok = ok,
-            parseError = element["parse_error"]?.jsonPrimitive?.content,
-            validationError = element["validation_error"]?.jsonPrimitive?.content,
-            messages = messages,
-            raw = element,
-        )
-    }
-
-    override fun serialize(
-        encoder: Encoder,
-        value: ServerFrame,
-    ): Unit = error("ServerFrame.A2ui is inbound-only; encoding it is never valid")
 }
 
 /**

@@ -1,8 +1,6 @@
 package com.letta.mobile.data.transport
 
 
-import com.letta.mobile.data.a2ui.A2uiFrameEvent
-import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
@@ -109,11 +107,6 @@ class WsChatBridge(
      */
     val agentScopes: AgentEventScopes = AgentEventScopes(events)
 
-    /** A2UI frame stream, kept separate from text/tool timeline events. */
-    val a2uiEvents: Flow<A2uiFrameEvent> = transport.events.mapNotNull { frame ->
-        (frame as? ServerFrame.A2ui)?.toA2uiEvent()
-    }
-
     suspend fun connect(
         baseShimUrl: String,
         token: String,
@@ -166,7 +159,6 @@ class WsChatBridge(
 
     fun cancel(conversationId: String): Boolean = transport.cancel(conversationId)
     fun bye(): Boolean = transport.bye()
-    fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = transport.sendA2uiAction(action)
     suspend fun disconnect(): Unit = transport.disconnect()
 }
 
@@ -208,7 +200,7 @@ private fun ChannelTransportState.Connected.toConnectionState(): WsConnectionSta
 /**
  * Higher-level event stream for chat ViewModels. Each entry maps
  * 1:1 to a [ServerFrame] except where the frame had no chat-relevant
- * payload (Welcome, Unknown — those don't appear here).
+ * payload (Unknown — those don't appear here).
  */
 sealed interface WsTimelineEvent {
     data class TurnStarted(
@@ -337,18 +329,6 @@ sealed interface WsTimelineEvent {
         val conversationId: String? = null,
         val runId: String? = null,
     ) : WsTimelineEvent
-
-    data class UserActionOutcome(
-        val frameId: String,
-        val outcome: String,
-        val actionId: String?,
-        val reason: String?,
-        val idempotent: Boolean,
-        val agentId: String?,
-        val conversationId: String?,
-        val turnId: String?,
-        val runId: String?,
-    ) : WsTimelineEvent
 }
 
 sealed interface BridgeTurnStatus {
@@ -392,7 +372,6 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     is ServerFrame.Error,
     is ServerFrame.GoalsUpdated,
     is ServerFrame.AgentUpdated,
-    is ServerFrame.UserActionOutcome,
     -> serverNoticeEvent()
     is ServerFrame.ToolCallMessage,
     is ServerFrame.UserMessage,
@@ -400,14 +379,9 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     is ServerFrame.ReasoningMessage,
     is ServerFrame.ToolReturnMessage,
     -> messageDeltaEvent(isReplay)
-    // Welcome carries connection metadata, not chat content; surface via state.
-    // A2UI frames / capabilities / acks / Unknown are silent for chat consumers.
+    // Unknown frames are silent for chat consumers.
     // Cron frames (letta-mobile-d52f.1) are observed directly off
     // IChannelTransport.events by the cron repository — not chat content.
-    is ServerFrame.Welcome,
-    is ServerFrame.A2ui,
-    is ServerFrame.A2uiCapabilities,
-    is ServerFrame.UserActionAck,
     is ServerFrame.CronListResponse,
     is ServerFrame.CronAddResponse,
     is ServerFrame.CronGetResponse,
@@ -503,17 +477,6 @@ private fun ServerFrame.serverNoticeEvent(): WsTimelineEvent? = when (this) {
         reason = reason,
         at = at,
     )
-    is ServerFrame.UserActionOutcome -> WsTimelineEvent.UserActionOutcome(
-        frameId = frameId,
-        outcome = outcome,
-        actionId = actionId,
-        reason = reason,
-        idempotent = idempotent,
-        agentId = agentId,
-        conversationId = conversationId,
-        turnId = turnId,
-        runId = runId,
-    )
     else -> null
 }
 
@@ -571,14 +534,3 @@ private fun ServerFrame.messageFrameTurnId(): String? = when (this) {
     else -> null
 }?.takeIf { it.isNotBlank() }
 
-private fun ServerFrame.A2ui.toA2uiEvent(): A2uiFrameEvent = A2uiFrameEvent(
-    transport = "admin-shim",
-    frameId = id,
-    timestamp = ts,
-    agentId = agentId,
-    conversationId = conversationId,
-    turnId = turnId,
-    runId = runId,
-    requestId = requestId,
-    messages = messages,
-)

@@ -39,7 +39,8 @@ fun buildProductionAdminRouter(
      * 0.29.12 advertises no skill enumeration on the wire, so without a host-side
      * enumerator `skill.list` answers `hydrated=false` forever and the Skills
      * screen stays empty. Enumerating this directory at startup is that missing
-     * authoritative source. Unset => `LETTA_SKILLS_DIR` => `~/.letta/skills`.
+     * authoritative source. Unset => `LETTA_SKILLS_DIR` => `<LETTA_HOME>/skills`
+     * (letta-code's own control root; only symlinks there are controllable).
      */
     skillsDir: String? = null,
     eventScope: CoroutineScope? = null,
@@ -63,28 +64,26 @@ fun buildProductionAdminRouter(
     /** letta-mobile-cdgpr.7: the plugin host's `plugins.*` handlers; null when plugins are off. */
     pluginRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
 ): AdminRpcRouter {
-    val skillsCatalog = NativeSkillsCatalog()
-    // Cold-start discovery: hydrate BEFORE the router is built, so the very first
-    // skill.list after a restart is already authoritative (lgns8.21.2 AC:
-    // "discovery at cold start" + "preserved across restart" — the skills root is
-    // on disk, so re-enumerating on every boot preserves it by construction).
+    // Every skill.list re-reads the root (a symlink is the controllable unit and can
+    // change on disk at any time); the cold-start read below also logs what the host
+    // sees, so the first listing after a restart is already authoritative.
     val resolvedSkillsDir = HostSkillsEnumerator
         .resolveSkillsDir(skillsDir)
-    HostSkillsEnumerator.enumerate(resolvedSkillsDir)
-        ?.let { enumerated ->
-            skillsCatalog.hydrateFromHost(enumerated)
-            Telemetry.event(
-                "SkillsCatalog",
-                "host.hydrated",
-                "skillsDir" to resolvedSkillsDir,
-                "skills" to enumerated.size.toString(),
-            )
-        }
-        ?: Telemetry.event(
+    val skillsCatalog = NativeSkillsCatalog(hostEnumeration = { HostSkillsEnumerator.enumerate(resolvedSkillsDir) })
+    if (skillsCatalog.refreshFromHost()) {
+        Telemetry.event(
+            "SkillsCatalog",
+            "host.hydrated",
+            "skillsDir" to resolvedSkillsDir,
+            "skills" to skillsCatalog.snapshot().size.toString(),
+        )
+    } else {
+        Telemetry.event(
             "SkillsCatalog",
             "host.root_missing",
             "skillsDir" to resolvedSkillsDir,
         )
+    }
     val subagentStore = subagentRegistryFile
         ?.let { com.letta.mobile.data.subagents.FileSubagentRegistryStore(java.nio.file.Path.of(it)) }
         ?: com.letta.mobile.data.subagents.InMemorySubagentRegistryStore()

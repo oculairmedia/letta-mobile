@@ -5,7 +5,6 @@ import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.backend.RemoteRoute
 import android.util.Log
 import com.letta.mobile.data.repository.api.ConversationCrudRemoteSource
-import com.letta.mobile.data.chat.branch.BranchUnavailableException
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.local.ConversationDao
@@ -14,15 +13,12 @@ import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.local.GatedDao
 import com.letta.mobile.data.local.SessionCacheGate
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ConversationUpdateParams
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
-import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
@@ -50,8 +46,6 @@ open class ConversationRepository(
     private val agentRepository: IAgentRepository,
     conversationDao: Lazy<ConversationDao>,
     repositoryScope: CoroutineScope,
-    private val localConversationSource: LocalRuntimeConversationSource? = null,
-    private val settingsRepository: ISettingsRepository? = null,
     private val irohConversationListSource: IrohAdminRpcConversationListSource? = null,
     /**
      * letta-mobile-xj85j: when given, an agent's loaded conversation list follows Meridian's
@@ -68,8 +62,6 @@ open class ConversationRepository(
         agentRepository: IAgentRepository,
         conversationDao: Lazy<ConversationDao>,
         repositoryScope: CoroutineScope,
-        localConversationSource: LocalRuntimeConversationSource? = null,
-        settingsRepository: ISettingsRepository? = null,
         irohConversationListSource: IrohAdminRpcConversationListSource? = null,
         transport: IChannelTransport? = null,
     ) : this(
@@ -77,8 +69,6 @@ open class ConversationRepository(
         agentRepository,
         conversationDao,
         repositoryScope,
-        localConversationSource,
-        settingsRepository,
         irohConversationListSource,
         transport,
     )
@@ -254,8 +244,6 @@ open class ConversationRepository(
     override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation {
         val irohSource = irohConversationListSource
         val conversation = when {
-            localConversationSource != null && AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value) ->
-                localConversationSource.createConversation(agentId, summary)
             irohSource?.shouldUseIroh() == true ->
                 irohSource.createConversation(agentId, summary)
             else -> {
@@ -364,10 +352,6 @@ open class ConversationRepository(
     private fun irohRecompileSource(): IrohAdminRpcConversationListSource? =
         irohConversationListSource?.takeIf { it.shouldUseIroh() && it.recompiler.supported }
 
-    /** The embedded runtime (letta-code 0.26.1) has no `conversation_fork`; every other backend forks. */
-    override fun canForkConversations(): Boolean =
-        localConversationSource == null || !AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value)
-
     override suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation =
         forkConversation(id, agentId, throughMessageId = null)
 
@@ -377,9 +361,6 @@ open class ConversationRepository(
      */
     override suspend fun forkConversation(id: ConversationId, agentId: AgentId, throughMessageId: String?): Conversation {
         val request = ConversationForkRequest(id.value, agentId.value, throughMessageId)
-        // letta-mobile-7mys7: the embedded runtime (letta-code 0.26.1) has no conversation_fork, and
-        // its conversations are not on any REST host, so it must not fall through to `/fork`.
-        if (!canForkConversations()) throw BranchUnavailableException(LOCAL_RUNTIME_CANNOT_FORK)
         val irohSource = irohConversationListSource
         val conversation = if (irohSource?.shouldUseIroh() == true) {
             irohSource.forkConversation(request)
@@ -477,8 +458,6 @@ open class ConversationRepository(
 
     private companion object {
         const val TAG = "ConversationRepository"
-        const val LOCAL_RUNTIME_CANNOT_FORK =
-            "The on-device runtime can't fork conversations; connect to a desktop or server host to fork."
     }
 }
 

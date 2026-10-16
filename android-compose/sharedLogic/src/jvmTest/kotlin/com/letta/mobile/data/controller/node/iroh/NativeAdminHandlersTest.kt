@@ -593,7 +593,7 @@ class NativeAdminHandlersTest {
         )
         val payload = Json.parseToJsonElement(response).jsonObject
         assertEquals(true, payload.getValue("success").jsonPrimitive.boolean)
-        assertTrue(payload.getValue("result").jsonArray.isEmpty(), "expected empty array, got: $response")
+        assertTrue(payload.getValue("result").jsonObject.getValue("blocks").jsonArray.isEmpty(), "expected empty page, got: $response")
     }
 
     @Test
@@ -625,8 +625,8 @@ class NativeAdminHandlersTest {
         assertEquals(true, first.getValue("success").jsonPrimitive.boolean)
         assertEquals(true, second.getValue("success").jsonPrimitive.boolean)
 
-        val firstBlocks = first.getValue("result").jsonArray.map { it.jsonObject }
-        val secondBlocks = second.getValue("result").jsonArray.map { it.jsonObject }
+        val firstBlocks = first.getValue("result").jsonObject.getValue("blocks").jsonArray.map { it.jsonObject }
+        val secondBlocks = second.getValue("result").jsonObject.getValue("blocks").jsonArray.map { it.jsonObject }
         assertEquals(listOf(LocalBackendFixtureStore.BLOCK_LABEL), firstBlocks.map { it.getValue("label").jsonPrimitive.content })
         assertEquals(listOf("human-two"), secondBlocks.map { it.getValue("label").jsonPrimitive.content })
         assertTrue(

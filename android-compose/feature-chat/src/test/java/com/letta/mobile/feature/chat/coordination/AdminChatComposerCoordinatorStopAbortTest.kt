@@ -2,15 +2,11 @@ package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BackendKind
-import com.letta.mobile.data.repository.api.IMessageRepository
 import com.letta.mobile.data.repository.api.ISlashCommandRepository
-import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -36,14 +32,11 @@ class AdminChatComposerCoordinatorStopAbortTest {
     private val testScope = TestScope()
     private val composerController = mockk<ChatComposerController>(relaxed = true)
     private val chatSendStrategySelector = mockk<ChatSendStrategySelector>(relaxed = true)
-    private val messageRepository = mockk<IMessageRepository>(relaxed = true)
     private val slashCommandRepository = mockk<ISlashCommandRepository>(relaxed = true)
-    private val sessionManager = mockk<SessionManager>(relaxed = true)
     private val uiState = MutableStateFlow(ChatUiState())
     private lateinit var bannerController: ChatBannerController
     private lateinit var coordinator: AdminChatComposerCoordinator
 
-    private val noopClearThinking: () -> Unit = {}
 
     @Before
     fun setup() {
@@ -51,10 +44,6 @@ class AdminChatComposerCoordinatorStopAbortTest {
         every { composerController.payloadForSend(any()) } answers {
             ComposerSendPayload(text = firstArg(), attachments = emptyList())
         }
-        every { sessionManager.current } returns mockk(relaxed = true) {
-            every { localRuntimeBackend } returns null
-        }
-        coEvery { messageRepository.cancelMessage(any<AgentId>(), any<List<String>>()) } returns emptyMap<String, String>()
         bannerController = ChatBannerController(uiState, composerController)
         coordinator = AdminChatComposerCoordinator(
             scope = testScope,
@@ -65,8 +54,6 @@ class AdminChatComposerCoordinatorStopAbortTest {
             agentId = AgentId("agent_123"),
             explicitConversationId = "conv_123",
             backendKind = { BackendKind.DIRECT_WS },
-            sessionManager = sessionManager,
-            messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,
             isStreaming = { uiState.value.isStreaming },
             projectContextAvailable = true,
@@ -90,7 +77,7 @@ class AdminChatComposerCoordinatorStopAbortTest {
     fun `stop holds streaming and cancelling visible until the terminal frame`() {
         beginStreamingTurn()
 
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
 
         // No optimistic clear: the server turn is still running, so the UI must
         // still read as busy, now explicitly "cancelling".
@@ -99,7 +86,7 @@ class AdminChatComposerCoordinatorStopAbortTest {
         assertTrue(uiState.value.isCancellingRun)
 
         testScope.runCurrent()
-        coVerify { messageRepository.cancelMessage(eq(AgentId("agent_123")), any()) }
+        verify { chatSendStrategySelector.cancel() }
         assertTrue("still cancelling after the abort is dispatched", uiState.value.isCancellingRun)
 
         deliverTerminalFrame()
@@ -113,7 +100,7 @@ class AdminChatComposerCoordinatorStopAbortTest {
     @Test
     fun `send is rejected while a stop is pending so frames cannot interleave`() {
         beginStreamingTurn()
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
         testScope.runCurrent()
 
         // A frame lands between Stop and the terminal — the turn is still alive.
@@ -135,7 +122,7 @@ class AdminChatComposerCoordinatorStopAbortTest {
     @Test
     fun `send is accepted again once the terminal frame settles the cancelled turn`() {
         beginStreamingTurn()
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
         testScope.runCurrent()
         deliverTerminalFrame()
         testScope.runCurrent()
@@ -149,11 +136,11 @@ class AdminChatComposerCoordinatorStopAbortTest {
     @Test
     fun `second stop press force clears locally as the escape hatch`() {
         beginStreamingTurn()
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
         testScope.runCurrent()
         assertTrue(uiState.value.isStreaming)
 
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
 
         assertFalse("second stop press force-clears the local UI", uiState.value.isStreaming)
         assertFalse(uiState.value.isCancelling)
@@ -163,7 +150,7 @@ class AdminChatComposerCoordinatorStopAbortTest {
     @Test
     fun `late frames after the cancelled turn's terminal do not reopen streaming`() {
         beginStreamingTurn()
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
         testScope.runCurrent()
         deliverTerminalFrame()
         testScope.runCurrent()
@@ -180,9 +167,9 @@ class AdminChatComposerCoordinatorStopAbortTest {
     @Test
     fun `a failed abort dispatch falls back to the local clear instead of wedging`() {
         beginStreamingTurn()
-        coEvery { messageRepository.cancelMessage(any<AgentId>(), any<List<String>>()) } throws IllegalStateException("socket down")
+        every { chatSendStrategySelector.cancel() } throws IllegalStateException("socket down")
 
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
         assertTrue(uiState.value.isCancellingRun)
         testScope.runCurrent()
 
@@ -194,11 +181,11 @@ class AdminChatComposerCoordinatorStopAbortTest {
     fun `stop is a no-op when nothing is streaming`() {
         uiState.value = ChatUiState(isStreaming = false)
 
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
         testScope.runCurrent()
 
         assertFalse(uiState.value.isCancelling)
         assertEquals(false, uiState.value.isCancellingRun)
-        coVerify(exactly = 0) { messageRepository.cancelMessage(any<AgentId>(), any<List<String>>()) }
+        verify(exactly = 0) { chatSendStrategySelector.cancel() }
     }
 }

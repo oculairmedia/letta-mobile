@@ -913,14 +913,13 @@ class ChatSendCoordinator(
             }
             is WsTimelineEvent.GoalsUpdated, is WsTimelineEvent.AgentUpdated -> Unit
             is WsTimelineEvent.TurnQueued -> serverQueueMarks.markQueuedOnServer(event)
-            // letta-mobile-bzvro.7: status-line events, like action outcomes, go to the run state only.
-            is WsTimelineEvent.UserActionOutcome, is WsTimelineEvent.RunActivity -> recordRunStateOnly(event)
+            // letta-mobile-bzvro.7: status-line events go to the run state only.
+            is WsTimelineEvent.RunActivity -> recordRunStateOnly(event)
         }
     }
 
-    private fun recordRunStateOnly(event: WsTimelineEvent) {
-        val named = (event as? WsTimelineEvent.RunActivity)?.conversationId
-            ?: (event as? WsTimelineEvent.UserActionOutcome)?.conversationId
+    private fun recordRunStateOnly(event: WsTimelineEvent.RunActivity) {
+        val named = event.conversationId
         runtimeEventBatcher.enqueue(event, resolveConversationId(named) ?: named ?: lastActiveConversationId)
     }
 

@@ -147,7 +147,7 @@ internal class NotebookHistoryArchive(
     /**
      * Finish or undo every move a crash interrupted, whichever step it stopped at: before the index
      * names the new document, the move is undone (unless the new document is already whole, when
-     * it is finished); after, it is finished. Also resolves the same-id restarts of earlier builds.
+     * it is finished); after, it is finished.
      */
     fun recoverInterrupted(index: NotebookDocumentIndex) {
         if (!Files.isDirectory(archiveRoot, NOFOLLOW_LINKS)) return
@@ -184,7 +184,6 @@ internal class NotebookHistoryArchive(
         fun run() {
             // Half-built documents (never journaled, or journaled but never moved in), and temp files.
             entries(directory).filter(::isScratch).forEach(::deleteTree)
-            recoverLegacyRestart()
             entries(directory).filter { it.name.endsWith(SUCCESSOR_SUFFIX) }.sorted().forEach(::resolve)
         }
 
@@ -208,37 +207,6 @@ internal class NotebookHistoryArchive(
                     deleteTree(documentDirectory(successor))
                     Files.delete(journal)
                 }
-            }
-        }
-
-        /**
-         * Earlier builds restarted a history in place: `<stamp>.fresh` (the fresh document, whole) and
-         * `<stamp>.replaced` (the old chunks, moved aside). The document directory is always the whole
-         * old history, the whole fresh snapshot, or absent with the old history in `.replaced`.
-         */
-        private fun recoverLegacyRestart() {
-            val stamps = entries(directory).mapNotNull { legacyStamp(it.name) }.distinct().sorted()
-            stamps.forEach { stamp -> recoverLegacyStamp(directory.resolve("$stamp$LEGACY_FRESH_SUFFIX"), directory.resolve("$stamp$LEGACY_REPLACED_SUFFIX")) }
-        }
-
-        private fun recoverLegacyStamp(fresh: Path, replaced: Path) {
-            val target = documentDirectory(key)
-            val hasFresh = Files.isDirectory(fresh, NOFOLLOW_LINKS)
-            val hasReplaced = Files.isDirectory(replaced, NOFOLLOW_LINKS)
-            when {
-                hasReplaced && chunks(target).isEmpty() -> {
-                    // Moved aside but not replaced (or replaced by an empty directory): finish with
-                    // the fresh document if it is whole, else put the old history back.
-                    deleteTree(target)
-                    Files.createDirectories(target.parent)
-                    Files.move(if (hasFresh) fresh else replaced, target, ATOMIC_MOVE)
-                    deleteTree(replaced)
-                }
-                hasReplaced -> {
-                    deleteTree(replaced)
-                    deleteTree(fresh)
-                }
-                hasFresh -> deleteTree(fresh)
             }
         }
     }
@@ -426,8 +394,6 @@ internal class NotebookHistoryArchive(
         private const val ARCHIVE_SUFFIX = ".automerge.gz"
         private const val SUCCESSOR_SUFFIX = ".successor"
         private const val BUILDING_SUFFIX = ".building"
-        private const val LEGACY_REPLACED_SUFFIX = ".replaced"
-        private const val LEGACY_FRESH_SUFFIX = ".fresh"
         private const val BUFFER_BYTES = 64 * 1024
         private const val ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
@@ -445,13 +411,6 @@ internal class NotebookHistoryArchive(
             }
             bytes.takeWhile { it.toInt() == 0 }.forEach { _ -> out.append(ALPHABET[0]) }
             return out.reverse().toString()
-        }
-
-        /** The stamp of a legacy same-id restart's `.fresh` or `.replaced` entry; null for any other. */
-        private fun legacyStamp(name: String): String? = when {
-            name.endsWith(LEGACY_FRESH_SUFFIX) -> name.removeSuffix(LEGACY_FRESH_SUFFIX)
-            name.endsWith(LEGACY_REPLACED_SUFFIX) -> name.removeSuffix(LEGACY_REPLACED_SUFFIX)
-            else -> null
         }
 
         private fun isTempFile(entry: Path): Boolean = entry.name.startsWith(".") && entry.name.endsWith(".tmp")
