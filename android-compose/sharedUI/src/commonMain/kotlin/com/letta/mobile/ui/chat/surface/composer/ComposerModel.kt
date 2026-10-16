@@ -35,6 +35,12 @@ internal data class ComposerModel(
     val showModel: Boolean get() = capabilities.modelSwitch && composer.model != null
 
     /**
+     * The context chip sits at the right of the keyboard-hint footer under the full page's card
+     * where the platform shows that footer; otherwise it stays in the card's control row.
+     */
+    val contextInHintFooter: Boolean get() = platform.showKeyboardHints && mode != ChatSurfaceMode.Docked
+
+    /**
      * "Open canvas" belongs to the full-screen page of a host that has a canvas: docked, the
      * canvas is already on screen; with no canvas there is nowhere to go.
      */

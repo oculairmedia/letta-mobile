@@ -24,7 +24,7 @@ import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** letta-mobile-bzvro.13 (F13): the permission-mode chip above the composer. */
+/** letta-mobile-bzvro.13 (F13): the permission-mode chip in the composer's control row. */
 class ComposerPermissionModeUiTest {
     private val unrestricted = ChatPermissionModeUiState(selected = AppServerPermissionMode.Unrestricted)
 
