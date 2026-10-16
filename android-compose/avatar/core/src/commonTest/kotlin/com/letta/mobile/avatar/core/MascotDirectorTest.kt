@@ -16,12 +16,12 @@ class MascotDirectorTest {
         var blinks = 0
         var lastListenLevel = 0f
 
-        override fun react(reaction: AvatarReaction, arg: Float) {
+        override fun react(reaction: AvatarReaction, arg: ReactionArg) {
             reactions += reaction
         }
 
-        override fun setListenLevel(level: Float) {
-            lastListenLevel = level
+        override fun setListenLevel(level: ListenLevel) {
+            lastListenLevel = level.value
         }
 
         override fun onPlayGesture(gesture: AvatarGesture, fadeSeconds: Float) {
@@ -238,11 +238,11 @@ class MascotDirectorTest {
             val reactions = mutableListOf<AvatarReaction>()
             var reduced = false
             override val honorsReducedMotion: Boolean get() = true
-            override fun react(reaction: AvatarReaction, arg: Float) {
+            override fun react(reaction: AvatarReaction, arg: ReactionArg) {
                 reactions += reaction
             }
-            override fun setReducedMotion(reduced: Boolean) {
-                this.reduced = reduced
+            override fun setReducedMotion(preference: MotionPreference) {
+                reduced = preference.reduced
             }
         }.also { it.load(AvatarModel(id = "m", displayName = "M", uri = "res://raw/mascot.riv")) }
         val director = MascotDirector(runtime, Random(7))

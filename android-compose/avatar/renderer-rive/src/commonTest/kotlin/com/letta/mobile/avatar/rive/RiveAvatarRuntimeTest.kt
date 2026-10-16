@@ -5,6 +5,12 @@ import com.letta.mobile.avatar.core.AvatarGesture
 import com.letta.mobile.avatar.core.AvatarLookTarget
 import com.letta.mobile.avatar.core.AvatarModel
 import com.letta.mobile.avatar.core.AvatarReaction
+import com.letta.mobile.avatar.core.Hover
+import com.letta.mobile.avatar.core.ListenLevel
+import com.letta.mobile.avatar.core.MascotMotion
+import com.letta.mobile.avatar.core.MotionPreference
+import com.letta.mobile.avatar.core.Petting
+import com.letta.mobile.avatar.core.ReactionArg
 import com.letta.mobile.avatar.core.AvatarRuntimeState
 import com.letta.mobile.avatar.core.AvatarState
 import kotlinx.coroutines.test.runTest
@@ -84,8 +90,8 @@ class RiveAvatarRuntimeTest {
         val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
         sink.writes.clear()
 
-        runtime.react(AvatarReaction.LAND, 3f)
-        runtime.react(AvatarReaction.TRICK, 2f)
+        runtime.react(AvatarReaction.LAND, ReactionArg(3f))
+        runtime.react(AvatarReaction.TRICK, ReactionArg(2f))
         assertEquals(
             listOf<Pair<String, Any>>(
                 RiveAvatarContract.INPUT_IMPACT to 1f,
@@ -103,11 +109,11 @@ class RiveAvatarRuntimeTest {
         val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
         sink.writes.clear()
 
-        runtime.setListenLevel(2f)
-        runtime.setHovered(true)
-        runtime.setPetting(true)
-        runtime.setMotion(8f, -0.5f)
-        runtime.setReducedMotion(true)
+        runtime.setListenLevel(ListenLevel(2f))
+        runtime.setHovered(Hover(over = true))
+        runtime.setPetting(Petting(active = true))
+        runtime.setMotion(MascotMotion(8f, -0.5f))
+        runtime.setReducedMotion(MotionPreference(reduced = true))
         assertEquals(
             listOf<Pair<String, Any>>(
                 RiveAvatarContract.INPUT_LISTEN_LEVEL to 1f,
@@ -131,10 +137,10 @@ class RiveAvatarRuntimeTest {
         sink.writes.clear()
 
         AvatarReaction.entries.forEach { runtime.react(it) }
-        runtime.setListenLevel(1f)
-        runtime.setHovered(true)
-        runtime.setMotion(1f, 1f)
-        runtime.setReducedMotion(true)
+        runtime.setListenLevel(ListenLevel(1f))
+        runtime.setHovered(Hover(over = true))
+        runtime.setMotion(MascotMotion(1f, 1f))
+        runtime.setReducedMotion(MotionPreference(reduced = true))
         assertEquals(emptyList(), sink.writes)
         assertEquals(false, runtime.honorsReducedMotion, "the director will blink instead")
         assertEquals(false, runtime.carriesBody, "the layer keeps deforming the drawing")

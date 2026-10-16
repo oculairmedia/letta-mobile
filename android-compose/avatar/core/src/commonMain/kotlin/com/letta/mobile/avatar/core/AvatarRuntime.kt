@@ -76,19 +76,19 @@ interface AvatarRuntime {
      * (LAND's impact, TRICK's id). A renderer whose asset has no animation for it plays its
      * fallback or nothing. Default no-op so renderers opt in.
      */
-    fun react(reaction: AvatarReaction, arg: Float = 0f) {}
+    fun react(reaction: AvatarReaction, arg: ReactionArg = ReactionArg.NONE) {}
 
-    /** How intently the mascot listens, 0..1 (the user's typing cadence while LISTENING). Default no-op. */
-    fun setListenLevel(level: Float) {}
+    /** How intently the mascot listens (the user's typing cadence while LISTENING). Default no-op. */
+    fun setListenLevel(level: ListenLevel) {}
 
-    /** The pointer is over the mascot. Default no-op. */
-    fun setHovered(hovered: Boolean) {}
+    /** Whether the pointer is over the mascot. Default no-op. */
+    fun setHovered(hover: Hover) {}
 
-    /** The user is petting the mascot. Default no-op. */
-    fun setPetting(petting: Boolean) {}
+    /** Whether the user is petting the mascot. Default no-op. */
+    fun setPetting(petting: Petting) {}
 
-    /** The mascot's own travel / drag velocity through the window, -1..1 on each axis. Default no-op. */
-    fun setMotion(vx: Float, vy: Float) {}
+    /** The mascot's own travel / drag velocity through the window. Default no-op. */
+    fun setMotion(motion: MascotMotion) {}
 
     /**
      * True when the asset squashes, stretches and leans itself from [setMotion] and LAND, so the
@@ -97,7 +97,7 @@ interface AvatarRuntime {
     val carriesBody: Boolean get() = false
 
     /** The platform asked for reduced motion; the asset holds still poses. Default no-op. */
-    fun setReducedMotion(reduced: Boolean) {}
+    fun setReducedMotion(preference: MotionPreference) {}
 
     /**
      * True when the asset calms its own reactions under [setReducedMotion]. When false the

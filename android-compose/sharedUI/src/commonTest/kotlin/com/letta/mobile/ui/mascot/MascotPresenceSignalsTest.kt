@@ -1,12 +1,6 @@
 package com.letta.mobile.ui.mascot
 
-import com.letta.mobile.avatar.core.AvatarExpression
-import com.letta.mobile.avatar.core.AvatarGesture
-import com.letta.mobile.avatar.core.AvatarLookTarget
-import com.letta.mobile.avatar.core.AvatarModel
 import com.letta.mobile.avatar.core.AvatarReaction
-import com.letta.mobile.avatar.core.AvatarRuntime
-import com.letta.mobile.avatar.core.AvatarRuntimeState
 import com.letta.mobile.avatar.core.AvatarState
 import com.letta.mobile.avatar.core.GazePose
 import com.letta.mobile.avatar.core.GazeTarget
@@ -16,6 +10,7 @@ import com.letta.mobile.avatar.core.MascotDirector
 import com.letta.mobile.avatar.core.MascotEvent
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.avatar.core.MascotShape
+import com.letta.mobile.avatar.core.ReactionArg
 import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.AgentPresence
 import com.letta.mobile.data.presence.ConversationRunPhasePublisher
@@ -30,8 +25,6 @@ import com.letta.mobile.runtime.ToolApprovalRequest
 import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,27 +37,15 @@ import kotlin.test.assertTrue
  */
 class MascotPresenceSignalsTest {
     /**
-     * Records the reactions and nothing else. Never loaded: this module's common tests also run on
-     * wasm, which has no coroutine test runner, and the director drives a runtime whatever its state.
+     * Records the reactions. Never loaded: this module's common tests also run on wasm, which has
+     * no coroutine test runner, and reactions reach a runtime whatever its load state.
      */
-    private class RecordingRuntime : AvatarRuntime {
+    private class RecordingRuntime : HeadlessAvatarRuntime() {
         val reactions = mutableListOf<AvatarReaction>()
-        override val state: StateFlow<AvatarRuntimeState> = MutableStateFlow(AvatarRuntimeState.Idle)
 
-        override fun react(reaction: AvatarReaction, arg: Float) {
+        override fun react(reaction: AvatarReaction, arg: ReactionArg) {
             reactions += reaction
         }
-
-        override suspend fun load(model: AvatarModel) = Unit
-        override suspend fun unload() = Unit
-        override fun setExpression(expression: AvatarExpression, weight: Float) = Unit
-        override fun setMouthOpen(value: Float) = Unit
-        override fun setLookTarget(target: AvatarLookTarget?) = Unit
-        override fun playGesture(gesture: AvatarGesture, fadeSeconds: Float) = Unit
-        override fun playAnimation(animationId: String, loop: Boolean) = Unit
-        override fun setAccessoryEnabled(accessoryId: String, enabled: Boolean) = Unit
-        override fun update(deltaSeconds: Float) = Unit
-        override fun dispose() = Unit
     }
 
     private class Rig(val runtime: RecordingRuntime) {
@@ -83,8 +64,8 @@ class MascotPresenceSignalsTest {
         fun present(presence: AgentPresence) = feed.apply(director, presence)
 
         /** Publish [events] the way a platform does, then hand the shell's sample to the director. */
-        fun publish(vararg events: RuntimeEventPayload, conversation: String = "c1") {
-            events.forEach { publisher.onEvent(RunScope(conversation, AGENT), it) }
+        fun publish(vararg events: RuntimeEventPayload) {
+            events.forEach { publisher.onEvent(SCOPE, it) }
             sample()
         }
 
@@ -93,9 +74,12 @@ class MascotPresenceSignalsTest {
 
     private fun rig(): Rig = Rig(RecordingRuntime())
 
-    private fun send(id: String) = RuntimeEventPayload.LocalUserAppend(id, "hi")
-    private fun toolCall(id: String) = RuntimeEventPayload.ToolCallObserved(ToolCallId(id), ToolName("grep"))
-    private fun toolReturn(id: String) = RuntimeEventPayload.ToolReturnObserved(ToolCallId(id), ToolExecutionStatus.Succeeded, "ok")
+    private var sends = 0
+
+    /** A fresh local send, numbered like the composer numbers them. */
+    private fun send() = RuntimeEventPayload.LocalUserAppend("l${++sends}", "hi")
+    private fun toolCall(id: ToolCallId) = RuntimeEventPayload.ToolCallObserved(id, ToolName("grep"))
+    private fun toolReturn(id: ToolCallId) = RuntimeEventPayload.ToolReturnObserved(id, ToolExecutionStatus.Succeeded, "ok")
     private fun lifecycle(status: RuntimeRunStatus) = RuntimeEventPayload.RunLifecycleChanged(status)
     private fun assistant() = RuntimeEventPayload.RemoteStreamFrame(frameId = "f", messageType = "assistant_message", body = "")
 
@@ -103,9 +87,9 @@ class MascotPresenceSignalsTest {
     fun anAndroidShapedTurnSendsWorksSpeaksAndSucceeds() {
         // Android folds each event batch and the shell samples the registry after it.
         val rig = rig()
-        rig.publish(send("l1"), lifecycle(RuntimeRunStatus.Started))
-        rig.publish(toolCall("t1"))
-        rig.publish(toolReturn("t1"))
+        rig.publish(send(), lifecycle(RuntimeRunStatus.Started))
+        rig.publish(toolCall(TOOL))
+        rig.publish(toolReturn(TOOL))
         rig.director.tick(2f) // past the working dwell
         rig.publish(assistant())
         rig.publish(lifecycle(RuntimeRunStatus.Completed))
@@ -130,13 +114,13 @@ class MascotPresenceSignalsTest {
     fun aDesktopShapedConflatedSampleStillSeesEveryFinish() {
         // Desktop's shell reads a conflated state flow: two whole turns can land between samples.
         val rig = rig()
-        rig.publisher.onEvent(RunScope("c1", AGENT), send("l1"))
-        rig.publisher.onEvent(RunScope("c1", AGENT), lifecycle(RuntimeRunStatus.Completed))
+        rig.publisher.onEvent(SCOPE, send())
+        rig.publisher.onEvent(SCOPE, lifecycle(RuntimeRunStatus.Completed))
         rig.sample()
         rig.director.tick(0.3f)
-        rig.publisher.onEvent(RunScope("c1", AGENT), send("l2"))
-        rig.publisher.onEvent(RunScope("c1", AGENT), lifecycle(RuntimeRunStatus.Completed))
-        rig.publisher.onEvent(RunScope("c1", AGENT), send("l3"))
+        rig.publisher.onEvent(SCOPE, send())
+        rig.publisher.onEvent(SCOPE, lifecycle(RuntimeRunStatus.Completed))
+        rig.publisher.onEvent(SCOPE, send())
         rig.sample()
         val finishes = rig.runtime.reactions.count { it == AvatarReaction.RUN_DONE }
         assertEquals(2, finishes, "back-to-back finishes both play: ${rig.runtime.reactions}")
@@ -149,7 +133,7 @@ class MascotPresenceSignalsTest {
         val rig = rig()
         val request = ToolApprovalRequest(ToolApprovalId("ap-1"), ToolCallId("t1"), ToolName("Bash"), "ls")
         val ask = RuntimeEventPayload.ApprovalRequested(request)
-        rig.publish(send("l1"))
+        rig.publish(send())
         rig.publish(ask)
         rig.publish(ask)
         assertEquals(AvatarState.WAITING_INPUT, rig.director.state)
@@ -159,11 +143,11 @@ class MascotPresenceSignalsTest {
     @Test
     fun aFailureFlashesOnceAndStaysThroughTyping() {
         val rig = rig()
-        rig.publish(send("l1"))
+        rig.publish(send())
         rig.publish(lifecycle(RuntimeRunStatus.Failed))
-        rig.publisher.setUserTyping(RunScope("c1", AGENT), true)
+        rig.publisher.setUserTyping(SCOPE, true)
         rig.sample()
-        rig.publisher.setUserTyping(RunScope("c1", AGENT), false)
+        rig.publisher.setUserTyping(SCOPE, false)
         rig.sample()
         assertEquals(AvatarState.ERROR, rig.director.state, "typing must not clear a failure that still stands")
         assertEquals(1, rig.runtime.reactions.count { it == AvatarReaction.RUN_FAILED })
@@ -173,7 +157,7 @@ class MascotPresenceSignalsTest {
     @Test
     fun aCancelEndsTheTurnWithoutASuccess() {
         val rig = rig()
-        rig.publish(send("l1"))
+        rig.publish(send())
         rig.publish(lifecycle(RuntimeRunStatus.Cancelled))
         assertTrue(AvatarReaction.RUN_DONE !in rig.runtime.reactions)
         assertTrue(AvatarState.SUCCESS !in rig.entered)
@@ -271,6 +255,8 @@ class MascotPresenceSignalsTest {
 
     private companion object {
         const val AGENT = "a1"
+        val SCOPE = RunScope("c1", AGENT)
+        val TOOL = ToolCallId("t1")
         val IDENTITY = MascotIdentity(MascotShape.entries.first(), 0xFF00AA88.toInt())
     }
 }

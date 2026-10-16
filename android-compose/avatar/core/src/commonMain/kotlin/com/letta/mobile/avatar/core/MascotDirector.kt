@@ -116,7 +116,7 @@ class MascotDirector(
         signals = next
         if (next.reduceMotion != previous.reduceMotion) {
             frame.reduceMotion = next.reduceMotion
-            runtime.setReducedMotion(next.reduceMotion)
+            runtime.setReducedMotion(MotionPreference(next.reduceMotion))
         }
         avatar.batch {
             if (next.error != previous.error) setFailed(next.error)
@@ -162,22 +162,22 @@ class MascotDirector(
             is MascotEvent.Petting -> {
                 if (event.active) wakeIfAsleep()
                 frame.petting = event.active
-                runtime.setPetting(event.active)
+                runtime.setPetting(Petting(event.active))
             }
             MascotEvent.DragStarted -> avatar.setDragged(true)
             is MascotEvent.DragEnded -> {
                 avatar.setDragged(false)
                 setMotion(0f, 0f)
-                fire(AvatarReaction.LAND, event.impact.coerceIn(0f, 1f))
+                fire(AvatarReaction.LAND, ReactionArg(event.impact.coerceIn(0f, 1f)))
             }
-            is MascotEvent.Landed -> fire(AvatarReaction.LAND, event.impact.coerceIn(0f, 1f))
+            is MascotEvent.Landed -> fire(AvatarReaction.LAND, ReactionArg(event.impact.coerceIn(0f, 1f)))
             is MascotEvent.DoubleTap -> {
                 wakeIfAsleep()
-                fire(AvatarReaction.TRICK, event.trick.toFloat())
+                fire(AvatarReaction.TRICK, ReactionArg(event.trick.toFloat()))
             }
             is MascotEvent.Hover -> {
                 frame.hovered = event.hovered
-                runtime.setHovered(event.hovered)
+                runtime.setHovered(Hover(event.hovered))
             }
             else -> Unit
         }
@@ -185,8 +185,7 @@ class MascotDirector(
 
     /**
      * The host-measured travel / drag velocity, -1..1 on each axis (te3n1.3's MascotBody motion).
-     * Allocation-free, so a host can write it every frame the body moves; reduced motion holds the
-     * body still, so it writes zero.
+     * Written to the runtime only when it changes; reduced motion holds the body still, so it writes zero.
      */
     fun setMotion(vx: Float, vy: Float) {
         val x = if (signals.reduceMotion || vx.isNaN()) 0f else vx.coerceIn(-1f, 1f)
@@ -194,7 +193,7 @@ class MascotDirector(
         if (x == frame.motionX && y == frame.motionY) return
         frame.motionX = x
         frame.motionY = y
-        runtime.setMotion(x, y)
+        runtime.setMotion(MascotMotion(x, y))
     }
 
     /** The composer's running keystroke count (any surface's; only an agent being typed to listens). */
@@ -240,7 +239,7 @@ class MascotDirector(
         val threshold = if (listenLevel == 0f) 0f else LEVEL_EPSILON
         if (abs(listenLevel - listenLevelSent) > threshold) {
             listenLevelSent = listenLevel
-            runtime.setListenLevel(listenLevel)
+            runtime.setListenLevel(ListenLevel(listenLevel))
         }
     }
 
@@ -266,7 +265,7 @@ class MascotDirector(
     }
 
     /** Fire [reaction] unless it is cooling down; reduced motion on an asset that cannot calm itself plays a blink. */
-    private fun fire(reaction: AvatarReaction, arg: Float = 0f) {
+    private fun fire(reaction: AvatarReaction, arg: ReactionArg = ReactionArg.NONE) {
         if (clock - lastFired[reaction.ordinal] < config.cooldownOf(reaction)) return
         lastFired[reaction.ordinal] = clock
         pending.add(reaction)

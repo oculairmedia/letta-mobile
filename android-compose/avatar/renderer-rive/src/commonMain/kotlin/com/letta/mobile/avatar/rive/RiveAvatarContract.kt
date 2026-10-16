@@ -170,6 +170,32 @@ object RiveAvatarContract {
     }
 }
 
+/** The optional host-written te3n1.5 inputs, typed so the renderer only ever names one the contract has. */
+enum class RiveHostInput {
+    REDUCE_MOTION,
+    PETTING,
+    HOVERED,
+    LISTEN_LEVEL,
+    MOVE_X,
+    MOVE_Y,
+    IMPACT,
+    TRICK_ID,
+    ;
+
+    /** The view-model property this input writes. */
+    val key: String
+        get() = when (this) {
+            REDUCE_MOTION -> RiveAvatarContract.INPUT_REDUCE_MOTION
+            PETTING -> RiveAvatarContract.INPUT_PETTING
+            HOVERED -> RiveAvatarContract.INPUT_HOVERED
+            LISTEN_LEVEL -> RiveAvatarContract.INPUT_LISTEN_LEVEL
+            MOVE_X -> RiveAvatarContract.INPUT_MOVE_X
+            MOVE_Y -> RiveAvatarContract.INPUT_MOVE_Y
+            IMPACT -> RiveAvatarContract.INPUT_IMPACT
+            TRICK_ID -> RiveAvatarContract.INPUT_TRICK_ID
+        }
+}
+
 /**
  * What the loaded `.riv` plays beyond the base contract (letta-mobile-te3n1.1): the reactions it
  * has a trigger for, the reactions it answers with a blink for want of its own animation, and the
@@ -186,18 +212,18 @@ data class RiveMascotCapabilities(
     /** Reactions the file has no animation for that read well as a blink. */
     val blinkFallback: Set<AvatarReaction> = emptySet(),
     /** Optional host inputs the file reads ([RiveAvatarContract.INPUT_REDUCE_MOTION] and friends). */
-    val inputs: Set<String> = emptySet(),
+    val inputs: Set<RiveHostInput> = emptySet(),
 ) {
     /** The file calms itself under reduced motion, so reactions need not shrink on the host side. */
-    val honorsReducedMotion: Boolean get() = RiveAvatarContract.INPUT_REDUCE_MOTION in inputs
+    val honorsReducedMotion: Boolean get() = RiveHostInput.REDUCE_MOTION in inputs
 
     /** The file squashes, stretches and leans itself from the travel inputs and its landing trigger. */
     val carriesBody: Boolean
-        get() = RiveAvatarContract.INPUT_MOVE_X in inputs &&
-            RiveAvatarContract.INPUT_MOVE_Y in inputs &&
-            AvatarReaction.LAND in reactionTriggers
+        get() = inputs.containsAll(BODY_INPUTS) && AvatarReaction.LAND in reactionTriggers
 
     companion object {
+        private val BODY_INPUTS = setOf(RiveHostInput.MOVE_X, RiveHostInput.MOVE_Y)
+
         /**
          * The mascot.riv shipped with the te3n1.5 rig: every reaction has its own trigger except an
          * approval ask, whose sustained waitingInput state says it and which gets a blink as its beat.
@@ -217,16 +243,7 @@ data class RiveMascotCapabilities(
                 AvatarReaction.TRICK to RiveAvatarContract.TRIGGER_TRICK,
             ),
             blinkFallback = setOf(AvatarReaction.APPROVAL_ASK),
-            inputs = setOf(
-                RiveAvatarContract.INPUT_REDUCE_MOTION,
-                RiveAvatarContract.INPUT_PETTING,
-                RiveAvatarContract.INPUT_HOVERED,
-                RiveAvatarContract.INPUT_LISTEN_LEVEL,
-                RiveAvatarContract.INPUT_MOVE_X,
-                RiveAvatarContract.INPUT_MOVE_Y,
-                RiveAvatarContract.INPUT_IMPACT,
-                RiveAvatarContract.INPUT_TRICK_ID,
-            ),
+            inputs = RiveHostInput.entries.toSet(),
         )
     }
 }

@@ -8,6 +8,12 @@ import com.letta.mobile.avatar.core.AvatarHeadTurn
 import com.letta.mobile.avatar.core.AvatarLookTarget
 import com.letta.mobile.avatar.core.AvatarModel
 import com.letta.mobile.avatar.core.AvatarReaction
+import com.letta.mobile.avatar.core.Hover
+import com.letta.mobile.avatar.core.ListenLevel
+import com.letta.mobile.avatar.core.MascotMotion
+import com.letta.mobile.avatar.core.MotionPreference
+import com.letta.mobile.avatar.core.Petting
+import com.letta.mobile.avatar.core.ReactionArg
 import com.letta.mobile.avatar.core.AvatarRuntime
 import com.letta.mobile.avatar.core.AvatarRuntimeState
 import com.letta.mobile.avatar.core.AvatarState
@@ -155,42 +161,52 @@ class RiveAvatarRuntime(
      * A one-shot, as far as the loaded file can play it ([rig]): its own trigger, else a blink,
      * else nothing - never a name the file does not declare.
      */
-    override fun react(reaction: AvatarReaction, arg: Float) {
+    override fun react(reaction: AvatarReaction, arg: ReactionArg) {
         if (!ready()) return
         val trigger = rig.reactionTriggers[reaction]
         when {
             trigger != null -> {
-                // The argument rides on its own input, written before the trigger reads it.
-                when (reaction) {
-                    AvatarReaction.LAND -> optional(IMPACT)?.setNumber(IMPACT, arg.coerceIn(0f, 1f))
-                    AvatarReaction.TRICK -> optional(TRICK_ID)?.setNumber(TRICK_ID, arg.coerceIn(0f, MAX_TRICK_ID))
-                    else -> Unit
-                }
+                writeArgument(reaction, arg)
                 sink.fire(trigger)
             }
             reaction in rig.blinkFallback -> sink.fire(RiveAvatarContract.TRIGGER_BLINK)
         }
     }
 
-    override fun setListenLevel(level: Float) {
-        optional(LISTEN_LEVEL)?.setNumber(LISTEN_LEVEL, level.coerceIn(0f, 1f))
+    /** The argument rides on its own input, written before the trigger reads it. */
+    private fun writeArgument(reaction: AvatarReaction, arg: ReactionArg) {
+        when (reaction) {
+            AvatarReaction.LAND -> {
+                val impact = arg.value.coerceIn(0f, 1f)
+                optional(RiveHostInput.IMPACT)?.setNumber(RiveHostInput.IMPACT.key, impact)
+            }
+            AvatarReaction.TRICK -> {
+                val trick = arg.value.coerceIn(0f, MAX_TRICK_ID)
+                optional(RiveHostInput.TRICK_ID)?.setNumber(RiveHostInput.TRICK_ID.key, trick)
+            }
+            else -> Unit
+        }
     }
 
-    override fun setHovered(hovered: Boolean) {
-        optional(HOVERED)?.setBoolean(HOVERED, hovered)
+    override fun setListenLevel(level: ListenLevel) {
+        optional(RiveHostInput.LISTEN_LEVEL)?.setNumber(RiveHostInput.LISTEN_LEVEL.key, level.value.coerceIn(0f, 1f))
     }
 
-    override fun setPetting(petting: Boolean) {
-        optional(PETTING)?.setBoolean(PETTING, petting)
+    override fun setHovered(hover: Hover) {
+        optional(RiveHostInput.HOVERED)?.setBoolean(RiveHostInput.HOVERED.key, hover.over)
     }
 
-    override fun setMotion(vx: Float, vy: Float) {
-        optional(MOVE_X)?.setNumber(MOVE_X, vx.coerceIn(-1f, 1f))
-        optional(MOVE_Y)?.setNumber(MOVE_Y, vy.coerceIn(-1f, 1f))
+    override fun setPetting(petting: Petting) {
+        optional(RiveHostInput.PETTING)?.setBoolean(RiveHostInput.PETTING.key, petting.active)
     }
 
-    override fun setReducedMotion(reduced: Boolean) {
-        optional(REDUCE_MOTION)?.setBoolean(REDUCE_MOTION, reduced)
+    override fun setMotion(motion: MascotMotion) {
+        optional(RiveHostInput.MOVE_X)?.setNumber(RiveHostInput.MOVE_X.key, motion.x.coerceIn(-1f, 1f))
+        optional(RiveHostInput.MOVE_Y)?.setNumber(RiveHostInput.MOVE_Y.key, motion.y.coerceIn(-1f, 1f))
+    }
+
+    override fun setReducedMotion(preference: MotionPreference) {
+        optional(RiveHostInput.REDUCE_MOTION)?.setBoolean(RiveHostInput.REDUCE_MOTION.key, preference.reduced)
     }
 
     override val honorsReducedMotion: Boolean get() = rig.honorsReducedMotion
@@ -198,7 +214,7 @@ class RiveAvatarRuntime(
     override val carriesBody: Boolean get() = rig.carriesBody
 
     /** The sink for an optional te3n1.5 input, or null when the loaded file does not declare it. */
-    private fun optional(input: String): RiveInputSink? = sink.takeIf { ready() && input in rig.inputs }
+    private fun optional(input: RiveHostInput): RiveInputSink? = sink.takeIf { ready() && input in rig.inputs }
 
     private fun ready(): Boolean = !disposed && _state.value is AvatarRuntimeState.Ready
 
@@ -208,15 +224,6 @@ class RiveAvatarRuntime(
 
         /** The highest trick id the rig plays (rig/contract.py `trickId` 0..3). */
         private const val MAX_TRICK_ID = 3f
-
-        private const val IMPACT = RiveAvatarContract.INPUT_IMPACT
-        private const val TRICK_ID = RiveAvatarContract.INPUT_TRICK_ID
-        private const val LISTEN_LEVEL = RiveAvatarContract.INPUT_LISTEN_LEVEL
-        private const val HOVERED = RiveAvatarContract.INPUT_HOVERED
-        private const val PETTING = RiveAvatarContract.INPUT_PETTING
-        private const val MOVE_X = RiveAvatarContract.INPUT_MOVE_X
-        private const val MOVE_Y = RiveAvatarContract.INPUT_MOVE_Y
-        private const val REDUCE_MOTION = RiveAvatarContract.INPUT_REDUCE_MOTION
 
         /**
          * What a flat mascot can actually do: expressions and gaze are state-machine inputs, so
