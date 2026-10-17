@@ -152,10 +152,14 @@ private fun HeaderSearchAffordance(search: SearchSlot?, mode: HeaderSearchMode, 
 @Composable
 private fun RowScope.HeaderContent(title: HeaderTitle, controls: HeaderControls, searchAffordance: @Composable () -> Unit) {
     HeaderNavSlot(controls.nav)
-    HeaderTitleSlot(title)
-    if (title !is HeaderTitle.Custom || !title.fill) {
-        // The free width: on desktop this is the window's drag lane.
-        Box(Modifier.weight(1f).fillMaxHeight())
+    if (title is HeaderTitle.Custom && title.fill) {
+        HeaderTitleSlot(title)
+    } else {
+        // The title at the start of the free width, so the search and actions sit at the end; on
+        // desktop the free width is the window's drag lane.
+        Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.CenterStart) {
+            Row(verticalAlignment = Alignment.CenterVertically) { HeaderTitleSlot(title) }
+        }
     }
     searchAffordance()
     controls.actions.forEach { action -> HeaderActionSlot(action) }
