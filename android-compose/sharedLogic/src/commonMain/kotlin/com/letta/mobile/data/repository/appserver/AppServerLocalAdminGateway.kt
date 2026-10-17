@@ -35,7 +35,8 @@ class AppServerLocalAdminGateway(
             AppServerCommand.ConversationList(
                 requestId = requestId(Operation.ConversationList.requestName),
                 query = buildJsonObject {
-                    put("limit", limit.toString())
+                    // A number: letta-code's local store ignores a string limit and returns 20.
+                    put("limit", limit)
                     archiveStatus?.let { put("archive_status", it) }
                     put("order", "desc")
                     put("order_by", "last_message_at")
@@ -89,7 +90,7 @@ class AppServerLocalAdminGateway(
                 requestId = requestId(Operation.MessageList.requestName),
                 conversationId = conversationId,
                 query = buildJsonObject {
-                    query.limit?.let { put("limit", it.toString()) }
+                    query.limit?.let { put("limit", it) }
                     query.after?.let { put("after", it) }
                     query.before?.let { put("before", it) }
                     query.order?.let { put("order", it) }

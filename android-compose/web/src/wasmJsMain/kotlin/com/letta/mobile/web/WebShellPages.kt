@@ -8,6 +8,13 @@ import com.letta.mobile.data.plugin.catalog.UnavailablePluginCatalog
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.ui.chat.session.TimelineSubagentViewSessions
+import com.letta.mobile.ui.chat.subagents.SubagentDualViewBinding
+import com.letta.mobile.ui.chat.subagents.rememberSubagentDualViewHolder
+import com.letta.mobile.ui.chat.subagents.withSubagentDualView
+import com.letta.mobile.ui.shell.workspace.ShellChatLook
+import androidx.compose.runtime.Composable
 import com.letta.mobile.ui.chat.surface.rememberChatDockGeometry
 import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
 import com.letta.mobile.ui.settings.BackendConnectionStatusRow
@@ -143,7 +150,13 @@ private fun webChatPage(shell: WebShell, page: WebPageInputs, ready: WebChatLoad
     val port = ready.port
     val target = port.target
     val agentNames = shell.backend.roster.toMap()
-    val host = remember(agentNames, shell) { ChatSurfaceHost(resolveAgentName = agentNames::get, openAgentPane = shell::showNavigation) }
+    // letta-mobile-zxk2n.8: a subagent's conversation opens in the dual view over the gateway's session.
+    val subagentViews = rememberWebSubagentViews(page, ConversationId(target.conversationId))
+    val host = remember(agentNames, shell, subagentViews) {
+        val base = ChatSurfaceHost(resolveAgentName = agentNames::get, openAgentPane = shell::showNavigation)
+        // The web keeps no subagent registry: a row opens the child agent it names, in its default conversation.
+        base.withSubagentDualView(subagentViews.holder) { emptyList() }
+    }
     ShellChatDestination(
         page = ShellChatPage(
             port = port,
@@ -154,7 +167,16 @@ private fun webChatPage(shell: WebShell, page: WebPageInputs, ready: WebChatLoad
         ),
         presentation = rememberShellChatPresentation(page.canvas.openOnCanvas, session = port),
         modifier = modifier,
+        look = ShellChatLook(subagentViews = subagentViews),
     )
+}
+
+/** The conversation's subagent dual view, closed again for each conversation. */
+@Composable
+private fun rememberWebSubagentViews(page: WebPageInputs, conversation: ConversationId): SubagentDualViewBinding {
+    val holder = rememberSubagentDualViewHolder(conversation)
+    val gateway = page.session.services.gateway
+    return remember(holder, gateway) { SubagentDualViewBinding(holder, TimelineSubagentViewSessions(gateway::subagentTimeline)) }
 }
 
 /** A conversation that has not opened: the connection and the way on. */

@@ -5,9 +5,11 @@ import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.subagents.SubagentView
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.data.timeline.TimelineTransport
+import com.letta.mobile.ui.chat.session.SubagentTimelineRoute
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 
@@ -119,9 +121,22 @@ private data class DesktopTimelineRouting(
 private fun resolveDesktopTimelineRouting(
     gateway: DesktopChatGateway,
     conversation: DesktopConversationSummary,
+): DesktopTimelineRouting = resolveDesktopTimelineRouting(gateway, ConversationId(conversation.id), conversation.agentId?.let(::AgentId))
+
+/**
+ * letta-mobile-ulcg6.1: where a subagent's conversation is read for the dual view, routed the way a
+ * selected conversation is (a `conv-default-<agentId>` child goes through the default-shim transport).
+ */
+internal fun desktopSubagentTimelineRoute(gateway: DesktopChatGateway, view: SubagentView): SubagentTimelineRoute {
+    val routing = resolveDesktopTimelineRouting(gateway, view.conversationId, view.agentId)
+    return SubagentTimelineRoute(routing.transport, routing.loopConversationId)
+}
+
+private fun resolveDesktopTimelineRouting(
+    gateway: DesktopChatGateway,
+    conversationId: ConversationId,
+    agentId: AgentId?,
 ): DesktopTimelineRouting {
-    val conversationId = ConversationId(conversation.id)
-    val agentId = conversation.agentId?.let(::AgentId)
     val usesDefaultShim = conversationId.value.isDefaultShimConversationId() && agentId != null
     return if (usesDefaultShim) {
         defaultShimRouting(gateway, conversationId, agentId!!)

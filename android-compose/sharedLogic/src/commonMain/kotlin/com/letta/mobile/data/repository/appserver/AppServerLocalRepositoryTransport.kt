@@ -43,8 +43,10 @@ class DefaultAppServerLocalRepositoryTransport(
             AppServerCommand.AgentList(
                 requestId = requestId("agent-list"),
                 query = buildJsonObject {
-                    put("limit", "10000")
-                    put("offset", "0")
+                    // Numbers: letta-code's local store reads `limit` only as a number (letta.js
+                    // 0.34.14:110688); the old "10000" string silently capped the roster at 20.
+                    put("limit", AGENT_LIST_LIMIT)
+                    put("offset", 0)
                 },
             ),
         )
@@ -147,6 +149,7 @@ class DefaultAppServerLocalRepositoryTransport(
 
     private companion object {
         const val BLOCK_LIST_PAGE_SIZE = 50
+        const val AGENT_LIST_LIMIT = 10_000
         const val BLOCK_LIST_MAX_PAGES = 100
     }
 }

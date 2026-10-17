@@ -213,7 +213,6 @@ internal class AdminChatViewModel @Inject constructor(
      */
     val selfTodoSource: SelfTodoSource =
         WsSelfTodoSource(selfTodoRepository)
-
     private val initialAgentName: String? = routeArgs.initialAgentName
     private val initialMessage: String? = routeArgs.initialMessage
     // letta-mobile-aw0dv: the display mode the route asked to open in (e.g.

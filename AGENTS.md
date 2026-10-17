@@ -592,11 +592,10 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
   **`@letta-ai/letta-code@0.34.14`** (`letta-code-runtime/letta-code-runtime.properties`), which
   is the wire contract (`app-server-v2-contract-matrix.json` `baseline.version`), the desktop's
   bundled runtime, the Android embedded runtime and what the `appserver-contract-baseline` CI job
-  installs; `LettaCodeVersionPinsTest` fails if they disagree. Not the contract: the Linux host
-  still runs **`0.33.6`** until redeployed (the client must keep working against it: never
-  require a 0.34-only field, gate 0.34-only commands on an advertised capability); the
-  restart-replay evidence is still the older **`0.29.12`** capture (it needs a live server +
-  model provider to re-capture). The Android embedded runtime ships in the
+  installs; `LettaCodeVersionPinsTest` fails if they disagree. The Linux host also runs
+  **`0.34.14`** (the client still must not require a 0.34-only field of an older server: gate
+  0.34-only commands on an advertised capability); the restart-replay evidence was re-captured
+  at **`0.34.14`** on 2026-10-17 (it needs a live server + model provider to re-capture). The Android embedded runtime ships in the
   `full` release APK only (nodejs-mobile Node 18 plus the `node18-compat.cjs` preload, arm64-v8a
   only; since letta-mobile-by4vm.110.6 it is a loopback `letta server` the app dials over ws://
   through the same channel as an Iroh host, with admin_rpc answered in process; the `lite` APK has

@@ -40,7 +40,7 @@ export JAVA_HOME="/usr/lib/jvm/jdk-26"      # CI parity
 
 To iterate on the phone UI from a desktop (`:desktop:runPhone`, `:desktop:runPhonePlayground`, hot reload), see `docs/development/phone-preview.md`.
 
-For App Server contract work, also provision Node `v24.18.0` and the contract `@letta-ai/letta-code@0.34.14`; restart-replay evidence is still the 0.29.12 capture (see the App Server section of `AGENTS.md`). Anything "verified against a 0.33/0.34 server" is desktop/remote-only, never the embedded Android runtime.
+For App Server contract work, also provision Node `v24.18.0` and the contract `@letta-ai/letta-code@0.34.14`; restart-replay evidence was re-captured at 0.34.14 on 2026-10-17 (see the App Server section of `AGENTS.md`). Anything "verified against a 0.33/0.34 server" is desktop/remote-only, never the embedded Android runtime.
 
 ---
 

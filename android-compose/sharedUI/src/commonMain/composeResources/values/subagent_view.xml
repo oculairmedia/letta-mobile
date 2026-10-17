@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- letta-mobile-zxk2n.8: the subagent dual view and its read-only composer. -->
+    <string name="subagent_view_read_only">Viewing a subagent. Reply in the parent conversation.</string>
+    <string name="subagent_view_strip">Open subagent conversations</string>
+    <string name="subagent_view_parent_tab">Parent</string>
+    <string name="subagent_view_tab_subagent">Subagent · %1$s</string>
+    <string name="subagent_view_tab_dream">Dream · %1$s</string>
+    <string name="subagent_view_close_tab">Close %1$s</string>
+    <string name="subagent_view_close_all">Close the subagent view</string>
+    <string name="subagent_view_open_full">Open the subagent’s full conversation</string>
+    <string name="subagent_view_unavailable">This subagent’s conversation can’t be opened right now.</string>
+</resources>

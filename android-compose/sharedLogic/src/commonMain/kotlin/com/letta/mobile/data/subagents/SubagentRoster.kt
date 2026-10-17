@@ -44,13 +44,6 @@ enum class SubagentRosterStatus {
     val isTerminal: Boolean get() = this == COMPLETED || this == FAILED || this == CANCELLED
 }
 
-/** Who is doing the work: a Letta subagent or an external coding agent (0.34). */
-enum class SubagentIdentity(val label: String?) {
-    LETTA(null),
-    CLAUDE_CODE("Claude Code"),
-    CODEX("Codex"),
-}
-
 data class SubagentRosterItem(
     val key: String,
     /** The dispatch's description, else its type. */
@@ -167,16 +160,7 @@ private fun SubagentEntry.rosterStatus(now: Long): SubagentRosterStatus = when (
     }
 }
 
-private fun SubagentEntry.identity(): SubagentIdentity {
-    val type = subagentType.trim().lowercase()
-    val ids = listOfNotNull(subagentAgentId, toolCallId).map { it.lowercase() }
-    return when {
-        type.startsWith("claude-code") || type.startsWith("claude code") || ids.any { it.startsWith("claude_") } ->
-            SubagentIdentity.CLAUDE_CODE
-        type.startsWith("codex") || ids.any { it.startsWith("codex_") } -> SubagentIdentity.CODEX
-        else -> SubagentIdentity.LETTA
-    }
-}
+private fun SubagentEntry.identity(): SubagentIdentity = subagentIdentityOf(subagentType, listOf(subagentAgentId, toolCallId))
 
 private fun SubagentEntry.elapsed(status: SubagentRosterStatus, now: Long): Long? {
     if (status.isTerminal) return durationMs?.takeIf { it > 0 }

@@ -4,7 +4,7 @@
   "description": "Observed persistence/identity evidence from executable probes against a real local Letta Code App Server v2. Captured - not hand-authored - by AppServerRestartReplayProbe. AppServerRestartReplayProbeTest re-verifies the restart-durability and client_message_id replay claims on every run; the mid_turn_kill and event_seq/idempotency_key scopes come from the original manual capture. See appserver-cli/README.md, 'Regenerating the restart/replay evidence', for the regeneration recipe.",
   "source": {
     "package": "@letta-ai/letta-code",
-    "version": "0.29.12",
+    "version": "0.34.14",
     "node": "v24.18.0",
     "backend": "local",
     "backend_env": {
@@ -14,7 +14,7 @@
     },
     "model": "lmstudio/MiniMax-M3",
     "provider": "local OpenAI-compatible proxy, connected as the letta-code 'lmstudio' provider and seeded into the throwaway backend as providers/auth.json (LETTA_CODE_PROBE_PROVIDER_AUTH)",
-    "last_reverified": "2026-07-31 (letta-mobile-lgns8.21.1.1) - re-ran the probe end to end against 0.29.9 and then 0.29.12; both runs reproduce every durability and identity observation below with no behavioural delta. The only 0.29.9 -> 0.29.12 change the probe surfaced is cosmetic: `letta app-server` now prints a deprecation warning in favour of `letta server --listen`, and the `Listening on` banner the probe waits for is unchanged."
+    "last_reverified": "2026-10-17 (letta-mobile-ckmub.13) - captured with AppServerRestartReplayProbeTest against letta-code 0.34.14 on Node v24.18.0 using lmstudio/MiniMax-M3; every durability and identity observation below reproduced with no behavioural delta from the 0.29.12 capture (agent/conversation/transcript survive restart, reattach created flags false, client_message_id resend after restart commits a duplicate user message with cmid count 2, run_id local-run-1 reused after restart). Only delta: a new stream connection restarts event_seq at 1 (0.29.12 was observed near 2)."
   },
   "durability": {
     "process_restart_same_backend_dir": {
@@ -47,7 +47,7 @@
     "event_seq": {
       "resets_on": "stream_connection",
       "durable_cursor": false,
-      "scope": "per-connection generation (new stream connection restarts near seq 2)"
+      "scope": "per-connection generation (new stream connection restarts at seq 1 on 0.34.14; near seq 2 on 0.29.12)"
     },
     "idempotency_key": {
       "format": "stream_delta:<event_seq>:<uuid>",
