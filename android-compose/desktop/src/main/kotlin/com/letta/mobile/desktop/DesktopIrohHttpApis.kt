@@ -35,21 +35,6 @@ private fun createDesktopHttpApis(irohAgentDirectory: IrohAdminRpcAgentDirectory
         slashCommandApi = irohAgentDirectory?.let(::DesktopIrohSlashCommandApi),
     )
 
-internal fun loadArchivedConversationIds(store: com.letta.mobile.data.storage.SecureSettingsStore): Set<String> =
-    store.getString(ARCHIVED_CONVERSATION_IDS_KEY)
-        ?.split(',')
-        ?.map { it.trim() }
-        ?.filter { it.isNotEmpty() }
-        ?.toSet()
-        ?: emptySet()
-
-internal fun persistArchivedConversationIds(
-    store: com.letta.mobile.data.storage.SecureSettingsStore,
-    ids: Set<String>,
-) {
-    store.putString(ARCHIVED_CONVERSATION_IDS_KEY, ids.joinToString(","))
-}
-
 @Composable
 internal fun rememberDesktopHttpApis(
     irohMode: Boolean,

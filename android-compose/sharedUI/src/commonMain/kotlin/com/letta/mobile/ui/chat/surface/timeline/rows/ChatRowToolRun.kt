@@ -24,6 +24,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.letta.mobile.avatar.core.AttentionKey
+import com.letta.mobile.avatar.core.AttentionKind
+import com.letta.mobile.ui.mascot.mascotAttention
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -111,7 +114,14 @@ internal fun ToolRunGroup(
                 haptics.play(LettaHapticCue.SegmentTick)
                 detailsOpen = if (inline) !detailsOpen else true
             },
-            modifier = Modifier.fillMaxWidth(),
+            // While one of its calls runs, the line is where a working mascot looks (te3n1.2).
+            modifier = Modifier
+                .fillMaxWidth()
+                .mascotAttention(
+                    AttentionKey("tool-run:${toolCalls.first().disclosureKey()}"),
+                    AttentionKind.TOOL,
+                    enabled = summary.running,
+                ),
         )
         if (inline) ToolRunInlineCards(visible = detailsOpen, ToolRunDetails(calls), callbacks)
         // Each request keeps its own slot, so answering one folds its card away (animated) in place.

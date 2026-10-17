@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.data
 
+import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.backend.SessionRoute
@@ -158,7 +159,7 @@ class DesktopSessionGraphAdaptersTest {
     @Test
     fun dataBindingsExposeDesktopStorageHealthAndSessionGraph() = runTest {
         val bindings = createDefaultDesktopDataBindings(
-            secureSettingsStore = DesktopInMemorySecureSettingsStore(),
+            secureSettingsStore = InMemorySecureSettingsStore(),
         )
 
         bindings.secureSettingsStore.putString("accessToken", "token-1")
@@ -184,7 +185,7 @@ class DesktopSessionGraphAdaptersTest {
 
     @Test
     fun configStorePersistsBackendAndHidesBlankTokenUpdates() {
-        val settingsStore = DesktopInMemorySecureSettingsStore()
+        val settingsStore = InMemorySecureSettingsStore()
         val configStore = DesktopLettaConfigStore(settingsStore)
 
         configStore.save(
@@ -210,7 +211,7 @@ class DesktopSessionGraphAdaptersTest {
 
     @Test
     fun configStoreImplementsSharedBackendConfigAndTokenContracts() = runTest {
-        val configStore = DesktopLettaConfigStore(DesktopInMemorySecureSettingsStore())
+        val configStore = DesktopLettaConfigStore(InMemorySecureSettingsStore())
         val backendStore: BackendConfigStore = configStore
         val tokenStore: SecureTokenStore = configStore
 
@@ -246,7 +247,7 @@ class DesktopSessionGraphAdaptersTest {
      */
     @Test
     fun configStoreRoundTripsRemoteDetailsAcrossASwitchToLocalAndBack() {
-        val settingsStore = DesktopInMemorySecureSettingsStore()
+        val settingsStore = InMemorySecureSettingsStore()
         val configStore = DesktopLettaConfigStore(settingsStore)
 
         configStore.save(
