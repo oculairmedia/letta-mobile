@@ -1,20 +1,24 @@
-package com.letta.mobile.desktop
+package com.letta.mobile.ui.shell.workspace
 
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * [DesktopShellLayoutController] over the shared layout store, including the "restart" scenario:
- * `rememberSaveable` does not survive a desktop process restart, so a second controller reading
- * the same preferences is how a restart restores the sidebar.
+ * [ShellLayoutController] over the shared layout store, including the "restart" scenario:
+ * `rememberSaveable` does not survive a process restart (desktop) or a reload (browser), so a second
+ * controller reading the same preferences is how a restart restores the sidebar.
  */
-class DesktopShellLayoutControllerTest {
+class ShellLayoutControllerTest {
     private val preferences = InMemorySecureSettingsStore()
 
-    private fun controller(backend: String) = DesktopShellLayoutController(desktopShellLayoutStore(backend, preferences))
+    private fun controller(backend: String) =
+        ShellLayoutController(shellLayoutStore(backendConfig(backend), preferences))
+
+    private fun backendConfig(id: String) = LettaConfig(id = id, mode = LettaConfig.Mode.entries.first(), serverUrl = "")
 
     @Test
     fun explicitCollapseSurvivesASimulatedRestart() {

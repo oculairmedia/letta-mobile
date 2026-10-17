@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- letta-mobile-ckmub.17.4: the shared shell workspace (desktop window and browser). -->
+    <string name="shell_workspace_title">Letta</string>
+    <string name="shell_sidebar_show">Show sidebar (Ctrl+B)</string>
+    <string name="shell_sidebar_hide">Hide sidebar (Ctrl+B)</string>
+    <string name="shell_open_navigation">Agents and conversations</string>
+    <string name="shell_sidebar_more">More</string>
+    <string name="shell_sidebar_more_description">More (%1$s, %2$s, and more)</string>
+    <string name="shell_new_chat">New chat</string>
+    <string name="shell_settings">Settings</string>
+    <string name="shell_new_conversation_tab">New conversation tab</string>
+    <string name="shell_chat_canvas_title">Canvas (%1$s)</string>
+    <string name="shell_chat_canvas_owner_fallback">Conversation</string>
+</resources>

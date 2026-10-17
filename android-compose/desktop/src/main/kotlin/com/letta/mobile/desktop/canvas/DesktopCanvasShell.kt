@@ -12,14 +12,8 @@ import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.desktop.OpenDesktopCanvasParams
 import com.letta.mobile.desktop.openDesktopCanvasSession
+import com.letta.mobile.ui.shell.workspace.ShellCanvasOwner
 import kotlinx.coroutines.CoroutineScope
-
-/** Who a conversation's canvas belongs to, for [DesktopCanvasShell.openForConversation]. */
-internal data class DesktopCanvasOwner(
-    val conversationId: String?,
-    val agentId: String?,
-    val agentName: String,
-)
 
 /**
  * The shell's canvas wiring in one place: the store, the library the sidebar lists, and the
@@ -39,7 +33,7 @@ internal class DesktopCanvasShell(
     fun createNew(agentId: String?) = library.createNew(agentId) { activeSession = it }
 
     /** The conversation's own canvas, created on first open. */
-    fun openForConversation(owner: DesktopCanvasOwner) = openDesktopCanvasSession(
+    fun openForConversation(owner: ShellCanvasOwner) = openDesktopCanvasSession(
         OpenDesktopCanvasParams(
             scope = scope,
             store = store,

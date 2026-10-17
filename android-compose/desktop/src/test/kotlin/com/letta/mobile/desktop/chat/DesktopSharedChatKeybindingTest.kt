@@ -2,6 +2,7 @@
 
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.ui.shell.workspace.escapeCollapsesToCanvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme

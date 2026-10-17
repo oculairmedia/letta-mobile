@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceDrawer
 
 /*
  * Phone preview (docs/development/phone-preview.md): the real desktop app, or the fixture
@@ -163,8 +164,10 @@ private const val TEN = 10
  */
 @Stable
 internal class DesktopPhoneChrome(val state: DesktopPhoneState) {
-    /** The agents and conversations panel (desktop's rail and sidebar), opened over the screen. */
-    var drawerOpen by mutableStateOf(false)
+    /** The shared workspace's navigation drawer (rail and agent panel), opened over the screen. */
+    val drawer = ShellWorkspaceDrawer()
+
+    var drawerOpen: Boolean by drawer::open
 }
 
 /** Non-null only under the phone preview (`:desktop:runPhone`). */

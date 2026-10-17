@@ -2,21 +2,17 @@ package com.letta.mobile.desktop
 
 import androidx.compose.runtime.State
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellChatPort
 import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellOverlays
 import com.letta.mobile.data.shell.ShellPageKind
-import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.desktop.chat.DesktopChatConnectionState
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.ui.shell.ShellChatSelection
-import com.letta.mobile.ui.shell.header.UnifiedSearchHit
-import com.letta.mobile.ui.shell.header.UnifiedSearchKind
 
 /**
  * letta-mobile-ckmub.17.3: the desktop's window adapters over the shared [ShellWorkspaceState] - its
@@ -72,20 +68,6 @@ internal var ShellWorkspaceState.selectedDestination: DesktopDestination
 /** Leaves any agent editor, then shows [destination]. */
 internal fun ShellWorkspaceState.navigate(destination: DesktopDestination) = navigate(destination.shellPage)
 
-/**
- * Opens a unified-search pick, from the header search, the command palette or the quick-query bar
- * alike: a message opens its conversation; a canvas goes to [openCanvas] (only the header's search
- * lists canvases); a destination hit names a [DesktopDestination].
- */
-internal fun ShellWorkspaceNavigator.openSearchHit(hit: UnifiedSearchHit, openCanvas: (CanvasId) -> Unit = {}) {
-    when (hit.kind) {
-        UnifiedSearchKind.Conversations, UnifiedSearchKind.Messages -> openConversation(ConversationId(hit.id))
-        UnifiedSearchKind.Agents -> openAgent(AgentId(hit.id))
-        UnifiedSearchKind.Canvases -> openCanvas(CanvasId(hit.id))
-        UnifiedSearchKind.Destinations ->
-            DesktopDestination.entries.firstOrNull { it.name == hit.id }?.let(state::navigate)
-    }
-}
 
 /** The overlay stack's flags: the shared workspace's. */
 internal val DesktopShellContext.overlays: ShellOverlays get() = navigator.overlays

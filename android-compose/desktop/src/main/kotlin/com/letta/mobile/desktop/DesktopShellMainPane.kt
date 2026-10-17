@@ -18,7 +18,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.subagents.visibleRunningCount
 import com.letta.mobile.desktop.agent.agentEditorHost
-import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
+import com.letta.mobile.ui.shell.workspace.ShellCanvasOwner
 import com.letta.mobile.ui.chat.session.ChatHostCommand
 import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
 import com.letta.mobile.desktop.chat.DesktopChatSubagents
@@ -144,8 +144,8 @@ private fun rememberShellContextUsage(context: DesktopShellContext, frame: Deskt
     )
 }
 
-private fun DesktopShellFrame.conversationCanvasOwner(): DesktopCanvasOwner {
-    return DesktopCanvasOwner(chatState.selectedConversationId, focus.selectedAgentId, focus.selectedAgentName)
+private fun DesktopShellFrame.conversationCanvasOwner(): ShellCanvasOwner {
+    return ShellCanvasOwner(chatState.selectedConversationId, focus.selectedAgentId, focus.selectedAgentName)
 }
 
 @Composable

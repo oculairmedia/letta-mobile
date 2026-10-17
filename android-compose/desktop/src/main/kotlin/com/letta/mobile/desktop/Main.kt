@@ -3,12 +3,6 @@ package com.letta.mobile.desktop
 import com.letta.mobile.data.canvas.bubble.CanvasBubbleLayout
 import com.letta.mobile.desktop.data.DesktopPreferences
 import com.letta.mobile.ui.chat.surface.CanvasBubbleLayoutHost
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
@@ -127,7 +121,7 @@ private fun runDesktopApplication(
             // toggle), but the header itself renders in the custom title bar,
             // which is a composition sibling — not a descendant — of
             // LettaDesktopApp. See letta-mobile-3arhe.1.
-            var headerChrome by remember { mutableStateOf(DesktopHeaderChromeState.Empty) }
+            var headerChrome by remember { mutableStateOf<com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState?>(null) }
             val mascots = remember { com.letta.mobile.ui.mascot.MascotIdentityRegistry() }
             // The transport verb: one mascot per agent, moved between the seats the surfaces declare.
             val mascotTransport = remember { com.letta.mobile.ui.mascot.MascotTransport() }
