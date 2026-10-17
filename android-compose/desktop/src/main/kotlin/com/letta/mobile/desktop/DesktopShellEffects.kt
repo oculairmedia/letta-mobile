@@ -12,7 +12,7 @@ import com.letta.mobile.ui.shell.SyncShellWorkspace
 /**
  * letta-mobile-bglj6.1.10: the shell's effects - controller lifecycles, the tab strip's sync,
  * the tray/taskbar/notification integration, the quick-query window, and the focused agent's
- * skills and slash commands.
+ * slash commands.
  */
 @Composable
 internal fun DesktopShellEffects(
@@ -33,7 +33,6 @@ private fun DesktopShellChatEffects(
 ) {
     val chatController = context.core.chatController
     val chatState = frame.chatState
-    val selectedDestination = context.navigator.selectedDestination
     // letta-mobile folder-settings #2: re-read the working directory whenever
     // the selected conversation changes (or its identity resolves for the
     // first time after a fresh connect).
@@ -43,17 +42,7 @@ private fun DesktopShellChatEffects(
     CommandPaletteKeyDispatcherEffect(onOpenPalette = { context.overlays.commandPalette = true })
     // letta-mobile-zxk2n.5: mod+Alt+Up / Down for the previous / next conversation.
     ConversationStepKeyDispatcherEffect(context, frame)
-    DesktopControllerLifecycles(
-        DesktopControllerLifecycleParams(
-            chatController = chatController,
-            libraries = context.panels.libraries,
-            selection = DesktopDestinationSelection(
-                selectedDestination = selectedDestination,
-                selectedConversationAgentId = chatState.selectedConversation?.agentId?.let(::DesktopAgentId),
-            ),
-            cronPanel = context.panels.cronPanel,
-        ),
-    )
+    DesktopChatControllerLifecycle(chatController)
 }
 
 /**
@@ -168,14 +157,8 @@ private fun DesktopShellQuickQueryBridge(context: DesktopShellContext, frame: De
 
 @Composable
 private fun DesktopShellFocusedAgentLoaders(context: DesktopShellContext, frame: DesktopShellFrame) {
-    val selectedDestination = context.navigator.selectedDestination
+    // The Skills page loads its catalog itself (the shared ShellLibraryFocusEffects).
     val selectedAgentId = frame.focus.selectedAgentId
-    val skills = context.panels.skills
-    // Load the skills registry + the focused agent's installed skills when the
-    // Skills page is open (or the focused agent changes).
-    LaunchedEffect(selectedDestination, skills, selectedAgentId) {
-        if (selectedDestination == DesktopDestination.Agents) skills.reload(selectedAgentId)
-    }
     val slashCommandApi = context.panels.httpApis.slashCommandApi
     val agentSlashCommands = context.panels.agentSlashCommands
     // Load the focused agent's server slash commands for the composer palette.

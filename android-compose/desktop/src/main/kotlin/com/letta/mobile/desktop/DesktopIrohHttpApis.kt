@@ -3,35 +3,28 @@ package com.letta.mobile.desktop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
-import com.letta.mobile.data.schedules.CronApi
 import com.letta.mobile.data.commands.SlashCommandsApi
-import com.letta.mobile.data.skills.SkillsApi
 import com.letta.mobile.desktop.commands.DesktopIrohSlashCommandApi
 import com.letta.mobile.desktop.memory.DesktopBlockApi
 import com.letta.mobile.desktop.memory.DesktopIrohBlockApi
-import com.letta.mobile.desktop.skills.DesktopIrohSkillsApi
 
 /**
- * The management APIs behind the desktop's memory, cron, skills and slash-command panels.
+ * The management APIs behind the desktop's memory and slash-command panels.
  *
  * letta-mobile-ckmub.4: these used to fall back to a Letta REST server for non-Iroh backends. That
  * backend is gone, so today they are served over an Iroh host's `admin_rpc` relay only; on the
- * bundled runtime or a direct App Server they are null and the panels say so. The App Server
- * equivalents (`cron_*`, `skill_enable`/`skill_disable`, `execute_command`, memory files) are wired
- * by the shared pages (ckmub S14 / S17). The name is kept until those pages replace the panels.
+ * bundled runtime or a direct App Server they are null and the panels say so. Skills and schedules
+ * are the shared pages' (letta-mobile-ckmub.17.5), over the session graph. The name is kept until
+ * the shared pages replace the panels.
  */
 internal class DesktopHttpApis(
     val blockApi: DesktopBlockApi?,
-    val cronApi: CronApi?,
-    val skillApi: SkillsApi?,
     val slashCommandApi: SlashCommandsApi?,
 )
 
 private fun createDesktopHttpApis(irohAgentDirectory: IrohAdminRpcAgentDirectory?): DesktopHttpApis =
     DesktopHttpApis(
         blockApi = irohAgentDirectory?.let(::DesktopIrohBlockApi),
-        cronApi = null,
-        skillApi = irohAgentDirectory?.let(::DesktopIrohSkillsApi),
         slashCommandApi = irohAgentDirectory?.let(::DesktopIrohSlashCommandApi),
     )
 

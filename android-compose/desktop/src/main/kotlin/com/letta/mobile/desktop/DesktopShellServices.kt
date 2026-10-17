@@ -1,7 +1,6 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
@@ -14,7 +13,11 @@ import androidx.compose.ui.focus.FocusRequester
 import com.letta.mobile.data.commands.AgentSlashCommand
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.skills.SkillsCatalogController
+import com.letta.mobile.desktop.workspace.DesktopWorkspaceSources
+import com.letta.mobile.desktop.workspace.memfs
+import com.letta.mobile.ui.shell.pages.ShellLibraryControllers
+import com.letta.mobile.ui.shell.pages.ShellLibrarySources
+import com.letta.mobile.ui.shell.pages.rememberShellLibraryControllers
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.notify.StoredAttentionPrefs
 import com.letta.mobile.data.repository.SubagentRepository
@@ -67,15 +70,13 @@ internal data class DesktopShellCore(
 /** The per-backend panels and libraries behind the shell's destinations. */
 internal data class DesktopShellPanels(
     val httpApis: DesktopHttpApis,
-    val cronPanel: DesktopCronPanelState,
-    /** letta-mobile-zxk2n.33: the shared skills catalog for the Skills page. */
-    val skills: SkillsCatalogController,
     /** The focused agent's server slash commands, for the composer palette. */
     val agentSlashCommands: MutableState<List<AgentSlashCommand>>,
     val subagents: DesktopSubagentRegistry,
     /** letta-mobile-bglj6.1: the docked chat's saved placement, read once per app session. */
     val chatDockGeometry: MutableState<ChatDockGeometry?>,
-    val libraries: DesktopLibraryControllers,
+    /** letta-mobile-ckmub.17.5: the shared library controllers behind the shell's pages. */
+    val libraries: ShellLibraryControllers,
 )
 
 /**
@@ -199,9 +200,9 @@ internal fun rememberDesktopShellPanels(core: DesktopShellCore, chatState: Deskt
     val chatScope = core.chatScope
     val sessionGraph = core.sessionGraph.value
     val httpApis = rememberDesktopHttpApis(core.iroh.transport != null, core.iroh.agentDirectory)
-    val cronPanel = remember(httpApis.cronApi) { DesktopCronPanelState(httpApis.cronApi, chatScope) }
-    val skills = remember(httpApis.skillApi) { SkillsCatalogController(httpApis.skillApi, chatScope) }
-    DisposableEffect(skills) { onDispose { skills.close() } }
+    val settingsStore = core.bootstrap.secureSettingsStore
+    // The MemFS browser reads through the process-wide direct App Server session, not the session graph.
+    val librarySources = remember(settingsStore) { ShellLibrarySources(settingsStore, DesktopWorkspaceSources().memfs()) }
     val agentSlashCommands = remember(httpApis.slashCommandApi) {
         mutableStateOf<List<AgentSlashCommand>>(emptyList())
     }
@@ -214,17 +215,10 @@ internal fun rememberDesktopShellPanels(core: DesktopShellCore, chatState: Deskt
     )
     return DesktopShellPanels(
         httpApis = httpApis,
-        cronPanel = cronPanel,
-        skills = skills,
         agentSlashCommands = agentSlashCommands,
         subagents = subagents,
         chatDockGeometry = rememberChatDockGeometry(remember { DesktopChatDockGeometryStore().asLayoutPrefStorage() }),
-        libraries = rememberDesktopLibraryControllers(
-            sessionGraphId = sessionGraph.id,
-            sessionGraphProvider = core.bootstrap.dataBindings.sessionGraphProvider,
-            chatScope = chatScope,
-            settingsStore = core.bootstrap.secureSettingsStore,
-        ),
+        libraries = rememberShellLibraryControllers(core.bootstrap.dataBindings.sessionGraphProvider, librarySources, chatScope),
     )
 }
 
