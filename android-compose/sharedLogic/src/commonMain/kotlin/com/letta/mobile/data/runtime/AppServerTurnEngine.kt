@@ -168,6 +168,8 @@ class AppServerTurnEngine(
         eventRouter?.approvalDecisionCache() ?: ApprovalDecisionCache(),
     /** letta-mobile-jvctq: false never answers an approval for the person; every one waits for them. */
     private val autoAllowApprovals: Boolean = true,
+    /** letta-mobile-zxk2n.2: 0.34 delivery for this host (durable terminals, client preferences); off by default. */
+    private val durableDelivery: DurableTurnDelivery = DurableTurnDelivery.OFF,
 ) : TurnEngine {
     internal val approvalSender = ApprovalResponseSender(client, approvalDecisionCache, requestIdFactory)
 
@@ -217,7 +219,25 @@ class AppServerTurnEngine(
         approvalSender,
         externalToolRegistry,
         noteSentInput = queueHygiene::noteSentInput,
+        durable = DurableInputSending(durableDelivery, InputResumption(inboundSource.sessionLink)),
     )
+
+    /** letta-mobile-zxk2n.2: `turn_finished_ack` for every durable terminal kept for this client. */
+    private val terminalAcks = TurnTerminalAcknowledger(client, durableDelivery.consumerId, connectionGenerationProvider)
+
+    /** Whether this engine names itself a durable terminal consumer (a host must then feed [acknowledgeTerminalOutsideTurns]). */
+    internal val keepsDurableTerminals: Boolean get() = durableDelivery.consumerId != null
+
+    /**
+     * letta-mobile-zxk2n.2: acks a durable `turn_finished` that no turn lease is collecting: a
+     * replay after a reconnect or restart, or a terminal that outlived the turn watching it. A
+     * held lease acks the frames it applies itself, so this no-ops for its runtime.
+     */
+    internal suspend fun acknowledgeTerminalOutsideTurns(received: AppServerReceivedFrame) {
+        val runtime = (received.frame as? AppServerInboundFrame.TurnFinished)?.runtime ?: return
+        if (leases.peek(TurnRuntimeKey(runtime.agentId, runtime.conversationId))?.lease != null) return
+        terminalAcks.acknowledge(received)
+    }
 
     /** letta-mobile-qygvv.6: latest `update_queue` snapshot per runtime (items + paused). */
     val queueSnapshots: StateFlow<Map<TurnRuntimeKey, AppServerQueueSnapshot>> get() = queueHygiene.snapshots
@@ -1076,7 +1096,18 @@ class AppServerTurnEngine(
         return context.lease.slot.runIdGate.accepts(received, context.lease.token)
     }
 
+    /** Applies [received] to the turn, then acks it when it is a durable terminal kept for this client (zxk2n.2). */
     private suspend fun processReceivedFrame(
+        received: AppServerReceivedFrame,
+        context: TurnFrameContext,
+        budget: FrameProjectionErrorBudget,
+    ) {
+        applyReceivedFrame(received, context, budget)
+        // The terminal this acks has usually just completed the turn, which stops the frame loop.
+        withContext(NonCancellable) { terminalAcks.acknowledge(received) }
+    }
+
+    private suspend fun applyReceivedFrame(
         received: AppServerReceivedFrame,
         context: TurnFrameContext,
         budget: FrameProjectionErrorBudget,

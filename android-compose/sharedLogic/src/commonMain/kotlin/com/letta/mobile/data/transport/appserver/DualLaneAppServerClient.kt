@@ -30,6 +30,7 @@ class DualLaneAppServerClient(
     override suspend fun input(command: AppServerCommand.Input) = runtime.input(command)
     override suspend fun inputAwaitingAcceptance(command: AppServerCommand.Input) = runtime.inputAwaitingAcceptance(command)
     override suspend fun changeDeviceState(command: AppServerCommand.ChangeDeviceState) = runtime.changeDeviceState(command)
+    override suspend fun acknowledgeTurnFinished(command: AppServerCommand.TurnFinishedAck) = runtime.acknowledgeTurnFinished(command)
     override suspend fun sync(command: AppServerCommand.Sync) = runtime.sync(command)
     override suspend fun abort(command: AppServerCommand.AbortMessage) = runtime.abort(command)
     override suspend fun resumeQueue(command: AppServerCommand.ResumeQueue) = runtime.resumeQueue(command)

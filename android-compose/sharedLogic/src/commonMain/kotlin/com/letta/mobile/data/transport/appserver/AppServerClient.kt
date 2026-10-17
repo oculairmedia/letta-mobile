@@ -67,6 +67,13 @@ interface AppServerClient {
     suspend fun changeDeviceState(command: AppServerCommand.ChangeDeviceState): Unit =
         throw UnsupportedOperationException("change_device_state is not supported by this client")
 
+    /**
+     * letta-code 0.34.8+: sends `turn_finished_ack` for a durably replayed terminal
+     * (letta-mobile-zxk2n.2). There is no response frame; repeating it is harmless.
+     */
+    suspend fun acknowledgeTurnFinished(command: AppServerCommand.TurnFinishedAck): Unit =
+        throw UnsupportedOperationException("turn_finished_ack is not supported by this client")
+
     suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse
 
     suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse
@@ -335,6 +342,10 @@ class DefaultAppServerClient(
     }
 
     override suspend fun changeDeviceState(command: AppServerCommand.ChangeDeviceState) {
+        transport.sendControl(command)
+    }
+
+    override suspend fun acknowledgeTurnFinished(command: AppServerCommand.TurnFinishedAck) {
         transport.sendControl(command)
     }
 
