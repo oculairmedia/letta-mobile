@@ -222,7 +222,7 @@ class LocalOpenAiOnDeviceBridge internal constructor(
             when (request.route) {
                 "GET /v1/models" -> socket.outputStream.writeJsonResponse(200, modelsBody())
                 "GET $LM_STUDIO_MODELS_PATH" ->
-                    socket.outputStream.writeJsonResponse(200, lmStudioModelsBody(servedModelId, capability, modelSelection.maxTokens))
+                    socket.outputStream.writeJsonResponse(200, lmStudioModelsBody(servedModelId, capability))
                 "POST /v1/chat/completions" -> handleChatCompletion(socket, request)
                 else -> socket.outputStream.writeJsonResponse(
                     404,
@@ -267,8 +267,15 @@ class LocalOpenAiOnDeviceBridge internal constructor(
                 "handle=${modelSelection.modelHandle} requestChars=${http.body.length} history=${chat.history.size} " +
                     "latestRole=${chat.latest.role} images=${chat.images.size} tools=${chat.tools.size} " +
                     "toolNames=${chat.tools.joinToString(",") { it.name }} stream=$stream " +
+                    "estimatedPromptTokens=${OnDeviceContextBudget.estimatePromptTokens(chat)} contextTokens=${modelSelection.maxTokens} " +
+                    "requestedMaxTokens=${generation.limits.requestedMaxOutputTokens ?: "none"} " +
                     "maxOutputTokens=${generation.limits.maxOutputTokens} timeoutMs=${generation.limits.timeoutMs}",
             )
+            // A request that may overflow the window never reaches LiteRT-LM: a large overflow aborts the process.
+            OnDeviceContextBudget.overflow(chat, generation.limits.maxOutputTokens, modelSelection.maxTokens)?.let {
+                output.writeRejection(it)
+                return
+            }
             val result = guards.guard(socket, generation) {
                 engine.generate(modelSelection, chat, generation)
             }
