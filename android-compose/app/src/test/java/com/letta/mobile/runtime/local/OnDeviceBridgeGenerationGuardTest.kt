@@ -211,16 +211,16 @@ class OnDeviceBridgeGenerationGuardTest {
             lastImages = images
             generation.onCancel { cancelled.countDown() }
             started.countDown()
-            var i = 0
             var streaming = true
-            while (streaming && i < chunkLimit && !generation.isStopped) {
-                if (chunkDelayMs > 0) Thread.sleep(chunkDelayMs)
-                streaming = !generation.isStopped && run {
-                    chunksSent += 1
-                    generation.accept(chunk(i++))
-                }
-            }
+            while (streaming && chunksSent < chunkLimit) streaming = streamOne(generation)
             return Result.success(generation.text)
+        }
+
+        /** Sends the next chunk after the delay; false once the generation stopped. */
+        private fun streamOne(generation: OnDeviceGeneration): Boolean {
+            if (chunkDelayMs > 0) Thread.sleep(chunkDelayMs)
+            if (generation.isStopped) return false
+            return generation.accept(chunk(chunksSent++))
         }
     }
 
