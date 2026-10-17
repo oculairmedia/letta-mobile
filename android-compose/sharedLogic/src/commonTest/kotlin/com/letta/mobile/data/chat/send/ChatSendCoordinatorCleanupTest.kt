@@ -963,7 +963,11 @@ class ChatSendCoordinatorCleanupTest {
     // down on the server (an on-device model finishing), not for "another client's turn".
     @Test
     fun sendQueuedBehindOwnStoppedTurnSaysSoNotAnotherClient() = runTest(UnconfinedTestDispatcher()) {
-        val coordinator = coordinator(timeline = RecordingTimelineWriter(), ui = RecordingUiSink(), transport = FakeChannelTransport(mutableListOf(true, true)))
+        val coordinator = coordinator(
+            timeline = RecordingTimelineWriter(),
+            ui = RecordingUiSink(),
+            transport = FakeChannelTransport(mutableListOf(true, true)),
+        )
 
         coordinator.send("first").join()
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
@@ -979,7 +983,11 @@ class ChatSendCoordinatorCleanupTest {
 
     @Test
     fun sendQueuedWithoutOwnStopWaitsForAnotherClient() = runTest(UnconfinedTestDispatcher()) {
-        val coordinator = coordinator(timeline = RecordingTimelineWriter(), ui = RecordingUiSink(), transport = FakeChannelTransport(mutableListOf(true)))
+        val coordinator = coordinator(
+            timeline = RecordingTimelineWriter(),
+            ui = RecordingUiSink(),
+            transport = FakeChannelTransport(mutableListOf(true)),
+        )
 
         coordinator.send("hello").join()
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))

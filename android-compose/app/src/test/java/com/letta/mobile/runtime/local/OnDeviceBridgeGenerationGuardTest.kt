@@ -212,11 +212,13 @@ class OnDeviceBridgeGenerationGuardTest {
             generation.onCancel { cancelled.countDown() }
             started.countDown()
             var i = 0
-            while (i < chunkLimit && !generation.isStopped) {
+            var streaming = true
+            while (streaming && i < chunkLimit && !generation.isStopped) {
                 if (chunkDelayMs > 0) Thread.sleep(chunkDelayMs)
-                if (generation.isStopped) break
-                chunksSent += 1
-                if (!generation.accept(chunk(i++))) break
+                streaming = !generation.isStopped && run {
+                    chunksSent += 1
+                    generation.accept(chunk(i++))
+                }
             }
             return Result.success(generation.text)
         }

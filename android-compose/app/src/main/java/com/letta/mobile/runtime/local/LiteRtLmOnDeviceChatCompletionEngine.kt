@@ -135,7 +135,8 @@ class LiteRtLmOnDeviceChatCompletionEngine @Inject constructor(
             } catch (error: Throwable) {
                 logLiteRtError(
                     "engine_init_error",
-                    "handle=${modelSelection.modelHandle} backend=${attempt.backendName} vision=${attempt.vision} path=${modelFile.absolutePath}",
+                    "handle=${modelSelection.modelHandle} backend=${attempt.backendName} vision=${attempt.vision} " +
+                        "path=${modelFile.absolutePath}",
                     error,
                 )
                 lastError = error
@@ -153,7 +154,7 @@ class LiteRtLmOnDeviceChatCompletionEngine @Inject constructor(
             activeVision = attempt.vision
             return LiteRtLmEngineHandle(engine, attempt.vision, attempt.backendName)
         }
-        throw lastError ?: IllegalStateException("LiteRT-LM engine did not initialize.")
+        throw lastError ?: error("LiteRT-LM engine did not initialize.")
     }
 
     private data class LiteRtLmEngineHandle(

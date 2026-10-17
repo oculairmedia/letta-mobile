@@ -126,7 +126,8 @@ class OnDeviceGenerationTest {
         assertEquals(200, cap("""{"max_tokens":200}"""))
         assertEquals(300, cap("""{"max_completion_tokens":300,"max_tokens":200}"""))
         assertEquals(1_024, cap("""{"max_tokens":32000}"""))
-        assertEquals(512, OnDeviceGenerationLimits.forRequest(Json.parseToJsonElement("{}").jsonObject, selection(maxTokens = 512)).maxOutputTokens)
+        val small = OnDeviceGenerationLimits.forRequest(Json.parseToJsonElement("{}").jsonObject, selection(maxTokens = 512))
+        assertEquals(512, small.maxOutputTokens)
     }
 
     @Test

@@ -312,13 +312,19 @@ class LocalOpenAiOnDeviceBridge internal constructor(
                 logLiteRtInfo("bridge_images_rejected", "handle=${modelSelection.modelHandle} images=${all.size}")
                 output.writeJsonResponse(
                     NON_RETRYABLE_STATUS,
-                    errorBody("on_device_images_unsupported", "The on-device model $servedModelId does not accept images. Pick a vision model in Settings or send text."),
+                    errorBody(
+                        "on_device_images_unsupported",
+                        "The on-device model $servedModelId does not accept images. Pick a vision model in Settings or send text.",
+                    ),
                 )
                 return null
             }
             val kept = all.takeLast(MAX_IMAGES_PER_REQUEST)
             if (kept.size < all.size) {
-                logLiteRtInfo("bridge_images_trimmed", "handle=${modelSelection.modelHandle} kept=${kept.size} dropped=${all.size - kept.size}")
+                logLiteRtInfo(
+                    "bridge_images_trimmed",
+                    "handle=${modelSelection.modelHandle} kept=${kept.size} dropped=${all.size - kept.size}",
+                )
             }
             return kept
         }
@@ -329,7 +335,10 @@ class LocalOpenAiOnDeviceBridge internal constructor(
          */
         private fun answeredStoppedGeneration(output: OutputStream, generation: OnDeviceGeneration): Boolean {
             val reason = generation.stopReason ?: return false
-            logLiteRtInfo("bridge_generation_stopped", "handle=${modelSelection.modelHandle} reason=${reason.wire} outputChars=${generation.text.length}")
+            logLiteRtInfo(
+                "bridge_generation_stopped",
+                "handle=${modelSelection.modelHandle} reason=${reason.wire} outputChars=${generation.text.length}",
+            )
             return when {
                 reason == OnDeviceStopReason.ClientDisconnected -> true
                 reason == OnDeviceStopReason.Timeout && generation.text.isBlank() -> {
