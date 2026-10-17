@@ -12,6 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import com.letta.mobile.avatar.core.AttentionKey
+import com.letta.mobile.avatar.core.AttentionRect
 import com.letta.mobile.avatar.core.GazeRect
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.data.presence.AgentPresence
@@ -37,6 +39,12 @@ class MascotIdentityRegistry {
 
     /** Window-space message timeline; null when the chat list is not composed. */
     val timelineBounds = mutableStateOf<GazeRect?>(null)
+
+    /**
+     * Every attention point a surface published with [mascotAttention] (te3n1.2): the caret, the
+     * newest message, a waiting approval card, a running tool. Read in a snapshot by [MascotLive].
+     */
+    val attention = mutableStateMapOf<AttentionKey, AttentionRect>()
 
     /**
      * Edits the primary composer has taken, counted for the life of the registry (letta-mobile-
