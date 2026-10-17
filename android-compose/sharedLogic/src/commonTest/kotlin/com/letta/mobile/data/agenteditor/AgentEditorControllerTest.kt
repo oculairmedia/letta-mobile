@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.CompactAgentProfile
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.data.model.Tool
@@ -28,6 +29,7 @@ import kotlin.test.assertTrue
 class AgentEditorControllerTest {
     private val search = Tool(id = ToolId("t-search"), name = "web_search")
     private val linear = Tool(id = ToolId("t-linear"), name = "linear_issues", toolType = "external_mcp")
+    private val gemma = LlmModel(id = "google/gemma-3n-E2B-it-litert-lm", handle = "lmstudio/google/gemma-3n-E2B-it-litert-lm")
     private val ada = Agent(
         id = AgentId("a-1"),
         name = "Ada",
@@ -181,6 +183,60 @@ class AgentEditorControllerTest {
         assertEquals(listOf("team"), params.tags?.toList())
         assertEquals(JsonPrimitive("pill"), params.metadata?.get("letta_mobile.avatar_style"))
         assertEquals(true, params.includeBaseTools)
+    }
+
+    /** A new agent on a small model starts compact by default; the user can see and turn it off. */
+    @Test
+    fun aNewAgentOnASmallModelIsCompactUnlessTheUserTurnsItOff() = runTest(UnconfinedTestDispatcher()) {
+        val backend = RecordingBackend(ada).apply { models.value = listOf(gemma) }
+        val controller = editor(backend, AgentEditorMode.Create)
+        controller.update { copy(name = "bobs") }
+        assertTrue(controller.state.value.compactRecommended, "the only model is the server default")
+        assertTrue(controller.state.value.compactProfile)
+
+        controller.save {}
+        val compact = backend.created.single()
+        assertEquals(CompactAgentProfile.SYSTEM_PROMPT, compact.system)
+        assertTrue(CompactAgentProfile.isCompact(compact.tags))
+        assertTrue(CompactAgentProfile.MEMFS_DISABLED_TAG in compact.tags.orEmpty())
+        assertEquals(false, compact.includeBaseTools)
+
+        controller.update { copy(compactProfile = false) }
+        controller.save {}
+        val full = backend.created.last()
+        assertNull(full.system)
+        assertNull(full.tags)
+        assertEquals(true, full.includeBaseTools)
+    }
+
+    @Test
+    fun aNewAgentOnACapableModelIsNotCompactUntilTheUserAsks() = runTest(UnconfinedTestDispatcher()) {
+        val backend = RecordingBackend(ada).apply { models.value = listOf(LlmModel(id = "m", handle = "openai/gpt-5"), gemma) }
+        val controller = editor(backend, AgentEditorMode.Create)
+        controller.update { copy(name = "Grace", model = "openai/gpt-5") }
+        assertFalse(controller.state.value.compactProfile)
+        controller.update { copy(model = gemma.handle!!) }
+        assertTrue(controller.state.value.compactProfile, "picking the small model turns it on")
+
+        controller.update { copy(model = "openai/gpt-5", compactProfile = true) }
+        controller.save {}
+        assertTrue(CompactAgentProfile.isCompact(backend.created.single().tags))
+    }
+
+    /** An existing agent can be switched to the compact profile from its editor. */
+    @Test
+    fun turningTheCompactProfileOnForAnAgentTagsItAndFillsABlankPrompt() = runTest(UnconfinedTestDispatcher()) {
+        val bobs = ada.copy(id = AgentId("a-1"), system = "", tags = persistentListOf("origin:letta-code"))
+        val backend = RecordingBackend(bobs)
+        val controller = editor(backend)
+        assertEquals(false, controller.state.value.form.compactProfile)
+
+        controller.update { copy(compactProfile = true) }
+        controller.save {}
+
+        val patch = backend.updates.single()
+        assertEquals(listOf("origin:letta-code", CompactAgentProfile.TAG), patch.tags?.toList())
+        assertEquals(CompactAgentProfile.SYSTEM_PROMPT, patch.system)
     }
 
     @Test
