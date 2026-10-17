@@ -146,7 +146,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     val surfacePort = rememberClientCommandPort(port, params.viewModel, LocalAndroidClientCommands.current)
     // letta-mobile-bglj6.1.19: the shared page reads the OS "Remove animations" setting through
     // sharedUI's LocalReducedMotion, the same preference the legacy chat honours.
-    val dualView = rememberSubagentDualView(params.viewModel.conversationId, params.subagents.source.viewSessions, params.fullSubagentView())
+    val dualView = rememberSubagentDualView(params.viewModel.conversationId, params.viewSessions, params.fullSubagentView())
     val platform = rememberAndroidChatSurfacePlatform(
         pageBackground = params.pageBackground,
         onComposerHeightChange = params.onComposerHeightChange,

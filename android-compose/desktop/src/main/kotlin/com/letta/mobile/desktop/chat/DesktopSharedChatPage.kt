@@ -204,7 +204,7 @@ private fun rememberDesktopChatPlatform(ambientStatus: AmbientMotionStatus, fram
             },
             showKeyboardHints = frame.showKeyboardHints,
             topChromeInset = frame.topChromeInset,
-            timelineOverlay = subagents?.let { rings -> { SubagentRingsOverlay(rings.entries, rings.loader, Modifier, rings.onViewConversation) } },
+            timelineOverlay = subagents?.let { { SubagentRingsOverlay(it.entries, it.loader, Modifier, it.onViewConversation) } },
         )
     }
 

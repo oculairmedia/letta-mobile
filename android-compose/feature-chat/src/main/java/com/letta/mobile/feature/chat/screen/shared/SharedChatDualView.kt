@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.screen.shared
 import com.letta.mobile.data.subagents.SubagentView
 import com.letta.mobile.feature.chat.screen.ChatScreenNavigationCallbacks
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
+import com.letta.mobile.ui.chat.session.SubagentViewSessions
 import com.letta.mobile.ui.chat.subagents.SubagentDualViewBinding
 import com.letta.mobile.ui.chat.subagents.SubagentDualViewOptions
 import com.letta.mobile.ui.chat.subagents.conversationOpener
@@ -26,3 +27,6 @@ internal fun SharedChatPageParams.dualNavigation(dualView: SubagentDualViewBindi
 /** How the subagent's pane is drawn: the page's own appearance and host, below its floating header. */
 internal fun SharedChatPageParams.dualViewOptions(appearance: ChatSurfaceAppearance, host: ChatSurfaceHost) =
     SubagentDualViewOptions(appearance = appearance, host = host, topInset = topChromeInset)
+
+/** Where the dual view reads a child's conversation: the subagent source's transport. */
+internal val SharedChatPageParams.viewSessions: SubagentViewSessions? get() = subagents.source.viewSessions
