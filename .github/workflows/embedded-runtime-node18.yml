@@ -10,8 +10,9 @@ name: Embedded runtime on Node 18
 #      emulation preload, against a fake OpenAI-compatible LLM: a headless stream-json Bash turn,
 #      then `letta server` through LocalAppServerHost driven by app-server-smoke (runtime_start ->
 #      Bash tool -> end_turn, then one turn with an image, prepared in a child node while
-#      process.execPath is an emulated app_process). The first missing-API error lands in the job
-#      summary.
+#      process.execPath is an emulated app_process), then a compact agent's turn through the same
+#      client: only the shared small toolset is offered and its Read call round-trips
+#      (letta-mobile-by4vm.121.16). The first missing-API error lands in the job summary.
 on:
   pull_request:
     paths:
@@ -23,6 +24,8 @@ on:
       - "android-compose/appserver-cli/**"
       - "android-compose/sharedLogic/src/*/kotlin/com/letta/mobile/data/runtime/host/**"
       - "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/appserver/**"
+      - "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/CompactAgentProfile.kt"
+      - "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/CompactProfileRuntimePolicy.kt"
   push:
     branches: [main]
   workflow_dispatch:

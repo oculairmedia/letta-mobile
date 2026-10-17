@@ -259,7 +259,7 @@ class DefaultAppServerClient(
         timeoutMs = requestTimeoutMs,
     )
 
-    /** Keeps compact agents' runs free of the skills catalog and client tools (see CompactAgentProfile). */
+    /** Keeps compact agents' runs free of the skills catalog and to a few client tools (see CompactAgentProfile). */
     private val compactProfile = CompactProfileRuntimePolicy()
 
     override val events: Flow<AppServerReceivedFrame> = transport.inboundFrames
@@ -333,7 +333,7 @@ class DefaultAppServerClient(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                // The run keeps its skills catalog; its inputs still offer no tools.
+                // The run keeps its skills catalog; its inputs still offer only the compact tools.
             }
         }
         return response

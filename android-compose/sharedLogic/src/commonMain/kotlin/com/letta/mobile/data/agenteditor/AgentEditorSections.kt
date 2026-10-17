@@ -154,7 +154,7 @@ class AgentEditorSections(
             SettingsRow.Link("tool-${tool.id}", tool.name, supporting = if (tool.mcp) "MCP" else tool.description, onClick = openers.onTools)
         }.ifEmpty { listOf(SettingsRow.Note("no-tools", SettingsStatus("No tools attached yet."))) }
         val manage = SettingsRow.Link("manage-tools", "Add or remove tools", value = attached.size.toString(), onClick = openers.onTools)
-        val supporting = if (state.compactProfile) "A compact agent runs without tools" else "Built-in tools and tools from MCP servers"
+        val supporting = if (state.compactProfile) "A compact agent gets a few core tools" else "Built-in tools and tools from MCP servers"
         return SettingsSectionModel(AgentEditorSectionKeys.TOOLS, "Tools", rows + manage, supporting = supporting)
     }
 
@@ -192,7 +192,7 @@ class AgentEditorSections(
         const val DEFAULT_EFFORT = "default"
         const val PROMPT_LINES = 6
         const val COMPACT_KEY = "compact-profile"
-        const val COMPACT_SUPPORTING = "Short instructions, no tools and no skills list, so a small model stays fast and on topic."
+        const val COMPACT_SUPPORTING = "Short instructions, a few core tools and no skills list, so a small model stays fast and on topic."
     }
 }
 

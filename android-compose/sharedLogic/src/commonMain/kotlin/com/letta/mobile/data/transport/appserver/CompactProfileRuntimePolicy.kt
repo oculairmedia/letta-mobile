@@ -14,8 +14,8 @@ import kotlinx.serialization.json.contentOrNull
  * skills catalog or the client toolset: `skill_sources` is per `runtime_start` and
  * `client_tool_allowlist` per input. So every [DefaultAppServerClient] (every platform, every hop)
  * learns which agents carry [CompactAgentProfile.TAG] from the agent records it sees and sends their
- * runs `skill_sources: []` and their inputs `client_tool_allowlist: []`: no skills catalog in the
- * system prompt, no tool schemas in the request.
+ * runs `skill_sources: []` and their inputs `client_tool_allowlist: CompactAgentProfile.CLIENT_TOOLS`:
+ * no skills catalog in the system prompt, a few tool schemas instead of twenty.
  */
 class CompactProfileRuntimePolicy {
     private val lock = SynchronizedObject()
@@ -58,11 +58,11 @@ class CompactProfileRuntimePolicy {
         )
     }
 
-    /** [command] with no client tools offered when its agent is compact. */
+    /** [command] offering only the compact client tools when its agent is compact. */
     fun input(command: AppServerCommand.Input): AppServerCommand.Input {
         val payload = command.payload as? AppServerInputPayload.CreateMessage ?: return command
         if (!isCompact(AgentId(command.runtime.agentId))) return command
-        return command.copy(payload = payload.copy(clientToolAllowlist = emptyList()))
+        return command.copy(payload = payload.copy(clientToolAllowlist = CompactAgentProfile.CLIENT_TOOLS))
     }
 
     private companion object {

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport.appserver
 
 import app.cash.turbine.test
+import com.letta.mobile.data.model.CompactAgentProfile
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -75,9 +76,9 @@ class AppServerClientTest {
         assertEquals(true, ack.queued)
     }
 
-    /** A compact agent's run drops the skills catalog (a second runtime_start) and its inputs offer no tools. */
+    /** A compact agent's run drops the skills catalog (a second runtime_start) and its inputs offer only the core tools. */
     @Test
-    fun aCompactAgentsRunHasNoSkillsAndItsInputsNoTools() = runTest {
+    fun aCompactAgentsRunHasNoSkillsAndItsInputsOnlyTheCoreTools() = runTest {
         val transport = FakeAppServerTransport()
         val client = DefaultAppServerClient(transport, parentScope = backgroundScope, requestTimeoutMs = 1_000)
         val compactAgent = buildJsonObject {
@@ -108,7 +109,7 @@ class AppServerClientTest {
             ),
         )
         val sent = assertIs<AppServerCommand.Input>(transport.sentControlCommands[2])
-        assertEquals(emptyList(), assertIs<AppServerInputPayload.CreateMessage>(sent.payload).clientToolAllowlist)
+        assertEquals(CompactAgentProfile.CLIENT_TOOLS, assertIs<AppServerInputPayload.CreateMessage>(sent.payload).clientToolAllowlist)
 
         // Known compact now: the next run starts without skills at once.
         val again = backgroundScope.async { client.runtimeStart(AppServerCommand.RuntimeStart(requestId = "start-2", agentId = "agent-1")) }

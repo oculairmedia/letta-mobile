@@ -198,7 +198,7 @@ class AgentEditorControllerTest {
         val compact = backend.created.single()
         assertEquals(CompactAgentProfile.SYSTEM_PROMPT, compact.system)
         assertTrue(CompactAgentProfile.isCompact(compact.tags))
-        assertTrue(CompactAgentProfile.MEMFS_DISABLED_TAG in compact.tags.orEmpty())
+        assertFalse("memfs:disabled" in compact.tags.orEmpty())
         assertEquals(false, compact.includeBaseTools)
 
         controller.update { copy(compactProfile = false) }
