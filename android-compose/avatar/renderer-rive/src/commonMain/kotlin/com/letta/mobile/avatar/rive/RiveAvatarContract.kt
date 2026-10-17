@@ -267,6 +267,48 @@ interface RiveInputSink {
     fun fire(input: String)
 }
 
+/**
+ * One [RiveInputSink] write as a value, so a sink that queues, gates or forwards writes (the frame
+ * pipeline's deferred sink, the browser scene) handles one type instead of restating the interface.
+ */
+sealed interface RiveWrite {
+    /** Performs this write on [sink]. */
+    fun applyTo(sink: RiveInputSink)
+
+    data class Number(val input: String, val value: Float) : RiveWrite {
+        override fun applyTo(sink: RiveInputSink) = sink.setNumber(input, value)
+    }
+
+    data class Bool(val input: String, val value: Boolean) : RiveWrite {
+        override fun applyTo(sink: RiveInputSink) = sink.setBoolean(input, value)
+    }
+
+    data class Enum(val input: String, val key: String) : RiveWrite {
+        override fun applyTo(sink: RiveInputSink) = sink.setEnum(input, key)
+    }
+
+    data class Color(val input: String, val argb: Int) : RiveWrite {
+        override fun applyTo(sink: RiveInputSink) = sink.setColor(input, argb)
+    }
+
+    data class Fire(val input: String) : RiveWrite {
+        override fun applyTo(sink: RiveInputSink) = sink.fire(input)
+    }
+}
+
+/** A [RiveInputSink] that hands every write to [onWrite] as a [RiveWrite]. */
+class RiveWriteSink(private val onWrite: (RiveWrite) -> Unit) : RiveInputSink {
+    override fun setNumber(input: String, value: Float) = onWrite(RiveWrite.Number(input, value))
+
+    override fun setBoolean(input: String, value: Boolean) = onWrite(RiveWrite.Bool(input, value))
+
+    override fun setEnum(input: String, key: String) = onWrite(RiveWrite.Enum(input, key))
+
+    override fun setColor(input: String, argb: Int) = onWrite(RiveWrite.Color(input, argb))
+
+    override fun fire(input: String) = onWrite(RiveWrite.Fire(input))
+}
+
 /** The mascot this module ships: a raw resource on Android, a classpath resource on desktop. */
 val MASCOT_MODEL: com.letta.mobile.avatar.core.AvatarModel = com.letta.mobile.avatar.core.AvatarModel(
     id = "letta-mascot",
