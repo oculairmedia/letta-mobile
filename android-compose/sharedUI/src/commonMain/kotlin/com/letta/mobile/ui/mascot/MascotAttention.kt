@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -101,6 +102,9 @@ internal class MascotCaret(private val publisher: AttentionPublisher) {
         publish()
     }
 
+    /** The inner text's coordinates while they are still attached to the window, else null. */
+    private fun placedCoordinates(): LayoutCoordinates? = coordinates?.takeIf { it.isAttached }
+
     fun onFocus(isFocused: Boolean) {
         if (isFocused == focused) return
         focused = isFocused
@@ -108,9 +112,10 @@ internal class MascotCaret(private val publisher: AttentionPublisher) {
     }
 
     private fun publish() {
-        val text = layout
-        val coords = coordinates
-        if (!focused || text == null || coords == null || !coords.isAttached) {
+        // Only a focused field's caret, laid out and still in the window, is worth a look.
+        val text = layout?.takeIf { focused }
+        val coords = placedCoordinates()
+        if (text == null || coords == null) {
             publisher.retract()
             return
         }
@@ -173,6 +178,9 @@ private class PlacedSurface {
     }
 }
 
+/** A finger on the glass: a pressed touch pointer (never a mouse or a hovering stylus). */
+private fun PointerInputChange.isFingerDown(): Boolean = pressed && type == PointerType.Touch
+
 /**
  * Watches touches on this surface (never consuming them) and publishes the last one as the
  * mascot's cursor for [MASCOT_TOUCH_PRESENCE]. Mouse and stylus hover are the desktop capture's.
@@ -188,7 +196,7 @@ fun Modifier.mascotTouchPresence(): Modifier {
         awaitPointerEventScope {
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
-                val touch = event.changes.firstOrNull { it.type == PointerType.Touch && it.pressed } ?: continue
+                val touch = event.changes.firstOrNull { it.isFingerDown() } ?: continue
                 presence.touched(placed.toWindow(touch.position))
                 expiry?.cancel()
                 expiry = scope.launch {

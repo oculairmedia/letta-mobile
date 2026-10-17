@@ -141,8 +141,10 @@ class GazeDirector(
     }
 
     /** True while a seat hand-off's eye lead owns the look. */
-    private fun leading(mode: GazeDriveMode): Boolean =
-        leadRemaining > 0f && !still && mode == GazeDriveMode.JUSTIFIED
+    private fun leading(mode: GazeDriveMode): Boolean = leadRemaining > 0f && planDrives(mode)
+
+    /** The justified plan owns the look this tick (not the bench cursor, not reduced motion's held look). */
+    private fun planDrives(mode: GazeDriveMode): Boolean = !still && mode == GazeDriveMode.JUSTIFIED
 
     /** Reduced motion holds one look; the product plan picks justified looks; the bench follows the cursor. */
     private fun chooseTarget(state: AvatarState, world: GazeWorld) {
@@ -159,21 +161,32 @@ class GazeDirector(
     // --- plan (spike `LaunchedEffect(gazeMode, current)`) ----------------------
 
     private fun tickPlan(state: AvatarState, world: GazeWorld) {
-        if (state != lastState) {
-            lastState = state
-            // A cued look holds through the flip its own event causes (an approval turns the state to WAITING_INPUT).
-            if (!cuedDwell) restartPlan()
-        }
+        noteStateFlip(state)
         beginCue(world)
         phaseRemaining -= stepSeconds
         var steps = 0
         while (phaseRemaining <= 0f && steps < 4) {
             steps++
-            when (phase) {
-                PlanPhase.PICK -> beginDwell(state, world)
-                PlanPhase.DWELL -> beginGap()
-                PlanPhase.GAP -> phase = PlanPhase.PICK
-            }
+            stepPhase(state, world)
+        }
+    }
+
+    /**
+     * A new state restarts the plan, unless a cued look holds through the flip its own event
+     * caused (an approval turns the state to WAITING_INPUT).
+     */
+    private fun noteStateFlip(state: AvatarState) {
+        if (state == lastState) return
+        lastState = state
+        if (!cuedDwell) restartPlan()
+    }
+
+    /** One PICK -> DWELL -> GAP step of the plan. */
+    private fun stepPhase(state: AvatarState, world: GazeWorld) {
+        when (phase) {
+            PlanPhase.PICK -> beginDwell(state, world)
+            PlanPhase.DWELL -> beginGap()
+            PlanPhase.GAP -> phase = PlanPhase.PICK
         }
     }
 
@@ -189,16 +202,28 @@ class GazeDirector(
         val cue = pendingCue ?: return
         pendingCue = null
         when (cue) {
-            GazeCue.APPROVAL_ASK -> {
-                holdCued(if (available(GazeTarget.APPROVAL, world)) GazeTarget.APPROVAL else GazeTarget.USER, config.cueApprovalSeconds)
-                snapHead = true
-            }
-            GazeCue.SENT -> {
-                val glance = sentGlance(world)
-                holdCued(glance ?: GazeTarget.USER, if (glance == null) config.cueReturnSeconds else config.cueGlanceSeconds)
-                followUp = if (glance == null) null else GazeTarget.USER
-            }
+            GazeCue.APPROVAL_ASK -> cueApproval(world)
+            GazeCue.SENT -> cueSent(world)
         }
+    }
+
+    /** APPROVAL_ASK: the card (or you, with no card), with the head turned at once. */
+    private fun cueApproval(world: GazeWorld) {
+        val look = if (available(GazeTarget.APPROVAL, world)) GazeTarget.APPROVAL else GazeTarget.USER
+        holdCued(look, config.cueApprovalSeconds)
+        snapHead = true
+    }
+
+    /** SENT: a glance at the newest message, then back at you; straight to you when there is nothing to glance at. */
+    private fun cueSent(world: GazeWorld) {
+        val glance = sentGlance(world)
+        if (glance == null) {
+            holdCued(GazeTarget.USER, config.cueReturnSeconds)
+            followUp = null
+            return
+        }
+        holdCued(glance, config.cueGlanceSeconds)
+        followUp = GazeTarget.USER
     }
 
     /** What a sent prompt glances at: the newest message, else the timeline, else nothing. */
@@ -218,17 +243,25 @@ class GazeDirector(
     }
 
     private fun beginDwell(state: AvatarState, world: GazeWorld) {
-        val next = followUp
-        if (next != null) {
-            followUp = null
-            holdCued(next, config.cueReturnSeconds)
-            return
-        }
+        if (beginFollowUp()) return
         val look = pickLook(GazePlan.forState(state), world)
         target = look.target
         dwellLook = look
         phase = PlanPhase.DWELL
         phaseRemaining = pickRange(look.dwellSeconds)
+        placeDwell(look, state, world)
+    }
+
+    /** A cued glance's hand-over (SENT's look back at you) takes the next dwell; false when there is none. */
+    private fun beginFollowUp(): Boolean {
+        val next = followUp ?: return false
+        followUp = null
+        holdCued(next, config.cueReturnSeconds)
+        return true
+    }
+
+    /** Where an aside or a peer look parks the eyes for this dwell. */
+    private fun placeDwell(look: GazeLook, state: AvatarState, world: GazeWorld) {
         val working = ContentGaze.isAtWork(state)
         when (look.target) {
             GazeTarget.AWAY -> asidePoint = pickAside(config.awayReach, working)
@@ -547,7 +580,8 @@ class GazeDirector(
      */
     private fun wantLook(base: GazePoint, world: GazeWorld): GazePoint {
         val mode = world.mode
-        val useScan = !cursorNear && mode != GazeDriveMode.CURSOR && !leading(mode)
+        // A look the pointer or a hand-off lead owns is followed as is, with no scan on top.
+        val useScan = !pointerDemands(mode)
         val host = contained(base)
         val lambda = if (useScan) GazeContainment.noiseScale(host, scanX, scanY) else 0f
         val want = GazePoint((host.x + lambda * scanX).coerceIn(-1f, 1f), (host.y + lambda * scanY).coerceIn(-1f, 1f))
@@ -564,8 +598,10 @@ class GazeDirector(
      * A look the user's pointer demands, or a seat hand-off's lead, is followed as is; every planned
      * look stays toward the content.
      */
-    private fun pointerDemands(mode: GazeDriveMode): Boolean =
-        mode == GazeDriveMode.CURSOR || cursorNear || leading(mode)
+    private fun pointerDemands(mode: GazeDriveMode): Boolean = pointerLook(mode) || leading(mode)
+
+    /** The bench's cursor mode, or a pointer moving near enough to demand a look. */
+    private fun pointerLook(mode: GazeDriveMode): Boolean = mode == GazeDriveMode.CURSOR || cursorNear
 
     private fun constrained(point: GazePoint): GazePoint =
         ContentGaze.constrain(point)
