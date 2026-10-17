@@ -17,7 +17,7 @@ internal value class ResponseModelId(val value: String)
 /** OpenAI `finish_reason` values the bridge sends. */
 internal enum class FinishReason(val wire: String) {
     Stop("stop"),
-    /** The output cap or the timeout cut the reply: the client sees it was truncated. */
+    /** The reply reached the output limit the client asked for. */
     Length("length"),
     ToolCalls("tool_calls"),
 }
@@ -150,9 +150,14 @@ internal class OpenAiCompletions(private val json: Json) : OpenAiCompletionWrite
  */
 internal const val NON_RETRYABLE_STATUS = 422
 
-/** Tool calls end the turn as `tool_calls`; a reply the output cap or the timeout cut is `length`. */
+/**
+ * Tool calls end the turn as `tool_calls`. `length` only when the reply reached the limit the
+ * client itself asked for: letta-code 0.34.14 fails a turn that ends in `length`
+ * (`max_tokens_exceeded`), so a reply the bridge's own guards cut (its output ceiling, the timeout,
+ * the repetition guard) is delivered as `stop`; the cut is logged (`bridge_generation_stopped`).
+ */
 internal fun finishReasonOf(reply: OnDeviceReply, generation: OnDeviceGeneration): FinishReason = when {
     reply.toolCalls.isNotEmpty() -> FinishReason.ToolCalls
-    generation.stopReason == OnDeviceStopReason.MaxTokens || generation.stopReason == OnDeviceStopReason.Timeout -> FinishReason.Length
+    generation.stopReason == OnDeviceStopReason.MaxTokens && generation.limits.capIsRequested -> FinishReason.Length
     else -> FinishReason.Stop
 }

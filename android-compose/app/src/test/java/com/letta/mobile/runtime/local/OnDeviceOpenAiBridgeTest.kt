@@ -194,6 +194,41 @@ class OnDeviceOpenAiBridgeTest {
         assertTrue(response.body.contains("6120"))
     }
 
+    /** Regression (Pixel 9 Pro, LiteRT-LM 0.18.0): a request far over the window aborted the app process. */
+    @Test
+    fun `a request that may overflow the context window is refused before the engine sees it`() {
+        val engine = FakeEngine()
+        val history = (1..18).joinToString(",") { i ->
+            """{"role": "${if (i % 2 == 1) "user" else "assistant"}", "content": "${"turn $i ".repeat(400)}"}"""
+        }
+        val tools = (1..21).joinToString(",") { i ->
+            TOOL_TEMPLATE.replace("NAME", "tool_$i").replace("DESC", "d".repeat(3000))
+        }
+        val response = chat(engine, """{"messages": [$history, {"role": "user", "content": "hi"}], "tools": [$tools]}""")
+
+        assertEquals(422, response.code)
+        assertTrue(response.body.contains("on_device_context_overflow"))
+        assertTrue(response.body.contains("4096-token context window"))
+        assertTrue("an overflowing request must never reach LiteRT-LM", engine.requests.isEmpty())
+    }
+
+    @Test
+    fun `a compact request fits the default window and reaches the engine`() {
+        val engine = FakeEngine(response = "Not much, you?")
+        val system = "You are a helpful assistant running on a small language model. ".repeat(30)
+        val tools = (1..3).joinToString(",") { i ->
+            TOOL_TEMPLATE.replace("NAME", "tool_$i").replace("DESC", "d".repeat(1200))
+        }
+        val response = chat(
+            engine,
+            """{"messages": [{"role": "system", "content": "$system"}, {"role": "user", "content": "what's up?"}], "tools": [$tools]}""",
+        )
+
+        assertEquals(200, response.code)
+        assertTrue(response.body.contains("Not much, you?"))
+        assertEquals(1, engine.requests.size)
+    }
+
     @Test
     fun `a malformed conversation is a bad request and never reaches the engine`() {
         val engine = FakeEngine()
@@ -419,6 +454,8 @@ class OnDeviceOpenAiBridgeTest {
     }
 
     private companion object {
+        const val TOOL_TEMPLATE = """{"type": "function", "function": {"name": "NAME", "description": "DESC",
+            "parameters": {"type": "object"}}}"""
         const val HELLO = """{"messages":[{"role":"user","content":"Hello"}]}"""
         const val READ_TOOL =
             """{"type": "function", "function": {"name": "Read", "description": "Read a file.",

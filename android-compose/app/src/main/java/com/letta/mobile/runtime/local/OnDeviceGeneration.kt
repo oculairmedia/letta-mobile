@@ -20,7 +20,12 @@ data class OnDeviceGenerationLimits(
     val timeoutMs: Long = DEFAULT_TIMEOUT_MS,
     /** Output text that ends the reply where it starts (Gemma's turn markers, plus the request's `stop`). */
     val stopSequences: List<String> = DEFAULT_STOP_SEQUENCES,
+    /** The request's own `max_completion_tokens`/`max_tokens`; null when it set none. */
+    val requestedMaxOutputTokens: Int? = null,
 ) {
+    /** Whether [maxOutputTokens] is the client's own limit (not the bridge's lower ceiling). */
+    val capIsRequested: Boolean get() = requestedMaxOutputTokens != null && requestedMaxOutputTokens <= maxOutputTokens
+
     companion object {
         /** Long enough for a chat reply, short enough that a loop on CPU ends in about a minute. */
         const val DEFAULT_MAX_OUTPUT_TOKENS = 1_024
@@ -56,6 +61,7 @@ data class OnDeviceGenerationLimits(
                 maxOutputTokens = requested?.coerceAtMost(ceiling) ?: ceiling,
                 timeoutMs = timeoutMs,
                 stopSequences = DEFAULT_STOP_SEQUENCES + request.stopSequences(),
+                requestedMaxOutputTokens = requested,
             )
         }
 
