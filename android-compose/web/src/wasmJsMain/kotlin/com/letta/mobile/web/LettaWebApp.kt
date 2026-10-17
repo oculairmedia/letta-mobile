@@ -23,7 +23,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
@@ -47,7 +46,6 @@ import com.letta.mobile.ui.shell.rememberShellWorkspaceState
 import com.letta.mobile.ui.shell.shellSettingsPage
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.SharedMaterialTheme
-import com.letta.mobile.web.chat.WebChatCanvas
 import com.letta.mobile.web.chat.WebChatLoad
 import com.letta.mobile.web.chat.WebChatOpener
 import com.letta.mobile.web.chat.WebChatPageNavigation
@@ -55,6 +53,7 @@ import com.letta.mobile.web.chat.WebSharedChatPage
 import com.letta.mobile.web.chat.rememberWebChatLoad
 import com.letta.mobile.web.data.WasmAppServerClientGateway
 import com.letta.mobile.web.data.WebSettingsStore
+import com.letta.mobile.web.storage.WebStorage
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
@@ -63,20 +62,19 @@ import kotlin.time.Clock
  * shared navigation ([ShellNavDrawer]: the agent rail and the agent panel) beside the page, as the
  * desktop does; narrow ones put it in a modal drawer, as Android does. What the shell shows is the
  * shared [ShellWorkspaceState] (letta-mobile-ckmub.17.3), its route bound to the URL fragment
- * ([BrowserRouteBinding]). What stays web-side is the binding: the App Server gateway, the browser's
- * settings storage and the in-memory canvas store.
+ * ([BrowserRouteBinding]). What stays web-side is the binding: the App Server gateway and the
+ * browser's storage ([WebStorage]).
  */
 @Composable
 fun LettaWebApp() {
     val scope = rememberCoroutineScope()
     val gateway = remember { WasmAppServerClientGateway(scope) }
-    val settingsStore = remember { WebSettingsStore() }
-    val savedSettings = remember(settingsStore) { settingsStore.load() }
+    val storage = remember { WebStorage() }
+    val settingsStore = remember { WebSettingsStore(storage.settings) }
     val workspace = rememberShellWorkspaceState(ShellDestination.Chat())
-    val backend = remember { WebBackend(savedSettings.config) }
+    val backend = remember { WebBackend(settingsStore.load()) }
     val navigator = remember(workspace) { ShellWorkspaceNavigator(workspace, WebChatPort) }
-    // letta-mobile-o4ygk.4.5: boards live in memory for the tab's lifetime (no web persistence yet).
-    val canvas = remember { WebChatCanvas(InMemoryCanvasDocumentStore(), savedSettings.openChatsOnCanvas) }
+    val canvas = remember { storage.chatCanvas() }
     val connection by gateway.state.collectAsState()
     val config = backend.config.value
     LaunchedEffect(config.serverUrl, config.accessToken, config.mode, backend.rosterRequest.intValue) {

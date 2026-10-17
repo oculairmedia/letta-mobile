@@ -9,8 +9,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import com.letta.mobile.data.canvas.bubble.CanvasBubbleLayout
+import com.letta.mobile.data.canvas.bubble.CanvasBubbleLayoutCodec
 import com.letta.mobile.data.canvas.bubble.CanvasBubbleLayoutPrefs
+import com.letta.mobile.data.storage.JsonPreference
+import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
+import com.letta.mobile.ui.chat.session.ChatDockGeometryMath
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -33,6 +37,28 @@ class LayoutPrefStorage<T : Any>(
     val save: (T) -> Unit,
     val io: CoroutineContext = Dispatchers.Default,
 )
+
+/** The minimised chat's layout kept in [settings]; [defaults] is the platform's own. */
+fun canvasBubbleLayoutStorage(
+    settings: SecureSettingsStore,
+    defaults: CanvasBubbleLayout,
+    io: CoroutineContext = Dispatchers.Default,
+): LayoutPrefStorage<CanvasBubbleLayout> = LayoutPrefStorage(
+    load = { CanvasBubbleLayoutCodec.read(settings, defaults) },
+    save = { CanvasBubbleLayoutCodec.write(settings, it) },
+    io = io,
+)
+
+/** The docked chat panel's placement kept in [settings]: one placement per window, sanitised on read. */
+fun chatDockGeometryStorage(
+    settings: SecureSettingsStore,
+    io: CoroutineContext = Dispatchers.Default,
+): LayoutPrefStorage<ChatDockGeometry> {
+    val preference = JsonPreference(settings, CHAT_DOCK_GEOMETRY_KEY, ChatDockGeometry.serializer())
+    return LayoutPrefStorage(load = { preference.load()?.let(ChatDockGeometryMath::sanitize) }, save = preference::save, io = io)
+}
+
+private const val CHAT_DOCK_GEOMETRY_KEY = "chat.dock.geometry"
 
 /** A slider, an edge drag or a panel drag reports every frame; storage is written once it has been still this long. */
 const val LAYOUT_PREF_SAVE_DEBOUNCE_MS = 400L

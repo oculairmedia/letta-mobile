@@ -67,4 +67,13 @@ class InMemoryCanvasOpLog : InMemoryOpLog<CanvasId, CanvasOp>(), CanvasOpLog {
     override suspend fun settle(canvasId: CanvasId, opIds: Collection<CanvasOpId>) {
         journalLock.withLock { pending[canvasId]?.keys?.removeAll(opIds.mapTo(mutableSetOf()) { it.value }) }
     }
+
+    /** Puts a stored log back: [ops] in their order, those not in [settled] pending again. */
+    internal suspend fun restore(canvasId: CanvasId, ops: List<CanvasOp>, settled: Set<String>) {
+        journalLock.withLock {
+            val journal = pending.getOrPut(canvasId) { LinkedHashMap() }
+            ops.filterNot { it.opId in settled }.forEach { journal[it.opId] = it }
+        }
+        super.restore(canvasId, ops)
+    }
 }

@@ -1,7 +1,7 @@
 package com.letta.mobile.desktop
 
 import com.letta.mobile.data.canvas.bubble.CanvasBubbleLayout
-import com.letta.mobile.desktop.data.DesktopCanvasBubbleLayoutStore
+import com.letta.mobile.desktop.data.DesktopPreferences
 import com.letta.mobile.ui.chat.surface.CanvasBubbleLayoutHost
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -190,7 +190,7 @@ private fun runDesktopApplication(
                             // Every mascot in the app looks toward the cursor; capture it once, at the root.
                             MascotCursorCapture(mascots) {
                             // The minimised chat's mascot size, bar width and reply hold (letta-mobile-zxk2n.29).
-                            CanvasBubbleLayoutHost(CanvasBubbleLayout.Desktop, remember { DesktopCanvasBubbleLayoutStore().asLayoutPrefStorage() }) {
+                            CanvasBubbleLayoutHost(CanvasBubbleLayout.Desktop, DesktopPreferences.bubbleLayout) {
                             LettaDesktopApp(
                                 shell = DesktopAppShellBindings(
                                     nucleusApplicationScope = nucleusScope,
