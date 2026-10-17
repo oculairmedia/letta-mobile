@@ -30,29 +30,64 @@ interface DocumentStore<Id, D : DocumentSnapshot<Id>> {
 }
 
 /**
- * Thread-safe in-memory [DocumentStore], for tests and hosts without storage. Open so a document
- * kind's own store can add its lookups over the same map ([withDocuments]) without copying the
- * revision check.
+ * Where an [InMemoryDocumentStore] keeps its documents beyond memory (the web's IndexedDB, through
+ * a [com.letta.mobile.data.storage.KeyValueStore]). Neither call throws: a backing reports its own
+ * failures as storage faults, and the store keeps working from memory.
  */
-open class InMemoryDocumentStore<Id, D : DocumentSnapshot<Id>> : DocumentStore<Id, D> {
+interface DocumentBacking<D> {
+    /** Every stored document; what cannot be read is reported and left out. */
+    suspend fun loadAll(): List<D>
+
+    /** Stores [doc], replacing what is stored under its id. */
+    suspend fun write(doc: D)
+}
+
+/**
+ * Thread-safe [DocumentStore] held in memory, for tests, hosts without storage and, over a
+ * [backing], hosts whose storage is a plain key-value store: the documents are read from it once,
+ * on first use, and every write goes through to it. Open so a document kind's own store can add
+ * its lookups over the same map ([withDocuments], [writeDocument]) without copying the revision check.
+ */
+open class InMemoryDocumentStore<Id, D : DocumentSnapshot<Id>>(
+    private val backing: DocumentBacking<D>? = null,
+) : DocumentStore<Id, D> {
     private val mutex = Mutex()
     private val documents = mutableMapOf<Id, D>()
+    private var loaded = backing == null
 
-    /** Runs [action] over the stored documents under the store's lock. */
-    protected suspend fun <T> withDocuments(action: (MutableMap<Id, D>) -> T): T = mutex.withLock { action(documents) }
+    /** Runs [action] over the stored documents under the store's lock; [action] only reads. */
+    protected suspend fun <T> withDocuments(action: (Map<Id, D>) -> T): T = mutex.withLock {
+        ensureLoaded()
+        action(documents)
+    }
+
+    /**
+     * Runs [action] under the store's lock; the document it returns beside its result, if any, is
+     * stored (in memory and in the backing).
+     */
+    protected suspend fun <T> writeDocument(action: (Map<Id, D>) -> Pair<T, D?>): T = mutex.withLock {
+        ensureLoaded()
+        val (result, written) = action(documents)
+        if (written != null) {
+            documents[written.id] = written
+            backing?.write(written)
+        }
+        result
+    }
+
+    private suspend fun ensureLoaded() {
+        if (loaded) return
+        backing?.loadAll()?.forEach { documents[it.id] = it }
+        loaded = true
+    }
 
     override suspend fun get(id: Id): D? = withDocuments { it[id] }
 
-    override suspend fun upsert(doc: D) = withDocuments { it[doc.id] = doc }
+    override suspend fun upsert(doc: D) = writeDocument { Unit to doc }
 
-    override suspend fun upsertIfRevision(doc: D, expectedRevision: Long): Boolean = withDocuments { stored ->
+    override suspend fun upsertIfRevision(doc: D, expectedRevision: Long): Boolean = writeDocument { stored ->
         val current = stored[doc.id]
-        if (current == null || current.revision != expectedRevision) {
-            false
-        } else {
-            stored[doc.id] = doc
-            true
-        }
+        if (current == null || current.revision != expectedRevision) false to null else true to doc
     }
 
     override suspend fun listAll(): List<D> = withDocuments { stored ->

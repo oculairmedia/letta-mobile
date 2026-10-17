@@ -120,7 +120,14 @@ abstract class MascotEntry(
      * plan so the eyes are never dead. Last writer wins when several surfaces of the
      * same agent compose in one frame.
      */
-    fun setGazeWorld(world: GazeWorld) = director.setGazeWorld(world)
+    fun setGazeWorld(world: GazeWorld) {
+        gazeWorld = world
+        director.setGazeWorld(world)
+    }
+
+    /** The last world handed to [setGazeWorld], as the director sees it. */
+    var gazeWorld: GazeWorld = GazeWorld()
+        private set
 
     /** Advances the director's clock once per frame, however many surfaces draw this agent. */
     fun tickTo(nowNanos: Long) {

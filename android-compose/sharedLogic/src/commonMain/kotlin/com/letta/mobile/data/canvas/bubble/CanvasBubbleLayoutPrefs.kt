@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas.bubble
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import com.letta.mobile.data.storage.SecureSettingsStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -149,6 +150,18 @@ object CanvasBubbleLayoutCodec {
         }
         val height = values[KEY_COMPOSER_HEIGHT]?.toFloatOrNull() ?: defaults.composerHeightDp
         return CanvasBubbleLayout(mascot, composer, hold, height).sanitize(defaults)
+    }
+
+    private val keys = listOf(KEY_MASCOT_SIZE, KEY_COMPOSER_WIDTH, KEY_REPLY_HOLD, KEY_COMPOSER_HEIGHT)
+
+    /** The layout [store] holds, read as [decode] reads it. */
+    fun read(store: SecureSettingsStore, defaults: CanvasBubbleLayout): CanvasBubbleLayout =
+        decode(keys.mapNotNull { key -> store.getString(key)?.let { key to it } }.toMap(), defaults)
+
+    /** Writes [layout] to [store]; a size it leaves unset is removed, so it reads back as the default. */
+    fun write(store: SecureSettingsStore, layout: CanvasBubbleLayout) {
+        val values = encode(layout)
+        keys.forEach { key -> values[key]?.let { store.putString(key, it) } ?: store.remove(key) }
     }
 }
 

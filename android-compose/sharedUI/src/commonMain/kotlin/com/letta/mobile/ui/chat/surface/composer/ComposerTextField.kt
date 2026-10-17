@@ -33,6 +33,7 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -45,8 +46,10 @@ import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightSource
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
+import com.letta.mobile.ui.mascot.MascotCaret
 import com.letta.mobile.ui.mascot.MascotGazeSurface
 import com.letta.mobile.ui.mascot.mascotGazeTarget
+import com.letta.mobile.ui.mascot.rememberMascotCaret
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -118,7 +121,9 @@ internal fun ComposerTextField(
     val textStyle = MaterialTheme.typography.bodyLarge.copy(color = composerFieldTextColor(enabled))
     val primary = LocalComposerPrimary.current
     val handoff = LocalComposerFocusHandoff.current
-    val focus = remember(primary, handoff) { FieldFocus(primary, handoff) }
+    // The mascot's eyes follow the caret while the field has focus (letta-mobile-te3n1.2).
+    val caret = rememberMascotCaret(primary, fieldValue.selection.end)
+    val focus = remember(primary, handoff, caret) { FieldFocus(primary, handoff, caret) }
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(primary, handoff) {
         if (focus.restores()) focusRequester.requestFocus()
@@ -159,11 +164,13 @@ internal fun ComposerTextField(
         maxLines = style.maxLines,
         keyboardOptions = style.keyboardOptions(),
         keyboardActions = KeyboardActions(onSend = { sendFromKeyboard() }),
+        onTextLayout = { caret?.onLayout(it) },
         decorationBox = { inner ->
             // Centred in the field's height, so a one-line bar's text sits mid-bar, not at its top.
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = style.textAlignment) {
                 if (fieldValue.text.isEmpty()) FieldPlaceholder(model, style, textStyle)
-                inner()
+                // The inner text's own coordinates, so the caret lands in the window where it is drawn.
+                Box(caretPlacement(caret)) { inner() }
             }
         },
     )
@@ -200,8 +207,18 @@ private fun primaryFieldTargets(primary: Boolean): Modifier {
     return rememberSendFlightSource().then(Modifier.mascotGazeTarget(MascotGazeSurface.INPUT))
 }
 
+/** Reports where the inner text sits to [caret]; nothing for a field without one. */
+private fun caretPlacement(caret: MascotCaret?): Modifier {
+    if (caret == null) return Modifier
+    return Modifier.onGloballyPositioned { caret.onPlaced(it) }
+}
+
 /** One field's part in the page's focus handoff: only the primary field reads or reports it. */
-private class FieldFocus(private val primary: Boolean, private val handoff: ComposerFocusHandoff?) {
+private class FieldFocus(
+    private val primary: Boolean,
+    private val handoff: ComposerFocusHandoff?,
+    private val caret: MascotCaret?,
+) {
     /** The page's prompt had focus as this field took over, so this field takes it. */
     fun restores(): Boolean {
         if (!primary) return false
@@ -209,6 +226,7 @@ private class FieldFocus(private val primary: Boolean, private val handoff: Comp
     }
 
     fun report(state: FocusState) {
+        caret?.onFocus(state.isFocused)
         if (!primary || handoff == null) return
         if (handoff.focused != state.isFocused) handoff.focused = state.isFocused
     }

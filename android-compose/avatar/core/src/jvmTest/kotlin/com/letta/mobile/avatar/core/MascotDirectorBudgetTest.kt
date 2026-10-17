@@ -38,7 +38,14 @@ class MascotDirectorBudgetTest {
             mascot = GazeRect(100f, 100f, 164f, 164f),
             reach = GazeReach(360f),
             pointerPx = GazePoint(400f, 300f),
-            rects = GazeTargetRects(input = GazeRect(0f, 600f, 800f, 660f), timeline = GazeRect(0f, 0f, 800f, 580f)),
+            rects = GazeTargetRects(
+                input = GazeRect(0f, 600f, 800f, 660f),
+                timeline = GazeRect(0f, 0f, 800f, 580f),
+                // te3n1.2: every attention kind in play, so the per-tick attention work is measured too.
+                attention = AttentionKind.entries.map { kind ->
+                    AttentionRect(AttentionKey(kind.name), kind, GazeRect(200f, 300f + kind.ordinal * 40f, 600f, 330f + kind.ordinal * 40f))
+                },
+            ),
         ),
     )
 
@@ -88,6 +95,24 @@ class MascotDirectorBudgetTest {
 
         println("allocation: director %.1f B/tick, avatar+gaze baseline %.1f B/tick".format(perTick, baselinePerTick))
         assertTrue(perTick <= baselinePerTick + NOISE_BYTES, "the director layer allocates ${perTick - baselinePerTick} B/tick of its own")
+    }
+
+    @Test
+    fun attentionPointsAddNoAllocationToAGazeTick() {
+        // te3n1.2: the attention lookups, interest clock and containment clamp run every tick on
+        // primitives; a gaze tick with every kind in play allocates no more than one with none.
+        val bare = world.copy(attention = emptyList())
+        fun perTick(of: GazeWorld): Double {
+            val gaze = GazeDirector(Random(3))
+            repeat(WARMUP) { gaze.tick(STEP, AvatarState.WORKING, of) }
+            val start = allocatedBytes()
+            repeat(TICKS) { gaze.tick(STEP, AvatarState.WORKING, of) }
+            return (allocatedBytes() - start).toDouble() / TICKS
+        }
+        val without = perTick(bare)
+        val with = perTick(world)
+        println("gaze allocation: %.1f B/tick with attention, %.1f B/tick without".format(with, without))
+        assertTrue(with <= without + NOISE_BYTES, "attention adds ${with - without} B/tick")
     }
 
     private companion object {

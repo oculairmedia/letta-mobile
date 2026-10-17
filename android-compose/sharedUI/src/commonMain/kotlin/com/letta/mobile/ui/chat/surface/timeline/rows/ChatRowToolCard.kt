@@ -22,6 +22,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.letta.mobile.avatar.core.AttentionKey
+import com.letta.mobile.avatar.core.AttentionKind
+import com.letta.mobile.ui.mascot.mascotAttention
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import com.letta.mobile.data.chat.projection.ToolTimelineState
@@ -89,7 +92,9 @@ internal fun ToolCard(
     RequestFullResultOnExpand(toolCall, expanded, callbacks)
     val haptics = LocalHaptics.current
     val reducedMotion = LocalReducedMotion.current
-    Column(modifier = Modifier.fillMaxWidth()) {
+    // A running step is where a working mascot looks (te3n1.2).
+    val running = view.state == ToolTimelineState.Running
+    Column(modifier = Modifier.fillMaxWidth().mascotAttention(AttentionKey("tool:$disclosureKey"), AttentionKind.TOOL, enabled = running)) {
         RunStepListRow(
             spec = toolStepRowSpec(view, callbacks),
             disclosure = RunStepDisclosure(expanded) {

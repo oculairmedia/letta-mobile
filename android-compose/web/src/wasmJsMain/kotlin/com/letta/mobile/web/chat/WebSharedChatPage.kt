@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.canvas.CanvasConversationOptions
 import com.letta.mobile.data.canvas.CanvasDocumentStore
+import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.canvas.CanvasWorkspace
@@ -27,10 +28,14 @@ import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.session.TimelineChatTarget
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 import com.letta.mobile.ui.chat.surface.ChatSurface
+import com.letta.mobile.ui.chat.surface.LayoutPrefStorage
+import com.letta.mobile.ui.chat.surface.rememberChatDockGeometry
 
-/** The board docked under the conversation: where it is kept, and whether the page opens on it. */
+/** The board docked under the conversation: where it and its op log are kept, the dock's placement, and whether the page opens on it. */
 internal data class WebChatCanvas(
     val store: CanvasDocumentStore,
+    val opLog: CanvasOpLog,
+    val dockGeometry: LayoutPrefStorage<ChatDockGeometry>,
     val openOnCanvas: Boolean,
 )
 
@@ -48,9 +53,8 @@ internal data class WebChatPageNavigation(
  * when [WebChatCanvas.openOnCanvas] is on (the default), else as the full-screen chat; expanding and "Open canvas"
  * move between the two.
  *
- * The canvas is the shared [CanvasWorkspace] over an in-memory [CanvasSession] from [WebChatCanvas.store]:
- * it lasts while the tab does, with no persistence or sync to other devices yet
- * (letta-mobile-o4ygk.4.6). The mascot
+ * The canvas is the shared [CanvasWorkspace] over a [CanvasSession] from [WebChatCanvas.store], kept in the
+ * browser (letta-mobile-ckmub.17.7); sync to other devices is letta-mobile-ckmub.17.9. The mascot
  * companion is off because the web has no mascot renderer, so the page shows the agent orb.
  */
 @Composable
@@ -63,8 +67,8 @@ internal fun WebSharedChatPage(
     var presentation by remember(port) {
         mutableStateOf(ChatSurfacePresentation.initial(openOnCanvas = canvas.openOnCanvas, hasCanvas = true))
     }
-    var dockGeometry by remember { mutableStateOf(ChatDockGeometry.Default) }
-    val session = rememberConversationCanvas(canvas.store, port.target)
+    var dockGeometry by rememberChatDockGeometry(canvas.dockGeometry)
+    val session = rememberConversationCanvas(canvas, port.target)
     ChatSurface(
         port = port,
         presentation = presentation,
@@ -77,14 +81,14 @@ internal fun WebSharedChatPage(
     )
 }
 
-/** The conversation's own board, created on first open in [store]. */
+/** The conversation's own board, created on first open in the canvas's store. */
 @Composable
-private fun rememberConversationCanvas(store: CanvasDocumentStore, target: TimelineChatTarget): CanvasSession? {
-    val session by produceState<CanvasSession?>(null, store, target.conversationId) {
+private fun rememberConversationCanvas(canvas: WebChatCanvas, target: TimelineChatTarget): CanvasSession? {
+    val session by produceState<CanvasSession?>(null, canvas, target.conversationId) {
         value = CanvasSession.getOrCreateForConversation(
-            store = store,
+            store = canvas.store,
             conversationId = ConversationId(target.conversationId),
-            options = CanvasConversationOptions(agentId = target.agentId, title = "Canvas (${target.agentName})"),
+            options = CanvasConversationOptions(agentId = target.agentId, title = "Canvas (${target.agentName})", opLog = canvas.opLog),
         )
     }
     return session

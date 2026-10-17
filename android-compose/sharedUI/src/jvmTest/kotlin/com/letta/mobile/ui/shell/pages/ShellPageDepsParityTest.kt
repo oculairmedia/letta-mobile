@@ -17,7 +17,7 @@ import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.data.shell.ShellPageKind
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
-import com.letta.mobile.data.storage.InMemorySettingsStore
+import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.pages.plugins.PluginsPageBinding
 import com.letta.mobile.ui.shell.pages.plugins.shellPluginsPage
@@ -48,7 +48,7 @@ class ShellPageDepsParityTest {
         val binding = HostSessionBinding(platform = platform, config = iroh, appServerClients = HostAppServerClients { null })
         val provider = HostSessionGraphProvider(HostSessionGraphFactory { binding }, platform)
         val graph = provider.current
-        val settings = InMemorySettingsStore()
+        val settings = InMemorySecureSettingsStore()
         val controllers = ShellLibraryControllers(
             memory = ShellLibraryFactory.memory(provider, scope),
             schedules = ShellLibraryFactory.schedules(graph, scope),
@@ -63,7 +63,7 @@ class ShellPageDepsParityTest {
         return registered
     }
 
-    private fun host(settings: InMemorySettingsStore) = ShellPageHost(
+    private fun host(settings: InMemorySecureSettingsStore) = ShellPageHost(
         navigator = ShellWorkspaceNavigator(ShellWorkspaceState(), NoChat),
         focus = ShellPageFocus(agentId = null, agentName = null),
         pages = ShellHostPages(

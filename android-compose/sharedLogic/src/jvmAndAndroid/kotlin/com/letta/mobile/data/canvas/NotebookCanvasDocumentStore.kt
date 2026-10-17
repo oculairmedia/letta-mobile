@@ -49,7 +49,7 @@ class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) :
      */
     private fun refused(canvasId: CanvasId, error: NotebookReadOnlyException) {
         Telemetry.event(
-            NotebookStorageFaults.TAG, "write_refused",
+            CanvasStorageFaults.TAG, "write_refused",
             "canvasId" to canvasId.value, "reason" to error.message,
             level = Telemetry.Level.WARN,
         )

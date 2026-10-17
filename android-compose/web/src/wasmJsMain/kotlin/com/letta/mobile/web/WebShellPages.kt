@@ -2,7 +2,7 @@ package com.letta.mobile.web
 
 import com.letta.mobile.data.plugin.catalog.UnavailablePluginCatalog
 import com.letta.mobile.data.shell.ShellDestination
-import com.letta.mobile.data.storage.InMemorySettingsStore
+import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.ui.settings.SettingsPageState
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.pages.ShellAgentEditorHost
@@ -22,10 +22,9 @@ import com.letta.mobile.web.data.WasmAppServerClientGateway
 /**
  * letta-mobile-ckmub.17.5: what the web adds to the shared shell pages - its chat container, its
  * Settings services and the gateway's sessions. Every page itself is the shared one desktop binds.
- * The tab's preferences (Home and project pins, a mascot pick) last the tab, as its token does.
+ * Home and project pins and a mascot pick are kept in the browser's settings store (letta-mobile-ckmub.17.7).
  */
-internal class WebPageServices(val gateway: WasmAppServerClientGateway) {
-    val settings = InMemorySettingsStore()
+internal class WebPageServices(val gateway: WasmAppServerClientGateway, val settings: SecureSettingsStore) {
     val sources = ShellLibrarySources(settings = settings, memfs = gateway.memfs)
 }
 
