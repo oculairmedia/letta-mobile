@@ -31,6 +31,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.letta.mobile.avatar.core.AttentionKey
+import com.letta.mobile.avatar.core.AttentionKind
+import com.letta.mobile.ui.mascot.mascotAttention
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -211,8 +214,12 @@ internal fun ApprovalRequestCard(
     LaunchedEffect(approval.requestId) {
         if (decider.submit != null) haptics.play(LettaHapticCue.ApprovalNeeded)
     }
-    // The step header and the queued note sit above the card, never under it.
-    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+    // The step header and the queued note sit above the card, never under it. While it waits, the
+    // card is where the mascot looks (te3n1.2), its pull fading over a few seconds.
+    Column(
+        modifier = Modifier.mascotAttention(AttentionKey("approval:${approval.requestId}"), AttentionKind.APPROVAL),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+    ) {
         ApprovalStepAndQueue(approval, context)
         ApprovalRequestCard(approval, decider)
     }

@@ -252,6 +252,9 @@ class DefaultAppServerClient(
         timeoutMs = requestTimeoutMs,
     )
 
+    /** Keeps compact agents' runs free of the skills catalog and client tools (see CompactAgentProfile). */
+    private val compactProfile = CompactProfileRuntimePolicy()
+
     override val events: Flow<AppServerReceivedFrame> = transport.inboundFrames
     override val isConnected: Flow<Boolean> = transport.isConnected
 
@@ -312,7 +315,24 @@ class DefaultAppServerClient(
 
     override suspend fun runtimeStart(
         command: AppServerCommand.RuntimeStart,
-    ): AppServerInboundFrame.RuntimeStartResponse =
+    ): AppServerInboundFrame.RuntimeStartResponse {
+        val sent = compactProfile.runtimeStart(command)
+        val response = sendRuntimeStart(sent)
+        // A compact agent first seen in this response: its run must drop the skills catalog too. Best
+        // effort: the run is already started, so a failed follow-up must not fail it.
+        compactProfile.followUp(sent, response)?.let { followUp ->
+            try {
+                sendRuntimeStart(followUp)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // The run keeps its skills catalog; its inputs still offer no tools.
+            }
+        }
+        return response
+    }
+
+    private suspend fun sendRuntimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
         registry.request(
             requestId = command.requestId,
             response = { it as? AppServerInboundFrame.RuntimeStartResponse },
@@ -320,17 +340,18 @@ class DefaultAppServerClient(
         )
 
     override suspend fun input(command: AppServerCommand.Input) {
-        transport.sendControl(command)
+        transport.sendControl(compactProfile.input(command))
     }
 
     override suspend fun inputAwaitingAcceptance(command: AppServerCommand.Input): AppServerInboundFrame.InputAccepted {
         val requestId = requireNotNull(command.requestId) {
             "input requires request_id to await input_accepted."
         }
+        val sent = compactProfile.input(command)
         return registry.request(
             requestId = requestId,
             response = { it as? AppServerInboundFrame.InputAccepted },
-            send = { transport.sendControl(command) },
+            send = { transport.sendControl(sent) },
         )
     }
 
@@ -385,15 +406,19 @@ class DefaultAppServerClient(
 
     override suspend fun agentList(command: AppServerCommand.AgentList): AppServerInboundFrame.AgentListResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.AgentListResponse }) { transport.sendControl(command) }
+            .also { response -> response.agents?.forEach { compactProfile.learn(it as? JsonObject) } }
 
     override suspend fun agentRetrieve(command: AppServerCommand.AgentRetrieve): AppServerInboundFrame.AgentRetrieveResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.AgentRetrieveResponse }) { transport.sendControl(command) }
+            .also { compactProfile.learn(it.agent) }
 
     override suspend fun agentCreate(command: AppServerCommand.AgentCreate): AppServerInboundFrame.AgentCreateResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.AgentCreateResponse }) { transport.sendControl(command) }
+            .also { compactProfile.learn(it.agent) }
 
     override suspend fun agentUpdate(command: AppServerCommand.AgentUpdate): AppServerInboundFrame.AgentUpdateResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.AgentUpdateResponse }) { transport.sendControl(command) }
+            .also { compactProfile.learn(it.agent) }
 
     override suspend fun agentDelete(command: AppServerCommand.AgentDelete): AppServerInboundFrame.AgentDeleteResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.AgentDeleteResponse }) { transport.sendControl(command) }

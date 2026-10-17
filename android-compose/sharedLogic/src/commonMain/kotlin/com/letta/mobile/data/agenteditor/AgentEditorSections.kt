@@ -129,11 +129,23 @@ class AgentEditorSections(
         key = AgentEditorSectionKeys.PROMPT,
         title = "System prompt",
         rows = listOf(
-            SettingsRow.Text("system", "Instructions", form.systemPrompt, placeholder = "Who the agent is and how it works", lines = PROMPT_LINES) { text ->
+            compact(),
+            SettingsRow.Text("system", "Instructions", form.systemPrompt, placeholder = promptPlaceholder(), lines = PROMPT_LINES) { text ->
                 actions.update { copy(systemPrompt = text) }
             },
         ),
     )
+
+    /** The explicit compact-profile choice: on by default for a small model, never applied silently. */
+    private fun compact() = SettingsRow.Toggle(
+        key = COMPACT_KEY,
+        title = "Compact prompt for small models",
+        checked = state.compactProfile,
+        supporting = (if (state.compactRecommended) "Recommended for this model. " else "") + COMPACT_SUPPORTING,
+    ) { on -> actions.update { copy(compactProfile = on) } }
+
+    private fun promptPlaceholder(): String =
+        if (state.compactProfile) "Leave blank for the built-in short prompt" else "Who the agent is and how it works"
 
     private fun tools(): SettingsSectionModel {
         val known = state.tools.associateBy { it.id } + state.agent?.tools.orEmpty().associate { it.id.value to AgentToolOption(it.id.value, it.name, it.description) }
@@ -142,7 +154,8 @@ class AgentEditorSections(
             SettingsRow.Link("tool-${tool.id}", tool.name, supporting = if (tool.mcp) "MCP" else tool.description, onClick = openers.onTools)
         }.ifEmpty { listOf(SettingsRow.Note("no-tools", SettingsStatus("No tools attached yet."))) }
         val manage = SettingsRow.Link("manage-tools", "Add or remove tools", value = attached.size.toString(), onClick = openers.onTools)
-        return SettingsSectionModel(AgentEditorSectionKeys.TOOLS, "Tools", rows + manage, supporting = "Built-in tools and tools from MCP servers")
+        val supporting = if (state.compactProfile) "A compact agent runs without tools" else "Built-in tools and tools from MCP servers"
+        return SettingsSectionModel(AgentEditorSectionKeys.TOOLS, "Tools", rows + manage, supporting = supporting)
     }
 
     private fun more(): SettingsSectionModel? {
@@ -178,6 +191,8 @@ class AgentEditorSections(
     private companion object {
         const val DEFAULT_EFFORT = "default"
         const val PROMPT_LINES = 6
+        const val COMPACT_KEY = "compact-profile"
+        const val COMPACT_SUPPORTING = "Short instructions, no tools and no skills list, so a small model stays fast and on topic."
     }
 }
 

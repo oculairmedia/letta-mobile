@@ -1,6 +1,7 @@
 package com.letta.mobile.data.agenteditor
 
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.CompactAgentProfile
 import com.letta.mobile.ui.chat.session.ChatModelOption
 import kotlinx.serialization.json.JsonElement
 
@@ -52,6 +53,8 @@ data class AgentEditorForm(
     val systemPrompt: String = "",
     val toolIds: Set<String> = emptySet(),
     val metadata: Map<String, JsonElement> = emptyMap(),
+    /** The compact profile ([CompactAgentProfile]) as the user set it; null follows the model's recommendation. */
+    val compactProfile: Boolean? = null,
 )
 
 /** A field the validation can fault. */
@@ -82,12 +85,28 @@ data class AgentEditorState(
     /** Why the models could not be listed (letta-mobile-by4vm.121.11); null when they were, or still may be. */
     val modelsUnavailable: String? = null,
     val tools: List<AgentToolOption> = emptyList(),
+    /** The listed models (by selection value) small enough that a new agent on them starts compact. */
+    val compactModels: Set<String> = emptySet(),
 ) {
     val agentId: String? get() = (mode as? AgentEditorMode.Edit)?.agentId
     val creating: Boolean get() = mode == AgentEditorMode.Create
     val problems: Map<AgentEditorField, String> get() = AgentEditorValidation.problems(form, mode)
     val dirty: Boolean get() = creating || form != original
     val canSave: Boolean get() = !loading && !saving && loadError == null && dirty && problems.isEmpty()
+
+    /**
+     * Whether the selected model calls for the compact profile: a small listed model, or a small-model
+     * name; with no model picked, the server's default when the catalog lists only that one model.
+     */
+    val compactRecommended: Boolean
+        get() = if (form.model.isBlank()) {
+            models.singleOrNull()?.handle?.let { it in compactModels } == true
+        } else {
+            form.model in compactModels || CompactAgentProfile.isSmallModelName(form.model)
+        }
+
+    /** Whether the agent gets (or has) the compact profile: the user's choice, else the recommendation. */
+    val compactProfile: Boolean get() = form.compactProfile ?: compactRecommended
 
     /** The selected model as the picker lists it, if it is listed. */
     val modelOption: ChatModelOption? get() = models.firstOrNull { it.handle == form.model }

@@ -35,7 +35,12 @@ data class GazeWorld(
      * eased, never scanned or parked aside.
      */
     val reducedMotion: Boolean = false,
+    /** Attention points (te3n1.2), at most one per [AttentionKind]; a missing kind makes its plan row unavailable. */
+    val attention: List<AttentionPoint> = emptyList(),
 ) {
+    /** The point of [kind], or null; allocation-free (read every tick). */
+    fun attentionOf(kind: AttentionKind): AttentionPoint? = attention.pointOf(kind)
+
     companion object {
         /** Product host API: window-space tile + optional composer / timeline. */
         fun fromWindow(
@@ -54,6 +59,7 @@ data class GazeWorld(
             mode = mode,
             pointerMovedRecently = pointerMovedRecently,
             reducedMotion = reducedMotion,
+            attention = window.rects.attention.toGazePoints(window.mascot, window.reach.minPx),
         )
     }
 }
@@ -62,7 +68,21 @@ data class GazeWorld(
 data class GazeTargetRects(
     val input: GazeRect? = null,
     val timeline: GazeRect? = null,
+    /** Every attention source the host published ([AttentionRect]); [GazeWorld.fromWindow] keeps the newest of each kind. */
+    val attention: List<AttentionRect> = emptyList(),
 )
+
+/**
+ * A reaction's bias on the next look (te3n1.2): [MascotDirector] hands one to [GazeDirector] as the
+ * reaction fires, and the next dwell honours it.
+ */
+enum class GazeCue {
+    /** An approval was raised: snap to its card (head turn and a blink), or to you without one. */
+    APPROVAL_ASK,
+
+    /** You sent a prompt: a glance at the newest message, then back to you. */
+    SENT,
+}
 
 /**
  * Window-space surfaces a host publishes for [GazeWorld.fromWindow].

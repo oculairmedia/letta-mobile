@@ -3,6 +3,7 @@ package com.letta.mobile.data.agenteditor
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.CompactAgentProfile
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.Tool
@@ -74,7 +75,13 @@ class AgentEditorController(
         scope.launch {
             guarded(if (current.creating) "Could not create the agent" else "Could not save the agent") {
                 val result = when (val mode = current.mode) {
-                    AgentEditorMode.Create -> backend.create(AgentEditorParams.createOf(current.form, starterAgent, backend.models.value))
+                    AgentEditorMode.Create -> backend.create(
+                        AgentEditorParams.createOf(
+                            current.form.copy(compactProfile = current.compactProfile),
+                            starterAgent,
+                            backend.models.value,
+                        ),
+                    )
                     is AgentEditorMode.Edit -> saveEdits(mode.agentId, current)
                 }
                 _state.update { it.copy(original = it.form) }
@@ -152,6 +159,7 @@ class AgentEditorController(
             starters = agents.map { AgentStarter.CopyOf(it.id.value, it.name) },
             models = models.map(::optionOf),
             tools = tools.map(::toolOf),
+            compactModels = models.filter(CompactAgentProfile::isSmallModel).map { ModelCatalog.selectionValue(models, it) }.toSet(),
         )
 
         private fun optionOf(model: LlmModel): ChatModelOption {

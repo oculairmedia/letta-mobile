@@ -473,6 +473,7 @@ class OnDeviceOpenAiBridgeTest {
             modelSelection: EmbeddedLettaCodeModelSelection,
             prompt: String,
             images: List<OnDeviceImage>,
+            generation: OnDeviceGeneration,
         ): Result<String> {
             lastPrompt = prompt
             lastImages = images

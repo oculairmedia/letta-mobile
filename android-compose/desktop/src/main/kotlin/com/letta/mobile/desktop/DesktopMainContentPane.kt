@@ -13,9 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.shell.ShellDestination
-import com.letta.mobile.ui.shell.ShellAdminPages
 import com.letta.mobile.ui.shell.ShellPage
-import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.desktop.chat.showsCanvasSidePane
 import com.letta.mobile.data.canvas.CanvasSession
@@ -25,25 +23,19 @@ import com.letta.mobile.ui.components.LettaSidePane
 internal data class DesktopMainContentInputs(
     /** letta-mobile-ckmub.3.24: the agent editor beside the chat (an agent's, or a new agent's), if open. */
     val agentEditor: ShellDestination.AgentEditor?,
-    /** The shared agent editor page, bound to this session. */
-    val agentEditorPage: ShellPageContent<ShellDestination.AgentEditor>,
     val selectedDestination: DesktopDestination,
     /** The shared destination of the route on screen, without the editor/canvas panels beside it. */
     val pageDestination: ShellDestination,
     val selectedConversationId: String?,
-    val destinationInputs: DestinationContentInputs,
+    /** letta-mobile-ckmub.17.5: the shared shell pages (the editor's too), bound to this session. */
+    val pages: ShellPageDeps,
     val activeCanvasSession: CanvasSession? = null,
     /** The board the shared page has docked; the side pane never shows it a second time. */
     val dockedCanvasId: com.letta.mobile.data.model.CanvasId? = null,
-    /** letta-mobile-ckmub.3.11: the shared KMP chat page, desktop's only chat. */
-    val chatPage: @Composable (Modifier) -> Unit,
-    /** letta-mobile-ckmub.2.6: the shared Runs, Templates and Projects pages, bound to this session. */
-    val adminPages: ShellAdminPages = ShellAdminPages(),
 )
 
 internal data class DesktopMainContentActions(
     val onEditAgentClose: () -> Unit,
-    val destinationActions: DestinationContentActions,
     val onCloseCanvas: () -> Unit = {},
     val onShareCanvasToChat: ((bytes: ByteArray, mimeType: String) -> Unit)? = null,
 )
@@ -69,7 +61,7 @@ private fun MainContentRow(inputs: DesktopMainContentInputs, actions: DesktopMai
     val canvas = inputs.activeCanvasSession
     // The editor is a panel beside the chat, not a page: the conversation stays in view.
     androidx.compose.foundation.layout.Row(modifier = modifier) {
-        Box(modifier = Modifier.weight(1f).fillMaxHeight()) { MainDestination(inputs, actions) }
+        Box(modifier = Modifier.weight(1f).fillMaxHeight()) { MainDestination(inputs) }
         when {
             editor != null -> AgentEditorSidePane(editor, inputs, actions)
             canvas != null && showsCanvasSidePane(canvas.canvasId, inputs.dockedCanvasId) -> CanvasSidePane(canvas, actions)
@@ -79,11 +71,9 @@ private fun MainContentRow(inputs: DesktopMainContentInputs, actions: DesktopMai
 
 /** letta-mobile-ckmub.3.4: the desktop maps its route to a shared destination; ShellPage draws its page. */
 @Composable
-private fun MainDestination(inputs: DesktopMainContentInputs, actions: DesktopMainContentActions) {
+private fun MainDestination(inputs: DesktopMainContentInputs) {
     // The bundled runtime's crash notice is a window banner (DesktopShellWindowContent), not part of the page.
-    val chat = ShellPageContent<ShellDestination.Chat> { _, modifier -> inputs.chatPage(modifier) }
-    val deps = desktopShellPageDeps(inputs.destinationInputs, actions.destinationActions, DesktopHostPages(chat, inputs.adminPages))
-    ShellPage(destination = inputs.pageDestination, deps = deps, modifier = Modifier.fillMaxSize())
+    ShellPage(destination = inputs.pageDestination, deps = inputs.pages, modifier = Modifier.fillMaxSize())
 }
 
 /** letta-mobile-ckmub.3.24: the shared agent editor, through ShellPage's AgentEditor destination. */
@@ -91,7 +81,7 @@ private fun MainDestination(inputs: DesktopMainContentInputs, actions: DesktopMa
 private fun AgentEditorSidePane(editor: ShellDestination.AgentEditor, inputs: DesktopMainContentInputs, actions: DesktopMainContentActions) {
     val title = if (editor.agentId == null) "New agent" else "Edit agent"
     LettaSidePane(title = title, onClose = actions.onEditAgentClose, initialWidth = 460.dp) {
-        ShellPage(destination = editor, deps = ShellPageDeps(agentEditor = inputs.agentEditorPage), modifier = Modifier.fillMaxSize())
+        ShellPage(destination = editor, deps = inputs.pages, modifier = Modifier.fillMaxSize())
     }
 }
 

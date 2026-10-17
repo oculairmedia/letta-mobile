@@ -1,4 +1,4 @@
-package com.letta.mobile.desktop
+package com.letta.mobile.ui.shell.pages
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentSummary
@@ -8,10 +8,7 @@ import com.letta.mobile.data.model.SchedulePayload
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
-import com.letta.mobile.data.schedules.CronApi
-import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.schedules.ScheduleLibraryController
-import com.letta.mobile.ui.shell.pages.schedules.CronTaskId
 import com.letta.mobile.ui.shell.pages.schedules.NativeScheduleRef
 import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageActions
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -24,22 +21,10 @@ import java.lang.reflect.Proxy
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** letta-mobile-by4vm.42: desktop deletes go to the list the page names, never by id lookup. */
+/** letta-mobile-by4vm.42 / ckmub.17.5: a schedule delete goes to its own agent's list, never by id lookup. */
 @OptIn(ExperimentalCoroutinesApi::class)
-class DesktopDestinationWiringScheduleDeleteTest {
-    private val cronDeletes = mutableListOf<String>()
+class ShellScheduleActionsTest {
     private val scheduleDeletes = mutableListOf<Pair<String, String>>()
-
-    @Test
-    fun aCronIdEqualToAScheduleIdDeletesOnlyTheCron() = runTest {
-        val actions = wiredActions()
-
-        actions.onDeleteCron(CronTaskId("s1"))
-        advanceUntilIdle()
-
-        assertEquals(listOf("s1"), cronDeletes)
-        assertEquals(emptyList(), scheduleDeletes)
-    }
 
     @Test
     fun aScheduleDeleteGoesToItsAgentAndOtherAgentsAreDropped() = runTest {
@@ -52,32 +37,16 @@ class DesktopDestinationWiringScheduleDeleteTest {
         actions.onDeleteSchedule(NativeScheduleRef(agentId = "a1", scheduleId = "s1"))
         advanceUntilIdle()
         assertEquals(listOf("a1" to "s1"), scheduleDeletes)
-        assertEquals(emptyList(), cronDeletes)
     }
 
     private fun TestScope.wiredActions(): SchedulesPageActions {
         val controller = ScheduleLibraryController(agents, schedules, scope = this)
         controller.start()
         advanceUntilIdle()
-        return destinationScheduleActions(
-            ScheduleWiringDeps(
-                schedules = controller,
-                cronPanel = DesktopCronPanelState(crons, this),
-                scheduleLibraryState = controller.state.value,
-                selectedAgentId = "a1",
-            ),
-        )
+        return shellScheduleActions(controller, controller.state.value, focusedAgent = AgentId("a1"))
     }
 
     /** Only what the wiring touches; any other call fails the test. */
-    private val crons = fake<CronApi> { method, args ->
-        when (method.name) {
-            "listCrons" -> listOf(CronTask(id = "s1", agentId = "a1"))
-            "deleteCron" -> { cronDeletes += args[0] as String }
-            else -> error("unused: ${method.name}")
-        }
-    }
-
     private val schedules = fake<IScheduleRepository> { method, args ->
         when (method.name) {
             "refreshSchedules" -> Unit

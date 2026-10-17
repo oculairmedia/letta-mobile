@@ -27,3 +27,10 @@ internal fun webSessionBinding(config: LettaConfig, client: AppServerClient, sco
         irohAgentDirectoryProvider = { directory },
     )
 }
+
+/** No session yet (or no longer): the graph of no backend, every route unserved. */
+internal fun disconnectedWebBinding(): HostSessionBinding = HostSessionBinding(
+    platform = SessionPlatform.WEB,
+    config = null,
+    appServerClients = HostAppServerClients { null },
+)

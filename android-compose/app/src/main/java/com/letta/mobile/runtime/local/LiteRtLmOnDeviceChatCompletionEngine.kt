@@ -18,14 +18,26 @@ class LiteRtLmOnDeviceChatCompletionEngine @Inject constructor(
 ) : OnDeviceChatCompletionEngine {
     private var activeKey: String? = null
     private var activeEngine: Engine? = null
+    private var activeBackendName: String = CPU_BACKEND
+    private var activeVision = false
 
+    /** The GPU failed an inference in this process: every later run uses CPU. */
+    private var gpuUnusable = false
+
+    /** Serializes generations: one engine, one conversation at a time. */
     @Synchronized
     override fun generate(
         modelSelection: EmbeddedLettaCodeModelSelection,
         prompt: String,
         images: List<OnDeviceImage>,
+        generation: OnDeviceGeneration,
     ): Result<String> =
         runCatching {
+            // Cancelled while it waited for the engine (the client left): free the engine at once.
+            if (generation.isStopped) {
+                logLiteRtInfo("inference_skipped", "handle=${modelSelection.modelHandle} reason=${generation.stopReason?.wire}")
+                return@runCatching generation.text
+            }
             logLiteRtInfo(
                 "model_handle_received",
                 "handle=${modelSelection.modelHandle} runtime=${modelSelection.runtime} accelerator=${modelSelection.accelerator} maxTokens=${modelSelection.maxTokens}",
@@ -49,20 +61,49 @@ class LiteRtLmOnDeviceChatCompletionEngine @Inject constructor(
                 "inference_start",
                 "promptChars=${sanitizedPrompt.length} images=${images.size} requiresVision=${request.requiresVision}",
             )
-            val engine = engineFor(modelSelection, modelFile, request.requiresVision)
-            val response = engine.instance.createConversation().use { conversation ->
-                if (shouldSendVisionContent(request, engine.visionEnabled)) {
-                    conversation.sendMessage(request.toContents()).toString()
-                } else {
-                    conversation.sendMessage(sanitizedPrompt).toString()
-                }
-            }
+            val engine = runOnBestBackend(modelSelection, modelFile, request, generation)
+            val response = generation.text
             logLiteRtInfo("first_token", "preview=${response.take(FIRST_TOKEN_LOG_CHARS).lineSafe()}")
-            logLiteRtInfo("inference_complete", "responseChars=${response.length}")
+            logLiteRtInfo(
+                "inference_complete",
+                "responseChars=${response.length} backend=${engine.backendName} stopReason=${generation.stopReason?.wire ?: "model_done"}",
+            )
             response
         }.onFailure { error ->
             logLiteRtError("inference_error", "handle=${modelSelection.modelHandle}", error)
         }
+
+    /**
+     * Runs on the requested accelerator. A GPU engine can initialize and still fail its first
+     * inference on some devices: before any output, that falls back to CPU, and later runs of this
+     * process go straight to CPU ([gpuUnusable]). Returns the engine that answered.
+     */
+    private fun runOnBestBackend(
+        modelSelection: EmbeddedLettaCodeModelSelection,
+        modelFile: File,
+        request: LiteRtLmRequest,
+        generation: OnDeviceGeneration,
+    ): LiteRtLmEngineHandle {
+        val selection = if (gpuUnusable) modelSelection.copy(accelerator = CPU_ACCELERATOR) else modelSelection
+        val engine = engineFor(selection, modelFile, request.requiresVision)
+        if (request.requiresVision && !engine.visionEnabled) {
+            logLiteRtInfo("vision_unavailable", "handle=${modelSelection.modelHandle} images=${request.images.size} action=text_only")
+        }
+        try {
+            engine.instance.createConversation().use { conversation ->
+                LiteRtLmStreamingRun(conversation, generation).run(
+                    if (shouldSendVisionContent(request, engine.visionEnabled)) request.toContents() else null,
+                    request.prompt,
+                )
+            }
+        } catch (error: Throwable) {
+            if (!engine.canFallBackToCpu(generation)) throw error
+            logLiteRtError("gpu_inference_error", "handle=${modelSelection.modelHandle} action=fallback_cpu", error)
+            gpuUnusable = true
+            return runOnBestBackend(modelSelection, modelFile, request, generation)
+        }
+        return engine
+    }
 
     private fun engineFor(
         modelSelection: EmbeddedLettaCodeModelSelection,
@@ -70,7 +111,7 @@ class LiteRtLmOnDeviceChatCompletionEngine @Inject constructor(
         requiresVision: Boolean,
     ): LiteRtLmEngineHandle {
         val key = liteRtLmEngineCacheKey(modelSelection, visionEnabled = requiresVision)
-        activeEngine?.takeIf { activeKey == key }?.let { return LiteRtLmEngineHandle(it, requiresVision) }
+        activeEngine?.takeIf { activeKey == key }?.let { return LiteRtLmEngineHandle(it, activeVision, activeBackendName) }
 
         runCatching { activeEngine?.close() }
         activeEngine = null
@@ -81,45 +122,52 @@ class LiteRtLmOnDeviceChatCompletionEngine @Inject constructor(
             "engine_init_start",
             "handle=${modelSelection.modelHandle} key=$key backend=${requestedBackend.javaClass.simpleName} vision=$requiresVision path=${modelFile.absolutePath}",
         )
-        val engine = try {
-            initializedEngine(modelFile, requestedBackend, modelSelection.maxTokens, visionEnabled = requiresVision)
-        } catch (error: Throwable) {
-            logLiteRtError(
-                "engine_init_error",
-                "handle=${modelSelection.modelHandle} backend=${requestedBackend.javaClass.simpleName} vision=$requiresVision path=${modelFile.absolutePath}",
-                error,
-            )
-            // GPU is unusable on some devices (e.g. OpenCL blocked for apps,
-            // OpenGL delegate unimplemented: "CreateSharedMemoryManager is
-            // not implemented" on Tensor) and selecting it bricked every
-            // turn. Fall back to CPU instead of failing the session.
-            if (requiresVision) {
-                android.util.Log.w(
-                    "LiteRtLmEngine",
-                    "Vision engine initialization failed; dropping image inputs and retrying text-only generation",
+        // GPU is unusable on some devices (OpenCL blocked for apps, or the OpenGL delegate's
+        // "CreateSharedMemoryManager is not implemented" on Tensor) and selecting it bricked every
+        // turn; a vision encoder can fail where text does not. Try, in order: as requested, vision
+        // on CPU, then text only (images dropped), and use the first that initializes.
+        var lastError: Throwable? = null
+        val attempts = liteRtLmInitAttempts(LiteRtLmInitAttempt(requestedBackend.javaClass.simpleName, requiresVision))
+        for (attempt in attempts) {
+            val backend = if (attempt.backendName == CPU_BACKEND) Backend.CPU() else requestedBackend
+            val engine = try {
+                initializedEngine(modelFile, backend, modelSelection.maxTokens, attempt.vision)
+            } catch (error: Throwable) {
+                logLiteRtError(
+                    "engine_init_error",
+                    "handle=${modelSelection.modelHandle} backend=${attempt.backendName} vision=${attempt.vision} " +
+                        "path=${modelFile.absolutePath}",
                     error,
                 )
-                return engineFor(modelSelection, modelFile, requiresVision = false)
+                lastError = error
+                continue
             }
-            if (requestedBackend is Backend.CPU) throw error
-            android.util.Log.w(
-                "LiteRtLmEngine",
-                "Accelerator '${modelSelection.accelerator}' failed to initialize; falling back to CPU",
-                error,
+            // Which backend actually runs: a GPU request that fell back to CPU says so here.
+            logLiteRtInfo(
+                "engine_init_success",
+                "handle=${modelSelection.modelHandle} key=$key requested=${modelSelection.accelerator} backend=${attempt.backendName} " +
+                    "vision=${attempt.vision} fallback=${attempt != attempts.first()}",
             )
-            initializedEngine(modelFile, Backend.CPU(), modelSelection.maxTokens, visionEnabled = false)
+            activeEngine = engine
+            activeKey = key
+            activeBackendName = attempt.backendName
+            activeVision = attempt.vision
+            return LiteRtLmEngineHandle(engine, attempt.vision, attempt.backendName)
         }
-        logLiteRtInfo("engine_init_success", "handle=${modelSelection.modelHandle} key=$key vision=$requiresVision")
-        activeEngine = engine
-        activeKey = key
-        return LiteRtLmEngineHandle(engine, requiresVision)
+        throw lastError ?: error("LiteRT-LM engine did not initialize.")
     }
 
     private data class LiteRtLmEngineHandle(
         val instance: Engine,
         val visionEnabled: Boolean,
-    )
+        val backendName: String,
+    ) {
+        /** A non-CPU engine failed before any output and nobody stopped it: CPU can still answer. */
+        fun canFallBackToCpu(generation: OnDeviceGeneration): Boolean =
+            backendName != CPU_BACKEND && !generation.isStopped && generation.text.isEmpty()
+    }
 
+    /** The vision encoder runs where the text model does: GPU with GPU, CPU with CPU. */
     private fun initializedEngine(modelFile: File, backend: Backend, maxTokens: Int, visionEnabled: Boolean): Engine {
         val cacheDir = File(context.cacheDir, "litert-lm").apply { mkdirs() }
         logLiteRtInfo(
@@ -130,7 +178,7 @@ class LiteRtLmOnDeviceChatCompletionEngine @Inject constructor(
             EngineConfig(
                 modelPath = modelFile.absolutePath,
                 backend = backend,
-                visionBackend = if (visionEnabled) Backend.GPU() else null,
+                visionBackend = if (!visionEnabled) null else if (backend is Backend.CPU) Backend.CPU() else Backend.GPU(),
                 maxNumTokens = maxTokens,
                 maxNumImages = if (visionEnabled) DEFAULT_MAX_IMAGES else null,
                 cacheDir = cacheDir.absolutePath,
@@ -175,6 +223,21 @@ fun sanitizeForLiteRt(input: String): String {
     return input.filterNot { it.isSurrogate() }
 }
 
+/** One engine initialization to try: the text backend's name and whether the vision encoder loads. */
+data class LiteRtLmInitAttempt(val backendName: String, val vision: Boolean)
+
+/**
+ * The initializations [LiteRtLmOnDeviceChatCompletionEngine] tries, first that works wins: as
+ * requested; vision on CPU; text only on the requested backend; text only on CPU. Duplicates drop.
+ */
+fun liteRtLmInitAttempts(requested: LiteRtLmInitAttempt): List<LiteRtLmInitAttempt> =
+    buildList {
+        add(requested)
+        if (requested.vision) add(LiteRtLmInitAttempt(CPU_BACKEND, true))
+        add(requested.copy(vision = false))
+        add(LiteRtLmInitAttempt(CPU_BACKEND, false))
+    }.distinct()
+
 fun liteRtLmEngineCacheKey(modelSelection: EmbeddedLettaCodeModelSelection, visionEnabled: Boolean): String =
     "${modelSelection.startKey}|vision=$visionEnabled"
 
@@ -201,6 +264,8 @@ data class LiteRtLmRequest(
 }
 
 private const val DEFAULT_MAX_IMAGES = 8
+private const val CPU_ACCELERATOR = "cpu"
+private const val CPU_BACKEND = "CPU"
 private const val FIRST_TOKEN_LOG_CHARS = 160
 
 private fun String.lineSafe(): String = replace('\n', ' ').replace('\r', ' ')

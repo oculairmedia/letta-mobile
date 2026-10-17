@@ -3,16 +3,20 @@ package com.letta.mobile.web
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
+import com.letta.mobile.data.session.ifSupported
 import com.letta.mobile.data.shell.ShellChatPort
 import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.ui.settings.SettingsPageServices
+import com.letta.mobile.ui.shell.pages.ShellLibraryControllers
 import com.letta.mobile.web.chat.WebChatCanvas
 import com.letta.mobile.web.chat.WebChatLoad
 import com.letta.mobile.web.data.WasmAppServerClientGateway
@@ -75,12 +79,32 @@ internal object WebChatPort : ShellChatPort {
     override fun stageComposerText(text: String) = Unit
 }
 
-/** What the page beside the navigation draws from. */
+/**
+ * A rename or delete in the agent editor: the roster again from the live session's agent repository,
+ * without reconnecting.
+ */
+internal suspend fun WebBackend.reloadRoster(graph: SharedSessionRepositoryGraph, workspace: ShellWorkspaceState) {
+    val repository = graph.ifSupported(SessionRoute.AGENTS) { agentRepository } ?: return
+    runCatching { repository.refreshAgents() }
+    agents.value = repository.agents.value
+    workspace.rosterChanged(agents.value.map { it.id })
+}
+
+/** What the page beside the navigation draws from: the chat, the connection, and the shared pages' session. */
 internal class WebPageInputs(
     val chat: WebChatLoad,
     val connection: BackendConnectionStatus,
     val canvas: WebChatCanvas,
     val settings: SettingsPageServices,
+    val session: WebPagesSession,
+)
+
+/** The shared pages' session: the live graph, its library controllers and the web's services. */
+internal class WebPagesSession(
+    val graph: SharedSessionRepositoryGraph,
+    val controllers: ShellLibraryControllers,
+    val services: WebPageServices,
+    val onRosterChanged: () -> Unit,
 )
 
 /** The shell's navigation and the backend behind it, as the web container passes them around. */

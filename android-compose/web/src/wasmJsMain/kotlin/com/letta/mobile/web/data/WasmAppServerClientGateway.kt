@@ -10,7 +10,12 @@ import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.session.graph.HostSessionBinding
+import com.letta.mobile.data.memory.memfs.AppServerMemfsSource
+import com.letta.mobile.data.memory.memfs.MemfsSource
+import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
+import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
 import com.letta.mobile.data.session.graph.HostSessionGraphFactory
+import com.letta.mobile.data.session.graph.HostSessionGraphProvider
 import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
 import com.letta.mobile.data.session.graph.hostServedKind
 import com.letta.mobile.runtime.BackendId
@@ -30,10 +35,13 @@ import io.ktor.client.engine.js.Js
 import io.ktor.client.plugins.websocket.WebSockets
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.random.Random
@@ -43,10 +51,13 @@ class WasmAppServerClientGateway(
 ) {
     private val httpClient = HttpClient(Js) { install(WebSockets) }
     private val mutableState = MutableStateFlow<BackendConnectionStatus>(BackendConnectionStatus.Unconfigured)
-    private var activeSession: WasmAppServerSession? = null
-    private val mutableGraph = MutableStateFlow<SharedSessionRepositoryGraph?>(null)
+    private val liveSession = MutableStateFlow<WasmAppServerSession?>(null)
+    private var activeSession: WasmAppServerSession?
+        get() = liveSession.value
+        set(value) {
+            liveSession.value = value
+        }
     private var nextBinding: HostSessionBinding? = null
-    private val graphFactory = HostSessionGraphFactory { checkNotNull(nextBinding) { "No App Server session to bind" } }
     private var connectionMonitor: Job? = null
     private val requestSessionId = Random.nextLong().toString()
     private var requestSequence = 0
@@ -54,10 +65,27 @@ class WasmAppServerClientGateway(
     val state: StateFlow<BackendConnectionStatus> = mutableState.asStateFlow()
 
     /**
-     * letta-mobile-ckmub.17.1: the live session's repository graph, built by the shared factory desktop
-     * uses; null while there is no connection.
+     * letta-mobile-ckmub.17.1 / ckmub.17.5: the live session's repository graph, built by the shared
+     * factory and provider desktop uses. With no connection it is the graph of no backend (every route
+     * unserved), which the shared pages bind the same way.
      */
-    val sessionGraph: StateFlow<SharedSessionRepositoryGraph?> = mutableGraph.asStateFlow()
+    val sessionGraphProvider: HostSessionGraphProvider = HostSessionGraphProvider(
+        HostSessionGraphFactory { nextBinding ?: disconnectedWebBinding() },
+        SessionPlatform.WEB,
+    )
+
+    /** letta-mobile-ckmub.17.5: the agent's MemFS files over the live session, with its `memory_updated` pushes. */
+    /** The provider and model catalog over the live session's `admin_rpc`, as desktop's Providers reads them. */
+    val modelControl: ModelControlSession = ModelControlSession(
+        AdminRpcInvoker.overTransport { activeSession?.let { sessionGraphProvider.current.channelTransport } },
+    )
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val memfs: MemfsSource = AppServerMemfsSource(
+        client = { activeSession?.client ?: error("Connect to an App Server first") },
+        events = liveSession.flatMapLatest { session -> session?.client?.events ?: emptyFlow() },
+        requestId = ::nextRequestId,
+    )
 
     private val mutableCanvasRelay = MutableStateFlow<CanvasRelayDial?>(null)
 
@@ -172,15 +200,15 @@ class WasmAppServerClientGateway(
 
     /** The shared session graph over [session], replacing the previous connection's. */
     private fun openGraph(config: LettaConfig, session: WasmAppServerSession): SharedSessionRepositoryGraph {
-        closeGraph()
         nextBinding = webSessionBinding(config, session.client, scope)
-        return graphFactory.create().also { mutableGraph.value = it }
+        return sessionGraphProvider.rebuild()
     }
 
+    /** Back to the graph of no backend; the previous generation closes. */
     private fun closeGraph() {
-        mutableGraph.value?.close()
-        mutableGraph.value = null
+        if (nextBinding == null) return
         nextBinding = null
+        sessionGraphProvider.rebuild()
     }
 
     private fun nextRequestId(prefix: String): String {
