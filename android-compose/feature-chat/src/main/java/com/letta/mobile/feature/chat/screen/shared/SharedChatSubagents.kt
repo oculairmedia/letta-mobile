@@ -3,7 +3,6 @@ package com.letta.mobile.feature.chat.screen.shared
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -11,7 +10,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -25,11 +23,7 @@ import com.letta.mobile.feature.chat.subagent.SelfTodoSource
 import com.letta.mobile.ui.chat.subagents.ActiveSubagent
 import com.letta.mobile.ui.chat.subagents.ActiveSubagentRings
 import com.letta.mobile.ui.chat.subagents.LocalSubagentTodoSheetOpener
-import com.letta.mobile.data.subagents.SubagentView
-import com.letta.mobile.ui.chat.subagents.SubagentDualViewBinding
 import com.letta.mobile.ui.chat.subagents.SubagentRoster
-import com.letta.mobile.ui.chat.subagents.conversationOpener
-import com.letta.mobile.ui.chat.subagents.rememberSubagentDualViewHolder
 import com.letta.mobile.ui.chat.subagents.SubagentTodoLoader
 import com.letta.mobile.ui.chat.subagents.SubagentTodoSheetHost
 import com.letta.mobile.ui.chat.subagents.SubagentTodoSheetTarget
@@ -238,40 +232,4 @@ private fun SharedChatSubagentRoster(
             }
         },
     )
-}
-
-/**
- * letta-mobile-zxk2n.8: the page's subagent dual view, over the canonical timeline transport and
- * closed again for each conversation. On a phone the child's conversation shows in place of this one,
- * read-only; Back returns to the parent, and "open full view" is the subagent conversation route.
- * Null outside a Hilt activity: "view conversation" then navigates, as before.
- */
-@Composable
-internal fun rememberSharedChatDualView(params: SharedChatPageParams): SubagentDualViewBinding? {
-    val holder = rememberSubagentDualViewHolder(params.viewModel.conversationId)
-    val sessions = rememberSharedChatSubagentViewSessions()
-    val openFull by rememberUpdatedState(params.navigation.onViewSubagentConversation)
-    val canOpenFull = params.navigation.onViewSubagentConversation != null
-    val binding = remember(holder, sessions, canOpenFull) {
-        sessions?.let { sessions ->
-            val onOpenFullView: ((SubagentView) -> Unit)? = if (canOpenFull) {
-                { view -> openFull?.invoke(view.agentId.value, view.conversationId.value) }
-            } else {
-                null
-            }
-            SubagentDualViewBinding(holder, sessions, onOpenFullView)
-        }
-    }
-    BackHandler(enabled = binding != null && holder.state.showsSubagent) { holder.showParent() }
-    return binding
-}
-
-/** The page's navigation with "view conversation" opening [dualView], when the page has one. */
-@Composable
-internal fun rememberDualViewNavigation(params: SharedChatPageParams, dualView: SubagentDualViewBinding?): ChatScreenNavigationCallbacks {
-    val source = params.subagents.source
-    return remember(params.navigation, dualView, source) {
-        val open = dualView?.holder?.conversationOpener { source.rosterEntries.value }
-        if (open == null) params.navigation else params.navigation.copy(onViewSubagentConversation = open)
-    }
 }

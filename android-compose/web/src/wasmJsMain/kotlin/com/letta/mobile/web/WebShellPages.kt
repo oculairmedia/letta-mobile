@@ -1,5 +1,10 @@
 package com.letta.mobile.web
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.ui.chat.session.TimelineSubagentViewSessions
+import com.letta.mobile.ui.chat.subagents.rememberSubagentDualView
+import com.letta.mobile.ui.chat.subagents.rememberSubagentDualViewHost
+import com.letta.mobile.ui.shell.workspace.ShellChatLook
 import androidx.compose.runtime.remember
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
@@ -8,13 +13,6 @@ import com.letta.mobile.data.plugin.catalog.UnavailablePluginCatalog
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
-import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.ui.chat.session.TimelineSubagentViewSessions
-import com.letta.mobile.ui.chat.subagents.SubagentDualViewBinding
-import com.letta.mobile.ui.chat.subagents.rememberSubagentDualViewHolder
-import com.letta.mobile.ui.chat.subagents.withSubagentDualView
-import com.letta.mobile.ui.shell.workspace.ShellChatLook
-import androidx.compose.runtime.Composable
 import com.letta.mobile.ui.chat.surface.rememberChatDockGeometry
 import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
 import com.letta.mobile.ui.settings.BackendConnectionStatusRow
@@ -150,13 +148,10 @@ private fun webChatPage(shell: WebShell, page: WebPageInputs, ready: WebChatLoad
     val port = ready.port
     val target = port.target
     val agentNames = shell.backend.roster.toMap()
-    // letta-mobile-zxk2n.8: a subagent's conversation opens in the dual view over the gateway's session.
-    val subagentViews = rememberWebSubagentViews(page, ConversationId(target.conversationId))
-    val host = remember(agentNames, shell, subagentViews) {
-        val base = ChatSurfaceHost(resolveAgentName = agentNames::get, openAgentPane = shell::showNavigation)
-        // The web keeps no subagent registry: a row opens the child agent it names, in its default conversation.
-        base.withSubagentDualView(subagentViews.holder) { emptyList() }
-    }
+    // letta-mobile-zxk2n.8: subagents open in the dual view; the web has no registry, so a row opens its child's default conversation.
+    val subagentViews = rememberSubagentDualView(ConversationId(target.conversationId), webSubagentViewSessions(page))
+    val base = remember(agentNames, shell) { ChatSurfaceHost(resolveAgentName = agentNames::get, openAgentPane = shell::showNavigation) }
+    val host = rememberSubagentDualViewHost(base, subagentViews, emptyList())
     ShellChatDestination(
         page = ShellChatPage(
             port = port,
@@ -169,14 +164,6 @@ private fun webChatPage(shell: WebShell, page: WebPageInputs, ready: WebChatLoad
         modifier = modifier,
         look = ShellChatLook(subagentViews = subagentViews),
     )
-}
-
-/** The conversation's subagent dual view, closed again for each conversation. */
-@Composable
-private fun rememberWebSubagentViews(page: WebPageInputs, conversation: ConversationId): SubagentDualViewBinding {
-    val holder = rememberSubagentDualViewHolder(conversation)
-    val gateway = page.session.services.gateway
-    return remember(holder, gateway) { SubagentDualViewBinding(holder, TimelineSubagentViewSessions(gateway::subagentTimeline)) }
 }
 
 /** A conversation that has not opened: the connection and the way on. */
@@ -196,3 +183,6 @@ private fun webWaitingPage(shell: WebShell, page: WebPageInputs) = ShellPageCont
         modifier = modifier,
     )
 }
+
+/** Where the dual view reads a subagent's conversation: the gateway's live session. */
+private fun webSubagentViewSessions(page: WebPageInputs) = TimelineSubagentViewSessions(page.session.services.gateway::subagentTimeline)
