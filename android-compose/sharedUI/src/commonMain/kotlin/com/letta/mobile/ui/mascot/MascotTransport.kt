@@ -50,6 +50,7 @@ import com.letta.mobile.avatar.core.MascotEvent
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.avatar.core.MascotVector
 import com.letta.mobile.data.model.AgentId
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import com.letta.mobile.ui.theme.LettaDimens
@@ -321,6 +322,7 @@ private fun TransportedMascot(
     // landings (te3n1.1 over te3n1.3), and a rig that animates them itself takes the deform over.
     val host = LocalMascotHost.current
     val director = remember(host, sceneKey, identity) { host.entry(sceneKey, identity) }?.director
+    val currentDirector by rememberUpdatedState(director)
     LaunchedEffect(director) { if (director?.carriesBody == true) transport.rigCarriesBody = true }
     LaunchedEffect(director, flight) {
         val d = director ?: return@LaunchedEffect
@@ -336,9 +338,17 @@ private fun TransportedMascot(
         launch { flight.enter(reducedMotion, landed) }
         launch { flight.drive(reducedMotion, landed) }
         val motion = HopMotion(reducedMotion, density.density)
+        // te3n1.2: each hop crouches at once and takes off after the eyes have led to the next seat.
+        var takeOff: Job? = null
         snapshotFlow { currentAgent.let { agent -> transport.activeStage(agent)?.let { MascotTransport.SeatKey(agent, it) } } }
             .distinctUntilChanged()
-            .collect { next -> if (next != null) transport.beginHop(flight, next, motion) }
+            .collect { next ->
+                if (next == null) return@collect
+                takeOff?.cancel()
+                val hop = transport.beginHop(flight, next, motion)
+                takeOff = hop?.let { launch { flight.takeOff(it, currentDirector, motion.density) } }
+                if (hop == null) flight.wakeIfMoving()
+            }
     }
     // The renderer's node keeps the DESTINATION size for the whole flight and the change of size
     // is a layer scale: a Rive surface re-allocates its readback buffer and restarts its frame
@@ -371,22 +381,26 @@ private fun TransportedMascot(
  * Starts [flight]'s hop to the seat [next] (the agent the slot shows now, at its active stage),
  * from wherever it is drawn this frame; nothing when that stage is the one already shown. The
  * slot's first stage is no hop: the character enters there ([MascotTransport.Flight.enter]).
+ * Returns the hop when one started: the body is set crouching at its origin and the caller wakes
+ * it ([takeOff]) once the eyes have led; null when it snapped or nothing moved.
  */
-private fun MascotTransport.beginHop(flight: MascotTransport.Flight, next: MascotTransport.SeatKey, motion: HopMotion) {
-    if (next.stage == flight.shownStage) return
+private fun MascotTransport.beginHop(flight: MascotTransport.Flight, next: MascotTransport.SeatKey, motion: HopMotion): HopTakeOff? {
+    if (next.stage == flight.shownStage) return null
     val ends = hopEnds(flight, next)
     flight.shownStage = next.stage
     flight.shownAgent = next.agentId
     if (ends == null || motion.reducedMotion) {
         flight.body.snap()
         flight.frame++
-        return
+        return null
     }
     val (from, destination) = ends
     flight.from = from
     val density = motion.density
     flight.body.hop(MascotVector((destination.center.x - from.center.x) / density, (destination.center.y - from.center.y) / density))
-    flight.wakes++
+    // Placed at its origin, crouched, until it takes off.
+    flight.frame++
+    return HopTakeOff(from, destination)
 }
 
 /**

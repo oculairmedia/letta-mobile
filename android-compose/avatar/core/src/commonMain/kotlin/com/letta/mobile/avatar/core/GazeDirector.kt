@@ -74,6 +74,20 @@ class GazeDirector(
     /** The last planned (non-pointer) aim, where a gap after a look at a place rests. */
     private var lastPlanAim: GazePoint = GazePoint(0f, 0f)
 
+    /** How long each attention point has been on screen (te3n1.2), for its interest decay. */
+    private val attentionClock = AttentionClock()
+    /** A reaction's bias, honoured at the next tick ([cue]). */
+    private var pendingCue: GazeCue? = null
+    /** The dwell running now was cued: it holds through a state flip instead of restarting the plan. */
+    private var cuedDwell: Boolean = false
+    /** The look a cued glance hands over to once it ends (SENT: back to you). */
+    private var followUp: GazeTarget? = null
+    /** Commit the head this tick, without waiting out the lead, and blink (APPROVAL_ASK's head turn). */
+    private var snapHead: Boolean = false
+    /** A seat hand-off's eye lead ([lead]): where, and for how much longer. */
+    private var leadPoint: GazePoint = GazePoint(0f, 0f)
+    private var leadRemaining: Float = 0f
+
     /** Current habituation 0..1 (Pan et al. / Disney Research eq. 2). [GazeTarget.OWN] never decays. */
     fun interestOf(target: GazeTarget): Float = interest[target] ?: 1f
 
@@ -93,6 +107,7 @@ class GazeDirector(
             return lastPose
         }
         notePointer(world.pointer)
+        attentionClock.advance(world.attention, stepSeconds)
         still = world.mode == GazeDriveMode.JUSTIFIED && world.reducedMotion
         chooseTarget(state, world)
         if (target != scanKind) resetScan(target)
@@ -100,9 +115,34 @@ class GazeDirector(
         tickHabituation()
         advanceScan(world.mode)
         val pose = tickMotion(world)
+        leadRemaining = (leadRemaining - stepSeconds).coerceAtLeast(0f)
         lastPose = pose
         return pose
     }
+
+    /**
+     * Bias the next look by a reaction (te3n1.2): [GazeCue.APPROVAL_ASK] snaps to the approval card
+     * with a head turn and a blink; [GazeCue.SENT] glances at the newest message, then back at you.
+     * Honoured at the next justified tick; reduced motion keeps its one held look instead.
+     */
+    fun cue(cue: GazeCue) {
+        pendingCue = cue
+    }
+
+    /**
+     * A seat hand-off (te3n1.2): the eyes go to [toward] (gaze units, from where the mascot stands
+     * now) for [seconds] before the body hops, and the head follows after its usual lead. The plan
+     * keeps running underneath, so when the lead ends the gaze carries on where it was - nothing
+     * resets on arrival. Ignored under reduced motion (the hop snaps; the look holds).
+     */
+    fun lead(toward: GazePoint, seconds: Float) {
+        leadPoint = toward.coerce()
+        leadRemaining = seconds.coerceAtLeast(0f)
+    }
+
+    /** True while a seat hand-off's eye lead owns the look. */
+    private fun leading(mode: GazeDriveMode): Boolean =
+        leadRemaining > 0f && !still && mode == GazeDriveMode.JUSTIFIED
 
     /** Reduced motion holds one look; the product plan picks justified looks; the bench follows the cursor. */
     private fun chooseTarget(state: AvatarState, world: GazeWorld) {
@@ -121,11 +161,10 @@ class GazeDirector(
     private fun tickPlan(state: AvatarState, world: GazeWorld) {
         if (state != lastState) {
             lastState = state
-            target = GazeTarget.OWN
-            phase = PlanPhase.PICK
-            phaseRemaining = 0f
-            dwellLook = null
+            // A cued look holds through the flip its own event causes (an approval turns the state to WAITING_INPUT).
+            if (!cuedDwell) restartPlan()
         }
+        beginCue(world)
         phaseRemaining -= stepSeconds
         var steps = 0
         while (phaseRemaining <= 0f && steps < 4) {
@@ -138,7 +177,53 @@ class GazeDirector(
         }
     }
 
+    private fun restartPlan() {
+        target = GazeTarget.OWN
+        phase = PlanPhase.PICK
+        phaseRemaining = 0f
+        dwellLook = null
+    }
+
+    /** Turns a pending [GazeCue] into a cued dwell, now. */
+    private fun beginCue(world: GazeWorld) {
+        val cue = pendingCue ?: return
+        pendingCue = null
+        when (cue) {
+            GazeCue.APPROVAL_ASK -> {
+                holdCued(if (available(GazeTarget.APPROVAL, world)) GazeTarget.APPROVAL else GazeTarget.USER, config.cueApprovalSeconds)
+                snapHead = true
+            }
+            GazeCue.SENT -> {
+                val glance = sentGlance(world)
+                holdCued(glance ?: GazeTarget.USER, if (glance == null) config.cueReturnSeconds else config.cueGlanceSeconds)
+                followUp = if (glance == null) null else GazeTarget.USER
+            }
+        }
+    }
+
+    /** What a sent prompt glances at: the newest message, else the timeline, else nothing. */
+    private fun sentGlance(world: GazeWorld): GazeTarget? = when {
+        available(GazeTarget.MESSAGE, world) -> GazeTarget.MESSAGE
+        available(GazeTarget.TIMELINE, world) -> GazeTarget.TIMELINE
+        else -> null
+    }
+
+    /** A dwell on [look] for [seconds] that the plan did not pick and a state flip does not cut short. */
+    private fun holdCued(look: GazeTarget, seconds: ClosedFloatingPointRange<Float>) {
+        target = look
+        dwellLook = GazeLook(look, 1, seconds, CUED_GAP_SECONDS)
+        phase = PlanPhase.DWELL
+        phaseRemaining = pickRange(seconds)
+        cuedDwell = true
+    }
+
     private fun beginDwell(state: AvatarState, world: GazeWorld) {
+        val next = followUp
+        if (next != null) {
+            followUp = null
+            holdCued(next, config.cueReturnSeconds)
+            return
+        }
         val look = pickLook(GazePlan.forState(state), world)
         target = look.target
         dwellLook = look
@@ -176,17 +261,38 @@ class GazeDirector(
      * content's live edge; at rest on the input when there is one; otherwise straight ahead.
      */
     private fun holdStill(state: AvatarState, world: GazeWorld) {
-        // Forget the plan so it restarts cleanly if motion comes back.
+        // Forget the plan (and any cue) so it restarts cleanly if motion comes back.
         lastState = null
         asidePoint = CENTER
-        target = when {
-            ContentGaze.isAtWork(state) && world.timeline != null -> GazeTarget.TIMELINE
-            !ContentGaze.isAtWork(state) && world.input != null -> GazeTarget.INPUT
+        pendingCue = null
+        followUp = null
+        cuedDwell = false
+        target = stillTarget(state, world)
+    }
+
+    /**
+     * The one held look: what the state is about when a surface published it (the approval card
+     * while it asks, the running tool while it works, the caret while you type), else the content
+     * at work, the input at rest, or straight ahead.
+     */
+    private fun stillTarget(state: AvatarState, world: GazeWorld): GazeTarget {
+        val atWork = ContentGaze.isAtWork(state)
+        val preferred = when {
+            state == AvatarState.WAITING_INPUT -> GazeTarget.APPROVAL
+            state == AvatarState.WORKING -> GazeTarget.TOOL
+            atWork -> GazeTarget.TIMELINE
+            else -> GazeTarget.CARET
+        }
+        return when {
+            available(preferred, world) -> preferred
+            atWork && world.timeline != null -> GazeTarget.TIMELINE
+            !atWork && world.input != null -> GazeTarget.INPUT
             else -> GazeTarget.OWN
         }
     }
 
     private fun beginGap() {
+        cuedDwell = false
         // The gap keeps the last parked point when the dwell was already aside: eyes rest where they
         // were, they do not snap to centre between every look. After a look at a place (the reply,
         // the input, a peer, you) the eyes rest on that place rather than on a stale aside.
@@ -201,7 +307,7 @@ class GazeDirector(
         val use = if (available.isEmpty()) GazePlan.fallback else available
         var total = 0f
         val scored = FloatArray(use.size) { i ->
-            val s = score(use[i])
+            val s = scoreIn(use[i], world)
             total += s
             s
         }
@@ -214,12 +320,25 @@ class GazeDirector(
         return use.last()
     }
 
+    /** [score] times the pull of the attention point the look aims at, as it has aged ([AttentionInterest]). */
+    private fun scoreIn(look: GazeLook, world: GazeWorld): Float {
+        val point = attentionPoint(look.target, world) ?: return score(look)
+        return score(look) * attentionClock.interestOf(point)
+    }
+
     private fun available(target: GazeTarget, world: GazeWorld): Boolean = when (target) {
         GazeTarget.OWN, GazeTarget.USER, GazeTarget.AWAY -> true
         GazeTarget.CURSOR -> world.pointer != null
         GazeTarget.INPUT -> world.input != null
         GazeTarget.TIMELINE -> world.timeline != null
         GazeTarget.PEER -> world.peers.isNotEmpty()
+        GazeTarget.CARET, GazeTarget.MESSAGE, GazeTarget.APPROVAL, GazeTarget.TOOL -> attentionPoint(target, world) != null
+    }
+
+    /** The published point [target] aims at, or null (not an attention target, or nothing published). */
+    private fun attentionPoint(target: GazeTarget, world: GazeWorld): AttentionPoint? {
+        val kind = target.attentionKind() ?: return null
+        return world.attentionOf(kind)
     }
 
     // --- pointer demand (spike `near`) ----------------------------------------
@@ -273,12 +392,13 @@ class GazeDirector(
         scanUserIndex = 0
         scanPhase = ScanPhase.STEP
         when (kind) {
-            GazeTarget.TIMELINE -> {
+            // The newest message reads like the timeline's live edge; the caret scans like the field.
+            GazeTarget.TIMELINE, GazeTarget.MESSAGE -> {
                 scanCursor = TIMELINE_SCAN_START
                 applyTimeline()
                 scanWait = pickRange(0.180f..0.340f)
             }
-            GazeTarget.INPUT -> {
+            GazeTarget.INPUT, GazeTarget.CARET -> {
                 scanCursor = -0.15f
                 scanSpeed = pickRange(0.03f..0.06f)
                 applyInput()
@@ -306,8 +426,11 @@ class GazeDirector(
         }
     }
 
-    private fun hasScanOverlay(kind: GazeTarget): Boolean = when (kind) {
-        GazeTarget.TIMELINE, GazeTarget.INPUT, GazeTarget.USER -> true
+    private fun hasScanOverlay(kind: GazeTarget): Boolean = kind == GazeTarget.USER || kind.readsAsScan()
+
+    /** Targets the eyes read across in quick fixations (text being written or typed), rather than hold. */
+    private fun GazeTarget.readsAsScan(): Boolean = when (this) {
+        GazeTarget.TIMELINE, GazeTarget.MESSAGE, GazeTarget.INPUT, GazeTarget.CARET -> true
         else -> false
     }
 
@@ -318,8 +441,8 @@ class GazeDirector(
                 applyUser()
                 scanWait = pickRange(0.100f..0.500f)
             }
-            GazeTarget.TIMELINE -> stepTimeline()
-            GazeTarget.INPUT -> stepInput()
+            GazeTarget.TIMELINE, GazeTarget.MESSAGE -> stepTimeline()
+            GazeTarget.INPUT, GazeTarget.CARET -> stepInput()
             else -> scanWait = 1f
         }
     }
@@ -410,7 +533,7 @@ class GazeDirector(
 
     private fun tickMotion(world: GazeWorld): GazePose {
         val base = aimBase(world)
-        val want = wantLook(base, world.mode)
+        val want = wantLook(base, world)
         noteWantJump(base)
         pulseBlink = commitHeadIfLed(base)
         easeEyes(want, world.mode)
@@ -418,16 +541,31 @@ class GazeDirector(
         return finishedPose()
     }
 
-    private fun wantLook(base: GazePoint, mode: GazeDriveMode): GazePoint {
-        val useScan = !cursorNear && mode != GazeDriveMode.CURSOR
-        val sx = if (useScan) scanX else 0f
-        val sy = if (useScan) scanY else 0f
-        val want = GazePoint((base.x + sx).coerceIn(-1f, 1f), (base.y + sy).coerceIn(-1f, 1f))
+    /**
+     * The base aim plus this tick's scan saccade, held inside the plate (SPEC §10.4, [GazeContainment]):
+     * the intent first, the saccade attenuated before the intent is.
+     */
+    private fun wantLook(base: GazePoint, world: GazeWorld): GazePoint {
+        val mode = world.mode
+        val useScan = !cursorNear && mode != GazeDriveMode.CURSOR && !leading(mode)
+        val host = contained(base)
+        val lambda = if (useScan) GazeContainment.noiseScale(host, scanX, scanY) else 0f
+        val want = GazePoint((host.x + lambda * scanX).coerceIn(-1f, 1f), (host.y + lambda * scanY).coerceIn(-1f, 1f))
         return if (pointerDemands(mode)) want else constrained(want)
     }
 
-    /** A look the user's pointer demands is followed as is; every planned look stays toward the content. */
-    private fun pointerDemands(mode: GazeDriveMode): Boolean = mode == GazeDriveMode.CURSOR || cursorNear
+    /** [point] as is when it fits the plate, else scaled in by the greatest κ that does (rare: extremes only). */
+    private fun contained(point: GazePoint): GazePoint {
+        val kappa = GazeContainment.hostScale(point)
+        return if (kappa >= 1f) point else GazePoint(point.x * kappa, point.y * kappa)
+    }
+
+    /**
+     * A look the user's pointer demands, or a seat hand-off's lead, is followed as is; every planned
+     * look stays toward the content.
+     */
+    private fun pointerDemands(mode: GazeDriveMode): Boolean =
+        mode == GazeDriveMode.CURSOR || cursorNear || leading(mode)
 
     private fun constrained(point: GazePoint): GazePoint =
         ContentGaze.constrain(point)
@@ -448,19 +586,22 @@ class GazeDirector(
     }
 
     private fun commitHeadIfLed(base: GazePoint): Boolean {
-        if (wantAge <= config.headLeadSeconds) return false
+        // A cued snap (APPROVAL_ASK) turns the head at once, with a blink; otherwise it waits out the lead.
+        val snap = snapHead
+        snapHead = false
+        if (wantAge <= config.headLeadSeconds && !snap) return false
         // Spike always adds headScan (0 unless TIMELINE); eyes drop scan when near/cursor.
         val nextX = base.x * config.headXScale + headScan
         val nextY = base.y * config.headYScale
         val blink = abs(nextX - headTargetX) > config.blinkOnHeadTurn
         headTargetX = nextX
         headTargetY = nextY
-        return blink
+        return blink || snap
     }
 
     private fun easeEyes(want: GazePoint, mode: GazeDriveMode) {
         // Scans snap between fixations; a held (reduced-motion) look always eases gently.
-        val scanning = !still && (target == GazeTarget.TIMELINE || target == GazeTarget.INPUT)
+        val scanning = !still && target.readsAsScan()
         val tau = if (scanning) config.scanTauSeconds else config.eyeTauSeconds
         val k = 1f - exp(-stepSeconds / tau)
         val ex = want.x - headX * config.eyeHeadCompensation
@@ -483,12 +624,9 @@ class GazeDirector(
     }
 
     private fun finishedPose(): GazePose {
-        // TODO(letta-mobile-kkjyd): SPEC §10.4 combined gaze containment — do not
-        // clamp look+saccade to the card here. Unattenuated H+N can put the
-        // failed X ~2.54 artboard px outside; λ attenuation is that bead (after
-        // 24gbf). coerceIn(-1, 1) is gaze-unit range only, not card clearance.
+        // SPEC §10.4 (letta-mobile-kkjyd): the eased eyes, head compensation included, stay inside the plate too.
         return GazePose(
-            look = GazePoint(eyeX, eyeY).coerce(),
+            look = contained(GazePoint(eyeX, eyeY).coerce()),
             head = GazePoint(headX, headY).coerce(),
             blink = pulseBlink,
             target = if (cursorNear) GazeTarget.CURSOR else target,
@@ -496,6 +634,7 @@ class GazeDirector(
     }
 
     private fun aimBase(world: GazeWorld): GazePoint {
+        if (leading(world.mode)) return leadPoint
         if (pointerDemands(world.mode)) return (world.pointer ?: CENTER).coerce()
         val aim = constrained(planAim(world) ?: CENTER)
         lastPlanAim = aim
@@ -505,8 +644,10 @@ class GazeDirector(
     /** Where the current plan target is this frame; null falls back to centre. */
     private fun planAim(world: GazeWorld): GazePoint? = when (target) {
         GazeTarget.CURSOR -> world.pointer
-        GazeTarget.INPUT -> world.input
+        // While a caret is published the field's look rides it, so its scan follows the caret's x.
+        GazeTarget.INPUT -> world.attentionOf(AttentionKind.CARET)?.point ?: world.input
         GazeTarget.TIMELINE -> world.timeline
+        GazeTarget.CARET, GazeTarget.MESSAGE, GazeTarget.APPROVAL, GazeTarget.TOOL -> attentionPoint(target, world)?.point
         GazeTarget.PEER -> world.peers.getOrNull(peerIndex) ?: asidePoint
         GazeTarget.OWN, GazeTarget.AWAY -> asidePoint
         GazeTarget.USER -> CENTER
@@ -530,6 +671,9 @@ class GazeDirector(
 
     private companion object {
         val CENTER = GazePoint(0f, 0f)
+
+        /** The pause after a cued look: short, so the hand-over (SENT's look back at you) reads as one beat. */
+        val CUED_GAP_SECONDS = 0.1f..0.25f
 
         /** A timeline sweep starts just before the live edge and reads rightward past it. */
         const val TIMELINE_SCAN_START = -0.05f
