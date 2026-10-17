@@ -6,6 +6,7 @@ import com.letta.mobile.data.document.attempt
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.data.serialization.LettaJson
+import com.letta.mobile.data.storage.AssetStore
 import com.letta.mobile.data.storage.KeyValueStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,9 +44,27 @@ class KeyValueCanvasStorage(
     /** The boards' op log and write-ahead journal. */
     val opLog: CanvasOpLog = KeyValueCanvasOpLog(io, budget)
 
+    /** The relay's durable delivery record (queued edits, host cursors), under [DELIVERY_KEY]. */
+    val delivery: CanvasDeliveryStore = KeyValueCanvasDeliveryStore(io)
+
+    /**
+     * The canvas relay client over these stores, bound as desktop binds its own: topics by
+     * conversation, ops for closed boards into the stored board, and - because this log is
+     * bounded - a never-shared board's first join seeded from the board ([StoreCanvasSnapshotSeed]).
+     */
+    fun relayClient(assets: AssetStore? = null): CanvasRelayClient = CanvasRelayClient(
+        opLog = opLog,
+        delivery = delivery,
+        topicOf = { documents.relayTopicOf(it) },
+        assets = assets,
+        closedBoard = StoreCanvasClosedBoardApplier(documents, opLog),
+        snapshotSeed = StoreCanvasSnapshotSeed(documents, opLog),
+    )
+
     companion object {
         const val BOARD_PREFIX: String = "canvas/board/"
         const val OPS_PREFIX: String = "canvas/ops/"
+        const val DELIVERY_KEY: String = "canvas/delivery"
 
         /** Op-log entries kept per board, past which settled history is dropped. */
         val DEFAULT_BUDGET: HistoryBudget = HistoryBudget(maxOps = 2_000)
@@ -101,9 +120,33 @@ private class Boards(private val io: StorageIo) : DocumentBacking<CanvasDocument
     }
 }
 
-/** A board's log as stored: its kept ops in append order, and which of them the board holds. */
+/** The relay's delivery record as one JSON value; a read or write that fails is a fault, never fatal. */
+private class KeyValueCanvasDeliveryStore(private val io: StorageIo) : StateCanvasDeliveryStore() {
+    private val entry = StoredEntry(KeyValueCanvasStorage.DELIVERY_KEY)
+
+    override suspend fun load(): CanvasDeliveryState =
+        io.guarded(CanvasStorageFault.Kind.LOAD_FAILED, entry, CanvasDeliveryState()) {
+            io.store.get(entry.key)?.let { LettaJson.persisted.decodeFromString(CanvasDeliveryState.serializer(), it) }
+                ?: CanvasDeliveryState()
+        }
+
+    override suspend fun save(state: CanvasDeliveryState) {
+        io.guarded(CanvasStorageFault.Kind.SAVE_FAILED, entry, Unit) {
+            io.store.put(entry.key, LettaJson.persisted.encodeToString(CanvasDeliveryState.serializer(), state))
+        }
+    }
+}
+
+/**
+ * A board's log as stored: its kept ops in append order, which of them the board holds, and whether
+ * settled history was ever dropped from it.
+ */
 @Serializable
-private data class StoredCanvasOps(val ops: List<CanvasOp> = emptyList(), val settled: List<String> = emptyList())
+private data class StoredCanvasOps(
+    val ops: List<CanvasOp> = emptyList(),
+    val settled: List<String> = emptyList(),
+    val droppedHistory: Boolean = false,
+)
 
 /**
  * The [InMemoryCanvasOpLog] (dedup, journal, observers), read back from storage per board on first
@@ -113,6 +156,7 @@ private class KeyValueCanvasOpLog(private val io: StorageIo, private val budget:
     private val memory = InMemoryCanvasOpLog()
     private val lock = Mutex()
     private val loaded = mutableSetOf<CanvasId>()
+    private val dropped = mutableSetOf<CanvasId>()
 
     override suspend fun append(canvasId: CanvasId, op: CanvasOp) = lock.withLock {
         load(canvasId)
@@ -130,6 +174,9 @@ private class KeyValueCanvasOpLog(private val io: StorageIo, private val budget:
 
     override fun observe(canvasId: CanvasId): Flow<CanvasOp> = memory.observe(canvasId)
 
+    override suspend fun hasDroppedHistory(canvasId: CanvasId): Boolean =
+        lock.withLock { load(canvasId).let { canvasId in dropped } }
+
     override suspend fun unsettled(canvasId: CanvasId): List<CanvasOp> =
         lock.withLock { load(canvasId) }.let { memory.unsettled(canvasId) }
 
@@ -146,6 +193,7 @@ private class KeyValueCanvasOpLog(private val io: StorageIo, private val budget:
         val stored = io.guarded(CanvasStorageFault.Kind.LOAD_FAILED, entry, null) {
             io.store.get(entry.key)?.let { LettaJson.persisted.decodeFromString(StoredCanvasOps.serializer(), it) }
         } ?: return
+        if (stored.droppedHistory) dropped += canvasId
         memory.restore(canvasId, stored.ops, stored.settled.toSet())
     }
 
@@ -153,7 +201,7 @@ private class KeyValueCanvasOpLog(private val io: StorageIo, private val budget:
     private suspend fun save(canvasId: CanvasId) {
         val pending = memory.unsettled(canvasId).mapTo(mutableSetOf()) { it.opId }
         val ops = compact(canvasId, memory.getOps(canvasId, Long.MIN_VALUE), pending)
-        val record = StoredCanvasOps(ops, ops.map { it.opId }.filterNot { it in pending })
+        val record = StoredCanvasOps(ops, ops.map { it.opId }.filterNot { it in pending }, droppedHistory = canvasId in dropped)
         val entry = StoredEntry.ops(canvasId)
         io.guarded(CanvasStorageFault.Kind.SAVE_FAILED, entry, Unit) {
             io.store.put(entry.key, LettaJson.persisted.encodeToString(StoredCanvasOps.serializer(), record))
@@ -166,6 +214,7 @@ private class KeyValueCanvasOpLog(private val io: StorageIo, private val budget:
         val excess = ops.size - budget.warnOps
         val dropped = ops.asSequence().filter { it.opId !in pending }.take(excess).mapTo(mutableSetOf()) { it.opId }
         memory.dropArchived(canvasId, dropped)
+        if (dropped.isNotEmpty()) this.dropped += canvasId
         val note = "Dropped ${dropped.size} settled ops the board already holds"
         io.faults.record(io.fault(CanvasStorageFault.Kind.COMPACTED, StoredEntry.ops(canvasId), note))
         return ops.filterNot { it.opId in dropped }

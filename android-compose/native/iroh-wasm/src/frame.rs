@@ -29,17 +29,23 @@ pub enum FrameError {
 }
 
 pub fn encode_frame(payload: &str) -> Result<Vec<u8>, FrameError> {
+    encode_frame_with_max(payload, MAX_FRAME_BYTES)
+}
+
+/// One plain frame of at most [maximum] payload bytes: the canvas relay's frames are plain and
+/// larger than the App Server's (`CanvasRelayFraming.MAX_FRAME_BYTES`).
+pub fn encode_frame_with_max(payload: &str, maximum: usize) -> Result<Vec<u8>, FrameError> {
     let payload = payload.as_bytes();
-    if payload.len() > MAX_FRAME_BYTES {
+    if payload.len() > maximum {
         return Err(FrameError::TooLarge {
             size: payload.len(),
-            maximum: MAX_FRAME_BYTES,
+            maximum,
         });
     }
 
     let length = u32::try_from(payload.len()).map_err(|_| FrameError::TooLarge {
         size: payload.len(),
-        maximum: MAX_FRAME_BYTES,
+        maximum,
     })?;
     let mut frame = Vec::with_capacity(HEADER_BYTES + payload.len());
     frame.extend_from_slice(&length.to_be_bytes());
@@ -91,20 +97,35 @@ fn encode_part(index: usize, fin: bool, payload: &[u8]) -> Result<Vec<u8>, Frame
 /// Decodes plain frames and reassembles `frame_part` sequences (see `IrohFrameCodec` for the
 /// wire format). Parts of one logical frame are strictly sequential on a stream, so any plain
 /// frame or out-of-order index mid-sequence is a protocol error.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct FrameDecoder {
     buffered: Vec<u8>,
     pending_parts: Vec<u8>,
     expected_part_index: u32,
+    max_frame_bytes: usize,
+}
+
+impl Default for FrameDecoder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FrameDecoder {
+    /// The App Server's decoder: plain frames up to [`MAX_FRAME_BYTES`].
     #[must_use]
     pub const fn new() -> Self {
+        Self::with_max_frame_bytes(MAX_FRAME_BYTES)
+    }
+
+    /// A decoder whose plain frames may carry up to [max_frame_bytes] payload bytes.
+    #[must_use]
+    pub const fn with_max_frame_bytes(max_frame_bytes: usize) -> Self {
         Self {
             buffered: Vec::new(),
             pending_parts: Vec::new(),
             expected_part_index: 0,
+            max_frame_bytes,
         }
     }
 
@@ -147,10 +168,10 @@ impl FrameDecoder {
                 expected: self.expected_part_index,
             });
         }
-        if length > MAX_FRAME_BYTES {
+        if length > self.max_frame_bytes {
             return Err(FrameError::TooLarge {
                 size: length,
-                maximum: MAX_FRAME_BYTES,
+                maximum: self.max_frame_bytes,
             });
         }
         let frame_end = HEADER_BYTES + length;
