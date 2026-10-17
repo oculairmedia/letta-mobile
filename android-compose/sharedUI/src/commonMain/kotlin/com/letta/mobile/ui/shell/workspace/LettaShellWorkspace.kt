@@ -88,7 +88,7 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val width = maxWidth
                     LaunchedEffect(width) { host.events.onWidthChanged(width.value) }
-                    WorkspaceColumn(WorkspaceFrame(state, host, drawer, width))
+                    WorkspaceColumn(WorkspaceFrame(state, host, drawer, workspaceFit(state.layout, width)))
                 }
                 host.slots.overlays()
             }
@@ -96,34 +96,35 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
     }
 }
 
-/** One composition's view of the workspace: what it draws and at which width. */
+/** How the workspace fits the window: folded into the drawer, and whether the agent panel shows. */
+private class WorkspaceFit(val compact: Boolean, val sidebarVisible: Boolean)
+
+private fun workspaceFit(layout: ShellWorkspaceLayout, width: Dp): WorkspaceFit = WorkspaceFit(
+    compact = layout.forceCompact || width < LettaDimens.Pane.wideBreakpoint,
+    // The person's choice, removed (not shrunk) below the layout's width rule.
+    sidebarVisible = layout.sidebarVisible && !ShellLayoutReducer.defaultCollapsedForWidth(width.value),
+)
+
+/** One composition's view of the workspace: what it draws and how it fits. */
 private class WorkspaceFrame(
     val state: LettaShellWorkspaceState,
     val host: LettaShellWorkspaceHost,
     val drawer: ShellWorkspaceDrawer,
-    width: Dp,
-) {
-    val compact: Boolean = state.layout.forceCompact || width < LettaDimens.Pane.wideBreakpoint
+    val fit: WorkspaceFit,
+)
 
-    /** The person's choice, removed (not shrunk) below the layout's width rule. */
-    val sidebarVisible: Boolean = state.layout.sidebarVisible && !ShellLayoutReducer.defaultCollapsedForWidth(width.value)
+/** Where the agent pane's mascot stands: the open drawer when compact, the visible sidebar when wide. */
+private fun WorkspaceFrame.agentPaneVisible(): Boolean = if (fit.compact) drawer.open else fit.sidebarVisible
 
-    /** Where the agent pane's mascot stands: the open drawer when compact, the visible sidebar when wide. */
-    val agentPaneVisible: Boolean get() = if (compact) drawer.open else sidebarVisible
-
-    /** In a compact window the header's sidebar control opens the drawer. */
-    val header: ShellWorkspaceHeaderState
-        get() = if (!compact) {
-            state.header
-        } else {
-            state.header.copy(sidebar = ShellSidebarControl(collapsed = true, onToggle = { drawer.open = true }, opensDrawer = true))
-        }
+/** In a compact window the header's sidebar control opens the drawer. */
+private fun WorkspaceFrame.header(): ShellWorkspaceHeaderState {
+    if (!fit.compact) return state.header
+    return state.header.copy(sidebar = ShellSidebarControl(collapsed = true, onToggle = { drawer.open = true }, opensDrawer = true))
 }
-
 @Composable
 private fun WorkspaceColumn(frame: WorkspaceFrame) {
     Column(Modifier.fillMaxSize()) {
-        val header = frame.header
+        val header = frame.header()
         when (val chrome = frame.host.chrome) {
             ShellWindowChrome.Inline -> InlineHeader(header)
             is ShellWindowChrome.Hoisted -> SideEffect { chrome.onHeader(header) }
@@ -159,12 +160,12 @@ internal fun inlineHeaderHeight(tabbed: Boolean): Dp =
 private fun WorkspaceBody(frame: WorkspaceFrame, modifier: Modifier) {
     // The panel's card and the page's panels open their detail in the frame around the page.
     val inspectors = rememberInspectorHost()
-    ShellMascotStage(frame.state.navigation.rail.focus, frame.agentPaneVisible)
+    ShellMascotStage(frame.state.navigation.rail.focus, frame.agentPaneVisible())
     Box(modifier.fillMaxWidth()) {
         // Every seated mascot draws here, over the shell, and travels between seats (wbin4.4).
         MascotTransportLayer {
             ProvideInspectorHost(inspectors) {
-                if (frame.compact) CompactBody(frame, inspectors) else WideBody(frame, inspectors)
+                if (frame.fit.compact) CompactBody(frame, inspectors) else WideBody(frame, inspectors)
             }
         }
     }
@@ -178,7 +179,7 @@ private fun WideBody(frame: WorkspaceFrame, inspectors: InspectorHost) {
     Row(Modifier.fillMaxSize().testTag(LettaShellWorkspaceTags.WIDE)) {
         ShellLibraryRail(state = navigation.rail, actions = actions.rail)
         VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        ShellCollapsibleSidebar(visible = frame.sidebarVisible, reducedMotion = frame.state.layout.reducedMotion) {
+        ShellCollapsibleSidebar(visible = frame.fit.sidebarVisible, reducedMotion = frame.state.layout.reducedMotion) {
             ShellAgentPanel(
                 state = navigation.panel,
                 actions = actions.panel,

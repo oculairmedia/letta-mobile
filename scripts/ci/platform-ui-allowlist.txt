@@ -126,7 +126,7 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellFra
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellMainPane.kt 319 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellServices.kt 240 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopSidebarChrome.kt 47 legacy-pending(ckmub.3)
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/LettaDesktopApp.kt 246 legacy-pending(ckmub.3)
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/LettaDesktopApp.kt 241 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/Main.kt 308 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/agent/DesktopAgentEditor.kt 70 container
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/RiveBenchInstruments.kt 158 legacy-pending(ckmub.3)

@@ -15,7 +15,6 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.ui.shell.rememberShellWorkspaceState
 import com.letta.mobile.ui.components.tabs.LettaTab
-import com.letta.mobile.ui.components.tabs.LettaTabStripActions
 import com.letta.mobile.ui.shell.header.SearchSlot
 import com.letta.mobile.ui.shell.header.ShellSearchContext
 import com.letta.mobile.ui.shell.header.rememberShellSearchSlot
@@ -101,16 +100,6 @@ private fun rememberDesktopShellHeader(context: DesktopShellContext, frame: Desk
     )
 }
 
-/** The strip's verbs; its browser-style "+" is a new chat with the focused agent. */
-private fun desktopTabActions(context: DesktopShellContext, frame: DesktopShellFrame): LettaTabStripActions {
-    val router = context.router
-    return LettaTabStripActions(
-        onSelect = { router.openConversation(ConversationId(it)) },
-        onClose = { router.closeConversationTab(ConversationId(it)) },
-        onReorder = { id, index -> router.reorderConversationTab(ConversationId(id), index) },
-        onNew = { context.openNewChatForFocusedAgent(frame.focus) },
-    )
-}
 
 /**
  * The shared header search over this window's unified search sources (conversations, message text,
