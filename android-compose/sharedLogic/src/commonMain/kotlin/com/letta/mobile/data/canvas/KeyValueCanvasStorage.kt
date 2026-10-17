@@ -52,16 +52,26 @@ class KeyValueCanvasStorage(
     }
 }
 
+/** One stored value: its key, and the board it belongs to when there is one. */
+private data class StoredEntry(val key: String, val canvasId: CanvasId? = null) {
+    companion object {
+        fun board(id: CanvasId) = StoredEntry(KeyValueCanvasStorage.BOARD_PREFIX + id.value, id)
+
+        fun ops(id: CanvasId) = StoredEntry(KeyValueCanvasStorage.OPS_PREFIX + id.value, id)
+    }
+}
+
 /** [KeyValueStore] calls that report a failure as a storage fault instead of throwing. */
 private class StorageIo(val store: KeyValueStore, val faults: CanvasStorageFaults, val clock: () -> Long) {
-    suspend fun <T> guarded(kind: CanvasStorageFault.Kind, key: String, canvasId: CanvasId?, fallback: T, action: suspend () -> T): T =
+    suspend fun <T> guarded(kind: CanvasStorageFault.Kind, entry: StoredEntry, fallback: T, action: suspend () -> T): T =
         attempt(action).getOrElse { error ->
-            faults.record(fault(kind, key, canvasId, describe(kind, error)), error)
+            faults.record(fault(kind, entry, describe(kind, error)), error)
             fallback
         }
 
-    fun fault(kind: CanvasStorageFault.Kind, key: String, canvasId: CanvasId?, message: String) =
-        CanvasStorageFault(kind, documentId = key, canvasId = canvasId, documentBytes = null, message = message, atEpochMs = clock())
+    fun fault(kind: CanvasStorageFault.Kind, entry: StoredEntry, message: String) = CanvasStorageFault(
+        kind, documentId = entry.key, canvasId = entry.canvasId, documentBytes = null, message = message, atEpochMs = clock(),
+    )
 
     private fun describe(kind: CanvasStorageFault.Kind, error: Throwable): String {
         val what = if (kind == CanvasStorageFault.Kind.SAVE_FAILED) "Not saved; changes are only in memory" else "Could not be read"
@@ -75,18 +85,18 @@ private class Boards(private val io: StorageIo) : DocumentBacking<CanvasDocument
 
     override suspend fun loadAll(): List<CanvasDocument> {
         val prefix = KeyValueCanvasStorage.BOARD_PREFIX
-        val keys = io.guarded(CanvasStorageFault.Kind.LOAD_FAILED, prefix, null, emptyList()) { io.store.keys(prefix) }
+        val keys = io.guarded(CanvasStorageFault.Kind.LOAD_FAILED, StoredEntry(prefix), emptyList()) { io.store.keys(prefix) }
         return keys.mapNotNull { key ->
-            io.guarded(CanvasStorageFault.Kind.LOAD_FAILED, key, null, null) {
+            io.guarded(CanvasStorageFault.Kind.LOAD_FAILED, StoredEntry(key), null) {
                 io.store.get(key)?.let { LettaJson.persisted.decodeFromString(CanvasDocument.serializer(), it) }
             }
         }
     }
 
     override suspend fun write(doc: CanvasDocument) {
-        val key = KeyValueCanvasStorage.BOARD_PREFIX + doc.id.value
-        io.guarded(CanvasStorageFault.Kind.SAVE_FAILED, key, doc.id, Unit) {
-            io.store.put(key, LettaJson.persisted.encodeToString(CanvasDocument.serializer(), doc))
+        val entry = StoredEntry.board(doc.id)
+        io.guarded(CanvasStorageFault.Kind.SAVE_FAILED, entry, Unit) {
+            io.store.put(entry.key, LettaJson.persisted.encodeToString(CanvasDocument.serializer(), doc))
         }
     }
 }
@@ -132,9 +142,9 @@ private class KeyValueCanvasOpLog(private val io: StorageIo, private val budget:
     /** Under [lock]: reads [canvasId]'s stored log into memory, once. */
     private suspend fun load(canvasId: CanvasId) {
         if (!loaded.add(canvasId)) return
-        val key = KeyValueCanvasStorage.OPS_PREFIX + canvasId.value
-        val stored = io.guarded(CanvasStorageFault.Kind.LOAD_FAILED, key, canvasId, null) {
-            io.store.get(key)?.let { LettaJson.persisted.decodeFromString(StoredCanvasOps.serializer(), it) }
+        val entry = StoredEntry.ops(canvasId)
+        val stored = io.guarded(CanvasStorageFault.Kind.LOAD_FAILED, entry, null) {
+            io.store.get(entry.key)?.let { LettaJson.persisted.decodeFromString(StoredCanvasOps.serializer(), it) }
         } ?: return
         memory.restore(canvasId, stored.ops, stored.settled.toSet())
     }
@@ -144,9 +154,9 @@ private class KeyValueCanvasOpLog(private val io: StorageIo, private val budget:
         val pending = memory.unsettled(canvasId).mapTo(mutableSetOf()) { it.opId }
         val ops = compact(canvasId, memory.getOps(canvasId, Long.MIN_VALUE), pending)
         val record = StoredCanvasOps(ops, ops.map { it.opId }.filterNot { it in pending })
-        val key = KeyValueCanvasStorage.OPS_PREFIX + canvasId.value
-        io.guarded(CanvasStorageFault.Kind.SAVE_FAILED, key, canvasId, Unit) {
-            io.store.put(key, LettaJson.persisted.encodeToString(StoredCanvasOps.serializer(), record))
+        val entry = StoredEntry.ops(canvasId)
+        io.guarded(CanvasStorageFault.Kind.SAVE_FAILED, entry, Unit) {
+            io.store.put(entry.key, LettaJson.persisted.encodeToString(StoredCanvasOps.serializer(), record))
         }
     }
 
@@ -156,9 +166,8 @@ private class KeyValueCanvasOpLog(private val io: StorageIo, private val budget:
         val excess = ops.size - budget.warnOps
         val dropped = ops.asSequence().filter { it.opId !in pending }.take(excess).mapTo(mutableSetOf()) { it.opId }
         memory.dropArchived(canvasId, dropped)
-        val key = KeyValueCanvasStorage.OPS_PREFIX + canvasId.value
         val note = "Dropped ${dropped.size} settled ops the board already holds"
-        io.faults.record(io.fault(CanvasStorageFault.Kind.COMPACTED, key, canvasId, note))
+        io.faults.record(io.fault(CanvasStorageFault.Kind.COMPACTED, StoredEntry.ops(canvasId), note))
         return ops.filterNot { it.opId in dropped }
     }
 }
