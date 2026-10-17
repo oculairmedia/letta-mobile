@@ -45,6 +45,7 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import com.letta.mobile.avatar.core.MascotBody
 import com.letta.mobile.avatar.core.MascotDirector
 import com.letta.mobile.avatar.core.MascotEvent
@@ -383,22 +384,31 @@ private fun TransportedMascot(
             .seatInput(seat.handlers, hover, SeatDrag(flight, dragFeel)),
         contentAlignment = Alignment.Center,
     ) {
-        MascotLive(
-            agentId,
-            identity,
-            size = boxSize * seat.overscale,
-            onClick = seat.onClick,
-            sceneKey = sceneKey,
-            // A seat that takes input at all lets the character be poked and petted; one that
-            // takes none (over the Touch chat head) leaves every touch to what is under it.
-            touch = seat.touch,
-        )
+        SeatedLive(seated, boxSize, sceneKey)
         // The pencil, in front of the character (the layer draws above every seat), on hover only:
         // one way to edit the agent from any mascot, so no seat needs to travel to the editor.
         seat.onEdit?.let { onEdit ->
             if (hovered) MascotEditBadge(onEdit, Modifier.align(Alignment.BottomEnd))
         }
     }
+}
+
+/**
+ * [seated]'s live character in a [boxSize] slot. A seat that takes input at all lets the character
+ * be poked and petted; one that takes none (over the Touch chat head) leaves every touch to what
+ * is under it.
+ */
+@Composable
+private fun SeatedLive(seated: SeatedMascot, boxSize: Dp, sceneKey: String) {
+    val seat = seated.seat
+    MascotLive(
+        seated.agentId,
+        seated.identity,
+        size = boxSize * seat.overscale,
+        onClick = seat.onClick,
+        sceneKey = sceneKey,
+        touch = seat.touch,
+    )
 }
 
 /**
