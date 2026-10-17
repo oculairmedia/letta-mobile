@@ -1,5 +1,6 @@
 package com.letta.mobile.runtime.local
 
+import com.google.ai.edge.litertlm.ToolCall
 import com.letta.mobile.data.serialization.LettaJson
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -12,20 +13,27 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.longOrNull
 
 /**
- * letta-mobile-by4vm.121.16: tool-call arguments between OpenAI's JSON string and LiteRT-LM's
- * `ToolCall.arguments` (a `Map<String, Any?>` of plain Kotlin values), value for value. LiteRT-LM's
- * own converters are internal to the library.
+ * letta-mobile-by4vm.121.16: the boundary adapter between OpenAI tool calls (arguments as a JSON
+ * string) and LiteRT-LM's [ToolCall], whose `arguments` the library types as `Map<String, Any?>` of
+ * plain Kotlin values. Untyped values exist only inside this adapter, value for value; everything
+ * outside it sees [OnDeviceToolCall] and JSON. LiteRT-LM's own converters are internal to the library.
  */
 internal object ToolArgumentsJson {
     private val json = LettaJson.wire
 
-    /** An OpenAI `arguments` string (a JSON object) as LiteRT-LM arguments. */
-    fun toArguments(argumentsJson: String): Map<String, Any?> =
-        json.parseToJsonElement(argumentsJson).jsonObject.mapValues { (_, value) -> value.toKotlin() }
+    /** An OpenAI call (its `arguments` a JSON object string) as a LiteRT-LM call. */
+    fun toLiteRt(call: OnDeviceToolCall, argumentsJson: String): ToolCall =
+        ToolCall(call.name, json.parseToJsonElement(argumentsJson).jsonObject.mapValues { (_, value) -> value.toKotlin() })
 
-    /** LiteRT-LM arguments as an OpenAI `arguments` string. */
-    fun toJson(arguments: Map<String, Any?>): String = json.encodeToString(JsonElement.serializer(), arguments.toJsonElement())
+    /** A LiteRT-LM call as an OpenAI call (no id yet: the bridge mints it). */
+    fun fromLiteRt(call: ToolCall): OnDeviceToolCall = OnDeviceToolCall(
+        id = null,
+        name = call.name,
+        argumentsJson = json.encodeToString(JsonElement.serializer(), call.arguments.toJsonElement()),
+    )
 
+    // LiteRT-LM's ToolCall.arguments is Map<String, Any?>: these two are the only untyped values.
+    @Suppress("NoAnyType")
     private fun JsonElement.toKotlin(): Any? = when (this) {
         is JsonNull -> null
         is JsonPrimitive -> if (isString) content else booleanOrNull ?: longOrNull ?: doubleOrNull ?: content
@@ -33,6 +41,7 @@ internal object ToolArgumentsJson {
         is JsonArray -> map { it.toKotlin() }
     }
 
+    @Suppress("NoAnyType")
     private fun Any?.toJsonElement(): JsonElement = when (this) {
         null -> JsonNull
         is JsonElement -> this

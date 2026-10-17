@@ -46,13 +46,12 @@ internal object LiteRtLmConversationMapping {
             listOfNotNull(message.text.takeIf { it.isNotEmpty() }?.let { Content.Text(sanitizeForLiteRt(it)) }),
     )
 
-    private fun toolCall(call: OnDeviceToolCall): ToolCall =
-        ToolCall(call.name, ToolArgumentsJson.toArguments(sanitizeForLiteRt(call.argumentsJson)))
+    private fun toolCall(call: OnDeviceToolCall): ToolCall = ToolArgumentsJson.toLiteRt(call, sanitizeForLiteRt(call.argumentsJson))
 
     /** The model's streamed messages as one reply: their text in order, and every tool call. */
     fun reply(text: String, toolCalls: List<ToolCall>): OnDeviceReply = OnDeviceReply(
         text = text,
-        toolCalls = toolCalls.map { OnDeviceToolCall(id = null, name = it.name, argumentsJson = ToolArgumentsJson.toJson(it.arguments)) },
+        toolCalls = toolCalls.map(ToolArgumentsJson::fromLiteRt),
     )
 
     /** The text parts of one streamed message (a tool-call message has none). */
