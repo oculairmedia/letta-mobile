@@ -34,6 +34,7 @@ import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.subagents.SubagentRingsOverlay
+import com.letta.mobile.ui.chat.subagents.withSubagentDualView
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbientStatus
@@ -135,7 +136,7 @@ internal fun DesktopSharedChatPage(
     val phone = LocalDesktopPhone.current
     val presentation = rememberShellChatPresentation(phone.opensOnCanvas(openOnCanvas.enabled.value))
     val directoryPicker = rememberDesktopWorkingDirectoryPicker(port)
-    val host = rememberDesktopChatSurfaceHost(port, navigation, directoryPicker, phone)
+    val host = rememberDualViewHost(rememberDesktopChatSurfaceHost(port, navigation, directoryPicker, phone), state.subagents)
     // The run's own state, as the composer's Stop button and the docked panel's glow read it: the
     // shell's "thinking" flag clears at the first reply and put the page's glow out mid-run.
     val uiState by port.uiState.collectAsState()
@@ -158,6 +159,8 @@ internal fun DesktopSharedChatPage(
                 recents = navigation.recentInteractions,
                 canvasHeaderTrailing = state.canvasHeaderTrailing,
                 onBoardShown = onBoardShown,
+                // letta-mobile-ulcg6.1: rings, rows and the Background tasks pane open a subagent beside this conversation.
+                subagentViews = state.subagents?.views,
             ),
         )
     }
@@ -201,9 +204,19 @@ private fun rememberDesktopChatPlatform(ambientStatus: AmbientMotionStatus, fram
             },
             showKeyboardHints = frame.showKeyboardHints,
             topChromeInset = frame.topChromeInset,
-            timelineOverlay = subagents?.let { rings -> { SubagentRingsOverlay(rings.entries, rings.loader) } },
+            timelineOverlay = subagents?.let { rings ->
+                { SubagentRingsOverlay(rings.entries, rings.loader, onViewConversation = rings.onViewConversation) }
+            },
         )
     }
+
+/** The page's host with its timeline rows opening their subagent in the dual view, when the page has one. */
+@Composable
+private fun rememberDualViewHost(host: ChatSurfaceHost, subagents: DesktopChatSubagents?): ChatSurfaceHost {
+    val entries by rememberUpdatedState(subagents?.entries.orEmpty())
+    val holder = subagents?.views?.holder
+    return remember(host, holder) { holder?.let { host.withSubagentDualView(it) { entries } } ?: host }
+}
 
 /** The page's host navigation; the working-directory row opens the shared picker (letta-mobile-zxk2n.6). */
 @Composable

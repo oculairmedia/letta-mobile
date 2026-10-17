@@ -22,6 +22,7 @@ import com.letta.mobile.ui.shell.workspace.ShellCanvasOwner
 import com.letta.mobile.ui.chat.session.ChatHostCommand
 import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
 import com.letta.mobile.desktop.chat.DesktopChatSubagents
+import com.letta.mobile.desktop.chat.desktopSubagentTimelineRoute
 import com.letta.mobile.desktop.chat.DesktopChatSessionPort
 import com.letta.mobile.desktop.chat.DesktopContextFocus
 import com.letta.mobile.desktop.chat.DesktopContextWindowSources
@@ -30,7 +31,9 @@ import com.letta.mobile.desktop.chat.DesktopSharedChatPageNavigation
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageState
 import com.letta.mobile.desktop.chat.rememberFocusedContextUsage
 import com.letta.mobile.ui.chat.subagents.BackgroundTasksToggle
+import com.letta.mobile.ui.chat.subagents.SubagentDualViewBinding
 import com.letta.mobile.ui.chat.subagents.SubagentTodoLoader
+import com.letta.mobile.ui.chat.session.TimelineSubagentViewSessions
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.pages.ShellHostPages
 import com.letta.mobile.ui.shell.pages.ShellPageFocus
@@ -298,7 +301,22 @@ private fun DesktopShellSharedChatPage(
 private fun rememberDesktopChatSubagents(context: DesktopShellContext, frame: DesktopShellFrame): DesktopChatSubagents? {
     val repository = context.panels.subagents.repository
     val loader = remember(repository) { repository?.let { repo -> SubagentTodoLoader { target -> repo.todos(target.toolCallId) } } }
-    return loader?.let { DesktopChatSubagents(frame.lists.activeSubagents, it) }
+    val views = rememberDesktopSubagentViews(context)
+    return loader?.let { DesktopChatSubagents(frame.lists.activeSubagents, it, views) }
+}
+
+/**
+ * letta-mobile-ulcg6.1: the chat's subagent dual view, each child conversation read over the active
+ * gateway the way a selected conversation is.
+ */
+@Composable
+private fun rememberDesktopSubagentViews(context: DesktopShellContext): SubagentDualViewBinding {
+    val controller = context.core.chatController
+    val holder = context.panels.subagents.views
+    return remember(controller, holder) {
+        val sessions = TimelineSubagentViewSessions { view -> controller.activeGateway?.let { desktopSubagentTimelineRoute(it, view) } }
+        SubagentDualViewBinding(holder, sessions)
+    }
 }
 
 /**

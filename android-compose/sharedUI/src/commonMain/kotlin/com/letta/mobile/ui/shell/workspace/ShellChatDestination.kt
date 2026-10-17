@@ -43,6 +43,9 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
+import com.letta.mobile.ui.chat.subagents.SubagentDualViewBinding
+import com.letta.mobile.ui.chat.subagents.SubagentDualViewFrame
+import com.letta.mobile.ui.chat.subagents.SubagentDualViewOptions
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 import com.letta.mobile.ui.chat.surface.ChatCanvasPlaceholder
 import com.letta.mobile.ui.chat.surface.ChatSurface
@@ -103,6 +106,8 @@ class ShellChatLook(
     val canvasHeaderTrailing: (@Composable () -> Unit)? = null,
     /** The board on show, so the host can route its own opens of it to this page (desktop's dock); null when it leaves. */
     val onBoardShown: ((CanvasId?) -> Unit)? = null,
+    /** letta-mobile-zxk2n.8: the conversation's subagent dual view; null draws the page alone. */
+    val subagentViews: SubagentDualViewBinding? = null,
 )
 
 /**
@@ -125,6 +130,27 @@ fun ShellChatDestination(
             onDispose { report(null) }
         }
     }
+    // letta-mobile-zxk2n.8: a subagent's conversation opens beside this one (in its place on a narrow page), read-only.
+    val dualViewOptions = SubagentDualViewOptions(look.appearance, page.host, look.platform.topChromeInset)
+    SubagentDualViewFrame(look.subagentViews, modifier, dualViewOptions) { parentModifier ->
+        ParentChatPage(ParentChatInputs(page, presentation, look, session), parentModifier)
+    }
+}
+
+private class ParentChatInputs(
+    val page: ShellChatPage,
+    val presentation: ShellChatPresentation,
+    val look: ShellChatLook,
+    val session: CanvasSession?,
+)
+
+/** The conversation's own page: the shared chat surface over its board. */
+@Composable
+private fun ParentChatPage(inputs: ParentChatInputs, modifier: Modifier) {
+    val page = inputs.page
+    val presentation = inputs.presentation
+    val look = inputs.look
+    val session = inputs.session
     var dockGeometry by page.dockGeometry
     ChatSurface(
         port = page.port,
