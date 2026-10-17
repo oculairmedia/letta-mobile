@@ -30,6 +30,13 @@ import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.LayoutPrefStorage
 import com.letta.mobile.ui.chat.surface.rememberChatDockGeometry
+import com.letta.mobile.ui.chat.session.SubagentViewSessions
+import com.letta.mobile.ui.chat.subagents.SubagentDualViewBinding
+import com.letta.mobile.ui.chat.subagents.SubagentDualViewFrame
+import com.letta.mobile.ui.chat.subagents.SubagentDualViewHolder
+import com.letta.mobile.ui.chat.subagents.SubagentDualViewOptions
+import com.letta.mobile.ui.chat.subagents.rememberSubagentDualViewHolder
+import com.letta.mobile.ui.chat.subagents.withSubagentDualView
 
 /** The board docked under the conversation: where it and its op log are kept, the dock's placement, and whether the page opens on it. */
 internal data class WebChatCanvas(
@@ -45,6 +52,8 @@ internal data class WebChatPageNavigation(
     val openAgentPane: () -> Unit,
     /** Agent display names for provenance labels. */
     val agentNamesById: Map<String, String> = emptyMap(),
+    /** letta-mobile-zxk2n.8: where a subagent's conversation is read for the dual view; null leaves it off. */
+    val subagentSessions: SubagentViewSessions? = null,
 )
 
 /**
@@ -69,16 +78,28 @@ internal fun WebSharedChatPage(
     }
     var dockGeometry by rememberChatDockGeometry(canvas.dockGeometry)
     val session = rememberConversationCanvas(canvas, port.target)
-    ChatSurface(
-        port = port,
-        presentation = presentation,
-        onIntent = { intent: ChatSurfaceIntent -> presentation = ChatSurfaceModeReducer.reduce(presentation, intent) },
-        host = rememberWebChatSurfaceHost(navigation),
-        modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-        canvas = { actions -> ConversationCanvas(session, actions) },
-        dockGeometry = dockGeometry,
-        onDockGeometryChange = { dockGeometry = it },
-    )
+    val dualView = rememberWebSubagentDualView(port, navigation.subagentSessions)
+    val host = rememberWebChatSurfaceHost(navigation, dualView?.holder)
+    // A dispatched subagent's conversation opens beside this one (in its place on a narrow window), read-only.
+    SubagentDualViewFrame(dualView, modifier, SubagentDualViewOptions(host = host)) { parentModifier ->
+        ChatSurface(
+            port = port,
+            presentation = presentation,
+            onIntent = { intent: ChatSurfaceIntent -> presentation = ChatSurfaceModeReducer.reduce(presentation, intent) },
+            host = host,
+            modifier = parentModifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+            canvas = { actions -> ConversationCanvas(session, actions) },
+            dockGeometry = dockGeometry,
+            onDockGeometryChange = { dockGeometry = it },
+        )
+    }
+}
+
+/** The conversation's subagent dual view, closed again for each conversation; null without [sessions]. */
+@Composable
+private fun rememberWebSubagentDualView(port: WebChatSessionPort, sessions: SubagentViewSessions?): SubagentDualViewBinding? {
+    val holder = rememberSubagentDualViewHolder(port)
+    return remember(holder, sessions) { sessions?.let { SubagentDualViewBinding(holder, it) } }
 }
 
 /** The conversation's own board, created on first open in the canvas's store. */
@@ -114,13 +135,15 @@ private fun ConversationCanvas(session: CanvasSession?, actions: ChatCanvasActio
 
 /** One host instance that forwards to the latest navigation, so timeline rows stay skippable. */
 @Composable
-private fun rememberWebChatSurfaceHost(navigation: WebChatPageNavigation): ChatSurfaceHost {
+private fun rememberWebChatSurfaceHost(navigation: WebChatPageNavigation, subagentViews: SubagentDualViewHolder?): ChatSurfaceHost {
     val latest by rememberUpdatedState(navigation)
     val agentNames = navigation.agentNamesById
-    return remember(agentNames) {
-        ChatSurfaceHost(
+    return remember(agentNames, subagentViews) {
+        val host = ChatSurfaceHost(
             resolveAgentName = agentNames::get,
             openAgentPane = { latest.openAgentPane() },
         )
+        // The web keeps no subagent registry: a row opens the child agent it names, in its default conversation.
+        subagentViews?.let { host.withSubagentDualView(it) { emptyList() } } ?: host
     }
 }

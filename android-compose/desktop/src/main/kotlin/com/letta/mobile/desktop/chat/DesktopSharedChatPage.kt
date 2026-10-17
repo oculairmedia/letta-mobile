@@ -61,7 +61,10 @@ import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
+import com.letta.mobile.ui.chat.subagents.SubagentDualViewFrame
+import com.letta.mobile.ui.chat.subagents.SubagentDualViewOptions
 import com.letta.mobile.ui.chat.subagents.SubagentRingsOverlay
+import com.letta.mobile.ui.chat.subagents.withSubagentDualView
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbientStatus
 
@@ -176,37 +179,52 @@ internal fun DesktopSharedChatPage(
     var dockGeometry by state.dockGeometry
     val onIntent = remember { { intent: ChatSurfaceIntent -> presentation = ChatSurfaceModeReducer.reduce(presentation, intent) } }
     val frameInputs = PhoneChatPageInputs(presentation.mode, port.uiState) { onIntent(ChatSurfaceIntent.Collapse) }
+    val appearance = phone.chatAppearance(rememberDesktopChatAppearance(displayOptions))
+    val dualView = state.subagents?.views
+    val pageHost = rememberDualViewHost(host, state.subagents)
     DesktopPhoneChatFrame(phone, frameInputs, modifier) { pageModifier, frame ->
-        ChatSurface(
-            port = port,
-            presentation = presentation,
-            onIntent = onIntent,
-            host = host,
-            modifier = pageModifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                // Bubble phase, so an open image viewer or popup takes its own Escape first.
-                .onKeyEvent { event ->
-                    val collapse = escapeCollapsesToCanvas(presentation.mode, event.key, event.type)
-                    if (collapse) presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse)
-                    collapse
+        // letta-mobile-ulcg6.1: a subagent's conversation opens beside this one (in its place on the phone preview).
+        val dualViewOptions = SubagentDualViewOptions(appearance = appearance, host = pageHost, topInset = frame.topChromeInset)
+        SubagentDualViewFrame(dualView, pageModifier, dualViewOptions) { parentModifier ->
+            ChatSurface(
+                port = port,
+                presentation = presentation,
+                onIntent = onIntent,
+                host = pageHost,
+                modifier = parentModifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+                    // Bubble phase, so an open image viewer or popup takes its own Escape first.
+                    .onKeyEvent { event ->
+                        val collapse = escapeCollapsesToCanvas(presentation.mode, event.key, event.type)
+                        if (collapse) presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse)
+                        collapse
+                    },
+                appearance = appearance,
+                platform = rememberDesktopChatPlatform(ambientStatus, frame, state.subagents),
+                pagedTimeline = state.pagedTimeline,
+                canvas = { actions ->
+                    if (hasConversation) {
+                        DockedConversationCanvas(session, actions, state.canvasHeaderTrailing, frame.topChromeInset)
+                    } else {
+                        ChatCanvasPlaceholder()
+                    }
                 },
-            appearance = phone.chatAppearance(rememberDesktopChatAppearance(displayOptions)),
-            platform = rememberDesktopChatPlatform(ambientStatus, frame, state.subagents),
-            pagedTimeline = state.pagedTimeline,
-            canvas = { actions ->
-                if (hasConversation) {
-                    DockedConversationCanvas(session, actions, state.canvasHeaderTrailing, frame.topChromeInset)
-                } else {
-                    ChatCanvasPlaceholder()
-                }
-            },
-            dockGeometry = dockGeometry,
-            onDockGeometryChange = { dockGeometry = it },
-            recents = navigation.recentInteractions,
-        )
+                dockGeometry = dockGeometry,
+                onDockGeometryChange = { dockGeometry = it },
+                recents = navigation.recentInteractions,
+            )
+        }
     }
     DesktopWorkingDirectoryPickerHost(directoryPicker)
+}
+
+/** The page's host with its timeline rows opening their subagent in the dual view, when the page has one. */
+@Composable
+private fun rememberDualViewHost(host: ChatSurfaceHost, subagents: DesktopChatSubagents?): ChatSurfaceHost {
+    val entries by rememberUpdatedState(subagents?.entries.orEmpty())
+    val holder = subagents?.views?.holder
+    return remember(host, holder) { holder?.let { host.withSubagentDualView(it) { entries } } ?: host }
 }
 
 /**
@@ -237,7 +255,7 @@ private fun rememberDesktopChatPlatform(ambientStatus: AmbientMotionStatus, fram
             },
             showKeyboardHints = frame.showKeyboardHints,
             topChromeInset = frame.topChromeInset,
-            timelineOverlay = subagents?.let { rings -> { SubagentRingsOverlay(rings.entries, rings.loader) } },
+            timelineOverlay = subagents?.let { rings -> { SubagentRingsOverlay(rings.entries, rings.loader, onViewConversation = rings.onViewConversation) } },
         )
     }
 

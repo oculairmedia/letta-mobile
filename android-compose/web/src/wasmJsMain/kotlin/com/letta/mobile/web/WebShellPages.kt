@@ -3,6 +3,7 @@ package com.letta.mobile.web
 import com.letta.mobile.data.plugin.catalog.UnavailablePluginCatalog
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.storage.SecureSettingsStore
+import com.letta.mobile.ui.chat.session.TimelineSubagentViewSessions
 import com.letta.mobile.ui.settings.SettingsPageState
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.pages.ShellAgentEditorHost
@@ -43,7 +44,9 @@ internal fun webPageHost(shell: WebShell, page: WebPageInputs, own: WebPageContr
         focus = ShellPageFocus(focused, shell.backend.agents.value.firstOrNull { it.id == focused }?.name),
         pages = ShellHostPages(
             chat = (page.chat as? WebChatLoad.Ready)?.let { ready ->
-                ShellPageContent { _, modifier -> WebSharedChatPage(ready.port, page.canvas, own.navigation, modifier) }
+                // letta-mobile-zxk2n.8: subagent conversations open in the chat's dual view, over the gateway's session.
+                val navigation = own.navigation.copy(subagentSessions = TimelineSubagentViewSessions(services.gateway::subagentTimeline))
+                ShellPageContent { _, modifier -> WebSharedChatPage(ready.port, page.canvas, navigation, modifier) }
             },
             settings = shellSettingsPage(
                 SettingsPageState(shell.backend.config.value, page.connection),

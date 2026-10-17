@@ -275,7 +275,7 @@ private fun TitleBlock(item: SubagentRosterItem, modifier: Modifier = Modifier) 
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            IdentityBadge(item)
+            ExternalAgentBadge(item.identity, testTag = SubagentRosterTag.BADGE.of(item.key))
         }
         Text(
             text = item.subtitle(),
@@ -284,23 +284,6 @@ private fun TitleBlock(item: SubagentRosterItem, modifier: Modifier = Modifier) 
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.testTag(SubagentRosterTag.SUBTITLE.of(item.key)),
-        )
-    }
-}
-
-/** External coding agents (Claude Code, Codex) are named, so their work is never mistaken for Letta's. */
-@Composable
-private fun IdentityBadge(item: SubagentRosterItem) {
-    val label = item.identity.label ?: return
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.xs).testTag(SubagentRosterTag.BADGE.of(item.key)),
         )
     }
 }

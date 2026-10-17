@@ -32,6 +32,7 @@ import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
 import com.letta.mobile.pluginview.ProvidePluginViews
 import com.letta.mobile.ui.chat.subagents.BackgroundTasksSidePane
+import com.letta.mobile.ui.chat.subagents.rosterOpener
 import com.letta.mobile.ui.host.InspectorFrame
 import com.letta.mobile.ui.host.OverlayHostRoot
 import com.letta.mobile.ui.host.OverlayWhile
@@ -223,7 +224,16 @@ private fun DesktopShellBackgroundTasks(context: DesktopShellContext, frame: Des
     val navigator = context.navigator
     if (!navigator.showBackgroundTasks || context.panels.subagents.repository == null) return
     // The roster opens in the window's inspector (docked beside the main pane when wide).
-    BackgroundTasksSidePane(frame.lists.activeSubagents, onClose = { navigator.showBackgroundTasks = false })
+    // letta-mobile-ulcg6.1: "View conversation" opens the subagent beside the chat's conversation.
+    val openInDualView = context.panels.subagents.views.rosterOpener()
+    BackgroundTasksSidePane(
+        subagents = frame.lists.activeSubagents,
+        onClose = { navigator.showBackgroundTasks = false },
+        onOpenConversation = { item ->
+            navigator.showChat()
+            openInDualView(item)
+        },
+    )
 }
 
 @Composable

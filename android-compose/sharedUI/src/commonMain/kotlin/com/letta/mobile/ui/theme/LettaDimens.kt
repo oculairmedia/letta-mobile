@@ -153,6 +153,9 @@ object LettaDimens {
         val sidePanelWidth: Dp = 380.dp
         val wideBreakpoint: Dp = 720.dp
 
+        /** Narrowest chat area that shows a subagent's conversation beside its parent's rather than in place of it. */
+        val dualViewBreakpoint: Dp = 960.dp
+
         /** Longest line a graph node label may take before it ellipsizes. */
         val nodeLabelMaxWidth: Dp = 120.dp
 
