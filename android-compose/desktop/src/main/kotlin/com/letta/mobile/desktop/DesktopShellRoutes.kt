@@ -12,6 +12,7 @@ import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.desktop.chat.DesktopChatConnectionState
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
+import com.letta.mobile.ui.components.tabs.LettaTabStripActions
 import com.letta.mobile.ui.shell.ShellChatSelection
 
 /**
@@ -128,4 +129,15 @@ internal class DesktopShellChatPort(
     override fun send(conversation: ConversationId, text: String) = controller.replyFromNotification(conversation.value, text)
 
     override fun stageComposerText(text: String) = controller.updateComposerText(text)
+}
+
+/** The strip's verbs; its browser-style "+" is a new chat with the focused agent. */
+internal fun desktopTabActions(context: DesktopShellContext, frame: DesktopShellFrame): LettaTabStripActions {
+    val router = context.router
+    return LettaTabStripActions(
+        onSelect = { router.openConversation(ConversationId(it)) },
+        onClose = { router.closeConversationTab(ConversationId(it)) },
+        onReorder = { id, index -> router.reorderConversationTab(ConversationId(id), index) },
+        onNew = { context.openNewChatForFocusedAgent(frame.focus) },
+    )
 }
