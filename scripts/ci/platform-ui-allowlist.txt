@@ -119,7 +119,7 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopQuickQue
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopRailPrefs.kt 33 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopRecentInteractions.kt 47 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopSettingsPage.kt 178 container
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellContent.kt 224 legacy-pending(ckmub.3)
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellContent.kt 219 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellContext.kt 123 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellEffects.kt 190 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellFrame.kt 331 legacy-pending(ckmub.3)

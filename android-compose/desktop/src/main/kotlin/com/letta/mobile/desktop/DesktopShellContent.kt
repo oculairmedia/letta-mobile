@@ -29,7 +29,6 @@ import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceSlots
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceState
 import com.letta.mobile.ui.shell.workspace.ShellWindowChrome
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceEvents
-import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceLayout
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigation
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigationActions
