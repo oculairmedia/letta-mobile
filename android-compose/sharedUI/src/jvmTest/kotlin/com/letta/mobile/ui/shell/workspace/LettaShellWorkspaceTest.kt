@@ -6,6 +6,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTopPositionInRootIsEqualTo
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -58,6 +62,29 @@ class LettaShellWorkspaceTest {
         onNodeWithTag(PageTag).assertExists()
         onNodeWithText("Window title").assertExists()
         onNodeWithTag(ShellWorkspaceHeaderTags.SIDEBAR_TOGGLE).assertExists()
+    }
+
+    /**
+     * #2096 regression: the inline header's free width fills its height, so an unbounded header
+     * took the whole browser window, drew its row centred in it and left the rail, panel and page
+     * no height at all. The header keeps its bar's height and the body takes the rest.
+     */
+    @Test
+    fun inlineHeaderKeepsItsBarHeightAndTheBodyTakesTheRest() = runComposeUiTest {
+        setContent { LettaShellWorkspace(workspaceState(), workspaceHost(), sized(1440.dp)) }
+
+        onNodeWithTag(LettaShellWorkspaceTags.INLINE_HEADER).assertHeightIsEqualTo(inlineHeaderHeight(tabbed = false))
+        onNodeWithTag(LettaShellWorkspaceTags.INLINE_HEADER).assertTopPositionInRootIsEqualTo(0.dp)
+        onNodeWithTag(PageTag).assertIsDisplayed()
+        onNodeWithTag(LettaShellWorkspaceTags.WIDE).assertHeightIsAtLeast(700.dp)
+    }
+
+    @Test
+    fun compactInlineHeaderLeavesTheBodyItsHeightToo() = runComposeUiTest {
+        setContent { LettaShellWorkspace(workspaceState(), workspaceHost(), sized(500.dp)) }
+
+        onNodeWithTag(LettaShellWorkspaceTags.INLINE_HEADER).assertHeightIsEqualTo(inlineHeaderHeight(tabbed = false))
+        onNodeWithTag(PageTag).assertIsDisplayed()
     }
 
     @Test

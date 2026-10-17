@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
@@ -131,12 +132,28 @@ private fun WorkspaceColumn(frame: WorkspaceFrame) {
     }
 }
 
-/** The header at the top of the page; with tabs the active tab runs into the page, so no line. */
+/**
+ * The header at the top of the page; with tabs the active tab runs into the page, so no line. Its
+ * height is the bar's, as a title bar bounds it on the desktop: the header's free width fills its
+ * height, so an unbounded header would take the whole window and leave the body none.
+ */
 @Composable
 private fun InlineHeader(header: ShellWorkspaceHeaderState) {
-    ShellWorkspaceHeader(header, Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow))
-    if (header.tabs.tabs.isEmpty()) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    val tabbed = header.tabs.tabs.isNotEmpty()
+    ShellWorkspaceHeader(
+        header,
+        Modifier
+            .fillMaxWidth()
+            .height(inlineHeaderHeight(tabbed))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .testTag(LettaShellWorkspaceTags.INLINE_HEADER),
+    )
+    if (!tabbed) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
+
+/** The bar's height: browser-thin with tabs (one line per tab), else room for the identity block. */
+internal fun inlineHeaderHeight(tabbed: Boolean): Dp =
+    if (tabbed) LettaDimens.Control.actionButton else LettaDimens.Control.minTouchTarget
 
 @Composable
 private fun WorkspaceBody(frame: WorkspaceFrame, modifier: Modifier) {
