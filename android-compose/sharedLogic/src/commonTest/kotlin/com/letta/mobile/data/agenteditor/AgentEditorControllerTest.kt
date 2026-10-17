@@ -239,6 +239,25 @@ class AgentEditorControllerTest {
         assertEquals(CompactAgentProfile.SYSTEM_PROMPT, patch.system)
     }
 
+    /** The compact toggle changes prompt and tags only: an on-device agent keeps the model it runs on. */
+    @Test
+    fun turningTheCompactProfileOnNeverChangesTheModel() = runTest(UnconfinedTestDispatcher()) {
+        val e4b = "lmstudio/google/gemma-3n-E4B-it-litert-lm"
+        val bobs = ada.copy(id = AgentId("a-1"), name = "bobs", model = e4b, system = "", tags = persistentListOf("origin:letta-code"))
+        // The catalog lists another small model first (E2B): the toggle must not pick it.
+        val e4bModel = LlmModel(id = "google/gemma-3n-E4B-it-litert-lm", handle = e4b)
+        val backend = RecordingBackend(bobs).apply { models.value = listOf(gemma, e4bModel) }
+        val controller = editor(backend)
+
+        controller.update { copy(compactProfile = true) }
+        controller.save {}
+
+        val patch = backend.updates.single()
+        assertNull(patch.model, "the compact toggle sent a model change: ${patch.model}")
+        assertNull(patch.modelSettings)
+        assertTrue(CompactAgentProfile.isCompact(patch.tags))
+    }
+
     @Test
     fun aBlankNewAgentNeedsOnlyAName() = runTest(UnconfinedTestDispatcher()) {
         val controller = editor(RecordingBackend(ada), AgentEditorMode.Create)

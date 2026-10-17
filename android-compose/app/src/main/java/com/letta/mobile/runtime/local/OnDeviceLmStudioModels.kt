@@ -17,14 +17,14 @@ internal const val LM_STUDIO_MODELS_PATH = "/api/v0/models"
  * image with "(image omitted: model does not support images)" before calling the bridge. The
  * capability comes from the model catalog ([OnDeviceModelCapability.supportsImages]).
  *
- * `loaded_context_length` is the engine's real context window (the Settings "Max tokens",
- * [EmbeddedLettaCodeModelSelection.maxTokens]), letta-mobile-by4vm.121.16. The bridge no longer
- * shrinks letta-code's prompt to fit, so letta-code must know the window: its own prompt-floor
- * check then fails loudly ("The system prompt and tool definitions need about N tokens, but … is
- * served with a 4,096-token context window") when an agent's prompt and tools cannot fit, and
- * its context management compacts history against the true window.
+ * No `loaded_context_length` / `max_context_length` (by4vm.121.16 follow-up): letta-code would take
+ * it as the model's context window, and its pi-ai layer keeps a fixed 4,096-token safety margin
+ * (`clampMaxTokensToContext`: window - prompt estimate - 4,096), so a 4,096- or 8,192-token engine
+ * window clamps every request's output to 1 token (seen on a Pixel 9 Pro: "Okay", then
+ * `max_tokens_exceeded`). letta-code keeps its default window; the bridge enforces the engine's real
+ * one itself, before LiteRT-LM sees the request ([OnDeviceContextBudget]), with a loud overflow error.
  */
-internal fun lmStudioModelsBody(servedModelId: String, capability: OnDeviceModelCapability, contextLength: Int): JsonObject =
+internal fun lmStudioModelsBody(servedModelId: String, capability: OnDeviceModelCapability): JsonObject =
     buildJsonObject {
         put("object", "list")
         put(
@@ -37,8 +37,6 @@ internal fun lmStudioModelsBody(servedModelId: String, capability: OnDeviceModel
                         put("type", if (capability.supportsImages == true) "vlm" else "llm")
                         put("publisher", "letta-mobile")
                         put("state", "loaded")
-                        put("loaded_context_length", contextLength)
-                        put("max_context_length", contextLength)
                         put(
                             "capabilities",
                             buildJsonArray { if (capability.supportsImages == true) add(JsonPrimitive("vision")) },

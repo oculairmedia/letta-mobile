@@ -27,6 +27,8 @@ import com.letta.mobile.data.chat.projection.extractSubagentNotification
 import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiSubagentNotification
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.data.subagents.SubagentIdentity
+import com.letta.mobile.data.subagents.subagentIdentityOf
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_activity_command
 import com.letta.mobile.sharedui.resources.rows_activity_subagent
@@ -49,6 +51,7 @@ import com.letta.mobile.sharedui.resources.rows_subagent_background
 import com.letta.mobile.sharedui.resources.rows_subagent_dispatched
 import com.letta.mobile.sharedui.resources.rows_transcript
 import com.letta.mobile.sharedui.resources.rows_view_conversation
+import com.letta.mobile.ui.chat.subagents.ExternalAgentBadge
 import com.letta.mobile.ui.components.ChevronEmphasis
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
@@ -118,6 +121,8 @@ private fun DispatchHeader(dispatch: UiSubagentDispatch, modifier: Modifier) {
             modifier = Modifier.weight(1f),
         )
         if (dispatch.runInBackground) MetaChip(stringResource(Res.string.rows_subagent_background))
+        // letta-mobile-zxk2n.8 (G40): an external coding agent's dispatch names it.
+        ExternalAgentBadge(subagentIdentityOf(dispatch.subagentType, listOf(dispatch.subagentAgentId)))
         MetaChip(dispatch.subagentType)
     }
 }
@@ -163,6 +168,9 @@ private data class NotificationModel(
 ) {
     val status: String = notification.status.trim().lowercase()
     val isFailure: Boolean = status in NOTIFICATION_FAILURE_STATUSES
+
+    /** letta-mobile-zxk2n.8 (G40): a report from an external coding agent names it. */
+    val identity: SubagentIdentity = subagentIdentityOf(null, listOf(notification.subagentAgentId))
 
     // The protocol names `completed` as its successful terminal state; older producers said
     // `success`. Never compact a status that is not positively successful.
@@ -255,6 +263,7 @@ private fun CompletedSummaryRow(model: NotificationModel, expanded: Boolean, onT
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        ExternalAgentBadge(model.identity)
         DisclosureChevron(expanded = expanded, contentDescription = detailsLabel(model, expanded))
     }
 }
@@ -285,6 +294,7 @@ private fun NotificationHeader(model: NotificationModel, onOpen: (() -> Unit)?) 
             color = color,
             modifier = Modifier.weight(1f),
         )
+        ExternalAgentBadge(model.identity)
     }
 }
 

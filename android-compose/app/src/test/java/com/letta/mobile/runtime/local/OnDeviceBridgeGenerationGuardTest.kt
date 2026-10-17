@@ -11,6 +11,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -76,13 +77,14 @@ class OnDeviceBridgeGenerationGuardTest {
     fun `the request max_tokens caps the output`() {
         val engine = StreamingEngine()
         LocalOpenAiOnDeviceBridge(engine).start(selection()).use { session ->
-            val (code, _) = post(session, """{"max_tokens":40,"messages":[{"role":"user","content":"go"}]}""")
+            val (code, body) = post(session, """{"max_tokens":40,"messages":[{"role":"user","content":"go"}]}""")
 
             assertEquals(200, code)
             val generation = engine.generations.single()
             assertEquals(OnDeviceStopReason.MaxTokens, generation.stopReason)
             assertEquals(40, generation.limits.maxOutputTokens)
             assertTrue(engine.chunksSent <= 41)
+            assertTrue("the client's own limit is reported as length", body.contains("\"finish_reason\":\"length\""))
         }
     }
 
@@ -90,9 +92,13 @@ class OnDeviceBridgeGenerationGuardTest {
     fun `without max_tokens the on device default cap applies`() {
         val engine = StreamingEngine()
         LocalOpenAiOnDeviceBridge(engine).start(selection()).use { session ->
-            post(session, """{"max_tokens":32000,"messages":[{"role":"user","content":"go"}]}""")
+            val (code, body) = post(session, """{"max_tokens":32000,"messages":[{"role":"user","content":"go"}]}""")
 
+            assertEquals(200, code)
             assertEquals(OnDeviceGenerationLimits.DEFAULT_MAX_OUTPUT_TOKENS, engine.generations.single().limits.maxOutputTokens)
+            assertEquals(OnDeviceStopReason.MaxTokens, engine.generations.single().stopReason)
+            // letta-code fails a `length` turn; the bridge's own ceiling delivers the reply as `stop`.
+            assertTrue(body.contains("\"finish_reason\":\"stop\""))
         }
     }
 
@@ -112,7 +118,7 @@ class OnDeviceBridgeGenerationGuardTest {
     }
 
     @Test
-    fun `lm studio model list advertises vision from the catalog and the engine context window`() {
+    fun `lm studio model list advertises vision from the catalog without a context length`() {
         val vision = OnDeviceModelCapabilities { OnDeviceModelCapability(supportsImages = true) }
         LocalOpenAiOnDeviceBridge(StreamingEngine(), vision).start(selection()).use { session ->
             val model = getModels(session)
@@ -120,8 +126,9 @@ class OnDeviceBridgeGenerationGuardTest {
             assertEquals(selection().openAiModelId, model.getValue("id").jsonPrimitive.content)
             assertEquals("vlm", model.getValue("type").jsonPrimitive.content)
             assertEquals(listOf("vision"), model.getValue("capabilities").jsonArray.map { it.jsonPrimitive.content })
-            assertEquals(selection().maxTokens, model.getValue("loaded_context_length").jsonPrimitive.content.toInt())
-            assertEquals(selection().maxTokens, model.getValue("max_context_length").jsonPrimitive.content.toInt())
+            // letta-code's pi-ai keeps 4,096 tokens of margin: a small advertised window clamps output to 1 token.
+            assertFalse(model.containsKey("max_context_length"))
+            assertFalse(model.containsKey("loaded_context_length"))
         }
     }
 

@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.subagents.SubagentView
 import com.letta.mobile.data.session.graph.HostSessionBinding
 import com.letta.mobile.data.memory.memfs.AppServerMemfsSource
 import com.letta.mobile.data.memory.memfs.MemfsSource
@@ -26,6 +27,7 @@ import com.letta.mobile.data.transport.appserver.AppServerTimelineConnection
 import com.letta.mobile.data.transport.appserver.AppServerTimelineTransport
 import com.letta.mobile.ui.chat.session.ConversationModelBackend
 import com.letta.mobile.ui.chat.session.TimelineChatRunControls
+import com.letta.mobile.ui.chat.session.SubagentTimelineRoute
 import com.letta.mobile.ui.chat.session.TimelineChatTarget
 import com.letta.mobile.ui.chat.session.TimelineChipSources
 import com.letta.mobile.ui.chat.session.TimelineModelSource
@@ -153,16 +155,7 @@ class WasmAppServerClientGateway(
     suspend fun openChat(agent: Agent): WebChatBinding {
         val session = activeSession ?: error("Connect to an App Server first")
         val conversationId = session.ensureConversation(agent.id.value, ::nextRequestId)
-        val transport = AppServerTimelineTransport(
-            AppServerTimelineConnection(
-                turnEngine = session.engine,
-                events = session.client.events,
-                isConnected = session.isConnected,
-                admin = { method, params -> session.admin(method.value, params, ::nextRequestId) },
-                agentIdFor = { agent.id },
-                backendId = BackendId(WEB_BACKEND_ID),
-            ),
-        )
+        val transport = timelineTransport(session, agent.id)
         val target = TimelineChatTarget(agentId = agent.id.value, agentName = agent.name, conversationId = conversationId)
         val admin = session.appServerAdmin
         return WebChatBinding(
@@ -179,6 +172,28 @@ class WasmAppServerClientGateway(
             ),
         )
     }
+
+    /**
+     * letta-mobile-zxk2n.8: where a subagent's conversation is read for the chat's dual view, over the
+     * live session's socket; null while no App Server is connected.
+     */
+    fun subagentTimeline(view: SubagentView): SubagentTimelineRoute? {
+        val session = activeSession ?: return null
+        return SubagentTimelineRoute(timelineTransport(session, view.agentId), view.conversationId)
+    }
+
+    /** A conversation's timeline over [session]'s socket, for [agent]'s conversations. */
+    private fun timelineTransport(session: WasmAppServerSession, agent: AgentId): AppServerTimelineTransport =
+        AppServerTimelineTransport(
+            AppServerTimelineConnection(
+                turnEngine = session.engine,
+                events = session.client.events,
+                isConnected = session.isConnected,
+                admin = { method, params -> session.admin(method.value, params, ::nextRequestId) },
+                agentIdFor = { agent },
+                backendId = BackendId(WEB_BACKEND_ID),
+            ),
+        )
 
     private fun monitor(session: WasmAppServerSession) {
         connectionMonitor?.cancel()
