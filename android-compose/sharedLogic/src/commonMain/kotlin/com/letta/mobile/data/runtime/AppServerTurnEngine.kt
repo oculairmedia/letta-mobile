@@ -1097,17 +1097,17 @@ class AppServerTurnEngine(
     }
 
     /** Applies [received] to the turn, then acks it when it is a durable terminal kept for this client (zxk2n.2). */
-    private suspend fun processReceivedFrame(
+    private suspend fun processAndAcknowledge(
         received: AppServerReceivedFrame,
         context: TurnFrameContext,
         budget: FrameProjectionErrorBudget,
     ) {
-        applyReceivedFrame(received, context, budget)
+        processReceivedFrame(received, context, budget)
         // The terminal this acks has usually just completed the turn, which stops the frame loop.
         withContext(NonCancellable) { terminalAcks.acknowledge(received) }
     }
 
-    private suspend fun applyReceivedFrame(
+    private suspend fun processReceivedFrame(
         received: AppServerReceivedFrame,
         context: TurnFrameContext,
         budget: FrameProjectionErrorBudget,
@@ -1318,7 +1318,7 @@ class AppServerTurnEngine(
                 // letta-mobile-qygvv.16 / by4vm.9: a torn-down stream ends the turn; an interrupted
                 // session gets SESSION_RECONNECT_GRACE_MS to come back first.
                 SessionLossCutOff(draftProcessor, command, lease, inboundSource.sessionLink).endOnDetach(inboundEvents).collect { received ->
-                    processReceivedFrame(received, frameContext, projectionErrors)
+                    processAndAcknowledge(received, frameContext, projectionErrors)
                 }
             }
             completion.complete(TurnOutcome.StreamEnded)

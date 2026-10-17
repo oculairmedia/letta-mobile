@@ -58,15 +58,15 @@ internal class TurnTerminalAcknowledger(
     }
 
     /** Never throws: an unsent ack only means the server replays the terminal on the next connection. */
-    private suspend fun send(ack: AppServerCommand.TurnFinishedAck): String = try {
-        withTimeoutOrNull(SEND_TIMEOUT_MS.milliseconds) {
-            client.acknowledgeTurnFinished(ack)
-            SENT
-        } ?: "timeout"
-    } catch (cancellation: CancellationException) {
-        throw cancellation
-    } catch (error: Throwable) {
-        "failed=${error::class.simpleName}"
+    private suspend fun send(ack: AppServerCommand.TurnFinishedAck): String {
+        val sent = runCatching {
+            withTimeoutOrNull(SEND_TIMEOUT_MS.milliseconds) { client.acknowledgeTurnFinished(ack) }
+        }
+        sent.exceptionOrNull()?.let { error ->
+            if (error is CancellationException) throw error
+            return "failed=${error::class.simpleName}"
+        }
+        return if (sent.getOrNull() == null) "timeout" else SENT
     }
 
     private fun claim(delivery: TerminalDelivery): Boolean = synchronized(lock) {

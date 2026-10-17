@@ -187,7 +187,8 @@ class AppServerTurnEngineDurableDeliveryTest {
 
     private fun TestScope.startTurn(host: DurableHost): RunningTurn {
         val router = AppServerRuntimeEventRouter()
-        val engine = router.attachTurnStack(host, backgroundScope, AppServerTurnStackSpec(durableDelivery = DurableTurnDelivery.chat(CONSUMER)))
+        val spec = AppServerTurnStackSpec(durableDelivery = DurableTurnDelivery.chat(CONSUMER))
+        val engine = router.attachTurnStack(host, backgroundScope, spec)
         val drafts = mutableListOf<RuntimeEventDraft>()
         val job = launch { engine.runTurn(COMMAND).toList(drafts) }
         runCurrent()
@@ -205,7 +206,8 @@ class AppServerTurnEngineDurableDeliveryTest {
         var failNextInputs = 0
 
         fun emit(frame: AppServerInboundFrame, generation: Long? = null) {
-            inbound.tryEmit(AppServerReceivedFrame(AppServerChannel.Stream, frame, buildJsonObject { put("type", frame.type ?: "") }, generation))
+            val raw = buildJsonObject { put("type", frame.type ?: "") }
+            inbound.tryEmit(AppServerReceivedFrame(AppServerChannel.Stream, frame, raw, generation))
         }
 
         override suspend fun inputAwaitingAcceptance(command: AppServerCommand.Input): AppServerInboundFrame.InputAccepted {
@@ -214,7 +216,12 @@ class AppServerTurnEngineDurableDeliveryTest {
                 failNextInputs -= 1
                 throw AppServerRequestFailedException(IllegalStateException("socket closed"))
             }
-            return AppServerInboundFrame.InputAccepted(command.requestId.orEmpty(), command.runtime, accepted = true, disposition = disposition)
+            return AppServerInboundFrame.InputAccepted(
+                command.requestId.orEmpty(),
+                command.runtime,
+                accepted = true,
+                disposition = disposition,
+            )
         }
 
         override suspend fun acknowledgeTurnFinished(command: AppServerCommand.TurnFinishedAck) {
