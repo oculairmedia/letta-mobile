@@ -5,12 +5,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.avatar.core.AvatarState
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.avatar.rive.MASCOT_MODEL
 import com.letta.mobile.avatar.rive.RiveAvatarContract
 import com.letta.mobile.avatar.rive.RiveAvatarRuntime
 import com.letta.mobile.avatar.rive.RiveInputSink
+import com.letta.mobile.avatar.rive.RiveWrite
+import com.letta.mobile.avatar.rive.RiveWriteSink
 import com.letta.mobile.ui.mascot.MascotEntries
 import com.letta.mobile.ui.mascot.MascotEntry
 import com.letta.mobile.ui.mascot.MascotHost
@@ -33,7 +36,7 @@ class FrameMascotEntry private constructor(
     private val rive: RiveAvatarRuntime,
 ) : MascotEntry(rive, identity, applyState = { state: AvatarState -> rive.applyState(state) }) {
     private constructor(renderer: RiveFrameRenderer, identity: MascotIdentity, sink: DeferredSink) :
-        this(renderer, identity, sink, RiveAvatarRuntime(sink))
+        this(renderer, identity, sink, RiveAvatarRuntime(sink.sink))
 
     constructor(renderer: RiveFrameRenderer, identity: MascotIdentity) : this(renderer, identity, DeferredSink())
 
@@ -47,7 +50,7 @@ class FrameMascotEntry private constructor(
 
     init {
         // Queued in the deferred sink: the first write the scene will see once it exists.
-        RiveAvatarContract.applyIdentity(sink, identity)
+        RiveAvatarContract.applyIdentity(sink.sink, identity)
     }
 
     override suspend fun load() {
@@ -67,7 +70,7 @@ class FrameMascotEntry private constructor(
         scene = created
     }
 
-    override fun writeIdentity(identity: MascotIdentity) = RiveAvatarContract.applyIdentity(sink, identity)
+    override fun writeIdentity(identity: MascotIdentity) = RiveAvatarContract.applyIdentity(sink.sink, identity)
 
     override fun dispose() {
         scene?.close()
@@ -122,6 +125,11 @@ class FrameMascotHost(private val renderer: RiveFrameRenderer) : MascotHost {
 internal class FrameStillCapture(private val renderer: RiveFrameRenderer) {
     private var scene: RiveFrameScene? = null
 
+    private companion object {
+        /** One simulated settling frame. */
+        val SETTLE_STEP = RiveFrameStep(MascotStills.FRAME_SECONDS)
+    }
+
     /**
      * [identity] as PNG: written into the capture scene, its state machine run
      * [MascotStills.SETTLE_FRAMES] simulated frames so the view-model bindings take effect, one
@@ -133,8 +141,8 @@ internal class FrameStillCapture(private val renderer: RiveFrameRenderer) {
             runCatching {
                 val warm = scene ?: renderer.createScene().also { scene = it }
                 RiveAvatarContract.applyIdentity(warm.inputSink, identity)
-                repeat(MascotStills.SETTLE_FRAMES) { warm.advance(MascotStills.FRAME_SECONDS) }
-                warm.renderImage(size, size)
+                repeat(MascotStills.SETTLE_FRAMES) { warm.advance(SETTLE_STEP) }
+                warm.renderImage(IntSize(size, size))
             }.onFailure {
                 // A broken scene is dropped, so the next capture starts clean.
                 scene?.close()
@@ -156,24 +164,21 @@ internal class FrameStillCapture(private val renderer: RiveFrameRenderer) {
  * everything after. Lets the runtime and director be built - and written to - before the scene has
  * been created. UI thread only: every write and the attach are made there.
  */
-internal class DeferredSink : RiveInputSink {
+internal class DeferredSink {
     private var target: RiveInputSink? = null
-    private val pending = ArrayList<(RiveInputSink) -> Unit>()
+    private val pending = ArrayList<RiveWrite>()
 
-    fun attach(sink: RiveInputSink) {
-        pending.forEach { it(sink) }
+    /** Where the runtime writes: queued until [attach], forwarded after. */
+    val sink: RiveInputSink = RiveWriteSink(::write)
+
+    fun attach(scene: RiveInputSink) {
+        pending.forEach { it.applyTo(scene) }
         pending.clear()
-        target = sink
+        target = scene
     }
 
-    private fun write(op: (RiveInputSink) -> Unit) {
+    private fun write(write: RiveWrite) {
         val t = target
-        if (t != null) op(t) else pending += op
+        if (t != null) write.applyTo(t) else pending += write
     }
-
-    override fun setNumber(input: String, value: Float) = write { it.setNumber(input, value) }
-    override fun setBoolean(input: String, value: Boolean) = write { it.setBoolean(input, value) }
-    override fun setEnum(input: String, key: String) = write { it.setEnum(input, key) }
-    override fun setColor(input: String, argb: Int) = write { it.setColor(input, argb) }
-    override fun fire(input: String) = write { it.fire(input) }
 }

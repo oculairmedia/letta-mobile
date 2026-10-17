@@ -1,8 +1,10 @@
 package com.letta.mobile.ui.mascot.frame
 
+import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.avatar.rive.RiveAvatarContract
-import com.letta.mobile.avatar.rive.RiveInputSink
+import com.letta.mobile.avatar.rive.RiveWrite
+import com.letta.mobile.avatar.rive.RiveWriteSink
 import com.letta.mobile.ui.mascot.MascotStillStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,29 +21,32 @@ import org.jetbrains.skia.ImageInfo
 
 class FrameMascotHostTest {
     private class RecordingScene : RiveFrameScene() {
-        val writes = mutableListOf<String>()
+        val writes = mutableListOf<RiveWrite>()
         var advanced = 0f
         var closed = false
 
-        override val inputSink = object : RiveInputSink {
-            override fun setNumber(input: String, value: Float) { writes += "number:$input" }
-            override fun setBoolean(input: String, value: Boolean) { writes += "boolean:$input" }
-            override fun setEnum(input: String, key: String) { writes += "enum:$input=$key" }
-            override fun setColor(input: String, argb: Int) { writes += "color:$input" }
-            override fun fire(input: String) { writes += "fire:$input" }
+        override val inputSink = RiveWriteSink { writes += it }
+
+        override fun advance(step: RiveFrameStep) {
+            advanced += step.seconds
         }
 
-        override fun advance(seconds: Float) { advanced += seconds }
+        override fun renderImage(size: IntSize): Image {
+            val info = ImageInfo(size.width, size.height, ColorType.RGBA_8888, ColorAlphaType.PREMUL)
+            return Image.makeRaster(info, ByteArray(size.width * size.height * 4), size.width * 4)
+        }
 
-        override fun renderImage(width: Int, height: Int): Image =
-            Image.makeRaster(ImageInfo(width, height, ColorType.RGBA_8888, ColorAlphaType.PREMUL), ByteArray(width * height * 4), width * 4)
+        override fun pointer(event: RivePointerEvent) = Unit
 
-        override fun pointer(kind: RivePointer, x: Float, y: Float) = Unit
-
-        override fun close() { closed = true }
+        override fun close() {
+            closed = true
+        }
     }
 
-    private class FakeRenderer(var fail: Boolean = false) : RiveFrameRenderer {
+    /** Whether the fake renderer can bring a scene up. */
+    private enum class SceneBringUp { WORKS, FAILS }
+
+    private class FakeRenderer(private val bringUp: SceneBringUp = SceneBringUp.WORKS) : RiveFrameRenderer {
         val scenes = mutableListOf<RecordingScene>()
         override val available = true
         override val assetVersion = "test"
@@ -49,7 +54,7 @@ class FrameMascotHostTest {
         override val stillStore: MascotStillStore? = null
 
         override fun createScene(): RiveFrameScene {
-            check(!fail) { "no renderer" }
+            check(bringUp == SceneBringUp.WORKS) { "no renderer" }
             return RecordingScene().also { scenes += it }
         }
 
@@ -62,13 +67,14 @@ class FrameMascotHostTest {
         val entry = FrameMascotEntry(renderer, MascotIdentity.seeded("agent-a"))
         entry.ensureLoaded()
         val scene = assertNotNull(renderer.scenes.single())
-        assertEquals("enum:${RiveAvatarContract.INPUT_SHAPE}=${RiveAvatarContract.shapeKey(entry.identity.shape)}", scene.writes.first())
+        val shape = RiveWrite.Enum(RiveAvatarContract.INPUT_SHAPE, RiveAvatarContract.shapeKey(entry.identity.shape))
+        assertEquals(shape, scene.writes.first())
         assertEquals(scene, entry.scene)
     }
 
     @Test
     fun aSceneThatCannotBeCreatedMarksTheEntryFailed() = runTest {
-        val host = FrameMascotHost(FakeRenderer(fail = true))
+        val host = FrameMascotHost(FakeRenderer(SceneBringUp.FAILS))
         val entry = assertNotNull(host.entry("agent-a", MascotIdentity.seeded("agent-a")))
         entry.ensureLoaded()
         assertTrue((entry as FrameMascotEntry).failed)

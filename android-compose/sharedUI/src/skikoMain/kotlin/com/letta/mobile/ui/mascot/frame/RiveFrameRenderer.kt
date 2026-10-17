@@ -1,6 +1,9 @@
 package com.letta.mobile.ui.mascot.frame
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.avatar.rive.RiveInputSink
+import kotlin.jvm.JvmInline
 import com.letta.mobile.ui.mascot.MascotStillStore
 import kotlinx.coroutines.CoroutineDispatcher
 import org.jetbrains.skia.Image
@@ -50,6 +53,13 @@ interface RiveFrameRenderer {
 /** Pointer events a scene hit-tests, in render pixels. */
 enum class RivePointer { MOVE, DOWN, UP, EXIT }
 
+/** One pointer event for a scene: what happened, and where in render pixels. */
+data class RivePointerEvent(val kind: RivePointer, val position: Offset)
+
+/** How far one advance moves a scene's state machine, in seconds of animation time. */
+@JvmInline
+value class RiveFrameStep(val seconds: Float)
+
 /**
  * One offscreen Rive scene: a loaded file, its state machine and its view model. Every call but
  * [pointer] and the [inputSink] writes runs on the renderer's dispatcher; those two may be called
@@ -59,14 +69,14 @@ abstract class RiveFrameScene {
     /** The view-model path [com.letta.mobile.avatar.rive.RiveAvatarRuntime] writes through. */
     abstract val inputSink: RiveInputSink
 
-    /** Advances the state machine by [seconds] and applies it to the artboard. */
-    abstract fun advance(seconds: Float)
+    /** Advances the state machine by [step] and applies it to the artboard. */
+    abstract fun advance(step: RiveFrameStep)
 
-    /** Renders the scene as it stands at [width] x [height] pixels: a new image the caller owns and closes. */
-    abstract fun renderImage(width: Int, height: Int): Image
+    /** Renders the scene as it stands at [size] pixels: a new image the caller owns and closes. */
+    abstract fun renderImage(size: IntSize): Image
 
-    /** A pointer event at ([x], [y]) in render pixels. */
-    abstract fun pointer(kind: RivePointer, x: Float, y: Float)
+    /** A pointer event, in render pixels. */
+    abstract fun pointer(event: RivePointerEvent)
 
     /** Releases the scene; nothing touches it afterwards. */
     abstract fun close()
@@ -82,7 +92,7 @@ abstract class RiveFrameScene {
         if (nowNanos == lastFrameNanos) return
         val dt = if (lastFrameNanos == 0L) 0f else ((nowNanos - lastFrameNanos) / NANOS_PER_SECOND).coerceIn(0f, MAX_STEP_SECONDS)
         lastFrameNanos = nowNanos
-        if (dt > 0f) advance(dt)
+        if (dt > 0f) advance(RiveFrameStep(dt))
     }
 
     private companion object {

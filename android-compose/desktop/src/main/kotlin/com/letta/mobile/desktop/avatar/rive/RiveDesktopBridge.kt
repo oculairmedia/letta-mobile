@@ -1,8 +1,11 @@
 package com.letta.mobile.desktop.avatar.rive
 
+import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.avatar.rive.RiveInputSink
 import com.letta.mobile.ui.mascot.frame.RiveFrameScene
+import com.letta.mobile.ui.mascot.frame.RiveFrameStep
 import com.letta.mobile.ui.mascot.frame.RivePointer
+import com.letta.mobile.ui.mascot.frame.RivePointerEvent
 import com.sun.jna.Library
 import com.sun.jna.Memory
 import com.sun.jna.Native
@@ -181,7 +184,7 @@ class RiveDesktopScene private constructor(
         check(code == 0) { "rive_bridge_load failed ($code)" }
     }
 
-    override fun advance(seconds: Float) = RiveThread.post { native.rive_bridge_advance(openHandle(), seconds) }
+    override fun advance(step: RiveFrameStep) = RiveThread.post { native.rive_bridge_advance(openHandle(), step.seconds) }
 
     /**
      * Renders into a reused native buffer and copies it into a reused byte array: premultiplied
@@ -202,13 +205,13 @@ class RiveDesktopScene private constructor(
      * One frame as a Skia image the caller owns, rasterised while the bytes are still this frame's
      * (the scene reuses them): premultiplied RGBA, as the bridge renders it.
      */
-    override fun renderImage(width: Int, height: Int): Image = RiveThread.call {
-        val info = ImageInfo(width, height, ColorType.RGBA_8888, ColorAlphaType.PREMUL)
-        Image.makeRaster(info, render(width, height), width * 4)
+    override fun renderImage(size: IntSize): Image = RiveThread.call {
+        val info = ImageInfo(size.width, size.height, ColorType.RGBA_8888, ColorAlphaType.PREMUL)
+        Image.makeRaster(info, render(size.width, size.height), size.width * 4)
     }
 
-    override fun pointer(kind: RivePointer, x: Float, y: Float) =
-        RiveThread.post { native.rive_bridge_pointer(openHandle(), kind.code, x, y) }
+    override fun pointer(event: RivePointerEvent) =
+        RiveThread.post { native.rive_bridge_pointer(openHandle(), event.kind.code, event.position.x, event.position.y) }
 
     fun fireTrigger(name: String): Boolean = RiveThread.call { native.rive_bridge_fire_trigger(openHandle(), name) == 0 }
 

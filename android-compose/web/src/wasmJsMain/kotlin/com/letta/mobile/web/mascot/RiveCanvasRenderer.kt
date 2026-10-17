@@ -5,12 +5,16 @@ package com.letta.mobile.web.mascot
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.avatar.rive.RiveAvatarContract
 import com.letta.mobile.avatar.rive.RiveInputSink
+import com.letta.mobile.avatar.rive.RiveWrite
+import com.letta.mobile.avatar.rive.RiveWriteSink
 import com.letta.mobile.ui.mascot.MascotStillStore
 import com.letta.mobile.ui.mascot.frame.RiveFrameRenderer
 import com.letta.mobile.ui.mascot.frame.RiveFrameScene
-import com.letta.mobile.ui.mascot.frame.RivePointer
+import com.letta.mobile.ui.mascot.frame.RiveFrameStep
+import com.letta.mobile.ui.mascot.frame.RivePointerEvent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.await
@@ -30,10 +34,7 @@ import org.jetbrains.skia.ImageInfo
  * Unavailable until [prepare] has the runtime and the mascot file; if either fails, it stays
  * unavailable and every mascot keeps drawing its fallback (one console line, no retry loop).
  */
-internal class RiveCanvasRenderer(
-    private val wasmUrl: String = RIVE_WASM_PATH,
-    private val mascotUrl: String = MASCOT_PATH,
-) : RiveFrameRenderer {
+internal class RiveCanvasRenderer : RiveFrameRenderer {
     private class Loaded(val rive: JsAny, val file: JsAny, val version: String)
 
     private var loaded: Loaded? by mutableStateOf(null)
@@ -52,8 +53,8 @@ internal class RiveCanvasRenderer(
     override suspend fun prepare() {
         if (loaded != null) return
         try {
-            val rive = riveInitRuntime(wasmUrl).await<JsAny>()
-            val bytes = riveFetchBytes(mascotUrl).await<JsAny>()
+            val rive = riveInitRuntime(RIVE_WASM_PATH).await<JsAny>()
+            val bytes = riveFetchBytes(MASCOT_PATH).await<JsAny>()
             val file = riveLoadFile(rive, bytes).await<JsAny>()
             loaded = Loaded(rive, file, riveFingerprint(bytes))
         } catch (failure: JsException) {
@@ -80,79 +81,88 @@ internal class RiveCanvasRenderer(
 /** One scene in its OffscreenCanvas. Single-threaded like the page; nothing is called after [close]. */
 private class RiveCanvasScene(private val js: JsAny) : RiveFrameScene() {
     private var closed = false
-    private var bitmap: Bitmap? = null
-    private var bitmapAddress = 0
+    private var frame: RiveCanvasFrame? = null
 
-    override val inputSink: RiveInputSink = object : RiveInputSink {
-        override fun setNumber(input: String, value: Float) {
-            if (!closed) riveSetNumber(js, input, value)
-        }
+    override val inputSink: RiveInputSink = RiveWriteSink(::write)
 
-        override fun setBoolean(input: String, value: Boolean) {
-            if (!closed) riveSetBoolean(js, input, value)
-        }
-
-        override fun setEnum(input: String, key: String) {
-            if (!closed) riveSetEnum(js, input, key)
-        }
-
-        override fun setColor(input: String, argb: Int) {
-            if (!closed) riveSetColor(js, input, argb)
-        }
-
-        override fun fire(input: String) {
-            if (!closed) riveFire(js, input)
+    private fun write(write: RiveWrite) {
+        if (closed) return
+        when (write) {
+            is RiveWrite.Number -> riveSetNumber(js, write.input, write.value)
+            is RiveWrite.Bool -> riveSetBoolean(js, write.input, write.value)
+            is RiveWrite.Enum -> riveSetEnum(js, write.input, write.key)
+            is RiveWrite.Color -> riveSetColor(js, write.input, write.argb)
+            is RiveWrite.Fire -> riveFire(js, write.input)
         }
     }
 
-    override fun advance(seconds: Float) {
-        if (!closed) riveAdvance(js, seconds)
+    override fun advance(step: RiveFrameStep) {
+        if (!closed) riveAdvance(js, step.seconds)
     }
 
-    /**
-     * Draws into the canvas, reads it back (straight RGBA) and copies it into this scene's bitmap
-     * with one typed-array copy into Skia's memory; the image is a copy the caller owns.
-     */
-    override fun renderImage(width: Int, height: Int): Image {
+    /** Draws into the canvas, reads it back and copies it into this scene's frame; the image is a copy the caller owns. */
+    override fun renderImage(size: IntSize): Image {
         check(!closed) { "scene is closed" }
-        val pixels = riveRender(js, width, height)
-        val target = bitmapOf(width, height)
-        if (bitmapAddress == 0 || !riveCopyIntoHeap(loadedWasm, pixels, bitmapAddress)) {
-            // Skia's memory is not reachable: the slow, element-by-element path.
-            val bytes = ByteArray(width * height * BYTES_PER_PIXEL) { rivePixelByte(pixels, it).toByte() }
-            target.installPixels(target.imageInfo, bytes, width * BYTES_PER_PIXEL)
-        }
-        target.notifyPixelsChanged()
-        return Image.makeFromBitmap(target)
+        val target = frameOf(size)
+        target.copy(riveRender(js, size.width, size.height))
+        return target.snapshot()
     }
 
-    private fun bitmapOf(width: Int, height: Int): Bitmap {
-        bitmap?.takeIf { it.width == width && it.height == height }?.let { return it }
-        bitmap?.close()
-        val info = ImageInfo(width, height, ColorType.RGBA_8888, ColorAlphaType.UNPREMUL)
-        return Bitmap().also { created ->
-            check(created.allocPixels(info)) { "could not allocate a ${width}x$height mascot frame" }
-            bitmap = created
-            // Rows packed edge to edge, as the canvas reads them back; otherwise use the slow path.
-            val pixmap = created.peekPixels()
-            bitmapAddress = if (pixmap != null && created.rowBytes == width * BYTES_PER_PIXEL) pixmap.addr else 0
-            pixmap?.close()
-        }
+    private fun frameOf(size: IntSize): RiveCanvasFrame {
+        frame?.takeIf { it.size == size }?.let { return it }
+        frame?.close()
+        return RiveCanvasFrame(size).also { frame = it }
     }
 
-    override fun pointer(kind: RivePointer, x: Float, y: Float) {
-        if (!closed) rivePointer(js, kind.ordinal, x, y)
+    override fun pointer(event: RivePointerEvent) {
+        if (!closed) rivePointer(js, event.kind.ordinal, event.position.x, event.position.y)
     }
 
     override fun close() {
         if (closed) return
         closed = true
         riveClose(js)
-        bitmap?.close()
-        bitmap = null
+        frame?.close()
+        frame = null
     }
+}
+
+/**
+ * One frame's pixels in Skia: a bitmap of [size] in straight RGBA, written from the canvas readback
+ * with one typed-array copy into skiko's wasm memory - or element by element when that memory is
+ * not reachable, or the bitmap's rows are padded.
+ */
+private class RiveCanvasFrame(val size: IntSize) {
+    private val bitmap = Bitmap()
+    private val address: Int
+
+    init {
+        val info = ImageInfo(size.width, size.height, ColorType.RGBA_8888, ColorAlphaType.UNPREMUL)
+        check(bitmap.allocPixels(info)) { "could not allocate a $size mascot frame" }
+        val pixmap = bitmap.peekPixels()
+        address = if (pixmap != null && bitmap.rowBytes == rowBytes) pixmap.addr else 0
+        pixmap?.close()
+    }
+
+    private val rowBytes: Int get() = size.width * BYTES_PER_PIXEL
+
+    private val fastCopyAvailable: Boolean get() = address != 0
+
+    fun copy(pixels: JsAny) {
+        val copiedInPlace = fastCopyAvailable && riveCopyIntoHeap(loadedWasm, pixels, address)
+        if (!copiedInPlace) {
+            val bytes = ByteArray(rowBytes * size.height) { rivePixelByte(pixels, it).toByte() }
+            bitmap.installPixels(bitmap.imageInfo, bytes, rowBytes)
+        }
+        bitmap.notifyPixelsChanged()
+    }
+
+    fun snapshot(): Image = Image.makeFromBitmap(bitmap)
+
+    fun close() = bitmap.close()
 
     private companion object {
         const val BYTES_PER_PIXEL = 4
     }
 }
+

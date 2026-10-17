@@ -102,7 +102,7 @@ private class RiveRenderTarget(
 ) {
     /** One frame of the scene as it stands; whichever live surface shares it advances it. */
     suspend fun renderStill() {
-        slots.show(withContext(dispatcher) { scene.renderImage(size.width, size.height) })
+        slots.show(withContext(dispatcher) { scene.renderImage(size) })
     }
 
     /**
@@ -115,10 +115,10 @@ private class RiveRenderTarget(
         val (image, ghostImage) = withContext(dispatcher) {
             scene.advanceTo(now)
             val started = TimeSource.Monotonic.markNow()
-            val frame = scene.renderImage(size.width, size.height)
+            val frame = scene.renderImage(size)
             onFrameStats?.invoke(started.elapsedNow().inWholeNanoseconds / 1e6)
             // A ghost gets its own image - the two-slot rotation closes its images a frame later.
-            frame to (if (ghost) scene.renderImage(size.width, size.height) else null)
+            frame to (if (ghost) scene.renderImage(size) else null)
         }
         slots.show(image)
         return ghostImage
@@ -161,7 +161,7 @@ private fun Modifier.rivePointerInput(scene: RiveFrameScene, renderSize: () -> I
                 val render = renderSize()
                 val sx = if (size.width > 0) render.width.toFloat() / size.width else 1f
                 val sy = if (size.height > 0) render.height.toFloat() / size.height else 1f
-                scene.pointer(rivePointerKind(event.type), p.x * sx, p.y * sy)
+                scene.pointer(RivePointerEvent(rivePointerKind(event.type), Offset(p.x * sx, p.y * sy)))
             }
         }
     }
