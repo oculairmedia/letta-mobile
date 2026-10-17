@@ -174,15 +174,10 @@ private fun DesktopShellBackgroundTasks(context: DesktopShellContext, frame: Des
     val navigator = context.navigator
     if (!navigator.showBackgroundTasks || context.panels.subagents.repository == null) return
     // The roster opens in the window's inspector (docked beside the main pane when wide).
-    // letta-mobile-ulcg6.1: "View conversation" opens the subagent beside the chat's conversation.
-    val openInDualView = context.panels.subagents.views.rosterOpener()
     BackgroundTasksSidePane(
         subagents = frame.lists.activeSubagents,
         onClose = { navigator.showBackgroundTasks = false },
-        onOpenConversation = { item ->
-            navigator.showChat()
-            openInDualView(item)
-        },
+        onOpenConversation = frame.subagentViews?.holder?.rosterOpener(navigator::showChat),
     )
 }
 

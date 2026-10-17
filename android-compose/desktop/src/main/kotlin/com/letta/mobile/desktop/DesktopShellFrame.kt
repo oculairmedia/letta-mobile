@@ -1,5 +1,9 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.desktop.chat.desktopSubagentViewSessions
+import com.letta.mobile.desktop.chat.subagentParent
+import com.letta.mobile.ui.chat.subagents.SubagentDualViewBinding
+import com.letta.mobile.ui.chat.subagents.rememberSubagentDualView
 import com.letta.mobile.data.session.agentRosterOrEmpty
 import com.letta.mobile.data.backend.SessionRoute
 import androidx.compose.runtime.Composable
@@ -90,6 +94,8 @@ internal data class DesktopShellFrame(
     val activity: DesktopShellActivity,
     val libraries: DesktopLibraryStates,
     val lists: DesktopShellLists,
+    /** letta-mobile-ulcg6.1: the selected conversation's subagent dual view. */
+    val subagentViews: SubagentDualViewBinding? = null,
 )
 
 @Composable
@@ -103,6 +109,7 @@ internal fun rememberDesktopShellFrame(context: DesktopShellContext, chatState: 
         activity = activity,
         libraries = libraries,
         lists = rememberDesktopShellLists(context, chatState, focus, libraries.memory),
+        subagentViews = rememberSubagentDualView(chatState.subagentParent, desktopSubagentViewSessions(context.core.chatController)),
     )
 }
 

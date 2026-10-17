@@ -16,8 +16,13 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
  * roster, the rings and the timeline rows open the same view the same way on every client.
  */
 
-/** The roster's "View conversation": opens the row's conversation beside the parent. */
-fun SubagentDualViewHolder.rosterOpener(): OpenSubagentConversation = { item -> item.toSubagentView()?.let(::open) }
+/** The roster's "View conversation": opens the row's conversation beside the parent, after [beforeOpen] (show the chat). */
+fun SubagentDualViewHolder.rosterOpener(beforeOpen: () -> Unit = {}): OpenSubagentConversation = { item ->
+    item.toSubagentView()?.let { view ->
+        beforeOpen()
+        open(view)
+    }
+}
 
 /**
  * A ring's or the todo sheet's "view conversation", handed the child's agent and conversation: it

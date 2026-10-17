@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.subagent
 
+import com.letta.mobile.ui.chat.session.SubagentViewSessions
 import com.letta.mobile.ui.chat.subagents.ActiveSubagent
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -75,6 +76,9 @@ interface ActiveSubagentSource {
         fun StateFlow<ImmutableList<ActiveSubagent>>.activeOnly(): Flow<ImmutableList<ActiveSubagent>> =
             map { list -> list.filter { it.isActive }.toImmutableList() }
     }
+
+    /** letta-mobile-zxk2n.8: where the subagent dual view reads a child's conversation; null: the host navigates instead. */
+    val viewSessions: SubagentViewSessions? get() = null
 }
 
 /**

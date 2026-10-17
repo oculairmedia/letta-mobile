@@ -27,8 +27,6 @@ import com.letta.mobile.desktop.data.DesktopCanonicalSendInstall
 import com.letta.mobile.desktop.data.DesktopCanonicalTimelineHost
 import com.letta.mobile.desktop.data.DesktopDataBindings
 import kotlinx.coroutines.CancellationException
-import com.letta.mobile.ui.chat.subagents.SubagentDualViewHolder
-import com.letta.mobile.ui.chat.subagents.rememberSubagentDualViewHolder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
@@ -314,8 +312,6 @@ private fun buildDesktopChatController(
 internal class DesktopSubagentRegistry(
     val repository: SubagentRepository?,
     val activeSubagents: State<List<SubagentEntry>>,
-    /** The selected conversation's subagent dual view (letta-mobile-ulcg6.1); a new parent starts closed. */
-    val views: SubagentDualViewHolder = SubagentDualViewHolder(),
 )
 
 /** Inputs for the active-subagent registry. */
@@ -352,20 +348,12 @@ internal fun rememberSubagentRegistry(request: SubagentRegistryRequest): Desktop
     ) {
         collectScopedActiveSubagents(subagentRepository, parentScope) { value = it }
     }
-    val views = rememberSubagentDualViewHolder(parentScope?.parentConversationId?.let(::ConversationId))
-    return DesktopSubagentRegistry(subagentRepository, activeSubagents, views)
+    return DesktopSubagentRegistry(subagentRepository, activeSubagents)
 }
 
 /** Resolve parent scope only when both conversation coordinates are present. */
-internal fun subagentParentScope(
-    parentAgentId: String?,
-    parentConversationId: String?,
-): SubagentParentScope? =
-    parentAgentId?.let { agentId ->
-        parentConversationId?.let { conversationId ->
-            SubagentParentScope(agentId, conversationId)
-        }
-    }
+internal fun subagentParentScope(parentAgentId: String?, parentConversationId: String?): SubagentParentScope? =
+    if (parentAgentId != null && parentConversationId != null) SubagentParentScope(parentAgentId, parentConversationId) else null
 
 private suspend fun collectScopedActiveSubagents(
     repository: SubagentRepository?,
