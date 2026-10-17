@@ -41,7 +41,7 @@ class LettaCode034CompatibilityTest {
         val finished = assertIs<AppServerInboundFrame.TurnFinished>(
             decode(LettaCode0348Frames.AGENT_FREE_TURN_FINISHED_WITH_CONSUMER).frame,
         )
-        val ack = encode(AppServerCommand.TurnFinishedAck.of(finished, consumerId = "letta-mobile:device-a"))
+        val ack = encode(AppServerCommand.TurnFinishedAck.of(finished, consumerId = AppServerTerminalConsumerId("letta-mobile:device-a")))
         // Upstream isRuntimeScope rejects an absent agent_id; only null or a non-empty id pass.
         assertEquals(
             """{"type":"turn_finished_ack","runtime":{"agent_id":null,"conversation_id":"conv-free"},""" +
@@ -53,10 +53,10 @@ class LettaCode034CompatibilityTest {
     @Test
     fun theAckForAnAgentTerminalNamesTheAgent() {
         val finished = assertIs<AppServerInboundFrame.TurnFinished>(decode(LettaCode0348Frames.TURN_FINISHED_WITH_CONSUMERS).frame)
-        val ack = encode(AppServerCommand.TurnFinishedAck.of(finished, consumerId = "desktop:b"))
+        val ack = encode(AppServerCommand.TurnFinishedAck.of(finished, consumerId = AppServerTerminalConsumerId("desktop:b")))
         assertEquals("agent-1", ack["runtime"]!!.jsonObject["agent_id"]!!.jsonPrimitive.content)
         val decoded = AppServerProtocol.json.decodeFromJsonElement(AppServerCommand.serializer(), ack)
-        assertEquals(AppServerCommand.TurnFinishedAck.of(finished, "desktop:b"), decoded)
+        assertEquals(AppServerCommand.TurnFinishedAck.of(finished, AppServerTerminalConsumerId("desktop:b")), decoded)
     }
 
     @Test
@@ -126,6 +126,15 @@ class LettaCode034CompatibilityTest {
         assertFalse(AppServerTerminalConsumerId.isValid("slash/no"))
         assertTrue(AppServerTerminalConsumerId.isValid("x".repeat(AppServerTerminalConsumerId.MAX_LENGTH)))
         assertFalse(AppServerTerminalConsumerId.isValid("x".repeat(AppServerTerminalConsumerId.MAX_LENGTH + 1)))
+    }
+
+    @Test
+    fun aClientConsumerIdIsAlwaysInTheGrammar() {
+        assertEquals("letta-desktop:inst-1", AppServerTerminalConsumerId.forClient("letta-desktop", "inst-1").value)
+        assertEquals("web-tab:a-b-", AppServerTerminalConsumerId.forClient("web tab", "a/b?").value)
+        assertEquals("-:-", AppServerTerminalConsumerId.forClient("", "").value)
+        val long = AppServerTerminalConsumerId.forClient("s", "x".repeat(400))
+        assertEquals(AppServerTerminalConsumerId.MAX_LENGTH, long.value.length)
     }
 
     @Test
