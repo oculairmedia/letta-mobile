@@ -7,9 +7,10 @@
     "estimatedPeakMemoryInBytes": 6442450944,
     "defaultConfig": {
       "maxTokens": 4096,
-      "accelerators": ["cpu", "gpu"]
+      "accelerators": ["gpu", "cpu"]
     },
     "taskTypes": ["chat", "text-generation"],
+    "llmSupportImage": true,
     "requiresAuth": true,
     "downloadUrl": "https://huggingface.co/google/gemma-3n-E2B-it-litert-lm/resolve/main/gemma-3n-E2B-it-int4.litertlm"
   },
@@ -21,9 +22,10 @@
     "estimatedPeakMemoryInBytes": 8589934592,
     "defaultConfig": {
       "maxTokens": 4096,
-      "accelerators": ["cpu", "gpu"]
+      "accelerators": ["gpu", "cpu"]
     },
     "taskTypes": ["chat", "text-generation"],
+    "llmSupportImage": true,
     "requiresAuth": true,
     "downloadUrl": "https://huggingface.co/google/gemma-3n-E4B-it-litert-lm/resolve/main/gemma-3n-E4B-it-int4.litertlm"
   },

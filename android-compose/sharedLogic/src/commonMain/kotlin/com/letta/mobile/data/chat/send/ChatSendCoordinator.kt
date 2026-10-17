@@ -1592,7 +1592,7 @@ class ChatSendCoordinator(
                 mainReplyCompleted = completion.isAuthoritativelyComplete,
                 kindHint = state.bufferedErrorKind,
             )
-            BridgeTurnStatus.Cancelled -> TurnFailureNotices.forCancelledTerminal()
+            BridgeTurnStatus.Cancelled -> serverQueueMarks.cancelledTerminalNotice(state.inFlightSend)
             else -> null
         }
         val deadTurn = status is BridgeTurnStatus.Failed && terminalNotice != null

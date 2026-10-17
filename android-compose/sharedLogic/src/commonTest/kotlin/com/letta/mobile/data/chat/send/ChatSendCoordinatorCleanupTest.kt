@@ -959,6 +959,44 @@ class ChatSendCoordinatorCleanupTest {
         assertNull(coordinator.sendQueue.state.value[QueueConversationId("conv-1")], "its own turn started")
     }
 
+    // letta-mobile-by4vm.121: after a Stop, the next send waits for this device's own run to wind
+    // down on the server (an on-device model finishing), not for "another client's turn".
+    @Test
+    fun sendQueuedBehindOwnStoppedTurnSaysSoNotAnotherClient() = runTest(UnconfinedTestDispatcher()) {
+        val coordinator = coordinator(
+            timeline = RecordingTimelineWriter(),
+            ui = RecordingUiSink(),
+            transport = FakeChannelTransport(mutableListOf(true, true)),
+        )
+
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Cancelled))
+        coordinator.send("hi").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-2", AGENT_ID, "conv-1", "run-2"))
+        coordinator.handleEvent(WsTimelineEvent.TurnQueued(turnId = "turn-2", conversationId = "conv-1"))
+
+        val queue = coordinator.sendQueue.state.value.getValue(QueueConversationId("conv-1"))
+        assertEquals("hi", queue.queuedOnServer?.text)
+        assertEquals(ServerQueueBlocker.OwnStoppingTurn, queue.queuedOnServerBehind)
+    }
+
+    @Test
+    fun sendQueuedWithoutOwnStopWaitsForAnotherClient() = runTest(UnconfinedTestDispatcher()) {
+        val coordinator = coordinator(
+            timeline = RecordingTimelineWriter(),
+            ui = RecordingUiSink(),
+            transport = FakeChannelTransport(mutableListOf(true)),
+        )
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(WsTimelineEvent.TurnQueued(turnId = "turn-1", conversationId = "conv-1"))
+
+        val queue = coordinator.sendQueue.state.value.getValue(QueueConversationId("conv-1"))
+        assertEquals(ServerQueueBlocker.OtherClient, queue.queuedOnServerBehind)
+    }
+
     private fun coordinator(
         timeline: RecordingTimelineWriter,
         ui: RecordingUiSink,

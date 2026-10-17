@@ -18,6 +18,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
+/** The bundled on-device model catalog (asset path). */
+const val EMBEDDED_MODEL_CATALOG_ASSET = "embedded-models/model_allowlist.json"
+
 sealed interface EmbeddedModelDownloadState {
     data object Idle : EmbeddedModelDownloadState
     data class Downloading(val bytesDownloaded: Long, val totalBytes: Long?) : EmbeddedModelDownloadState
@@ -76,7 +79,7 @@ class AssetEmbeddedModelRepository @Inject constructor(
 ) : EmbeddedModelRepository {
     private val parser = EmbeddedModelCatalogParser()
     private val entries: List<EmbeddedModelCatalogEntry> by lazy {
-        context.assets.open(CATALOG_ASSET).bufferedReader().use { parser.parse(it.readText()) }
+        context.assets.open(EMBEDDED_MODEL_CATALOG_ASSET).bufferedReader().use { parser.parse(it.readText()) }
     }
     private val downloadStates = mutableMapOf<String, MutableStateFlow<EmbeddedModelDownloadState>>()
     private val _catalog = MutableStateFlow<List<EmbeddedModelCatalogItem>>(emptyList())
@@ -229,7 +232,6 @@ class AssetEmbeddedModelRepository @Inject constructor(
     }
 
     private companion object {
-        private const val CATALOG_ASSET = "embedded-models/model_allowlist.json"
         private const val MODEL_DIRECTORY = "embedded-lettacode/models"
     }
 }
