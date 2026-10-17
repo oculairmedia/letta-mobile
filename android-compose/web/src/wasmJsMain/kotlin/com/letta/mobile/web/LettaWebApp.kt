@@ -43,7 +43,6 @@ import com.letta.mobile.ui.shell.rememberShellWorkspaceState
 import com.letta.mobile.ui.shell.shellSettingsPage
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.SharedMaterialTheme
-import com.letta.mobile.web.chat.WebChatCanvas
 import com.letta.mobile.web.chat.WebChatLoad
 import com.letta.mobile.web.chat.WebChatOpener
 import com.letta.mobile.web.chat.WebChatPageNavigation
