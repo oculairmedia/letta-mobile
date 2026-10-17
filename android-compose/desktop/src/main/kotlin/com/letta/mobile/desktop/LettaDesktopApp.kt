@@ -2,7 +2,6 @@ package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +19,11 @@ import com.letta.mobile.ui.components.tabs.LettaTabStripActions
 import com.letta.mobile.ui.shell.header.SearchSlot
 import com.letta.mobile.ui.shell.header.ShellSearchContext
 import com.letta.mobile.ui.shell.header.rememberShellSearchSlot
+import com.letta.mobile.ui.shell.workspace.openSearchHit
+import com.letta.mobile.ui.shell.workspace.ShellConversationTabs
+import com.letta.mobile.ui.shell.workspace.ShellSidebarControl
+import com.letta.mobile.ui.shell.workspace.ShellSidebarOverflow
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState
 import com.letta.mobile.desktop.chat.DesktopChatConnectionState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
@@ -36,6 +40,12 @@ internal data class DesktopAppShellBindings(
     val quickQuery: DesktopQuickQueryCoordinator,
 )
 
+/** The workspace header's state, and where the window's title bar takes it. */
+internal class DesktopShellHeader(
+    val state: ShellWorkspaceHeaderState,
+    val onHoisted: (ShellWorkspaceHeaderState) -> Unit,
+)
+
 /**
  * The desktop shell. letta-mobile-bglj6.1.10: it only assembles the pieces - the services and
  * navigation ([rememberDesktopShellContext]), the state derived from them each composition
@@ -45,7 +55,7 @@ internal data class DesktopAppShellBindings(
 internal fun LettaDesktopApp(
     shell: DesktopAppShellBindings,
     onActiveTitleChange: (String) -> Unit = {},
-    onHeaderChromeChange: (DesktopHeaderChromeState) -> Unit = {},
+    onHeaderChromeChange: (ShellWorkspaceHeaderState) -> Unit = {},
 ) {
     // Launch on the fleet dashboard: it is the only view that says something
     // before a conversation is selected.
@@ -58,46 +68,48 @@ internal fun LettaDesktopApp(
     val workingDirectory = context.core.chatController.workingDirectory.current.collectAsState().value?.path
     DesktopMaterialTheme {
         DesktopWorkspaceFileViewerHost(context.core.chatScope, workingDirectory) {
-            DesktopShellWindowContent(context, frame)
+            // The workspace hoists its header into the window title bar, a sibling of the shell (letta-mobile-3arhe.1).
+            DesktopShellWindowContent(context, frame, DesktopShellHeader(rememberDesktopShellHeader(context, frame), onHeaderChromeChange))
         }
-        DesktopShellHeaderChrome(context, frame, onHeaderChromeChange)
     }
 }
 
 /**
- * Lifts the header's state to the window title bar, which composes as a sibling of the shell
- * (letta-mobile-3arhe.1): the identity block, sidebar toggle and overflow, the tab strip, and the
- * shared shell search slot (letta-mobile-ckmub.3.5), which searches Home in place while Home shows.
+ * The workspace header's state: the identity block, sidebar toggle and overflow, the tab strip, and
+ * the shared shell search slot (letta-mobile-ckmub.3.5), which searches Home in place while Home shows.
  */
 @Composable
-private fun DesktopShellHeaderChrome(
-    context: DesktopShellContext,
-    frame: DesktopShellFrame,
-    onHeaderChromeChange: (DesktopHeaderChromeState) -> Unit,
-) {
-    val router = context.router
+private fun rememberDesktopShellHeader(context: DesktopShellContext, frame: DesktopShellFrame): ShellWorkspaceHeaderState {
     val layout = context.core.layout
     val identity = desktopHeaderIdentity(context, frame)
-    val headerChrome = DesktopHeaderChromeState(
+    return ShellWorkspaceHeaderState(
+        title = desktopActiveTitle(context.navigator.selectedDestination, frame.chatState.selectedConversation?.title),
         identity = identity.state,
         identityActions = identity.actions,
-        sidebarCollapsed = !layout.controller.state.isSidebarVisible,
-        onToggleSidebar = { layout.controller.dispatch(ShellLayoutEvent.ToggleSidebar) },
-        sidebarToggleFocusRequester = layout.sidebarToggleFocusRequester,
-        sidebarOverflow = desktopSidebarOverflow(context, frame),
-        conversationTabs = rememberOpenTabs(context.navigator.tabs, frame.chatState.conversations),
-        activeConversationId = frame.chatState.selectedConversationId,
-        conversationTabActions = LettaTabStripActions(
-            onSelect = { router.openConversation(ConversationId(it)) },
-            onClose = { router.closeConversationTab(ConversationId(it)) },
-            onReorder = { id, index -> router.reorderConversationTab(ConversationId(id), index) },
-            // Browser-style "+" on the strip: a new chat with the focused agent.
-            onNew = { context.openNewChatForFocusedAgent(frame.focus) },
-            newLabel = "New conversation tab",
+        sidebar = ShellSidebarControl(
+            collapsed = !layout.controller.state.isSidebarVisible,
+            onToggle = { layout.controller.dispatch(ShellLayoutEvent.ToggleSidebar) },
+            focusRequester = layout.sidebarToggleFocusRequester,
+            overflow = desktopSidebarOverflow(context, frame),
         ),
         search = rememberDesktopShellSearch(context, frame),
+        tabs = ShellConversationTabs(
+            tabs = rememberOpenTabs(context.navigator.tabs, frame.chatState.conversations),
+            activeKey = frame.chatState.selectedConversationId,
+            actions = desktopTabActions(context, frame),
+        ),
     )
-    SideEffect { onHeaderChromeChange(headerChrome) }
+}
+
+/** The strip's verbs; its browser-style "+" is a new chat with the focused agent. */
+private fun desktopTabActions(context: DesktopShellContext, frame: DesktopShellFrame): LettaTabStripActions {
+    val router = context.router
+    return LettaTabStripActions(
+        onSelect = { router.openConversation(ConversationId(it)) },
+        onClose = { router.closeConversationTab(ConversationId(it)) },
+        onReorder = { id, index -> router.reorderConversationTab(ConversationId(id), index) },
+        onNew = { context.openNewChatForFocusedAgent(frame.focus) },
+    )
 }
 
 /**
@@ -145,9 +157,9 @@ private fun rememberOpenTabs(tabs: ConversationTabsState, conversations: List<De
 }
 
 /** The collapsed sidebar's overflow menu in the header. */
-private fun desktopSidebarOverflow(context: DesktopShellContext, frame: DesktopShellFrame): DesktopHeaderSidebarOverflow {
+private fun desktopSidebarOverflow(context: DesktopShellContext, frame: DesktopShellFrame): ShellSidebarOverflow {
     val navigator = context.navigator
-    return DesktopHeaderSidebarOverflow(
+    return ShellSidebarOverflow(
         mode = navigator.workPlayMode,
         onNewChat = { context.openNewChatForFocusedAgent(frame.focus) },
         onDestination = { navigator.navigate(lensNavTarget(navigator.workPlayMode, it).first) },

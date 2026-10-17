@@ -1,18 +1,5 @@
 package com.letta.mobile.web
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Surface
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -20,172 +7,63 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
-import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.ProvideLettaHost
-import com.letta.mobile.ui.settings.BackendConnectionNotice
-import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
-import com.letta.mobile.ui.settings.BackendConnectionStatusRow
-import com.letta.mobile.ui.shell.ShellNavDrawer
-import com.letta.mobile.ui.shell.ShellPage
-import com.letta.mobile.ui.shell.ShellPageContent
-import com.letta.mobile.ui.shell.navDrawerActions
-import com.letta.mobile.ui.shell.navDrawerState
 import com.letta.mobile.ui.shell.pages.ShellHomeFleet
 import com.letta.mobile.ui.shell.pages.ShellHomeFleetEffect
 import com.letta.mobile.ui.shell.pages.rememberShellLibraryControllers
-import com.letta.mobile.ui.shell.pages.rememberShellPageDeps
 import com.letta.mobile.ui.shell.rememberShellWorkspaceState
-import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.shell.workspace.LettaShellWorkspace
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderBinding
+import com.letta.mobile.ui.shell.workspace.rememberShellLayoutController
+import com.letta.mobile.ui.shell.workspace.rememberShellWorkspaceHeader
 import com.letta.mobile.ui.theme.SharedMaterialTheme
 import com.letta.mobile.web.chat.WebChatLoad
 import com.letta.mobile.web.chat.WebChatOpener
-import com.letta.mobile.web.chat.WebChatPageNavigation
 import com.letta.mobile.web.chat.rememberWebChatLoad
-import com.letta.mobile.web.data.WasmAppServerClientGateway
-import com.letta.mobile.web.data.WebSettingsStore
-import com.letta.mobile.web.storage.WebStorage
 import kotlinx.coroutines.launch
-import kotlin.time.Clock
 
 /**
- * letta-mobile-ckmub.8: the web app is a container around the shared shell. Wide windows show the
- * shared navigation ([ShellNavDrawer]: the agent rail and the agent panel) beside the page, as the
- * desktop does; narrow ones put it in a modal drawer, as Android does. What the shell shows is the
- * shared [ShellWorkspaceState] (letta-mobile-ckmub.17.3), its route bound to the URL fragment
- * ([BrowserRouteBinding]). What stays web-side is the binding: the App Server gateway and the
- * browser's storage ([WebStorage]).
+ * letta-mobile-ckmub.17.4: the web app is bootstrap and browser bindings around the shared
+ * [LettaShellWorkspace] the desktop window mounts ([webWorkspace]). Web-side are the App Server gateway,
+ * the browser's storage ([WebApp]), and the URL fragment bound to the shared route ([BrowserRouteBinding]).
  */
 @Composable
 fun LettaWebApp() {
     val scope = rememberCoroutineScope()
-    val gateway = remember { WasmAppServerClientGateway(scope) }
-    val storage = remember { WebStorage() }
-    val settingsStore = remember { WebSettingsStore(storage.settings) }
+    val app = remember { WebApp(scope) }
+    val backend = app.backend
     val workspace = rememberShellWorkspaceState(ShellDestination.Chat())
-    val backend = remember { WebBackend(settingsStore.load()) }
-    val navigator = remember(workspace) { ShellWorkspaceNavigator(workspace, WebChatPort) }
-    val canvas = remember { storage.chatCanvas() }
-    val connection by gateway.state.collectAsState()
     val config = backend.config.value
+    val layout = rememberShellLayoutController(config, app.storage.settings)
+    val shell = remember(workspace, layout) {
+        WebChatPort(workspace).let { WebShell(ShellWorkspaceNavigator(workspace, it), backend, it, layout) }
+    }
+    val connection by app.gateway.state.collectAsState()
     LaunchedEffect(config.serverUrl, config.accessToken, config.mode, backend.rosterRequest.intValue) {
-        backend.loadRoster(gateway, workspace)
+        backend.loadRoster(app.gateway, workspace)
     }
     // The URL fragment follows the workspace's route, and back/forward follow the URL.
     val browserRoute = remember(workspace) { BrowserRouteBinding(workspace) }
     DisposableEffect(browserRoute) { onDispose(browserRoute.start()) }
     LaunchedEffect(browserRoute, workspace.route) { browserRoute.publish(workspace.route) }
     val focusedAgent = backend.agents.value.firstOrNull { it.id == workspace.focusedAgentId }
-    val chat = rememberWebChatLoad(remember(gateway) { WebChatOpener(gateway::openChat) }, focusedAgent, connection)
+    val chat = rememberWebChatLoad(remember(app) { WebChatOpener(app.gateway::openChat) }, focusedAgent, connection)
+    LaunchedEffect(chat) { (chat as? WebChatLoad.Ready)?.let { shell.chat.shown(it.port.target) } }
     // letta-mobile-ckmub.17.5: the shared pages over the live session graph, as desktop binds them.
-    val services = remember(gateway, storage) { WebPageServices(gateway, storage.settings) }
-    val graph by gateway.sessionGraphProvider.currentGraph.collectAsState()
-    val controllers = rememberShellLibraryControllers(gateway.sessionGraphProvider, services.sources, scope)
+    val graph by app.gateway.sessionGraphProvider.currentGraph.collectAsState()
+    val controllers = rememberShellLibraryControllers(app.gateway.sessionGraphProvider, app.services.sources, scope)
     ShellHomeFleetEffect(controllers.home, ShellHomeFleet(conversations = emptyList(), roster = backend.agents.value))
     val onRosterChanged: () -> Unit = { scope.launch { backend.reloadRoster(graph, workspace) } }
-    val page = WebPageInputs(
-        chat = chat,
-        connection = connection,
-        canvas = canvas,
-        settings = webSettingsServices(backend.config, settingsStore),
-        session = WebPagesSession(graph, controllers, services, onRosterChanged),
-    )
-    val shell = WebShell(navigator, backend)
+    val settings = webSettingsServices(backend.config, app.settingsStore)
+    val page = WebPageInputs(chat, connection, app.canvas, settings, WebPagesSession(graph, controllers, app.services, onRosterChanged))
+    val header = rememberShellWorkspaceHeader(ShellWorkspaceHeaderBinding(shell.navigator, layout, webSearch(shell, page), shell.chat::tab))
     SharedMaterialTheme {
         ProvideLettaHost(LettaHost.Pointer) {
-            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                BoxWithConstraints {
-                    if (maxWidth < LettaDimens.Pane.wideBreakpoint) CompactWebShell(shell, page) else WideWebShell(shell, page)
-                }
-            }
+            val bound = webWorkspace(shell, page, header)
+            LettaShellWorkspace(bound.state, bound.host)
         }
     }
 }
-
-
-@Composable
-private fun WideWebShell(shell: WebShell, page: WebPageInputs) {
-    Row(modifier = Modifier.fillMaxSize()) {
-        WebNavigation(shell, page.connection, afterNavigate = {}, modifier = Modifier.width(WideNavigationWidth))
-        WebPage(shell, page, onShowAgents = null, modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun CompactWebShell(shell: WebShell, page: WebPageInputs) {
-    val drawer = rememberDrawerState(DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
-    ModalNavigationDrawer(
-        drawerState = drawer,
-        drawerContent = {
-            ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
-                WebNavigation(shell, page.connection, afterNavigate = { scope.launch { drawer.close() } })
-            }
-        },
-    ) {
-        WebPage(shell, page, onShowAgents = { scope.launch { drawer.open() } }, modifier = Modifier.fillMaxSize())
-    }
-}
-
-/** The shared navigation; the connection's status sits under the agent's name. */
-@Composable
-private fun WebNavigation(
-    shell: WebShell,
-    connection: BackendConnectionStatus,
-    afterNavigate: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val roster = shell.backend.roster
-    val now = remember(roster, shell.workspace.page) { Clock.System.now() }
-    ShellNavDrawer(
-        state = shell.workspace.navDrawerState(roster, now),
-        actions = shell.navigator.navDrawerActions(afterNavigate),
-        modifier = modifier.fillMaxHeight(),
-        agentCard = { BackendConnectionStatusRow(connection) },
-    )
-}
-
-/**
- * The shared ShellPage beside the navigation, over the pages desktop binds ([rememberShellPageDeps]);
- * [onShowAgents] opens the navigation where it is hidden. A conversation that has not opened falls
- * back to the connection notice.
- */
-@Composable
-private fun WebPage(shell: WebShell, page: WebPageInputs, onShowAgents: (() -> Unit)?, modifier: Modifier) {
-    val own = WebPageContributions(
-        navigation = WebChatPageNavigation(onShowAgents ?: {}, agentNamesById = shell.backend.roster.toMap()),
-        fallback = ShellPageContent { _, m -> WebWaitingPage(shell, page, onShowAgents, m) },
-    )
-    val deps = rememberShellPageDeps(page.session.graph, page.session.controllers, webPageHost(shell, page, own))
-    ShellPage(destination = shell.workspace.destination, deps = deps, modifier = modifier)
-}
-
-/** A conversation that has not opened: the connection and the way on. */
-@Composable
-private fun WebWaitingPage(shell: WebShell, page: WebPageInputs, onShowAgents: (() -> Unit)?, modifier: Modifier) {
-    val chat = page.chat
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        if (shell.workspace.page is ShellDestination.Chat && chat == WebChatLoad.Opening) {
-            CircularProgressIndicator()
-        } else {
-            BackendConnectionNotice(
-                status = page.connection,
-                error = (chat as? WebChatLoad.Failed)?.message ?: (page.connection as? BackendConnectionStatus.Failed)?.message,
-                actions = BackendConnectionNoticeActions(
-                    onOpenSettings = { shell.workspace.navigate(ShellDestination.Settings()) },
-                    onShowAgents = onShowAgents,
-                    onRetry = shell.backend::retry.takeIf { page.connection is BackendConnectionStatus.Failed },
-                ),
-            )
-        }
-    }
-}
-
-/** The rail plus the desktop sidebar's width. */
-private val WideNavigationWidth = LettaDimens.Pane.railWidth + 231.dp

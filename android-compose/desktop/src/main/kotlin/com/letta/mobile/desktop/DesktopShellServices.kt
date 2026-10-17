@@ -34,11 +34,13 @@ import com.letta.mobile.desktop.phone.LocalDesktopPhone
 import com.letta.mobile.desktop.phone.reducedMotionOr
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.surface.rememberChatDockGeometry
+import com.letta.mobile.ui.shell.workspace.ShellLayoutController
+import com.letta.mobile.ui.shell.workspace.rememberShellLayoutController
 import kotlinx.coroutines.CoroutineScope
 
 /** The shell's sidebar layout: its controller, the reduced-motion preference, and the toggle's focus. */
 internal data class DesktopShellLayout(
-    val controller: DesktopShellLayoutController,
+    val controller: ShellLayoutController,
     val reducedMotion: Boolean,
     val sidebarToggleFocusRequester: FocusRequester,
 )
@@ -92,7 +94,7 @@ internal fun rememberDesktopShellCore(): DesktopShellCore {
     // Transport publish rebuilds the graph without going through applyConfig;
     // observe currentGraph so libraries / subagent registry track the live id.
     val sessionGraph = bootstrap.dataBindings.sessionGraphProvider.currentGraph.collectAsState()
-    val layout = rememberDesktopShellLayout(bootstrap.activeConfig.id)
+    val layout = rememberDesktopShellLayout(bootstrap.activeConfig)
     val chatScope = rememberCoroutineScope()
     val railPrefs = rememberDesktopRailPrefs(bootstrap.secureSettingsStore)
     val attentionPrefs = remember(bootstrap.secureSettingsStore) { StoredAttentionPrefs(bootstrap.secureSettingsStore) }
@@ -134,8 +136,8 @@ internal fun rememberDesktopShellCore(): DesktopShellCore {
  * persisted store).
  */
 @Composable
-private fun rememberDesktopShellLayout(backendConfigId: String): DesktopShellLayout {
-    val controller = rememberDesktopShellLayoutController(backendConfigId)
+private fun rememberDesktopShellLayout(backend: LettaConfig): DesktopShellLayout {
+    val controller = rememberShellLayoutController(backend, DesktopPreferences.store)
     // The phone preview brings its own reduced-motion preset; the desktop follows the OS.
     val reducedMotion = LocalDesktopPhone.current.reducedMotionOr(remember { desktopPrefersReducedMotion() })
     SidebarToggleKeyDispatcherEffect(
