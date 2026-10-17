@@ -4,6 +4,7 @@ import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.runs.RunMonitorController
 import com.letta.mobile.data.session.ifSupported
+import com.letta.mobile.data.shell.ShellPageErrors
 import com.letta.mobile.data.templates.AgentTemplatesController
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.data.desktopSessionGraphFactory
@@ -31,7 +32,7 @@ class DesktopAdminPagesTest {
         val runs = graph.ifSupported(SessionRoute.RUNS) { runRepository }
         assertNull(runs, "a direct App Server session serves no runs")
 
-        val controller = RunMonitorController(runs, backgroundScope, ::desktopAdminErrorMessage)
+        val controller = RunMonitorController(runs, backgroundScope, ShellPageErrors::message)
         controller.start()
         runCurrent()
         val state = controller.state.value
@@ -48,7 +49,7 @@ class DesktopAdminPagesTest {
         val agents = graph.ifSupported(SessionRoute.AGENTS) { agentRepository }
         assertNull(agents, "no backend configured serves no agents")
 
-        val controller = AgentTemplatesController(agentRepository = agents, scope = backgroundScope, errorMessageMapper = ::desktopAdminErrorMessage)
+        val controller = AgentTemplatesController(agents, scope = backgroundScope, errorMessageMapper = ShellPageErrors::message)
         assertEquals("This backend cannot create agents yet.", controller.state.value.createUnavailableReason)
         val opened = mutableListOf<String>()
         controller.create("default") { opened += it }
@@ -63,8 +64,8 @@ class DesktopAdminPagesTest {
     fun theUnifiedRouteFailureReadsAsTheNotServedReason() {
         assertEquals(
             "This backend does not serve this page yet.",
-            desktopAdminErrorMessage(AppServerRouteUnavailable(SessionRoute.PROJECTS), "fallback"),
+            ShellPageErrors.message(AppServerRouteUnavailable(SessionRoute.PROJECTS), "fallback"),
         )
-        assertEquals("boom", desktopAdminErrorMessage(IllegalStateException("boom"), "fallback"))
+        assertEquals("boom", ShellPageErrors.message(IllegalStateException("boom"), "fallback"))
     }
 }

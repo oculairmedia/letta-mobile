@@ -16,9 +16,8 @@ import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellDestination
-import com.letta.mobile.data.shell.ShellHomePrompt
-import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.data.subagents.visibleRunningCount
+import com.letta.mobile.desktop.agent.agentEditorHost
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
 import com.letta.mobile.ui.chat.session.ChatHostCommand
 import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
@@ -30,13 +29,13 @@ import com.letta.mobile.desktop.chat.DesktopSharedChatPage
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageNavigation
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageState
 import com.letta.mobile.desktop.chat.rememberFocusedContextUsage
-import com.letta.mobile.desktop.home.DesktopHome
-import com.letta.mobile.data.schedules.ScheduleLibraryState
-import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageState
 import com.letta.mobile.ui.chat.subagents.BackgroundTasksToggle
 import com.letta.mobile.ui.chat.subagents.SubagentTodoLoader
-import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
-import com.letta.mobile.ui.shell.pages.home.HomePageNavigation
+import com.letta.mobile.ui.shell.ShellPageContent
+import com.letta.mobile.ui.shell.pages.ShellHostPages
+import com.letta.mobile.ui.shell.pages.ShellPageFocus
+import com.letta.mobile.ui.shell.pages.ShellPageHost
+import com.letta.mobile.ui.shell.pages.rememberShellPageDeps
 import com.letta.mobile.ui.shell.sidebar.ShellRenameChatDialog
 
 /** What the shared chat page takes from the shell: the composer's commands and context reading, and the canvas. */
@@ -59,7 +58,7 @@ internal fun RowScope.DesktopShellMainPane(context: DesktopShellContext, frame: 
     val host = rememberDesktopShellChatHost(context, frame)
     DesktopMainContentPane(
         inputs = desktopMainContentInputs(context, frame, host),
-        actions = desktopMainContentActions(context, frame),
+        actions = desktopMainContentActions(context),
         modifier = Modifier.weight(1f).fillMaxHeight(),
     )
     DesktopRenameChatOverlay(context, frame)
@@ -159,61 +158,53 @@ private fun desktopMainContentInputs(
     val navigator = context.navigator
     return DesktopMainContentInputs(
         agentEditor = navigator.agentEditor,
-        agentEditorPage = context.agentEditorPage(),
         selectedDestination = navigator.selectedDestination,
         pageDestination = navigator.pageFor(frame),
         selectedConversationId = frame.chatState.selectedConversationId,
-        destinationInputs = destinationContentInputs(context, frame),
+        pages = rememberShellPageDeps(core.sessionGraph.value, context.panels.libraries, desktopPageHost(context, frame, host)),
         activeCanvasSession = core.canvasShell.activeSession,
         dockedCanvasId = context.sharedChat.dockedCanvas.dockedCanvasId,
-        chatPage = desktopSharedChatPage(context, frame, host),
-        adminPages = desktopAdminPages(rememberDesktopAdminBinding(context)),
+    )
+}
+
+/** letta-mobile-ckmub.17.5: what the desktop adds to the shared shell pages: its chat, Settings, plugins and editor extras. */
+@Composable
+private fun desktopPageHost(context: DesktopShellContext, frame: DesktopShellFrame, host: DesktopShellChatHost): ShellPageHost {
+    val core = context.core
+    val chat = desktopSharedChatPage(context, frame, host)
+    val focus = frame.focus
+    return ShellPageHost(
+        navigator = context.router,
+        focus = ShellPageFocus(focus.selectedAgentId?.let(::AgentId), focus.selectedAgentName),
+        pages = ShellHostPages(
+            chat = ShellPageContent { _, modifier -> chat(modifier) },
+            settings = desktopSettingsPage(desktopSettingsInputs(context, frame), desktopSettingsActions(context)),
+            plugins = desktopPluginsPage(core.bootstrap.dataBindings.pluginViews),
+            slots = DesktopChannelsPageSlots,
+        ),
+        home = rememberDesktopHomeHost(context, frame),
+        agentEditor = context.agentEditorHost(),
+        modelControl = core.bootstrap.dataBindings.modelControl,
+        settings = core.bootstrap.secureSettingsStore,
     )
 }
 
 @Composable
-private fun destinationContentInputs(context: DesktopShellContext, frame: DesktopShellFrame): DestinationContentInputs {
+private fun desktopSettingsInputs(context: DesktopShellContext, frame: DesktopShellFrame): DesktopSettingsInputs {
     val core = context.core
-    val panels = context.panels
-    val skillsCatalog by panels.skills.state.collectAsState()
-    val libraries = frame.libraries
-    val focus = frame.focus
     val nucleusState by core.nucleusController.state.collectAsState()
-    return DestinationContentInputs(
+    return DesktopSettingsInputs(
         railRecencyDays = core.railPrefs.recencyDays,
         state = core.bootstrap.bootstrapState,
-        home = rememberDesktopHomeInputs(context, frame),
-        chat = frame.chatState,
-        memoryState = libraries.memory,
-        schedule = SchedulesPageState(
-            library = libraries.schedules,
-            crons = panels.cronPanel.crons,
-            focusedAgentId = focus.selectedAgentId,
-            canCreate = canCreateCron(context, libraries.schedules, focus),
-        ),
-        channels = libraries.channels,
-        toolLibraryState = libraries.tools,
-        skills = DestinationSkillsInputs(catalog = skillsCatalog, focusedAgentName = focus.selectedAgentName),
         nucleus = nucleusState,
         localRuntimeProvider = core.localConfig.providerState,
         localBackendDirectory = core.localConfig.directoryState,
-        pairing = com.letta.mobile.desktop.qr.desktopInstallAndPairBindings(context, focus),
+        pairing = com.letta.mobile.desktop.qr.desktopInstallAndPairBindings(context, frame.focus),
         localRuntime = core.localConfig.runtime,
     )
 }
 
-/** A schedule can be created when the backend takes them (cron API or Iroh) and an agent is chosen. */
-private fun canCreateCron(
-    context: DesktopShellContext,
-    scheduleState: ScheduleLibraryState,
-    focus: DesktopAgentFocus,
-): Boolean {
-    val backendSchedules = context.panels.cronPanel.available || context.core.iroh.transport != null
-    val agentChosen = scheduleState.selectedAgentId != null || focus.selectedAgentId != null
-    return backendSchedules && agentChosen
-}
-
-private fun desktopMainContentActions(context: DesktopShellContext, frame: DesktopShellFrame): DesktopMainContentActions {
+private fun desktopMainContentActions(context: DesktopShellContext): DesktopMainContentActions {
     val chatController = context.core.chatController
     val canvasShell = context.core.canvasShell
     val navigator = context.navigator
@@ -226,72 +217,23 @@ private fun desktopMainContentActions(context: DesktopShellContext, frame: Deskt
                 canvasShell.close()
             }
         },
-        destinationActions = desktopDestinationActions(context, frame),
     )
 }
 
-private fun desktopDestinationActions(context: DesktopShellContext, frame: DesktopShellFrame): DestinationContentActions {
+private fun desktopSettingsActions(context: DesktopShellContext): DesktopSettingsActions {
     val core = context.core
-    val panels = context.panels
-    val controllers = panels.libraries
     val bootstrap = core.bootstrap
-    val selectedAgentId = frame.focus.selectedAgentId
-    return DestinationContentActions(
+    return DesktopSettingsActions(
         onRailRecencyDaysChange = core.railPrefs::updateRecencyDays,
         onOpenProviders = { context.navigator.navigate(ShellDestination.Providers) },
         onOpenPlugins = { context.navigator.navigate(ShellDestination.Plugins) },
-        pluginViews = core.bootstrap.dataBindings.pluginViews,
-        onRetryConnection = core.chatController::retryConnection,
-        home = desktopHomeCallbacks(context, frame),
-        memory = controllers.memory,
-        memfs = controllers.memfs,
-        schedules = destinationScheduleActions(
-            ScheduleWiringDeps(
-                schedules = controllers.schedules,
-                cronPanel = panels.cronPanel,
-                scheduleLibraryState = frame.libraries.schedules,
-                selectedAgentId = selectedAgentId,
-            ),
-        ),
-        channels = controllers.channels,
-        tools = DestinationToolsActions(
-            onRefresh = controllers.tools::reload,
-            onSearchQueryChanged = controllers.tools::updateSearchQuery,
-            onTagToggled = controllers.tools::toggleTag,
-            onClearTags = controllers.tools::clearTags,
-            onLoadMore = controllers.tools::loadMore,
-        ),
-        skills = destinationSkillsActions(skills = panels.skills, selectedAgentId = selectedAgentId),
+        pluginViews = bootstrap.dataBindings.pluginViews,
         onConfigSaved = { bootstrap.applyConfig(it) },
         onTokenCleared = { bootstrap.applyConfig(bootstrap.activeConfig.copy(accessToken = null)) },
         onIrohIdentityReset = { context.overlays.irohResetConfirm = true },
         nucleus = destinationNucleusActions(core.nucleusController, context.shell.window),
         localRuntimeProvider = core.localConfig.providerActions,
         localBackendDirectory = core.localConfig.directoryActions,
-    )
-}
-
-private fun desktopHomeCallbacks(context: DesktopShellContext, frame: DesktopShellFrame): HomePageCallbacks {
-    val navigator = context.navigator
-    val router = context.router
-    val focus = frame.focus
-    val openConversation = { id: String -> router.openConversation(ConversationId(id)) }
-    return HomePageCallbacks(
-        actions = context.panels.libraries.home,
-        navigation = HomePageNavigation(
-            onSubmitPrompt = { text ->
-                val rosterAgentId = focus.rosterAgents.firstOrNull()?.id?.value
-                router.submitHomePrompt(ShellHomePrompt(text, focus.selectedAgentId?.let(::AgentId), rosterAgentId?.let(::AgentId)))
-            },
-            onOpenConversation = { openConversation(it.conversationId) },
-            onOpenAgent = { router.openAgent(AgentId(it)) },
-            onOpenShortcut = { shortcut -> DesktopHome.destinationFor(shortcut)?.let(navigator::navigate) },
-            onConfigureAgent = { navigator.editAgentId = AgentId(it) },
-            onOpenMessage = { message -> message.conversationId?.let(openConversation) },
-            onOpenTool = { navigator.navigate(ShellDestination.Skills(section = ShellSkillsSection.Tools)) },
-            onOpenBlock = { navigator.navigate(DesktopDestination.Memory) },
-            onA2uiAction = context.onA2uiAction,
-        ),
     )
 }
 

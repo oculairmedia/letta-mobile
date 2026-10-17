@@ -7,7 +7,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.avatar.core.MascotIdentity
@@ -26,19 +25,19 @@ import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
-import com.letta.mobile.data.home.FleetOverviewParams
-import com.letta.mobile.data.home.buildFleetOverview
-import com.letta.mobile.desktop.home.DesktopHomeInputs
+import com.letta.mobile.data.chat.runtime.ChatConnectionState
 import com.letta.mobile.desktop.home.toFleetConversation
 import com.letta.mobile.data.schedules.ScheduleLibraryState
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.mascot.resolveMascotIdentity
+import com.letta.mobile.ui.shell.pages.ShellHomeConnection
+import com.letta.mobile.ui.shell.pages.ShellHomeFleet
+import com.letta.mobile.ui.shell.pages.ShellHomeFleetEffect
+import com.letta.mobile.ui.shell.pages.ShellHomeHost
+import com.letta.mobile.ui.shell.pages.ShellLibraryControllers
+import com.letta.mobile.ui.shell.pages.home.HomeConnectionState
 import com.letta.mobile.ui.shell.pages.home.HomePageOptions
 import com.letta.mobile.ui.shell.rail.ShellRailActivity
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
-import kotlinx.coroutines.delay
 
 /** The agent the shell is focused on, and every agent's name and identity around it. */
 internal data class DesktopAgentFocus(
@@ -227,7 +226,7 @@ private fun runningAgentIds(foreground: List<String>, activeSubagents: List<Suba
 }
 
 @Composable
-private fun collectLibraryStates(libraries: DesktopLibraryControllers): DesktopLibraryStates {
+private fun collectLibraryStates(libraries: ShellLibraryControllers): DesktopLibraryStates {
     val memory by libraries.memory.state.collectAsState()
     val schedules by libraries.schedules.state.collectAsState()
     val channels by libraries.channels.state.collectAsState()
@@ -279,59 +278,52 @@ private fun rememberDesktopShellLists(
 }
 
 /**
- * Home page inputs. The fleet half is folded from state the shell already holds (conversations +
- * roster + who is mid-run) and handed to the shared controller; the rest of the page (pins, stats,
- * search) is the controller's own.
+ * Home's host side (letta-mobile-ckmub.17.5). The fleet is folded from state the shell already holds
+ * (conversations + roster + who is mid-run) and handed to the shared controller; Home waits behind the
+ * connection hero until the backend is there. The rest of the page is the shared binding's.
  */
 @Composable
-internal fun rememberDesktopHomeInputs(context: DesktopShellContext, frame: DesktopShellFrame): DesktopHomeInputs {
+internal fun rememberDesktopHomeHost(context: DesktopShellContext, frame: DesktopShellFrame): ShellHomeHost {
     val focus = frame.focus
     val conversations = frame.chatState.conversations
-    val runningAgentIds = frame.activity.runningAgentIds
-    val agentDirectory = context.core.iroh.agentDirectory
-    val fleetClock = rememberFleetClock()
-    val fleetOverview = remember(conversations, focus.rosterAgents, runningAgentIds, fleetClock) {
-        buildFleetOverview(
-            FleetOverviewParams(
-                conversations = conversations.map { it.toFleetConversation() },
-                rosterAgents = focus.rosterAgents,
-                runningAgentIds = runningAgentIds,
-                now = fleetClock,
-                // Broken backend pagination truncates the roster; the summary
-                // then renders counts as "N+" lower bounds, not exact figures.
-                rosterTruncated = agentDirectory?.lastAgentListTruncated == true,
-            ),
-        )
-    }
-    val controller = context.panels.libraries.home
-    LaunchedEffect(controller, fleetOverview) { controller.updateFleet(fleetOverview) }
-    val state by controller.state.collectAsState()
+    val fleetConversations = remember(conversations) { conversations.map { it.toFleetConversation() } }
+    ShellHomeFleetEffect(
+        context.panels.libraries.home,
+        ShellHomeFleet(
+            conversations = fleetConversations,
+            roster = focus.rosterAgents,
+            runningAgentIds = frame.activity.runningAgentIds,
+            // Broken backend pagination truncates the roster; counts then read as "N+" lower bounds.
+            rosterTruncated = context.core.iroh.agentDirectory?.lastAgentListTruncated == true,
+        ),
+    )
     val homeOrbIndexes = remember(focus.railAgents, focus.avatarStyleByAgentId) {
         focus.railAgents
             .mapIndexed { index, (id, _) -> id to (focus.avatarStyleByAgentId[id] ?: index) }
             .toMap()
     }
-    val navigator = context.navigator
-    return DesktopHomeInputs(
-        state = state,
+    return ShellHomeHost(
         options = HomePageOptions(
             // The header's search field searches Home while it shows (letta-mobile-xuhmy).
             showSearch = false,
             orbIndexByAgentId = homeOrbIndexes,
-            composerPlaceholder = WorkPlayLens.composerPlaceholder(navigator.workPlayMode, focus.selectedAgentName),
+            composerPlaceholder = WorkPlayLens.composerPlaceholder(context.navigator.workPlayMode, focus.selectedAgentName),
         ),
+        connection = frame.chatState.homeConnection(context.core.chatController::retryConnection),
+        onA2uiAction = context.onA2uiAction,
     )
 }
 
-/** Now, advanced once a minute so the fleet dashboard's relative times stay current. */
-@Composable
-private fun rememberFleetClock(): Instant {
-    var fleetClock by remember { mutableStateOf(Clock.System.now()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(60.seconds)
-            fleetClock = Clock.System.now()
-        }
+/** The connection hero while the backend is not there yet (connecting, unconfigured, offline); null once it is. */
+private fun DesktopChatSurfaceState.homeConnection(onRetry: () -> Unit): ShellHomeConnection? =
+    if (connectionState in ConnectionPendingStates) {
+        ShellHomeConnection(HomeConnectionState(chatScreenStatus, errorMessage, loading = isLoading), onRetry, wordmark = "LETTA DESKTOP")
+    } else {
+        null
     }
-    return fleetClock
-}
+
+private val ConnectionPendingStates = setOf(
+    ChatConnectionState.Loading,
+    ChatConnectionState.ConfigNeeded,
+    ChatConnectionState.Offline,
+)
