@@ -14,6 +14,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.AppServerTurnStackSpec
+import com.letta.mobile.data.runtime.DurableTurnDelivery
 import com.letta.mobile.data.runtime.attachTurnStack
 import com.letta.mobile.data.runtime.permissionGovernedTurnStackSpec
 import com.letta.mobile.data.runtime.PermissionModeRegistry
@@ -25,6 +26,8 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
+import com.letta.mobile.data.transport.appserver.AppServerTerminalConsumerId
+import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchPreference
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
@@ -252,11 +255,16 @@ class DesktopAppServerChatGatewayBuilder(
 internal fun desktopTurnStackSpec(
     externalToolRegistry: ExternalToolRegistry? = null,
     permissionModes: PermissionModeRegistry? = null,
+    installId: String? = DesktopRuntimeLaunchPreference.instanceId,
 ): AppServerTurnStackSpec = permissionGovernedTurnStackSpec(
     modes = permissionModes,
     clientInfo = DESKTOP_CLIENT_INFO,
     fallback = AppServerPermissionMode.Unrestricted,
     externalToolRegistry = externalToolRegistry,
+    // letta-mobile-zxk2n.2: the per-install id makes this desktop a durable terminal consumer.
+    durableDelivery = DurableTurnDelivery.chat(
+        installId?.let { AppServerTerminalConsumerId.forClient(DESKTOP_CLIENT_INFO.name, it) },
+    ),
 )
 
 /**

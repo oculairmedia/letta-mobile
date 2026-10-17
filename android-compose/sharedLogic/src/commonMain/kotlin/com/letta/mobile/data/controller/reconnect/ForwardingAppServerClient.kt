@@ -31,6 +31,9 @@ abstract class ForwardingAppServerClient : AppServerClient {
 
     override suspend fun changeDeviceState(command: AppServerCommand.ChangeDeviceState) = target().changeDeviceState(command)
 
+    override suspend fun acknowledgeTurnFinished(command: AppServerCommand.TurnFinishedAck) =
+        target().acknowledgeTurnFinished(command)
+
     override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
         target().sync(command)
 

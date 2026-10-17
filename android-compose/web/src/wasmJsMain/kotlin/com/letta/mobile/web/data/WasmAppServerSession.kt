@@ -11,6 +11,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.isIrohBackendUrl
 import com.letta.mobile.data.repository.appserver.AppServerLocalAdminGateway
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.DurableTurnDelivery
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.runtime.permissionGovernedTurnStackSpec
@@ -237,7 +238,11 @@ private fun attachServices(
     val engine = router.attachTurnStack(
         link.client,
         scope,
-        permissionGovernedTurnStackSpec(modes, requestIdFactory = { nextRequestId("turn") }),
+        permissionGovernedTurnStackSpec(
+            modes,
+            requestIdFactory = { nextRequestId("turn") },
+            durableDelivery = DurableTurnDelivery.chat(webTabTerminalConsumerId()),
+        ),
     )
     return WasmAppServerServices(
         engine = engine,
