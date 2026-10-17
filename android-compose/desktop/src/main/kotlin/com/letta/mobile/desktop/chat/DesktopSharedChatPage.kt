@@ -168,13 +168,7 @@ internal fun DesktopSharedChatPage(
     val ambientStatus = rememberChatAmbientStatus(isThinking = uiState.isRunInFlight, failed = state.errorMessage != null)
     val session = rememberConversationCanvasSession(state.canvasStore, state.canvasOwner)
     state.dockedCanvas?.let { router ->
-        DisposableEffect(router, session) {
-            router.dockedCanvasId = session?.canvasId
-            onDispose { router.dockedCanvasId = null }
-        }
-        LaunchedEffect(router, router.showRequests) {
-            if (router.showRequests > 0) presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse)
-        }
+        DockedCanvasRouting(router, session) { presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse) }
     }
     var dockGeometry by state.dockGeometry
     val onIntent = remember { { intent: ChatSurfaceIntent -> presentation = ChatSurfaceModeReducer.reduce(presentation, intent) } }
@@ -219,6 +213,18 @@ internal fun DesktopSharedChatPage(
     DesktopWorkingDirectoryPickerHost(directoryPicker)
 }
 
+/** Routes the shell's canvas opens to this page's dock: it names the docked board, and a show request collapses to it. */
+@Composable
+private fun DockedCanvasRouting(router: DesktopDockedCanvasRouter, session: CanvasSession?, onShow: () -> Unit) {
+    DisposableEffect(router, session) {
+        router.dockedCanvasId = session?.canvasId
+        onDispose { router.dockedCanvasId = null }
+    }
+    LaunchedEffect(router, router.showRequests) {
+        if (router.showRequests > 0) onShow()
+    }
+}
+
 /** The page's host with its timeline rows opening their subagent in the dual view, when the page has one. */
 @Composable
 private fun rememberDualViewHost(host: ChatSurfaceHost, subagents: DesktopChatSubagents?): ChatSurfaceHost {
@@ -255,7 +261,9 @@ private fun rememberDesktopChatPlatform(ambientStatus: AmbientMotionStatus, fram
             },
             showKeyboardHints = frame.showKeyboardHints,
             topChromeInset = frame.topChromeInset,
-            timelineOverlay = subagents?.let { rings -> { SubagentRingsOverlay(rings.entries, rings.loader, onViewConversation = rings.onViewConversation) } },
+            timelineOverlay = subagents?.let { rings ->
+                { SubagentRingsOverlay(rings.entries, rings.loader, onViewConversation = rings.onViewConversation) }
+            },
         )
     }
 

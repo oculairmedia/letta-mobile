@@ -41,7 +41,9 @@ class ExternalAgentRowBadgeUiTest {
             subagentAgentId = "claude_0b1c2d3e-0000-4000-8000-000000000001",
         )
         val msg = message("m-1", "assistant", "").copy(
-            toolCalls = listOf(UiToolCall(name = "Agent", arguments = "{}", result = null, status = "running", subagentDispatch = dispatch)),
+            toolCalls = listOf(
+                UiToolCall(name = "Agent", arguments = "{}", result = null, status = "running", subagentDispatch = dispatch),
+            ),
         )
         setContent { MaterialTheme { RenderRow(single(msg), rowContext(toolDetails = ChatToolDetails.Sheet)) } }
 

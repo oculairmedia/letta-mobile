@@ -352,7 +352,8 @@ internal fun rememberSubagentRegistry(request: SubagentRegistryRequest): Desktop
     ) {
         collectScopedActiveSubagents(subagentRepository, parentScope) { value = it }
     }
-    return DesktopSubagentRegistry(subagentRepository, activeSubagents, rememberSubagentDualViewHolder(parentScope))
+    val views = rememberSubagentDualViewHolder(parentScope?.parentConversationId?.let(::ConversationId))
+    return DesktopSubagentRegistry(subagentRepository, activeSubagents, views)
 }
 
 /** Resolve parent scope only when both conversation coordinates are present. */

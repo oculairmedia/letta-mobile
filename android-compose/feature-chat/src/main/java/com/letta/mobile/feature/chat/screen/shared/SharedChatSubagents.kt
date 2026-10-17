@@ -241,19 +241,19 @@ private fun SharedChatSubagentRoster(
 }
 
 /**
- * letta-mobile-zxk2n.8: the page's subagent dual view, over the view model's canonical transport and
+ * letta-mobile-zxk2n.8: the page's subagent dual view, over the canonical timeline transport and
  * closed again for each conversation. On a phone the child's conversation shows in place of this one,
  * read-only; Back returns to the parent, and "open full view" is the subagent conversation route.
- * Null where the view model has no transport: "view conversation" then navigates, as before.
+ * Null outside a Hilt activity: "view conversation" then navigates, as before.
  */
 @Composable
 internal fun rememberSharedChatDualView(params: SharedChatPageParams): SubagentDualViewBinding? {
-    val viewModel = params.viewModel
-    val holder = rememberSubagentDualViewHolder(viewModel.conversationId)
+    val holder = rememberSubagentDualViewHolder(params.viewModel.conversationId)
+    val sessions = rememberSharedChatSubagentViewSessions()
     val openFull by rememberUpdatedState(params.navigation.onViewSubagentConversation)
     val canOpenFull = params.navigation.onViewSubagentConversation != null
-    val binding = remember(holder, viewModel, canOpenFull) {
-        viewModel.subagentViewSessions?.let { sessions ->
+    val binding = remember(holder, sessions, canOpenFull) {
+        sessions?.let { sessions ->
             val onOpenFullView: ((SubagentView) -> Unit)? = if (canOpenFull) {
                 { view -> openFull?.invoke(view.agentId.value, view.conversationId.value) }
             } else {

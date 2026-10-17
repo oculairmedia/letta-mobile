@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.subagents.SubagentDualViewState
 import com.letta.mobile.data.subagents.SubagentView
 import com.letta.mobile.data.subagents.SubagentViewKey
@@ -85,7 +86,7 @@ class SubagentDualViewHolder(initial: SubagentDualViewState = SubagentDualViewSt
 
 /** One holder per parent conversation: [parent] changing starts a closed dual view. */
 @Composable
-fun rememberSubagentDualViewHolder(parent: Any?): SubagentDualViewHolder = remember(parent) { SubagentDualViewHolder() }
+fun rememberSubagentDualViewHolder(parent: ConversationId?): SubagentDualViewHolder = remember(parent) { SubagentDualViewHolder() }
 
 /**
  * What a chat page binds the dual view with: its [holder], where a child conversation's session
@@ -203,9 +204,8 @@ private fun SubagentViewStrip(binding: SubagentDualViewBinding, layout: DualView
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (!layout.wide && state.showsSubagent) {
-                    StripAction(LettaIcons.ArrowBack, stringResource(Res.string.subagent_view_parent_tab), SubagentDualViewTags.BACK_TO_PARENT) {
-                        holder.showParent()
-                    }
+                    val backLabel = stringResource(Res.string.subagent_view_parent_tab)
+                    StripAction(LettaIcons.ArrowBack, backLabel, SubagentDualViewTags.BACK_TO_PARENT) { holder.showParent() }
                 }
                 LettaTabStrip(
                     tabs = state.views.map { it.toTab() },

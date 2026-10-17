@@ -213,18 +213,6 @@ internal class AdminChatViewModel @Inject constructor(
      */
     val selfTodoSource: SelfTodoSource =
         WsSelfTodoSource(selfTodoRepository)
-
-    /**
-     * letta-mobile-zxk2n.8: where the shared subagent dual view reads a child's conversation - the
-     * canonical transport this screen's own timeline reads; null in tests, where the rings navigate.
-     */
-    val subagentViewSessions: com.letta.mobile.ui.chat.session.SubagentViewSessions? =
-        timelineTransport?.let { transport ->
-            com.letta.mobile.ui.chat.session.TimelineSubagentViewSessions { view ->
-                com.letta.mobile.ui.chat.session.SubagentTimelineRoute(transport, view.conversationId)
-            }
-        }
-
     private val initialAgentName: String? = routeArgs.initialAgentName
     private val initialMessage: String? = routeArgs.initialMessage
     // letta-mobile-aw0dv: the display mode the route asked to open in (e.g.

@@ -76,7 +76,7 @@ internal fun WebSharedChatPage(
 /** The conversation's subagent dual view, closed again for each conversation; null without [sessions]. */
 @Composable
 private fun rememberWebSubagentDualView(port: WebChatSessionPort, sessions: SubagentViewSessions?): SubagentDualViewBinding? {
-    val holder = rememberSubagentDualViewHolder(port)
+    val holder = rememberSubagentDualViewHolder(ConversationId(port.target.conversationId))
     return remember(holder, sessions) { sessions?.let { SubagentDualViewBinding(holder, it) } }
 }
 

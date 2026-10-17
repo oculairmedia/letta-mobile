@@ -52,7 +52,11 @@ class SubagentDualViewUiTest {
         SubagentViewSession(ChatSurfaceUiTest.TestPort(childState)) { closed += view }
     }
 
-    private fun ComposeUiTest.show(holder: SubagentDualViewHolder, width: Dp, sessions: SubagentViewSessions = this@SubagentDualViewUiTest.sessions) {
+    private fun ComposeUiTest.show(
+        holder: SubagentDualViewHolder,
+        width: Dp,
+        sessions: SubagentViewSessions = this@SubagentDualViewUiTest.sessions,
+    ) {
         setContent {
             MaterialTheme {
                 Box(Modifier.size(width = width, height = 720.dp)) {
