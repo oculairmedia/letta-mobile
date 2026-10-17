@@ -223,6 +223,8 @@ class MascotDirectorTest {
         val rig = rig()
         rig.signals { copy(reduceMotion = true, activity = AvatarActivity.THINKING) }
         rig.director.onEvent(MascotEvent.Sent)
+        // te3n1.2: two host blinks are never closer than 250 ms, so the second reaction comes later.
+        rig.tick(0.3f)
         rig.signals { copy(activity = AvatarActivity.IDLE) }
         rig.director.onEvent(MascotEvent.RunFinished(ok = true))
         assertTrue(rig.runtime.reactions.isEmpty(), "no reaction animation under reduced motion: ${rig.runtime.reactions}")

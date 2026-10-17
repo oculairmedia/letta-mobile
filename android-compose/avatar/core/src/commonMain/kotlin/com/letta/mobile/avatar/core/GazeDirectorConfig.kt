@@ -32,4 +32,11 @@ class GazeDirectorConfig {
     var headYScale: Float = 0.7f
     var eyeHeadCompensation: Float = 0.6f
     var maxDeltaSeconds: Float = 0.1f
+    // Reaction cues (te3n1.2): how long a cued look holds.
+    /** [GazeCue.APPROVAL_ASK]: the snap to the card. */
+    var cueApprovalSeconds: ClosedFloatingPointRange<Float> = 2.5f..4f
+    /** [GazeCue.SENT]: the glance at the newest message ... */
+    var cueGlanceSeconds: ClosedFloatingPointRange<Float> = 0.6f..0.9f
+    /** ... and the look back at you that follows it. */
+    var cueReturnSeconds: ClosedFloatingPointRange<Float> = 1.5f..3f
 }
