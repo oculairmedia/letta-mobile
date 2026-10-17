@@ -53,7 +53,11 @@ enum class MascotTouch {
 
     companion object {
         /** Answers where the place it stands takes any input at all: a click, the edit pencil, a drag. */
-        fun answering(vararg handlers: Any?): MascotTouch = if (handlers.any { it != null }) ANSWERS else PASSES_THROUGH
+        fun answering(
+            onClick: (() -> Unit)?,
+            onEdit: (() -> Unit)? = null,
+            onDrag: ((dxDp: Float, dyDp: Float) -> Unit)? = null,
+        ): MascotTouch = if (listOfNotNull(onClick, onEdit, onDrag).isEmpty()) PASSES_THROUGH else ANSWERS
     }
 }
 
