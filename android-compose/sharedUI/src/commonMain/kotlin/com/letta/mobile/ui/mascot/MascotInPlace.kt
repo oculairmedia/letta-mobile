@@ -25,10 +25,10 @@ internal fun MascotInPlace(
     live: Boolean,
     onClick: (() -> Unit)? = null,
     /** Live, the character answers gestures (see [MascotLive]); a still only clicks. */
-    interactive: Boolean = onClick != null,
+    touch: MascotTouch = MascotTouch.answering(onClick),
 ) {
     if (live) {
-        MascotLive(agentId, identity, size = size, onClick = onClick, interactive = interactive)
+        MascotLive(agentId, identity, size = size, onClick = onClick, touch = touch)
         return
     }
     Box(Modifier.requiredSize(size), contentAlignment = Alignment.Center) {

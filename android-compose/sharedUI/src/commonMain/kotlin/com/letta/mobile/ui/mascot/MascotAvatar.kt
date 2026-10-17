@@ -148,7 +148,7 @@ fun MascotLive(
      * by default wherever it is a control; a seat that takes input without a click (a hero with an
      * edit pencil) turns it on too, and one that must leave every touch to what is under it, off.
      */
-    interactive: Boolean = onClick != null,
+    touch: MascotTouch = MascotTouch.answering(onClick),
 ) {
     val host = LocalMascotHost.current
     val registry = LocalMascotRegistry.current
@@ -209,7 +209,7 @@ fun MascotLive(
         contentAlignment = Alignment.Center,
     ) {
         host.Surface(entry, Modifier.matchParentSize(), playing = moving)
-        if (interactive) MascotGestureArea(size, gestures)
+        if (touch == MascotTouch.ANSWERS) MascotGestureArea(size, gestures)
     }
 }
 

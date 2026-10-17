@@ -95,7 +95,13 @@ internal data class MascotSeatInfo(
     val onEdit: (() -> Unit)? get() = handlers.onEdit
 
     /** The seat answers anything at all - a click, the pencil, a drag - so its character may be touched. */
-    val takesInput: Boolean get() = handlers.onClick != null || handlers.editable || handlers.draggable
+    // The edit and drag flags are snapshot state: a seat that gains a pencil or a drag later re-installs the input.
+    val touch: MascotTouch
+        get() = MascotTouch.answering(
+            handlers.onClick,
+            handlers.onEdit.takeIf { handlers.editable },
+            handlers.onDrag.takeIf { handlers.draggable },
+        )
 
     /** The box the character is drawn in, before the seat's own scale. */
     val drawWidth: Float get() = seatDrawWidth()
@@ -375,7 +381,7 @@ private fun TransportedMascot(
             sceneKey = sceneKey,
             // A seat that takes input at all lets the character be poked and petted; one that
             // takes none (over the Touch chat head) leaves every touch to what is under it.
-            interactive = seat.takesInput,
+            touch = seat.touch,
         )
         // The pencil, in front of the character (the layer draws above every seat), on hover only:
         // one way to edit the agent from any mascot, so no seat needs to travel to the editor.

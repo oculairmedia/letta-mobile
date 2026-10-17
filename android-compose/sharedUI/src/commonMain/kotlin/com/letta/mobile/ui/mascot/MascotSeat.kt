@@ -213,7 +213,7 @@ fun MascotSeat(
                 live = live,
                 onClick = onClick,
                 // A seat that takes input at all lets the character be poked and petted (te3n1.4).
-                interactive = onClick != null || onEdit != null,
+                touch = MascotTouch.answering(onClick, onEdit),
             )
             SeatPresence.Here -> Unit
             SeatPresence.Arriving, SeatPresence.Elsewhere -> empty(MascotSeatVacancy.SEATED_ELSEWHERE)

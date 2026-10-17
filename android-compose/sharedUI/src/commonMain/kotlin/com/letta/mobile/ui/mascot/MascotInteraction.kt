@@ -43,6 +43,21 @@ import kotlinx.coroutines.launch
  */
 
 /**
+ * Whether a live mascot answers touch and pointer - hover, poke, pet, double-click tricks
+ * (te3n1.4) - or leaves every touch to what is under it (over the Touch chat head).
+ */
+enum class MascotTouch {
+    ANSWERS,
+    PASSES_THROUGH,
+    ;
+
+    companion object {
+        /** Answers where the place it stands takes any input at all: a click, the edit pencil, a drag. */
+        fun answering(vararg handlers: Any?): MascotTouch = if (handlers.any { it != null }) ANSWERS else PASSES_THROUGH
+    }
+}
+
+/**
  * What a classified gesture does around one live mascot: the director's event, the seat's click,
  * a haptic, and a nudge to the rest rule so a mascot at rest wakes to play its reaction. Updated
  * in place from composition (like [SeatHandlers]); only [touches] and [petting] are state.

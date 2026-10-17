@@ -105,7 +105,13 @@ class MascotInteractionUiTest {
         reducedMotion: Boolean = false,
         clickable: Boolean = true,
         content: @Composable (Stage) -> Unit = { stage ->
-            MascotLive(AGENT, IDENTITY, size = SIZE.dp, onClick = if (clickable) ({ stage.clicks++ }) else null, interactive = true)
+            MascotLive(
+                AGENT,
+                IDENTITY,
+                size = SIZE.dp,
+                onClick = if (clickable) ({ stage.clicks++ }) else null,
+                touch = MascotTouch.ANSWERS,
+            )
         },
     ): Stage {
         val registry = MascotIdentityRegistry().also { it.update(mapOf(AGENT to IDENTITY)) }
