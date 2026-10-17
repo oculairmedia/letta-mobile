@@ -176,7 +176,11 @@
       "Bash(cp /opt/stacks/letta-mobile/android-compose/local.properties /tmp/a2ui-handshake/android-compose/local.properties)",
       "Read(//tmp/a2ui-handshake/android-compose/**)",
       "Bash(perl -i -pe 's/\\\\bhuly-vibe-sync-\\([a-z0-9]{2,}\\)\\\\b/vibesync-$1/g' .beads/interactions.jsonl)",
-      "Bash(export JAVA_HOME=/usr/lib/jvm/jdk-26)"
+      "Bash(export JAVA_HOME=/usr/lib/jvm/jdk-26)",
+      "Bash(F=\"/c/Users/Emmanuel/AppData/Local/Programs/letta-code/resources/app.asar\"; LC_ALL=C grep -a -o -E '.{0,500}isolated_block_ids.{0,500}' \"$F\" | grep -a -E 'model' | sort -u | head -c 8000)",
+      "Bash(LC_ALL=C grep -a -o -E '.{0,400}conversation\\\\.json.{0,400}' /c/Users/Emmanuel/AppData/Local/Programs/letta-code/resources/app.asar)",
+      "Bash(LC_ALL=C grep -a -o -E '.{0,200}\\(function normalizeConversationRecord|normalizeConversationRecord =|function toConversation\\\\\\(|function conversationResponse|publicConversation\\).{0,1500}' /c/Users/Emmanuel/AppData/Local/Programs/letta-code/resources/app.asar)",
+      "Bash(dd if=/c/Users/Emmanuel/AppData/Local/Programs/letta-code/resources/app.asar bs=1 skip=15550500 count=4500)"
     ]
   }
 }

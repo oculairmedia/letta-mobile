@@ -4,6 +4,7 @@
 // scripts/ci/platform-ui-gate.sh (PUI001-PUI004, the authoritative new-platform-UI-file check).
 // Run locally:  danger-kotlin pr https://github.com/oculairmedia/letta-mobile/pull/<n>
 import systems.danger.kotlin.*
+import systems.danger.kotlin.models.git.GitCommit
 import java.io.File
 
 val LARGE_PR_LINES = 1500
@@ -52,11 +53,11 @@ danger(args) {
 
     checkReuseChecklist(ctx)
     checkPlatformUiReason(ctx)
-    checkBeadReference(ctx, git.commits.map { it.message ?: "" })
+    checkBeadReference(ctx, git.commits.map { it.message })
     checkNoBom(ctx)
     checkCoAuthoredBy(git.commits)
     checkRatchets(ctx)
-    checkSize(github.pullRequest.additions + github.pullRequest.deletions)
+    checkSize((github.pullRequest.additions ?: 0) + (github.pullRequest.deletions ?: 0))
     checkTestsAccompanySource(ctx)
     checkPlanningDocs(ctx)
 }
@@ -99,7 +100,7 @@ fun checkNoBom(ctx: Ctx) {
 
 fun checkCoAuthoredBy(commits: List<GitCommit>) {
     val missing = commits.filter { c ->
-        val msg = c.message ?: ""
+        val msg = c.message
         !msg.startsWith("Merge ") &&
             msg.lineSequence().none { it.trim().startsWith("Co-Authored-By:", ignoreCase = true) }
     }
