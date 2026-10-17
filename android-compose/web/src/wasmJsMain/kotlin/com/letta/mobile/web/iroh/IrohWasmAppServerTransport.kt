@@ -2,6 +2,7 @@ package com.letta.mobile.web.iroh
 
 import com.letta.mobile.data.canvas.CanvasRelayLink
 import com.letta.mobile.data.model.HostId
+import com.letta.mobile.data.model.IrohServerAddress
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
@@ -60,7 +61,7 @@ internal class IrohWasmAppServerTransport private constructor(
 
     override suspend fun sendControl(command: AppServerCommand) {
         check(connected.value) { "Iroh App Server transport is disconnected" }
-        bridge.sendControl(AppServerProtocol.encodeCommand(command))
+        bridge.sendControl(IrohWireFrame(AppServerProtocol.encodeCommand(command)))
     }
 
     /** A canvas relay stream to [hostId], this transport's host, from the same endpoint (letta-mobile-ckmub.17.9). */
@@ -82,7 +83,7 @@ internal class IrohWasmAppServerTransport private constructor(
 
     private suspend fun pump(
         channel: AppServerChannel,
-        poll: () -> String?,
+        poll: () -> IrohWireFrame?,
         destination: MutableSharedFlow<AppServerReceivedFrame>,
     ) {
         var pollIntervalMs = MIN_POLL_INTERVAL_MS
@@ -90,17 +91,17 @@ internal class IrohWasmAppServerTransport private constructor(
             while (currentCoroutineContext().isActive && connected.value) {
                 val raw = poll()
                 if (raw != null) {
-                    destination.emit(AppServerProtocol.decodeFrame(raw, channel))
+                    destination.emit(AppServerProtocol.decodeFrame(raw.text, channel))
                     pollIntervalMs = MIN_POLL_INTERVAL_MS
                     continue
                 }
                 when (bridge.state()) {
-                    "connected" -> {
+                    IrohStreamState.CONNECTED -> {
                         delay(pollIntervalMs.milliseconds)
                         pollIntervalMs = (pollIntervalMs * 2).coerceAtMost(MAX_POLL_INTERVAL_MS)
                     }
-                    "error" -> error(bridge.error() ?: "Iroh App Server stream failed")
-                    else -> return
+                    IrohStreamState.ERROR -> error(bridge.error() ?: "Iroh App Server stream failed")
+                    IrohStreamState.ENDED -> return
                 }
             }
         } catch (cancelled: CancellationException) {
@@ -117,7 +118,7 @@ internal class IrohWasmAppServerTransport private constructor(
         private const val MIN_POLL_INTERVAL_MS = 10L
         private const val MAX_POLL_INTERVAL_MS = 100L
 
-        suspend fun connect(ticket: String, scope: CoroutineScope): IrohWasmAppServerTransport =
-            IrohWasmAppServerTransport(IrohWasmBridge.connect(ticket), scope)
+        suspend fun connect(address: IrohServerAddress, scope: CoroutineScope): IrohWasmAppServerTransport =
+            IrohWasmAppServerTransport(IrohWasmBridge.connect(address), scope)
     }
 }
