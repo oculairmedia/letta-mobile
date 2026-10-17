@@ -1,6 +1,10 @@
 package com.letta.mobile.runtime.local
 
+import android.util.Log
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.runtime.OnDeviceModelFollowPolicy
+import com.letta.mobile.data.runtime.OnDeviceModelFollower
+import com.letta.mobile.data.runtime.OnDeviceServedModel
 import com.letta.mobile.data.runtime.host.LocalAppServerHost
 import com.letta.mobile.data.session.LocalRuntimeDialer
 import com.letta.mobile.data.session.ProcessScope
@@ -9,9 +13,11 @@ import com.letta.mobile.data.transport.appserver.AppServerWebSocketDial
 import com.letta.mobile.data.transport.iroh.DirectAppServerDial
 import com.letta.mobile.data.transport.iroh.IrohConnectConfig
 import com.letta.mobile.data.transport.iroh.openDirectAppServerDial
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * letta-mobile-by4vm.110.6: how the session's App Server channel reaches the on-device runtime. Each
@@ -31,10 +37,11 @@ class AndroidLocalRuntimeDialer @Inject constructor(
         // Once node's one launch is over the host refuses without launching (a terminal failure:
         // the channel supervisor stops redialling, letta-mobile-by4vm.121.11).
         val lease = host.acquire()
-        val backendDir = runCatching { launchSource.prepareModel(settingsRepository.activeConfig.value) }
+        val config = settingsRepository.activeConfig.value
+        val backendDir = runCatching { launchSource.prepareModel(config) }
             .onFailure { lease.close() }
             .getOrThrow()
-        return openDirectAppServerDial(
+        val dial = openDirectAppServerDial(
             target = AppServerWebSocketDial(
                 serverUrl = lease.serverUrl,
                 bearerToken = lease.bearerToken,
@@ -45,9 +52,30 @@ class AndroidLocalRuntimeDialer @Inject constructor(
             localBackendDir = backendDir.absolutePath,
             release = lease::close,
         )
+        config?.let(EmbeddedLettaCodeModelSelection::from)?.let { followDeviceModel(dial, it) }
+        return dial
+    }
+
+    /**
+     * letta-mobile-by4vm.121.18: each dial is when the runtime starts serving a device model (first
+     * start, and a Settings model change), so existing on-device agents and conversation overrides
+     * move to it here (shared [OnDeviceModelFollower] policy). Best effort, off the dial's path.
+     */
+    private fun followDeviceModel(dial: DirectAppServerDial, selection: EmbeddedLettaCodeModelSelection) {
+        val served = OnDeviceServedModel(selection.lettaCodeModelHandle, selection.maxTokens)
+        if (!selection.requiresOnDeviceModel || !OnDeviceModelFollowPolicy.isOnDeviceHandle(served.handle)) return
+        scope.launch {
+            runCatching { OnDeviceModelFollower(dial.client) { "follow-$it-${UUID.randomUUID()}" }.follow(served) }
+                .onSuccess { plan ->
+                    Log.i(TAG, "device model follow: served=$served agents=${plan.agents.size} conversations=${plan.conversations.size}")
+                }
+                .onFailure { error -> Log.w(TAG, "device model follow failed: served=$served", error) }
+        }
     }
 
     private companion object {
+        const val TAG = "LocalAppServer"
+
         /** agent_create runs memfs git on the phone: ~30–40 s on a Pixel 9 Pro. */
         const val LOCAL_REQUEST_TIMEOUT_MS = 90_000L
     }
