@@ -21,17 +21,21 @@ use wasm_streams::ReadableStream;
 
 use crate::frame::{FrameDecoder, encode_frame, encode_frame_parts};
 use crate::negotiation::auth_allows_frame_parts;
+use crate::relay::IrohCanvasRelayStream;
 
 const APP_SERVER_ALPN: &[u8] = b"/letta/appserver/0";
 const READ_CHUNK_BYTES: usize = 64 * 1024;
-const EVENT_QUEUE_CAPACITY: usize = 128;
+pub(crate) const EVENT_QUEUE_CAPACITY: usize = 128;
 
-type FrameEvent = Result<String, String>;
-type EventReceiver = Receiver<FrameEvent>;
+pub(crate) type FrameEvent = Result<String, String>;
+pub(crate) type EventReceiver = Receiver<FrameEvent>;
 
 #[wasm_bindgen]
 pub struct IrohAppServerSession {
     endpoint: Endpoint,
+    /// The host this session dialled: side protocols (the canvas relay) dial it again from
+    /// [endpoint], so the host admits them for this session's authenticated identity.
+    host: EndpointId,
     connection: Connection,
     control_send: Arc<Mutex<SendStream>>,
     /// Set by the control reader from the server's `auth_response`.
@@ -74,13 +78,15 @@ impl IrohAppServerSession {
             spawn_reader(
                 control_recv,
                 control_tx,
+                FrameDecoder::new(),
                 Some(Arc::clone(&frame_parts_allowed)),
             ),
-            spawn_reader(stream_recv, stream_tx, None),
+            spawn_reader(stream_recv, stream_tx, FrameDecoder::new(), None),
         ];
 
         Ok(Self {
             endpoint,
+            host: endpoint_id,
             connection,
             control_send: Arc::new(Mutex::new(control_send)),
             frame_parts_allowed,
@@ -117,6 +123,12 @@ impl IrohAppServerSession {
         take_events(&mut self.stream_events, "stream")
     }
 
+    /// letta-mobile-ckmub.17.9: one canvas relay stream to this session's host, dialled from the
+    /// same endpoint on the relay's own ALPN (the host demultiplexes by ALPN).
+    pub async fn open_canvas_relay(&self) -> Result<IrohCanvasRelayStream, JsError> {
+        IrohCanvasRelayStream::open(&self.endpoint, self.host).await
+    }
+
     pub async fn close(&mut self) {
         self.reader_tasks.clear();
         self.connection.close(0u8.into(), b"browser client closed");
@@ -135,12 +147,18 @@ fn parse_endpoint_id(ticket_or_url: &str) -> Result<EndpointId, JsError> {
 }
 
 /// [frame_parts_allowed] is given for the control stream only, where the `auth_response` arrives.
-fn spawn_reader(
+pub(crate) fn spawn_reader(
     recv: RecvStream,
     sender: Sender<FrameEvent>,
+    decoder: FrameDecoder,
     frame_parts_allowed: Option<Arc<AtomicBool>>,
 ) -> AbortOnDropHandle<()> {
-    AbortOnDropHandle::new(task::spawn(read_frames(recv, sender, frame_parts_allowed)))
+    AbortOnDropHandle::new(task::spawn(read_frames(
+        recv,
+        sender,
+        decoder,
+        frame_parts_allowed,
+    )))
 }
 
 /// Records what a successful `auth_response` says about `frame_part`; other frames change nothing.
@@ -153,10 +171,10 @@ fn note_auth_response(frame_parts_allowed: &AtomicBool, frame: &str) {
 async fn read_frames(
     mut recv: RecvStream,
     sender: Sender<FrameEvent>,
+    mut decoder: FrameDecoder,
     frame_parts_allowed: Option<Arc<AtomicBool>>,
 ) {
     let result = async {
-        let mut decoder = FrameDecoder::new();
         while let Some(chunk) = recv
             .read_chunk(READ_CHUNK_BYTES)
             .await
@@ -182,7 +200,7 @@ async fn read_frames(
     }
 }
 
-fn take_events(
+pub(crate) fn take_events(
     receiver: &mut Option<EventReceiver>,
     channel: &str,
 ) -> Result<web_sys::ReadableStream, JsError> {
@@ -196,7 +214,7 @@ fn take_events(
     Ok(ReadableStream::from_stream(stream).into_raw())
 }
 
-fn js_error(context: &str, error: impl std::fmt::Display) -> JsError {
+pub(crate) fn js_error(context: &str, error: impl std::fmt::Display) -> JsError {
     JsError::new(&format!("{context}: {error}"))
 }
 

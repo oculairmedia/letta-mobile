@@ -48,7 +48,8 @@ class MascotDirector(
         /** [AvatarReaction.DIZZY]: this many pokes inside [dizzyWindowSeconds]. */
         val dizzyPokes: Int = 5,
         val dizzyWindowSeconds: Float = 2f,
-        val dizzyCooldownSeconds: Float = 2f,
+        /** Measured on ticked time like every cooldown; a mascot at rest does not count it down. */
+        val dizzyCooldownSeconds: Float = 10f,
         /** Typing at this many keystrokes per second is full attention. */
         val listenFullCadence: Float = 8f,
         /** A composing user who pauses still has some attention. */
@@ -110,6 +111,13 @@ class MascotDirector(
     init {
         avatar.addStateListener { exit, enter -> onTransition(exit, enter) }
     }
+
+    /**
+     * Hears every reaction the director fires, after cooldowns and suppression (letta-mobile-te3n1.4):
+     * the host's hook for what it adds around the asset - a squash on the seat's body - so the body
+     * answers exactly the reactions the asset plays. Null tells no one.
+     */
+    var reactionListener: MascotReactionListener? = null
 
     /** Observe sustained-state transitions (the host's renderer write is one of these). */
     fun addStateListener(listener: AvatarStateListener) = avatar.addStateListener(listener)
@@ -299,10 +307,16 @@ class MascotDirector(
         lastFired[reaction.ordinal] = clock
         pending.add(reaction)
         if (signals.reduceMotion && !runtime.honorsReducedMotion) blink() else runtime.react(reaction, arg)
+        reactionListener?.onReaction(reaction, arg)
     }
 
     private companion object {
         val BLINK = AvatarGesture("blink")
         const val LEVEL_EPSILON = 0.01f
     }
+}
+
+/** Hears the reactions a [MascotDirector] fires; see [MascotDirector.reactionListener]. */
+fun interface MascotReactionListener {
+    fun onReaction(reaction: AvatarReaction, arg: ReactionArg)
 }

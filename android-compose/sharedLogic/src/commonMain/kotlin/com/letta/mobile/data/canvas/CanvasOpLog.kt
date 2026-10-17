@@ -36,6 +36,13 @@ interface CanvasOpLog : OpLog<CanvasId, CanvasOp> {
 
     /** Records that the stored document of [canvasId] now holds [opIds]. Idempotent. */
     suspend fun settle(canvasId: CanvasId, opIds: Collection<CanvasOpId>) = Unit
+
+    /**
+     * Whether this log has let go of settled history of [canvasId] (a bounded log past its budget):
+     * its ops then no longer rebuild the stored board from nothing, only the board itself does
+     * ([CanvasSnapshotSeed]). A log that keeps everything never has.
+     */
+    suspend fun hasDroppedHistory(canvasId: CanvasId): Boolean = false
 }
 
 /**

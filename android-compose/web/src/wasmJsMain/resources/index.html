@@ -74,6 +74,7 @@
                 control: [],
                 stream: [],
                 drains: [],
+                relays: new Set(),
             };
             sessions.set(id, session);
             session.drains = [
@@ -97,9 +98,52 @@
             if (!session) return;
             session.state = 'closed';
             sessions.delete(id);
+            await Promise.allSettled([...session.relays].map((relayId) => window.irohRelayClose(relayId)));
             await session.native.close();
             await Promise.allSettled(session.drains);
             session.native.free();
+        };
+
+        // letta-mobile-ckmub.17.9: canvas relay streams, dialled from a session's own endpoint
+        // (one endpoint, one more ALPN). Frames are the shared canvas relay protocol's text.
+        const relays = new Map();
+        const maxQueuedRelayFrames = 16384;
+        let nextRelayId = 1;
+
+        window.irohOpenCanvasRelay = async (sessionId) => {
+            const session = sessions.get(sessionId);
+            if (!session || session.state !== 'connected') throw new Error('Iroh session is not connected');
+            const native = await session.native.open_canvas_relay();
+            const id = nextRelayId++;
+            const relay = { native, sessionId, state: 'connected', error: null, frames: [], drains: [] };
+            relays.set(id, relay);
+            session.relays.add(id);
+            relay.drains = [drain(relay, native.take_events(), relay.frames, maxQueuedRelayFrames)];
+            return id;
+        };
+        window.irohRelaySend = (id, payload) => {
+            const relay = relays.get(id);
+            if (!relay || relay.state !== 'connected') throw new Error('Canvas relay stream is not connected');
+            return relay.native.send(payload);
+        };
+        window.irohRelayPoll = (id) => relays.get(id)?.frames.shift() ?? null;
+        window.irohRelayState = (id) => relays.get(id)?.state ?? 'closed';
+        window.irohRelayError = (id) => relays.get(id)?.error ?? null;
+        window.irohRelayClose = async (id) => {
+            const relay = relays.get(id);
+            if (!relay) return;
+            relay.state = 'closed';
+            relays.delete(id);
+            sessions.get(relay.sessionId)?.relays.delete(id);
+            // A send still in flight borrows the stream; its session's endpoint close ends it then.
+            try {
+                relay.native.close();
+            } catch (error) {
+                console.warn('Canvas relay close deferred to its session', error);
+                return;
+            }
+            await Promise.allSettled(relay.drains);
+            relay.native.free();
         };
     </script>
     <script>

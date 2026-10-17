@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.BackendConnectionStatus
+import com.letta.mobile.data.model.isIrohBackendUrl
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
@@ -80,6 +81,8 @@ fun LettaWebApp() {
     LaunchedEffect(config.serverUrl, config.accessToken, config.mode, backend.rosterRequest.intValue) {
         backend.loadRoster(gateway, workspace)
     }
+    // letta-mobile-ckmub.17.9: boards sync through the live session's host, as on desktop.
+    LaunchedEffect(config.serverUrl) { storage.followCanvasHost(gateway.canvasRelay, isIrohBackendUrl(config.serverUrl)) }
     // The URL fragment follows the workspace's route, and back/forward follow the URL.
     val browserRoute = remember(workspace) { BrowserRouteBinding(workspace) }
     DisposableEffect(browserRoute) { onDispose(browserRoute.start()) }

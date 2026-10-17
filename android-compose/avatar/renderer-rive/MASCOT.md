@@ -246,8 +246,19 @@ Total to "mascot everywhere on both platforms": ~11-14 working days after P0.
 
 - One `.riv`, one artboard, one state machine, view-model driven. Identity = shape + colour,
   written once on load; state never persists.
-- Interaction logic (hover, drag, blink, wander, entries, saccades) lives in the file; the host
-  writes contract properties only. Attention/gaze policy lives in `avatar/core`, not the file.
+- Gestures are the host's, animation is the file's (amended 2026-10-16, epic letta-mobile-te3n1,
+  option A; supersedes "interaction logic lives in the file"). The HOST interprets every gesture
+  and every motion: it hit-tests the body, classifies hover / tap (poke) / double tap (trick, cycling
+  `trickId` 0..3) / long press or slow stroke (pet) / drag, measures pointer velocity and seat
+  travel, and writes contract inputs and triggers (`hovered`, `dragged`, `petting`, `moveX`/`moveY`,
+  `poke`, `dizzy`, `trickId` + `trick`, `impact` + `land`). The classifier is shared pure code
+  (`avatar/core` `MascotGestureClassifier`, fed by sharedUI's `Modifier.mascotGestures` on the
+  mascot's hit area), so Android, desktop and web read gestures identically; the `MascotDirector`
+  owns reaction policy (cooldowns, dizzy at 5 pokes in 2 s, wake-before-react, reduced motion). The
+  FILE owns every animation curve and pose. Its own pointer listeners (HoverIn/HoverOut/DragStart/
+  DragEnd) remain only as a desktop fallback; the host is the writer of `hovered`/`dragged`, and
+  Android keeps the rig's pointer input `PassThrough`. Blink cadence, idle beats, wander and
+  saccades stay in the file. Attention/gaze policy lives in `avatar/core`, not the file.
 - Write identity and state before the first frame (no startup flash); `contain` fit.
 - Desktop rendering is the native bridge (feathering needs the Rive Renderer); Android is
   rive-android (same renderer). No webview.
