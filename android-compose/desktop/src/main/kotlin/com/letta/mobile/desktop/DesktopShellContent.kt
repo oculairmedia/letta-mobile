@@ -174,11 +174,10 @@ private fun DesktopShellBackgroundTasks(context: DesktopShellContext, frame: Des
     val navigator = context.navigator
     if (!navigator.showBackgroundTasks || context.panels.subagents.repository == null) return
     // The roster opens in the window's inspector (docked beside the main pane when wide).
-    val openInDualView = frame.subagentViews?.holder?.rosterOpener(navigator::showChat)
     BackgroundTasksSidePane(
         subagents = frame.lists.activeSubagents,
         onClose = { navigator.showBackgroundTasks = false },
-        onOpenConversation = openInDualView,
+        onOpenConversation = frame.subagentViews?.holder?.rosterOpener(navigator::showChat),
     )
 }
 

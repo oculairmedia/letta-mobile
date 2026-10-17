@@ -352,15 +352,8 @@ internal fun rememberSubagentRegistry(request: SubagentRegistryRequest): Desktop
 }
 
 /** Resolve parent scope only when both conversation coordinates are present. */
-internal fun subagentParentScope(
-    parentAgentId: String?,
-    parentConversationId: String?,
-): SubagentParentScope? =
-    parentAgentId?.let { agentId ->
-        parentConversationId?.let { conversationId ->
-            SubagentParentScope(agentId, conversationId)
-        }
-    }
+internal fun subagentParentScope(parentAgentId: String?, parentConversationId: String?): SubagentParentScope? =
+    if (parentAgentId != null && parentConversationId != null) SubagentParentScope(parentAgentId, parentConversationId) else null
 
 private suspend fun collectScopedActiveSubagents(
     repository: SubagentRepository?,
