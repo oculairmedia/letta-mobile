@@ -60,7 +60,7 @@ import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
 import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
 import com.letta.mobile.ui.chat.subagents.SubagentDualViewFrame
-import com.letta.mobile.ui.chat.subagents.SubagentDualViewOptions
+import com.letta.mobile.ui.chat.subagents.rememberSubagentDualView
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.haptics.LocalHaptics
@@ -146,14 +146,12 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     val surfacePort = rememberClientCommandPort(port, params.viewModel, LocalAndroidClientCommands.current)
     // letta-mobile-bglj6.1.19: the shared page reads the OS "Remove animations" setting through
     // sharedUI's LocalReducedMotion, the same preference the legacy chat honours.
-    // letta-mobile-zxk2n.8: a subagent's conversation opens in place of this one, read-only, and Back returns here.
-    val dualView = rememberSharedChatDualView(params)
-    val navigation = rememberDualViewNavigation(params, dualView)
+    val dualView = rememberSubagentDualView(params.viewModel.conversationId, params.subagents.source.viewSessions, params.fullSubagentView())
     val platform = rememberAndroidChatSurfacePlatform(
         pageBackground = params.pageBackground,
         onComposerHeightChange = params.onComposerHeightChange,
         // The rings show on the canvas too: subagent activity stays in sight in canvas mode.
-        subagentRings = { SharedChatSubagentRings(subagentSheet, currentSubagents, navigation) },
+        subagentRings = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.dualNavigation(dualView)) },
         topChromeInset = params.topChromeInset,
     )
     // letta-mobile-bglj6.1.16: the shared rows render markdown through the designsystem
@@ -164,8 +162,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     // HapticPolicy to the designsystem Android realization, gated by the haptics setting.
     SharedChatPageLocals(hapticsEnabled = params.hapticsEnabled) {
         SharedChatWorkspaceFilesBox(workspaceFiles, port, target.agentId, modifier) {
-            val dualViewOptions = SubagentDualViewOptions(appearance = appearance, host = host, topInset = params.topChromeInset)
-            SubagentDualViewFrame(dualView, Modifier.fillMaxSize(), dualViewOptions) { parentModifier ->
+            SubagentDualViewFrame(dualView, Modifier.fillMaxSize(), params.dualViewOptions(appearance, host)) { parentModifier ->
                 ChatSurface(
                     port = surfacePort,
                     presentation = presentation,
@@ -185,7 +182,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
                 state = subagentSheet,
                 inputs = params.subagents,
                 currentConversationId = target.conversationId,
-                navigation = navigation,
+                navigation = params.dualNavigation(dualView),
             )
             SharedChatSubagentBanner(subagentSheet)
             ChatScreenVoiceOverlay(modifier = Modifier.fillMaxSize())

@@ -45,6 +45,7 @@ import com.letta.mobile.sharedui.resources.subagent_view_tab_dream
 import com.letta.mobile.sharedui.resources.subagent_view_tab_subagent
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.SubagentViewSessions
+import com.letta.mobile.ui.chat.surface.CanvasBubbleBackHandler
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.components.tabs.LettaTab
 import com.letta.mobile.ui.components.tabs.LettaTabStrip
@@ -141,6 +142,8 @@ fun SubagentDualViewFrame(
     val state = binding?.holder?.state ?: SubagentDualViewState.Closed
     BoxWithConstraints(modifier.testTag(SubagentDualViewTags.FRAME)) {
         val layout = DualViewLayout.of(state, wide = maxWidth >= LettaDimens.Pane.dualViewBreakpoint)
+        // Compact: the system Back returns from the subagent to its parent (Android; a no-op elsewhere).
+        CanvasBubbleBackHandler(enabled = layout.stripOnTop && state.showsSubagent) { binding?.holder?.showParent() }
         Column(Modifier.fillMaxSize()) {
             if (binding != null && layout.stripOnTop) {
                 SubagentViewStrip(binding, layout, Modifier.padding(top = options.topInset))

@@ -201,6 +201,12 @@ internal class AdminChatViewModel @Inject constructor(
             scope = viewModelScope,
             parentAgentId = agentId.value,
             parentConversationId = parentConversationId,
+            // letta-mobile-zxk2n.8: the dual view reads a child's conversation over the same canonical transport.
+            viewSessions = timelineTransport?.let { transport ->
+                com.letta.mobile.ui.chat.session.TimelineSubagentViewSessions { view ->
+                    com.letta.mobile.ui.chat.session.SubagentTimelineRoute(transport, view.conversationId)
+                }
+            },
         )
     }
 

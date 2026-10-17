@@ -1,6 +1,9 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.ui.chat.session.SubagentViewSessions
+import com.letta.mobile.ui.chat.session.TimelineSubagentViewSessions
 import com.letta.mobile.ui.chat.subagents.SubagentDualViewBinding
 import com.letta.mobile.ui.chat.subagents.SubagentTodoLoader
 import com.letta.mobile.ui.chat.subagents.conversationOpener
@@ -20,3 +23,14 @@ internal data class DesktopChatSubagents(
     val onViewConversation: ((String, String) -> Unit)?
         get() = views?.holder?.conversationOpener { entries }
 }
+
+/**
+ * letta-mobile-ulcg6.1: where the dual view reads a subagent's conversation - over [controller]'s
+ * active gateway, routed the way a selected conversation is.
+ */
+internal fun desktopSubagentViewSessions(controller: DesktopChatController): SubagentViewSessions =
+    TimelineSubagentViewSessions { view -> controller.activeGateway?.let { desktopSubagentTimelineRoute(it, view) } }
+
+/** The conversation whose subagents the dual view opens: the selected one. */
+internal val DesktopChatSurfaceState.subagentParent: ConversationId?
+    get() = selectedConversationId?.let(::ConversationId)

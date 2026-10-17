@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.subagent
 
+import com.letta.mobile.ui.chat.session.SubagentViewSessions
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.repository.api.ISubagentRepository
@@ -57,6 +58,7 @@ class WsActiveSubagentSource(
     scope: CoroutineScope,
     private val parentAgentId: String,
     private val parentConversationId: StateFlow<String?>,
+    override val viewSessions: SubagentViewSessions? = null,
 ) : ActiveSubagentSource {
 
     override suspend fun todos(toolCallId: String): Result<List<SubagentTodo>> = repository.todos(toolCallId)
