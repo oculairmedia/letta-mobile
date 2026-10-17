@@ -30,22 +30,6 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 
-/**
- * A live onion skin over the surface: the last [frames] rendered frames, sampled every [stride]th
- * frame, drawn under the live one. The ramp is the one `rive/mascot/onion.py` uses so the bench and
- * the CLI tool read the same - alpha [minAlpha]..[maxAlpha] oldest to newest, and with [tint] a
- * cool-to-warm paper tint that fades out as the frames approach now.
- *
- * Passing null (the default, and what every production call site does) allocates no ring at all.
- */
-data class RiveOnionSkin(
-    val frames: Int = 8,
-    val stride: Int = 3,
-    val tint: Boolean = true,
-    val minAlpha: Float = 0.15f,
-    val maxAlpha: Float = 0.6f,
-)
-
 /** onion.py's `COOL` and `WARM`: the oldest frame's paper is blue, the newest is nearly untinted. */
 private val ONION_COOL = Color(0.353f, 0.588f, 1f)
 private val ONION_WARM = Color(1f, 0.588f, 0.235f)

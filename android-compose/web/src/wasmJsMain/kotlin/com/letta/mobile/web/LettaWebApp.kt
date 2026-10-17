@@ -29,7 +29,6 @@ import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.ui.host.LettaHost
-import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.ui.host.ProvideLettaHost
 import com.letta.mobile.ui.mascot.frame.ProvideFrameMascots
 import com.letta.mobile.ui.mascot.rememberMascotRegistry
@@ -98,7 +97,7 @@ fun LettaWebApp() {
     val shell = WebShell(navigator, backend)
     SharedMaterialTheme {
         ProvideLettaHost(LettaHost.Pointer) {
-            val mascots = rememberMascotRegistry(remember(shell.agents) { shell.agents.map { AgentId(it.id) } })
+            val mascots = rememberMascotRegistry(backend.agents.value)
             ProvideFrameMascots(remember { RiveCanvasRenderer() }, mascots) {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     BoxWithConstraints {

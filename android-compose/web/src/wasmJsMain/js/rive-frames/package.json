@@ -1,0 +1,11 @@
+{
+  "name": "letta-rive-frames",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The web mascot's binding to @rive-app/canvas-advanced: offscreen scenes read back into Skia memory (letta-mobile-ckmub.17.6).",
+  "type": "module",
+  "main": "index.mjs",
+  "dependencies": {
+    "@rive-app/canvas-advanced": "2.43.1"
+  }
+}

@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
-import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Agent
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -81,14 +81,14 @@ class MascotIdentityRegistry {
 }
 
 /**
- * A registry kept current with [agents]' identities, each the generated one
- * ([resolveMascotIdentity] with no chosen identity) - for a shell whose roster carries no agent
- * metadata. A shell that knows the agents' metadata updates its own registry instead.
+ * A registry kept current with [agents]' identities: the one chosen in the agent's metadata, else
+ * the one generated from its id ([resolveMascotIdentity]). A shell that also keeps a device-local
+ * cache of chosen identities updates its own registry instead.
  */
 @Composable
-fun rememberMascotRegistry(agents: List<AgentId>): MascotIdentityRegistry {
+fun rememberMascotRegistry(agents: List<Agent>): MascotIdentityRegistry {
     val registry = remember { MascotIdentityRegistry() }
-    val identities = remember(agents) { agents.associate { it.value to resolveMascotIdentity(it.value, agent = null, localValue = null) } }
+    val identities = remember(agents) { agents.associate { it.id.value to resolveMascotIdentity(it.id.value, it, localValue = null) } }
     SideEffect { registry.update(identities) }
     return registry
 }

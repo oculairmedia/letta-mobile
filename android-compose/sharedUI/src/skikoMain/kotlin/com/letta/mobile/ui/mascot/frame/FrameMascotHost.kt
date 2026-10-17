@@ -88,8 +88,9 @@ class FrameMascotHost(private val renderer: RiveFrameRenderer) : MascotHost {
 
     override val available: Boolean get() = renderer.available
 
-    override fun entry(agentId: String, identity: MascotIdentity): MascotEntry? =
-        if (available) entries.get(agentId, identity)?.takeUnless { it.failed } else null
+    /** [sceneKey] is the scene's key (an agent's id, or a candidate's shape key - see MascotLive). */
+    override fun entry(sceneKey: String, identity: MascotIdentity): MascotEntry? =
+        if (available) entries.get(sceneKey, identity)?.takeUnless { it.failed } else null
 
     @Composable
     override fun Surface(entry: MascotEntry, modifier: Modifier, playing: Boolean) {
