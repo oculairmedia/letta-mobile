@@ -1,11 +1,10 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlayActions
+import com.letta.mobile.data.shell.ShellRoute
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.agents.RecentAgents
@@ -26,7 +25,6 @@ import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.chat.runtime.groupSubagentConversations
 import com.letta.mobile.data.model.SubagentEntry
-import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.desktop.chat.DesktopModelControlHost
 import com.letta.mobile.desktop.data.DesktopDataBindings
 import kotlinx.coroutines.CoroutineScope
@@ -259,15 +257,19 @@ internal fun buildMentionables(params: BuildMentionablesParams): List<Mentionabl
 /**
  * The pages the command palette and the quick-query bar can go to; conversations, message text and
  * agents come from the unified search's own sources (letta-mobile-ckmub.3.9). The lens's sections,
- * then the fleet's admin pages, which no lens section opens (letta-mobile-ckmub.2.6).
+ * then the fleet's admin pages, which no lens section opens (letta-mobile-ckmub.2.6). A row's id is its page's
+ * shell route, which the shared search-hit opener decodes.
  */
 internal fun buildPaletteDestinations(workPlayMode: WorkPlayMode): List<UnifiedSearchDestination> =
     WorkPlayLens.navDestinations(workPlayMode)
         .map { lensDestination ->
             val target = lensNavTarget(workPlayMode, lensDestination)
-            UnifiedSearchDestination(id = target.first.name, label = WorkPlayLens.destinationLabel(workPlayMode, lensDestination))
+            UnifiedSearchDestination(
+                id = ShellRoute.encode(target.first.shellPage),
+                label = WorkPlayLens.destinationLabel(workPlayMode, lensDestination),
+            )
         }
-        .plus(PaletteAdminDestinations.map { UnifiedSearchDestination(id = it.name, label = it.label) })
+        .plus(PaletteAdminDestinations.map { UnifiedSearchDestination(id = ShellRoute.encode(it.shellPage), label = it.label) })
         // Picker rows are keyed by id: a page reached through two lens entries is listed once.
         .distinctBy { it.id }
 
@@ -498,11 +500,13 @@ internal fun createDesktopOverlayActions(
         onModelSelected = params.chatController.models::select,
         recentModels = params.chatController.conversationManagement.recentModels,
     ),
-    onOpenAgent = params.onOpenAgent,
     onNavigate = params.onSelectDestination,
-    onNewCanvas = params.onNewCanvas,
-    onOpenSearchHit = params.onOpenSearchHit,
-    onNewAgent = params.onNewAgent,
     onIrohIdentityReset = params.onIrohIdentityReset,
+    workspace = ShellWorkspaceOverlayActions(
+        onOpenAgent = params.onOpenAgent,
+        onNewAgent = params.onNewAgent,
+        onOpenSearchHit = params.onOpenSearchHit,
+        onNewCanvas = params.onNewCanvas,
+    ),
 )
 

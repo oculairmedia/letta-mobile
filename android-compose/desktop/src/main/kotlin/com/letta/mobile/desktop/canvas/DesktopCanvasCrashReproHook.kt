@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.letta.mobile.ui.shell.workspace.ShellCanvasOwner
 import kotlinx.coroutines.delay
 import kotlin.system.exitProcess
 
@@ -37,7 +38,7 @@ internal fun DesktopCanvasCrashReproHook(canvasShell: DesktopCanvasShell) {
             delay(REPRO_MENU_MS)
             reproMenuOpen = false
             canvasShell.openForConversation(
-                DesktopCanvasOwner(
+                ShellCanvasOwner(
                     conversationId = "repro-conversation-$index",
                     agentId = null,
                     agentName = "Repro",

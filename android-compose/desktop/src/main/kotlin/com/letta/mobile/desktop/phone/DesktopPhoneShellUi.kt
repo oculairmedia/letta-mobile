@@ -1,27 +1,17 @@
 package com.letta.mobile.desktop.phone
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
@@ -30,7 +20,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
@@ -49,7 +38,6 @@ internal object PhoneShellTags {
     const val CHAT_HEADER = "phone-chat-header"
     const val CANVAS_IDENTITY_PILL = "phone-canvas-identity-pill"
     const val TOP_BAR = "phone-top-bar"
-    const val DRAWER = "phone-drawer"
 }
 
 /**
@@ -181,52 +169,5 @@ internal fun PhoneAwareContent(
     }
 }
 
-/**
- * The agents and conversations panel (desktop's rail and sidebar) as a phone's navigation drawer:
- * over the screen from the start edge, on a scrim that closes it.
- */
-@Composable
-internal fun PhoneNavigationDrawer(
-    open: Boolean,
-    onDismiss: () -> Unit,
-    reducedMotion: Boolean,
-    content: @Composable () -> Unit,
-) {
-    Box(Modifier.fillMaxSize()) {
-        AnimatedVisibility(open, enter = fadeIn(), exit = fadeOut()) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = SCRIM_ALPHA))
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
-            )
-        }
-        AnimatedVisibility(
-            open,
-            enter = if (reducedMotion) fadeIn() else slideInHorizontally { -it },
-            exit = if (reducedMotion) fadeOut() else slideOutHorizontally { -it },
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .widthIn(max = DRAWER_MAX_WIDTH)
-                    .testTag(PhoneShellTags.DRAWER),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                tonalElevation = DRAWER_ELEVATION,
-            ) {
-                Row(
-                    Modifier
-                        .fillMaxHeight()
-                        .windowInsetsPadding(WindowInsets.statusBars)
-                        .windowInsetsPadding(WindowInsets.navigationBars),
-                ) { content() }
-            }
-        }
-    }
-}
-
 private val HEADER_ELEVATION: Dp = 3.dp
 private val TOP_BAR_HEIGHT: Dp = 56.dp
-private val DRAWER_MAX_WIDTH: Dp = 360.dp
-private val DRAWER_ELEVATION: Dp = 1.dp
-private const val SCRIM_ALPHA = 0.32f

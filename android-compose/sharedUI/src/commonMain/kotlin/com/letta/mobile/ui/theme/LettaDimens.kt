@@ -190,6 +190,12 @@ object LettaDimens {
         val railWidth: Dp = 56.dp
         val railExpandedWidth: Dp = 248.dp
 
+        /** The agent panel beside the rail in a wide workspace (desktop window, browser). */
+        val agentPanelWidth: Dp = 232.dp
+
+        /** Widest the header's now-active identity block grows before it ellipsizes. */
+        val headerIdentityMaxWidth: Dp = 320.dp
+
         /** Readable width of a settings page's content column. */
         val contentMaxWidth: Dp = 760.dp
 

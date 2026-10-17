@@ -1,47 +1,26 @@
 package com.letta.mobile.desktop.chat
 
-import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
-import com.letta.mobile.ui.chat.session.ChatDockGeometry
-import androidx.compose.runtime.MutableState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.canvas.CanvasDocumentStore
-import com.letta.mobile.data.canvas.CanvasSession
-import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.display.ChatFontScale
+import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.desktop.LocalDesktopChatFontScale
 import com.letta.mobile.desktop.LocalDesktopChatFontScaleSetter
 import com.letta.mobile.desktop.LocalDesktopOpenChatsOnCanvas
-import com.letta.mobile.desktop.OpenDesktopCanvasParams
 import com.letta.mobile.desktop.canvas.DesktopCanvasHostSync
-import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
-import com.letta.mobile.desktop.openDesktopCanvasSession
 import com.letta.mobile.desktop.phone.ChatPageFrame
 import com.letta.mobile.desktop.phone.DesktopPhoneChatFrame
 import com.letta.mobile.desktop.phone.DesktopPhoneChrome
@@ -49,28 +28,28 @@ import com.letta.mobile.desktop.phone.LocalDesktopPhone
 import com.letta.mobile.desktop.phone.PhoneChatPageInputs
 import com.letta.mobile.desktop.phone.chatAppearance
 import com.letta.mobile.desktop.phone.opensOnCanvas
-import com.letta.mobile.ui.canvas.CanvasWorkspace
+import com.letta.mobile.ui.ambient.AmbientMotionStatus
+import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
+import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
-import com.letta.mobile.ui.chat.session.ChatSurfaceMode
-import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
-import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
-import com.letta.mobile.ui.chat.surface.ChatCanvasActions
-import com.letta.mobile.ui.chat.surface.ChatCanvasPlaceholder
-import com.letta.mobile.ui.chat.surface.ChatSurface
-import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
-import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
-import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
-import com.letta.mobile.ui.chat.subagents.SubagentDualViewFrame
-import com.letta.mobile.ui.chat.subagents.SubagentDualViewOptions
 import com.letta.mobile.ui.chat.subagents.SubagentRingsOverlay
 import com.letta.mobile.ui.chat.subagents.withSubagentDualView
-import com.letta.mobile.ui.ambient.AmbientMotionStatus
+import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
+import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbientStatus
+import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
+import com.letta.mobile.ui.shell.workspace.ShellCanvasOwner
+import com.letta.mobile.ui.shell.workspace.ShellChatBoard
+import com.letta.mobile.ui.shell.workspace.ShellChatDestination
+import com.letta.mobile.ui.shell.workspace.ShellChatLook
+import com.letta.mobile.ui.shell.workspace.ShellChatPage
+import com.letta.mobile.ui.shell.workspace.rememberShellChatPresentation
 
 /*
- * letta-mobile-bglj6.1, ckmub.3.11: the Conversations destination is the shared KMP chat page;
- * this file is its desktop container (port, dock, canvas, ambient background, keyboard).
+ * letta-mobile-bglj6.1, ckmub.3.11, ckmub.17.4: the Conversations destination is the shared
+ * [ShellChatDestination]; this file is its desktop container (port, dock router, board sync, ambient
+ * background, working-directory picker, the phone preview's frame).
  */
 
 /**
@@ -125,7 +104,7 @@ internal data class DesktopSharedChatPageState(
     val errorMessage: String?,
     /** Where the conversation's board lives, and whose it is: the docked canvas. */
     val canvasStore: CanvasDocumentStore,
-    val canvasOwner: DesktopCanvasOwner,
+    val canvasOwner: ShellCanvasOwner,
     /** Routes the shell's canvas opens to this page's dock (one live session per board). */
     val dockedCanvas: DesktopDockedCanvasRouter? = null,
     /** The shell's own control drawn at the end of the canvas header (background tasks). */
@@ -142,7 +121,7 @@ internal data class DesktopSharedChatPageState(
 /**
  * letta-mobile-bglj6.1 (stage 4): the conversation opens on its canvas with the chat docked
  * under it; expanding gives the full-screen page, and swipe up or "Open canvas" returns to the
- * canvas. The canvas stays composed underneath (see ChatSurface).
+ * canvas. The page itself is the shared [ShellChatDestination].
  */
 @Composable
 internal fun DesktopSharedChatPage(
@@ -155,83 +134,47 @@ internal fun DesktopSharedChatPage(
     val openOnCanvas = LocalDesktopOpenChatsOnCanvas.current
     // The phone preview draws this page as Android's SharedChatPage does; null on the desktop.
     val phone = LocalDesktopPhone.current
-    var presentation by remember {
-        mutableStateOf(ChatSurfacePresentation.initial(phone.opensOnCanvas(openOnCanvas.enabled.value), hasCanvas = true))
-    }
-    val hasConversation = state.canvasOwner.conversationId != null
+    val presentation = rememberShellChatPresentation(phone.opensOnCanvas(openOnCanvas.enabled.value))
     val directoryPicker = rememberDesktopWorkingDirectoryPicker(port)
-    val host = rememberDesktopChatSurfaceHost(port, navigation, directoryPicker, phone)
+    val host = rememberDualViewHost(rememberDesktopChatSurfaceHost(port, navigation, directoryPicker, phone), state.subagents)
     // The run's own state, as the composer's Stop button and the docked panel's glow read it: the
     // shell's "thinking" flag clears at the first reply and put the page's glow out mid-run.
     val uiState by port.uiState.collectAsState()
     val displayOptions by port.displayOptions.collectAsState()
     val ambientStatus = rememberChatAmbientStatus(isThinking = uiState.isRunInFlight, failed = state.errorMessage != null)
-    val session = rememberConversationCanvasSession(state.canvasStore, state.canvasOwner)
-    state.dockedCanvas?.let { router ->
-        DockedCanvasRouting(router, session) { presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse) }
-    }
-    var dockGeometry by state.dockGeometry
-    val onIntent = remember { { intent: ChatSurfaceIntent -> presentation = ChatSurfaceModeReducer.reduce(presentation, intent) } }
-    val frameInputs = PhoneChatPageInputs(presentation.mode, port.uiState) { onIntent(ChatSurfaceIntent.Collapse) }
-    val appearance = phone.chatAppearance(rememberDesktopChatAppearance(displayOptions))
-    val dualView = state.subagents?.views
-    val pageHost = rememberDualViewHost(host, state.subagents)
+    val router = state.dockedCanvas
+    router?.let { LaunchedEffect(it, it.showRequests) { if (it.showRequests > 0) presentation.onIntent(ChatSurfaceIntent.Collapse) } }
+    val onBoardShown = remember(router) { router?.let { docked -> { id: CanvasId? -> docked.dockedCanvasId = id } } }
+    val board = remember(state.canvasStore) { desktopChatBoard(state.canvasStore) }
+    val frameInputs = PhoneChatPageInputs(presentation.value.mode, port.uiState) { presentation.onIntent(ChatSurfaceIntent.Collapse) }
     DesktopPhoneChatFrame(phone, frameInputs, modifier) { pageModifier, frame ->
-        // letta-mobile-ulcg6.1: a subagent's conversation opens beside this one (in its place on the phone preview).
-        val dualViewOptions = SubagentDualViewOptions(appearance = appearance, host = pageHost, topInset = frame.topChromeInset)
-        SubagentDualViewFrame(dualView, pageModifier, dualViewOptions) { parentModifier ->
-            ChatSurface(
-                port = port,
-                presentation = presentation,
-                onIntent = onIntent,
-                host = pageHost,
-                modifier = parentModifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
-                    // Bubble phase, so an open image viewer or popup takes its own Escape first.
-                    .onKeyEvent { event ->
-                        val collapse = escapeCollapsesToCanvas(presentation.mode, event.key, event.type)
-                        if (collapse) presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse)
-                        collapse
-                    },
-                appearance = appearance,
+        ShellChatDestination(
+            page = ShellChatPage(port, host, board, state.canvasOwner, state.dockGeometry),
+            presentation = presentation,
+            modifier = pageModifier.fillMaxSize(),
+            look = ShellChatLook(
+                appearance = phone.chatAppearance(rememberDesktopChatAppearance(displayOptions)),
                 platform = rememberDesktopChatPlatform(ambientStatus, frame, state.subagents),
                 pagedTimeline = state.pagedTimeline,
-                canvas = { actions ->
-                    if (hasConversation) {
-                        DockedConversationCanvas(session, actions, state.canvasHeaderTrailing, frame.topChromeInset)
-                    } else {
-                        ChatCanvasPlaceholder()
-                    }
-                },
-                dockGeometry = dockGeometry,
-                onDockGeometryChange = { dockGeometry = it },
                 recents = navigation.recentInteractions,
-            )
-        }
+                canvasHeaderTrailing = state.canvasHeaderTrailing,
+                onBoardShown = onBoardShown,
+                // letta-mobile-ulcg6.1: rings, rows and the Background tasks pane open a subagent beside this conversation.
+                subagentViews = state.subagents?.views,
+            ),
+        )
     }
     DesktopWorkingDirectoryPickerHost(directoryPicker)
 }
 
-/** Routes the shell's canvas opens to this page's dock: it names the docked board, and a show request collapses to it. */
-@Composable
-private fun DockedCanvasRouting(router: DesktopDockedCanvasRouter, session: CanvasSession?, onShow: () -> Unit) {
-    DisposableEffect(router, session) {
-        router.dockedCanvasId = session?.canvasId
-        onDispose { router.dockedCanvasId = null }
-    }
-    LaunchedEffect(router, router.showRequests) {
-        if (router.showRequests > 0) onShow()
-    }
-}
-
-/** The page's host with its timeline rows opening their subagent in the dual view, when the page has one. */
-@Composable
-private fun rememberDualViewHost(host: ChatSurfaceHost, subagents: DesktopChatSubagents?): ChatSurfaceHost {
-    val entries by rememberUpdatedState(subagents?.entries.orEmpty())
-    val holder = subagents?.views?.holder
-    return remember(host, holder) { holder?.let { host.withSubagentDualView(it) { entries } } ?: host }
-}
+/** The conversation's board in the desktop's store, synced and with presence over the host relay. */
+private fun desktopChatBoard(store: CanvasDocumentStore) = ShellChatBoard(
+    store = store,
+    opLog = DesktopCanvasHostSync.opLog,
+    syncTransport = DesktopCanvasHostSync.syncTransport,
+    presence = DesktopCanvasHostSync.presenceTransport,
+    assets = DesktopCanvasHostSync.assets,
+)
 
 /**
  * The desktop's appearance: its own font scale, already applied to the window's text through
@@ -267,60 +210,12 @@ private fun rememberDesktopChatPlatform(ambientStatus: AmbientMotionStatus, fram
         )
     }
 
-/** Escape on the full-screen page goes back to the canvas (Android's Back does the same). */
-internal fun escapeCollapsesToCanvas(mode: ChatSurfaceMode, key: Key, type: KeyEventType): Boolean =
-    mode == ChatSurfaceMode.FullScreen && key == Key.Escape && type == KeyEventType.KeyDown
-
-/** The selected conversation's own board, created on first open (the side pane's same session). */
+/** The page's host with its timeline rows opening their subagent in the dual view, when the page has one. */
 @Composable
-private fun rememberConversationCanvasSession(
-    store: CanvasDocumentStore,
-    owner: DesktopCanvasOwner,
-): CanvasSession? {
-    val session by produceState<CanvasSession?>(null, store, owner.conversationId, owner.agentId) {
-        value = null
-        // A new chat has no board yet: never fall back to a shared default board for it.
-        if (owner.conversationId == null) return@produceState
-        openDesktopCanvasSession(
-            OpenDesktopCanvasParams(
-                scope = this,
-                store = store,
-                conversationId = owner.conversationId,
-                agentId = owner.agentId,
-                agentName = owner.agentName,
-                onSessionReady = { value = it },
-            ),
-        )
-    }
-    return session
-}
-
-@Composable
-private fun DockedConversationCanvas(
-    session: CanvasSession?,
-    actions: ChatCanvasActions,
-    headerTrailing: (@Composable () -> Unit)?,
-    /** The phone's status bar (and header, over the full-screen page), which the board draws under. */
-    chromeTopInset: Dp = 0.dp,
-) {
-    if (session == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        return
-    }
-    CanvasWorkspace(
-        session = session,
-        presenceTransport = DesktopCanvasHostSync.presenceTransport,
-        assets = DesktopCanvasHostSync.assets,
-        // The canvas is the page: no title bar or back arrow, just its actions pill.
-        onNavigateBack = null,
-        onShareToChat = actions::shareToChat,
-        showTitle = false,
-        headerTrailing = headerTrailing,
-        modifier = Modifier.fillMaxSize(),
-        // A chat card's "Show on canvas" frames its artifact here (letta-mobile-bglj6.13).
-        cameraRequest = actions.camera,
-        chromeTopInset = chromeTopInset,
-    )
+private fun rememberDualViewHost(host: ChatSurfaceHost, subagents: DesktopChatSubagents?): ChatSurfaceHost {
+    val entries by rememberUpdatedState(subagents?.entries.orEmpty())
+    val holder = subagents?.views?.holder
+    return remember(host, holder) { holder?.let { host.withSubagentDualView(it) { entries } } ?: host }
 }
 
 /** The page's host navigation; the working-directory row opens the shared picker (letta-mobile-zxk2n.6). */

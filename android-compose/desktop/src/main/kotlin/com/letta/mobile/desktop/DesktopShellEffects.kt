@@ -8,6 +8,7 @@ import com.letta.mobile.data.dreaming.DreamNotifyPrefs
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.ui.shell.SyncShellWorkspace
+import com.letta.mobile.ui.shell.workspace.openSearchHit
 
 /**
  * letta-mobile-bglj6.1.10: the shell's effects - controller lifecycles, the tab strip's sync,

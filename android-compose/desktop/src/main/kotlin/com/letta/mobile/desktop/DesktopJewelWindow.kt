@@ -1,43 +1,25 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material3.Icon
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.WindowState
 import com.letta.mobile.ui.canvas.LocalCanvasPenTarget
 import com.letta.mobile.ui.components.LocalMenuActionScope
-import com.letta.mobile.ui.components.tabs.LettaTab
-import com.letta.mobile.ui.components.tabs.LettaTabStrip
-import com.letta.mobile.ui.components.tabs.LettaTabStripActions
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.host.desktopPointer
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.WindowState
-import com.letta.mobile.data.lens.LensDestination
-import com.letta.mobile.data.lens.WorkPlayMode
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeader
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState
+import com.letta.mobile.ui.theme.LettaDimens
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import dev.nucleusframework.window.AwtDecoratedWindowScope
 import dev.nucleusframework.window.BasicTitleBar
@@ -50,60 +32,6 @@ import dev.nucleusframework.window.styling.DecoratedWindowStyle
 import dev.nucleusframework.window.styling.TitleBarColors
 import dev.nucleusframework.window.styling.TitleBarMetrics
 import dev.nucleusframework.window.styling.TitleBarStyle
-import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.shell.header.HeaderAction
-import com.letta.mobile.ui.shell.header.HeaderControls
-import com.letta.mobile.ui.shell.header.HeaderNav
-import com.letta.mobile.ui.shell.header.HeaderTitle
-import com.letta.mobile.ui.shell.header.SearchSlot
-import com.letta.mobile.ui.shell.header.ShellHeader
-import com.letta.mobile.ui.shell.nowactive.NowActiveBarActions
-import com.letta.mobile.ui.shell.nowactive.NowActiveBarState
-import com.letta.mobile.ui.shell.nowactive.NowActiveIdentity
-import com.letta.mobile.ui.shell.nowactive.NowActiveRunControls
-
-/** Overflow entry points surfaced next to the sidebar toggle while the
- * sidebar is collapsed — see [DesktopSidebarOverflowMenu]. */
-@Immutable
-internal data class DesktopHeaderSidebarOverflow(
-    val mode: WorkPlayMode,
-    val onNewChat: () -> Unit,
-    val onDestination: (LensDestination) -> Unit,
-    val onSettings: () -> Unit,
-)
-
-/**
- * Header chrome state lifted out of [LettaDesktopApp] (which owns the live
- * chat/shell state) into the window's title bar, mirroring the existing
- * `windowTitle`/`onActiveTitleChange` lift in Main.kt. Carries both the
- * agent-first identity block (letta-mobile-3arhe.1) and the collapsible-sidebar
- * toggle (letta-mobile-o5m90) — the toggle needs to live in the
- * always-visible chrome, not floating over content, to stay discoverable once
- * the sidebar is hidden.
- */
-@Immutable
-internal data class DesktopHeaderChromeState(
-    val identity: NowActiveBarState?,
-    val identityActions: NowActiveBarActions,
-    val sidebarCollapsed: Boolean,
-    val onToggleSidebar: () -> Unit,
-    val sidebarToggleFocusRequester: FocusRequester? = null,
-    val sidebarOverflow: DesktopHeaderSidebarOverflow? = null,
-    /** The shared shell header's one search (letta-mobile-ckmub.3.5). */
-    val search: SearchSlot? = null,
-    val conversationTabs: List<LettaTab> = emptyList(),
-    val activeConversationId: String? = null,
-    val conversationTabActions: LettaTabStripActions = LettaTabStripActions(),
-) {
-    companion object {
-        val Empty = DesktopHeaderChromeState(
-            identity = null,
-            identityActions = NowActiveBarActions.None,
-            sidebarCollapsed = true,
-            onToggleSidebar = {},
-        )
-    }
-}
 
 /** Title-bar height: taller than a stock 32-44dp caption bar to comfortably
  * fit the two-line agent identity block (title over agent name). */
@@ -114,23 +42,6 @@ private const val TOUCH_HANDLE_SCALE = 2f
 
 /** With tabs the strip is one line per tab (title, then agent), so the bar can be browser-thin. */
 private val TabbedTitleBarHeight = LettaDimens.Control.actionButton
-
-/**
- * Bounds the identity block by a fixed max width rather than a Row `weight`.
- * A `weight(fill = false)` sibling next to a `weight(fill = true)` drag
- * spacer leaves the shortfall between the identity block's actual (smaller)
- * width and its allotted weighted share as trailing dead space at the END of
- * the row — after the window control buttons — instead of being reclaimed by
- * the spacer. A fixed `widthIn(max = …)` sizes the block to its own content
- * (so short titles don't take excess room) while still bounding it for
- * ellipsis on long titles, and leaves the single flexible spacer as the only
- * element that absorbs leftover width, which keeps the caption buttons flush
- * to the window's right edge at any width.
- */
-private val IdentityBlockMaxWidth = 320.dp
-
-/** Always leaves an unobstructed title-bar lane for native window dragging. */
-private val MinimumTitleBarDragWidth = 96.dp
 
 /**
  * Main desktop window chrome.
@@ -153,7 +64,7 @@ internal fun DesktopJewelWindow(
     title: String,
     state: WindowState,
     onCloseRequest: () -> Unit,
-    header: DesktopHeaderChromeState = DesktopHeaderChromeState.Empty,
+    header: ShellWorkspaceHeaderState? = null,
     content: @Composable AwtDecoratedWindowScope.() -> Unit,
 ) {
     DesktopJewelTheme {
@@ -178,28 +89,9 @@ internal fun DesktopJewelWindow(
                 // background and must run straight into the content beneath it,
                 // so the title bar's hairline is dropped — the tab-vs-strip
                 // contrast carries the separation instead (browser behaviour).
-                val tabbed = header.conversationTabs.isNotEmpty()
-                val titleBarStyle = remember(colorScheme, tabbed) {
-                    TitleBarStyle(
-                        colors = TitleBarColors(
-                            background = colorScheme.surfaceContainerLow,
-                            inactiveBackground = colorScheme.surfaceContainerLow,
-                            content = colorScheme.onSurface,
-                            border = if (tabbed) Color.Transparent else colorScheme.outlineVariant,
-                        ),
-                        metrics = TitleBarMetrics(height = if (tabbed) TabbedTitleBarHeight else TitleBarHeight),
-                    )
-                }
-                val windowStyle = remember(colorScheme) {
-                    DecoratedWindowStyle(
-                        colors = DecoratedWindowColors(
-                            border = colorScheme.outlineVariant,
-                            borderInactive = colorScheme.outlineVariant,
-                            background = colorScheme.surfaceContainerLow,
-                        ),
-                        metrics = DecoratedWindowMetrics(borderWidth = 1.dp),
-                    )
-                }
+                val tabbed = header?.tabs?.tabs?.isNotEmpty() == true
+                val titleBarStyle = remember(colorScheme, tabbed) { titleBarStyle(colorScheme, tabbed) }
+                val windowStyle = remember(colorScheme) { decoratedWindowStyle(colorScheme) }
                 NucleusDecoratedWindowTheme(
                     isDark = dark,
                     windowStyle = windowStyle,
@@ -250,93 +142,38 @@ internal fun DesktopJewelWindow(
     }
 }
 
+/** Always leaves an unobstructed title-bar lane for native window dragging. */
+private val MinimumTitleBarDragWidth = 96.dp
+
 /**
- * The shared [ShellHeader] in the title bar (letta-mobile-ckmub.3.5). Desktop supplies only its
- * chrome-bound pieces: the sidebar toggle and collapsed overflow, the identity block or tab strip,
- * and the run controls. The free width the header leaves stays the native drag lane; with tabs the
- * strip reserves that lane itself ([MinimumTitleBarDragWidth]).
+ * The shared workspace header in the title bar (letta-mobile-ckmub.17.4): the workspace hoists it
+ * here because the title bar composes as a sibling of the content. The free width the header leaves
+ * stays the native drag lane; with tabs the strip reserves that lane itself ([MinimumTitleBarDragWidth]).
  */
 @Composable
-private fun DesktopTitleBarHeader(title: String, header: DesktopHeaderChromeState, modifier: Modifier) {
-    ShellHeader(
-        title = desktopHeaderTitle(title, header),
+private fun DesktopTitleBarHeader(title: String, header: ShellWorkspaceHeaderState?, modifier: Modifier) {
+    ShellWorkspaceHeader(
+        state = header ?: ShellWorkspaceHeaderState(title = title),
         modifier = modifier,
-        search = header.search,
-        controls = desktopHeaderControls(header),
+        dragLaneWidth = MinimumTitleBarDragWidth,
     )
 }
 
-/** Leading: the sidebar toggle and, while collapsed, its overflow. Trailing: the run controls. */
-private fun desktopHeaderControls(header: DesktopHeaderChromeState): HeaderControls = HeaderControls(
-    nav = HeaderNav.Custom { DesktopSidebarControls(header) },
-    actions = header.identity?.let { state ->
-        listOf(HeaderAction.Custom { NowActiveRunControls(state = state, actions = header.identityActions) })
-    }.orEmpty(),
+private fun titleBarStyle(colorScheme: ColorScheme, tabbed: Boolean) = TitleBarStyle(
+    colors = TitleBarColors(
+        background = colorScheme.surfaceContainerLow,
+        inactiveBackground = colorScheme.surfaceContainerLow,
+        content = colorScheme.onSurface,
+        border = if (tabbed) Color.Transparent else colorScheme.outlineVariant,
+    ),
+    metrics = TitleBarMetrics(height = if (tabbed) TabbedTitleBarHeight else TitleBarHeight),
 )
 
-/** The one control that survives collapse (o5m90 AC #1), so the hidden sidebar stays findable. */
-@Composable
-private fun DesktopSidebarControls(header: DesktopHeaderChromeState) {
-    DesktopSidebarToggleButton(
-        collapsed = header.sidebarCollapsed,
-        onToggle = header.onToggleSidebar,
-        focusRequester = header.sidebarToggleFocusRequester,
-    )
-    header.sidebarOverflow?.takeIf { header.sidebarCollapsed }?.let { overflow ->
-        DesktopSidebarOverflowMenu(
-            mode = overflow.mode,
-            onNewChat = overflow.onNewChat,
-            onDestination = overflow.onDestination,
-            onSettings = overflow.onSettings,
-        )
-    }
-    Box(modifier = Modifier.width(LettaDimens.Space.xs))
-}
-
-/** The tab strip when tabs are open, else the agent identity block, else the window title. */
-private fun desktopHeaderTitle(title: String, header: DesktopHeaderChromeState): HeaderTitle {
-    val identity = header.identity
-    return when {
-        header.conversationTabs.isNotEmpty() -> HeaderTitle.Custom(fill = true) {
-            LettaTabStrip(
-                tabs = header.conversationTabs,
-                activeKey = header.activeConversationId,
-                actions = header.conversationTabActions,
-                dragLaneWidth = MinimumTitleBarDragWidth,
-                modifier = Modifier.fillMaxHeight(),
-            )
-        }
-        identity != null -> HeaderTitle.Custom {
-            NowActiveIdentity(
-                state = identity,
-                actions = header.identityActions,
-                modifier = Modifier.widthIn(max = IdentityBlockMaxWidth),
-            )
-        }
-        else -> HeaderTitle.Custom { DesktopWindowTitle(title) }
-    }
-}
-
-@Composable
-private fun DesktopWindowTitle(title: String) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.widthIn(max = IdentityBlockMaxWidth).padding(horizontal = LettaDimens.Space.sm),
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.ChatBubbleOutline,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(LettaDimens.Control.icon),
-        )
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
+private fun decoratedWindowStyle(colorScheme: ColorScheme) = DecoratedWindowStyle(
+    colors = DecoratedWindowColors(
+        border = colorScheme.outlineVariant,
+        borderInactive = colorScheme.outlineVariant,
+        background = colorScheme.surfaceContainerLow,
+    ),
+    metrics = DecoratedWindowMetrics(borderWidth = 1.dp),
+)

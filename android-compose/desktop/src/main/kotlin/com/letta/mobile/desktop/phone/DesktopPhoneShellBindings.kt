@@ -1,30 +1,19 @@
 package com.letta.mobile.desktop.phone
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.Modifier
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.desktop.DesktopDestination
 
 /*
  * How the desktop shell (LettaDesktopApp) folds into a phone. Each binding takes the window's
  * [DesktopPhoneChrome], which is null in the normal desktop app, and then answers exactly as the
- * desktop did before the phone preview existed.
+ * desktop did before the phone preview existed. The rail and agent panel fold into the shared
+ * workspace's drawer ([DesktopPhoneChrome.drawer]).
  */
 
 /** The phone's reduced-motion preset, or the OS's setting on the desktop. */
 internal fun DesktopPhoneChrome?.reducedMotionOr(system: Boolean): Boolean = this?.state?.reducedMotion ?: system
-
-/** On the phone the sidebar lives in the drawer, where it is always shown. */
-internal fun DesktopPhoneChrome?.sidebarVisible(desktopVisible: Boolean): Boolean = this != null || desktopVisible
-
-/** Where the agent pane's mascot stands: the open drawer on a phone, the visible sidebar on the desktop. */
-internal fun DesktopPhoneChrome?.agentPaneVisible(sidebarVisible: Boolean): Boolean = this?.drawerOpen ?: sidebarVisible
 
 /**
  * The chat page draws edge to edge with its own floating header; every other destination (and the
@@ -32,39 +21,6 @@ internal fun DesktopPhoneChrome?.agentPaneVisible(sidebarVisible: Boolean): Bool
  */
 internal fun isBareChatPage(destination: DesktopDestination, agentEditor: ShellDestination.AgentEditor?): Boolean =
     destination == DesktopDestination.Conversations && agentEditor == null
-
-/** Reports the shell's width to the desktop layout; a phone's width says nothing about the layout the person saved. */
-@Composable
-internal fun ReportShellWidth(phone: DesktopPhoneChrome?, widthDp: Float, report: (Float) -> Unit) {
-    if (phone != null) return
-    LaunchedEffect(widthDp) { report(widthDp) }
-}
-
-/**
- * The shell's row: the agent rail and sidebar ([navigationPanes]) beside [content] on the desktop;
- * on a phone, [content] alone, with the panes in a drawer over it.
- */
-@Composable
-internal fun DesktopShellRow(
-    phone: DesktopPhoneChrome?,
-    reducedMotion: Boolean,
-    navigationPanes: @Composable RowScope.() -> Unit,
-    content: @Composable RowScope.() -> Unit,
-) {
-    if (phone == null) {
-        Row(Modifier.fillMaxSize()) {
-            navigationPanes()
-            content()
-        }
-        return
-    }
-    Box(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxSize(), content = content)
-        PhoneNavigationDrawer(open = phone.drawerOpen, onDismiss = { phone.drawerOpen = false }, reducedMotion = reducedMotion) {
-            Row(Modifier.fillMaxHeight(), content = navigationPanes)
-        }
-    }
-}
 
 /** A phone's drawer closes once something in it was picked: a destination, a conversation, an agent to edit. */
 @Composable
