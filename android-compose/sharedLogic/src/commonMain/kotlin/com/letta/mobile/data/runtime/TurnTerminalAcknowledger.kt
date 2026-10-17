@@ -15,6 +15,30 @@ import kotlin.time.Duration.Companion.milliseconds
 /** One delivery of a durable terminal: its frame key on one connection generation. */
 private data class TerminalDelivery(val idempotencyKey: String, val generation: Long)
 
+/** The ack one delivery calls for. */
+private class PendingAck(
+    val frame: AppServerInboundFrame.TurnFinished,
+    val consumer: AppServerTerminalConsumerId,
+    val delivery: TerminalDelivery,
+)
+
+/** The deliveries already acked, bounded: one older than [capacity] acks is simply acked again. */
+private class AckLedger(private val capacity: Int) {
+    private val lock = SynchronizedObject()
+    private val acknowledged = LinkedHashSet<TerminalDelivery>()
+
+    /** True when [delivery] was not acked yet; it is then recorded. */
+    fun claim(delivery: TerminalDelivery): Boolean = synchronized(lock) {
+        val added = acknowledged.add(delivery)
+        if (acknowledged.size > capacity) acknowledged.remove(acknowledged.first())
+        added
+    }
+
+    fun release(delivery: TerminalDelivery) {
+        synchronized(lock) { acknowledged.remove(delivery) }
+    }
+}
+
 /**
  * letta-mobile-zxk2n.2: answers every `turn_finished` that lists this client's
  * [AppServerTerminalConsumerId] with `turn_finished_ack`, so the server stops replaying it.
@@ -31,55 +55,65 @@ internal class TurnTerminalAcknowledger(
     private val consumerId: AppServerTerminalConsumerId?,
     private val connectionGenerationProvider: () -> Long,
 ) {
-    private val lock = SynchronizedObject()
-    private val acknowledged = LinkedHashSet<TerminalDelivery>()
+    private val ledger = AckLedger(CAPACITY)
 
     /** Acks [received] when it is a `turn_finished` kept for this client and not yet acked on its generation. */
     suspend fun acknowledge(received: AppServerReceivedFrame) {
-        val frame = received.frame as? AppServerInboundFrame.TurnFinished ?: return
-        val consumer = consumerId?.takeIf { it.value in frame.terminalConsumerIds } ?: return
-        val delivery = TerminalDelivery(frame.idempotencyKey, received.connectionGeneration ?: connectionGenerationProvider())
-        if (!claim(delivery)) return
+        val pending = pendingAckFor(received) ?: return
+        if (!ledger.claim(pending.delivery)) return
+        report(pending, sendClaimed(pending))
+    }
+
+    /** The ack [received] calls for: a `turn_finished` that lists this client's consumer id; null otherwise. */
+    private fun pendingAckFor(received: AppServerReceivedFrame): PendingAck? {
+        val frame = received.frame as? AppServerInboundFrame.TurnFinished ?: return null
+        val consumer = consumerId?.takeIf { it.value in frame.terminalConsumerIds } ?: return null
+        return PendingAck(frame, consumer, deliveryOf(frame, received.connectionGeneration))
+    }
+
+    /** One delivery per frame key and connection generation; an unstamped frame is on the live generation. */
+    private fun deliveryOf(frame: AppServerInboundFrame.TurnFinished, stamped: Long?): TerminalDelivery =
+        TerminalDelivery(frame.idempotencyKey, stamped ?: connectionGenerationProvider())
+
+    /** Sends a claimed ack; a cancelled or unsent ack gives its claim back, so a later delivery retries it. */
+    private suspend fun sendClaimed(pending: PendingAck): String {
         val outcome = try {
-            send(AppServerCommand.TurnFinishedAck.of(frame, consumer))
+            send(AppServerCommand.TurnFinishedAck.of(pending.frame, pending.consumer))
         } catch (cancellation: CancellationException) {
-            release(delivery)
+            ledger.release(pending.delivery)
             throw cancellation
         }
-        if (outcome != SENT) release(delivery)
+        if (outcome != SENT) ledger.release(pending.delivery)
+        return outcome
+    }
+
+    /** Never throws: an unsent ack only means the server replays the terminal on the next connection. */
+    private suspend fun send(ack: AppServerCommand.TurnFinishedAck): String = outcomeOf(
+        runCatching { withTimeoutOrNull(SEND_TIMEOUT_MS.milliseconds) { client.acknowledgeTurnFinished(ack) } },
+    )
+
+    /** `sent`, `timeout` (null result) or `failed=<type>`; a cancellation is rethrown. */
+    private fun outcomeOf(sent: Result<Unit?>): String {
+        val error = sent.exceptionOrNull() ?: return if (sent.getOrNull() == null) TIMEOUT else SENT
+        if (error is CancellationException) throw error
+        return "failed=${error::class.simpleName}"
+    }
+
+    private fun report(pending: PendingAck, outcome: String) {
         Telemetry.event(
             TELEMETRY_TAG, "terminal.acknowledged",
-            "conversationId" to frame.runtime.conversationId,
-            "turnId" to frame.turnId,
-            "generation" to delivery.generation,
+            "conversationId" to pending.frame.runtime.conversationId,
+            "turnId" to pending.frame.turnId,
+            "generation" to pending.delivery.generation,
             "outcome" to outcome,
             level = if (outcome == SENT) Telemetry.Level.INFO else Telemetry.Level.WARN,
         )
     }
 
-    /** Never throws: an unsent ack only means the server replays the terminal on the next connection. */
-    private suspend fun send(ack: AppServerCommand.TurnFinishedAck): String {
-        val sent = runCatching {
-            withTimeoutOrNull(SEND_TIMEOUT_MS.milliseconds) { client.acknowledgeTurnFinished(ack) }
-        }
-        sent.exceptionOrNull()?.let { error ->
-            if (error is CancellationException) throw error
-            return "failed=${error::class.simpleName}"
-        }
-        return if (sent.getOrNull() == null) "timeout" else SENT
-    }
-
-    private fun claim(delivery: TerminalDelivery): Boolean = synchronized(lock) {
-        if (!acknowledged.add(delivery)) return@synchronized false
-        if (acknowledged.size > CAPACITY) acknowledged.remove(acknowledged.first())
-        true
-    }
-
-    private fun release(delivery: TerminalDelivery) = synchronized(lock) { acknowledged.remove(delivery) }
-
     private companion object {
         const val TELEMETRY_TAG = "AppServerTurnEngine"
         const val SENT = "sent"
+        const val TIMEOUT = "timeout"
 
         /** The ack runs on a turn's NonCancellable tail, so a stalled socket must not hold it. */
         const val SEND_TIMEOUT_MS = 5_000L
