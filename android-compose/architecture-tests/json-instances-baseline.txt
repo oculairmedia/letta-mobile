@@ -23,7 +23,6 @@ android-compose/app/src/main/java/com/letta/mobile/runtime/local/AndroidEmbedded
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/AndroidNetworkBridge.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/EndpointOpenAiModelCatalog.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/OnDeviceOpenAiBridge.kt
-android-compose/app/src/main/java/com/letta/mobile/runtime/local/OnDeviceToolCallProtocol.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/modelcatalog/EmbeddedModelCatalog.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/mobileactions/AndroidProviderReadTool.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/mobileactions/MobileIntentActionTool.kt

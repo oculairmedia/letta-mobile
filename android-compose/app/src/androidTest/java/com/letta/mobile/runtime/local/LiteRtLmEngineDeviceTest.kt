@@ -38,12 +38,12 @@ class LiteRtLmEngineDeviceTest {
                 accelerator = accelerator,
                 maxTokens = 256,
             ),
-            "user: Reply with the single word ok.",
+            OnDeviceChatRequest.userText("Reply with the single word ok."),
         )
 
         assertTrue(
             "generate($accelerator) failed: ${result.exceptionOrNull()}",
-            result.isSuccess && result.getOrThrow().isNotBlank(),
+            result.isSuccess && result.getOrThrow().text.isNotBlank(),
         )
     }
 }

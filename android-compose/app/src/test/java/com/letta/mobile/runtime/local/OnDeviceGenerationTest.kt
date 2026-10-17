@@ -31,13 +31,23 @@ class OnDeviceGenerationTest {
     }
 
     @Test
-    fun `a transcript role marker ends the reply where it starts`() {
-        val generation = OnDeviceGeneration()
+    fun `the request stop sequences end the reply where they start`() {
+        val request = Json.parseToJsonElement("""{"stop":["\nUSER:"],"messages":[]}""").jsonObject
+        val limits = OnDeviceGenerationLimits.forRequest(request, selection())
+        val generation = OnDeviceGeneration(limits)
 
         assertTrue(generation.accept("Sure, here it is."))
-        assertFalse(generation.accept("\nuser: and then"))
+        assertFalse(generation.accept("\nUSER: and then"))
         assertEquals("Sure, here it is.", generation.text)
         assertEquals(OnDeviceStopReason.StopSequence, generation.stopReason)
+    }
+
+    @Test
+    fun `a transcript role prefix is ordinary text now the model template renders the conversation`() {
+        val generation = OnDeviceGeneration()
+
+        assertTrue(generation.accept("Say it like this:\nuser: hello"))
+        assertEquals("Say it like this:\nuser: hello", generation.text)
     }
 
     @Test

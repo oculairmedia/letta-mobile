@@ -4,6 +4,7 @@ import java.io.OutputStream
 import java.time.Instant
 import java.util.UUID
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -16,22 +17,21 @@ internal value class ResponseModelId(val value: String)
 /** OpenAI `finish_reason` values the bridge sends. */
 internal enum class FinishReason(val wire: String) {
     Stop("stop"),
+    /** The output cap or the timeout cut the reply: the client sees it was truncated. */
+    Length("length"),
     ToolCalls("tool_calls"),
 }
 
 /**
  * The OpenAI-shaped chat completion bodies the on-device bridge answers with, as one JSON body or
  * as an SSE stream. Split out of [LocalOpenAiOnDeviceBridge] (letta-mobile-by4vm.121) so its
- * session only handles requests.
+ * session only handles requests. A reply's tool calls become OpenAI `tool_calls`, each with its
+ * own id (LiteRT-LM calls carry none), alongside any text the model wrote (by4vm.121.16).
  */
 internal interface OpenAiCompletionWriter {
-    fun completionBody(text: String, model: ResponseModelId): JsonObject
+    fun completionBody(reply: OnDeviceReply, model: ResponseModelId, finishReason: FinishReason): JsonObject
 
-    fun toolCallCompletionBody(turn: OnDeviceToolCallProtocol.ModelTurn.ToolCall, model: ResponseModelId): JsonObject
-
-    fun OutputStream.writeStreamingCompletion(text: String, model: ResponseModelId)
-
-    fun OutputStream.writeStreamingToolCall(turn: OnDeviceToolCallProtocol.ModelTurn.ToolCall, model: ResponseModelId)
+    fun OutputStream.writeStreamingCompletion(reply: OnDeviceReply, model: ResponseModelId, finishReason: FinishReason)
 }
 
 internal class OpenAiCompletions(private val json: Json) : OpenAiCompletionWriter {
@@ -41,45 +41,30 @@ internal class OpenAiCompletions(private val json: Json) : OpenAiCompletionWrite
         val created = Instant.now().epochSecond
     }
 
-    override fun completionBody(text: String, model: ResponseModelId): JsonObject =
+    override fun completionBody(reply: OnDeviceReply, model: ResponseModelId, finishReason: FinishReason): JsonObject =
         completion(model, message = buildJsonObject {
             put("role", "assistant")
-            put("content", text)
-        }, finishReason = FinishReason.Stop)
+            if (reply.text.isEmpty() && reply.toolCalls.isNotEmpty()) put("content", null as String?) else put("content", reply.text)
+            if (reply.toolCalls.isNotEmpty()) put("tool_calls", toolCallsJson(reply.toolCalls))
+        }, finishReason = finishReason)
 
-    override fun toolCallCompletionBody(turn: OnDeviceToolCallProtocol.ModelTurn.ToolCall, model: ResponseModelId): JsonObject =
-        completion(model, message = buildJsonObject {
-            put("role", "assistant")
-            if (turn.leadingText.isNotBlank()) put("content", turn.leadingText) else put("content", null as String?)
-            put("tool_calls", buildJsonArray { add(toolCallJson(turn)) })
-        }, finishReason = FinishReason.ToolCalls)
-
-    override fun OutputStream.writeStreamingCompletion(text: String, model: ResponseModelId) {
+    override fun OutputStream.writeStreamingCompletion(reply: OnDeviceReply, model: ResponseModelId, finishReason: FinishReason) {
         val stream = CompletionStream(model)
         writeSseHeaders()
-        writeChunk(stream, buildJsonObject {
-            put("role", "assistant")
-            put("content", text)
-        }, finishReason = null)
-        writeChunk(stream, buildJsonObject {}, FinishReason.Stop)
-        writeDone()
-    }
-
-    override fun OutputStream.writeStreamingToolCall(turn: OnDeviceToolCallProtocol.ModelTurn.ToolCall, model: ResponseModelId) {
-        val stream = CompletionStream(model)
-        writeSseHeaders()
-        if (turn.leadingText.isNotBlank()) {
+        if (reply.text.isNotEmpty() || reply.toolCalls.isEmpty()) {
             writeChunk(stream, buildJsonObject {
                 put("role", "assistant")
-                put("content", turn.leadingText)
+                put("content", reply.text)
             }, finishReason = null)
         }
-        // pi-ai's parser accepts the whole arguments string in one delta.
-        writeChunk(stream, buildJsonObject {
-            put("role", "assistant")
-            put("tool_calls", buildJsonArray { add(toolCallJson(turn)) })
-        }, finishReason = null)
-        writeChunk(stream, buildJsonObject {}, FinishReason.ToolCalls)
+        // pi-ai's parser accepts each call's whole arguments string in one delta.
+        if (reply.toolCalls.isNotEmpty()) {
+            writeChunk(stream, buildJsonObject {
+                put("role", "assistant")
+                put("tool_calls", toolCallsJson(reply.toolCalls))
+            }, finishReason = null)
+        }
+        writeChunk(stream, buildJsonObject {}, finishReason)
         writeDone()
     }
 
@@ -103,17 +88,23 @@ internal class OpenAiCompletions(private val json: Json) : OpenAiCompletionWrite
             )
         }
 
-    private fun toolCallJson(turn: OnDeviceToolCallProtocol.ModelTurn.ToolCall): JsonObject = buildJsonObject {
-        put("index", 0)
-        put("id", "call_${UUID.randomUUID()}")
-        put("type", "function")
-        put(
-            "function",
-            buildJsonObject {
-                put("name", turn.name)
-                put("arguments", turn.argumentsJson)
-            },
-        )
+    private fun toolCallsJson(calls: List<OnDeviceToolCall>): JsonArray = buildJsonArray {
+        calls.forEachIndexed { index, call ->
+            add(
+                buildJsonObject {
+                    put("index", index)
+                    put("id", call.id ?: "call_${UUID.randomUUID()}")
+                    put("type", "function")
+                    put(
+                        "function",
+                        buildJsonObject {
+                            put("name", call.name)
+                            put("arguments", call.argumentsJson)
+                        },
+                    )
+                },
+            )
+        }
     }
 
     /** A chunk's `finish_reason` is null until the last one, which carries an empty delta. */
@@ -158,3 +149,10 @@ internal class OpenAiCompletions(private val json: Json) : OpenAiCompletionWrite
  * wording in its message ends the turn instead.
  */
 internal const val NON_RETRYABLE_STATUS = 422
+
+/** Tool calls end the turn as `tool_calls`; a reply the output cap or the timeout cut is `length`. */
+internal fun finishReasonOf(reply: OnDeviceReply, generation: OnDeviceGeneration): FinishReason = when {
+    reply.toolCalls.isNotEmpty() -> FinishReason.ToolCalls
+    generation.stopReason == OnDeviceStopReason.MaxTokens || generation.stopReason == OnDeviceStopReason.Timeout -> FinishReason.Length
+    else -> FinishReason.Stop
+}

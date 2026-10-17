@@ -53,7 +53,7 @@ class CompactAgentProfileTest {
     }
 
     @Test
-    fun aCompactCreateRequestHasTheShortPromptTheTagsAndNoTools() {
+    fun aCompactCreateRequestHasTheShortPromptTheTagAndNoServerTools() {
         val params = CompactAgentProfile.applyTo(
             AgentCreateParams(
                 name = "bobs",
@@ -67,13 +67,21 @@ class CompactAgentProfileTest {
 
         assertEquals(JsonPrimitive(CompactAgentProfile.SYSTEM_PROMPT), body["system"])
         assertEquals(
-            listOf("team", CompactAgentProfile.TAG, CompactAgentProfile.MEMFS_DISABLED_TAG),
+            listOf("team", CompactAgentProfile.TAG),
             (body["tags"] as JsonArray).map { (it as JsonPrimitive).content },
         )
         assertEquals(JsonPrimitive(false), body["include_base_tools"])
         assertNull(body["tool_ids"])
         assertNull(body["tools"])
         assertTrue(CompactAgentProfile.SYSTEM_PROMPT.length in 400..800)
+    }
+
+    @Test
+    fun aCompactAgentKeepsASmallCoreToolsetAndItsMemory() {
+        assertEquals(listOf("Memory", "Read", "device_action"), CompactAgentProfile.CLIENT_TOOLS)
+        assertFalse(CompactAgentProfile.SYSTEM_PROMPT.contains("no tools"))
+        val tags = CompactAgentProfile.applyTo(AgentCreateParams(name = "a")).tags.orEmpty()
+        assertFalse("memfs:disabled" in tags, "the Memory tool needs the memory filesystem")
     }
 
     @Test

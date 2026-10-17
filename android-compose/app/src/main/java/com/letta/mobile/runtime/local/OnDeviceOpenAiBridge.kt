@@ -13,7 +13,6 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
@@ -49,18 +48,18 @@ interface OnDeviceOpenAiBridge {
 }
 
 /**
- * Runs one on-device generation. An engine streams its output into [OnDeviceGeneration.accept]
+ * Runs one on-device generation. An engine streams its text into [OnDeviceGeneration.accept]
  * and stops as soon as that returns false, registers its native cancel with
  * [OnDeviceGeneration.onCancel] (the bridge cancels on client disconnect and timeout), and
- * returns [OnDeviceGeneration.text]: never a run that outlives its request.
+ * returns [OnDeviceGeneration.text] with the tool calls the model made: never a run that
+ * outlives its request. A request it cannot run as sent fails with [OnDeviceRequestRejected].
  */
 interface OnDeviceChatCompletionEngine {
     fun generate(
         modelSelection: EmbeddedLettaCodeModelSelection,
-        prompt: String,
-        images: List<OnDeviceImage> = emptyList(),
+        request: OnDeviceChatRequest,
         generation: OnDeviceGeneration = OnDeviceGeneration(),
-    ): Result<String>
+    ): Result<OnDeviceReply>
 }
 
 @Singleton
@@ -213,15 +212,22 @@ class LocalOpenAiOnDeviceBridge internal constructor(
                 return
             }
             android.util.Log.d("OnDeviceOpenAiBridge", "request: $method $path bodyBytes=$resolvedContentLength")
-            route(socket, "$method $path", body)
+            route(socket, BridgeHttpRequest("$method $path", body))
         }
 
-        private fun route(socket: Socket, route: String, body: String) {
-            when (route) {
+        /** One authorized request: its `METHOD /path` and its body. */
+        private class BridgeHttpRequest(val route: String, val body: String)
+
+        private fun route(socket: Socket, request: BridgeHttpRequest) {
+            when (request.route) {
                 "GET /v1/models" -> socket.outputStream.writeJsonResponse(200, modelsBody())
-                "GET $LM_STUDIO_MODELS_PATH" -> socket.outputStream.writeJsonResponse(200, lmStudioModelsBody(servedModelId, capability))
-                "POST /v1/chat/completions" -> handleChatCompletion(socket, body)
-                else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: ${route.substringAfter(' ')}"))
+                "GET $LM_STUDIO_MODELS_PATH" ->
+                    socket.outputStream.writeJsonResponse(200, lmStudioModelsBody(servedModelId, capability, modelSelection.maxTokens))
+                "POST /v1/chat/completions" -> handleChatCompletion(socket, request)
+                else -> socket.outputStream.writeJsonResponse(
+                    404,
+                    errorBody("not_found", "Unknown route: ${request.route.substringAfter(' ')}"),
+                )
             }
         }
 
@@ -235,9 +241,9 @@ class LocalOpenAiOnDeviceBridge internal constructor(
             )
         }
 
-        private fun handleChatCompletion(socket: Socket, body: String) {
+        private fun handleChatCompletion(socket: Socket, http: BridgeHttpRequest) {
             val output = socket.outputStream
-            val request = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
+            val request = runCatching { json.parseToJsonElement(http.body).jsonObject }.getOrNull()
             if (request == null) {
                 output.writeJsonResponse(400, errorBody("invalid_request", "Request body is not valid JSON."))
                 return
@@ -248,51 +254,62 @@ class LocalOpenAiOnDeviceBridge internal constructor(
                 LITERT_BRIDGE_TAG,
                 "incoming model=${requestedModelId ?: "<missing>"} served=$servedModelId comparison=not_enforced response=$responseModelId",
             )
-            val filteredRequest = applyOnDeviceToolPolicy(request)
-            val prompt = OnDeviceToolCallProtocol.renderPrompt(filteredRequest)
-            val images = imagesForEngine(output, OnDeviceToolCallProtocol.extractImages(filteredRequest)) ?: return
+            val chat = try {
+                OpenAiChatTranslation.translate(request).also(::checkImagesSupported)
+            } catch (rejected: OnDeviceRequestRejected) {
+                output.writeRejection(rejected)
+                return
+            }
             val stream = request["stream"]?.jsonPrimitive?.booleanOrNull == true
             val generation = OnDeviceGeneration(OnDeviceGenerationLimits.forRequest(request, modelSelection, generationTimeoutMs))
             logLiteRtInfo(
                 "bridge_inference_start",
-                "handle=${modelSelection.modelHandle} promptChars=${prompt.length} images=${images.size} stream=$stream " +
+                "handle=${modelSelection.modelHandle} requestChars=${http.body.length} history=${chat.history.size} " +
+                    "latestRole=${chat.latest.role} images=${chat.images.size} tools=${chat.tools.size} " +
+                    "toolNames=${chat.tools.joinToString(",") { it.name }} stream=$stream " +
                     "maxOutputTokens=${generation.limits.maxOutputTokens} timeoutMs=${generation.limits.timeoutMs}",
             )
             val result = guards.guard(socket, generation) {
-                engine.generate(modelSelection, prompt, images, generation)
+                engine.generate(modelSelection, chat, generation)
             }
             if (answeredStoppedGeneration(output, generation)) return
-            writeResult(output, result, stream, ResponseModelId(responseModelId))
+            writeResult(output, result, ReplyTarget(stream, ResponseModelId(responseModelId), generation))
         }
 
-        private fun writeResult(output: OutputStream, result: Result<String>, stream: Boolean, responseModelId: ResponseModelId) {
+        /** How a reply goes out: streamed or as one body, the model id it names, the generation it ends. */
+        private class ReplyTarget(val stream: Boolean, val model: ResponseModelId, val generation: OnDeviceGeneration)
+
+        private fun writeResult(output: OutputStream, result: Result<OnDeviceReply>, target: ReplyTarget) {
             result.fold(
-                onSuccess = { raw ->
-                    logLiteRtInfo("bridge_inference_complete", "handle=${modelSelection.modelHandle} rawChars=${raw.length}")
-                    if (raw.isDegenerateLiteRtOutput()) {
-                        logLiteRtInfo("bridge_repetition_guard", "handle=${modelSelection.modelHandle} rawChars=${raw.length} preview=${raw.take(80).lineSafe()}")
+                onSuccess = { reply ->
+                    logLiteRtInfo(
+                        "bridge_inference_complete",
+                        "handle=${modelSelection.modelHandle} rawChars=${reply.text.length} toolCalls=${reply.toolCalls.size} " +
+                            "toolCallNames=${reply.toolCalls.joinToString(",") { it.name }}",
+                    )
+                    if (reply.toolCalls.isEmpty() && reply.text.isDegenerateLiteRtOutput()) {
+                        logLiteRtInfo(
+                            "bridge_repetition_guard",
+                            "handle=${modelSelection.modelHandle} rawChars=${reply.text.length} preview=${reply.text.take(80).lineSafe()}",
+                        )
                         output.writeJsonResponse(
                             NON_RETRYABLE_STATUS,
                             errorBody("on_device_degenerate_output", "On-device model produced degenerate repeated output; try a shorter prompt or reset the conversation."),
                         )
                         return@fold
                     }
-                    when (val turn = OnDeviceToolCallProtocol.parseModelOutput(raw)) {
-                        is OnDeviceToolCallProtocol.ModelTurn.Text ->
-                            if (stream) {
-                                output.writeStreamingCompletion(turn.text, responseModelId)
-                            } else {
-                                output.writeJsonResponse(200, completionBody(turn.text, responseModelId))
-                            }
-                        is OnDeviceToolCallProtocol.ModelTurn.ToolCall ->
-                            if (stream) {
-                                output.writeStreamingToolCall(turn, responseModelId)
-                            } else {
-                                output.writeJsonResponse(200, toolCallCompletionBody(turn, responseModelId))
-                            }
+                    val finishReason = finishReasonOf(reply, target.generation)
+                    if (target.stream) {
+                        output.writeStreamingCompletion(reply, target.model, finishReason)
+                    } else {
+                        output.writeJsonResponse(200, completionBody(reply, target.model, finishReason))
                     }
                 },
                 onFailure = { error ->
+                    if (error is OnDeviceRequestRejected) {
+                        output.writeRejection(error)
+                        return@fold
+                    }
                     logLiteRtError("bridge_inference_error", "handle=${modelSelection.modelHandle}", error)
                     output.writeJsonResponse(
                         503,
@@ -302,31 +319,25 @@ class LocalOpenAiOnDeviceBridge internal constructor(
             )
         }
 
+        /** A request the engine cannot run as sent: 400 when malformed, else a non-retryable 422 naming why. */
+        private fun OutputStream.writeRejection(rejected: OnDeviceRequestRejected) {
+            logLiteRtInfo(
+                "bridge_request_rejected",
+                "handle=${modelSelection.modelHandle} code=${rejected.code} message=${rejected.message.orEmpty().lineSafe()}",
+            )
+            val status = if (rejected.code == OpenAiChatTranslation.INVALID_REQUEST) 400 else NON_RETRYABLE_STATUS
+            writeJsonResponse(status, errorBody(rejected.code, rejected.message.orEmpty()))
+        }
 
-        /**
-         * The images to hand the engine, or null after answering: a catalog model without vision
-         * gets a clear error instead of a reply that silently ignores the picture.
-         */
-        private fun imagesForEngine(output: OutputStream, all: List<OnDeviceImage>): List<OnDeviceImage>? {
-            if (all.isNotEmpty() && capability.supportsImages == false) {
-                logLiteRtInfo("bridge_images_rejected", "handle=${modelSelection.modelHandle} images=${all.size}")
-                output.writeJsonResponse(
-                    NON_RETRYABLE_STATUS,
-                    errorBody(
-                        "on_device_images_unsupported",
-                        "The on-device model $servedModelId does not accept images. Pick a vision model in Settings or send text.",
-                    ),
-                )
-                return null
-            }
-            val kept = all.takeLast(MAX_IMAGES_PER_REQUEST)
-            if (kept.size < all.size) {
-                logLiteRtInfo(
-                    "bridge_images_trimmed",
-                    "handle=${modelSelection.modelHandle} kept=${kept.size} dropped=${all.size - kept.size}",
+        /** A catalog model without vision gets a clear error instead of a reply that silently ignores the picture. */
+        private fun checkImagesSupported(chat: OnDeviceChatRequest) {
+            val count = chat.images.size
+            if (count > 0 && capability.supportsImages == false) {
+                throw OnDeviceRequestRejected(
+                    "on_device_images_unsupported",
+                    "The on-device model $servedModelId does not accept images. Pick a vision model in Settings or send text.",
                 )
             }
-            return kept
         }
 
         /**
@@ -350,17 +361,6 @@ class LocalOpenAiOnDeviceBridge internal constructor(
                 }
                 else -> false
             }
-        }
-
-        private fun applyOnDeviceToolPolicy(request: JsonObject): JsonObject {
-            if (!modelSelection.isLiteRtLmRuntime()) return request
-            val tools = request["tools"] as? JsonArray
-            if (tools.isNullOrEmpty()) return request
-            logLiteRtInfo(
-                "bridge_tool_policy",
-                "handle=${modelSelection.modelHandle} runtime=${modelSelection.runtime} action=drop_tools count=${tools.size}",
-            )
-            return JsonObject(request.filterKeys { key -> key != "tools" && key != "tool_choice" })
         }
 
         private fun modelsBody(): JsonObject = buildJsonObject {
@@ -433,14 +433,8 @@ class LocalOpenAiOnDeviceBridge internal constructor(
         private const val LITERT_BRIDGE_TAG = "LITERT_BRIDGE"
 
 
-        /**
-         * The most recent images only: each costs the small engine context (gemma-3n: ~256 tokens
-         * of a 4096-token window), and older ones belong to turns the prompt already trimmed.
-         */
-        private const val MAX_IMAGES_PER_REQUEST = 2
-
-        // Generous bound for chat-completion payloads (the full local system
-        // prompt + transcript is ~50 KB today); rejects pathological
+        // Generous bound for chat-completion payloads (letta-code's full
+        // request with every tool schema is ~110 KB); rejects pathological
         // Content-Length values before allocation.
         private const val MAX_BODY_BYTES = 8 * 1024 * 1024
     }
@@ -470,11 +464,6 @@ private fun java.io.InputStream.readHttpLine(): String? {
     }
     return line.toString()
 }
-
-private fun EmbeddedLettaCodeModelSelection.isLiteRtLmRuntime(): Boolean =
-    runtime.equals("litert-lm", ignoreCase = true) ||
-        modelHandle.contains("litert", ignoreCase = true)
-
 
 private fun String.isDegenerateLiteRtOutput(): Boolean {
     val compact = filterNot { it.isWhitespace() }
