@@ -107,7 +107,8 @@ class ConfigViewModel @Inject constructor(
         const val LOCAL_RUNTIME_URL = "local-lettacode://device"
         const val DEFAULT_LOCAL_MODEL_HANDLE = "local/model"
         const val DEFAULT_LOCAL_MODEL_RUNTIME = "litert-lm"
-        const val DEFAULT_LOCAL_MODEL_ACCELERATOR = "cpu"
+        // letta-mobile-by4vm.121: GPU first; the engine falls back to CPU when the GPU fails.
+        const val DEFAULT_LOCAL_MODEL_ACCELERATOR = "gpu"
         const val DEFAULT_LOCAL_MODEL_MAX_TOKENS = "4096"
     }
 

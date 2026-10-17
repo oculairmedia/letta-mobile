@@ -13,6 +13,9 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -70,6 +73,50 @@ class AppServerClientTest {
         val ack = accepted.await()
         assertEquals(true, ack.accepted)
         assertEquals(true, ack.queued)
+    }
+
+    /** A compact agent's run drops the skills catalog (a second runtime_start) and its inputs offer no tools. */
+    @Test
+    fun aCompactAgentsRunHasNoSkillsAndItsInputsNoTools() = runTest {
+        val transport = FakeAppServerTransport()
+        val client = DefaultAppServerClient(transport, parentScope = backgroundScope, requestTimeoutMs = 1_000)
+        val compactAgent = buildJsonObject {
+            put("id", "agent-1")
+            put("tags", buildJsonArray { add("profile:compact") })
+        }
+
+        val started = backgroundScope.async {
+            client.runtimeStart(AppServerCommand.RuntimeStart(requestId = "start-1", agentId = "agent-1"))
+        }
+        runCurrent()
+        assertEquals(null, assertIs<AppServerCommand.RuntimeStart>(transport.sentControlCommands.single()).skillSources)
+        transport.emitControl(runtimeStartResponse("start-1", runtime).copy(agent = compactAgent))
+        runCurrent()
+        val followUp = assertIs<AppServerCommand.RuntimeStart>(transport.sentControlCommands[1])
+        assertEquals(emptyList(), followUp.skillSources)
+        assertEquals("conv-1", followUp.conversationId)
+        transport.emitControl(runtimeStartResponse(followUp.requestId, runtime))
+        assertEquals(runtime, started.await().runtime)
+
+        client.input(
+            AppServerCommand.Input(
+                runtime = runtime,
+                payload = AppServerInputPayload.CreateMessage(
+                    listOf(AppServerInputMessage.userText("hi")),
+                    clientToolAllowlist = listOf("Canvas"),
+                ),
+            ),
+        )
+        val sent = assertIs<AppServerCommand.Input>(transport.sentControlCommands[2])
+        assertEquals(emptyList(), assertIs<AppServerInputPayload.CreateMessage>(sent.payload).clientToolAllowlist)
+
+        // Known compact now: the next run starts without skills at once.
+        val again = backgroundScope.async { client.runtimeStart(AppServerCommand.RuntimeStart(requestId = "start-2", agentId = "agent-1")) }
+        runCurrent()
+        assertEquals(emptyList(), assertIs<AppServerCommand.RuntimeStart>(transport.sentControlCommands[3]).skillSources)
+        transport.emitControl(runtimeStartResponse("start-2", runtime).copy(agent = compactAgent))
+        again.await()
+        assertEquals(4, transport.sentControlCommands.size)
     }
 
     // letta-mobile-qygvv.6

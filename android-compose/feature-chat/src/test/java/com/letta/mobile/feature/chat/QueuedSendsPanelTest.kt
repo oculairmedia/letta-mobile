@@ -9,6 +9,8 @@ import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.data.chat.send.QueuedChatSend
 import com.letta.mobile.data.chat.send.QueuedSendId
+import com.letta.mobile.data.chat.send.ServerQueueBlocker
+import com.letta.mobile.ui.chat.QUEUED_BEHIND_OWN_STOP_LABEL
 import com.letta.mobile.ui.chat.QUEUED_ON_SERVER_LABEL
 import com.letta.mobile.ui.chat.QueuedSendActions
 import com.letta.mobile.ui.chat.QueuedSendsPanel
@@ -91,6 +93,20 @@ class QueuedSendsPanelTest {
         composeRule.onNodeWithTag(QueuedSendsPanelTestTags.ON_SERVER).assertIsDisplayed()
         composeRule.onNodeWithText(QUEUED_ON_SERVER_LABEL).assertIsDisplayed()
         composeRule.onNodeWithText("sent from phone").assertIsDisplayed()
+    }
+
+    // letta-mobile-by4vm.121: parked behind this device's own stopped turn, not another client's.
+    @Test
+    fun `a send parked behind our own stopped turn says it waits for that response to stop`() {
+        render(
+            ConversationSendQueue(
+                queuedOnServer = send("s", "hi"),
+                queuedOnServerBehind = ServerQueueBlocker.OwnStoppingTurn,
+            ),
+        )
+
+        composeRule.onNodeWithText(QUEUED_BEHIND_OWN_STOP_LABEL).assertIsDisplayed()
+        composeRule.onNodeWithText(QUEUED_ON_SERVER_LABEL).assertDoesNotExist()
     }
 
     @Test
