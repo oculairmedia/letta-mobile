@@ -268,7 +268,8 @@ class LocalOpenAiOnDeviceBridge internal constructor(
                     "latestRole=${chat.latest.role} images=${chat.images.size} tools=${chat.tools.size} " +
                     "toolNames=${chat.tools.joinToString(",") { it.name }} stream=$stream " +
                     "estimatedPromptTokens=${OnDeviceContextBudget.estimatePromptTokens(chat)} contextTokens=${modelSelection.maxTokens} " +
-                    "requestedMaxTokens=${generation.limits.requestedMaxOutputTokens ?: "none"} " +
+                    "requestedMaxTokens=${generation.limits.clientMaxOutputTokens ?: "none"} " +
+                    "honoredMaxTokens=${generation.limits.requestedMaxOutputTokens ?: "none"} " +
                     "maxOutputTokens=${generation.limits.maxOutputTokens} timeoutMs=${generation.limits.timeoutMs}",
             )
             // A request that may overflow the window never reaches LiteRT-LM: a large overflow aborts the process.

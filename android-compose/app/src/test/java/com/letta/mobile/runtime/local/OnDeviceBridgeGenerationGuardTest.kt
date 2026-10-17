@@ -77,13 +77,13 @@ class OnDeviceBridgeGenerationGuardTest {
     fun `the request max_tokens caps the output`() {
         val engine = StreamingEngine()
         LocalOpenAiOnDeviceBridge(engine).start(selection()).use { session ->
-            val (code, body) = post(session, """{"max_tokens":40,"messages":[{"role":"user","content":"go"}]}""")
+            val (code, body) = post(session, """{"max_tokens":200,"messages":[{"role":"user","content":"go"}]}""")
 
             assertEquals(200, code)
             val generation = engine.generations.single()
             assertEquals(OnDeviceStopReason.MaxTokens, generation.stopReason)
-            assertEquals(40, generation.limits.maxOutputTokens)
-            assertTrue(engine.chunksSent <= 41)
+            assertEquals(200, generation.limits.maxOutputTokens)
+            assertTrue(engine.chunksSent <= 201)
             assertTrue("the client's own limit is reported as length", body.contains("\"finish_reason\":\"length\""))
         }
     }
@@ -98,6 +98,22 @@ class OnDeviceBridgeGenerationGuardTest {
             assertEquals(OnDeviceGenerationLimits.DEFAULT_MAX_OUTPUT_TOKENS, engine.generations.single().limits.maxOutputTokens)
             assertEquals(OnDeviceStopReason.MaxTokens, engine.generations.single().stopReason)
             // letta-code fails a `length` turn; the bridge's own ceiling delivers the reply as `stop`.
+            assertTrue(body.contains("\"finish_reason\":\"stop\""))
+        }
+    }
+
+    /** Device report: letta-code's window clamp asked for max_tokens=1; the reply must not be cut to one token. */
+    @Test
+    fun `a degenerate client max_tokens from letta-code's window clamp is ignored`() {
+        val engine = StreamingEngine(chunkLimit = 5)
+        LocalOpenAiOnDeviceBridge(engine).start(selection()).use { session ->
+            val (code, body) = post(session, """{"max_tokens":1,"messages":[{"role":"user","content":"hi"}]}""")
+
+            assertEquals(200, code)
+            val limits = engine.generations.single().limits
+            assertEquals(OnDeviceGenerationLimits.DEFAULT_MAX_OUTPUT_TOKENS, limits.maxOutputTokens)
+            assertEquals(1, limits.clientMaxOutputTokens)
+            assertTrue(body.contains("t0 t1 t2 t3 t4"))
             assertTrue(body.contains("\"finish_reason\":\"stop\""))
         }
     }
