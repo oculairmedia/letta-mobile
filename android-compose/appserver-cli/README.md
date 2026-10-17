@@ -61,9 +61,9 @@ Set `APP_SERVER_TEST_TOKEN` or pass `--token` for any server started with
 `src/test/resources/appserver/restart-replay-evidence.json` is **observed**, not
 hand-authored. `AppServerRestartReplayEvidenceTest` runs everywhere and hard-fails
 when the evidence's `source.version` drifts from
-`AppServerRestartReplayEvidence.PINNED_LETTA_CODE_VERSION`. The evidence is still
-the 0.29.12 capture; re-capturing it at the 0.34.14 contract is letta-mobile-ckmub.13
-(it needs a model provider, so it runs on the Linux host). `AppServerRestartReplayProbeTest` is the
+`AppServerRestartReplayEvidence.PINNED_LETTA_CODE_VERSION`. The evidence was
+last captured at the 0.34.14 contract on 2026-10-17 with Node v24.18.0 (letta-mobile-ckmub.13; it needs a
+model provider, so it runs on the Linux host). `AppServerRestartReplayProbeTest` is the
 capture tool: it launches a real `letta.js app-server`, runs a turn, kills and
 restarts the process against the same backend root, replays the same
 `client_message_id`, and reads the on-disk transcript. It skips unless the
