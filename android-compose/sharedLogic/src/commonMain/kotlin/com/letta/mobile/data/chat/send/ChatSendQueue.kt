@@ -43,6 +43,8 @@ data class ConversationSendQueue(
      * its own queue behind another client's turn. Shown, not run: it leaves once it starts.
      */
     val queuedOnServer: QueuedChatSend? = null,
+    /** What [queuedOnServer] waits behind (letta-mobile-by4vm.121). */
+    val queuedOnServerBehind: ServerQueueBlocker = ServerQueueBlocker.OtherClient,
 ) {
     val isEmpty: Boolean get() = items.isEmpty() && queuedOnServer == null
 
@@ -153,14 +155,14 @@ class ChatSendQueue {
         _state.value.filterValues { it.heldByOtherClient }.keys.toList()
 
     /** letta-mobile-1n5py.1: [item] was sent and now waits in the App Server's queue. */
-    fun markQueuedOnServer(item: QueuedChatSend) {
-        updateQueue(item.conversationId) { it.copy(queuedOnServer = item) }
+    fun markQueuedOnServer(item: QueuedChatSend, behind: ServerQueueBlocker = ServerQueueBlocker.OtherClient) {
+        updateQueue(item.conversationId) { it.copy(queuedOnServer = item, queuedOnServerBehind = behind) }
     }
 
     /** [conversationId]'s server-queued send started or ended; returns true when one was shown. */
     fun clearQueuedOnServer(conversationId: QueueConversationId): Boolean {
         if (queueFor(conversationId).queuedOnServer == null) return false
-        updateQueue(conversationId) { it.copy(queuedOnServer = null) }
+        updateQueue(conversationId) { it.copy(queuedOnServer = null, queuedOnServerBehind = ServerQueueBlocker.OtherClient) }
         return true
     }
 
@@ -181,4 +183,17 @@ class ChatSendQueue {
     private companion object {
         val EMPTY = ConversationSendQueue()
     }
+}
+
+/**
+ * letta-mobile-by4vm.121: what a send parked in the App Server's queue waits behind. The server
+ * says only that the input is queued; this device knows when it just stopped a turn of its own
+ * there, whose run can take a while to wind down (an on-device model finishing its generation).
+ */
+enum class ServerQueueBlocker {
+    /** Another client (a second device) runs the conversation's turn. */
+    OtherClient,
+
+    /** This device's own turn, stopped, still finishing on the server. */
+    OwnStoppingTurn,
 }

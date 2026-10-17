@@ -7,6 +7,7 @@ import com.letta.mobile.runtime.local.BuildConfigEmbeddedLettaCodeRuntimeStatusP
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.LiteRtLmOnDeviceChatCompletionEngine
 import com.letta.mobile.runtime.local.LocalAndroidNetworkBridge
+import com.letta.mobile.runtime.local.CatalogOnDeviceModelCapabilities
 import com.letta.mobile.runtime.local.LocalOpenAiOnDeviceBridge
 import com.letta.mobile.runtime.local.NativeLettaCodeNodeBridge
 import com.letta.mobile.runtime.local.AndroidLocalAppServerLaunchSource
@@ -24,6 +25,7 @@ import com.letta.mobile.runtime.local.AndroidLocalRuntimeDialer
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.runtime.local.OnDeviceChatCompletionEngine
 import com.letta.mobile.runtime.local.OnDeviceModelImporter
+import com.letta.mobile.runtime.local.OnDeviceModelCapabilities
 import com.letta.mobile.runtime.local.OnDeviceOpenAiBridge
 import com.letta.mobile.runtime.local.SafOnDeviceModelImporter
 import com.letta.mobile.runtime.clipboard.AndroidClipboardProvider
@@ -189,6 +191,12 @@ object RuntimeModule {
     @ElementsIntoSet
     @Singleton
     fun provideMobileExternalToolHandlers(): Set<MobileExternalToolHandler> = emptySet()
+
+    @Provides
+    @Singleton
+    fun provideOnDeviceModelCapabilities(
+        capabilities: CatalogOnDeviceModelCapabilities,
+    ): OnDeviceModelCapabilities = capabilities
 
     @Provides
     @Singleton

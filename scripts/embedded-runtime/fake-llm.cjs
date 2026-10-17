@@ -5,7 +5,9 @@
 // $FAKE_LLM_LOG, including any tool result text, so the caller can assert the tool really ran, and
 // the number of images in the last user message (`images`), so it can assert an image arrived.
 // Routes mirror the on-device bridge (OnDeviceOpenAiBridge): GET /v1/models lists FAKE_LLM_MODEL,
-// POST /v1/chat/completions answers, anything else (LM Studio's /api/v0/models) is a 404.
+// GET /api/v0/models lists it LM Studio style as a vision model (letta-mobile-by4vm.121: the only
+// way letta-code 0.34.14 lets an lmstudio model see images, so the image turn proves it), POST
+// /v1/chat/completions answers, anything else is a 404.
 // usage: FAKE_LLM_PORT=4711 FAKE_LLM_LOG=<log path> FAKE_LLM_MODEL=<served id> node fake-llm.cjs
 'use strict';
 const http = require('http');
@@ -83,6 +85,10 @@ http.createServer((req, res) => {
     if (req.url === '/v1/models') {
       res.writeHead(200, { 'content-type': 'application/json' });
       return res.end(JSON.stringify({ object: 'list', data: [{ id: MODEL, object: 'model', owned_by: 'ci' }] }));
+    }
+    if (req.url === '/api/v0/models') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ object: 'list', data: [{ id: MODEL, object: 'model', type: 'vlm', state: 'loaded', capabilities: ['vision'] }] }));
     }
     if (req.url !== '/v1/chat/completions') {
       res.writeHead(404, { 'content-type': 'application/json' });

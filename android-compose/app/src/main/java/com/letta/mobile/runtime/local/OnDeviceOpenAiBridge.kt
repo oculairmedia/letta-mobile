@@ -7,12 +7,11 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.security.MessageDigest
 import java.security.SecureRandom
-import java.time.Instant
 import java.util.Base64
 import java.util.Locale
-import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -49,18 +48,35 @@ interface OnDeviceOpenAiBridge {
     fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession
 }
 
+/**
+ * Runs one on-device generation. An engine streams its output into [OnDeviceGeneration.accept]
+ * and stops as soon as that returns false, registers its native cancel with
+ * [OnDeviceGeneration.onCancel] (the bridge cancels on client disconnect and timeout), and
+ * returns [OnDeviceGeneration.text]: never a run that outlives its request.
+ */
 interface OnDeviceChatCompletionEngine {
     fun generate(
         modelSelection: EmbeddedLettaCodeModelSelection,
         prompt: String,
         images: List<OnDeviceImage> = emptyList(),
+        generation: OnDeviceGeneration = OnDeviceGeneration(),
     ): Result<String>
 }
 
 @Singleton
-class LocalOpenAiOnDeviceBridge @Inject constructor(
+class LocalOpenAiOnDeviceBridge internal constructor(
     private val engine: OnDeviceChatCompletionEngine,
+    private val capabilities: OnDeviceModelCapabilities,
+    private val generationTimeoutMs: Long,
 ) : OnDeviceOpenAiBridge {
+    @Inject constructor(
+        engine: OnDeviceChatCompletionEngine,
+        capabilities: OnDeviceModelCapabilities,
+    ) : this(engine, capabilities, OnDeviceGenerationLimits.DEFAULT_TIMEOUT_MS)
+
+    /** No catalog (tests, the debug self-test): image support unknown, images pass through. */
+    constructor(engine: OnDeviceChatCompletionEngine) : this(engine, OnDeviceModelCapabilities.Unknown)
+
     private val json = Json { ignoreUnknownKeys = true }
     private val secureRandom = SecureRandom()
 
@@ -74,11 +90,17 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
         val executor = Executors.newCachedThreadPool { runnable ->
             Thread(runnable, "on-device-openai-bridge").apply { isDaemon = true }
         }
+        val timer = Executors.newSingleThreadScheduledExecutor { runnable ->
+            Thread(runnable, "on-device-openai-bridge-timeout").apply { isDaemon = true }
+        }
         val session = BridgeServerSession(
             serverSocket = serverSocket,
             executor = executor,
+            timer = timer,
             modelSelection = modelSelection,
             engine = engine,
+            capability = capabilities.forSelection(modelSelection),
+            generationTimeoutMs = generationTimeoutMs,
             json = json,
             authToken = authToken,
         )
@@ -100,12 +122,16 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
     private class BridgeServerSession(
         private val serverSocket: ServerSocket,
         private val executor: ExecutorService,
+        private val timer: ScheduledExecutorService,
         private val modelSelection: EmbeddedLettaCodeModelSelection,
         private val engine: OnDeviceChatCompletionEngine,
+        private val capability: OnDeviceModelCapability,
+        private val generationTimeoutMs: Long,
         private val json: Json,
         private val authToken: String,
-    ) {
+    ) : OpenAiCompletionWriter by OpenAiCompletions(json) {
         @Volatile private var closed = false
+        private val guards = OnDeviceGenerationGuards(executor, timer)
 
         /** The id letta-code looks up for the agents' handle (by4vm.121.1), never the prefixed handle. */
         private val servedModelId: String = lettaCodeLookupId(modelSelection.lettaCodeModelHandle)
@@ -121,6 +147,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
             closed = true
             runCatching { serverSocket.close() }
             executor.shutdownNow()
+            timer.shutdownNow()
         }
 
         private fun handleSocket(socket: Socket) {
@@ -186,10 +213,15 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 return
             }
             android.util.Log.d("OnDeviceOpenAiBridge", "request: $method $path bodyBytes=$resolvedContentLength")
-            when {
-                method == "GET" && path == "/v1/models" -> socket.outputStream.writeJsonResponse(200, modelsBody())
-                method == "POST" && path == "/v1/chat/completions" -> handleChatCompletion(socket.outputStream, body)
-                else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
+            route(socket, "$method $path", body)
+        }
+
+        private fun route(socket: Socket, route: String, body: String) {
+            when (route) {
+                "GET /v1/models" -> socket.outputStream.writeJsonResponse(200, modelsBody())
+                "GET $LM_STUDIO_MODELS_PATH" -> socket.outputStream.writeJsonResponse(200, lmStudioModelsBody(servedModelId, capability))
+                "POST /v1/chat/completions" -> handleChatCompletion(socket, body)
+                else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: ${route.substringAfter(' ')}"))
             }
         }
 
@@ -203,7 +235,8 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
             )
         }
 
-        private fun handleChatCompletion(output: OutputStream, body: String) {
+        private fun handleChatCompletion(socket: Socket, body: String) {
+            val output = socket.outputStream
             val request = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
             if (request == null) {
                 output.writeJsonResponse(400, errorBody("invalid_request", "Request body is not valid JSON."))
@@ -217,20 +250,29 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
             )
             val filteredRequest = applyOnDeviceToolPolicy(request)
             val prompt = OnDeviceToolCallProtocol.renderPrompt(filteredRequest)
-            val images = OnDeviceToolCallProtocol.extractImages(filteredRequest)
+            val images = imagesForEngine(output, OnDeviceToolCallProtocol.extractImages(filteredRequest)) ?: return
             val stream = request["stream"]?.jsonPrimitive?.booleanOrNull == true
+            val generation = OnDeviceGeneration(OnDeviceGenerationLimits.forRequest(request, modelSelection, generationTimeoutMs))
             logLiteRtInfo(
                 "bridge_inference_start",
-                "handle=${modelSelection.modelHandle} promptChars=${prompt.length} images=${images.size} stream=$stream",
+                "handle=${modelSelection.modelHandle} promptChars=${prompt.length} images=${images.size} stream=$stream " +
+                    "maxOutputTokens=${generation.limits.maxOutputTokens} timeoutMs=${generation.limits.timeoutMs}",
             )
-            val result = engine.generate(modelSelection, prompt, images)
+            val result = guards.guard(socket, generation) {
+                engine.generate(modelSelection, prompt, images, generation)
+            }
+            if (answeredStoppedGeneration(output, generation)) return
+            writeResult(output, result, stream, ResponseModelId(responseModelId))
+        }
+
+        private fun writeResult(output: OutputStream, result: Result<String>, stream: Boolean, responseModelId: ResponseModelId) {
             result.fold(
                 onSuccess = { raw ->
                     logLiteRtInfo("bridge_inference_complete", "handle=${modelSelection.modelHandle} rawChars=${raw.length}")
                     if (raw.isDegenerateLiteRtOutput()) {
                         logLiteRtInfo("bridge_repetition_guard", "handle=${modelSelection.modelHandle} rawChars=${raw.length} preview=${raw.take(80).lineSafe()}")
                         output.writeJsonResponse(
-                            503,
+                            NON_RETRYABLE_STATUS,
                             errorBody("on_device_degenerate_output", "On-device model produced degenerate repeated output; try a shorter prompt or reset the conversation."),
                         )
                         return@fold
@@ -261,6 +303,46 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
         }
 
 
+        /**
+         * The images to hand the engine, or null after answering: a catalog model without vision
+         * gets a clear error instead of a reply that silently ignores the picture.
+         */
+        private fun imagesForEngine(output: OutputStream, all: List<OnDeviceImage>): List<OnDeviceImage>? {
+            if (all.isNotEmpty() && capability.supportsImages == false) {
+                logLiteRtInfo("bridge_images_rejected", "handle=${modelSelection.modelHandle} images=${all.size}")
+                output.writeJsonResponse(
+                    NON_RETRYABLE_STATUS,
+                    errorBody("on_device_images_unsupported", "The on-device model $servedModelId does not accept images. Pick a vision model in Settings or send text."),
+                )
+                return null
+            }
+            val kept = all.takeLast(MAX_IMAGES_PER_REQUEST)
+            if (kept.size < all.size) {
+                logLiteRtInfo("bridge_images_trimmed", "handle=${modelSelection.modelHandle} kept=${kept.size} dropped=${all.size - kept.size}")
+            }
+            return kept
+        }
+
+        /**
+         * True when a stop left nothing to reply with: the client is gone (nobody reads a reply,
+         * and the engine is already free), or the timeout fired before any output.
+         */
+        private fun answeredStoppedGeneration(output: OutputStream, generation: OnDeviceGeneration): Boolean {
+            val reason = generation.stopReason ?: return false
+            logLiteRtInfo("bridge_generation_stopped", "handle=${modelSelection.modelHandle} reason=${reason.wire} outputChars=${generation.text.length}")
+            return when {
+                reason == OnDeviceStopReason.ClientDisconnected -> true
+                reason == OnDeviceStopReason.Timeout && generation.text.isBlank() -> {
+                    output.writeJsonResponse(
+                        NON_RETRYABLE_STATUS,
+                        errorBody("on_device_timeout", "On-device model did not answer within ${generation.limits.timeoutMs / 1_000} s."),
+                    )
+                    true
+                }
+                else -> false
+            }
+        }
+
         private fun applyOnDeviceToolPolicy(request: JsonObject): JsonObject {
             if (!modelSelection.isLiteRtLmRuntime()) return request
             val tools = request["tools"] as? JsonArray
@@ -286,199 +368,6 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                     )
                 },
             )
-        }
-
-        private fun completionBody(text: String, responseModelId: String): JsonObject = buildJsonObject {
-            put("id", "chatcmpl-${UUID.randomUUID()}")
-            put("object", "chat.completion")
-            put("created", Instant.now().epochSecond)
-            put("model", responseModelId)
-            put(
-                "choices",
-                buildJsonArray {
-                    add(
-                        buildJsonObject {
-                            put("index", 0)
-                            put(
-                                "message",
-                                buildJsonObject {
-                                    put("role", "assistant")
-                                    put("content", text)
-                                },
-                            )
-                            put("finish_reason", "stop")
-                        }
-                    )
-                },
-            )
-        }
-
-        private fun toolCallJson(turn: OnDeviceToolCallProtocol.ModelTurn.ToolCall, id: String): JsonObject =
-            buildJsonObject {
-                put("index", 0)
-                put("id", id)
-                put("type", "function")
-                put(
-                    "function",
-                    buildJsonObject {
-                        put("name", turn.name)
-                        put("arguments", turn.argumentsJson)
-                    },
-                )
-            }
-
-        private fun toolCallCompletionBody(
-            turn: OnDeviceToolCallProtocol.ModelTurn.ToolCall,
-            responseModelId: String,
-        ): JsonObject =
-            buildJsonObject {
-                put("id", "chatcmpl-${UUID.randomUUID()}")
-                put("object", "chat.completion")
-                put("created", Instant.now().epochSecond)
-                put("model", responseModelId)
-                put(
-                    "choices",
-                    buildJsonArray {
-                        add(
-                            buildJsonObject {
-                                put("index", 0)
-                                put(
-                                    "message",
-                                    buildJsonObject {
-                                        put("role", "assistant")
-                                        if (turn.leadingText.isNotBlank()) {
-                                            put("content", turn.leadingText)
-                                        } else {
-                                            put("content", null as String?)
-                                        }
-                                        put("tool_calls", buildJsonArray { add(toolCallJson(turn, newToolCallId())) })
-                                    },
-                                )
-                                put("finish_reason", "tool_calls")
-                            }
-                        )
-                    },
-                )
-            }
-
-        private fun OutputStream.writeStreamingToolCall(
-            turn: OnDeviceToolCallProtocol.ModelTurn.ToolCall,
-            responseModelId: String,
-        ) {
-            val id = "chatcmpl-${UUID.randomUUID()}"
-            val created = Instant.now().epochSecond
-            writeHeaders(200, "text/event-stream; charset=utf-8")
-            if (turn.leadingText.isNotBlank()) {
-                writeSseChunk(id, created, responseModelId, turn.leadingText, finishReason = null)
-            }
-            // pi-ai's parser accepts the whole arguments string in one delta.
-            val toolCallChunk = buildJsonObject {
-                put("id", id)
-                put("object", "chat.completion.chunk")
-                put("created", created)
-                put("model", responseModelId)
-                put(
-                    "choices",
-                    buildJsonArray {
-                        add(
-                            buildJsonObject {
-                                put("index", 0)
-                                put(
-                                    "delta",
-                                    buildJsonObject {
-                                        put("role", "assistant")
-                                        put("tool_calls", buildJsonArray { add(toolCallJson(turn, newToolCallId())) })
-                                    },
-                                )
-                                put("finish_reason", null as String?)
-                            }
-                        )
-                    },
-                )
-            }
-            write("data: ${json.encodeToString(JsonObject.serializer(), toolCallChunk)}\n\n".toByteArray(Charsets.UTF_8))
-            writeFinishChunk(id, created, responseModelId, finishReason = "tool_calls")
-            write("data: [DONE]\n\n".toByteArray(Charsets.UTF_8))
-            flush()
-        }
-
-        private fun OutputStream.writeFinishChunk(
-            id: String,
-            created: Long,
-            responseModelId: String,
-            finishReason: String,
-        ) {
-            val body = buildJsonObject {
-                put("id", id)
-                put("object", "chat.completion.chunk")
-                put("created", created)
-                put("model", responseModelId)
-                put(
-                    "choices",
-                    buildJsonArray {
-                        add(
-                            buildJsonObject {
-                                put("index", 0)
-                                put("delta", buildJsonObject {})
-                                put("finish_reason", finishReason)
-                            }
-                        )
-                    },
-                )
-            }
-            write("data: ${json.encodeToString(JsonObject.serializer(), body)}\n\n".toByteArray(Charsets.UTF_8))
-        }
-
-        private fun newToolCallId(): String = "call_${UUID.randomUUID()}"
-
-        private fun OutputStream.writeStreamingCompletion(text: String, responseModelId: String) {
-            val id = "chatcmpl-${UUID.randomUUID()}"
-            val created = Instant.now().epochSecond
-            writeHeaders(200, "text/event-stream; charset=utf-8")
-            writeSseChunk(id, created, responseModelId, text, finishReason = null)
-            writeSseChunk(id, created, responseModelId, "", finishReason = "stop")
-            write("data: [DONE]\n\n".toByteArray(Charsets.UTF_8))
-            flush()
-        }
-
-        private fun OutputStream.writeSseChunk(
-            id: String,
-            created: Long,
-            responseModelId: String,
-            text: String,
-            finishReason: String?,
-        ) {
-            val body = buildJsonObject {
-                put("id", id)
-                put("object", "chat.completion.chunk")
-                put("created", created)
-                put("model", responseModelId)
-                put(
-                    "choices",
-                    buildJsonArray {
-                        add(
-                            buildJsonObject {
-                                put("index", 0)
-                                put(
-                                    "delta",
-                                    buildJsonObject {
-                                        if (finishReason == null) {
-                                            put("role", "assistant")
-                                            put("content", text)
-                                        }
-                                    },
-                                )
-                                if (finishReason == null) {
-                                    put("finish_reason", null as String?)
-                                } else {
-                                    put("finish_reason", finishReason)
-                                }
-                            }
-                        )
-                    },
-                )
-            }
-            write("data: ${json.encodeToString(JsonObject.serializer(), body)}\n\n".toByteArray(Charsets.UTF_8))
         }
 
         private fun errorBody(code: String, message: String): JsonObject = buildJsonObject {
@@ -514,6 +403,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 400 -> "Bad Request"
                 401 -> "Unauthorized"
                 404 -> "Not Found"
+                NON_RETRYABLE_STATUS -> "Unprocessable Content"
                 503 -> "Service Unavailable"
                 else -> "OK"
             }
@@ -532,6 +422,13 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
     private companion object {
         private const val LOOPBACK_HOST = "127.0.0.1"
         private const val LITERT_BRIDGE_TAG = "LITERT_BRIDGE"
+
+
+        /**
+         * The most recent images only: each costs the small engine context (gemma-3n: ~256 tokens
+         * of a 4096-token window), and older ones belong to turns the prompt already trimmed.
+         */
+        private const val MAX_IMAGES_PER_REQUEST = 2
 
         // Generous bound for chat-completion payloads (the full local system
         // prompt + transcript is ~50 KB today); rejects pathological
