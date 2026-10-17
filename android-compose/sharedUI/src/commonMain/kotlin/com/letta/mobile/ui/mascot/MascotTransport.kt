@@ -46,12 +46,14 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import com.letta.mobile.avatar.core.MascotBody
+import com.letta.mobile.avatar.core.MascotDirector
 import com.letta.mobile.avatar.core.MascotEvent
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.avatar.core.MascotVector
 import com.letta.mobile.data.model.AgentId
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 
@@ -91,6 +93,9 @@ internal data class MascotSeatInfo(
 ) {
     val onClick: (() -> Unit)? get() = handlers.onClick
     val onEdit: (() -> Unit)? get() = handlers.onEdit
+
+    /** The seat answers anything at all - a click, the pencil, a drag - so its character may be touched. */
+    val takesInput: Boolean get() = handlers.onClick != null || handlers.editable || handlers.draggable
 
     /** The box the character is drawn in, before the seat's own scale. */
     val drawWidth: Float get() = seatDrawWidth()
@@ -327,6 +332,10 @@ private fun TransportedMascot(
         // Keyed on the flight's frame counter, so a body at rest asks for no frames.
         snapshotFlow { flight.observeFrame() }.collect { d.setMotion(flight.body.motionX, flight.body.motionY) }
     }
+    // The body answers the director's reactions (a poke, a trick, a send, a finished run) with a
+    // squash, and a drag's pick-up and drop reach the director (te3n1.4).
+    FlightReactionsEffect(flight, director, reducedMotion)
+    val dragFeel = rememberDragFeel(flight, director, reducedMotion)
     val landed: (Float) -> Unit = { impact ->
         transport.landed(flight, impact)
         director?.onEvent(MascotEvent.Landed(impact))
@@ -355,10 +364,19 @@ private fun TransportedMascot(
             .graphicsLayer { flight.applyPose(this, seat, reducedMotion, deform = !transport.rigCarriesBody) }
             // Hover (for the pencil) and drag only where the seat has them: a seat with neither
             // takes no input at all, and what it stands over (the Touch chat head) keeps its own.
-            .seatInput(seat.handlers, hover, flight),
+            .seatInput(seat.handlers, hover, SeatDrag(flight, dragFeel)),
         contentAlignment = Alignment.Center,
     ) {
-        MascotLive(agentId, identity, size = boxSize * seat.overscale, onClick = seat.onClick, sceneKey = sceneKey)
+        MascotLive(
+            agentId,
+            identity,
+            size = boxSize * seat.overscale,
+            onClick = seat.onClick,
+            sceneKey = sceneKey,
+            // A seat that takes input at all lets the character be poked and petted; one that
+            // takes none (over the Touch chat head) leaves every touch to what is under it.
+            interactive = seat.takesInput,
+        )
         // The pencil, in front of the character (the layer draws above every seat), on hover only:
         // one way to edit the agent from any mascot, so no seat needs to travel to the editor.
         seat.onEdit?.let { onEdit ->
@@ -410,10 +428,35 @@ private fun MascotTransport.landed(flight: MascotTransport.Flight, impact: Float
     motionListener?.onLanded(AgentId(agentId), impact)
 }
 
+/** Hooks [flight]'s body to [director]'s reactions ([FlightReactions]) while this slot shows it. */
+@Composable
+private fun FlightReactionsEffect(flight: MascotTransport.Flight, director: MascotDirector?, reducedMotion: Boolean) {
+    val transport = LocalMascotTransport.current
+    val reactions = remember(flight, transport) { FlightReactions(flight) { transport.rigCarriesBody } }
+    reactions.reducedMotion = reducedMotion
+    DisposableEffect(director, reactions) {
+        director?.reactionListener = reactions
+        onDispose { director?.takeIf { it.reactionListener === reactions }?.reactionListener = null }
+    }
+}
+
+/** [flight]'s drag feel, kept across recompositions and updated to this pass's director. */
+@Composable
+private fun rememberDragFeel(flight: MascotTransport.Flight, director: MascotDirector?, reducedMotion: Boolean): MascotDragFeel {
+    val feel = remember(flight) { MascotDragFeel(flight) }
+    feel.director = director
+    feel.haptics = LocalHaptics.current
+    feel.reducedMotion = reducedMotion
+    return feel
+}
+
+/** What a seat drag moves: the slot's body (its lean) and what it tells the character ([MascotDragFeel]). */
+private class SeatDrag(val flight: MascotTransport.Flight, val feel: MascotDragFeel)
+
 /** Hover for the pencil when the seat is [SeatHandlers.editable], drag when it is [SeatHandlers.draggable]. */
-private fun Modifier.seatInput(handlers: SeatHandlers, hover: MutableInteractionSource, flight: MascotTransport.Flight): Modifier {
+private fun Modifier.seatInput(handlers: SeatHandlers, hover: MutableInteractionSource, drag: SeatDrag): Modifier {
     val hoverInput = if (handlers.editable) Modifier.hoverable(hover) else Modifier
-    val dragInput = if (handlers.draggable) Modifier.seatDrag(handlers, flight) else Modifier
+    val dragInput = if (handlers.draggable) Modifier.seatDrag(handlers, drag) else Modifier
     return then(hoverInput).then(dragInput)
 }
 
@@ -421,14 +464,16 @@ private fun Modifier.seatInput(handlers: SeatHandlers, hover: MutableInteraction
  * Drags the character for [handlers]. A gesture is taken (its slop consumed) only when the seat's
  * gate is open as it starts; otherwise it is left alone for whatever is under the layer. The
  * pointer's velocity goes to [flight]'s body as host data (letta-mobile-te3n1: the host reads
- * gestures, the file animates), so the character leans into the drag and the rig hears it.
+ * gestures, the file animates), so the character leans into the drag and the rig hears it; the
+ * director holds DRAGGED from the slop to the release and lands it at the release speed (te3n1.4).
  */
-private fun Modifier.seatDrag(handlers: SeatHandlers, flight: MascotTransport.Flight): Modifier {
-    return pointerInput(handlers, flight) { seatDragGestures(handlers, flight) }
+private fun Modifier.seatDrag(handlers: SeatHandlers, drag: SeatDrag): Modifier {
+    return pointerInput(handlers, drag.flight) { seatDragGestures(handlers, drag) }
 }
 
 /** The gesture loop behind [seatDrag]: gate, slop, then every drag delta to the seat's handler in dp. */
-private suspend fun PointerInputScope.seatDragGestures(handlers: SeatHandlers, flight: MascotTransport.Flight) {
+private suspend fun PointerInputScope.seatDragGestures(handlers: SeatHandlers, seatDrag: SeatDrag) {
+    val flight = seatDrag.flight
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         if (!handlers.dragEnabled()) return@awaitEachGesture
@@ -436,6 +481,7 @@ private suspend fun PointerInputScope.seatDragGestures(handlers: SeatHandlers, f
             change.consume()
             handlers.onDrag?.invoke(overSlop.x.toDp().value, overSlop.y.toDp().value)
         } ?: return@awaitEachGesture
+        seatDrag.feel.pickedUp()
         var vx = 0f
         var vy = 0f
         try {
@@ -458,6 +504,7 @@ private suspend fun PointerInputScope.seatDragGestures(handlers: SeatHandlers, f
         } finally {
             flight.body.drag(null)
             flight.wakes++
+            seatDrag.feel.putDown(vx, vy)
         }
     }
 }

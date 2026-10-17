@@ -30,6 +30,13 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import com.letta.mobile.avatar.core.MascotGesture
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.avatar.core.AvatarLookTarget
 import com.letta.mobile.avatar.core.GazeMath
 import com.letta.mobile.avatar.core.GazePoint
@@ -135,6 +142,12 @@ fun MascotLive(
      * a new scene brought up for each agent.
      */
     sceneKey: String = agentId,
+    /**
+     * The character answers touch and pointer (hover, poke, pet, double-click tricks; te3n1.4). On
+     * by default wherever it is a control; a seat that takes input without a click (a hero with an
+     * edit pencil) turns it on too, and one that must leave every touch to what is under it, off.
+     */
+    interactive: Boolean = onClick != null,
 ) {
     val host = LocalMascotHost.current
     val registry = LocalMascotRegistry.current
@@ -151,20 +164,10 @@ fun MascotLive(
     }
     // At rest (idle, no pointer, its last beat played out) the scene holds its pose and no frame
     // is asked for: a seat that stays composed must not redraw the window every vsync (MascotRest).
-    val moving = rememberMascotMoving(mascotEngaged(presence, pointerPresent = pointerPresent), identity)
-    // The director's timers (listening release, success hold, blink schedule) need a clock;
-    // tickTo is idempotent per frame so several surfaces of one agent tick it once. The keystroke
-    // count is read here, not in composition, so typing never recomposes the tile.
-    LaunchedEffect(entry, moving) {
-        if (moving) {
-            while (true) {
-                withFrameNanos {
-                    entry.setKeystrokes(registry.composerKeystrokes)
-                    entry.tickTo(it)
-                }
-            }
-        }
-    }
+    val gestures = rememberMascotGestureEffects(entry, onClick, reducedMotion)
+    val engaged = mascotEngaged(presence, pointerPresent = pointerPresent) || gestures.petting
+    val moving = rememberMascotMoving(engaged, identity, gestures.touches)
+    MascotClock(entry, moving, registry)
     // Gaze: this tile vs the pointer plus optional composer / timeline rects
     // from the registry. Null input/timeline skip those plan rows; OWN/USER
     // (and CURSOR when the pointer is present) still run so the eyes are never dead.
@@ -204,27 +207,81 @@ fun MascotLive(
         contentAlignment = Alignment.Center,
     ) {
         host.Surface(entry, Modifier.matchParentSize(), playing = moving)
-        if (onClick != null) MascotHitArea(size, onClick)
+        if (interactive) MascotHitArea(size, onClick, gestures)
     }
 }
 
 /**
- * The control over a clickable mascot: an invisible hit area the size of the body (the rig draws
- * it across ~60 % of the tile, a little below centre) and a hand cursor. No highlight of its own -
- * the character already answers a hover with motion (the rig's Hover layer), and that is the
- * affordance.
+ * The director's timers (listening release, success hold, blink schedule) need a clock; tickTo is
+ * idempotent per frame so several surfaces of one agent tick it once. The keystroke count is read
+ * here, not in composition, so typing never recomposes the tile. Nothing runs while not [moving].
  */
 @Composable
-internal fun MascotHitArea(size: Dp, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .offset(y = size * BODY_DROP_FRACTION)
-            .size(size * BODY_FRACTION)
-            .clip(CircleShape)
-            .pointerHoverIcon(PointerIcon.Hand)
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
-    )
+private fun MascotClock(entry: MascotEntry, moving: Boolean, registry: MascotIdentityRegistry) {
+    LaunchedEffect(entry, moving) {
+        if (moving) {
+            while (true) {
+                withFrameNanos {
+                    entry.setKeystrokes(registry.composerKeystrokes)
+                    entry.tickTo(it)
+                }
+            }
+        }
+    }
 }
+
+/** [entry]'s gesture effects, kept across recompositions and updated to this pass's handlers. */
+@Composable
+private fun rememberMascotGestureEffects(entry: MascotEntry, onClick: (() -> Unit)?, reducedMotion: Boolean): MascotGestureEffects {
+    val effects = remember(entry) { MascotGestureEffects() }
+    effects.director = entry.director
+    effects.onClick = onClick
+    effects.haptics = LocalHaptics.current
+    effects.reducedMotion = reducedMotion
+    return effects
+}
+
+/**
+ * The control over a mascot: an invisible hit area the size of the body (the rig draws it across
+ * ~60 % of the tile, a little below centre), with a hand cursor where it is clickable. No highlight
+ * of its own - the character answers a hover, a poke, a stroke with motion, and that is the
+ * affordance. With [gestures] it reads every gesture (a tap still runs [onClick], at once, and is
+ * still a click to accessibility); without, a still's plain click.
+ */
+@Composable
+internal fun MascotHitArea(size: Dp, onClick: (() -> Unit)?, gestures: MascotGestureEffects? = null) {
+    val body = Modifier
+        .offset(y = size * BODY_DROP_FRACTION)
+        .size(size * BODY_FRACTION)
+        .clip(CircleShape)
+        .testTag(MASCOT_HIT_AREA_TAG)
+        .then(if (onClick != null) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+    val clicks = remember { MutableInteractionSource() }
+    val input = when {
+        gestures != null -> Modifier.mascotTapSemantics(gestures, onClick).mascotGestures(gestures)
+        onClick != null -> Modifier.clickable(interactionSource = clicks, indication = null, onClick = onClick)
+        else -> Modifier
+    }
+    Box(body.then(input))
+}
+
+/**
+ * A clickable mascot stays one button to accessibility; its click is a tap (the agent opens, the
+ * character is poked).
+ */
+private fun Modifier.mascotTapSemantics(gestures: MascotGestureEffects, onClick: (() -> Unit)?): Modifier {
+    if (onClick == null) return this
+    return semantics {
+        role = Role.Button
+        onClick {
+            gestures.apply(MascotGesture.TAP, trick = 0)
+            true
+        }
+    }
+}
+
+/** The body's hit area; tests find the character's touchable part by it. */
+internal const val MASCOT_HIT_AREA_TAG = "mascot-hit-area"
 
 /** The body's share of a tile and how far below the tile's centre it sits (see the 8yee3 framing note). */
 private const val BODY_FRACTION = 0.62f

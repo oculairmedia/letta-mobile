@@ -206,7 +206,15 @@ fun MascotSeat(
     ) {
         when (presence) {
             SeatPresence.NoMascot -> empty(MascotSeatVacancy.NO_MASCOT)
-            is SeatPresence.InPlace -> MascotInPlace(presence.mascot.agentId, presence.mascot.identity, size = size * overscale, live = live, onClick = onClick)
+            is SeatPresence.InPlace -> MascotInPlace(
+                presence.mascot.agentId,
+                presence.mascot.identity,
+                size = size * overscale,
+                live = live,
+                onClick = onClick,
+                // A seat that takes input at all lets the character be poked and petted (te3n1.4).
+                interactive = onClick != null || onEdit != null,
+            )
             SeatPresence.Here -> Unit
             SeatPresence.Arriving, SeatPresence.Elsewhere -> empty(MascotSeatVacancy.SEATED_ELSEWHERE)
         }
