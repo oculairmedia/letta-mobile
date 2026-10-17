@@ -16,19 +16,19 @@ internal class IrohWasmCanvasRelayLink(
     override val hostId: HostId,
     private val stream: IrohWasmRelayStream,
 ) : CanvasRelayLink {
-    override suspend fun send(frame: String) = stream.send(frame)
+    override suspend fun send(frame: String) = stream.send(IrohWireFrame(frame))
 
     override suspend fun receive(): String? {
         var pollIntervalMs = MIN_POLL_INTERVAL_MS
         while (true) {
-            stream.poll()?.let { return it }
+            stream.poll()?.let { return it.text }
             when (stream.state()) {
-                "connected" -> {
+                IrohStreamState.CONNECTED -> {
                     delay(pollIntervalMs.milliseconds)
                     pollIntervalMs = (pollIntervalMs * 2).coerceAtMost(MAX_POLL_INTERVAL_MS)
                 }
-                "error" -> error(stream.error() ?: "Canvas relay stream failed")
-                else -> return null
+                IrohStreamState.ERROR -> error(stream.error() ?: "Canvas relay stream failed")
+                IrohStreamState.ENDED -> return null
             }
         }
     }

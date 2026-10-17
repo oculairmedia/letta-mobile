@@ -4,60 +4,99 @@
 
 package com.letta.mobile.web.iroh
 
+import com.letta.mobile.data.model.IrohServerAddress
 import com.letta.mobile.web.data.displayMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.await
 
+/** The JS glue's handle for one Iroh App Server session (`window.irohConnect`). */
+internal value class IrohSessionHandle(val js: JsNumber)
+
+/** The JS glue's handle for one canvas relay stream of a session (`window.irohOpenCanvasRelay`). */
+internal value class IrohRelayHandle(val js: JsNumber)
+
+/** One frame's text as it crosses the JS glue, either way. */
+internal value class IrohWireFrame(val text: String) {
+    val js: JsString get() = text.toJsString()
+
+    companion object {
+        fun of(js: JsString?): IrohWireFrame? = js?.let { IrohWireFrame(it.toString()) }
+    }
+}
+
+/** Where a JS-side session or stream is, as the glue reports it. */
+internal enum class IrohStreamState {
+    CONNECTED,
+    ERROR,
+
+    /** Disconnected, closed, or unknown to the glue: no more frames will come. */
+    ENDED,
+    ;
+
+    companion object {
+        fun of(js: JsString): IrohStreamState = when (js.toString()) {
+            "connected" -> CONNECTED
+            "error" -> ERROR
+            else -> ENDED
+        }
+    }
+}
+
 internal class IrohWasmBridge private constructor(
-    private val sessionId: Int,
+    private val session: IrohSessionHandle,
 ) {
-    suspend fun sendControl(payload: String) {
-        callSendControl(sessionId, payload).await()
+    suspend fun sendControl(frame: IrohWireFrame) {
+        callSendControl(session.js, frame.js).await<JsAny?>()
     }
 
-    fun pollControl(): String? = callPollControl(sessionId)?.toString()
+    fun pollControl(): IrohWireFrame? = IrohWireFrame.of(callPollControl(session.js))
 
-    fun pollStream(): String? = callPollStream(sessionId)?.toString()
+    fun pollStream(): IrohWireFrame? = IrohWireFrame.of(callPollStream(session.js))
 
-    fun state(): String = callSessionState(sessionId).toString()
+    fun state(): IrohStreamState = IrohStreamState.of(callSessionState(session.js))
 
-    fun error(): String? = callSessionError(sessionId)?.toString()
+    fun error(): String? = callSessionError(session.js)?.toString()
 
     suspend fun close() {
-        callClose(sessionId).await()
+        callClose(session.js).await<JsAny?>()
     }
 
     /**
      * letta-mobile-ckmub.17.9: a canvas relay stream to this session's host, dialled from the
      * session's own endpoint on the relay's ALPN, so the host admits it for this session's identity.
      */
-    suspend fun openCanvasRelay(): IrohWasmRelayStream =
-        IrohWasmRelayStream(rejectedAsState("Could not open the canvas relay") { callOpenCanvasRelay(sessionId).await<JsNumber>().toInt() })
+    suspend fun openCanvasRelay(): IrohWasmRelayStream {
+        val relay = rejectedAsState("Could not open the canvas relay") { callOpenCanvasRelay(session.js).await<JsNumber>() }
+        return IrohWasmRelayStream(IrohRelayHandle(relay))
+    }
 
     companion object {
         /**
-         * Dials [endpointUrl] (`iroh://<endpoint id>`). A rejection from the JS side (a JS `Error`)
-         * comes back as an [IllegalStateException] with a readable message, never the raw JS value.
+         * Dials [address] by its endpoint id (through the relay; a browser has no direct UDP). A
+         * rejection from the JS side (a JS `Error`) comes back as an [IllegalStateException] with a
+         * readable message, never the raw JS value.
          */
-        suspend fun connect(endpointUrl: String): IrohWasmBridge =
-            IrohWasmBridge(rejectedAsState("Could not connect over Iroh") { callConnect(endpointUrl).await<JsNumber>().toInt() })
+        suspend fun connect(address: IrohServerAddress): IrohWasmBridge {
+            val session = rejectedAsState("Could not connect over Iroh") { callConnect(address.endpointUrl.toJsString()).await<JsNumber>() }
+            return IrohWasmBridge(IrohSessionHandle(session))
+        }
     }
 }
 
 /** One canvas relay stream of a session ([IrohWasmBridge.openCanvasRelay]): text frames both ways. */
-internal class IrohWasmRelayStream(private val relayId: Int) {
-    suspend fun send(payload: String) {
-        callRelaySend(relayId, payload).await<JsAny?>()
+internal class IrohWasmRelayStream(private val relay: IrohRelayHandle) {
+    suspend fun send(frame: IrohWireFrame) {
+        callRelaySend(relay.js, frame.js).await<JsAny?>()
     }
 
-    fun poll(): String? = callRelayPoll(relayId)?.toString()
+    fun poll(): IrohWireFrame? = IrohWireFrame.of(callRelayPoll(relay.js))
 
-    fun state(): String = callRelayState(relayId).toString()
+    fun state(): IrohStreamState = IrohStreamState.of(callRelayState(relay.js))
 
-    fun error(): String? = callRelayError(relayId)?.toString()
+    fun error(): String? = callRelayError(relay.js)?.toString()
 
     suspend fun close() {
-        callRelayClose(relayId).await<JsAny?>()
+        callRelayClose(relay.js).await<JsAny?>()
     }
 }
 
@@ -67,41 +106,41 @@ private suspend fun <T> rejectedAsState(what: String, block: suspend () -> T): T
     throw IllegalStateException("$what: ${failure.displayMessage("unknown error")}", failure)
 }
 
-private fun callConnect(ticket: String): kotlin.js.Promise<JsNumber> =
+private fun callConnect(ticket: JsString): kotlin.js.Promise<JsNumber> =
     js("window.irohConnect(ticket)")
 
-private fun callSendControl(sessionId: Int, payload: String): kotlin.js.Promise<JsAny?> =
-    js("window.irohSendControl(sessionId, payload)")
+private fun callSendControl(session: JsNumber, payload: JsString): kotlin.js.Promise<JsAny?> =
+    js("window.irohSendControl(session, payload)")
 
-private fun callPollControl(sessionId: Int): JsString? =
-    js("window.irohPollControl(sessionId)")
+private fun callPollControl(session: JsNumber): JsString? =
+    js("window.irohPollControl(session)")
 
-private fun callPollStream(sessionId: Int): JsString? =
-    js("window.irohPollStream(sessionId)")
+private fun callPollStream(session: JsNumber): JsString? =
+    js("window.irohPollStream(session)")
 
-private fun callSessionState(sessionId: Int): JsString =
-    js("window.irohSessionState(sessionId)")
+private fun callSessionState(session: JsNumber): JsString =
+    js("window.irohSessionState(session)")
 
-private fun callSessionError(sessionId: Int): JsString? =
-    js("window.irohSessionError(sessionId)")
+private fun callSessionError(session: JsNumber): JsString? =
+    js("window.irohSessionError(session)")
 
-private fun callClose(sessionId: Int): kotlin.js.Promise<JsAny?> =
-    js("window.irohClose(sessionId)")
+private fun callClose(session: JsNumber): kotlin.js.Promise<JsAny?> =
+    js("window.irohClose(session)")
 
-private fun callOpenCanvasRelay(sessionId: Int): kotlin.js.Promise<JsNumber> =
-    js("window.irohOpenCanvasRelay(sessionId)")
+private fun callOpenCanvasRelay(session: JsNumber): kotlin.js.Promise<JsNumber> =
+    js("window.irohOpenCanvasRelay(session)")
 
-private fun callRelaySend(relayId: Int, payload: String): kotlin.js.Promise<JsAny?> =
-    js("window.irohRelaySend(relayId, payload)")
+private fun callRelaySend(relay: JsNumber, payload: JsString): kotlin.js.Promise<JsAny?> =
+    js("window.irohRelaySend(relay, payload)")
 
-private fun callRelayPoll(relayId: Int): JsString? =
-    js("window.irohRelayPoll(relayId)")
+private fun callRelayPoll(relay: JsNumber): JsString? =
+    js("window.irohRelayPoll(relay)")
 
-private fun callRelayState(relayId: Int): JsString =
-    js("window.irohRelayState(relayId)")
+private fun callRelayState(relay: JsNumber): JsString =
+    js("window.irohRelayState(relay)")
 
-private fun callRelayError(relayId: Int): JsString? =
-    js("window.irohRelayError(relayId)")
+private fun callRelayError(relay: JsNumber): JsString? =
+    js("window.irohRelayError(relay)")
 
-private fun callRelayClose(relayId: Int): kotlin.js.Promise<JsAny?> =
-    js("window.irohRelayClose(relayId)")
+private fun callRelayClose(relay: JsNumber): kotlin.js.Promise<JsAny?> =
+    js("window.irohRelayClose(relay)")

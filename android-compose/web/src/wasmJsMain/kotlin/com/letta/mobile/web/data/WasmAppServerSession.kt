@@ -186,7 +186,7 @@ internal suspend fun connectWasmAppServerSession(
  */
 private suspend fun openIrohLink(config: LettaConfig, scope: CoroutineScope): WasmAppServerLink {
     val address = IrohServerAddress.parse(config.serverUrl)
-    val transport = IrohWasmAppServerTransport.connect(address.endpointUrl, scope)
+    val transport = IrohWasmAppServerTransport.connect(address, scope)
     try {
         bounded(CONNECT_TIMEOUT_MS, "Connection timed out") { transport.isConnected.first { it } }
     } catch (error: Throwable) {
