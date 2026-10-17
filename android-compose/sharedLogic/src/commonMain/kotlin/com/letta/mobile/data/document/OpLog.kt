@@ -74,4 +74,13 @@ open class InMemoryOpLog<Id, Op : DocumentOp> : CompactableOpLog<Id, Op> {
     override suspend fun dropArchived(documentId: Id, opIds: Set<String>) {
         mutex.withLock { opsByDocument[documentId]?.removeAll { it.opId in opIds } }
     }
+
+    /** Puts [ops] read back from storage into the log without announcing them to [observe]rs. */
+    internal suspend fun restore(documentId: Id, ops: List<Op>) {
+        mutex.withLock {
+            val opIds = opIdsByDocument.getOrPut(documentId) { mutableSetOf() }
+            val log = opsByDocument.getOrPut(documentId) { mutableListOf() }
+            ops.forEach { op -> if (opIds.add(op.opId)) log.add(op) }
+        }
+    }
 }

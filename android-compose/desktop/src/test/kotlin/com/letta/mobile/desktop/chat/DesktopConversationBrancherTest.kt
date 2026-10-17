@@ -7,7 +7,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.desktop.data.DesktopInMemorySecureSettingsStore
+import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.ui.chat.session.ChatBranchView
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -99,7 +99,7 @@ class DesktopConversationBrancherTest {
     }
 
     private class RecordingHost(override val gateway: DesktopChatGateway) : DesktopBranchHost {
-        override val pins = PinnedConversations(DesktopInMemorySecureSettingsStore())
+        override val pins = PinnedConversations(InMemorySecureSettingsStore())
         val opened = mutableListOf<Pair<String, String?>>()
         val branches = mutableListOf<DesktopOpenedBranch>()
         val errors = mutableListOf<String>()

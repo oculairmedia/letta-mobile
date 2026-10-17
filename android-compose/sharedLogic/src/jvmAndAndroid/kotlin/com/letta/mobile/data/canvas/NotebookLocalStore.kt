@@ -125,7 +125,7 @@ class NotebookLocalStore(
         health.awaitPrepared()
         if (health.isRetired(id.stableKey())) {
             Telemetry.event(
-                NotebookStorageFaults.TAG, "retired_document_refused",
+                CanvasStorageFaults.TAG, "retired_document_refused",
                 "documentId" to id.stableKey(), "reason" to "moved to a new document; not registered again",
                 level = Telemetry.Level.WARN,
             )
@@ -179,7 +179,7 @@ class NotebookLocalStore(
      * Storage faults: logged at ERROR and kept here for the board to show. Nothing is thrown,
      * except [NotebookReadOnlyException] from a write the store refuses.
      */
-    val faults: NotebookStorageFaults get() = health.faults
+    val faults: CanvasStorageFaults get() = health.faults
     override val storageFaults: StateFlow<List<CanvasStorageFault>> get() = health.faults.faults
 
     /** Whether writes are refused after a repository error; see [CanvasStorageFault.Kind.READ_ONLY]. */

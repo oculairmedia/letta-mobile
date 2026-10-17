@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop.data
 
 import com.letta.mobile.data.backend.SessionPlatform
+import com.letta.mobile.data.canvas.bubble.CanvasBubbleLayout
 import com.letta.mobile.data.chat.runtime.BackendConfigPolicy
 import com.letta.mobile.data.chat.runtime.BackendConfigStore
 import com.letta.mobile.data.chat.runtime.SecureTokenStore
@@ -13,11 +14,18 @@ import com.letta.mobile.data.session.graph.HostSessionGraphProvider
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
+import com.letta.mobile.ui.chat.session.ChatDockGeometry
+import com.letta.mobile.ui.chat.surface.LayoutPrefStorage
+import com.letta.mobile.ui.chat.surface.canvasBubbleLayoutStorage
+import com.letta.mobile.ui.chat.surface.chatDockGeometryStorage
 import java.io.InputStream
 import java.io.OutputStream
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.Properties
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,31 +34,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
-
-class DesktopInMemorySecureSettingsStore(
-    initialValues: Map<String, String> = emptyMap(),
-) : SecureSettingsStore {
-    private val values = initialValues.toMutableMap()
-
-    @Synchronized
-    override fun getString(key: String, defaultValue: String?): String? =
-        values[key] ?: defaultValue
-
-    @Synchronized
-    override fun putString(key: String, value: String) {
-        values[key] = value
-    }
-
-    @Synchronized
-    override fun remove(key: String) {
-        values.remove(key)
-    }
-
-    @Synchronized
-    override fun clear() {
-        values.clear()
-    }
-}
 
 /**
  * Interim JVM settings store for the Windows desktop preview.
@@ -108,10 +91,23 @@ class DesktopFileSecureSettingsStore(
         return properties
     }
 
+    /** Temp file + rename, so a crash mid-write never leaves a half-written file. */
     private fun saveProperties(properties: Properties) {
-        path.parent?.let(Files::createDirectories)
-        Files.newOutputStream(path).use<OutputStream, Unit> { output ->
-            properties.store(output, "Letta Desktop settings")
+        val target = path.toAbsolutePath()
+        val parent = requireNotNull(target.parent)
+        Files.createDirectories(parent)
+        val tmp = Files.createTempFile(parent, target.fileName.toString(), ".tmp")
+        try {
+            Files.newOutputStream(tmp).use<OutputStream, Unit> { output ->
+                properties.store(output, "Letta Desktop settings")
+            }
+            try {
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            Files.deleteIfExists(tmp)
         }
         // Force a re-read next time — mtime granularity can miss rapid writes.
         cachedProperties = null
@@ -121,6 +117,25 @@ class DesktopFileSecureSettingsStore(
     companion object {
         fun defaultSettingsPath(): Path =
             defaultDesktopStateDirectory().resolve("desktop-settings.properties")
+    }
+}
+
+/**
+ * The desktop's non-secret preferences (sidebar layout, dock placement, text size, the minimised
+ * chat's layout, "open on the canvas"), read by the shared stores. One instance per process: every
+ * write re-reads and replaces the whole file, so two instances would lose each other's keys.
+ */
+internal object DesktopPreferences {
+    val store: SecureSettingsStore by lazy {
+        DesktopFileSecureSettingsStore(defaultDesktopStateDirectory().resolve("desktop-preferences.properties"))
+    }
+
+    /** The docked chat panel's placement, read and written on the IO pool. */
+    val chatDock: LayoutPrefStorage<ChatDockGeometry> by lazy { chatDockGeometryStorage(store, Dispatchers.IO) }
+
+    /** The minimised chat's layout, from the desktop's defaults. */
+    val bubbleLayout: LayoutPrefStorage<CanvasBubbleLayout> by lazy {
+        canvasBubbleLayoutStorage(store, CanvasBubbleLayout.Desktop, Dispatchers.IO)
     }
 }
 
