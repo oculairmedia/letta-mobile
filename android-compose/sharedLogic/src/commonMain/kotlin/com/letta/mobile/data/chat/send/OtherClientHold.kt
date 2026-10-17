@@ -1,5 +1,7 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.data.runtime.TurnFailureNotice
+import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.runtime.isTurnAlreadyActiveMessage
 import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -101,16 +103,39 @@ internal class ServerQueueMarks(
     private val sendOfTurn: (String) -> QueuedChatSend?,
     private val sendOfConversation: (String) -> QueuedChatSend?,
 ) {
-    /** This device's send waits in the App Server queue behind another client's turn. */
+    private val lock = SynchronizedObject()
+
+    /** Conversations where this device's own turn was cancelled and may still be finishing. */
+    private val stoppingOwnTurn = HashSet<QueueConversationId>()
+
+    /**
+     * This device's send waits in the App Server queue: behind its own just-stopped turn when one
+     * is still winding down there ([onOwnTurnCancelled]), otherwise behind another client's turn.
+     */
     fun markQueuedOnServer(event: WsTimelineEvent.TurnQueued) {
         val send = sendOfTurn(event.turnId) ?: sendOfConversation(event.conversationId) ?: return
-        queue.markQueuedOnServer(send)
+        val behind = synchronized(lock) {
+            if (send.conversationId in stoppingOwnTurn) ServerQueueBlocker.OwnStoppingTurn else ServerQueueBlocker.OtherClient
+        }
+        queue.markQueuedOnServer(send, behind)
+    }
+
+    /**
+     * letta-mobile-by4vm.121: the notice for a turn of this device's own that ended cancelled; its
+     * run may still be winding down on the server, so a send queued next waits for it, not for
+     * another device ([markQueuedOnServer]).
+     */
+    fun cancelledTerminalNotice(send: QueuedChatSend?): TurnFailureNotice {
+        send?.let { synchronized(lock) { stoppingOwnTurn += it.conversationId } }
+        return TurnFailureNotices.forCancelledTerminal()
     }
 
     /** A live frame of this device's own turn: a send the server had queued has started. */
     fun onOwnTurnFrame(event: WsTimelineEvent.MessageDelta) {
         if (event.isReplay) return
         val send = event.turnId?.let(sendOfTurn) ?: return
+        // A turn of ours runs: whatever we stopped before it has finished.
+        synchronized(lock) { stoppingOwnTurn -= send.conversationId }
         queue.clearQueuedOnServer(send.conversationId)
     }
 }

@@ -113,9 +113,11 @@ cat > "$WORK/backend/providers/auth.json" <<EOF
   "base_url": "http://127.0.0.1:$LLM_PORT/v1" } } }
 EOF
 # The device environment (AndroidEmbeddedLettaCodeLaunch) minus the Android-only bridge/tool paths.
+# No LETTA_CODE_VISION_MODEL_IDS match for the served model: vision must come from the fake's
+# /api/v0/models, as it does from the on-device bridge (letta-mobile-by4vm.121).
 export HOME="$WORK/home" TMPDIR="$WORK/tmp" TMP="$WORK/tmp" TEMP="$WORK/tmp" SHELL=/bin/sh NO_COLOR=1 \
   LETTA_LOCAL_BACKEND_EXPERIMENTAL=1 LETTA_LOCAL_BACKEND_DIR="$WORK/backend" LETTA_LOCAL_BACKEND_EXECUTOR=pi \
-  UV_USE_IO_URING=0 UV_THREADPOOL_SIZE=2 LETTA_COMPAT_TRACE=1 LETTA_CODE_VISION_MODEL_IDS=node18-model \
+  UV_USE_IO_URING=0 UV_THREADPOOL_SIZE=2 LETTA_COMPAT_TRACE=1 \
   LMSTUDIO_BASE_URL="http://127.0.0.1:$LLM_PORT/v1" LMSTUDIO_API_KEY=lm-studio \
   NODE_OPTIONS="--max-old-space-size=384 --max-semi-space-size=16"
 NODE18_BIN=$(dirname "$(command -v "$NODE18")")

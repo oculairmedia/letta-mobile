@@ -21,6 +21,11 @@ data class EmbeddedModelCatalogEntry(
     @SerialName("supported")
     private val supportedFlag: Boolean? = null,
     val unsupportedReason: String? = null,
+    /**
+     * letta-mobile-by4vm.121: the model takes image input (the AI Edge Gallery allowlist's own
+     * field name). The on-device bridge advertises it to letta-code, which otherwise strips images.
+     */
+    val llmSupportImage: Boolean = false,
 ) {
     val id: String = "$modelId/$modelFile"
     val isLiteRtLmCompatible: Boolean = modelFile.endsWith(".litertlm", ignoreCase = true)
