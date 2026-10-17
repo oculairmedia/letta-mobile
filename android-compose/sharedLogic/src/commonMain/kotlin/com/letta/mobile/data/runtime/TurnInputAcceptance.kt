@@ -360,6 +360,8 @@ internal class TurnInputSender(
     private val externalToolRegistry: ExternalToolRegistry? = null,
     /** letta-mobile-qygvv.6: records a user input before it is sent, so its queue item is recognised. */
     private val noteSentInput: (TurnRuntimeKey, String?, TurnCommand) -> Unit = { _, _, _ -> },
+    /** letta-mobile-zxk2n.2: the 0.34 delivery fields and the re-send of an input a dropped link lost. */
+    private val durable: DurableInputSending = DurableInputSending(),
 ) {
     /**
      * Sends [command]'s input. letta-mobile-1n5py.1: the lease's acknowledgement latch opens only
@@ -397,12 +399,36 @@ internal class TurnInputSender(
             return null
         }
         noteSentInput(lease.key, lease.queuedInput.clientMessageId, command)
-        val acceptance = client.sendInputAwaitingAcceptance(input, requestIdFactory())
+        val fields = durable.delivery.fieldsFor(client.serverInfo.value, command)
+        val acceptance = sendResumably(input.withDurableFields(fields), fields, lease)
         val failure = acceptance.recordAndFailure(command.conversationId)
         // letta-mobile-qygvv.12: before the queued draft, so a relaying node acks before it forwards.
         reportInputAcknowledgement(acceptance.toAcknowledgement())
         if (acceptance == InputAcceptance.Queued) enterQueued(command, lease, emit)
         return failure
+    }
+
+    /**
+     * letta-mobile-zxk2n.2: when the link drops before `input_accepted` and the host keeps input
+     * identities ([DurableInputFields.isResumable]), the SAME input (same `client_message_id`) is
+     * sent once more on the restored session. The host answers a duplicate with the first copy's
+     * disposition instead of running it twice, so the turn resumes instead of failing.
+     */
+    private suspend fun sendResumably(
+        input: AppServerCommand.Input,
+        fields: DurableInputFields,
+        lease: LeaseRef,
+    ): InputAcceptance {
+        val epoch = durable.resumption.epoch()
+        val first = client.sendInputAwaitingAcceptance(input, requestIdFactory())
+        if (first !is InputAcceptance.ConnectionLost || !fields.isResumable) return first
+        if (!durable.resumption.awaitRestoredAfter(epoch)) return first
+        Telemetry.event(
+            TELEMETRY_TAG, "input.resent",
+            "key" to lease.key.toString(),
+            "clientMessageId" to (lease.queuedInput.clientMessageId ?: "<none>"),
+        )
+        return client.sendInputAwaitingAcceptance(input, requestIdFactory())
     }
 }
 

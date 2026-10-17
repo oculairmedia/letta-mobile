@@ -1,6 +1,7 @@
 package com.letta.mobile.web.data
 
 import com.letta.mobile.data.backend.SessionCapabilities
+import com.letta.mobile.data.canvas.CanvasRelayDial
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.Agent
@@ -88,6 +89,15 @@ class WasmAppServerClientGateway(
         requestId = ::nextRequestId,
     )
 
+    private val mutableCanvasRelay = MutableStateFlow<CanvasRelayDial?>(null)
+
+    /**
+     * letta-mobile-ckmub.17.9: the way to the live session's canvas relay, once it has authenticated
+     * (the host admits the relay only for an authenticated peer); null while there is none. The
+     * shared [com.letta.mobile.data.canvas.CanvasRelayAttachment] follows it.
+     */
+    val canvasRelay: StateFlow<CanvasRelayDial?> = mutableCanvasRelay.asStateFlow()
+
     suspend fun listAgents(config: LettaConfig): List<Agent> {
         unservedStatus(config)?.let { status ->
             close()
@@ -114,6 +124,7 @@ class WasmAppServerClientGateway(
             val graph = openGraph(config, session)
             bounded(REQUEST_TIMEOUT_MS, "Agent list timed out") { graph.agentRepository.refreshAgents() }
             mutableState.value = BackendConnectionStatus.Connected(session.label)
+            mutableCanvasRelay.value = session.canvasRelay
             monitor(session)
             graph.agentRepository.agents.value
         } catch (cancelled: CancellationException) {
@@ -129,6 +140,7 @@ class WasmAppServerClientGateway(
     suspend fun close() {
         val session = activeSession
         activeSession = null
+        mutableCanvasRelay.value = null
         connectionMonitor?.cancel()
         connectionMonitor = null
         closeGraph()
@@ -189,6 +201,7 @@ class WasmAppServerClientGateway(
             session.isConnected.first { connected -> !connected }
             if (activeSession === session) {
                 activeSession = null
+                mutableCanvasRelay.value = null
                 closeGraph()
                 session.onTransportDisconnected()
                 val reason = session.failureReason()

@@ -24,11 +24,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.BackendConnectionStatus
+import com.letta.mobile.data.model.isIrohBackendUrl
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.ProvideLettaHost
+import com.letta.mobile.ui.mascot.frame.ProvideFrameMascots
+import com.letta.mobile.ui.mascot.rememberMascotRegistry
+import com.letta.mobile.web.mascot.RiveCanvasRenderer
 import com.letta.mobile.ui.settings.BackendConnectionNotice
 import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
 import com.letta.mobile.ui.settings.BackendConnectionStatusRow
@@ -77,6 +81,8 @@ fun LettaWebApp() {
     LaunchedEffect(config.serverUrl, config.accessToken, config.mode, backend.rosterRequest.intValue) {
         backend.loadRoster(gateway, workspace)
     }
+    // letta-mobile-ckmub.17.9: boards sync through the live session's host, as on desktop.
+    LaunchedEffect(config.serverUrl) { storage.followCanvasHost(gateway.canvasRelay, isIrohBackendUrl(config.serverUrl)) }
     // The URL fragment follows the workspace's route, and back/forward follow the URL.
     val browserRoute = remember(workspace) { BrowserRouteBinding(workspace) }
     DisposableEffect(browserRoute) { onDispose(browserRoute.start()) }
@@ -99,9 +105,12 @@ fun LettaWebApp() {
     val shell = WebShell(navigator, backend)
     SharedMaterialTheme {
         ProvideLettaHost(LettaHost.Pointer) {
-            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                BoxWithConstraints {
-                    if (maxWidth < LettaDimens.Pane.wideBreakpoint) CompactWebShell(shell, page) else WideWebShell(shell, page)
+            val mascots = rememberMascotRegistry(backend.agents.value)
+            ProvideFrameMascots(remember { RiveCanvasRenderer() }, mascots) {
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    BoxWithConstraints {
+                        if (maxWidth < LettaDimens.Pane.wideBreakpoint) CompactWebShell(shell, page) else WideWebShell(shell, page)
+                    }
                 }
             }
         }

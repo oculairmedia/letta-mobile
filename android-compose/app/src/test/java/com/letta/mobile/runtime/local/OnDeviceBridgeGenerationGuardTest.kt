@@ -11,7 +11,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -113,7 +112,7 @@ class OnDeviceBridgeGenerationGuardTest {
     }
 
     @Test
-    fun `lm studio model list advertises vision from the catalog without a context length`() {
+    fun `lm studio model list advertises vision from the catalog and the engine context window`() {
         val vision = OnDeviceModelCapabilities { OnDeviceModelCapability(supportsImages = true) }
         LocalOpenAiOnDeviceBridge(StreamingEngine(), vision).start(selection()).use { session ->
             val model = getModels(session)
@@ -121,8 +120,8 @@ class OnDeviceBridgeGenerationGuardTest {
             assertEquals(selection().openAiModelId, model.getValue("id").jsonPrimitive.content)
             assertEquals("vlm", model.getValue("type").jsonPrimitive.content)
             assertEquals(listOf("vision"), model.getValue("capabilities").jsonArray.map { it.jsonPrimitive.content })
-            assertFalse(model.containsKey("max_context_length"))
-            assertFalse(model.containsKey("loaded_context_length"))
+            assertEquals(selection().maxTokens, model.getValue("loaded_context_length").jsonPrimitive.content.toInt())
+            assertEquals(selection().maxTokens, model.getValue("max_context_length").jsonPrimitive.content.toInt())
         }
     }
 
@@ -203,17 +202,16 @@ class OnDeviceBridgeGenerationGuardTest {
         @Synchronized
         override fun generate(
             modelSelection: EmbeddedLettaCodeModelSelection,
-            prompt: String,
-            images: List<OnDeviceImage>,
+            request: OnDeviceChatRequest,
             generation: OnDeviceGeneration,
-        ): Result<String> {
+        ): Result<OnDeviceReply> {
             generations += generation
-            lastImages = images
+            lastImages = request.images
             generation.onCancel { cancelled.countDown() }
             started.countDown()
             var streaming = true
             while (streaming && chunksSent < chunkLimit) streaming = streamOne(generation)
-            return Result.success(generation.text)
+            return Result.success(OnDeviceReply(generation.text))
         }
 
         /** Sends the next chunk after the delay; false once the generation stopped. */

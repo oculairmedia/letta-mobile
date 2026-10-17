@@ -113,7 +113,6 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopLocalBac
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopLocalRuntimeEffects.kt 60 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopLocalRuntimeProviderEffects.kt 67 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopMainContentPane.kt 110 legacy-pending(ckmub.3)
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopMascotCursor.kt 34 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopMascotStage.kt 29 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopNowActiveBar.kt 125 container
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopNucleusEffects.kt 510 legacy-pending(ckmub.3)
@@ -132,9 +131,7 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopSidebarC
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/LettaDesktopApp.kt 246 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/Main.kt 308 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/agent/DesktopAgentEditor.kt 70 container
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/DesktopMascotHost.kt 127 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/RiveBenchInstruments.kt 158 legacy-pending(ckmub.3)
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/RiveDesktopSurface.kt 267 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/RiveDesktopTelemetry.kt 250 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/Surround.kt 132 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/canvas/CanvasDebugWindow.kt 93 legacy-pending(ckmub.3)
@@ -188,4 +185,4 @@ android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/SharedChatWorkspaceFiles.kt 78 legacy-pending(ckmub.2)
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/LettaWebApp.kt 196 legacy-pending(ckmub.8)
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/chat/WebChatLoad.kt 59 legacy-pending(ckmub.8)
-android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/chat/WebSharedChatPage.kt 121 legacy-pending(ckmub.8)
+android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/chat/WebSharedChatPage.kt 106 legacy-pending(ckmub.8)

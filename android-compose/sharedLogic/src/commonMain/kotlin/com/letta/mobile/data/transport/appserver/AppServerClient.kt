@@ -67,6 +67,13 @@ interface AppServerClient {
     suspend fun changeDeviceState(command: AppServerCommand.ChangeDeviceState): Unit =
         throw UnsupportedOperationException("change_device_state is not supported by this client")
 
+    /**
+     * letta-code 0.34.8+: sends `turn_finished_ack` for a durably replayed terminal
+     * (letta-mobile-zxk2n.2). There is no response frame; repeating it is harmless.
+     */
+    suspend fun acknowledgeTurnFinished(command: AppServerCommand.TurnFinishedAck): Unit =
+        throw UnsupportedOperationException("turn_finished_ack is not supported by this client")
+
     suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse
 
     suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse
@@ -252,7 +259,7 @@ class DefaultAppServerClient(
         timeoutMs = requestTimeoutMs,
     )
 
-    /** Keeps compact agents' runs free of the skills catalog and client tools (see CompactAgentProfile). */
+    /** Keeps compact agents' runs free of the skills catalog and to a few client tools (see CompactAgentProfile). */
     private val compactProfile = CompactProfileRuntimePolicy()
 
     override val events: Flow<AppServerReceivedFrame> = transport.inboundFrames
@@ -326,7 +333,7 @@ class DefaultAppServerClient(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                // The run keeps its skills catalog; its inputs still offer no tools.
+                // The run keeps its skills catalog; its inputs still offer only the compact tools.
             }
         }
         return response
@@ -356,6 +363,10 @@ class DefaultAppServerClient(
     }
 
     override suspend fun changeDeviceState(command: AppServerCommand.ChangeDeviceState) {
+        transport.sendControl(command)
+    }
+
+    override suspend fun acknowledgeTurnFinished(command: AppServerCommand.TurnFinishedAck) {
         transport.sendControl(command)
     }
 

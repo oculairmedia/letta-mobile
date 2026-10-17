@@ -1,14 +1,17 @@
 package com.letta.mobile.web.data
 
+import com.letta.mobile.data.canvas.CanvasRelayDial
 import com.letta.mobile.data.chat.runtime.EnginePermissionModes
 import com.letta.mobile.data.chat.runtime.PermissionModeGateway
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.HostId
 import com.letta.mobile.data.model.IrohServerAddress
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.isIrohBackendUrl
 import com.letta.mobile.data.repository.appserver.AppServerLocalAdminGateway
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.DurableTurnDelivery
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.runtime.permissionGovernedTurnStackSpec
@@ -48,6 +51,9 @@ internal class WasmAppServerSession(
     val isConnected: Flow<Boolean> get() = link.isConnected
     val failureReason: () -> String? get() = link.failureReason
     val label: String get() = link.label
+
+    /** How this session reaches its host's canvas relay; null for a backend with none (ws://). */
+    val canvasRelay: CanvasRelayDial? get() = link.canvasRelay
     val engine: AppServerTurnEngine = services.engine
     val router: AppServerRuntimeEventRouter = services.router
     val appServerAdmin: AppServerLocalAdminGateway = services.appServerAdmin
@@ -138,6 +144,8 @@ internal class WasmAppServerLink(
     val failureReason: () -> String?,
     val label: String,
     val close: suspend () -> Unit,
+    /** letta-mobile-ckmub.17.9: the host's canvas relay, from this connection's endpoint; Iroh only. */
+    val canvasRelay: CanvasRelayDial? = null,
 )
 
 /** What a session serves on top of its [WasmAppServerLink]: its turn engine and the reads and writes it makes. */
@@ -178,7 +186,7 @@ internal suspend fun connectWasmAppServerSession(
  */
 private suspend fun openIrohLink(config: LettaConfig, scope: CoroutineScope): WasmAppServerLink {
     val address = IrohServerAddress.parse(config.serverUrl)
-    val transport = IrohWasmAppServerTransport.connect(address.endpointUrl, scope)
+    val transport = IrohWasmAppServerTransport.connect(address, scope)
     try {
         bounded(CONNECT_TIMEOUT_MS, "Connection timed out") { transport.isConnected.first { it } }
     } catch (error: Throwable) {
@@ -191,6 +199,7 @@ private suspend fun openIrohLink(config: LettaConfig, scope: CoroutineScope): Wa
         failureReason = { transport.failureReason.value },
         label = "Iroh",
         close = transport::close,
+        canvasRelay = CanvasRelayDial { transport.openCanvasRelay(HostId(address.endpointIdHex)) },
     )
 }
 
@@ -229,7 +238,11 @@ private fun attachServices(
     val engine = router.attachTurnStack(
         link.client,
         scope,
-        permissionGovernedTurnStackSpec(modes, requestIdFactory = { nextRequestId("turn") }),
+        permissionGovernedTurnStackSpec(
+            modes,
+            requestIdFactory = { nextRequestId("turn") },
+            durableDelivery = DurableTurnDelivery.chat(webTabTerminalConsumerId()),
+        ),
     )
     return WasmAppServerServices(
         engine = engine,

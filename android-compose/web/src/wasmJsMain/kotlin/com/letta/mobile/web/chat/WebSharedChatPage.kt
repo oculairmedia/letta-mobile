@@ -15,22 +15,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.canvas.CanvasConversationOptions
-import com.letta.mobile.data.canvas.CanvasDocumentStore
-import com.letta.mobile.data.canvas.CanvasOpLog
+import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.canvas.CanvasWorkspace
-import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
+import com.letta.mobile.ui.chat.session.SubagentViewSessions
 import com.letta.mobile.ui.chat.session.TimelineChatTarget
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 import com.letta.mobile.ui.chat.surface.ChatSurface
-import com.letta.mobile.ui.chat.surface.LayoutPrefStorage
 import com.letta.mobile.ui.chat.surface.rememberChatDockGeometry
-import com.letta.mobile.ui.chat.session.SubagentViewSessions
 import com.letta.mobile.ui.chat.subagents.SubagentDualViewBinding
 import com.letta.mobile.ui.chat.subagents.SubagentDualViewFrame
 import com.letta.mobile.ui.chat.subagents.SubagentDualViewHolder
@@ -38,33 +35,14 @@ import com.letta.mobile.ui.chat.subagents.SubagentDualViewOptions
 import com.letta.mobile.ui.chat.subagents.rememberSubagentDualViewHolder
 import com.letta.mobile.ui.chat.subagents.withSubagentDualView
 
-/** The board docked under the conversation: where it and its op log are kept, the dock's placement, and whether the page opens on it. */
-internal data class WebChatCanvas(
-    val store: CanvasDocumentStore,
-    val opLog: CanvasOpLog,
-    val dockGeometry: LayoutPrefStorage<ChatDockGeometry>,
-    val openOnCanvas: Boolean,
-)
-
-/** Where the page's host affordances go in the web shell. */
-internal data class WebChatPageNavigation(
-    /** The agent's mascot beside the composer: show the agent list (the sidebar). */
-    val openAgentPane: () -> Unit,
-    /** Agent display names for provenance labels. */
-    val agentNamesById: Map<String, String> = emptyMap(),
-    /** letta-mobile-zxk2n.8: where a subagent's conversation is read for the dual view; null leaves it off. */
-    val subagentSessions: SubagentViewSessions? = null,
-)
-
 /**
  * letta-mobile-o4ygk.4.5: the web's conversation page, the shared [ChatSurface] in the Pointer
  * idiom, as desktop draws it. It opens on the conversation's canvas with the chat docked under it
  * when [WebChatCanvas.openOnCanvas] is on (the default), else as the full-screen chat; expanding and "Open canvas"
  * move between the two.
  *
- * The canvas is the shared [CanvasWorkspace] over a [CanvasSession] from [WebChatCanvas.store], kept in the
- * browser (letta-mobile-ckmub.17.7); sync to other devices is letta-mobile-ckmub.17.9. The mascot
- * companion is off because the web has no mascot renderer, so the page shows the agent orb.
+ * The canvas is the shared [CanvasWorkspace] over a [CanvasSession] from [WebChatCanvas.store], kept in the browser (ckmub.17.7)
+ * and synced with edits and cursors through [WebChatCanvas.relay] (ckmub.17.9). The web has no mascot renderer: the agent orb shows.
  */
 @Composable
 internal fun WebSharedChatPage(
@@ -88,7 +66,7 @@ internal fun WebSharedChatPage(
             onIntent = { intent: ChatSurfaceIntent -> presentation = ChatSurfaceModeReducer.reduce(presentation, intent) },
             host = host,
             modifier = parentModifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-            canvas = { actions -> ConversationCanvas(session, actions) },
+            canvas = { actions -> ConversationCanvas(session, canvas.relay, actions) },
             dockGeometry = dockGeometry,
             onDockGeometryChange = { dockGeometry = it },
         )
@@ -109,20 +87,20 @@ private fun rememberConversationCanvas(canvas: WebChatCanvas, target: TimelineCh
         value = CanvasSession.getOrCreateForConversation(
             store = canvas.store,
             conversationId = ConversationId(target.conversationId),
-            options = CanvasConversationOptions(agentId = target.agentId, title = "Canvas (${target.agentName})", opLog = canvas.opLog),
+            options = CanvasConversationOptions(target.agentId, "Canvas (${target.agentName})", canvas.opLog, syncTransport = canvas.relay),
         )
     }
     return session
 }
 
 @Composable
-private fun ConversationCanvas(session: CanvasSession?, actions: ChatCanvasActions) {
+private fun ConversationCanvas(session: CanvasSession?, presence: CanvasPresenceTransport, actions: ChatCanvasActions) {
     if (session == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
     }
     CanvasWorkspace(
-        session = session,
+        session = session, presenceTransport = presence,
         // The canvas is the page: no title bar or back arrow, just its actions pill.
         onNavigateBack = null,
         onShareToChat = actions::shareToChat,

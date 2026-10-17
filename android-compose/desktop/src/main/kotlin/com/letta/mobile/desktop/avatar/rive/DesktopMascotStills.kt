@@ -1,11 +1,13 @@
 package com.letta.mobile.desktop.avatar.rive
 
-import com.letta.mobile.avatar.core.MascotIdentity
-import com.letta.mobile.avatar.rive.RiveAvatarContract
 import com.letta.mobile.ui.mascot.MascotStillStore
-import com.letta.mobile.ui.mascot.MascotStills
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.jetbrains.skia.Bitmap
+import org.jetbrains.skia.ColorAlphaType
+import org.jetbrains.skia.ColorType
+import org.jetbrains.skia.Image
+import org.jetbrains.skia.ImageInfo
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.nio.file.Files
@@ -16,44 +18,20 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
 /**
- * The one offscreen scene stills are captured in, on the Rive thread only. Created on the first
- * capture and kept: a new scene per capture was a new D3D11 device plus a first-render warm-up,
- * about 450 ms each, where a capture in a warm scene is a few milliseconds. Each capture writes the
- * next identity over the last and settles; the body's transition completes well inside the settle.
+ * PNG bytes of a rendered still, read back as premultiplied RGBA. Encoded with ImageIO rather than
+ * Skia: Skia's encoder signature differs between the Skiko builds Compose pulls in, and a still must
+ * not depend on which one won the dependency resolution.
  */
-private var captureScene: RiveDesktopScene? = null
-
-/**
- * Renders [identity] offscreen as a still, as PNG: the identity written into the capture scene,
- * its state machine run [MascotStills.SETTLE_FRAMES] simulated frames so the view-model bindings
- * take effect, one frame read back, encoded off the Rive thread.
- */
-internal suspend fun captureDesktopMascotStill(mascot: ByteArray, identity: MascotIdentity): ByteArray? {
-    val size = MascotStills.SIZE_PX
-    val pixels = withContext(RiveThread.dispatcher) {
-        runCatching {
-            val scene = captureScene ?: RiveDesktopScene.create().also { created ->
-                runCatching { created.load(mascot) }.onFailure { created.close() }.getOrThrow()
-                captureScene = created
-            }
-            RiveAvatarContract.applyIdentity(scene.inputSink, identity)
-            repeat(MascotStills.SETTLE_FRAMES) { scene.advance(MascotStills.FRAME_SECONDS) }
-            // A copy: the scene reuses its buffer for the next render.
-            scene.render(size, size).copyOf()
-        }.onFailure {
-            // A broken scene is dropped, so the next capture starts clean.
-            captureScene?.close()
-            captureScene = null
-        }.getOrNull()
-    } ?: return null
-    return withContext(Dispatchers.Default) { pngOfPremultipliedRgba(pixels, size, size) }
+internal fun pngOfImage(image: Image): ByteArray? {
+    val info = ImageInfo(image.width, image.height, ColorType.RGBA_8888, ColorAlphaType.PREMUL)
+    val pixels = Bitmap().use { bitmap ->
+        if (!bitmap.allocPixels(info) || !image.readPixels(bitmap)) return null
+        bitmap.readPixels() ?: return null
+    }
+    return pngOfPremultipliedRgba(pixels, image.width, image.height)
 }
 
-/**
- * PNG bytes of a premultiplied RGBA frame, top row first, as the bridge renders it. Encoded with
- * ImageIO rather than Skia: Skia's encoder signature differs between the Skiko builds Compose pulls
- * in, and a still must not depend on which one won the dependency resolution.
- */
+/** PNG bytes of a premultiplied RGBA frame, top row first, as the bridge renders it. */
 internal fun pngOfPremultipliedRgba(rgba: ByteArray, width: Int, height: Int): ByteArray {
     val argb = IntArray(width * height) { i ->
         val o = i * 4

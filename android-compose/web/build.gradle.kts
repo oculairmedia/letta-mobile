@@ -51,6 +51,24 @@ val generateIrohWasmBindings = tasks.register<Exec>("generateIrohWasmBindings") 
     )
 }
 
+// letta-mobile-ckmub.17.6: the mascot's browser binding (src/wasmJsMain/js/rive-frames), a local
+// package over @rive-app/canvas-advanced pinned exactly in its package.json (2.43.1, published
+// 2026-09-23). Both are bundled by the web build; the runtime's wasm is staged next to the page
+// (rive/rive.wasm) and located there at runtime, so nothing is fetched from a CDN.
+val riveFramesPackage = layout.projectDirectory.dir("src/wasmJsMain/js/rive-frames")
+val generatedRiveResources = layout.buildDirectory.dir("generated/rive-wasm")
+val stageRiveWasm = tasks.register<Sync>("stageRiveWasm") {
+    dependsOn(":kotlinWasmNpmInstall")
+    from(rootProject.layout.buildDirectory.dir("wasm/node_modules/@rive-app/canvas-advanced")) {
+        include("rive.wasm")
+    }
+    into(generatedRiveResources.map { it.dir("rive") })
+}
+
+// The mascot file :avatar:renderer-rive ships (one copy; desktop reads it from the classpath),
+// served beside the page as mascot/mascot.riv.
+val mascotResources = rootProject.layout.projectDirectory.dir("avatar/renderer-rive/src/jvmMain/resources")
+
 kotlin {
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
@@ -65,7 +83,10 @@ kotlin {
     sourceSets {
         val wasmJsMain by getting {
             resources.srcDir(generatedIrohResources)
+            resources.srcDir(generatedRiveResources)
+            resources.srcDir(mascotResources)
             dependencies {
+                implementation(npm(riveFramesPackage.asFile))
                 implementation(project(":sharedLogic"))
                 // letta-mobile-o4ygk.4.5: the shared Compose UI (the chat page, the canvas, the
                 // theme). Its Compose Multiplatform runtime, foundation, material3, ui and icons
@@ -92,6 +113,7 @@ kotlin {
 
 tasks.named("wasmJsProcessResources") {
     dependsOn(generateIrohWasmBindings)
+    dependsOn(stageRiveWasm)
 }
 
 // letta-mobile-o4ygk.4.5: the Compose Gradle plugin (1.10) ships the browser its own Skiko runtime

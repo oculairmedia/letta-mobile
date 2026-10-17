@@ -19,7 +19,7 @@ everything else cites it (letta-mobile-bzvro.10, letta-mobile-ckmub.5).
 | Pin | Version | Source of truth | What it means |
 |---|---|---|---|
 | THE pin: wire contract, desktop bundled runtime, Android embedded runtime | 0.34.14 | `letta-code-runtime/letta-code-runtime.properties` (`lettaCodeVersion`, letta-mobile-by4vm.110 D1) | One version everywhere. The Android embedded runtime (`com.letta.mobile.embedded-runtime` build-logic plugin) and the desktop bundled runtime (`desktop/build.gradle.kts` reads the same file) are built from it, and it is THE wire contract: the protocol `.d.ts` corpus the Kotlin wire types are verified against (`scripts/appserver/verify-contract-baseline.mjs`), 104 commands, 113 messages. Mirrors that must name it: the contract matrix `sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json` (`baseline.version`); `desktop/runtime/package.json`, `package-lock.json`, `runtime-manifest.json`; the `appserver-contract-baseline` CI job (it reads `baseline.version` from the matrix, never a literal); `LettaCodeContract.VERSION` (user-facing text); and the pins quoted in CLAUDE.md, AGENTS.md and the CLI READMEs. `LettaCodeVersionPinsTest` (appserver-cli) fails if any of them disagree. |
-| Deployed Linux host | 0.33.6 | the host (not in this repo) | Not the contract: the host has not been redeployed to 0.34.x yet (redeploy item, letta-mobile-ckmub.14). The client keeps working against it: decoding is additive-tolerant (0.34-only fields are optional, unknown frames decode to `Unknown`), and the 0.34-only `turn_finished_ack` / `terminal_consumer_id` / `client_preferences` are never sent by production code, so nothing requires a 0.34 server. Any future use must be gated on an advertised capability. |
+| Deployed Linux host | 0.33.6 | the host (not in this repo) | Not the contract: the host has not been redeployed to 0.34.x yet (redeploy item, letta-mobile-ckmub.14). The client keeps working against it: decoding is additive-tolerant (0.34-only fields are optional, unknown frames decode to `Unknown`), and the 0.34-only `turn_finished_ack` / `terminal_consumer_id` / `client_preferences` are sent only to a server whose `app_server_info` names a letta-code version that has them (`runtime/DurableTurnDelivery.kt`: `client_preferences` from 0.34.0, `terminal_consumer_id` + `turn_finished_ack` from 0.34.8), so nothing requires a 0.34 server. |
 | Live golden capture | 0.32.3 | `golden/letta-code-0.32.3-live.jsonl` (same matrix) | A historical capture, not the contract. To be re-captured after the host redeploy (letta-mobile-ckmub.14); it needs a live server (`scripts/appserver/capture-live-goldens.mjs`). Its unions equal 0.32.10, so it covers neither `launch_subagent` nor `turn_finished_ack`. |
 | Restart-replay evidence | 0.29.12 | `appserver-cli/src/test/resources/appserver/restart-replay-evidence.json` (`AppServerRestartReplayEvidence.PINNED_LETTA_CODE_VERSION`) | Not the contract until re-captured: it is produced by a live probe against a real local server plus a model provider, which a pin bump cannot fake. Durability and identity observations (restart, reconnect, `client_message_id`) were measured on 0.29.12 and are not re-measured on the contract yet; the re-capture at the contract is letta-mobile-ckmub.13. |
 
@@ -66,6 +66,16 @@ the run and never settles a turn; official `StopReasonType` reasons (and the pro
 reasons `stop_sequence`, `max_tokens`, `length`) end it; an unrecognised reason such as a provider
 `tool_use` does not. Live captures show `turn_finished` always arrives after the terminal
 `stop_reason` delta, and a trailing `loop_error` can follow a failed turn's `turn_finished`.
+
+## Durable delivery (letta-code 0.34.8+)
+
+A host that binds a stable `AppServerTerminalConsumerId` (`DurableTurnDelivery`) sends it as
+`input.terminal_consumer_id`. The server keeps that turn's `turn_finished` until the client
+answers `turn_finished_ack`, and replays it after a reconnect's `runtime_start`. The engine applies
+a terminal once (deduped by `turn_id` / settled run) and acks each delivery once per connection
+generation, also between turns. An input whose `input_accepted` was lost to a dropped link is sent
+again, unchanged (same `client_message_id`), on the restored session: the server answers a
+duplicate with the first copy's disposition. A client disconnect never aborts the server turn.
 
 ## Correlation
 

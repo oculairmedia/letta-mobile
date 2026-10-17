@@ -1,0 +1,37 @@
+name: Danger (advisory PR hygiene)
+
+# letta-mobile-fi7th pilot. ADVISORY ONLY: do not add to required checks / branch protection.
+# Rules live in Dangerfile.df.kts. The job is continue-on-error so a Danger "fail" message
+# shows in the PR comment but never turns the PR red. Revisit after ~2 weeks: make required,
+# fold into Agents Policy Check, or drop.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+concurrency:
+  group: danger-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  danger:
+    name: Danger Kotlin (advisory)
+    # Fork PRs get a read-only token and cannot comment.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: the Dangerfile runs `git show <base-sha>:path` for ratchet checks.
+          fetch-depth: 0
+
+      - name: Run Danger Kotlin
+        uses: danger/kotlin@1.3.4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

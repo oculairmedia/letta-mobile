@@ -75,6 +75,8 @@ import com.letta.mobile.avatar.core.MascotShape
 import com.letta.mobile.avatar.rive.MASCOT_MODEL
 import com.letta.mobile.avatar.rive.RiveAvatarContract
 import com.letta.mobile.avatar.rive.RiveAvatarRuntime
+import com.letta.mobile.ui.mascot.frame.RiveFrameSurface
+import com.letta.mobile.ui.mascot.frame.RiveOnionSkin
 import java.io.File
 import kotlinx.coroutines.delay
 
@@ -154,7 +156,7 @@ private fun SceneColumn(file: File, stateMachine: String?, triggers: List<String
     }
     Column(modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("${file.name}  |  ${scene.adapterName}  |  render+readback %.2f ms".format(nativeMs), color = Color.LightGray)
-        RiveDesktopSurface(scene, Modifier.weight(1f).fillMaxSize(), onFrameStats = { nativeMs = it })
+        RiveFrameSurface(scene, RiveThread.dispatcher, Modifier.weight(1f).fillMaxSize(), onFrameStats = { nativeMs = it })
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             triggers.forEach { name -> OutlinedButton(onClick = { scene.fireTrigger(name) }) { Text(name) } }
         }
@@ -657,7 +659,7 @@ private fun ScenarioButton(bench: BenchInstruments, candidate: BenchScenario) {
 @Composable
 private fun MascotBox(scene: RiveDesktopScene, sizeDp: Float, onion: RiveOnionSkin?, onBounds: (Rect) -> Unit) {
     Box(Modifier.size(sizeDp.dp).onGloballyPositioned { onBounds(it.boundsInParent()) }) {
-        RiveDesktopSurface(scene, Modifier.fillMaxSize(), onion = onion)
+        RiveFrameSurface(scene, RiveThread.dispatcher, Modifier.fillMaxSize(), onion = onion)
     }
 }
 

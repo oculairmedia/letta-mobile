@@ -84,11 +84,11 @@ sealed interface AppServerCommand {
     ) : AppServerCommand {
         companion object {
             /** The receipt for [frame] on behalf of [consumerId]. */
-            fun of(frame: AppServerInboundFrame.TurnFinished, consumerId: String): TurnFinishedAck =
+            fun of(frame: AppServerInboundFrame.TurnFinished, consumerId: AppServerTerminalConsumerId): TurnFinishedAck =
                 TurnFinishedAck(
                     runtime = AppServerTerminalAckScope.of(frame.runtime),
                     idempotencyKey = frame.idempotencyKey,
-                    consumerId = consumerId,
+                    consumerId = consumerId.value,
                 )
         }
     }
