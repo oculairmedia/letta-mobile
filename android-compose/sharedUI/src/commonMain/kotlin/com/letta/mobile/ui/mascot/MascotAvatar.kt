@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import com.letta.mobile.avatar.core.MascotGesture
+import com.letta.mobile.avatar.core.MotionPreference
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.avatar.core.AvatarLookTarget
 import com.letta.mobile.avatar.core.GazeMath
@@ -164,10 +165,11 @@ fun MascotLive(
     }
     // At rest (idle, no pointer, its last beat played out) the scene holds its pose and no frame
     // is asked for: a seat that stays composed must not redraw the window every vsync (MascotRest).
-    val gestures = rememberMascotGestureEffects(entry, onClick, reducedMotion)
+    val gestures = rememberMascotGestureEffects(entry, onClick, MotionPreference(reducedMotion))
     val engaged = mascotEngaged(presence, pointerPresent = pointerPresent) || gestures.petting
     val moving = rememberMascotMoving(engaged, identity, gestures.touches)
-    MascotClock(entry, moving, registry)
+    // At rest the clock leaves composition and asks for no frames.
+    if (moving) MascotClock(entry, registry)
     // Gaze: this tile vs the pointer plus optional composer / timeline rects
     // from the registry. Null input/timeline skip those plan rows; OWN/USER
     // (and CURSOR when the pointer is present) still run so the eyes are never dead.
@@ -214,17 +216,15 @@ fun MascotLive(
 /**
  * The director's timers (listening release, success hold, blink schedule) need a clock; tickTo is
  * idempotent per frame so several surfaces of one agent tick it once. The keystroke count is read
- * here, not in composition, so typing never recomposes the tile. Nothing runs while not [moving].
+ * here, not in composition, so typing never recomposes the tile. Composed only while the scene moves.
  */
 @Composable
-private fun MascotClock(entry: MascotEntry, moving: Boolean, registry: MascotIdentityRegistry) {
-    LaunchedEffect(entry, moving) {
-        if (moving) {
-            while (true) {
-                withFrameNanos {
-                    entry.setKeystrokes(registry.composerKeystrokes)
-                    entry.tickTo(it)
-                }
+private fun MascotClock(entry: MascotEntry, registry: MascotIdentityRegistry) {
+    LaunchedEffect(entry) {
+        while (true) {
+            withFrameNanos {
+                entry.setKeystrokes(registry.composerKeystrokes)
+                entry.tickTo(it)
             }
         }
     }
@@ -232,12 +232,12 @@ private fun MascotClock(entry: MascotEntry, moving: Boolean, registry: MascotIde
 
 /** [entry]'s gesture effects, kept across recompositions and updated to this pass's handlers. */
 @Composable
-private fun rememberMascotGestureEffects(entry: MascotEntry, onClick: (() -> Unit)?, reducedMotion: Boolean): MascotGestureEffects {
+private fun rememberMascotGestureEffects(entry: MascotEntry, onClick: (() -> Unit)?, motion: MotionPreference): MascotGestureEffects {
     val effects = remember(entry) { MascotGestureEffects() }
     effects.director = entry.director
     effects.onClick = onClick
     effects.haptics = LocalHaptics.current
-    effects.reducedMotion = reducedMotion
+    effects.reducedMotion = motion.reduced
     return effects
 }
 
