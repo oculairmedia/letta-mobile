@@ -80,6 +80,17 @@ class ShellHeaderTest {
         onNodeWithTag(ShellHeaderTags.NAV).assertExists()
     }
 
+    /** The search sits at the header's end, after the free width, with the title at the start (not centred between them). */
+    @Test
+    fun aPointerHeaderPutsTheSearchAtTheEnd() = runComposeUiTest {
+        header(onHome = false)
+        val header = onNodeWithTag(ShellHeaderTags.HEADER).fetchSemanticsNode().boundsInRoot
+        val search = onNodeWithTag(ShellHeaderTags.SEARCH).fetchSemanticsNode().boundsInRoot
+        val title = onNodeWithTag(ShellHeaderTags.TITLE).fetchSemanticsNode().boundsInRoot
+        assertTrue(abs(header.right - search.right) < 1f, "search ends at ${search.right}, header at ${header.right}")
+        assertTrue(title.right < search.left, "the title stays at the start")
+    }
+
     @Test
     fun onHomeTheSearchFiltersTheHomeViewInPlace() = runComposeUiTest {
         header(onHome = true)
