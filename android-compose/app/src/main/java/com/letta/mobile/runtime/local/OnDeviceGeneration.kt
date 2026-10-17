@@ -20,8 +20,10 @@ data class OnDeviceGenerationLimits(
     val timeoutMs: Long = DEFAULT_TIMEOUT_MS,
     /** Output text that ends the reply where it starts (Gemma's turn markers, plus the request's `stop`). */
     val stopSequences: List<String> = DEFAULT_STOP_SEQUENCES,
-    /** The request's own `max_completion_tokens`/`max_tokens`; null when it set none. */
+    /** The request's own `max_completion_tokens`/`max_tokens` as honoured; null when it set none or a degenerate one. */
     val requestedMaxOutputTokens: Int? = null,
+    /** What the request asked for, honoured or not (logged). */
+    val clientMaxOutputTokens: Int? = null,
 ) {
     /** Whether [maxOutputTokens] is the client's own limit (not the bridge's lower ceiling). */
     val capIsRequested: Boolean get() = requestedMaxOutputTokens != null && requestedMaxOutputTokens <= maxOutputTokens
@@ -29,6 +31,17 @@ data class OnDeviceGenerationLimits(
     companion object {
         /** Long enough for a chat reply, short enough that a loop on CPU ends in about a minute. */
         const val DEFAULT_MAX_OUTPUT_TOKENS = 1_024
+
+        /**
+         * A requested output budget below this is not a real request but letta-code's window clamp
+         * (pi-ai `clampMaxTokensToContext`: window - prompt - 4,096, floored at 1; letta.js:26056)
+         * computed against a context window that is too small, e.g. a stale
+         * `context_window_limit` of 4,096 on the agent: honouring it asks the model for 1 token
+         * and letta-code then fails the turn as `max_tokens_exceeded`. The bridge enforces the
+         * engine's real window itself ([OnDeviceContextBudget]), so such a budget is ignored (the
+         * bridge ceiling applies) and logged as `requestedMaxTokens` in `bridge_inference_start`.
+         */
+        const val MIN_HONORED_OUTPUT_TOKENS = 128
 
         /** Below the client's own 300 s header timeout (Node fetch), so the bridge answers first. */
         const val DEFAULT_TIMEOUT_MS = 180_000L
@@ -55,13 +68,15 @@ data class OnDeviceGenerationLimits(
             modelSelection: EmbeddedLettaCodeModelSelection,
             timeoutMs: Long = DEFAULT_TIMEOUT_MS,
         ): OnDeviceGenerationLimits {
-            val requested = request.positiveInt("max_completion_tokens") ?: request.positiveInt("max_tokens")
+            val asked = request.positiveInt("max_completion_tokens") ?: request.positiveInt("max_tokens")
+            val requested = asked?.takeIf { it >= MIN_HONORED_OUTPUT_TOKENS }
             val ceiling = minOf(DEFAULT_MAX_OUTPUT_TOKENS, modelSelection.maxTokens.coerceAtLeast(1))
             return OnDeviceGenerationLimits(
                 maxOutputTokens = requested?.coerceAtMost(ceiling) ?: ceiling,
                 timeoutMs = timeoutMs,
                 stopSequences = DEFAULT_STOP_SEQUENCES + request.stopSequences(),
                 requestedMaxOutputTokens = requested,
+                clientMaxOutputTokens = asked,
             )
         }
 

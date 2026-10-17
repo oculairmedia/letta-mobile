@@ -21,7 +21,7 @@ class OnDeviceModelFollowTest {
     fun aDeviceModelSwitchFromE2bToE4bMovesTheAgent() = runTest {
         val client = RecordingClient(agents = listOf(record("agent-bobs", E2B)))
 
-        val plan = OnDeviceModelFollower(client) { it }.follow(E4B)
+        val plan = OnDeviceModelFollower(client) { it }.follow(SERVED)
 
         assertEquals(listOf(AgentId("agent-bobs")), plan.agents)
         assertEquals(listOf<Pair<String, String?>>("agent-bobs" to E4B), client.agentUpdates)
@@ -34,7 +34,7 @@ class OnDeviceModelFollowTest {
             conversations = listOf(record("local-conv-2", E2B), record("local-conv-3", null), record("local-conv-4", E4B)),
         )
 
-        val plan = OnDeviceModelFollower(client) { it }.follow(E4B)
+        val plan = OnDeviceModelFollower(client) { it }.follow(SERVED)
 
         assertTrue(plan.agents.isEmpty(), "an agent already on the served model stays")
         assertEquals(listOf(ConversationId("local-conv-2")), plan.conversations)
@@ -52,10 +52,24 @@ class OnDeviceModelFollowTest {
             conversations = listOf(record("server-conv", "lmstudio/qwen3-8b")),
         )
 
-        val plan = OnDeviceModelFollower(client) { it }.follow(E4B)
+        val plan = OnDeviceModelFollower(client) { it }.follow(SERVED)
 
         assertTrue(plan.isEmpty)
         assertTrue(client.agentUpdates.isEmpty() && client.conversationUpdates.isEmpty())
+    }
+
+    /** Device report: a stored 4,096 window made letta-code request 1 output token (window - prompt - 4,096). */
+    @Test
+    fun aStoredWindowTooSmallForLettaCodeIsHealedOnTheServedModel() = runTest {
+        val client = RecordingClient(
+            agents = listOf(record("agent-bobs", E4B, window = 4_096), record("agent-roomy", E4B, window = 128_000)),
+        )
+
+        val plan = OnDeviceModelFollower(client) { it }.follow(SERVED)
+
+        assertEquals(listOf(AgentId("agent-bobs")), plan.agents)
+        assertEquals(8_192 + 4_096, SERVED.lettaCodeWindow)
+        assertEquals(JsonPrimitive(SERVED.lettaCodeWindow), client.agentWindows.single())
     }
 
     @Test
@@ -71,15 +85,16 @@ class OnDeviceModelFollowTest {
     fun theListsAskForEveryRecordAsNumbers() = runTest {
         val client = RecordingClient()
 
-        OnDeviceModelFollower(client) { it }.follow(E4B)
+        OnDeviceModelFollower(client) { it }.follow(SERVED)
 
         assertEquals(JsonPrimitive(1_000), client.agentQuery?.get("limit"))
         assertEquals(JsonPrimitive(1_000), client.conversationQuery?.get("limit"))
     }
 
-    private fun record(id: String, model: String?): JsonObject = buildJsonObject {
+    private fun record(id: String, model: String?, window: Int? = null): JsonObject = buildJsonObject {
         put("id", id)
         model?.let { put("model", it) }
+        window?.let { put("model_settings", buildJsonObject { put("context_window_limit", it) }) }
     }
 
     private class RecordingClient(
@@ -87,6 +102,7 @@ class OnDeviceModelFollowTest {
         private val conversations: List<JsonObject> = emptyList(),
     ) : TurnEngineTestStreamClient() {
         val agentUpdates = mutableListOf<Pair<String, String?>>()
+        val agentWindows = mutableListOf<kotlinx.serialization.json.JsonElement?>()
         val conversationUpdates = mutableListOf<Pair<String, String?>>()
         var agentQuery: JsonObject? = null
         var conversationQuery: JsonObject? = null
@@ -109,6 +125,7 @@ class OnDeviceModelFollowTest {
 
         override suspend fun agentUpdate(command: AppServerCommand.AgentUpdate): AppServerInboundFrame.AgentUpdateResponse {
             agentUpdates += command.agentId to (command.body["model"] as? JsonPrimitive)?.content
+            agentWindows += (command.body["model_settings"] as? JsonObject)?.get("context_window_limit")
             return AppServerInboundFrame.AgentUpdateResponse(command.requestId, success = true)
         }
 
@@ -123,5 +140,6 @@ class OnDeviceModelFollowTest {
     private companion object {
         const val E2B = "lmstudio/google/gemma-3n-E2B-it-litert-lm"
         const val E4B = "lmstudio/google/gemma-3n-E4B-it-litert-lm"
+        val SERVED = OnDeviceServedModel(E4B, contextTokens = 8_192)
     }
 }

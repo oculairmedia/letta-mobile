@@ -9,6 +9,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 
 /**
@@ -23,10 +24,31 @@ import kotlinx.serialization.json.put
  * other than the served one moves to the served handle. A model-server handle (an LM Studio or
  * other OpenAI-compatible model, cloud models) is never touched: only on-device handles follow.
  *
+ * The same pass heals a context window letta-code cannot work with. letta-code 0.34.14 takes an
+ * agent's (or conversation's) `model_settings.context_window_limit` as the model's window
+ * (letta.js:116099 `resolvePiModelForAgent`), and its pi-ai layer clamps every request's output to
+ * `window - prompt estimate - 4,096` (letta.js:26056 `clampMaxTokensToContext`, :26105
+ * `CONTEXT_SAFETY_TOKENS = 4096`). A limit at the engine's real window (4,096 or 8,192, stored on
+ * agents while #2094 advertised it) therefore asks the model for 1 token. On-device records get
+ * [OnDeviceServedModel.lettaCodeWindow] instead: the engine window plus pi-ai's margin, so the clamp
+ * leaves exactly the engine's room; the bridge itself enforces the engine window (overflow 422).
+ *
  * Shared on purpose: the rule is about agents and models, not the platform that applies it.
  */
+
+/** The model the runtime serves now: its bridge handle and the engine's context window (Settings "Max tokens"). */
+data class OnDeviceServedModel(val handle: String, val contextTokens: Int) {
+    /** The `context_window_limit` letta-code needs so its 4,096-token safety margin leaves the engine's window. */
+    val lettaCodeWindow: Int get() = contextTokens + PI_AI_CONTEXT_SAFETY_TOKENS
+
+    private companion object {
+        /** letta-code 0.34.14 pi-ai `CONTEXT_SAFETY_TOKENS` (letta.js:26105). */
+        const val PI_AI_CONTEXT_SAFETY_TOKENS = 4_096
+    }
+}
+
 data class OnDeviceModelFollowPlan(
-    val servedHandle: String,
+    val served: OnDeviceServedModel,
     val agents: List<AgentId> = emptyList(),
     val conversations: List<ConversationId> = emptyList(),
 ) {
@@ -43,17 +65,30 @@ object OnDeviceModelFollowPolicy {
     fun isOnDeviceHandle(handle: String?): Boolean =
         handle != null && handle.startsWith(BRIDGE_PREFIX) && OnDeviceModel.containsMatchIn(handle.removePrefix(BRIDGE_PREFIX))
 
-    /** What must move to [servedHandle], from the agent and conversation records the server lists. */
-    fun plan(servedHandle: String, agents: List<JsonObject>, conversations: List<JsonObject>): OnDeviceModelFollowPlan =
-        OnDeviceModelFollowPlan(
-            servedHandle = servedHandle,
-            agents = agents.filter { it.followsTo(servedHandle) }.mapNotNull { it.id()?.let(::AgentId) },
-            conversations = conversations.filter { it.followsTo(servedHandle) }.mapNotNull { it.id()?.let(::ConversationId) },
+    /** What must move to [served] (model, window), from the agent and conversation records the server lists. */
+    fun plan(served: OnDeviceServedModel, agents: List<JsonObject>, conversations: List<JsonObject>): OnDeviceModelFollowPlan {
+        val agentModels = agents.associate { (it.id() ?: "") to it.string("model") }
+        return OnDeviceModelFollowPlan(
+            served = served,
+            agents = agents.filter { it.needsFollow(served, it.string("model")) }.mapNotNull { it.id()?.let(::AgentId) },
+            conversations = conversations
+                // A conversation without its own model runs on its agent's.
+                .filter { it.needsFollow(served, it.string("model") ?: agentModels[it.string("agent_id")]) }
+                .mapNotNull { it.id()?.let(::ConversationId) },
         )
+    }
 
-    private fun JsonObject.followsTo(servedHandle: String): Boolean {
-        val model = string("model")
-        return model != servedHandle && isOnDeviceHandle(model)
+    /** The update every planned record gets: the served model and the window letta-code can work with. */
+    fun updateBody(served: OnDeviceServedModel): JsonObject = buildJsonObject {
+        put("model", served.handle)
+        put("model_settings", buildJsonObject { put("context_window_limit", served.lettaCodeWindow) })
+    }
+
+    private fun JsonObject.needsFollow(served: OnDeviceServedModel, model: String?): Boolean {
+        if (!isOnDeviceHandle(model)) return false
+        val window = ((this["model_settings"] as? JsonObject)?.get("context_window_limit") as? JsonPrimitive)?.intOrNull
+        val ownModel = string("model")
+        return (ownModel != null && ownModel != served.handle) || (window != null && window < served.lettaCodeWindow)
     }
 
     private fun JsonObject.id(): String? = string("id")
@@ -70,14 +105,14 @@ class OnDeviceModelFollower(
     private val client: AppServerClient,
     private val requestId: (String) -> String,
 ) {
-    suspend fun follow(servedHandle: String): OnDeviceModelFollowPlan {
-        require(OnDeviceModelFollowPolicy.isOnDeviceHandle(servedHandle)) { "$servedHandle is not an on-device model handle" }
+    suspend fun follow(served: OnDeviceServedModel): OnDeviceModelFollowPlan {
+        require(OnDeviceModelFollowPolicy.isOnDeviceHandle(served.handle)) { "${served.handle} is not an on-device model handle" }
         val agents = client.agentList(AppServerCommand.AgentList(requestId("agents"), query = page()))
         val conversations = client.conversationList(AppServerCommand.ConversationList(requestId("conversations"), query = page()))
         requireDone(agents.success, agents.error)
         requireDone(conversations.success, conversations.error)
-        val plan = OnDeviceModelFollowPolicy.plan(servedHandle, agents.agents.objects(), conversations.conversations.objects())
-        val body = buildJsonObject { put("model", servedHandle) }
+        val plan = OnDeviceModelFollowPolicy.plan(served, agents.agents.objects(), conversations.conversations.objects())
+        val body = OnDeviceModelFollowPolicy.updateBody(served)
         plan.agents.forEach { id ->
             client.agentUpdate(AppServerCommand.AgentUpdate(requestId("agent"), id.value, body)).let { requireDone(it.success, it.error) }
         }

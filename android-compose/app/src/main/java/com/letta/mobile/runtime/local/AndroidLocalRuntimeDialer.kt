@@ -4,6 +4,7 @@ import android.util.Log
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.runtime.OnDeviceModelFollowPolicy
 import com.letta.mobile.data.runtime.OnDeviceModelFollower
+import com.letta.mobile.data.runtime.OnDeviceServedModel
 import com.letta.mobile.data.runtime.host.LocalAppServerHost
 import com.letta.mobile.data.session.LocalRuntimeDialer
 import com.letta.mobile.data.session.ProcessScope
@@ -61,8 +62,8 @@ class AndroidLocalRuntimeDialer @Inject constructor(
      * move to it here (shared [OnDeviceModelFollower] policy). Best effort, off the dial's path.
      */
     private fun followDeviceModel(dial: DirectAppServerDial, selection: EmbeddedLettaCodeModelSelection) {
-        val served = selection.lettaCodeModelHandle
-        if (!selection.requiresOnDeviceModel || !OnDeviceModelFollowPolicy.isOnDeviceHandle(served)) return
+        val served = OnDeviceServedModel(selection.lettaCodeModelHandle, selection.maxTokens)
+        if (!selection.requiresOnDeviceModel || !OnDeviceModelFollowPolicy.isOnDeviceHandle(served.handle)) return
         scope.launch {
             runCatching { OnDeviceModelFollower(dial.client) { "follow-$it-${UUID.randomUUID()}" }.follow(served) }
                 .onSuccess { plan ->
