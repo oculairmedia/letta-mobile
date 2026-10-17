@@ -47,8 +47,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * and the chat/permission/notification preferences. Every row is drawn by sharedUI.
  */
 internal fun desktopSettingsPage(
-    inputs: DestinationContentInputs,
-    actions: DestinationContentActions,
+    inputs: DesktopSettingsInputs,
+    actions: DesktopSettingsActions,
 ): ShellPageContent<ShellDestination.Settings> = ShellPageContent { destination, modifier ->
     DesktopSettingsPage(destination, inputs, actions, modifier)
 }
@@ -56,8 +56,8 @@ internal fun desktopSettingsPage(
 @Composable
 private fun DesktopSettingsPage(
     destination: ShellDestination.Settings,
-    inputs: DestinationContentInputs,
-    actions: DestinationContentActions,
+    inputs: DesktopSettingsInputs,
+    actions: DesktopSettingsActions,
     modifier: Modifier,
 ) {
     val services = SettingsPageServices(
@@ -72,7 +72,7 @@ private fun DesktopSettingsPage(
 }
 
 /** Saves under the desktop's per-address config id, as the desktop store expects. */
-private fun desktopBackendActions(actions: DestinationContentActions) = BackendSettingsActions(
+private fun desktopBackendActions(actions: DesktopSettingsActions) = BackendSettingsActions(
     onConfigSaved = { config -> actions.onConfigSaved(config.copy(id = desktopConfigIdFor(config.serverUrl))) },
     onTokenCleared = actions.onTokenCleared,
     onIrohIdentityReset = actions.onIrohIdentityReset,
@@ -89,7 +89,7 @@ private fun rememberDesktopChatSettings(): ChatSettings {
 }
 
 @Composable
-private fun desktopContributions(inputs: DestinationContentInputs, actions: DestinationContentActions): List<SettingsContribution> {
+private fun desktopContributions(inputs: DesktopSettingsInputs, actions: DesktopSettingsActions): List<SettingsContribution> {
     val backend = rememberLocalRuntimeContributions(inputs, actions)
     LiveSystemInfo(actions.nucleus.onRefreshSystemInfo)
     val nucleus = inputs.nucleus
@@ -103,7 +103,7 @@ private fun desktopContributions(inputs: DestinationContentInputs, actions: Dest
 
 /** The bundled runtime's sections, with the two folder pickers they open. */
 @Composable
-private fun rememberLocalRuntimeContributions(inputs: DestinationContentInputs, actions: DestinationContentActions): List<SettingsContribution> {
+private fun rememberLocalRuntimeContributions(inputs: DesktopSettingsInputs, actions: DesktopSettingsActions): List<SettingsContribution> {
     val runtime = inputs.localRuntime
     LaunchedEffect(runtime) { runtime.load() }
     LaunchedEffect(Unit) {

@@ -39,7 +39,6 @@
     <ID>LoopWithTooManyJumpStatements:DesktopChatFontScale.kt$while</ID>
     <ID>LoopWithTooManyJumpStatements:DesktopTimelineBoundedStore.kt$DesktopTimelineBoundedStore.Transaction$for</ID>
     <ID>LoopWithTooManyJumpStatements:RiveDesktopSpike.kt$while</ID>
-    <ID>MatchingDeclarationName:DesktopDestinationWiring.kt$ScheduleWiringDeps</ID>
     <ID>MatchingDeclarationName:DesktopDreamingPane.kt$DesktopDreamingDeps</ID>
     <ID>MatchingDeclarationName:DesktopImageIngress.kt$DesktopImageIngressConfig</ID>
     <ID>MatchingDeclarationName:DesktopImageIngressSupport.kt$DesktopImageIngressSink</ID>
@@ -52,7 +51,6 @@
     <ID>MatchingDeclarationName:DesktopShellRoutes.kt$DesktopShellRoute</ID>
     <ID>MatchingDeclarationName:DesktopTouchOrigin.kt$DesktopTouchOriginTracker</ID>
     <ID>MatchingDeclarationName:LettaDesktopApp.kt$DesktopAppShellBindings</ID>
-    <ID>MatchingDeclarationName:RiveDesktopSurface.kt$RiveOnionSkin</ID>
     <ID>MaxLineLength:CanvasBackgroundSyncUiTest.kt$CanvasBackgroundSyncUiTest$CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "Board", initialSceneJson = "", syncTransport = relay))</ID>
     <ID>MaxLineLength:CanvasBlockEditorToolbarTest.kt$CanvasBlockEditorToolbarTest$assertEquals(listOf("paragraph"), toolbar!!.holder.state.blocks.map { it.type.typeId }, "a fresh note has one paragraph to type into")</ID>
     <ID>MaxLineLength:CanvasCascadeBlocksOracleTest.kt$CanvasCascadeBlocksOracleTest$assertEquals(canonical(DocumentSchema.encodeToString(libraryBlocks)), canonical(json), "the library writes these blocks differently")</ID>
@@ -79,9 +77,6 @@
     <ID>MaxLineLength:CanvasWorkspaceUiTest.kt$CanvasWorkspaceUiTest$onNodeWithContentDescription("Opacity").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(0.5f) }</ID>
     <ID>MaxLineLength:CanvasWorkspaceUiTest.kt$CanvasWorkspaceUiTest$val copyShape = controller.state.value.elements.filterIsInstance&lt;io.ak1.drawbox.domain.model.Element.Shape&gt;().first { it.id != "rect-1" }</ID>
     <ID>MaxLineLength:CanvasWorkspaceUiTest.kt$CanvasWorkspaceUiTest$waitUntil(timeoutMillis = 5000) { onAllNodes(androidx.compose.ui.test.isFocused() and androidx.compose.ui.test.hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }</ID>
-    <ID>MaxLineLength:DesktopAdminPages.kt$projects = if (binding.projectsAvailable) desktopProjectsPage(binding) else shellProjectsUnavailablePage(binding.navigation.openSettings)</ID>
-    <ID>MaxLineLength:DesktopAdminPages.kt$val actions = remember(controller, openAgent) { controller.projectsPageActions { project, _ -&gt; project.agentIdOrNull()?.let(openAgent) } }</ID>
-    <ID>MaxLineLength:DesktopAdminPagesTest.kt$DesktopAdminPagesTest$val controller = AgentTemplatesController(agentRepository = agents, scope = backgroundScope, errorMessageMapper = ::desktopAdminErrorMessage)</ID>
     <ID>MaxLineLength:DesktopAppServerChatGateway.kt$DesktopAppServerChatGateway$private</ID>
     <ID>MaxLineLength:DesktopAppServerChatGatewayTest.kt$DesktopAppServerChatGatewayTest$DeltaSpec(messageType = "assistant_message", messageId = "letta-msg-a1", logicalMessageId = "lm-a1", runId = "run-1", content = "Hello")</ID>
     <ID>MaxLineLength:DesktopAppServerChatGatewayTest.kt$DesktopAppServerChatGatewayTest$DeltaSpec(messageType = "reasoning_message", messageId = "letta-msg-r1", logicalMessageId = "lm-r1", runId = "run-1", content = "thinking")</ID>
@@ -135,7 +130,6 @@
     <ID>MaxLineLength:DesktopSettingsSections.kt$val line = SettingsRow.Note("runtime-git", SettingsStatus("Git: ${git.describe()}", if (missing != null) SettingsTone.Error else SettingsTone.Normal))</ID>
     <ID>MaxLineLength:DesktopSharedChatKeybindingTest.kt$DesktopSharedChatKeybindingTest.RecordingPort$ChatComposerUiState(text = text, canSend = text.isNotBlank(), commands = persistentListOf&lt;ChatComposerCommand&gt;().addAll(commands))</ID>
     <ID>MaxLineLength:DesktopSharedChatPage.kt$private</ID>
-    <ID>MaxLineLength:DesktopShellMainPane.kt$pageDestination = navigator.currentRoute(frame.chatState.selectedConversationId, frame.focus.selectedAgentId).page.toShellDestination()</ID>
     <ID>MaxLineLength:JcefPluginViewHost.kt$JcefPluginViewHost$val slot = remember(app, session) { JcefViewSlot(views, app, session) { reason -&gt; SwingUtilities.invokeLater { onFailure(reason) } } }</ID>
     <ID>MaxLineLength:Main.kt$CanvasBubbleLayoutHost</ID>
     <ID>MaxLineLength:PhoneAgentPillTest.kt$PhoneAgentPillTest$PhoneCanvasIdentityPill(phoneAgentIdentity("agent-1", "A very long agent name that would run across the whole phone screen") {})</ID>

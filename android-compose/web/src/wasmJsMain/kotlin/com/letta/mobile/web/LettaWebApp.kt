@@ -35,21 +35,21 @@ import com.letta.mobile.web.mascot.RiveCanvasRenderer
 import com.letta.mobile.ui.settings.BackendConnectionNotice
 import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
 import com.letta.mobile.ui.settings.BackendConnectionStatusRow
-import com.letta.mobile.ui.settings.SettingsPageState
 import com.letta.mobile.ui.shell.ShellNavDrawer
 import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.ShellPageContent
-import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.ui.shell.navDrawerActions
 import com.letta.mobile.ui.shell.navDrawerState
+import com.letta.mobile.ui.shell.pages.ShellHomeFleet
+import com.letta.mobile.ui.shell.pages.ShellHomeFleetEffect
+import com.letta.mobile.ui.shell.pages.rememberShellLibraryControllers
+import com.letta.mobile.ui.shell.pages.rememberShellPageDeps
 import com.letta.mobile.ui.shell.rememberShellWorkspaceState
-import com.letta.mobile.ui.shell.shellSettingsPage
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.SharedMaterialTheme
 import com.letta.mobile.web.chat.WebChatLoad
 import com.letta.mobile.web.chat.WebChatOpener
 import com.letta.mobile.web.chat.WebChatPageNavigation
-import com.letta.mobile.web.chat.WebSharedChatPage
 import com.letta.mobile.web.chat.rememberWebChatLoad
 import com.letta.mobile.web.data.WasmAppServerClientGateway
 import com.letta.mobile.web.data.WebSettingsStore
@@ -86,11 +86,18 @@ fun LettaWebApp() {
     LaunchedEffect(browserRoute, workspace.route) { browserRoute.publish(workspace.route) }
     val focusedAgent = backend.agents.value.firstOrNull { it.id == workspace.focusedAgentId }
     val chat = rememberWebChatLoad(remember(gateway) { WebChatOpener(gateway::openChat) }, focusedAgent, connection)
+    // letta-mobile-ckmub.17.5: the shared pages over the live session graph, as desktop binds them.
+    val services = remember(gateway, storage) { WebPageServices(gateway, storage.settings) }
+    val graph by gateway.sessionGraphProvider.currentGraph.collectAsState()
+    val controllers = rememberShellLibraryControllers(gateway.sessionGraphProvider, services.sources, scope)
+    ShellHomeFleetEffect(controllers.home, ShellHomeFleet(conversations = emptyList(), roster = backend.agents.value))
+    val onRosterChanged: () -> Unit = { scope.launch { backend.reloadRoster(graph, workspace) } }
     val page = WebPageInputs(
         chat = chat,
         connection = connection,
         canvas = canvas,
         settings = webSettingsServices(backend.config, settingsStore),
+        session = WebPagesSession(graph, controllers, services, onRosterChanged),
     )
     val shell = WebShell(navigator, backend)
     SharedMaterialTheme {
@@ -151,27 +158,21 @@ private fun WebNavigation(
 }
 
 /**
- * The shared ShellPage beside the navigation; [onShowAgents] opens the navigation where it is hidden.
- * Pages the web does not bind yet, and a conversation that has not opened, fall back to the connection notice.
+ * The shared ShellPage beside the navigation, over the pages desktop binds ([rememberShellPageDeps]);
+ * [onShowAgents] opens the navigation where it is hidden. A conversation that has not opened falls
+ * back to the connection notice.
  */
 @Composable
 private fun WebPage(shell: WebShell, page: WebPageInputs, onShowAgents: (() -> Unit)?, modifier: Modifier) {
-    val ready = page.chat as? WebChatLoad.Ready
-    val navigation = WebChatPageNavigation(onShowAgents ?: {}, agentNamesById = shell.backend.roster.toMap())
-    val workspace = shell.workspace
-    val deps = ShellPageDeps(
-        chat = ready?.let { ShellPageContent { _, m -> WebSharedChatPage(it.port, page.canvas, navigation, m) } },
-        settings = shellSettingsPage(
-            SettingsPageState(shell.backend.config.value, page.connection),
-            page.settings,
-            onBack = { workspace.navigate(ShellDestination.Chat()) },
-        ),
+    val own = WebPageContributions(
+        navigation = WebChatPageNavigation(onShowAgents ?: {}, agentNamesById = shell.backend.roster.toMap()),
         fallback = ShellPageContent { _, m -> WebWaitingPage(shell, page, onShowAgents, m) },
     )
-    ShellPage(destination = workspace.destination, deps = deps, modifier = modifier)
+    val deps = rememberShellPageDeps(page.session.graph, page.session.controllers, webPageHost(shell, page, own))
+    ShellPage(destination = shell.workspace.destination, deps = deps, modifier = modifier)
 }
 
-/** A page the web does not bind yet, or a conversation that has not opened: the connection and the way on. */
+/** A conversation that has not opened: the connection and the way on. */
 @Composable
 private fun WebWaitingPage(shell: WebShell, page: WebPageInputs, onShowAgents: (() -> Unit)?, modifier: Modifier) {
     val chat = page.chat
