@@ -14,10 +14,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,13 +39,11 @@ import com.letta.mobile.avatar.core.MotionPreference
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.avatar.core.AvatarLookTarget
 import com.letta.mobile.avatar.core.GazeMath
-import com.letta.mobile.avatar.core.GazePoint
 import com.letta.mobile.avatar.core.GazeReach
 import com.letta.mobile.avatar.core.GazeRect
-import com.letta.mobile.avatar.core.GazeTargetRects
-import com.letta.mobile.avatar.core.GazeWindow
 import com.letta.mobile.avatar.core.GazeWorld
 import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.AgentPresence
 import com.letta.mobile.ui.theme.LettaDimens
@@ -170,39 +167,26 @@ fun MascotLive(
     val moving = rememberMascotMoving(engaged, identity, gestures.touches)
     // At rest the clock leaves composition and asks for no frames.
     if (moving) MascotClock(entry, registry)
-    // Gaze: this tile vs the pointer plus optional composer / timeline rects
-    // from the registry. Null input/timeline skip those plan rows; OWN/USER
-    // (and CURSOR when the pointer is present) still run so the eyes are never dead.
-    var bounds by remember { mutableStateOf(Rect.Zero) }
-    val inputBounds = registry.inputBounds.value
-    val timelineBounds = registry.timelineBounds.value
+    // Gaze: this tile vs the pointer, the composer / timeline rects, the other mascots and every
+    // attention point the registry holds. Null input/timeline skip those plan rows; OWN/USER
+    // (and CURSOR when the pointer is present) still run so the eyes are never dead. All of it is
+    // read in a snapshot (te3n1.2), not in composition: a card moving or a caret stepping rebuilds
+    // the world without recomposing the tile.
+    val tile = remember { mutableStateOf(Rect.Zero) }
     // This surface's slot in the registry, so the other agents' mascots can look at it.
     val slotKey = remember(agentId) { "$agentId#${slotCounter++}" }
     DisposableEffect(registry, slotKey) { onDispose { registry.mascotBounds.remove(slotKey) } }
-    val peersPx = registry.mascotBounds.values
-        .filter { it.agentId != agentId && !it.bounds.isEmpty }
-        .map { GazePoint(it.bounds.centerX, it.bounds.centerY) }
     val minReachPx = with(LocalDensity.current) { GAZE_MIN_REACH.toPx() }
-    LaunchedEffect(entry, cursor, bounds, minReachPx, inputBounds, timelineBounds, peersPx, reducedMotion) {
-        entry.setGazeWorld(
-            GazeWorld.fromWindow(
-                GazeWindow(
-                    mascot = GazeRect(bounds.left, bounds.top, bounds.right, bounds.bottom),
-                    reach = GazeReach(minReachPx),
-                    pointerPx = cursor?.let { GazePoint(it.x, it.y) },
-                    rects = GazeTargetRects(input = inputBounds, timeline = timelineBounds),
-                    peersPx = peersPx,
-                ),
-                reducedMotion = reducedMotion,
-            ),
-        )
+    LaunchedEffect(entry, registry, agentId, minReachPx, reducedMotion) {
+        snapshotFlow { registry.gazeWindow(AgentId(agentId), tile.value, GazeReach(minReachPx)) }
+            .collect { entry.setGazeWorld(GazeWorld.fromWindow(it, reducedMotion = reducedMotion)) }
     }
     // requiredSize: an overscaled mascot must exceed its tile so the tile's clip crops it;
     // plain size() is coerced down to the parent's constraints and never overscales.
     Box(
         modifier = modifier.mascotSemantics(identity, live = true).requiredSize(size).onGloballyPositioned {
             val r = it.boundsInWindow()
-            bounds = r
+            tile.value = r
             val slot = MascotSlot(agentId, GazeRect(r.left, r.top, r.right, r.bottom))
             if (registry.mascotBounds[slotKey] != slot) registry.mascotBounds[slotKey] = slot
         },
@@ -377,7 +361,7 @@ const val MASCOT_TILE_OVERSCALE = 1.6f
 
 /** Distinguishes several surfaces of one agent in [MascotIdentityRegistry.mascotBounds]; composition-thread only. */
 private var slotCounter = 0
-private val GAZE_MIN_REACH = 360.dp
+internal val GAZE_MIN_REACH = 360.dp
 
 /** The identity to draw for [agentId], or null when it has none or the host cannot draw it. */
 @Composable

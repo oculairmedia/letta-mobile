@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
+import com.letta.mobile.avatar.core.AttentionKey
+import com.letta.mobile.avatar.core.AttentionKind
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -33,6 +35,7 @@ import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRenderItemRow
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowCallbacks
 import com.letta.mobile.ui.chat.surface.timeline.rows.LocalDockedPromptCompaction
 import com.letta.mobile.ui.mascot.MascotGazeSurface
+import com.letta.mobile.ui.mascot.mascotAttention
 import com.letta.mobile.ui.mascot.mascotGazeTarget
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -221,14 +224,18 @@ internal fun TimelineItemRow(
     leadingSpace: Boolean = true,
 ) {
     val sticky = LocalStickyPrompt.current.takeIf { item.isUserPrompt() }
+    val context = bindings.contexts.forItem(item)
     Box(
         modifier = modifier
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
             .hiddenUnderStickyCopy(sticky, item.key)
-            .padding(top = if (leadingSpace) timelineLeadingSpace(item) else 0.dp),
+            .padding(top = if (leadingSpace) timelineLeadingSpace(item) else 0.dp)
+            // The newest message (your prompt as it lands, then the reply as it streams) draws the
+            // mascot's eyes (te3n1.2); only the list's own row, never the pinned copy.
+            .mascotAttention(AttentionKey("message:${item.key}"), AttentionKind.MESSAGE, enabled = leadingSpace && context.isNewest),
     ) {
-        ChatRenderItemRow(item = item, context = bindings.contexts.forItem(item), callbacks = bindings.callbacks)
+        ChatRenderItemRow(item = item, context = context, callbacks = bindings.callbacks)
     }
 }
 

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import com.letta.mobile.ui.chat.session.ChatDockRect
+import com.letta.mobile.ui.mascot.mascotTouchPresence
 import androidx.compose.foundation.lazy.LazyListState
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.TouchComposerDimens
@@ -193,7 +194,9 @@ fun ChatSurface(
 /** The page's layers for its idiom, under the send flight. Skipped while only the keyboard moves. */
 @Composable
 private fun ChatSurfaceLayers(frame: ChatSurfaceFrame, canvas: (@Composable () -> Unit)?) {
-    SendFlightLayer(rememberSendFlightState(), Modifier.fillMaxSize()) {
+    // On a phone the last touch is the mascot's cursor for a moment (te3n1.2); the desktop's mouse
+    // is captured at its window root instead.
+    SendFlightLayer(rememberSendFlightState(), Modifier.fillMaxSize().mascotTouchPresence()) {
         if (frame.appearance.platformStyle == ChatPlatformStyle.Touch) {
             // Phones: the canvas over a flush chat bar with a floating chat head, no panel.
             TouchCanvasWithChat(frame, canvas)

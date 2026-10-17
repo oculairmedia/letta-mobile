@@ -55,6 +55,10 @@ class MascotDirector(
         /** A composing user who pauses still has some attention. */
         val listenFloor: Float = 0.25f,
         val listenSmoothingSeconds: Float = 0.35f,
+        /** te3n1.2: the host never plays two blinks closer than this (a head-turn blink and a reaction's). */
+        val blinkMinGapSeconds: Float = 0.25f,
+        /** te3n1.2: how long the eyes lead toward the next seat before the body hops there. */
+        val seatLeadSeconds: Float = 0.45f,
     ) {
         /** How long [reaction] waits before it may fire again; completions never wait. */
         fun cooldownOf(reaction: AvatarReaction): Float = when (reaction) {
@@ -96,6 +100,7 @@ class MascotDirector(
     private val lastFired = FloatArray(AvatarReaction.entries.size) { Float.NEGATIVE_INFINITY }
     private val pokeTimes = FloatArray(config.dizzyPokes.coerceAtLeast(1)) { Float.NEGATIVE_INFINITY }
     private var pokeCursor = 0
+    private var lastBlinkAt = Float.NEGATIVE_INFINITY
 
     private var keystrokesSeen = -1
     private var keysSinceTick = 0
@@ -140,7 +145,10 @@ class MascotDirector(
         when (event) {
             MascotEvent.Sent -> {
                 wakeIfAsleep()
-                if (avatar.state != AvatarState.ERROR) fire(AvatarReaction.SENT)
+                if (avatar.state != AvatarState.ERROR) {
+                    fire(AvatarReaction.SENT)
+                    gaze.cue(GazeCue.SENT)
+                }
             }
             is MascotEvent.ToolStarted -> {
                 wakeIfAsleep()
@@ -150,6 +158,7 @@ class MascotDirector(
             MascotEvent.ApprovalRaised -> {
                 wakeIfAsleep()
                 fire(AvatarReaction.APPROVAL_ASK)
+                gaze.cue(GazeCue.APPROVAL_ASK)
             }
             is MascotEvent.RunFinished -> if (event.ok) {
                 avatar.notifyTaskSucceeded()
@@ -215,6 +224,19 @@ class MascotDirector(
         world = next
     }
 
+    /**
+     * A seat hand-off is about to start (te3n1.2): the eyes go to [toward] (gaze units from where the
+     * mascot stands now) for [seatLeadSeconds] before the body hops; the host waits that long. Under
+     * reduced motion the hop snaps and there is no lead.
+     */
+    fun leadGaze(toward: GazePoint) {
+        if (signals.reduceMotion) return
+        gaze.lead(toward, config.seatLeadSeconds)
+    }
+
+    /** How long a hop waits on [leadGaze]: zero under reduced motion. */
+    val seatLeadSeconds: Float get() = if (signals.reduceMotion) 0f else config.seatLeadSeconds
+
     /** Advance state, gaze, listening and reactions by [deltaSeconds]; returns the rewritten [frame]. */
     fun tick(deltaSeconds: Float): MascotFrame {
         if (deltaSeconds <= 0f || deltaSeconds.isNaN()) return frame
@@ -232,7 +254,14 @@ class MascotDirector(
         frame.gaze = pose
         avatar.setLookTarget(pose.lookTarget)
         headTurn?.setHeadTurn(pose.headX, pose.headY)
-        if (pose.blink) runtime.playGesture(BLINK)
+        if (pose.blink) blink()
+    }
+
+    /** One host blink, unless one played less than [Config.blinkMinGapSeconds] ago. */
+    private fun blink() {
+        if (clock - lastBlinkAt < config.blinkMinGapSeconds) return
+        lastBlinkAt = clock
+        runtime.playGesture(BLINK)
     }
 
     private fun tickListening(delta: Float) {
@@ -277,7 +306,7 @@ class MascotDirector(
         if (clock - lastFired[reaction.ordinal] < config.cooldownOf(reaction)) return
         lastFired[reaction.ordinal] = clock
         pending.add(reaction)
-        if (signals.reduceMotion && !runtime.honorsReducedMotion) runtime.playGesture(BLINK) else runtime.react(reaction, arg)
+        if (signals.reduceMotion && !runtime.honorsReducedMotion) blink() else runtime.react(reaction, arg)
         reactionListener?.onReaction(reaction, arg)
     }
 

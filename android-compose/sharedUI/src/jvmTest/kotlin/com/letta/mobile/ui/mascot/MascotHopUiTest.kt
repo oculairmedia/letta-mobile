@@ -27,8 +27,8 @@ import kotlin.test.assertTrue
 class MascotHopUiTest {
     private class Stage(val shell: FakeMascotShell, val landings: MutableList<Float>)
 
-    private fun ComposeUiTest.stage(reducedMotion: Boolean): Stage {
-        val shell = FakeMascotShell(AGENT, layerMounted = false)
+    private fun ComposeUiTest.stage(reducedMotion: Boolean, host: MascotHost = FakeMascotHost): Stage {
+        val shell = FakeMascotShell(AGENT, layerMounted = false, host = host)
         val landings = mutableListOf<Float>()
         shell.transport.motionListener = MascotMotionListener { agent, impact ->
             assertEquals(AGENT, agent.value)
@@ -67,7 +67,8 @@ class MascotHopUiTest {
         val destinationWidth = nodeWidth()
         val centers = mutableListOf(from)
         val compositionsAtTakeOff = stage.shell.transport.transportedCompositions
-        repeat(FLIGHT_FRAMES) {
+        // te3n1.2: the eyes lead for a beat first, then the body flies.
+        repeat(LEAD_FRAMES + FLIGHT_FRAMES) {
             mainClock.advanceTimeByFrame()
             centers += character().center
             assertEquals(destinationWidth, nodeWidth(), "the renderer keeps the destination size")
@@ -92,7 +93,7 @@ class MascotHopUiTest {
         stage.shell.transport.transportTo(AGENT, MascotStage.AGENT_PANE_HERO)
         var moved = false
         val start = character().center
-        repeat(FLIGHT_FRAMES / 2) {
+        repeat(LEAD_FRAMES + FLIGHT_FRAMES / 2) {
             mainClock.advanceTimeByFrame()
             val shown = character()
             if (shown.center != start) moved = true
@@ -101,6 +102,21 @@ class MascotHopUiTest {
         assertTrue(moved, "still carried along the hop")
         assertNotNull(stage.shell.transport.bodyOf(AgentId(AGENT)), "the director can read the body's motion")
         assertEquals(2, stage.landings.size, "the entrance's and the hop's landings still reach the director")
+    }
+
+    @Test
+    fun theEyesLeadToTheNextSeatBeforeTheBodyHops() = runComposeUiTest {
+        val host = CachingMascotHost()
+        val stage = stage(reducedMotion = false, host = host)
+        val from = character().center
+        stage.shell.transport.transportTo(AGENT, MascotStage.AGENT_PANE_HERO)
+        repeat(LEAD_FRAMES - 4) { mainClock.advanceTimeByFrame() }
+        assertEquals(from, character().center, "the body waits on the eyes")
+        val gaze = assertNotNull(host.made["mascot-focus-0"], "the slot's scene").lastGaze
+        // The hero seat is up and to the right of the companion.
+        assertTrue(gaze.lookX > 0.1f && gaze.lookY < 0f, "the eyes are already on the next seat: $gaze")
+        repeat(FLIGHT_FRAMES / 2) { mainClock.advanceTimeByFrame() }
+        assertTrue((character().center - from).getDistance() > 1f, "then it hops")
     }
 
     @Test
@@ -148,6 +164,9 @@ class MascotHopUiTest {
         const val LARGE = 96
         const val SETTLE_MILLIS = 2_000L
         const val FLIGHT_FRAMES = 60
+
+        /** MascotDirector.Config.seatLeadSeconds (0.45 s) in 16 ms frames, rounded up. */
+        const val LEAD_FRAMES = 29
         const val FRAME_MILLIS = 16L
         const val SEAT_FRAMES = 3
     }

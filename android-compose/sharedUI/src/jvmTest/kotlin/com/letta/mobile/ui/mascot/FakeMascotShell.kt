@@ -43,6 +43,14 @@ internal open class FakeMascotRenderer(private val observesPointer: Boolean) : M
     }
 }
 
+/** [FakeMascotHost] that keeps one entry per agent (or scene key), as the platform hosts do, so a test can read it. */
+internal class CachingMascotHost : FakeMascotRenderer(observesPointer = false) {
+    val made = HashMap<String, MascotEntry>()
+
+    override fun entry(agentId: String, identity: MascotIdentity): MascotEntry =
+        made.getOrPut(agentId) { super.entry(agentId, identity) }
+}
+
 /** Rive's pass-through pointer filter: sees every event, consumes none, shares with its siblings. */
 private data object RiveLikePointerFilter : ModifierNodeElement<RiveLikePointerNode>() {
     override fun create(): RiveLikePointerNode = RiveLikePointerNode()
