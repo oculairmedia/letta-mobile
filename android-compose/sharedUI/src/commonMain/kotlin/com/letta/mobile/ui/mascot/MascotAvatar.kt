@@ -207,7 +207,7 @@ fun MascotLive(
         contentAlignment = Alignment.Center,
     ) {
         host.Surface(entry, Modifier.matchParentSize(), playing = moving)
-        if (interactive) MascotHitArea(size, onClick, gestures)
+        if (interactive) MascotGestureArea(size, gestures)
     }
 }
 
@@ -242,44 +242,51 @@ private fun rememberMascotGestureEffects(entry: MascotEntry, onClick: (() -> Uni
 }
 
 /**
- * The control over a mascot: an invisible hit area the size of the body (the rig draws it across
- * ~60 % of the tile, a little below centre), with a hand cursor where it is clickable. No highlight
- * of its own - the character answers a hover, a poke, a stroke with motion, and that is the
- * affordance. With [gestures] it reads every gesture (a tap still runs [onClick], at once, and is
- * still a click to accessibility); without, a still's plain click.
+ * The control over a still mascot: an invisible hit area the size of the body (the rig draws it
+ * across ~60 % of the tile, a little below centre) and a hand cursor. No highlight of its own.
  */
 @Composable
-internal fun MascotHitArea(size: Dp, onClick: (() -> Unit)?, gestures: MascotGestureEffects? = null) {
-    val body = Modifier
-        .offset(y = size * BODY_DROP_FRACTION)
-        .size(size * BODY_FRACTION)
-        .clip(CircleShape)
-        .testTag(MASCOT_HIT_AREA_TAG)
-        .then(if (onClick != null) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
+internal fun MascotHitArea(size: Dp, onClick: () -> Unit) {
     val clicks = remember { MutableInteractionSource() }
-    val input = when {
-        gestures != null -> Modifier.mascotTapSemantics(gestures, onClick).mascotGestures(gestures)
-        onClick != null -> Modifier.clickable(interactionSource = clicks, indication = null, onClick = onClick)
-        else -> Modifier
-    }
-    Box(body.then(input))
+    Box(
+        Modifier
+            .mascotBodyArea(size)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(interactionSource = clicks, indication = null, onClick = onClick),
+    )
 }
 
 /**
- * A clickable mascot stays one button to accessibility; its click is a tap (the agent opens, the
- * character is poked).
+ * The live mascot's body as a control: the same hit area, reading every gesture for [gestures]
+ * (te3n1.4). The character answers a hover, a poke, a stroke with motion, and that is the
+ * affordance; a tap still runs the seat's click at once and is still a click to accessibility.
  */
-private fun Modifier.mascotTapSemantics(gestures: MascotGestureEffects, onClick: (() -> Unit)?): Modifier {
-    if (onClick == null) return this
-    return semantics {
-        role = Role.Button
-        onClick {
-            gestures.apply(MascotGesture.TAP, trick = 0)
-            true
-        }
-    }
+@Composable
+private fun MascotGestureArea(size: Dp, gestures: MascotGestureEffects) {
+    val clickable = gestures.onClick != null
+    Box(
+        Modifier
+            .mascotBodyArea(size)
+            .then(if (clickable) Modifier.pointerHoverIcon(PointerIcon.Hand).mascotTapSemantics(gestures) else Modifier)
+            .mascotGestures(gestures),
+    )
 }
 
+/** The body's share of a tile, a little below its centre, as a circle tests can find. */
+private fun Modifier.mascotBodyArea(size: Dp): Modifier = this
+    .offset(y = size * BODY_DROP_FRACTION)
+    .size(size * BODY_FRACTION)
+    .clip(CircleShape)
+    .testTag(MASCOT_HIT_AREA_TAG)
+
+/** One button to accessibility; its click is a tap (the agent opens, the character is poked). */
+private fun Modifier.mascotTapSemantics(gestures: MascotGestureEffects): Modifier = semantics {
+    role = Role.Button
+    onClick {
+        gestures.apply(MascotGesture.TAP, trick = 0)
+        true
+    }
+}
 /** The body's hit area; tests find the character's touchable part by it. */
 internal const val MASCOT_HIT_AREA_TAG = "mascot-hit-area"
 

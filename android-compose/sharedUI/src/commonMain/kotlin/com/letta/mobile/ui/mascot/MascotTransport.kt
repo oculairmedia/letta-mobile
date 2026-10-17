@@ -504,7 +504,7 @@ private suspend fun PointerInputScope.seatDragGestures(handlers: SeatHandlers, s
         } finally {
             flight.body.drag(null)
             flight.wakes++
-            seatDrag.feel.putDown(vx, vy)
+            seatDrag.feel.putDown(MascotVector(vx, vy))
         }
     }
 }

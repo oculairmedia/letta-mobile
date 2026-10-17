@@ -12,9 +12,9 @@ import kotlin.test.assertTrue
 class MascotGestureClassifierTest {
     private val classifier = MascotGestureClassifier()
 
-    private fun tap(at: Long, x: Float = 10f, y: Float = 10f): MascotGesture {
-        classifier.down(at, x, y)
-        return classifier.up(at + TAP_MILLIS)
+    private fun tap(millis: Long, x: Float = 10f, y: Float = 10f): MascotGesture {
+        classifier.down(at(millis), GesturePoint(x, y))
+        return classifier.up(at(millis + TAP_MILLIS))
     }
 
     @Test
@@ -24,16 +24,16 @@ class MascotGestureClassifierTest {
 
     @Test
     fun aPressThatWandersPastTheSlopIsNoTap() {
-        classifier.down(0L, 0f, 0f)
-        classifier.move(20L, 30f, 0f)
-        assertEquals(MascotGesture.NONE, classifier.up(40L))
+        classifier.down(at(0L), GesturePoint(0f, 0f))
+        classifier.move(at(20L), GesturePoint(30f, 0f))
+        assertEquals(MascotGesture.NONE, classifier.up(at(40L)))
     }
 
     @Test
     fun aPressTheSeatsDragTakesIsNoTap() {
-        classifier.down(0L, 0f, 0f)
-        classifier.cancel(16L)
-        assertEquals(MascotGesture.NONE, classifier.up(40L))
+        classifier.down(at(0L), GesturePoint(0f, 0f))
+        classifier.cancel(at(16L))
+        assertEquals(MascotGesture.NONE, classifier.up(at(40L)))
     }
 
     @Test
@@ -67,26 +67,26 @@ class MascotGestureClassifierTest {
 
     @Test
     fun aStillLongPressPetsAndPettingReleasesAfterTheLift() {
-        classifier.down(0L, 0f, 0f)
-        assertEquals(400L, classifier.deadline())
-        assertEquals(MascotGesture.NONE, classifier.tick(399L))
-        assertEquals(MascotGesture.PET_START, classifier.tick(400L))
+        classifier.down(at(0L), GesturePoint(0f, 0f))
+        assertEquals(at(400L), classifier.deadline())
+        assertEquals(MascotGesture.NONE, classifier.tick(at(399L)))
+        assertEquals(MascotGesture.PET_START, classifier.tick(at(400L)))
         assertTrue(classifier.petting)
-        assertEquals(MascotGesture.NONE, classifier.up(2_000L), "lifting is not a tap")
-        assertEquals(2_600L, classifier.deadline())
-        assertEquals(MascotGesture.NONE, classifier.tick(2_599L))
-        assertEquals(MascotGesture.PET_END, classifier.tick(2_600L))
+        assertEquals(MascotGesture.NONE, classifier.up(at(2_000L)), "lifting is not a tap")
+        assertEquals(at(2_600L), classifier.deadline())
+        assertEquals(MascotGesture.NONE, classifier.tick(at(2_599L)))
+        assertEquals(MascotGesture.PET_END, classifier.tick(at(2_600L)))
         assertFalse(classifier.petting)
-        assertEquals(MascotGestureClassifier.NEVER, classifier.deadline())
+        assertEquals(PointerTime.NEVER, classifier.deadline())
     }
 
     @Test
     fun aSlowStrokeAcrossTheBodyPets() {
-        classifier.down(0L, 0f, 0f)
+        classifier.down(at(0L), GesturePoint(0f, 0f))
         // 60 dp in 500 ms: 0.12 dp/ms, well under the 0.3 limit.
         var gesture = MascotGesture.NONE
         for (step in 1..10) {
-            val g = classifier.move(step * 50L, step * 6f, 0f)
+            val g = classifier.move(at(step * 50L), GesturePoint(step * 6f, 0f))
             if (g != MascotGesture.NONE) gesture = g
         }
         assertEquals(MascotGesture.PET_START, gesture)
@@ -94,23 +94,23 @@ class MascotGestureClassifierTest {
 
     @Test
     fun aFastSwipeNeverPets() {
-        classifier.down(0L, 0f, 0f)
-        classifier.move(16L, 40f, 0f)
-        classifier.move(500L, 41f, 0f)
-        assertEquals(MascotGesture.NONE, classifier.tick(600L))
+        classifier.down(at(0L), GesturePoint(0f, 0f))
+        classifier.move(at(16L), GesturePoint(40f, 0f))
+        classifier.move(at(500L), GesturePoint(41f, 0f))
+        assertEquals(MascotGesture.NONE, classifier.tick(at(600L)))
         assertFalse(classifier.petting)
-        assertEquals(MascotGestureClassifier.NEVER, classifier.deadline())
+        assertEquals(PointerTime.NEVER, classifier.deadline())
     }
 
     @Test
     fun aStrokeThatResumesBeforeTheReleaseKeepsPetting() {
-        classifier.down(0L, 0f, 0f)
-        classifier.tick(400L)
-        classifier.up(800L)
-        classifier.down(1_000L, 0f, 0f)
-        assertEquals(MascotGesture.NONE, classifier.tick(1_400L), "still the same petting")
+        classifier.down(at(0L), GesturePoint(0f, 0f))
+        classifier.tick(at(400L))
+        classifier.up(at(800L))
+        classifier.down(at(1_000L), GesturePoint(0f, 0f))
+        assertEquals(MascotGesture.NONE, classifier.tick(at(1_400L)), "still the same petting")
         assertTrue(classifier.petting)
-        assertEquals(MascotGestureClassifier.NEVER, classifier.deadline(), "held: nothing to time")
+        assertEquals(PointerTime.NEVER, classifier.deadline(), "held: nothing to time")
     }
 
     @Test
@@ -124,13 +124,15 @@ class MascotGestureClassifierTest {
     @Test
     fun aStillPressTimedOutWithoutPettingAsksForNoMoreTicks() {
         // Jitter inside the slop but too fast to be a stroke: the long-press moment passes once.
-        classifier.down(0L, 0f, 0f)
+        classifier.down(at(0L), GesturePoint(0f, 0f))
         // ~300 dp of path in 350 ms, never more than 3 dp from where it went down.
-        for (step in 1..50) classifier.move(step * 7L, if (step % 2 == 0) 3f else -3f, 0f)
-        assertEquals(MascotGesture.NONE, classifier.tick(400L))
+        for (step in 1..50) classifier.move(at(step * 7L), GesturePoint(if (step % 2 == 0) 3f else -3f, 0f))
+        assertEquals(MascotGesture.NONE, classifier.tick(at(400L)))
         assertFalse(classifier.petting)
-        assertEquals(MascotGestureClassifier.NEVER, classifier.deadline())
+        assertEquals(PointerTime.NEVER, classifier.deadline())
     }
+
+    private fun at(millis: Long) = PointerTime(millis)
 
     private companion object {
         const val TAP_MILLIS = 60L

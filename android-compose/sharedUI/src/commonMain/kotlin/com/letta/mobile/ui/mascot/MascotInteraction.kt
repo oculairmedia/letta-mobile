@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerInputChange
@@ -17,12 +18,16 @@ import com.letta.mobile.avatar.core.MascotEvent
 import com.letta.mobile.avatar.core.MascotGesture
 import com.letta.mobile.avatar.core.MascotGestureClassifier
 import com.letta.mobile.avatar.core.MascotGestureTune
+import com.letta.mobile.avatar.core.GesturePoint
+import com.letta.mobile.avatar.core.PointerTime
 import com.letta.mobile.avatar.core.MascotReactionListener
+import com.letta.mobile.avatar.core.MascotVector
 import com.letta.mobile.avatar.core.ReactionArg
 import com.letta.mobile.ui.haptics.Haptics
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.NoHaptics
 import kotlin.math.sqrt
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -117,74 +122,95 @@ internal class MascotGestureEffects {
 internal fun Modifier.mascotGestures(effects: MascotGestureEffects): Modifier =
     pointerInput(effects) { readMascotGestures(effects) }
 
-/** The last event's time, which the timer measures its waits from. */
-private class GestureClock {
-    var nowMillis = 0L
-}
-
 private suspend fun PointerInputScope.readMascotGestures(effects: MascotGestureEffects) {
-    val classifier = MascotGestureClassifier(
-        MascotGestureTune(slopDp = viewConfiguration.touchSlop / density, doubleTapMillis = viewConfiguration.doubleTapTimeoutMillis),
+    val tune = MascotGestureTune(
+        slopDp = viewConfiguration.touchSlop / density,
+        doubleTap = viewConfiguration.doubleTapTimeoutMillis.milliseconds,
     )
-    val clock = GestureClock()
-    // Woken on every press and release; conflated, so signalling never queues or allocates.
-    val wake = Channel<Unit>(Channel.CONFLATED)
+    val reader = MascotGestureReader(MascotGestureClassifier(tune), effects, dpPerPx = 1f / density)
     coroutineScope {
-        launch { tickDeadlines(classifier, effects, clock, wake) }
+        launch { reader.runDeadlines() }
         awaitPointerEventScope {
-            while (true) {
-                val event = awaitPointerEvent(PointerEventPass.Final)
-                val change = event.changes.firstOrNull() ?: continue
-                clock.nowMillis = change.uptimeMillis
-                if (event.type == PointerEventType.Press) effects.pressed()
-                val gesture = classifier.read(event.type, change, 1f / density)
-                if (gesture == MascotGesture.TAP || gesture == MascotGesture.NUDGE || gesture == MascotGesture.TRICK) change.consume()
-                effects.apply(gesture, classifier.trick)
-                if (event.type == PointerEventType.Press || event.type == PointerEventType.Release) wake.trySend(Unit)
-            }
+            while (true) reader.onEvent(awaitPointerEvent(PointerEventPass.Final))
         }
-    }
-}
-
-/** One pointer event as a classifier step; [dpPerPx] turns positions into the classifier's dp. */
-private fun MascotGestureClassifier.read(type: PointerEventType, change: PointerInputChange, dpPerPx: Float): MascotGesture {
-    val t = change.uptimeMillis
-    val x = change.position.x * dpPerPx
-    val y = change.position.y * dpPerPx
-    return when (type) {
-        // Touch never hovers: a finger is not a pointer resting over the character.
-        PointerEventType.Enter -> if (change.type == PointerType.Touch) MascotGesture.NONE else hover(true)
-        PointerEventType.Exit -> hover(false)
-        PointerEventType.Press -> down(t, x, y)
-        // Consumed by the time it reaches this pass: the seat's drag has it.
-        PointerEventType.Move -> if (change.isConsumed) cancel(t) else move(t, x, y)
-        PointerEventType.Release -> up(t)
-        else -> MascotGesture.NONE
     }
 }
 
 /**
- * Runs the classifier's timed edges - a still press becoming petting, petting's release - at its
- * [MascotGestureClassifier.deadline], measured from the last event. Idle, it waits on [wake].
+ * Feeds one mascot's pointer events to its classifier and acts on what it reads; also runs the
+ * classifier's timed edges (a still press becoming petting, petting's release) at its deadline,
+ * measured from the last event. All on the UI thread; nothing here allocates per event.
  */
-private suspend fun tickDeadlines(
-    classifier: MascotGestureClassifier,
-    effects: MascotGestureEffects,
-    clock: GestureClock,
-    wake: Channel<Unit>,
+private class MascotGestureReader(
+    private val classifier: MascotGestureClassifier,
+    private val effects: MascotGestureEffects,
+    /** Turns event positions into the classifier's dp. */
+    private val dpPerPx: Float,
 ) {
-    while (true) {
-        wake.receive()
+    /** The last event's time, which the timer measures its waits from. */
+    private var now = PointerTime(0L)
+
+    /** Woken on every press and release; conflated, so signalling never queues or allocates. */
+    private val wake = Channel<Unit>(Channel.CONFLATED)
+
+    fun onEvent(event: PointerEvent) {
+        val change = event.changes.firstOrNull() ?: return
+        now = PointerTime(change.uptimeMillis)
+        val gesture = step(event.type, change)
+        // A tap's release is consumed, as a click's is.
+        if (gesture.isTap) change.consume()
+        effects.apply(gesture, classifier.trick)
+        if (event.type.startsOrEndsAPress()) wake.trySend(Unit)
+    }
+
+    private fun step(type: PointerEventType, change: PointerInputChange): MascotGesture = when (type) {
+        PointerEventType.Enter -> enter(change)
+        PointerEventType.Exit -> classifier.hover(false)
+        PointerEventType.Press -> press(change)
+        PointerEventType.Move -> move(change)
+        PointerEventType.Release -> classifier.up(now)
+        else -> MascotGesture.NONE
+    }
+
+    /** Touch never hovers: a finger is not a pointer resting over the character. */
+    private fun enter(change: PointerInputChange): MascotGesture =
+        if (change.type == PointerType.Touch) MascotGesture.NONE else classifier.hover(true)
+
+    private fun press(change: PointerInputChange): MascotGesture {
+        effects.pressed()
+        return classifier.down(now, change.point())
+    }
+
+    /** Consumed by the time it reaches this pass: the seat's drag has it. */
+    private fun move(change: PointerInputChange): MascotGesture =
+        if (change.isConsumed) classifier.cancel(now) else classifier.move(now, change.point())
+
+    private fun PointerInputChange.point(): GesturePoint = GesturePoint(position.x * dpPerPx, position.y * dpPerPx)
+
+    /** Runs each timed edge at the classifier's deadline; idle, it waits for the next press or release. */
+    suspend fun runDeadlines() {
+        while (true) {
+            wake.receive()
+            tickUntilNothingIsDue()
+        }
+    }
+
+    private suspend fun tickUntilNothingIsDue() {
         var deadline = classifier.deadline()
-        while (deadline != MascotGestureClassifier.NEVER) {
-            delay((deadline - clock.nowMillis).coerceAtLeast(1L))
-            if (deadline > clock.nowMillis) clock.nowMillis = deadline
-            effects.apply(classifier.tick(clock.nowMillis), classifier.trick)
+        while (deadline != PointerTime.NEVER) {
+            delay((deadline - now).coerceAtLeast(MIN_WAIT))
+            if (deadline > now) now = deadline
+            effects.apply(classifier.tick(now), classifier.trick)
             deadline = classifier.deadline()
         }
     }
+
+    private companion object {
+        val MIN_WAIT = 1.milliseconds
+    }
 }
 
+private fun PointerEventType.startsOrEndsAPress(): Boolean = this == PointerEventType.Press || this == PointerEventType.Release
 
 /**
  * How hard the seat's body squashes for [reaction] (0..1), or 0 for none. LAND is not here: a hop's
@@ -223,10 +249,13 @@ internal class FlightReactions(
     var reducedMotion: Boolean = false
 
     override fun onReaction(reaction: AvatarReaction, arg: ReactionArg) {
-        if (reducedMotion || rigCarriesBody()) return
+        if (!hostDrawsTheBody()) return
         val impact = bodyImpactOf(reaction)
         if (impact > 0f) flight.impulse(impact)
     }
+
+    /** The layer deforms the body only with motion allowed and a rig that does not animate it itself. */
+    private fun hostDrawsTheBody(): Boolean = !reducedMotion && !rigCarriesBody()
 }
 
 /**
@@ -243,12 +272,14 @@ internal class MascotDragFeel(private val flight: MascotTransport.Flight) {
         if (!reducedMotion) haptics.play(LettaHapticCue.GestureStart)
     }
 
-    /** Put down while moving at ([vxDp], [vyDp]) dp/s. */
-    fun putDown(vxDp: Float, vyDp: Float) {
-        val impact = (sqrt(vxDp * vxDp + vyDp * vyDp) / flight.body.tune.impactSpeedDp).coerceIn(0f, 1f)
+    /** Put down while moving at [releaseVelocity] (dp/s). */
+    fun putDown(releaseVelocity: MascotVector) {
+        val impact = (releaseVelocity.speedDp() / flight.body.tune.impactSpeedDp).coerceIn(0f, 1f)
         director?.onEvent(MascotEvent.DragEnded(impact))
         if (reducedMotion) return
         flight.impulse(impact)
         haptics.play(LettaHapticCue.GestureEnd)
     }
 }
+
+private fun MascotVector.speedDp(): Float = sqrt(xDp * xDp + yDp * yDp)
