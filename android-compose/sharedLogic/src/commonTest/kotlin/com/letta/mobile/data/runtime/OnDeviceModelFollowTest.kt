@@ -2,12 +2,8 @@ package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -89,13 +85,11 @@ class OnDeviceModelFollowTest {
     private class RecordingClient(
         private val agents: List<JsonObject> = emptyList(),
         private val conversations: List<JsonObject> = emptyList(),
-    ) : AppServerClient {
+    ) : TurnEngineTestStreamClient() {
         val agentUpdates = mutableListOf<Pair<String, String?>>()
         val conversationUpdates = mutableListOf<Pair<String, String?>>()
         var agentQuery: JsonObject? = null
         var conversationQuery: JsonObject? = null
-
-        override val events: Flow<AppServerReceivedFrame> = emptyFlow()
 
         override suspend fun agentList(command: AppServerCommand.AgentList): AppServerInboundFrame.AgentListResponse {
             agentQuery = command.query
@@ -124,21 +118,6 @@ class OnDeviceModelFollowTest {
             conversationUpdates += command.conversationId to (command.body["model"] as? JsonPrimitive)?.content
             return AppServerInboundFrame.ConversationUpdateResponse(command.requestId, success = true)
         }
-
-        override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
-            error("runtimeStart unused")
-
-        override suspend fun input(command: AppServerCommand.Input) = Unit
-
-        override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse = error("sync unused")
-
-        override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-            error("abort unused")
-
-        override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-            error("adminRpc unused")
-
-        override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
     }
 
     private companion object {

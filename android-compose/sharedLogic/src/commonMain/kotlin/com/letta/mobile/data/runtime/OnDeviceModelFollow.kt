@@ -74,22 +74,23 @@ class OnDeviceModelFollower(
         require(OnDeviceModelFollowPolicy.isOnDeviceHandle(servedHandle)) { "$servedHandle is not an on-device model handle" }
         val agents = client.agentList(AppServerCommand.AgentList(requestId("agents"), query = page()))
         val conversations = client.conversationList(AppServerCommand.ConversationList(requestId("conversations"), query = page()))
-        check(agents.success) { agents.error ?: "agent_list failed" }
-        check(conversations.success) { conversations.error ?: "conversation_list failed" }
+        requireDone(agents.success, agents.error)
+        requireDone(conversations.success, conversations.error)
         val plan = OnDeviceModelFollowPolicy.plan(servedHandle, agents.agents.objects(), conversations.conversations.objects())
         val body = buildJsonObject { put("model", servedHandle) }
         plan.agents.forEach { id ->
-            val response = client.agentUpdate(AppServerCommand.AgentUpdate(requestId("agent"), id.value, body))
-            check(response.success) { response.error ?: "agent_update ${id.value} failed" }
+            client.agentUpdate(AppServerCommand.AgentUpdate(requestId("agent"), id.value, body)).let { requireDone(it.success, it.error) }
         }
         plan.conversations.forEach { id ->
-            val response = client.conversationUpdate(AppServerCommand.ConversationUpdate(requestId("conversation"), id.value, body))
-            check(response.success) { response.error ?: "conversation_update ${id.value} failed" }
+            client.conversationUpdate(AppServerCommand.ConversationUpdate(requestId("conversation"), id.value, body))
+                .let { requireDone(it.success, it.error) }
         }
         return plan
     }
 
     /** letta-code's local store reads `limit` only as a number (a string falls back to 20). */
+    private fun requireDone(success: Boolean, error: String?) = check(success) { error ?: "App Server request failed" }
+
     private fun page(): JsonObject = buildJsonObject {
         put("limit", PAGE_LIMIT)
         put("include_hidden", true)
