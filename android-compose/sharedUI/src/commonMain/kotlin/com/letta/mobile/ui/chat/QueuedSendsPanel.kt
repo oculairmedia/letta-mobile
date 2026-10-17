@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.chat.send.QueuedChatSend
 import com.letta.mobile.data.chat.send.QueuedSendId
+import com.letta.mobile.data.chat.send.ServerQueueBlocker
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -44,6 +45,15 @@ fun queuedSendLabel(position: Int): String = "Queued · $position"
 
 /** letta-mobile-1n5py.1: the label on a sent message the App Server parked behind another client. */
 const val QUEUED_ON_SERVER_LABEL = "Queued on server · another client's turn"
+
+/** letta-mobile-by4vm.121: the label when it waits for this device's own stopped turn to wind down. */
+const val QUEUED_BEHIND_OWN_STOP_LABEL = "Queued on server · waiting for the previous response to stop"
+
+/** The label on [ConversationSendQueue.queuedOnServer]: what it waits behind. */
+fun queuedOnServerLabel(behind: ServerQueueBlocker): String = when (behind) {
+    ServerQueueBlocker.OtherClient -> QUEUED_ON_SERVER_LABEL
+    ServerQueueBlocker.OwnStoppingTurn -> QUEUED_BEHIND_OWN_STOP_LABEL
+}
 
 /** The panel's header: how many wait, and what holds them (a Stop, or another device's turn). */
 fun queuedSendsHeader(queue: ConversationSendQueue): String {
@@ -76,7 +86,7 @@ fun QueuedSendsPanel(
     ) {
         Column(modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs)) {
             QueuedSendsHeader(queue, actions.onResume)
-            queue.queuedOnServer?.let { QueuedOnServerRow(it) }
+            queue.queuedOnServer?.let { QueuedOnServerRow(it, queue.queuedOnServerBehind) }
             queue.items.forEachIndexed { index, item -> QueuedSendRow(item, position = index + 1, actions) }
         }
     }
@@ -99,12 +109,12 @@ private fun QueuedSendsHeader(queue: ConversationSendQueue, onResume: () -> Unit
     }
 }
 
-/** letta-mobile-1n5py.1: already sent; the server runs it once the other client's turn ends. */
+/** letta-mobile-1n5py.1: already sent; the server runs it once the turn ahead of it ends. */
 @Composable
-private fun QueuedOnServerRow(item: QueuedChatSend) {
+private fun QueuedOnServerRow(item: QueuedChatSend, behind: ServerQueueBlocker) {
     Column(modifier = Modifier.fillMaxWidth().testTag(QueuedSendsPanelTestTags.ON_SERVER)) {
         Text(
-            text = QUEUED_ON_SERVER_LABEL,
+            text = queuedOnServerLabel(behind),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.tertiary,
         )
