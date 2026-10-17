@@ -10,25 +10,35 @@ import kotlinx.collections.immutable.toImmutableList
  * What letta-code 0.34.14 compiles for a default agent on such a model (measured on the host): an
  * 84 KB request with 20 client tool schemas (77 KB) and a ~5.8 K char system prompt that is almost
  * all the bundled skills catalog. The profile keeps what the agent record can hold (a short system
- * prompt, letta-code's own [MEMFS_DISABLED_TAG], the [TAG] marker, no attached tools); the per-run
- * parts letta-code only takes per runtime or per input (no skills catalog, no client tools) are
- * applied by [com.letta.mobile.data.transport.appserver.CompactProfileRuntimePolicy] for every agent
- * carrying [TAG].
+ * prompt, the [TAG] marker, no attached server tools); the per-run parts letta-code only takes per
+ * runtime or per input (no skills catalog, the small [CLIENT_TOOLS] set instead of all 20 client
+ * tools) are applied by [com.letta.mobile.data.transport.appserver.CompactProfileRuntimePolicy] for
+ * every agent carrying [TAG].
+ *
+ * letta-mobile-by4vm.121.16: compact means a SMALL toolset, not none. Tools are agent policy, so
+ * the set lives here, the same on every platform: a name the host does not offer (device_action
+ * off the phone) simply matches nothing.
  */
 object CompactAgentProfile {
-    /** Marks an agent as compact; the shared App Server client keeps its runs free of tools and skills. */
+    /** Marks an agent as compact; the shared App Server client keeps its runs to [CLIENT_TOOLS] and no skills. */
     const val TAG: String = "profile:compact"
 
-    /** letta-code's own create-time opt-out of the memory filesystem (`MEMFS_DISABLED_TAG`). */
-    const val MEMFS_DISABLED_TAG: String = "memfs:disabled"
+    /**
+     * The client tools a compact agent's inputs offer (letta-code `client_tool_allowlist`), chosen
+     * for a phone-sized model and window. Schema cost as letta-code 0.34.14 sends them (host
+     * measurement): Memory 1,375 B, Read 2,148 B, device_action ~0.5 KB: ~4 KB, about 1,000 tokens,
+     * against 77 KB (~19 K tokens) for all 20. Memory needs the memory filesystem, so compact agents
+     * keep it (no `memfs:disabled`).
+     */
+    val CLIENT_TOOLS: List<String> = listOf("Memory", "Read", "device_action")
 
     /** The short instructions a compact agent gets when its prompt is left blank. */
     const val SYSTEM_PROMPT: String =
         "You are a helpful assistant running on a small language model. Reply in plain, natural " +
             "language. Keep answers short: one to three sentences unless the user asks for more. " +
             "Answer what was asked, then stop. Never repeat yourself or restate the question. If you " +
-            "are unsure, say so briefly instead of guessing. You have no tools: you cannot browse, " +
-            "run code or read files, so do not offer to, and do not write tool calls or JSON. " +
+            "are unsure, say so briefly instead of guessing. You have a few tools; call one only when " +
+            "the request needs it, and only a tool you are offered. Otherwise answer directly. " +
             "Messages wrapped in <system-reminder> are context from the software; use them only " +
             "if they help, and never repeat them."
 
@@ -64,12 +74,12 @@ object CompactAgentProfile {
     }
 
     /**
-     * [params] as a compact agent: the short prompt where none was written, the compact and memfs
-     * opt-out tags, and no tools attached.
+     * [params] as a compact agent: the short prompt where none was written, the compact tag, and no
+     * server tools attached (its client tools come per input, [CLIENT_TOOLS]).
      */
     fun applyTo(params: AgentCreateParams): AgentCreateParams = params.copy(
         system = params.system?.takeIf { it.isNotBlank() } ?: SYSTEM_PROMPT,
-        tags = (tagsWith(params.tags, compact = true) + MEMFS_DISABLED_TAG).distinct().toImmutableList(),
+        tags = tagsWith(params.tags, compact = true).distinct().toImmutableList(),
         tools = null,
         toolIds = null,
         includeBaseTools = false,

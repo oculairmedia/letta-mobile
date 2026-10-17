@@ -7,10 +7,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import com.letta.mobile.data.model.isIrohBackendUrl
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.ProvideLettaHost
+import com.letta.mobile.ui.mascot.frame.ProvideFrameMascots
+import com.letta.mobile.ui.mascot.rememberMascotRegistry
 import com.letta.mobile.ui.shell.pages.ShellHomeFleet
 import com.letta.mobile.ui.shell.pages.ShellHomeFleetEffect
 import com.letta.mobile.ui.shell.pages.rememberShellLibraryControllers
@@ -23,6 +26,7 @@ import com.letta.mobile.ui.theme.SharedMaterialTheme
 import com.letta.mobile.web.chat.WebChatLoad
 import com.letta.mobile.web.chat.WebChatOpener
 import com.letta.mobile.web.chat.rememberWebChatLoad
+import com.letta.mobile.web.mascot.RiveCanvasRenderer
 import kotlinx.coroutines.launch
 
 /**
@@ -45,6 +49,8 @@ fun LettaWebApp() {
     LaunchedEffect(config.serverUrl, config.accessToken, config.mode, backend.rosterRequest.intValue) {
         backend.loadRoster(app.gateway, workspace)
     }
+    // letta-mobile-ckmub.17.9: boards sync through the live session's host, as on desktop.
+    LaunchedEffect(config.serverUrl) { app.storage.followCanvasHost(app.gateway.canvasRelay, isIrohBackendUrl(config.serverUrl)) }
     // The URL fragment follows the workspace's route, and back/forward follow the URL.
     val browserRoute = remember(workspace) { BrowserRouteBinding(workspace) }
     DisposableEffect(browserRoute) { onDispose(browserRoute.start()) }
@@ -62,8 +68,11 @@ fun LettaWebApp() {
     val header = rememberShellWorkspaceHeader(ShellWorkspaceHeaderBinding(shell.navigator, layout, webSearch(shell, page), shell.chat::tab))
     SharedMaterialTheme {
         ProvideLettaHost(LettaHost.Pointer) {
-            val bound = webWorkspace(shell, page, header)
-            LettaShellWorkspace(bound.state, bound.host)
+            // letta-mobile-ckmub.17.6: Rive mascots through the shared frame pipeline.
+            ProvideFrameMascots(remember { RiveCanvasRenderer() }, rememberMascotRegistry(backend.agents.value)) {
+                val bound = webWorkspace(shell, page, header)
+                LettaShellWorkspace(bound.state, bound.host)
+            }
         }
     }
 }

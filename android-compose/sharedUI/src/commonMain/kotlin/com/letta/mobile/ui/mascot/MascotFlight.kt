@@ -141,6 +141,15 @@ internal suspend fun MascotTransport.Flight.drive(reducedMotion: Boolean, onLand
 }
 
 /**
+ * A squash of [impact] (0..1) from outside the hop - a poke, a drop, a reaction (te3n1.4) - that
+ * wakes the frame driver so the body springs back. Under reduced motion the driver stands it still.
+ */
+internal fun MascotTransport.Flight.impulse(impact: Float) {
+    body.impulse(impact)
+    wakes++
+}
+
+/**
  * The slot's first appearance: the character rises from its feet with one overshoot and lands
  * ([onLanded], plus a small squash). Under [reducedMotion] a short fade, nothing else. Nothing
  * when it is already standing.
@@ -152,8 +161,7 @@ internal suspend fun MascotTransport.Flight.enter(reducedMotion: Boolean, onLand
         return
     }
     presence.animateTo(1f, tween(ENTRANCE_MILLIS, easing = LinearEasing))
-    body.impulse(ENTRANCE_IMPACT)
-    wakes++
+    impulse(ENTRANCE_IMPACT)
     onLanded(ENTRANCE_IMPACT)
 }
 

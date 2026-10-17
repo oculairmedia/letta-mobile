@@ -1,7 +1,9 @@
 // Fake OpenAI-compatible LLM for the embedded-runtime-node18 CI job (letta-mobile-by4vm.110.3).
 // Each turn: when the last message is the user's and a shell-like tool is offered, answer with ONE
-// tool call (exercises tool execution + child_process on Node 18); once the tool result is back (or
-// with no tool offered) answer with the text NODE18-OK. Requests are logged as JSON lines to
+// tool call (exercises tool execution + child_process on Node 18); without a shell tool but with
+// Read offered (a compact agent's small toolset, letta-mobile-by4vm.121.16), ONE Read call on
+// $FAKE_LLM_READ_FILE; once the tool result is back (or with no tool offered) answer with the text
+// NODE18-OK. Requests are logged as JSON lines to
 // $FAKE_LLM_LOG, including any tool result text, so the caller can assert the tool really ran, and
 // the number of images in the last user message (`images`), so it can assert an image arrived.
 // Routes mirror the on-device bridge (OnDeviceOpenAiBridge): GET /v1/models lists FAKE_LLM_MODEL,
@@ -20,6 +22,7 @@ const MODEL = process.env.FAKE_LLM_MODEL;
 if (!MODEL) throw new Error('FAKE_LLM_MODEL (the id /v1/models lists) is required');
 const SHELL_TOOLS = ['Bash', 'bash', 'shell', 'Shell', 'ShellCommand', 'run_shell_command', 'exec_command'];
 const TOOL_ARGS = JSON.stringify({ command: 'echo NODE18-TOOL-$((6*7))', description: 'node18 smoke' });
+const READ_FILE = process.env.FAKE_LLM_READ_FILE || '/dev/null';
 
 let requests = 0;
 
@@ -38,13 +41,17 @@ function plan(parsed) {
   const toolNames = (parsed.tools || []).map((t) => (t.function ? t.function.name : t.name));
   const msgs = parsed.messages || [];
   const last = msgs[msgs.length - 1] || {};
-  const shellTool = SHELL_TOOLS.find((t) => toolNames.includes(t)) || null;
+  const shellTool = SHELL_TOOLS.find((t) => toolNames.includes(t)) || (toolNames.includes('Read') ? 'Read' : null);
   const toolResult = last.role === 'tool' ? textOf(last.content).slice(0, 200) : null;
   const lastUser = [...msgs].reverse().find((m) => m.role === 'user') || {};
   return {
     toolNames, lastRole: last.role, shellTool, toolResult, images: imagesIn(lastUser.content),
     callTool: Boolean(shellTool) && last.role === 'user',
   };
+}
+
+function toolArgs(step) {
+  return step.shellTool === 'Read' ? JSON.stringify({ file_path: READ_FILE }) : TOOL_ARGS;
 }
 
 function streamReply(res, id, step) {
@@ -54,7 +61,7 @@ function streamReply(res, id, step) {
   })}\n\n`);
   res.writeHead(200, { 'content-type': 'text/event-stream' });
   if (step.callTool) {
-    chunk({ role: 'assistant', tool_calls: [{ index: 0, id: `call_${id}`, type: 'function', function: { name: step.shellTool, arguments: TOOL_ARGS } }] });
+    chunk({ role: 'assistant', tool_calls: [{ index: 0, id: `call_${id}`, type: 'function', function: { name: step.shellTool, arguments: toolArgs(step) } }] });
     chunk({}, 'tool_calls');
   } else {
     chunk({ role: 'assistant', content: 'NODE18-' });
@@ -68,7 +75,7 @@ function streamReply(res, id, step) {
 
 function jsonReply(res, id, step) {
   const message = step.callTool
-    ? { role: 'assistant', content: null, tool_calls: [{ id: `call_${id}`, type: 'function', function: { name: step.shellTool, arguments: TOOL_ARGS } }] }
+    ? { role: 'assistant', content: null, tool_calls: [{ id: `call_${id}`, type: 'function', function: { name: step.shellTool, arguments: toolArgs(step) } }] }
     : { role: 'assistant', content: 'NODE18-OK' };
   res.writeHead(200, { 'content-type': 'application/json' });
   res.end(JSON.stringify({

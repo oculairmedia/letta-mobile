@@ -8,6 +8,7 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.runtime.TurnCommand
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /** letta-mobile-by4vm.90: what a host varies in its App Server turn stack; every default is the engine's own. */
 class AppServerTurnStackSpec(
@@ -19,6 +20,8 @@ class AppServerTurnStackSpec(
     val externalToolRegistry: ExternalToolRegistry? = null,
     /** letta-mobile-jvctq: false leaves every approval to the person (a client that must never answer one). */
     val autoAllowApprovals: Boolean = true,
+    /** letta-mobile-zxk2n.2: durable terminals and client preferences, sent only to a host that supports them. */
+    val durableDelivery: DurableTurnDelivery = DurableTurnDelivery.OFF,
 )
 
 /**
@@ -33,6 +36,7 @@ fun permissionGovernedTurnStackSpec(
     fallback: AppServerPermissionMode = RuntimePermissionDefaults.DEFAULT_MODE,
     requestIdFactory: () -> String = AppServerTurnEngine.defaultRequestId,
     externalToolRegistry: ExternalToolRegistry? = null,
+    durableDelivery: DurableTurnDelivery = DurableTurnDelivery.OFF,
 ) = AppServerTurnStackSpec(
     clientInfo = clientInfo,
     permissionMode = fallback,
@@ -42,6 +46,7 @@ fun permissionGovernedTurnStackSpec(
     onPermissionModeInForce = { runtime, mode -> modes?.observed(runtime, mode) },
     requestIdFactory = requestIdFactory,
     externalToolRegistry = externalToolRegistry,
+    durableDelivery = durableDelivery,
 )
 
 /** letta-mobile-by4vm.90: the client -> router -> engine stack of desktop, web and Android Iroh: attaches, then [turnEngine]. */
@@ -54,7 +59,10 @@ fun AppServerRuntimeEventRouter.attachTurnStack(
     return turnEngine(client, scope, spec)
 }
 
-/** The engine over this attached router, on its connection generation, re-answering approval replays (qygvv.5). */
+/**
+ * The engine over this attached router, on its connection generation, re-answering approval replays
+ * (qygvv.5) and, for a durable terminal consumer, acking the terminals no turn is collecting (zxk2n.2).
+ */
 fun AppServerRuntimeEventRouter.turnEngine(
     client: AppServerClient,
     scope: CoroutineScope,
@@ -70,4 +78,14 @@ fun AppServerRuntimeEventRouter.turnEngine(
     eventRouter = this,
     connectionGenerationProvider = connectionGenerationProvider,
     autoAllowApprovals = spec.autoAllowApprovals,
-).also { engine -> engine.answerApprovalReplaysFrom(this, scope) }
+    durableDelivery = spec.durableDelivery,
+).also { engine ->
+    engine.answerApprovalReplaysFrom(this, scope)
+    engine.acknowledgeTerminalsOutsideTurnsFrom(client, scope)
+}
+
+/** letta-mobile-zxk2n.2: feeds every frame of [client] to the between-turns terminal ack; a no-op without a consumer id. */
+internal fun AppServerTurnEngine.acknowledgeTerminalsOutsideTurnsFrom(client: AppServerClient, scope: CoroutineScope) {
+    if (!keepsDurableTerminals) return
+    scope.launch { client.events.collect { received -> acknowledgeTerminalOutsideTurns(received) } }
+}

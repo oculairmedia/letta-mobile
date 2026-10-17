@@ -2,8 +2,6 @@ package com.letta.mobile.runtime.local
 
 import android.content.Context
 import com.google.ai.edge.litertlm.Backend
-import com.google.ai.edge.litertlm.Content
-import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -28,15 +26,14 @@ class LiteRtLmOnDeviceChatCompletionEngine @Inject constructor(
     @Synchronized
     override fun generate(
         modelSelection: EmbeddedLettaCodeModelSelection,
-        prompt: String,
-        images: List<OnDeviceImage>,
+        request: OnDeviceChatRequest,
         generation: OnDeviceGeneration,
-    ): Result<String> =
+    ): Result<OnDeviceReply> =
         runCatching {
             // Cancelled while it waited for the engine (the client left): free the engine at once.
             if (generation.isStopped) {
                 logLiteRtInfo("inference_skipped", "handle=${modelSelection.modelHandle} reason=${generation.stopReason?.wire}")
-                return@runCatching generation.text
+                return@runCatching OnDeviceReply(generation.text)
             }
             logLiteRtInfo(
                 "model_handle_received",
@@ -54,21 +51,20 @@ class LiteRtLmOnDeviceChatCompletionEngine @Inject constructor(
             check(modelFile.isFile) {
                 "On-device model file was not found at ${modelFile.absolutePath}."
             }
-
-            val sanitizedPrompt = sanitizeForLiteRt(prompt)
-            val request = LiteRtLmRequest.from(sanitizedPrompt, images)
+            checkImageCount(request)
             logLiteRtInfo(
                 "inference_start",
-                "promptChars=${sanitizedPrompt.length} images=${images.size} requiresVision=${request.requiresVision}",
+                "history=${request.history.size} tools=${request.tools.size} images=${request.images.size} " +
+                    "latestRole=${request.latest.role} surrogatesStripped=${request.surrogateCount()}",
             )
-            val engine = runOnBestBackend(modelSelection, modelFile, request, generation)
-            val response = generation.text
-            logLiteRtInfo("first_token", "preview=${response.take(FIRST_TOKEN_LOG_CHARS).lineSafe()}")
+            val (engine, reply) = runOnBestBackend(modelSelection, modelFile, request, generation)
+            logLiteRtInfo("first_token", "preview=${reply.text.take(FIRST_TOKEN_LOG_CHARS).lineSafe()}")
             logLiteRtInfo(
                 "inference_complete",
-                "responseChars=${response.length} backend=${engine.backendName} stopReason=${generation.stopReason?.wire ?: "model_done"}",
+                "responseChars=${reply.text.length} toolCalls=${reply.toolCalls.size} backend=${engine.backendName} " +
+                    "stopReason=${generation.stopReason?.wire ?: "model_done"}",
             )
-            response
+            reply
         }.onFailure { error ->
             logLiteRtError("inference_error", "handle=${modelSelection.modelHandle}", error)
         }
@@ -81,28 +77,55 @@ class LiteRtLmOnDeviceChatCompletionEngine @Inject constructor(
     private fun runOnBestBackend(
         modelSelection: EmbeddedLettaCodeModelSelection,
         modelFile: File,
-        request: LiteRtLmRequest,
+        request: OnDeviceChatRequest,
         generation: OnDeviceGeneration,
-    ): LiteRtLmEngineHandle {
+    ): Pair<LiteRtLmEngineHandle, OnDeviceReply> {
         val selection = if (gpuUnusable) modelSelection.copy(accelerator = CPU_ACCELERATOR) else modelSelection
-        val engine = engineFor(selection, modelFile, request.requiresVision)
-        if (request.requiresVision && !engine.visionEnabled) {
-            logLiteRtInfo("vision_unavailable", "handle=${modelSelection.modelHandle} images=${request.images.size} action=text_only")
-        }
-        try {
-            engine.instance.createConversation().use { conversation ->
-                LiteRtLmStreamingRun(conversation, generation).run(
-                    if (shouldSendVisionContent(request, engine.visionEnabled)) request.toContents() else null,
-                    request.prompt,
-                )
-            }
+        val engine = engineFor(selection, modelFile, request.images.isNotEmpty())
+        requireVisionFor(request, engine, modelSelection)
+        return try {
+            engine to converse(engine, request, generation)
         } catch (error: Throwable) {
+            contextOverflow(error, modelSelection)?.let { throw it }
             if (!engine.canFallBackToCpu(generation)) throw error
             logLiteRtError("gpu_inference_error", "handle=${modelSelection.modelHandle} action=fallback_cpu", error)
             gpuUnusable = true
-            return runOnBestBackend(modelSelection, modelFile, request, generation)
+            runOnBestBackend(modelSelection, modelFile, request, generation)
         }
-        return engine
+    }
+
+    /** One conversation on [engine]: the request's config, its latest message, the streamed reply. */
+    private fun converse(engine: LiteRtLmEngineHandle, request: OnDeviceChatRequest, generation: OnDeviceGeneration): OnDeviceReply {
+        val config = LiteRtLmConversationMapping.config(request, generation.limits.maxOutputTokens)
+        val toolCalls = engine.instance.createConversation(config).use { conversation ->
+            LiteRtLmStreamingRun(conversation, generation).run(LiteRtLmConversationMapping.message(request.latest))
+        }
+        return LiteRtLmConversationMapping.reply(generation.text, toolCalls)
+    }
+
+    /** Images the engine cannot see (its vision encoder did not load) are an error, never dropped. */
+    private fun requireVisionFor(
+        request: OnDeviceChatRequest,
+        engine: LiteRtLmEngineHandle,
+        modelSelection: EmbeddedLettaCodeModelSelection,
+    ) {
+        if (request.images.isEmpty() || engine.visionEnabled) return
+        logLiteRtInfo("vision_unavailable", "handle=${modelSelection.modelHandle} images=${request.images.size} action=reject")
+        throw OnDeviceRequestRejected(
+            "on_device_vision_unavailable",
+            "The request has ${request.images.size} image(s), but this device could not load the model's vision encoder; send text only.",
+        )
+    }
+
+    /** More images than the engine was built for is an engine limit: say so instead of dropping some. */
+    private fun checkImageCount(request: OnDeviceChatRequest) {
+        val count = request.images.size
+        if (count > DEFAULT_MAX_IMAGES) {
+            throw OnDeviceRequestRejected(
+                "on_device_too_many_images",
+                "The request carries $count images; the on-device engine takes at most $DEFAULT_MAX_IMAGES per request.",
+            )
+        }
     }
 
     private fun engineFor(
@@ -241,28 +264,32 @@ fun liteRtLmInitAttempts(requested: LiteRtLmInitAttempt): List<LiteRtLmInitAttem
 fun liteRtLmEngineCacheKey(modelSelection: EmbeddedLettaCodeModelSelection, visionEnabled: Boolean): String =
     "${modelSelection.startKey}|vision=$visionEnabled"
 
-fun shouldSendVisionContent(request: LiteRtLmRequest, engineVisionEnabled: Boolean): Boolean =
-    engineVisionEnabled && request.requiresVision
-
-data class LiteRtLmRequest(
-    val prompt: String,
-    val images: List<OnDeviceImage>,
-) {
-    val requiresVision: Boolean = images.isNotEmpty()
-
-    fun toContents(): Contents {
-        val contents = mutableListOf<Content>()
-        images.forEach { image -> contents.add(Content.ImageBytes(image.bytes)) }
-        if (prompt.isNotBlank()) contents.add(Content.Text(prompt))
-        return Contents.of(contents)
-    }
-
-    companion object {
-        fun from(prompt: String, images: List<OnDeviceImage>): LiteRtLmRequest =
-            LiteRtLmRequest(prompt = prompt, images = images)
-    }
+/**
+ * The engine's own context-overflow error ("Input token ids are too long. Exceeding the maximum
+ * number of tokens allowed: <needed> >= <available>") as a non-retryable rejection that names the
+ * overflow; null for any other error. The bridge never trims a request to fit (by4vm.121.16).
+ */
+internal fun contextOverflow(error: Throwable, modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceRequestRejected? {
+    val text = generateSequence(error) { it.cause }.mapNotNull { it.message }.firstOrNull { CONTEXT_OVERFLOW_MARKER in it }
+        ?: return null
+    val detail = text.substring(text.indexOf(CONTEXT_OVERFLOW_MARKER)).lineSequence().first().trim()
+    return OnDeviceRequestRejected(
+        "on_device_context_overflow",
+        "The request does not fit the on-device model's context window of ${modelSelection.maxTokens} tokens " +
+            "(LiteRT-LM: $detail). Raise Settings > Max tokens, give the agent fewer tools, or start a new conversation.",
+        error,
+    )
 }
 
+/** UTF-16 surrogates [sanitizeForLiteRt] will drop from the request (logged, never silent). */
+internal fun OnDeviceChatRequest.surrogateCount(): Int {
+    val texts = listOfNotNull(systemInstruction) + (history + latest).flatMap { message ->
+        listOf(message.text) + message.toolCalls.map { it.argumentsJson } + message.toolResults.map { it.content }
+    }
+    return texts.sumOf { text -> text.count { it.isSurrogate() } }
+}
+
+private const val CONTEXT_OVERFLOW_MARKER = "Input token ids are too long"
 private const val DEFAULT_MAX_IMAGES = 8
 private const val CPU_ACCELERATOR = "cpu"
 private const val CPU_BACKEND = "CPU"

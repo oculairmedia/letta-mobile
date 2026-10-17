@@ -125,6 +125,12 @@ kotlin {
         // Skiko, so the SkSL glow shader and the Skia image decode compile once for both.
         val skikoMain by creating {
             dependsOn(commonMain.get())
+            dependencies {
+                // letta-mobile-ckmub.17.6: the mascot's frame pipeline (FrameMascotHost) drives the
+                // shared Rive runtime and contract; desktop and web bind it with their own renderer.
+                // api: RiveFrameScene exposes the contract's RiveInputSink to the renderers.
+                api(project(":avatar:renderer-rive"))
+            }
         }
 
         jvmMain {

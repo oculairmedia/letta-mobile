@@ -1,6 +1,6 @@
 use letta_iroh_wasm::frame::{
     FrameDecoder, FrameError, MAX_FRAME_BYTES, MAX_REASSEMBLED_BYTES, encode_frame,
-    encode_frame_parts,
+    encode_frame_parts, encode_frame_with_max,
 };
 
 #[test]
@@ -284,4 +284,37 @@ fn part_encoder_rejects_payloads_past_the_reassembly_cap() {
         error,
         FrameError::TooLarge { maximum, .. } if maximum == MAX_REASSEMBLED_BYTES
     ));
+}
+
+#[test]
+fn a_decoder_with_a_larger_limit_takes_plain_frames_past_the_app_server_limit() {
+    // The canvas relay's plain frames go up to 8 MiB (CanvasRelayFraming.MAX_FRAME_BYTES).
+    let maximum = 8 * 1024 * 1024;
+    let payload = "x".repeat(MAX_FRAME_BYTES + 1);
+    let frame = encode_frame_with_max(&payload, maximum).expect("frame within the larger limit");
+    let mut decoder = FrameDecoder::with_max_frame_bytes(maximum);
+
+    assert_eq!(
+        decoder.push(&frame).expect("frame should decode"),
+        vec![payload]
+    );
+    assert!(
+        FrameDecoder::new().push(&frame).is_err(),
+        "the App Server limit still holds"
+    );
+}
+
+#[test]
+fn the_larger_limit_still_rejects_what_exceeds_it() {
+    let payload = "x".repeat(17);
+
+    let error = encode_frame_with_max(&payload, 16).expect_err("oversized payload must fail");
+
+    assert_eq!(
+        error,
+        FrameError::TooLarge {
+            size: 17,
+            maximum: 16
+        }
+    );
 }

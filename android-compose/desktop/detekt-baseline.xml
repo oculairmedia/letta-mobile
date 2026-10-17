@@ -51,7 +51,6 @@
     <ID>MatchingDeclarationName:DesktopShellRoutes.kt$DesktopShellRoute</ID>
     <ID>MatchingDeclarationName:DesktopTouchOrigin.kt$DesktopTouchOriginTracker</ID>
     <ID>MatchingDeclarationName:LettaDesktopApp.kt$DesktopAppShellBindings</ID>
-    <ID>MatchingDeclarationName:RiveDesktopSurface.kt$RiveOnionSkin</ID>
     <ID>MaxLineLength:CanvasBackgroundSyncUiTest.kt$CanvasBackgroundSyncUiTest$CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "Board", initialSceneJson = "", syncTransport = relay))</ID>
     <ID>MaxLineLength:CanvasBlockEditorToolbarTest.kt$CanvasBlockEditorToolbarTest$assertEquals(listOf("paragraph"), toolbar!!.holder.state.blocks.map { it.type.typeId }, "a fresh note has one paragraph to type into")</ID>
     <ID>MaxLineLength:CanvasCascadeBlocksOracleTest.kt$CanvasCascadeBlocksOracleTest$assertEquals(canonical(DocumentSchema.encodeToString(libraryBlocks)), canonical(json), "the library writes these blocks differently")</ID>

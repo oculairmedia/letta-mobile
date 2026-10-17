@@ -5,12 +5,8 @@
     <ID>InstanceOfCheckForException:FileSystemAccess.kt$WebWorkspaceController$t is CancellationException</ID>
     <ID>TooGenericExceptionCaught:FileSystemAccess.kt$WebWorkspaceController$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:IrohWasmAppServerTransport.kt$IrohWasmAppServerTransport$error: Throwable</ID>
-    <ID>TooGenericExceptionCaught:IrohWasmBridge.kt$IrohWasmBridge.Companion$failure: Throwable</ID>
     <ID>TooGenericExceptionCaught:WasmAppServerClientGateway.kt$WasmAppServerClientGateway$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:WasmAppServerSession.kt$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:WebChatLoad.kt$failure: Exception</ID>
-    <ID>UnusedParameter:IrohWasmBridge.kt$payload: String</ID>
-    <ID>UnusedParameter:IrohWasmBridge.kt$sessionId: Int</ID>
-    <ID>UnusedParameter:IrohWasmBridge.kt$ticket: String</ID>
   </CurrentIssues>
 </SmellBaseline>

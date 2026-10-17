@@ -67,264 +67,198 @@ class OnDeviceOpenAiBridgeTest {
     @Test
     fun `chat completions endpoint delegates prompt to engine`() {
         val engine = FakeEngine(response = "Hello from device")
-        val bridge = LocalOpenAiOnDeviceBridge(engine)
-        bridge.start(selection()).use { session ->
-            val response = post(
-                url = "${session.baseUrl}/chat/completions",
-                body = """
-                    {
-                      "model": "gemma-3n",
-                      "messages": [
-                        { "role": "system", "content": "Be direct." },
-                        { "role": "user", "content": "Say hello" }
-                      ]
-                    }
-                """.trimIndent(),
-                bearerToken = session.authToken,
-            )
+        val response = chat(
+            engine,
+            """{"model": "gemma-3n", "messages": [
+              {"role": "system", "content": "Be direct."}, {"role": "user", "content": "Say hello"}]}""",
+        )
 
-            assertEquals(200, response.code)
-            assertTrue(response.body.contains("Hello from device"))
-            assertTrue(engine.lastPrompt.orEmpty().contains("system: Be direct.\n\nuser: Say hello"))
-        }
+        assertEquals(200, response.code)
+        assertTrue(response.body.contains("Hello from device"))
+        assertEquals("Be direct.", engine.lastRequest?.systemInstruction)
+        assertEquals(OnDeviceMessage.user("Say hello"), engine.lastRequest?.latest)
     }
-
 
     @Test
     fun `chat completions endpoint passes image content parts to engine`() {
         val engine = FakeEngine(response = "saw image")
-        val bridge = LocalOpenAiOnDeviceBridge(engine)
-        bridge.start(selection()).use { session ->
-            val response = post(
-                url = "${session.baseUrl}/chat/completions",
-                body = """
-                    {
-                      "messages": [{"role": "user", "content": [
-                        {"type": "image_url", "image_url": {"url": "data:image/png;base64,AQIDBA=="}},
-                        {"type": "text", "text": "Describe this"}
-                      ]}]
-                    }
-                """.trimIndent(),
-                bearerToken = session.authToken,
-            )
+        val response = chat(
+            engine,
+            """
+                {"messages": [{"role": "user", "content": [
+                  {"type": "image_url", "image_url": {"url": "data:image/png;base64,AQIDBA=="}},
+                  {"type": "text", "text": "Describe this"}
+                ]}]}
+            """.trimIndent(),
+        )
 
-            assertEquals(200, response.code)
-            assertTrue(engine.lastPrompt.orEmpty().contains("user:"))
-            assertTrue(engine.lastPrompt.orEmpty().contains("Describe this"))
-            assertEquals(1, engine.lastImages.size)
-            assertEquals("image/png", engine.lastImages.single().mediaType)
-            assertArrayEquals(byteArrayOf(1, 2, 3, 4), engine.lastImages.single().bytes)
+        assertEquals(200, response.code)
+        assertEquals("Describe this", engine.lastRequest?.latest?.text)
+        val image = engine.lastRequest?.images.orEmpty().single()
+        assertEquals("image/png", image.mediaType)
+        assertArrayEquals(byteArrayOf(1, 2, 3, 4), image.bytes)
+    }
+
+    @Test
+    fun `chat completions endpoint accepts any requested model and echoes it`() {
+        listOf(
+            "google/gemma-3n-E2B-it-litert-lm",
+            "lmstudio/google/gemma-3n-E2B-it-litert-lm",
+            "totally/different-model",
+        ).forEach { requestedModel ->
+            val engine = FakeEngine(response = "served by device")
+            val response = chat(engine, """{"model": "$requestedModel", "messages": [{"role": "user", "content": "Say hello"}]}""")
+
+            assertEquals(requestedModel, 200, response.code)
+            assertTrue(response.body.contains("served by device"))
+            assertTrue(response.body.contains("\"model\":\"$requestedModel\""))
+            assertEquals("Say hello", engine.lastRequest?.latest?.text)
         }
-    }
-
-
-    @Test
-    fun `chat completions endpoint accepts bare model and echoes it`() {
-        assertAcceptedAndEchoed("google/gemma-3n-E2B-it-litert-lm")
-    }
-
-    @Test
-    fun `chat completions endpoint accepts prefixed model and echoes it`() {
-        assertAcceptedAndEchoed("lmstudio/google/gemma-3n-E2B-it-litert-lm")
-    }
-
-    @Test
-    fun `chat completions endpoint accepts mismatched model and echoes it`() {
-        assertAcceptedAndEchoed("totally/different-model")
     }
 
     @Test
     fun `chat completions endpoint reports engine failure as unavailable`() {
-        val bridge = LocalOpenAiOnDeviceBridge(
-            FakeEngine(result = Result.failure(IllegalStateException("runtime missing"))),
-        )
-        bridge.start(selection()).use { session ->
-            val response = post(
-                url = "${session.baseUrl}/chat/completions",
-                body = """{"messages":[{"role":"user","content":"Hello"}]}""",
-                bearerToken = session.authToken,
-            )
+        val response = chat(FakeEngine(failure = IllegalStateException("runtime missing")), HELLO)
 
-            assertEquals(503, response.code)
-            assertTrue(response.body.contains("on_device_runtime_unavailable"))
-            assertTrue(response.body.contains("runtime missing"))
+        assertEquals(503, response.code)
+        assertTrue(response.body.contains("on_device_runtime_unavailable"))
+        assertTrue(response.body.contains("runtime missing"))
+    }
+
+    @Test
+    fun `tools reach the engine verbatim`() {
+        val engine = FakeEngine(response = "plain response")
+        val response = chat(
+            engine,
+            """{"messages": [{"role": "user", "content": "say hi"}], "tools": [$READ_TOOL], "tool_choice": "auto"}""",
+        )
+
+        assertEquals(200, response.code)
+        assertTrue(response.body.contains("plain response"))
+        val tool = engine.lastRequest?.tools.orEmpty().single()
+        assertEquals("Read", tool.name)
+        assertEquals(Json.parseToJsonElement(READ_TOOL).jsonObject["function"], Json.parseToJsonElement(tool.functionJson))
+    }
+
+    @Test
+    fun `a tool call round trips through the bridge to a final answer`() {
+        val engine = FakeEngine(
+            replies = ArrayDeque(
+                listOf(
+                    OnDeviceReply("", listOf(OnDeviceToolCall(null, "Read", """{"file_path":"/notes.txt"}"""))),
+                    OnDeviceReply("The note says: buy milk."),
+                ),
+            ),
+        )
+        LocalOpenAiOnDeviceBridge(engine).start(selection()).use { session ->
+            // 1. The model asks for a tool: an OpenAI tool_calls reply with a fresh id.
+            val first = session.chat(
+                """{"stream": true, "messages": [{"role": "user", "content": "read my note"}], "tools": [$READ_TOOL]}""",
+            )
+            assertEquals(200, first.code)
+            assertTrue(first.body.contains("\"finish_reason\":\"tool_calls\""))
+            val call = first.sseToolCalls().single()
+            val callId = call.getValue("id").jsonPrimitive.content
+            val function = call.getValue("function").jsonObject
+            assertTrue(callId.startsWith("call_"))
+            assertEquals("Read", function.getValue("name").jsonPrimitive.content)
+            assertEquals("""{"file_path":"/notes.txt"}""", function.getValue("arguments").jsonPrimitive.content)
+
+            // 2. letta-code ran it and sends the call and its result back: the engine gets both.
+            val second = session.chat(
+                """
+                    {"stream": true, "tools": [$READ_TOOL], "messages": [
+                      {"role": "user", "content": "read my note"},
+                      {"role": "assistant", "content": null, "tool_calls": [{"id": "$callId", "type": "function",
+                        "function": {"name": "Read", "arguments": "{\"file_path\":\"/notes.txt\"}"}}]},
+                      {"role": "tool", "tool_call_id": "$callId", "content": "buy milk"}
+                    ]}
+                """.trimIndent(),
+            )
+            assertEquals(200, second.code)
+            assertTrue(second.body.contains("The note says: buy milk."))
+            assertTrue(second.body.contains("\"finish_reason\":\"stop\""))
+            val sent = engine.requests.last()
+            assertEquals(OnDeviceToolCall(callId, "Read", """{"file_path":"/notes.txt"}"""), sent.history.last().toolCalls.single())
+            assertEquals(listOf(OnDeviceToolResult("Read", "buy milk")), sent.latest.toolResults)
         }
     }
 
-    // Main: LiteRT bridge strips tools before rendering prompt.
     @Test
-    fun `LiteRT bridge strips tools before rendering prompt`() {
-        val engine = FakeEngine(response = "plain response")
-        val bridge = LocalOpenAiOnDeviceBridge(engine)
-        bridge.start(selection()).use { session ->
-            val response = post(
-                url = "${session.baseUrl}/chat/completions",
-                body = """
-                    {
-                      "messages": [{"role": "user", "content": "say hi"}],
-                      "tools": [{"type": "function", "function": {
-                        "name": "Read", "description": "Read a file.",
-                        "parameters": {"type": "object", "required": ["file_path"]}
-                      }}],
-                      "tool_choice": "auto"
-                    }
-                """.trimIndent(),
-                bearerToken = session.authToken,
-            )
+    fun `a context overflow is a non retryable error that names it`() {
+        val overflow = OnDeviceRequestRejected("on_device_context_overflow", "needs 6120 tokens, the window is 4096")
+        val response = chat(FakeEngine(failure = overflow), HELLO)
 
-            assertEquals(200, response.code)
-            assertTrue(response.body.contains("plain response"))
-            assertTrue(engine.lastPrompt.orEmpty().contains("user: say hi"))
-            assertTrue(!engine.lastPrompt.orEmpty().contains("Read a file"))
-            assertTrue(!engine.lastPrompt.orEmpty().contains("```tool_call"))
-        }
+        assertEquals(422, response.code)
+        assertTrue(response.body.contains("on_device_context_overflow"))
+        assertTrue(response.body.contains("6120"))
+    }
+
+    @Test
+    fun `a malformed conversation is a bad request and never reaches the engine`() {
+        val engine = FakeEngine()
+        val response = chat(engine, """{"messages":[{"role":"tool","tool_call_id":"nope","content":"orphan"}]}""")
+
+        assertEquals(400, response.code)
+        assertTrue(response.body.contains("invalid_request"))
+        assertTrue(engine.requests.isEmpty())
     }
 
     // PR #536: reject malformed/negative Content-Length; accept explicit valid one.
     @Test
-    fun `chat completions rejects malformed Content-Length header`() {
-        val bridge = LocalOpenAiOnDeviceBridge(FakeEngine())
-        bridge.start(selection()).use { session ->
-            val response = postRawRequest(
-                url = "${session.baseUrl}/chat/completions",
-                body = """{"messages":[{"role":"user","content":"Hello"}]}""",
-                bearerToken = session.authToken,
-                contentLength = "abc",
-            )
+    fun `chat completions rejects a malformed or negative Content-Length header`() {
+        listOf("abc", "-5").forEach { contentLength ->
+            val response = chatRaw(FakeEngine(), HELLO, contentLength)
 
-            assertEquals(400, response.code)
-            assertTrue(response.body.contains("Invalid Content-Length header."))
-        }
-    }
-
-    @Test
-    fun `chat completions rejects negative Content-Length header`() {
-        val bridge = LocalOpenAiOnDeviceBridge(FakeEngine())
-        bridge.start(selection()).use { session ->
-            val response = postRawRequest(
-                url = "${session.baseUrl}/chat/completions",
-                body = """{"messages":[{"role":"user","content":"Hello"}]}""",
-                bearerToken = session.authToken,
-                contentLength = "-5",
-            )
-
-            assertEquals(400, response.code)
+            assertEquals(contentLength, 400, response.code)
             assertTrue(response.body.contains("Invalid Content-Length header."))
         }
     }
 
     @Test
     fun `chat completions accepts explicit Content-Length header`() {
-        val bridge = LocalOpenAiOnDeviceBridge(FakeEngine(response = "Hello from device"))
         val body = """{"messages":[{"role":"user","content":"Hello from header"}]}"""
-        val contentLength = body.toByteArray(Charsets.UTF_8).size.toString()
-        bridge.start(selection()).use { session ->
-            val response = postRawRequest(
-                url = "${session.baseUrl}/chat/completions",
-                body = body,
-                bearerToken = session.authToken,
-                contentLength = contentLength,
-            )
+        val response = chatRaw(FakeEngine(response = "Hello from device"), body, body.toByteArray(Charsets.UTF_8).size.toString())
 
-            assertEquals(200, response.code)
-            assertTrue(response.body.contains("Hello from device"))
-        }
+        assertEquals(200, response.code)
+        assertTrue(response.body.contains("Hello from device"))
     }
 
-    // letta-mobile-69i0z: prompt-format tool calling through the bridge.
     @Test
     fun `tool call reply becomes openai tool_calls with finish_reason tool_calls`() {
         val engine = FakeEngine(
-            response = "```tool_call\n{\"name\": \"memory\", \"arguments\": {\"op\": \"view\"}}\n```",
+            replies = ArrayDeque(listOf(OnDeviceReply("Checking.", listOf(OnDeviceToolCall(null, "Memory", """{"op":"view"}"""))))),
         )
-        val bridge = LocalOpenAiOnDeviceBridge(engine)
-        bridge.start(selection()).use { session ->
-            val response = post(
-                url = "${session.baseUrl}/chat/completions",
-                body = """
-                    {
-                      "messages": [{"role": "user", "content": "check memory"}],
-                      "tools": [{"type": "function", "function": {
-                        "name": "memory", "description": "Edit memory.",
-                        "parameters": {"type": "object"}
-                      }}]
-                    }
-                """.trimIndent(),
-                bearerToken = session.authToken,
-            )
+        val response = chat(engine, """{"messages": [{"role": "user", "content": "check memory"}], "tools": [$READ_TOOL]}""")
 
-            assertEquals(200, response.code)
-            assertTrue(response.body.contains("\"tool_calls\""))
-            assertTrue(response.body.contains("\"name\":\"memory\""))
-            assertTrue(response.body.contains("\"finish_reason\":\"tool_calls\""))
-            // LiteRT runs tool-free by policy; parser still converts fenced model output.
-            assertTrue(!engine.lastPrompt.orEmpty().contains("- memory: Edit memory."))
-            assertTrue(!engine.lastPrompt.orEmpty().contains("```tool_call"))
-        }
-    }
-
-    @Test
-    fun `streamed tool call emits tool_calls delta then tool_calls finish`() {
-        val engine = FakeEngine(
-            response = "```tool_call\n{\"name\": \"Bash\", \"arguments\": {\"command\": \"ls\"}}\n```",
-        )
-        val bridge = LocalOpenAiOnDeviceBridge(engine)
-        bridge.start(selection()).use { session ->
-            val response = post(
-                url = "${session.baseUrl}/chat/completions",
-                body = """
-                    {
-                      "stream": true,
-                      "messages": [{"role": "user", "content": "list files"}],
-                      "tools": [{"type": "function", "function": {
-                        "name": "Bash", "description": "Run a command.",
-                        "parameters": {"type": "object"}
-                      }}]
-                    }
-                """.trimIndent(),
-                bearerToken = session.authToken,
-            )
-
-            assertEquals(200, response.code)
-            assertTrue(response.contentType.orEmpty().startsWith("text/event-stream"))
-            assertTrue(response.body.contains("\"tool_calls\""))
-            assertTrue(response.body.contains("\"finish_reason\":\"tool_calls\""))
-            assertTrue(response.body.contains("data: [DONE]"))
-        }
+        assertEquals(200, response.code)
+        val choice = Json.parseToJsonElement(response.body).jsonObject.getValue("choices").jsonArray[0].jsonObject
+        assertEquals("tool_calls", choice.getValue("finish_reason").jsonPrimitive.content)
+        val message = choice.getValue("message").jsonObject
+        assertEquals("Checking.", message.getValue("content").jsonPrimitive.content)
+        val function = message.getValue("tool_calls").jsonArray.single().jsonObject.getValue("function").jsonObject
+        assertEquals("Memory", function.getValue("name").jsonPrimitive.content)
     }
 
     @Test
     fun `streaming chat completions endpoint emits delta and done sentinel`() {
-        val bridge = LocalOpenAiOnDeviceBridge(FakeEngine(response = "streamed device text"))
-        bridge.start(selection()).use { session ->
-            val response = post(
-                url = "${session.baseUrl}/chat/completions",
-                body = """
-                    {
-                      "stream": true,
-                      "messages": [
-                        { "role": "user", "content": [
-                          { "type": "text", "text": "Hello" }
-                        ] }
-                      ]
-                    }
-                """.trimIndent(),
-                bearerToken = session.authToken,
-            )
+        val response = chat(
+            FakeEngine(response = "streamed device text"),
+            """{"stream": true, "messages": [{"role": "user", "content": [{"type": "text", "text": "Hello"}]}]}""",
+        )
 
-            assertEquals(200, response.code)
-            assertTrue(response.contentType.orEmpty().startsWith("text/event-stream"))
-            assertTrue(response.body.contains("streamed device text"))
-            assertTrue(response.body.contains("\"finish_reason\":\"stop\""))
-            assertTrue(response.body.contains("data: [DONE]"))
-        }
+        assertEquals(200, response.code)
+        assertTrue(response.contentType.orEmpty().startsWith("text/event-stream"))
+        assertTrue(response.body.contains("streamed device text"))
+        assertTrue(response.body.contains("\"finish_reason\":\"stop\""))
+        assertTrue(response.body.contains("data: [DONE]"))
     }
 
     @Test
     fun `LiteRT engine rejects missing model path before native initialization`() {
         val engine = LiteRtLmOnDeviceChatCompletionEngine(mockk<Context>(relaxed = true))
 
-        val result = engine.generate(selection(modelPath = null), "hello")
+        val result = engine.generate(selection(modelPath = null), OnDeviceChatRequest.userText("hello"))
 
         assertTrue(result.isFailure)
         assertEquals("No on-device model file has been imported.", result.exceptionOrNull()?.message)
@@ -335,35 +269,29 @@ class OnDeviceOpenAiBridgeTest {
         val engine = LiteRtLmOnDeviceChatCompletionEngine(mockk<Context>(relaxed = true))
         val missing = File("/tmp/missing-model.litertlm")
 
-        val result = engine.generate(selection(modelPath = missing.absolutePath), "hello")
+        val result = engine.generate(selection(modelPath = missing.absolutePath), OnDeviceChatRequest.userText("hello"))
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()?.message.orEmpty().contains(missing.absolutePath))
     }
 
-    private fun assertAcceptedAndEchoed(requestedModel: String) {
-        val engine = FakeEngine(response = "served by device")
-        val bridge = LocalOpenAiOnDeviceBridge(engine)
-        bridge.start(selection()).use { session ->
-            val response = post(
-                url = "${session.baseUrl}/chat/completions",
-                body = """
-                    {
-                      "model": "$requestedModel",
-                      "messages": [
-                        { "role": "user", "content": "Say hello" }
-                      ]
-                    }
-                """.trimIndent(),
-                bearerToken = session.authToken,
-            )
+    /** One chat completion through a fresh bridge on [engine]. */
+    private fun chat(engine: FakeEngine, body: String): Response =
+        LocalOpenAiOnDeviceBridge(engine).start(selection()).use { session -> session.chat(body) }
 
-            assertEquals(200, response.code)
-            assertTrue(response.body.contains("served by device"))
-            assertTrue(response.body.contains("\"model\":\"$requestedModel\""))
-            assertTrue(engine.lastPrompt.orEmpty().contains("user: Say hello"))
+    /** One chat completion through a fresh bridge on [engine], with a raw Content-Length header. */
+    private fun chatRaw(engine: FakeEngine, body: String, contentLength: String): Response =
+        LocalOpenAiOnDeviceBridge(engine).start(selection()).use { session ->
+            postRawRequest(
+                url = "${session.baseUrl}/chat/completions",
+                body = body,
+                bearerToken = session.authToken,
+                contentLength = contentLength,
+            )
         }
-    }
+
+    private fun OnDeviceOpenAiBridgeSession.chat(body: String): Response =
+        post(url = "$baseUrl/chat/completions", body = body, bearerToken = authToken)
 
     private fun selection(modelPath: String? = "/data/model/gemma.litertlm"): EmbeddedLettaCodeModelSelection = EmbeddedLettaCodeModelSelection(
         modelHandle = "local/gemma-3n",
@@ -461,23 +389,39 @@ class OnDeviceOpenAiBridgeTest {
 
     private data class Response(val code: Int, val body: String, val contentType: String?)
 
+    /** The tool_calls of an SSE reply's chunks. */
+    private fun Response.sseToolCalls() = body.lineSequence()
+        .filter { it.startsWith("data: {") }
+        .flatMap { line ->
+            Json.parseToJsonElement(line.removePrefix("data: ")).jsonObject.getValue("choices").jsonArray
+                .flatMap { choice -> choice.jsonObject.getValue("delta").jsonObject["tool_calls"]?.jsonArray.orEmpty() }
+        }
+        .map { it.jsonObject }
+        .toList()
+
     private class FakeEngine(
         private val response: String = "ok",
-        private val result: Result<String>? = null,
+        private val failure: Throwable? = null,
+        private val replies: ArrayDeque<OnDeviceReply> = ArrayDeque(),
     ) : OnDeviceChatCompletionEngine {
-        var lastPrompt: String? = null
-
-        var lastImages: List<OnDeviceImage> = emptyList()
+        val requests = mutableListOf<OnDeviceChatRequest>()
+        val lastRequest: OnDeviceChatRequest? get() = requests.lastOrNull()
 
         override fun generate(
             modelSelection: EmbeddedLettaCodeModelSelection,
-            prompt: String,
-            images: List<OnDeviceImage>,
+            request: OnDeviceChatRequest,
             generation: OnDeviceGeneration,
-        ): Result<String> {
-            lastPrompt = prompt
-            lastImages = images
-            return result ?: Result.success(response)
+        ): Result<OnDeviceReply> {
+            requests += request
+            failure?.let { return Result.failure(it) }
+            return Result.success(replies.removeFirstOrNull() ?: OnDeviceReply(response))
         }
+    }
+
+    private companion object {
+        const val HELLO = """{"messages":[{"role":"user","content":"Hello"}]}"""
+        const val READ_TOOL =
+            """{"type": "function", "function": {"name": "Read", "description": "Read a file.",
+            "parameters": {"type": "object", "required": ["file_path"]}}}"""
     }
 }

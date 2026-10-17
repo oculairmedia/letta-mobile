@@ -12,7 +12,7 @@ import com.letta.mobile.desktop.DesktopQuickQueryCoordinator
 import com.letta.mobile.desktop.DesktopThemeOverride
 import com.letta.mobile.desktop.LettaDesktopApp
 import com.letta.mobile.desktop.LocalDesktopThemeOverride
-import com.letta.mobile.desktop.MascotCursorCapture
+import com.letta.mobile.ui.mascot.MascotCursorCapture
 import com.letta.mobile.desktop.avatar.rive.DesktopMascotHost
 import com.letta.mobile.desktop.markdown.DesktopMermaidDiagramRenderer
 import com.letta.mobile.ui.mascot.LocalMascotHost

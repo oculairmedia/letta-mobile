@@ -1,7 +1,9 @@
 package com.letta.mobile.runtime.local
 
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 
 /**
@@ -16,7 +18,7 @@ data class OnDeviceGenerationLimits(
     val maxOutputTokens: Int = DEFAULT_MAX_OUTPUT_TOKENS,
     /** Wall-clock backstop for one request, prefill included. */
     val timeoutMs: Long = DEFAULT_TIMEOUT_MS,
-    /** Output text that ends the reply where it starts (the bridge's transcript role markers). */
+    /** Output text that ends the reply where it starts (Gemma's turn markers, plus the request's `stop`). */
     val stopSequences: List<String> = DEFAULT_STOP_SEQUENCES,
 ) {
     companion object {
@@ -27,19 +29,15 @@ data class OnDeviceGenerationLimits(
         const val DEFAULT_TIMEOUT_MS = 180_000L
 
         /**
-         * Gemma's turn markers, and the role prefixes [OnDeviceToolCallProtocol.renderPrompt] writes
-         * the transcript with: a model that starts a new transcript line is writing the next turn
-         * of the conversation itself, the commonest runaway.
+         * Gemma's turn markers: a model that writes one is starting the next turn of the
+         * conversation itself, the commonest runaway. (The transcript role prefixes the bridge used
+         * to stop on are gone with its hand-made transcript: the model's own chat template renders
+         * the conversation now, by4vm.121.16.)
          */
         val DEFAULT_STOP_SEQUENCES = listOf(
             "<end_of_turn>",
             "<start_of_turn>",
             "<eos>",
-            "\nuser:",
-            "\nsystem:",
-            "\ntool result",
-            "\nassistant:",
-            "\nassistant called tool",
         )
 
         /**
@@ -57,7 +55,15 @@ data class OnDeviceGenerationLimits(
             return OnDeviceGenerationLimits(
                 maxOutputTokens = requested?.coerceAtMost(ceiling) ?: ceiling,
                 timeoutMs = timeoutMs,
+                stopSequences = DEFAULT_STOP_SEQUENCES + request.stopSequences(),
             )
+        }
+
+        /** OpenAI `stop`: one string or a list of them. */
+        private fun JsonObject.stopSequences(): List<String> = when (val stop = this["stop"]) {
+            is JsonPrimitive -> listOfNotNull(stop.contentOrNull?.takeIf { stop.isString && it.isNotEmpty() })
+            is JsonArray -> stop.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotEmpty) }
+            else -> emptyList()
         }
 
         private fun JsonObject.positiveInt(key: String): Int? =

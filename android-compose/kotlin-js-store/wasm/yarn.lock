@@ -7,6 +7,16 @@
   resolved "https://registry.yarnpkg.com/@js-joda/core/-/core-3.2.0.tgz#3e61e21b7b2b8a6be746df1335cf91d70db2a273"
   integrity sha512-PMqgJ0sw5B7FKb2d5bWYIoxjri+QlW/Pys7+Rw82jSH0QN3rB05jZ/VrrsUdh1w4+i2kw9JOejXGq/KhDOX7Kg==
 
+"@rive-app/canvas-advanced@2.43.1":
+  version "2.43.1"
+  resolved "https://registry.yarnpkg.com/@rive-app/canvas-advanced/-/canvas-advanced-2.43.1.tgz#10a0bbe01ebedc3b97caf840147cbf7c0f9ab609"
+  integrity sha512-3bG48sdgOy3DZgBambhJ7p+rxd2tWAlERFl7xl5MYtZzPO3vduOzZW0uuCjF3Ns96j9OA9QtbuC0Qep9OkOpvw==
+
+"letta-rive-frames@file:../../web/src/wasmJsMain/js/rive-frames":
+  version "1.0.0"
+  dependencies:
+    "@rive-app/canvas-advanced" "2.43.1"
+
 ws@8.18.3:
   version "8.18.3"
   resolved "https://registry.yarnpkg.com/ws/-/ws-8.18.3.tgz#b56b88abffde62791c639170400c93dcb0c95472"
