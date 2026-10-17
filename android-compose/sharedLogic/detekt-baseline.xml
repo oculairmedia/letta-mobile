@@ -1806,7 +1806,6 @@
     <ID>TooGenericExceptionCaught:IrohCanvasPresenceTransport.kt$IrohCanvasPresenceTransport$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:IrohCanvasPresenceTransport.kt$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:IrohCanvasRelay.kt$IrohCanvasRelay$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:IrohCanvasRelayClient.kt$IrohCanvasRelayClient$e: Exception</ID>
     <ID>TooGenericExceptionCaught:IrohCanvasSyncTransport.kt$IrohCanvasSyncTransport$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:IrohChannelTransport.kt$IrohChannelTransport$error: Exception</ID>
     <ID>TooGenericExceptionCaught:IrohCronRpcClient.kt$IrohCronRpcClient$error: Exception</ID>

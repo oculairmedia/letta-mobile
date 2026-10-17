@@ -1,5 +1,7 @@
 package com.letta.mobile.web.iroh
 
+import com.letta.mobile.data.canvas.CanvasRelayLink
+import com.letta.mobile.data.model.HostId
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
@@ -59,6 +61,12 @@ internal class IrohWasmAppServerTransport private constructor(
     override suspend fun sendControl(command: AppServerCommand) {
         check(connected.value) { "Iroh App Server transport is disconnected" }
         bridge.sendControl(AppServerProtocol.encodeCommand(command))
+    }
+
+    /** A canvas relay stream to [hostId], this transport's host, from the same endpoint (letta-mobile-ckmub.17.9). */
+    suspend fun openCanvasRelay(hostId: HostId): CanvasRelayLink {
+        check(connected.value) { "Iroh App Server transport is disconnected" }
+        return IrohWasmCanvasRelayLink(hostId, bridge.openCanvasRelay())
     }
 
     suspend fun close() {

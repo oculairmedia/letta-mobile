@@ -1,9 +1,11 @@
 package com.letta.mobile.web.data
 
+import com.letta.mobile.data.canvas.CanvasRelayDial
 import com.letta.mobile.data.chat.runtime.EnginePermissionModes
 import com.letta.mobile.data.chat.runtime.PermissionModeGateway
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.HostId
 import com.letta.mobile.data.model.IrohServerAddress
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.isIrohBackendUrl
@@ -48,6 +50,9 @@ internal class WasmAppServerSession(
     val isConnected: Flow<Boolean> get() = link.isConnected
     val failureReason: () -> String? get() = link.failureReason
     val label: String get() = link.label
+
+    /** How this session reaches its host's canvas relay; null for a backend with none (ws://). */
+    val canvasRelay: CanvasRelayDial? get() = link.canvasRelay
     val engine: AppServerTurnEngine = services.engine
     val router: AppServerRuntimeEventRouter = services.router
     val appServerAdmin: AppServerLocalAdminGateway = services.appServerAdmin
@@ -138,6 +143,8 @@ internal class WasmAppServerLink(
     val failureReason: () -> String?,
     val label: String,
     val close: suspend () -> Unit,
+    /** letta-mobile-ckmub.17.9: the host's canvas relay, from this connection's endpoint; Iroh only. */
+    val canvasRelay: CanvasRelayDial? = null,
 )
 
 /** What a session serves on top of its [WasmAppServerLink]: its turn engine and the reads and writes it makes. */
@@ -191,6 +198,7 @@ private suspend fun openIrohLink(config: LettaConfig, scope: CoroutineScope): Wa
         failureReason = { transport.failureReason.value },
         label = "Iroh",
         close = transport::close,
+        canvasRelay = CanvasRelayDial { transport.openCanvasRelay(HostId(address.endpointIdHex)) },
     )
 }
 

@@ -68,6 +68,12 @@ class CanvasRelayClient(
      * one, such an op is left for the next join to replay rather than skipped.
      */
     private val closedBoard: CanvasClosedBoardApplier? = null,
+    /**
+     * Rebuilds what the op log no longer holds of a canvas from its stored board (a bounded log,
+     * letta-mobile-ckmub.17.9); the first join to a host uploads it beside the log. Without one, the
+     * first join uploads what the log holds.
+     */
+    private val snapshotSeed: CanvasSnapshotSeed? = null,
 ) : CanvasSyncTransport, CanvasPresenceTransport {
 
     private val gate = CanvasRelayApplyGate(closedBoard)
@@ -496,7 +502,8 @@ class CanvasRelayClient(
             live.hostReads[message.topic] = message.features.toSet()
             canvasesOf(message.topic).onEach { it.canonicalId = CanvasId(message.canvasId) }.map { it.id }
         }
-        val localOps = locals.flatMap { opLog.getOps(it, 0L) }.associateBy { it.canvasOpId }
+        // A seed is what a bounded log no longer holds, rebuilt from the board: queued like the log's own.
+        val localOps = locals.flatMap { seedOps(it) + opLog.getOps(it, 0L) }.associateBy { it.canvasOpId }
         if (firstTimeHere) {
             // First time on this host: everything this app has for the canvas goes up, which is how
             // canvases made before sharing - or on another host - arrive. Idempotent on the host.
@@ -505,6 +512,8 @@ class CanvasRelayClient(
         }
         if (sendQueued(live, message.topic, localOps)) refresh(message.topic)
     }
+
+    private suspend fun seedOps(canvasId: CanvasId): List<CanvasOp> = snapshotSeed?.seed(canvasId).orEmpty()
 
     /** Every op still queued for [topic], each after its assets; false if [live] was superseded meanwhile. */
     private suspend fun sendQueued(live: Live, topic: String, localOps: Map<CanvasOpId, CanvasOp>): Boolean {
