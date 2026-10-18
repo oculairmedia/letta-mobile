@@ -216,57 +216,58 @@ private fun AccessibilityAuditFixture() {
     val workspaceHost = LettaShellWorkspaceHost(
         actions = ShellWorkspaceNavigationActions(),
         chrome = ShellWindowChrome.Inline,
-        slots = LettaShellWorkspaceSlots(
-            main = { modifier ->
-                Column(modifier) {
-                    AccessibilitySettingsSection()
-                    Row {
-                        ComposerIconButton(icon = LettaIcons.Add, contentDescription = "Attach", onClick = {})
-                    }
-                    ThinkingStatusText(messages = emptyList())
-                    CompactionDividerRow(summary = "Compacted context")
-                    RenderRow(
-                        ChatRenderItem.Single(
-                            message = UiMessage(
-                                id = "user-1",
-                                role = "user",
-                                content = "Audit prompt",
-                                timestamp = "2026-07-19T12:00:00Z",
-                                imageAttachments = listOf(UiImageAttachment(mimeType = "image/png", base64 = "")),
-                            ),
-                            groupPosition = GroupPosition.None,
-                        ),
-                    )
-                    RenderRow(
-                        ChatRenderItem.Single(
-                            message = UiMessage(
-                                id = "assistant-1",
-                                role = "assistant",
-                                content = "Settled reply",
-                                timestamp = "2026-07-19T12:01:00Z",
-                                reasoning = "Verified clickables",
-                                toolCalls = listOf(
-                                    UiToolCall(
-                                        name = "shell",
-                                        arguments = "echo ok",
-                                        result = "ok",
-                                        status = "completed",
-                                        toolCallId = "call-1",
-                                    ),
-                                ),
-                            ),
-                            groupPosition = GroupPosition.None,
-                        ),
-                    )
-                }
-            },
-        ),
+        slots = LettaShellWorkspaceSlots(main = { modifier -> AccessibilityAuditMainColumn(modifier) }),
     )
     LettaShellWorkspace(
         state = workspaceState,
         host = workspaceHost,
         modifier = Modifier.size(width = 1440.dp, height = 900.dp),
     )
+}
+
+@Composable
+private fun AccessibilityAuditMainColumn(modifier: Modifier = Modifier) {
+    Column(modifier) {
+        AccessibilitySettingsSection()
+        Row {
+            ComposerIconButton(icon = LettaIcons.Add, contentDescription = "Attach", onClick = {})
+        }
+        ThinkingStatusText(messages = emptyList())
+        CompactionDividerRow(summary = "Compacted context")
+        RenderRow(
+            ChatRenderItem.Single(
+                message = UiMessage(
+                    id = "user-1",
+                    role = "user",
+                    content = "Audit prompt",
+                    timestamp = "2026-07-19T12:00:00Z",
+                    imageAttachments = listOf(UiImageAttachment(mimeType = "image/png", base64 = "")),
+                ),
+                groupPosition = GroupPosition.None,
+            ),
+        )
+        RenderRow(
+            ChatRenderItem.Single(
+                message = UiMessage(
+                    id = "assistant-1",
+                    role = "assistant",
+                    content = "Settled reply",
+                    timestamp = "2026-07-19T12:01:00Z",
+                    reasoning = "Verified clickables",
+                    toolCalls = listOf(
+                        UiToolCall(
+                            name = "shell",
+                            arguments = "echo ok",
+                            result = "ok",
+                            status = "completed",
+                            toolCallId = "call-1",
+                        ),
+                    ),
+                ),
+                groupPosition = GroupPosition.None,
+            ),
+        )
+    }
 }
 
 private fun SemanticsNode.allNodes(): List<SemanticsNode> = buildList {
