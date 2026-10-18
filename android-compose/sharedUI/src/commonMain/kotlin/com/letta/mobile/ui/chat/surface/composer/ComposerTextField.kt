@@ -70,6 +70,11 @@ internal val LocalComposerPrimary = compositionLocalOf { true }
 @Stable
 internal class ComposerFocusHandoff {
     var focused: Boolean by mutableStateOf(false)
+    var requester: FocusRequester? = null
+
+    fun requestFocus() {
+        requester?.let { runCatching { it.requestFocus() } }
+    }
 }
 
 /** The page's handoff; null outside a chat page. */
@@ -125,7 +130,8 @@ internal fun ComposerTextField(
     val caret = rememberMascotCaret(primary, fieldValue.selection.end)
     val focus = remember(primary, handoff, caret) { FieldFocus(primary, handoff, caret) }
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(primary, handoff) {
+    LaunchedEffect(primary, handoff, focusRequester) {
+        if (primary) handoff?.requester = focusRequester
         if (focus.restores()) focusRequester.requestFocus()
     }
     // A keyboard send (IME action, Enter) launches the flight like the bar's button does.

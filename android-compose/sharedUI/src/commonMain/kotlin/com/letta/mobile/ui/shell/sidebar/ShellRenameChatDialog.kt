@@ -21,6 +21,7 @@ import com.letta.mobile.ui.host.LettaAlertPane
 import com.letta.mobile.ui.host.LettaAlertSpec
 import com.letta.mobile.ui.host.LettaPaneButton
 import com.letta.mobile.ui.host.LettaPaneButtons
+import com.letta.mobile.ui.shell.shortcuts.shortcutTextInput
 
 /** Test tags for the rename dialog. */
 object ShellRenameChatDialogTags {
@@ -53,7 +54,7 @@ fun ShellRenameChatDialog(title: String, onRename: (String) -> Unit, onDismiss: 
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { save() }),
-            modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag(ShellRenameChatDialogTags.FIELD),
+            modifier = Modifier.fillMaxWidth().focusRequester(focus).shortcutTextInput().testTag(ShellRenameChatDialogTags.FIELD),
         )
         // Inside the pane, so it runs after the pane takes focus and the field keeps the caret.
         LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }

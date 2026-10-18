@@ -17,7 +17,12 @@ import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.withKeyDown
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.desktop.commandPaletteKeyDispatcher
+import com.letta.mobile.ui.shell.shortcuts.ShortcutContext
+import com.letta.mobile.ui.shell.shortcuts.ShortcutKeystroke
+import com.letta.mobile.ui.shell.shortcuts.ShortcutModifiers
+import com.letta.mobile.ui.shell.shortcuts.ShortcutPlatform
+import com.letta.mobile.ui.shell.shortcuts.ShortcutRegistry
+import com.letta.mobile.ui.shell.shortcuts.ShellShortcutId
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatActions
@@ -29,13 +34,11 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
-import java.awt.Canvas
-import java.awt.event.InputEvent
-import java.awt.event.KeyEvent
 import java.lang.reflect.Proxy
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -137,17 +140,17 @@ class DesktopSharedChatKeybindingTest {
 
     @Test
     fun modKOpensThePaletteFromAnyFocusedField() {
-        var opened = 0
-        val dispatcher = commandPaletteKeyDispatcher { opened++ }
-        val source = Canvas()
-        fun key(id: Int, modifiers: Int, code: Int = KeyEvent.VK_K) =
-            KeyEvent(source, id, System.currentTimeMillis(), modifiers, code, KeyEvent.CHAR_UNDEFINED)
+        val idle = ShortcutContext(ShortcutPlatform.Desktop, inTextInput = false, composerFocused = false)
+        val atPrompt = idle.copy(composerFocused = true)
+        val typingElsewhere = idle.copy(inTextInput = true)
+        fun stroke(ctrl: Boolean, key: Key = Key.K, down: Boolean = true) =
+            ShortcutKeystroke(key, down, ShortcutModifiers(ctrlOrMeta = ctrl))
 
-        assertTrue(dispatcher.dispatchKeyEvent(key(KeyEvent.KEY_PRESSED, InputEvent.CTRL_DOWN_MASK)))
-        assertTrue(dispatcher.dispatchKeyEvent(key(KeyEvent.KEY_PRESSED, InputEvent.META_DOWN_MASK)))
-        assertFalse(dispatcher.dispatchKeyEvent(key(KeyEvent.KEY_PRESSED, 0)), "a plain K is typed into the prompt")
-        assertFalse(dispatcher.dispatchKeyEvent(key(KeyEvent.KEY_RELEASED, InputEvent.CTRL_DOWN_MASK)))
-        assertFalse(dispatcher.dispatchKeyEvent(key(KeyEvent.KEY_PRESSED, InputEvent.CTRL_DOWN_MASK, KeyEvent.VK_J)))
-        assertEquals(2, opened)
+        assertEquals(ShellShortcutId.Search, ShortcutRegistry.match(stroke(ctrl = true), idle))
+        assertEquals(ShellShortcutId.Search, ShortcutRegistry.match(stroke(ctrl = true), atPrompt))
+        assertNull(ShortcutRegistry.match(stroke(ctrl = false), idle), "a plain K is typed into the prompt")
+        assertNull(ShortcutRegistry.match(stroke(ctrl = true, down = false), idle))
+        assertNull(ShortcutRegistry.match(stroke(ctrl = true, key = Key.J), idle))
+        assertNull(ShortcutRegistry.match(stroke(ctrl = true), typingElsewhere))
     }
 }

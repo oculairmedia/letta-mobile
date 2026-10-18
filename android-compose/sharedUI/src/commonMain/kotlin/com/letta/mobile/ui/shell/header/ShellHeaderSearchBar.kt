@@ -31,6 +31,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import com.letta.mobile.ui.chat.surface.CanvasBubbleBackHandler
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.search.SearchFieldTestTag
+import com.letta.mobile.ui.shell.shortcuts.shortcutTextInput
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -90,6 +91,7 @@ private fun SearchBarField(query: String, onQuery: (String) -> Unit, placeholder
         modifier = modifier
             .padding(horizontal = LettaDimens.Space.xs)
             .focusRequester(focusRequester)
+            .shortcutTextInput()
             .testTag(SearchFieldTestTag),
         decorationBox = { inner ->
             Box(contentAlignment = Alignment.CenterStart) {

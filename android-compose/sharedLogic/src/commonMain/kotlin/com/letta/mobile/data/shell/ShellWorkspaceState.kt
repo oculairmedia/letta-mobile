@@ -194,6 +194,9 @@ class ShellOverlays {
     /** `/rename`'s dialog for the open chat. */
     var renameChat: Boolean by mutableStateOf(false)
     var irohResetConfirm: Boolean by mutableStateOf(false)
+
+    /** Keyboard shortcut help overlay (letta-mobile-k5nbq.4). */
+    var shortcutHelp: Boolean by mutableStateOf(false)
 }
 
 /** What the shell knows of a conversation to route to it: whose it is and how recent. */

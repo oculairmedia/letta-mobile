@@ -11,7 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.focus.FocusRequester
 import com.letta.mobile.data.commands.AgentSlashCommand
-import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.workspace.DesktopWorkspaceSources
 import com.letta.mobile.desktop.workspace.memfs
@@ -140,9 +139,6 @@ private fun rememberDesktopShellLayout(backend: LettaConfig): DesktopShellLayout
     val controller = rememberShellLayoutController(backend, DesktopPreferences.store)
     // The phone preview brings its own reduced-motion preset; the desktop follows the OS.
     val reducedMotion = LocalDesktopPhone.current.reducedMotionOr(remember { desktopPrefersReducedMotion() })
-    SidebarToggleKeyDispatcherEffect(
-        onToggle = { controller.dispatch(ShellLayoutEvent.ToggleSidebar) },
-    )
     val focusRequester = remember { FocusRequester() }
     // Move focus onto the surviving toggle button whenever the sidebar
     // leaves composition, so a keyboard user never loses focus into a
