@@ -1,5 +1,7 @@
 # Android Project Work API Contract
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 Android uses the Vibe Sync Project / Beads Work API as the canonical project-work source for native project workspace screens.
 
 ## Canonical endpoints

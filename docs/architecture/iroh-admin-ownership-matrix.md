@@ -1,5 +1,7 @@
 # Iroh Admin RPC Ownership Matrix (lgns8.13)
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 Date: 2026-07-22
 
 Beads: `letta-mobile-lgns8.13`
@@ -33,7 +35,7 @@ enforced by `IrohAdminOwnershipMatrixTest`, which:
   caller `evidence`, and a `successor` — lgns8.25 dispositioned
   `work_activity_ingest`, `worker_events`, `usage_summary`,
   `permissions_preview`, and `pool_introspection`; see
-  `lgns8-epic-status-and-shim-retirement-ceiling.md` for the evidence;
+  `lgns8-shim-retirement-snapshot-2026-07-31.md` for the evidence;
 - forbids any direct-Letta-storage data store.
 
 ## Ownership summary

@@ -1,5 +1,7 @@
 # Screen-Off Streaming Measurement Protocol
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 **Date:** 2026-05-02  
 **Bead:** `letta-mobile-jmzq.9`  
 **Build baseline:** `0d30f0ab Add chat push alarm recovery` or newer  

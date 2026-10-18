@@ -1,4 +1,6 @@
-# KMP Extraction Current State
+# KMP Extraction Snapshot — 2026-06-06
+
+**Status:** Historical snapshot of 2026-06-06; paths and migration phases below describe that date. See [current module layout](../../README.md#module-layout).
 
 Last updated: 2026-06-06 on branch `codex/windows-chat-ui-decision`.
 

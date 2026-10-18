@@ -453,7 +453,7 @@ The current machine matrix contains 89 registered methods:
 
 `admin_rest_service` is retired (letta-mobile-lgns8.9): the count is **0** and
 `LETTA_IROH_ADMIN_REST_BASE_URL` is no longer consumed. See
-`lgns8-epic-status-and-shim-retirement-ceiling.md` for the per-method
+`lgns8-shim-retirement-snapshot-2026-07-31.md` for the per-method
 disposition and the remaining upstream write ceiling.
 
 Exact method rows, authorization classes, data stores, native discriminants,

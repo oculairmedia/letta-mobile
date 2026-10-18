@@ -1,5 +1,7 @@
 # Mobile embedded bridge vs. Letta Code desktop
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 This document maps the Android embedded runtime bridge to the official Letta Code desktop architecture observed from the packaged desktop application. It is a behavioral/architectural comparison, not a source-code port.
 
 ## Desktop shape

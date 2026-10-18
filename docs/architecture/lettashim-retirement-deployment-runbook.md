@@ -58,7 +58,7 @@ record — see `docs/testing/lgns8-acceptance-evidence-ledger.md` §6.
 production during the night of 2026-08-01; row 1 remains and needs a human at a
 device, not a maintenance window. `letta-mobile-lgns8.11` is **CLOSED** against
 that state — see the "lgns8.11 close-out — 2026-08-01" section of
-`docs/architecture/lgns8-epic-status-and-shim-retirement-ceiling.md` for the
+`docs/architecture/lgns8-shim-retirement-snapshot-2026-07-31.md` for the
 role-by-role retirement record, the rollback inventory, and why the lettashim
 **service-stop** belongs to `letta-mobile-lgns8.25.1` rather than to `.11`.
 `letta-mobile-lgns8.10` stays open on row 1. None of these rows is

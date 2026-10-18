@@ -74,16 +74,18 @@ git push --force-with-lease                 # safe force-push to your branch
 
 **Runs nowhere in CI:** `:sharedLogic:allTests` / hostNativeTest, and the 7 files under `app/src/androidTest` (device tests: mascot still, LiteRT-LM engine, embedded-runtime loop, image request capture, live Iroh receive, Automerge JNI). Run those by hand on a device when you touch their area.
 
+Documentation ownership and lifecycle conventions: [docs/README.md](docs/README.md).
+
 ## Module map (where work belongs)
 
 | Area | Module path | Put logic here | Host binding only |
 | --- | --- | --- | --- |
 | Shared domain / transport / timeline | `android-compose/sharedLogic/` | repositories, reducers, mappers, RPC, caching | — |
-| Shared Compose UI (Android + Desktop) | `android-compose/sharedUI/` | shared composables, A2UI renderer, markdown/bubbles (after Phase 3b) | — |
-| Android UI / navigation | `android-compose/app/`, `feature-*` | Compose screens, ViewModels that call shared APIs | Activity, Hilt, permissions |
+| Shared Compose UI (Android + Desktop + browser) | `android-compose/sharedUI/` | shared pages, composables, A2UI renderer, markdown and bubbles | — |
+| Android host / navigation | `android-compose/app/`, `feature-*` | ViewModels that call shared APIs; pages live in sharedUI | Activity, navigation host, Hilt, permissions |
 | Design system / A2UI | `android-compose/designsystem/`, `android-compose/sharedUI/` | reusable components/theme; shared Android/Desktop A2UI renderer | — |
 | Desktop shell | `android-compose/desktop/` | — | windowing, installer, Ktor engine, OS lock |
-| CLI / probes | `android-compose/cli/`, `appserver-cli/` | JVM tooling | — |
+| CLI / probes | `android-compose/cli/`, `android-compose/appserver-cli/`, `android-compose/iroh-wrapper-cli/` | JVM tooling and production Iroh wrapper | — |
 
 Local quality: run `bash scripts/tests/ci-policy-scripts-test.sh`, then `bash scripts/ci/agents-policy-check.sh` (full) or `bash scripts/ci/agents-policy-check.sh --diff-base origin/main` (PR-shaped). Run detekt from `android-compose/` with Java 21 as documented below. The policy scripts are Bash-only; their regression runner executes in the required `test` CI job.
 

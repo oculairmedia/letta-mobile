@@ -1,13 +1,15 @@
 # Embed Letta Code as on-device runtime - integration design
 
-**Status:** Day 0 spike complete 2026-05-26 02:00 EDT. Highest-risk unknown
-(Node 22 requirement) resolved. Full Android spike pending - 1-2 day budget.
+**Status:** Historical integration design and spike log (2026-05-26). The embedded runtime now ships
+in the full release APK; see [release documentation](../RELEASE.md) and the
+[current runtime pins](../../android-compose/letta-code-runtime/letta-code-runtime.properties).
+The pending work, bead states and compatibility constraints below describe the original spike.
 
 **Decision bead:** `lcp-59c` (P1, open)
 **Spike bead:** `lcp-59c.1` (P1, open)
 **Filed by:** Emmanuel + Meridian, 2026-05-26 01:30am EDT.
 
-This doc is the canonical project-side reference for the
+This doc records the original project-side design for the
 embed-Letta-Code-via-nodejs-mobile pivot. It is grounded in a source-tree review
 of `sepivip/SeekerClaw`, a shipping production app using the same pattern, and
 a live Day 0 spike confirming Node-version compatibility.

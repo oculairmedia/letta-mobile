@@ -13,12 +13,16 @@ When the user lifts, the gesture commits one snapped `fontScale` value through
 `onActiveFontScaleChange` and persists the setting through `onFontScaleChange`.
 That is the only true typography/layout reflow in the current interaction.
 
-Important files:
+<!-- live-path: android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/timeline/TimelinePinchZoom.kt -->
+<!-- live-path: android-compose/sharedUI/src/jvmTest/kotlin/com/letta/mobile/ui/chat/surface/timeline/TimelinePinchPreviewUiTest.kt -->
 
-- `android-compose/app/src/main/java/com/letta/mobile/ui/screens/chat/ChatMessageList.kt`
-- `android-compose/app/src/main/java/com/letta/mobile/ui/screens/chat/ChatScreen.kt`
-- `android-compose/designsystem/src/main/java/com/letta/mobile/ui/theme/ChatTheme.kt`
-- `android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/MarkdownText.kt`
+Current shared implementation (repository-relative paths):
+
+- `android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/timeline/TimelinePinchZoom.kt`
+- `android-compose/sharedUI/src/jvmTest/kotlin/com/letta/mobile/ui/chat/surface/timeline/TimelinePinchPreviewUiTest.kt`
+
+The callback names above describe the original Android implementation; the shared
+implementation commits through `ChatActions.setFontScale`.
 
 ## Why not raw realtime text reflow
 

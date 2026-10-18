@@ -2,12 +2,13 @@
 
 ## Project Overview
 
-Letta Mobile is a Kotlin Multiplatform project that ships **two clients** from one `sharedLogic` codebase:
+Letta Mobile is a Kotlin Multiplatform project that ships **three clients** from one `sharedLogic` codebase:
 
 - **Android app** (`com.letta.mobile` / `.dev`) — Compose UI, Hilt, Room, Material 3, A2UI renderer.
 - **Compose Desktop** — same `sharedLogic`, Skiko rendering, packaged CLI.
+- **Browser WASM** — shared domain and Compose UI, with browser host bindings.
 
-The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The WebSocket App Server is reached over a single bidirectional `/ws` connection. There is ONE letta-code pin, `@letta-ai/letta-code@0.34.14`, in `android-compose/letta-code-runtime/letta-code-runtime.properties` (= wire contract = desktop bundled runtime = Android embedded runtime = `appserver-contract-baseline` CI job); the embedded runtime ships in the `full` release APK (nodejs-mobile Node 18, arm64-v8a only, a loopback App Server the app dials over ws:// through the same channel as an Iroh host, letta-mobile-by4vm.110.6; the `lite` APK has no runtime, see `docs/RELEASE.md`); the Linux host still runs 0.33.6 until redeployed; restart-replay evidence stays at 0.29.12 until re-captured live. All pins are tabulated in `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`.
+The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The WebSocket App Server is reached over a single bidirectional `/ws` connection. There is ONE letta-code pin, `@letta-ai/letta-code@0.34.14`, in `android-compose/letta-code-runtime/letta-code-runtime.properties` (= wire contract = desktop bundled runtime = Android embedded runtime = `appserver-contract-baseline` CI job); the embedded runtime ships in the `full` release APK (nodejs-mobile Node 18, arm64-v8a only, a loopback App Server the app dials over ws:// through the same channel as an Iroh host, letta-mobile-by4vm.110.6; the `lite` APK has no runtime, see `docs/RELEASE.md`); the Linux host still runs 0.33.6 until redeployed; restart-replay evidence was re-captured at 0.34.14 on 2026-10-17. All pins are tabulated in `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`.
 
 **Location:** `/opt/stacks/letta-mobile`
 **Build root:** `android-compose/` (the Gradle workspace)
@@ -40,24 +41,29 @@ export JAVA_HOME="/usr/lib/jvm/jdk-26"      # CI parity
 
 To iterate on the phone UI from a desktop (`:desktop:runPhone`, `:desktop:runPhonePlayground`, hot reload), see `docs/development/phone-preview.md`.
 
-For App Server contract work, also provision Node `v24.18.0` and the contract `@letta-ai/letta-code@0.34.14`; restart-replay evidence was re-captured at 0.34.14 on 2026-10-17 (see the App Server section of `AGENTS.md`). Anything "verified against a 0.33/0.34 server" is desktop/remote-only, never the embedded Android runtime.
+For App Server contract work, also provision Node `v24.18.0` and the contract `@letta-ai/letta-code@0.34.14`; restart-replay evidence was re-captured at 0.34.14 on 2026-10-17 (see the App Server section of `AGENTS.md`). The embedded runtime uses the same package pin; platform capability and Node 18 compatibility still require embedded-runtime validation.
 
 ---
 
 ## Module map
 
+Module and source paths below are relative to `android-compose/` unless prefixed with `docs/`.
+
 | Module | Purpose |
 |---|---|
-| `app/` | Android app — screens, navigation, ViewModels, Hilt DI |
+| `app/` | Android host — navigation, ViewModels, Hilt DI and containers around shared pages |
 | `feature-chat/` | Android host of the shared chat page — ViewModels, Hilt bindings and platform glue around the `sharedUI` chat surface |
 | `core/android-data/` | Repositories, Room DB, transport-bound data sources |
 | `core/runtime/` | App Server runtime contracts, turn lifecycle interfaces |
-| `core/ids/` `core/schemas/` | Shared identifiers and wire-shape schemas |
+| `core/ids/` | Shared identifiers; wire schemas live in source packages |
 | `designsystem/` | Reusable Android Compose UI, theming, and dialogs |
 | `sharedLogic/` | **KMP shared module** — platform-neutral domain, transports, timeline, repositories and runtime |
 | `sharedUI/` | **KMP Compose UI** — the shared Compose UI for Android, Desktop and web: pages, chat surface, A2UI renderer, LettaIcons, primitives |
 | `desktop/` | Compose Desktop — windowing, Ktor engine, OS lock, installer |
-| `cli/` `appserver-cli/` | JVM tooling for probes, restart-replay evidence, shim-off parity gates |
+| `web/` | Browser WASM host and browser API bindings |
+| `cli/` `appserver-cli/` `iroh-wrapper-cli/` | JVM tooling, contract probes and the production Iroh server wrapper |
+
+**Documentation:** start at [docs/README.md](docs/README.md) for ownership, status conventions and historical material.
 
 **Important directories:**
 - `docs/reference/letta-docs.md` — **how to look up Letta's own docs** (index at `docs.letta.com/llms.txt`, canonical markdown at any page + `/index.md`, plus a page map). Read Letta docs instead of guessing at agent/memory/App-Server semantics; they are fetched on demand, not vendored.

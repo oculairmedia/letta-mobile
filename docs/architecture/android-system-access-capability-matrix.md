@@ -1,5 +1,7 @@
 # Android System Access Capability Matrix
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 **Date:** 2026-05-02  
 **Bead:** `letta-mobile-n3x7`  
 **Parent:** `letta-mobile-ifd7` — Build layered Android system access architecture

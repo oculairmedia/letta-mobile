@@ -1,5 +1,7 @@
 # Repository cache and paging policy
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 This policy is the baseline for `letta-mobile-yoic.3` follow-up work. It is intentionally incremental: do not block urgent bug fixes, but do not add new unbounded list fetches or process-only caches for data that must survive cold start.
 
 ## Principles

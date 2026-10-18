@@ -1,5 +1,7 @@
 # Letta API Behavior Empirical Findings
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 **Date:** 2026-04-17
 **Latest validation:** 2026-05-10
 **Beads:** letta-mobile-mdlg, letta-mobile-ar2w

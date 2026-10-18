@@ -1,5 +1,7 @@
 # Letta Mobile Architecture Diagrams
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 ## 1. Overall Module Structure
 
 ```mermaid

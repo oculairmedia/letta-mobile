@@ -1,5 +1,7 @@
 # lgns8 epic: status, achievable scope, and the shim-retirement ceiling
 
+**Status:** Historical epic snapshot of 2026-07-31; conclusions below are scoped to that evidence and runtime version. See [current module layout](../../README.md#module-layout).
+
 Date: 2026-07-23 · **rewritten 2026-07-31 for `letta-mobile-lgns8.9`** (admin-REST
 ceiling recomputed), with the shim-only-surfaces disposition and the
 train/channels addendum retained below.

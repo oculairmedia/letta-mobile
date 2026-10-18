@@ -1,5 +1,7 @@
 # KMP module map
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 Gradle root: **`android-compose/`**. Open that directory (or link only that Gradle project) for day-to-day KMP work. The git repo root also contains optional extra Gradle trees (`cli/`, `poc/chat-cli/`) that are not part of the LettaMobile multiplatform graph.
 
 `:web` is included in `android-compose/settings.gradle.kts`; re-sync Gradle in the IDE if it is missing from the module list.

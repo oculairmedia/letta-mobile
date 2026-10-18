@@ -1,5 +1,7 @@
 # Typed ids and the id ratchets
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 Bead: letta-mobile-by4vm.23. Ids in `sharedLogic` are still mostly raw `String`s. On main, when
 this note was written, the scan counted 1,842 raw `*Id: String` parameters across 462 files, plus
 40 hardcoded id-prefix literals across 24 files. The fix is gradual: typed ids and one owner for

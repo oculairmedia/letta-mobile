@@ -1,5 +1,7 @@
 # Shared-module layering ratchet
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 Bead: `letta-mobile-by4vm.27`. Gate: `SharedLayeringTest` in `android-compose/architecture-tests`,
 run by `./gradlew :architecture-tests:architectureTest` inside the required CI `test` job.
 

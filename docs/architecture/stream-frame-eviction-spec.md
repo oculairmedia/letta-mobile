@@ -1,5 +1,7 @@
 # Stream-frame eviction instead of session teardown
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 Design spec for `letta-mobile-aggeh` option (b), scoped down to the specific
 failure observed on 2026-08-23. **Not implemented — this is for review.**
 

@@ -5,7 +5,7 @@
 **Labels:** `kmp`, `architecture`, `migration`  
 **Related docs:**
 
-- [kmp-extraction-current-state.md](kmp-extraction-current-state.md) — what is already landed in `:sharedLogic`
+- [kmp-extraction-snapshot-2026-06-06.md](kmp-extraction-snapshot-2026-06-06.md) — what is already landed in `:sharedLogic`
 - [kmp-best-practices-migration-plan.md](kmp-best-practices-migration-plan.md) — long-form JetBrains/Cash App guidance (bead `letta-mobile-45eyc`)
 - [../architecture-review.md](../architecture-review.md) — session graph / runtime boundary context
 

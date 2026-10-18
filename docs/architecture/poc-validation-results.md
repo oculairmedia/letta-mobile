@@ -1,5 +1,7 @@
 # POC Validation Results
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 **Date:** 2026-04-17
 **Bead:** letta-mobile-iuq8
 **POC location:** `/opt/stacks/letta-mobile/poc/chat-cli/`

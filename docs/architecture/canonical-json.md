@@ -1,5 +1,7 @@
 # Canonical JSON configurations
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 Bead: `letta-mobile-by4vm.20`. Code: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/serialization/LettaJson.kt`.
 
 ## Problem

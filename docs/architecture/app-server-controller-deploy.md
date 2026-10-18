@@ -1,5 +1,7 @@
 # App Server Controller Deployment Guide
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 For the complete upstream protocol inventory, Iroh admin extension, state
 ownership, persistence, fallback, and cache-invalidation contract, see
 [App Server v2 and Meridian State Audit Specification](app-server-v2-audit-spec.md).

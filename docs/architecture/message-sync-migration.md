@@ -1,6 +1,7 @@
 # Message Sync Architecture Migration Plan
 
-**Status:** Proposed — awaiting POC validation
+**Status:** Historical migration proposal (2026-04-16); POC validated on 2026-04-17.
+See [validation results](poc-validation-results.md); this is not the current transport contract.
 **Date:** 2026-04-16
 **Author:** Huly - letta-mobile agent + Emmanuel
 

@@ -1,5 +1,7 @@
 # Live external tools and re-advertisement
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 Bead `letta-mobile-s416w.27`. Plan: `docs/design/canvas-plugin-platform-plan.md` section 6.3, decision R2.
 
 ## What changed

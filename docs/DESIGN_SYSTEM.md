@@ -1,11 +1,12 @@
 # Letta Design System Reference (extracted from code)
 
-Source of truth: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/theme/`
-and `android-compose/designsystem/src/main/java/com/letta/mobile/ui/theme/`.
+**Status:** Historical token snapshot; values and paths below may predate the shared UI migration.
 
-This document is the **canonical spec** that drives all design work in this repo. It was
-extracted directly from the Compose `object` declarations so any change to those files
-invalidates this document and it must be regenerated.
+Design direction and policy: [DESIGN.md](../DESIGN.md) and [AGENTS.md](../AGENTS.md).
+Current implementation: [shared UI theme](../android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/theme/)
+and [Android design system theme](../android-compose/designsystem/src/main/java/com/letta/mobile/ui/theme/).
+When this snapshot disagrees with code, code determines implemented token values;
+use the design policy to decide intended behavior.
 
 ## 1. Color Tokens
 

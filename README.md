@@ -10,6 +10,9 @@ Multiplatform project: one shared domain module (`sharedLogic`) and one shared C
 Browser client (Iroh WASM, shipped in #1205): https://oculairmedia.github.io/letta-mobile/
 
 
+Documentation index and lifecycle conventions: [docs/README.md](docs/README.md).
+Historical planning and experiments live in [plan/](plan/) and [poc/](poc/).
+
 ## Features
 
 - **Agent management** — create, edit, clone, import, delete, and organize agents; one shared agent editor and new-agent flow used by every client

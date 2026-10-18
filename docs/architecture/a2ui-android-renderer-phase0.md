@@ -1,5 +1,7 @@
 # A2UI Android Renderer Phase 0 Decision
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 Date: 2026-05-17
 Bead: `letta-mobile-51xm.1`
 

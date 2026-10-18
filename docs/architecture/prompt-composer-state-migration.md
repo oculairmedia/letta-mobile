@@ -1,5 +1,7 @@
 # PromptComposerState migration note
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 `PromptComposerState` lives in `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/runtime` as a small, headless state container for composer actions. It intentionally does not depend on Compose UI or prompt-bar.
 
 ## First-pass scope

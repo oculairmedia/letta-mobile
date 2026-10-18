@@ -1,5 +1,7 @@
 # Timeline REST Snapshot Policy
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 `TimelineSyncLoop` has two REST snapshot paths: full hydrate and recent-message reconcile. Neither path should compete with a healthy live stream.
 
 ## Call-Site Audit

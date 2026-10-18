@@ -1,5 +1,7 @@
 # Phase 6a — runnable entry points (docs + aliases deferred)
 
+**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+
 Physical `apps/*` moves (Option B) stay deferred so CI paths (`:app`, `:desktop`, `:web`) stay stable while Phase 5 continues.
 
 ## One entry per platform

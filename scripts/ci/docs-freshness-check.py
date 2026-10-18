@@ -11,6 +11,8 @@ so the docs cannot silently go stale when a module, gate or link changes:
   gates     the README "Required CI gates" list equals CHECKS in
             scripts/bootstrap-branch-protection.sh, and each gate is a workflow job
   links     relative markdown links resolve
+  lifecycle architecture docs have explicit Status headers; marked live paths resolve
+  clients   agent overview/module map names each declared client host
   gradle    "Gradle X.Y.Z" matches the wrapper's distributionUrl
 
 Usage: docs-freshness-check.py [repo-root]   (defaults to this script's repo)
@@ -18,6 +20,7 @@ Runs in the required `test` job of .github/workflows/android.yml.
 """
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -26,7 +29,7 @@ ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else Path(__file__).resolve().paren
 BUILD = ROOT / "android-compose"
 
 # Docs whose links, task references and Gradle version are checked.
-DOCS = ["README.md", "CONTRIBUTING.md", "CLAUDE.md", "AGENTS.md", "android-compose/README.md"]
+DOCS = ["README.md", "CONTRIBUTING.md", "CLAUDE.md", "AGENTS.md", "android-compose/README.md", "docs/README.md", "DESIGN.md", "docs/DESIGN_SYSTEM.md"]
 # Docs that must name every Gradle module.
 MODULE_DOCS = ["README.md", "android-compose/README.md"]
 
@@ -171,6 +174,47 @@ def check_gradle_version() -> None:
                 fail(doc, f"says Gradle {found}; the wrapper is {version}")
 
 
+def check_lifecycle() -> None:
+    architecture = ROOT / "docs/architecture"
+    for path in sorted(architecture.glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        if not re.search(r"^(?:\*\*)?Status(?:\*\*)?:(?:\*\*)?\s*\S", text, re.M):
+            fail(path.relative_to(ROOT).as_posix(), "missing Status header")
+    docs = list((ROOT / "docs").rglob("*.md"))
+    docs.extend(ROOT / doc for doc in DOCS if (ROOT / doc).is_file())
+    for path in docs:
+        text = path.read_text(encoding="utf-8")
+        for target in re.findall(r"<!-- live-path: ([^\n]+?) -->", text):
+            resolved = (ROOT / target).resolve()
+            if not resolved.is_relative_to(ROOT.resolve()) or not resolved.exists():
+                fail(path.relative_to(ROOT).as_posix(), f"missing live path ({target})")
+
+
+def check_client_hosts(modules: list[str]) -> None:
+    # Client host inventory comes from Gradle rather than a second hand-maintained manifest.
+    hosts = [m for m in modules if m in {":app", ":desktop", ":web"}]
+    text = read("CLAUDE.md") or ""
+    table = "\n".join(line for line in section(text, "Module map").splitlines() if line.startswith("|"))
+    for host in hosts:
+        if f"`{module_path(host)}/`" not in table:
+            fail("CLAUDE.md", f"missing client host {host} in module map")
+    if len(hosts) == 3 and re.search(r"\btwo (?:clients|apps)\b", text, re.I):
+        fail("CLAUDE.md", "says two clients/apps but Gradle declares three client hosts")
+
+
+def check_replay_claims() -> None:
+    evidence = read("android-compose/appserver-cli/src/test/resources/appserver/restart-replay-evidence.json")
+    if evidence is None:
+        fail("restart-replay-evidence.json", "missing evidence source")
+        return
+    version = json.loads(evidence)["source"]["version"]
+    for doc, text in present_docs(["CLAUDE.md", "AGENTS.md"]):
+        claims = re.findall(r"restart-replay evidence (?:stays at|was re-captured at) ([0-9]+\.[0-9]+\.[0-9]+)", text)
+        for claim in claims:
+            if claim != version:
+                fail(doc, f"restart-replay claim {claim} differs from captured evidence {version}")
+
+
 def main() -> int:
     modules = declared_modules()
     check_modules(modules)
@@ -178,6 +222,9 @@ def main() -> int:
     check_gates()
     check_links()
     check_gradle_version()
+    check_lifecycle()
+    check_client_hosts(modules)
+    check_replay_claims()
     if errors:
         print("Docs are out of date with the tree:", file=sys.stderr)
         for error in errors:
