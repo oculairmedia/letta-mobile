@@ -9,6 +9,8 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.ui.theme.LocalCustomColors
+import com.letta.mobile.ui.theme.LocalHighContrast
+import com.letta.mobile.ui.theme.ProvideAccessibilityPolicy
 import com.letta.mobile.ui.theme.SharedShapes
 import com.letta.mobile.ui.theme.SharedTypography
 import com.letta.mobile.ui.theme.lettaColorScheme
@@ -80,21 +82,22 @@ internal fun DesktopJewelTheme(content: @Composable () -> Unit) {
  */
 @Composable
 internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
-    val override = LocalDesktopThemeOverride.current
-    val dark = override?.dark ?: isSystemInDarkMode()
-    // Cool-slate palette (2026-06-23 retune) — one definition shared with the web host's
-    // SharedMaterialTheme, built from the shared LettaColorTokens (letta-mobile-by4vm.28).
-    val scheme = remember(dark) { lettaColorScheme(dark) }
-    val customColors = remember(scheme) { lettaCustomColors(scheme) }
+    ProvideAccessibilityPolicy {
+        val override = LocalDesktopThemeOverride.current
+        val dark = override?.dark ?: isSystemInDarkMode()
+        val highContrast = LocalHighContrast.current
+        val scheme = remember(dark, highContrast) { lettaColorScheme(dark, highContrast) }
+        val customColors = remember(scheme) { lettaCustomColors(scheme) }
 
-    CompositionLocalProvider(LocalCustomColors provides customColors) {
-        val phoneMetrics = override?.phoneMetrics == true
-        MaterialTheme(
-            colorScheme = scheme,
-            shapes = if (phoneMetrics) PhoneShapes else SharedShapes,
-            typography = if (phoneMetrics) PhoneTypography else SharedTypography,
-            content = content,
-        )
+        CompositionLocalProvider(LocalCustomColors provides customColors) {
+            val phoneMetrics = override?.phoneMetrics == true
+            MaterialTheme(
+                colorScheme = scheme,
+                shapes = if (phoneMetrics) PhoneShapes else SharedShapes,
+                typography = if (phoneMetrics) PhoneTypography else SharedTypography,
+                content = content,
+            )
+        }
     }
 }
 

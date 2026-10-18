@@ -21,6 +21,8 @@ import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.ui.chat.surface.composer.description
 import com.letta.mobile.ui.chat.surface.composer.displayName
+import com.letta.mobile.ui.theme.LocalAccessibilityPolicy
+import com.letta.mobile.ui.theme.LocalHighContrastChoice
 
 // letta-mobile-ckmub.3.12 (S10) / ckmub.3.12.1: the Settings page's standard sections, drawn the same
 // on every platform from the ports in com.letta.mobile.data.settings. A null port leaves its rows
@@ -38,6 +40,32 @@ fun AppearanceSettingsSection(settings: AppearanceSettings, modifier: Modifier =
             EnumChoice(preset, PRESET_CHOICE.copy(supporting = if (dynamicOn) "Dynamic colour overrides the preset" else null))
         }
         settings.haptics?.let { ToggleSetting(it, SettingsCopy.HAPTICS) }
+    }
+}
+
+/** OS reduced-motion fact and the high-contrast toggle that actually switches colour tokens. */
+@Composable
+fun AccessibilitySettingsSection(modifier: Modifier = Modifier) {
+    val policy = LocalAccessibilityPolicy.current
+    val setHighContrast = LocalHighContrastChoice.current
+    SettingsSection(SettingsHeader("accessibility", "Accessibility", showTitle = false), modifier) {
+        InfoRow(
+            SettingsRow.Info(
+                key = SettingsCopy.REDUCED_MOTION.key,
+                title = SettingsCopy.REDUCED_MOTION.title,
+                value = if (policy.reducedMotion) "On" else "Off",
+                supporting = SettingsCopy.REDUCED_MOTION.helper,
+            ),
+        )
+        ToggleRow(
+            SettingsRow.Toggle(
+                key = SettingsCopy.HIGH_CONTRAST.key,
+                title = SettingsCopy.HIGH_CONTRAST.title,
+                checked = policy.highContrast,
+                supporting = SettingsCopy.HIGH_CONTRAST.helper,
+                onChange = setHighContrast,
+            ),
+        )
     }
 }
 

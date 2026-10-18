@@ -67,7 +67,6 @@ android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/Messag
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/MessageSender.kt 31 legacy-pending(ckmub.2)
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/MessageSkeleton.kt 98 legacy-pending(ckmub.2)
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/ModelDropdown.kt 121 legacy-pending(ckmub.2)
-android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/MotionPreferences.kt 31 legacy-pending(ckmub.2)
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/Previews.kt 294 legacy-pending(ckmub.2)
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/RotationalLoader.kt 77 legacy-pending(ckmub.2)
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/ScrollToBottomFab.kt 52 legacy-pending(ckmub.2)

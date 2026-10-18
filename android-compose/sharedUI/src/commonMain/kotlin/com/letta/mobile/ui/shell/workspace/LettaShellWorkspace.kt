@@ -58,6 +58,8 @@ import com.letta.mobile.ui.shell.rail.ShellLibraryRail
 import com.letta.mobile.ui.shell.rail.ShellRailFocus
 import com.letta.mobile.ui.shell.rail.railLightDismiss
 import com.letta.mobile.ui.platform.SharedUiMemoryPressure
+import com.letta.mobile.ui.a11y.AccessibilityTraversal
+import com.letta.mobile.ui.a11y.accessibilityTraversal
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanel
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.flow.drop
@@ -179,9 +181,17 @@ private fun WideBody(frame: WorkspaceFrame, inspectors: InspectorHost) {
     val actions = frame.host.actions
     val slots = frame.host.slots
     Row(Modifier.fillMaxSize().testTag(LettaShellWorkspaceTags.WIDE)) {
-        ShellLibraryRail(state = navigation.rail, actions = actions.rail)
+        ShellLibraryRail(
+            state = navigation.rail,
+            actions = actions.rail,
+            modifier = Modifier.accessibilityTraversal(AccessibilityTraversal.SIDEBAR),
+        )
         VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        ShellCollapsibleSidebar(visible = frame.fit.sidebarVisible, reducedMotion = frame.state.layout.reducedMotion) {
+        ShellCollapsibleSidebar(
+            visible = frame.fit.sidebarVisible,
+            reducedMotion = frame.state.layout.reducedMotion,
+            modifier = Modifier.accessibilityTraversal(AccessibilityTraversal.SIDEBAR),
+        ) {
             ShellAgentPanel(
                 state = navigation.panel,
                 actions = actions.panel,

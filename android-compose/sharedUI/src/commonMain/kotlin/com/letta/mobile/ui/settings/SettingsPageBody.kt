@@ -235,7 +235,10 @@ internal class StandardSectionInputs(
     private fun Section(group: SettingsGroup, anchor: BringIntoViewRequester) {
         when (group) {
             SettingsGroup.Backend -> BackendGroup(anchor)
-            SettingsGroup.Appearance -> services.appearance?.let { AppearanceSettingsSection(it) }
+            SettingsGroup.Appearance -> {
+                AccessibilitySettingsSection()
+                services.appearance?.let { AppearanceSettingsSection(it) }
+            }
             SettingsGroup.Chat -> services.chat?.let { ChatSettingsSection(it) }
             SettingsGroup.Notifications -> services.notifications?.let { NotificationSettingsSection(it) }
             SettingsGroup.Providers -> services.onOpenProviders?.let { open ->

@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Image
 import com.composables.icons.lucide.Lucide
@@ -172,7 +173,7 @@ internal fun ComposerIconButton(
         modifier = modifier
             .size(LettaDimens.Control.iconButton)
             .clip(CircleShape)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick, role = Role.Button, onClickLabel = contentDescription),
         contentAlignment = Alignment.Center,
     ) {
         Icon(

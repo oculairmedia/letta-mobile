@@ -27,16 +27,19 @@ fun SharedMaterialTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    val scheme = remember(darkTheme) { lettaColorScheme(darkTheme) }
-    val customColors = remember(scheme) { lettaCustomColors(scheme) }
+    ProvideAccessibilityPolicy {
+        val highContrast = LocalHighContrast.current
+        val scheme = remember(darkTheme, highContrast) { lettaColorScheme(darkTheme, highContrast) }
+        val customColors = remember(scheme) { lettaCustomColors(scheme) }
 
-    CompositionLocalProvider(LocalCustomColors provides customColors) {
-        MaterialTheme(
-            colorScheme = scheme,
-            shapes = SharedShapes,
-            typography = SharedTypography,
-            content = content,
-        )
+        CompositionLocalProvider(LocalCustomColors provides customColors) {
+            MaterialTheme(
+                colorScheme = scheme,
+                shapes = SharedShapes,
+                typography = SharedTypography,
+                content = content,
+            )
+        }
     }
 }
 
@@ -45,7 +48,12 @@ fun SharedMaterialTheme(
  * (desktop, web). Android's `LettaTheme` layers presets, dynamic colour and a contrast boost on top of
  * the same [LettaColorTokens].
  */
-fun lettaColorScheme(dark: Boolean): ColorScheme = if (dark) darkColorScheme(
+fun lettaColorScheme(dark: Boolean, highContrast: Boolean = false): ColorScheme {
+    val base = if (dark) lettaDarkScheme() else lettaLightScheme()
+    return if (highContrast) base.withHighContrast() else base
+}
+
+private fun lettaDarkScheme(): ColorScheme = darkColorScheme(
     primary = Color(LettaColorTokens.DARK_PRIMARY),
     onPrimary = Color(0xFF06302B),
     primaryContainer = Color(LettaColorTokens.DARK_PRIMARY_VARIANT),
@@ -75,7 +83,9 @@ fun lettaColorScheme(dark: Boolean): ColorScheme = if (dark) darkColorScheme(
     errorContainer = Color(0xFF93000A),
     onError = Color(0xFF000000),
     onErrorContainer = Color(0xFFFFDAD6),
-) else lightColorScheme(
+)
+
+private fun lettaLightScheme(): ColorScheme = lightColorScheme(
     primary = Color(LettaColorTokens.LIGHT_PRIMARY),
     onPrimary = Color.White,
     primaryContainer = Color(LettaColorTokens.LIGHT_PRIMARY).copy(alpha = 0.16f),
