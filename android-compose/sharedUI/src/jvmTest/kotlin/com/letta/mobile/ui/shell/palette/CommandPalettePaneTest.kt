@@ -17,7 +17,9 @@ import androidx.compose.ui.test.withKeyDown
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.search.MessageSearchCapabilities
 import com.letta.mobile.data.search.MessageSearchHit
+import com.letta.mobile.data.search.MessageSearchQuery
 import com.letta.mobile.data.search.MessageSearchSource
 import com.letta.mobile.ui.shell.header.UnifiedSearchDestination
 import com.letta.mobile.ui.shell.header.UnifiedSearchHit
@@ -72,8 +74,13 @@ class CommandPalettePaneTest {
     @Test
     fun thePaletteFindsMessageTextAndOpensItsConversation() = runComposeUiTest {
         val selected = mutableListOf<UnifiedSearchHit>()
-        val search = MessageSearchSource { query ->
-            listOf(MessageSearchHit("c1", "a1", "m1", "Ask Emmanuel about the ${query.text} release")).takeIf { query.text == "emmanuel" }.orEmpty()
+        val search = object : MessageSearchSource {
+            override val capabilities = MessageSearchCapabilities.LOCAL
+
+            override suspend fun search(query: MessageSearchQuery): List<MessageSearchHit> =
+                listOf(MessageSearchHit("c1", "a1", "m1", "Ask Emmanuel about the ${query.text} release"))
+                    .takeIf { query.text == "emmanuel" }
+                    .orEmpty()
         }
         setContent {
             ProvideLettaHost(LettaHost.Pointer) {

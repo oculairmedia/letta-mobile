@@ -5,6 +5,9 @@ import com.letta.mobile.data.model.MessageSearchResult
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.search.MessageSearchQuery
+import com.letta.mobile.data.search.MessageSearchRole
+import com.letta.mobile.data.search.MessageSearchSelection
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -30,9 +33,8 @@ class ChatSearchControllerTest {
         )
 
         val results = controller.localResults(
-            query = "needle",
+            query = MessageSearchQuery(text = "needle", agentId = "agent-1"),
             messages = messages,
-            agentId = "agent-1",
             conversationId = "conv-1",
         )
 
@@ -41,21 +43,34 @@ class ChatSearchControllerTest {
     }
 
     @Test
-    fun `remoteResults scopes request and filters other agents`() = runTest {
+    fun `localResults follows the role chips`() {
+        val messages = listOf(
+            UiMessage(id = "u1", role = "user", content = "needle", timestamp = "2026-05-01T00:00:00Z"),
+            UiMessage(id = "a1", role = "assistant", content = "needle", timestamp = "2026-05-01T00:00:01Z"),
+        )
+        val assistantOnly = MessageSearchQuery("needle", "agent-1", MessageSearchSelection(roles = setOf(MessageSearchRole.Assistant)))
+
+        val results = controller.localResults(assistantOnly, messages, conversationId = "conv-1")
+
+        assertEquals(listOf("a1"), results.map { it.messageId })
+    }
+
+    @Test
+    fun `remoteResults asks full-text by default and keeps this agent's person and agent messages`() = runTest {
         var capturedRequest: MessageSearchRequest? = null
         coEvery { messageRepository.searchMessages(any()) } answers {
             capturedRequest = firstArg()
             listOf(
                 searchResult(messageId = "m1", agentId = "agent-1", content = "hit"),
                 searchResult(messageId = "m2", agentId = "agent-2", content = "wrong agent"),
+                searchResult(messageId = "m3", agentId = "agent-1", content = "system text", type = "system_message"),
             )
         }
 
-        val results = controller.remoteResults("needle", "agent-1")
+        val results = controller.remoteResults(MessageSearchQuery(text = "needle", agentId = "agent-1"))
 
         assertEquals("needle", capturedRequest?.query)
-        assertEquals("hybrid", capturedRequest?.searchMode)
-        assertEquals(listOf("user", "assistant"), capturedRequest?.roles)
+        assertEquals("fts", capturedRequest?.searchMode)
         assertEquals("agent-1", capturedRequest?.agentId)
         assertEquals(50, capturedRequest?.limit)
         assertEquals(listOf("m1"), results.map { it.messageId })
@@ -84,13 +99,14 @@ class ChatSearchControllerTest {
         messageId: String,
         agentId: String,
         content: String,
+        type: String = "assistant_message",
     ): MessageSearchResult = MessageSearchResult(
         embeddedText = content,
         message = JsonObject(
             mapOf(
                 "message_id" to JsonPrimitive(messageId),
                 "agent_id" to JsonPrimitive(agentId),
-                "message_type" to JsonPrimitive("assistant"),
+                "message_type" to JsonPrimitive(type),
                 "content" to JsonPrimitive(content),
                 "conversation_id" to JsonPrimitive("conv-1"),
             )

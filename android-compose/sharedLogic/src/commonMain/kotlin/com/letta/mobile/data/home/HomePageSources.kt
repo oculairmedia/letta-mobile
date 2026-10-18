@@ -5,11 +5,8 @@ import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.ParsedSearchMessage
-import com.letta.mobile.data.search.MessageSearchCapabilities
-import com.letta.mobile.data.search.MessageSearchMode
 import com.letta.mobile.data.search.MessageSearchQuery
-import com.letta.mobile.data.search.MessageSearchSelection
-import com.letta.mobile.data.search.toRequest
+import com.letta.mobile.data.search.searchBackend
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.runtime.RunId
 import com.letta.mobile.data.repository.api.IRunRepository
@@ -41,12 +38,9 @@ fun interface HomeMessageSearch {
         /** Messages Home asks for per query. */
         const val RESULT_LIMIT = 20
 
-        /** Home's message search: full-text, over what the user and the agents said. */
-        fun request(query: String): MessageSearchRequest =
-            MessageSearchQuery(
-                text = query,
-                selection = MessageSearchSelection(mode = MessageSearchMode.FullText),
-            ).toRequest(MessageSearchCapabilities.REMOTE, RESULT_LIMIT)
+        /** Home's message search over Letta's [search]: full-text, over what the user and the agents said. */
+        fun backedBy(search: suspend (MessageSearchRequest) -> List<ParsedSearchMessage>): HomeMessageSearch =
+            HomeMessageSearch { query -> MessageSearchQuery(text = query).searchBackend(RESULT_LIMIT, search) }
     }
 }
 

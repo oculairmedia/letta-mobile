@@ -7,6 +7,7 @@ import com.letta.mobile.data.chat.runtime.chatScreenStatusOf
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.ProjectBugReport
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.search.MessageSearchSelection
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -282,6 +283,8 @@ data class ChatUiState(
     val isSearchActive: Boolean = false,
     val isSearching: Boolean = false,
     val searchResults: ImmutableList<ParsedSearchMessage> = persistentListOf(),
+    /** The chat search's mode and role chips (letta-mobile-k5nbq.5). */
+    val searchSelection: MessageSearchSelection = MessageSearchSelection(),
     val a2uiSurfaces: ImmutableMap<String, A2uiSurfaceState> = persistentMapOf(),
     val a2uiResolvedActionCounters: ImmutableMap<String, Int> = persistentMapOf(),
     val a2uiActionSnackbar: A2uiActionSnackbarUi? = null,

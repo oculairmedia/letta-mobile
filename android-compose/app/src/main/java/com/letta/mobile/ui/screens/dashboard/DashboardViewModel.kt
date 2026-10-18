@@ -56,8 +56,8 @@ class DashboardViewModel internal constructor(
         source = SessionHomePageSource(
             sessionGraphProvider = sessionGraphs,
             scope = viewModelScope,
-            messageSearch = HomeMessageSearch { query ->
-                repositories.messages.searchMessages(HomeMessageSearch.request(query)).map { it.toParsed() }
+            messageSearch = HomeMessageSearch.backedBy { request ->
+                repositories.messages.searchMessages(request).map { it.toParsed() }
             },
         ),
         pins = SettingsHomePinStore(repositories.settings, viewModelScope),
