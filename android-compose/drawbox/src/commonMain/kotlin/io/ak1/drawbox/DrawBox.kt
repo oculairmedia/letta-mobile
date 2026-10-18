@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -254,13 +253,10 @@ fun DrawBox(
     // composition-scoped and must come from rememberTextMeasurer.
     val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
     val textCache = remember { TextLayoutCache() }
-    DisposableEffect(pathCache, imageCache, textCache) {
-        val cancel = DrawboxCachePressure.register {
-            pathCache.retainOnly(emptySet())
-            imageCache.retainOnly(emptySet())
-            textCache.retainOnly(emptySet())
-        }
-        onDispose(cancel)
+    RememberDrawboxPressure {
+        pathCache.retainOnly(emptySet())
+        imageCache.retainOnly(emptySet())
+        textCache.retainOnly(emptySet())
     }
     // How shape text is painted: built once per board colour, not per element per frame, and the
     // hidden variant only for the shape whose text an editor is showing.
@@ -1057,12 +1053,9 @@ fun DrawingPreview(
     val textCache = remember { TextLayoutCache() }
     val previewScope = rememberCoroutineScope()
     val imageCache = remember(previewScope) { ImageBitmapCache(previewScope) }
-    DisposableEffect(imageCache, textCache) {
-        val cancel = DrawboxCachePressure.register {
-            imageCache.retainOnly(emptySet())
-            textCache.retainOnly(emptySet())
-        }
-        onDispose(cancel)
+    RememberDrawboxPressure {
+        imageCache.retainOnly(emptySet())
+        textCache.retainOnly(emptySet())
     }
     val shapeText = remember(bgColor) { ShapeTextPaint(hidden = false, chip = bgColor) }
     Canvas(modifier = modifier) {
