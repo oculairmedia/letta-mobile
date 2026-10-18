@@ -36,8 +36,12 @@ import com.letta.mobile.ui.components.picker.PickerCallbacks
 import com.letta.mobile.ui.components.picker.PickerItem
 import com.letta.mobile.ui.components.picker.PickerSearch
 import com.letta.mobile.ui.components.picker.PickerSlots
+import com.letta.mobile.data.search.MessageSearchSelection
 import com.letta.mobile.ui.host.LettaDialogFrame
+import com.letta.mobile.ui.search.LettaSearchChipRow
+import com.letta.mobile.ui.search.LettaSearchChipRows
 import com.letta.mobile.ui.search.LettaSearchRow
+import com.letta.mobile.ui.search.messageSearchChipRows
 import com.letta.mobile.ui.shell.header.UnifiedSearchHit
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.host.PaneSize
@@ -66,7 +70,9 @@ class QuickQueryActions(
 fun QuickQueryPanel(sources: UnifiedSearchSources, ambientContext: String?, actions: QuickQueryActions) {
     var query by remember { mutableStateOf("") }
     var includeContext by remember { mutableStateOf(true) }
-    val sections = rememberPaletteSections(sources, query, QuickQueryRecent)
+    var message by remember { mutableStateOf(MessageSearchSelection()) }
+    val sections = rememberPaletteSections(sources, query, QuickQueryRecent, message)
+    val chips = messageSearchChipRows(sources.messageCapabilities, message) { message = it }
     val kept = ambientContext.takeIf { includeContext }
     val submit = {
         val text = query.trim()
@@ -99,11 +105,17 @@ fun QuickQueryPanel(sources: UnifiedSearchSources, ambientContext: String?, acti
             ),
             slots = PickerSlots(
                 leading = { PaletteRowLeading(it.value) },
-                header = { kept?.let { AmbientContextChip(it, onDismiss = { includeContext = false }) } },
+                header = { QuickQueryHeader(chips, kept) { includeContext = false } },
                 footer = { QuickQueryFooter() },
             ),
         )
     }
+}
+
+@Composable
+private fun QuickQueryHeader(chips: List<LettaSearchChipRow>, ambient: String?, onDropAmbient: () -> Unit) {
+    LettaSearchChipRows(chips)
+    ambient?.let { AmbientContextChip(it, onDismiss = onDropAmbient) }
 }
 
 /** Ctrl+Enter always asks the agent; Enter asks it only when no result is highlighted to open. */

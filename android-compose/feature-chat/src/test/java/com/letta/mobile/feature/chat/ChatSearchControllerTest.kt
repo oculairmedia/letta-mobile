@@ -54,7 +54,7 @@ class ChatSearchControllerTest {
         val results = controller.remoteResults("needle", "agent-1")
 
         assertEquals("needle", capturedRequest?.query)
-        assertEquals("fts", capturedRequest?.searchMode)
+        assertEquals("hybrid", capturedRequest?.searchMode)
         assertEquals(listOf("user", "assistant"), capturedRequest?.roles)
         assertEquals("agent-1", capturedRequest?.agentId)
         assertEquals(50, capturedRequest?.limit)

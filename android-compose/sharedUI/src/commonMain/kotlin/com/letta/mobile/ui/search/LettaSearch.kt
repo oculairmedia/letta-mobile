@@ -155,6 +155,7 @@ internal fun LettaSearchScaffold(
             LettaSearchScopeRow(config)
         }
         config.toggle?.let { LettaSearchToggleRow(it) }
+        LettaSearchChipRows(config.chipRows)
 
         config.actions.forEach { action ->
             LettaSearchActionRow(action = action, query = query)

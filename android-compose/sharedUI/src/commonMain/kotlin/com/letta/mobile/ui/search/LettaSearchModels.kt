@@ -78,6 +78,22 @@ data class LettaSearchToggle(
     val onCheckedChange: (Boolean) -> Unit,
 )
 
+/** One chip in a [LettaSearchChipRow] (search mode or role). */
+@Immutable
+data class LettaSearchChip(
+    val id: String,
+    val label: String,
+    val selected: Boolean,
+    val onClick: () -> Unit,
+)
+
+/** A horizontal strip of chips under the field. Exclusive rows pick one; others toggle. */
+@Immutable
+data class LettaSearchChipRow(
+    val chips: List<LettaSearchChip>,
+    val exclusive: Boolean = false,
+)
+
 /**
  * A pinned row above the results — "Create new agent", "New canvas",
  * "Create \"foo\" Bot". Actions are always visible; they are not filtered by
@@ -125,6 +141,8 @@ data class LettaSearchConfig(
     val onScopeSelected: (String) -> Unit = {},
     /** Checkbox beside the scopes; null hides it. */
     val toggle: LettaSearchToggle? = null,
+    /** Mode and role chips under the toggle. Empty (the default) hides them. */
+    val chipRows: List<LettaSearchChipRow> = emptyList(),
     /** Pinned, unfiltered actions above the results. */
     val actions: List<LettaSearchAction> = emptyList(),
     /** Section headers. Off for flat lists even when sections are supplied. */

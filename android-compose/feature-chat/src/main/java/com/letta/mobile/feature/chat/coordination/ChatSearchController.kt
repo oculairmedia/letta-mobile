@@ -1,10 +1,12 @@
 package com.letta.mobile.feature.chat.coordination
 
-import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.toParsed
 import com.letta.mobile.data.repository.api.IMessageRepository
+import com.letta.mobile.data.search.MessageSearchCapabilities
+import com.letta.mobile.data.search.MessageSearchQuery
+import com.letta.mobile.data.search.toRequest
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -50,18 +52,13 @@ internal class ChatSearchController(
             .toImmutableList()
     }
 
-    suspend fun remoteResults(query: String, agentId: String): List<ParsedSearchMessage> {
-        return messageRepository.searchMessages(
-            MessageSearchRequest(
-                query = query,
-                searchMode = "fts",
-                roles = listOf("user", "assistant"),
-                agentId = agentId,
-                limit = 50,
-            )
-        )
+    suspend fun remoteResults(query: String, agentId: String): List<ParsedSearchMessage> =
+        remoteResults(MessageSearchQuery(text = query, agentId = agentId))
+
+    suspend fun remoteResults(query: MessageSearchQuery): List<ParsedSearchMessage> {
+        return messageRepository.searchMessages(query.toRequest(MessageSearchCapabilities.REMOTE))
             .map { it.toParsed() }
-            .filter { it.agentId == agentId }
+            .filter { it.agentId == query.agentId }
     }
 
     fun mergeResults(

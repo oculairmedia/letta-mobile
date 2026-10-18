@@ -3,6 +3,9 @@ package com.letta.mobile.data.search
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ParsedSearchMessage
+import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.model.ToolCallMessage
+import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -21,10 +24,15 @@ data class MessageSearchHit(
     val messageId: String?,
     val text: String,
     val date: String? = null,
+    val role: MessageSearchRole = MessageSearchRole.User,
 )
 
 /** What a message search looks for: the typed [text], narrowed to [agentId]'s conversations when set. */
-data class MessageSearchQuery(val text: String, val agentId: String? = null)
+data class MessageSearchQuery(
+    val text: String,
+    val agentId: String? = null,
+    val selection: MessageSearchSelection = MessageSearchSelection(),
+)
 
 /**
  * Searches message text for the unified search. A host either asks its backend (a REST message
@@ -32,13 +40,15 @@ data class MessageSearchQuery(val text: String, val agentId: String? = null)
  */
 fun interface MessageSearchSource {
     suspend fun search(query: MessageSearchQuery): List<MessageSearchHit>
+
+    fun capabilities(): MessageSearchCapabilities = MessageSearchCapabilities.LOCAL
 }
 
 /** A backend search result as a hit; null when it names no conversation to open or has no text. */
 fun ParsedSearchMessage.toSearchHit(): MessageSearchHit? {
     val conversation = conversationId?.takeIf { it.isNotBlank() } ?: return null
     val body = content?.takeIf { it.isNotBlank() } ?: return null
-    return MessageSearchHit(conversation, agentId, messageId, body, date)
+    return MessageSearchHit(conversation, agentId, messageId, body, date, MessageSearchRole.fromWire(role))
 }
 
 /** A conversation the index may read: its id, its agent and a [revision] that changes when it gets new messages. */
@@ -86,9 +96,10 @@ class ConversationMessageIndex(
         val indexed = targets.chunked(limits.parallelReads).flatMap { batch ->
             coroutineScope { batch.map { async { messagesOf(it) } }.awaitAll() }
         }
+        val roles = query.selection.effectiveRoles()
         return indexed.asSequence()
             .flatMap { it.hits.asSequence() }
-            .filter { TextMatch.matches(query.text, it.text) }
+            .filter { it.role in roles && TextMatch.matches(query.text, it.text) }
             .take(limits.results)
             .toList()
     }
@@ -111,12 +122,30 @@ class ConversationMessageIndex(
     private class IndexedMessages(val revision: String, val hits: List<MessageSearchHit>)
 }
 
-/** What the person and the agent said; reasoning, tool traffic and system text are not searched. */
+/** Indexes person, agent, reasoning and tool text; the query's role filter decides which of those run. */
 private fun LettaMessage.toHit(conversation: IndexedConversation): MessageSearchHit? {
-    val body = when (this) {
-        is UserMessage -> content
-        is AssistantMessage -> content
-        else -> null
-    }?.takeIf { it.isNotBlank() } ?: return null
-    return MessageSearchHit(conversation.id, conversation.agentId, id, body, date)
+    val searchable = searchableText() ?: return null
+    return MessageSearchHit(conversation.id, conversation.agentId, id, searchable.text, date, searchable.role)
 }
+
+private class SearchableText(val role: MessageSearchRole, val text: String)
+
+private fun LettaMessage.searchableText(): SearchableText? {
+    val (role, body) = when (this) {
+        is UserMessage -> MessageSearchRole.User to content
+        is AssistantMessage -> MessageSearchRole.Assistant to content
+        is ReasoningMessage -> MessageSearchRole.Reasoning to reasoning
+        is ToolCallMessage -> MessageSearchRole.Tool to toolCallText()
+        is ToolReturnMessage -> MessageSearchRole.Tool to toolReturnText()
+        else -> return null
+    }
+    return body.takeIf { it.isNotBlank() }?.let { SearchableText(role, it) }
+}
+
+private fun ToolCallMessage.toolCallText(): String =
+    effectiveToolCalls.joinToString(" ") { listOfNotNull(it.name, it.arguments).joinToString(" ") }
+
+private fun ToolReturnMessage.toolReturnText(): String =
+    listOfNotNull(toolReturn.funcResponse, toolReturn.stdout?.joinToString(" "), toolReturn.stderr?.joinToString(" "))
+        .joinToString(" ")
+

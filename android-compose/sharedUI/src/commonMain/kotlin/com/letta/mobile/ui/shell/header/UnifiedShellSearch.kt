@@ -7,7 +7,9 @@ import com.letta.mobile.data.home.conversationRecency
 import com.letta.mobile.data.home.relativeAgeLabel
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.DisplayNames
+import com.letta.mobile.data.search.MessageSearchCapabilities
 import com.letta.mobile.data.search.MessageSearchHit
+import com.letta.mobile.data.search.MessageSearchSelection
 import com.letta.mobile.data.search.MessageSearchSource
 import com.letta.mobile.data.search.TextMatch
 import com.letta.mobile.ui.icons.LettaIcons
@@ -34,7 +36,10 @@ data class UnifiedSearchSources(
     val agentId: String? = null,
     val destinations: List<UnifiedSearchDestination> = emptyList(),
     val messageSearch: MessageSearchSource? = null,
-)
+) {
+    val messageCapabilities: MessageSearchCapabilities
+        get() = messageSearch?.capabilities() ?: MessageSearchCapabilities.NONE
+}
 
 /** The kind of thing a unified search row opens. */
 enum class UnifiedSearchKind(val id: String, val label: String) {
@@ -65,6 +70,7 @@ data class UnifiedSearchQuery(
     val filterToAgent: Boolean = false,
     val scopeId: String = UnifiedShellSearch.ALL,
     val surface: UnifiedSearchSurface = UnifiedSearchSurface.Header,
+    val message: MessageSearchSelection = MessageSearchSelection(),
 ) {
     fun includes(kind: UnifiedSearchKind): Boolean =
         kind in surface.kinds && (scopeId == UnifiedShellSearch.ALL || scopeId == kind.id)
