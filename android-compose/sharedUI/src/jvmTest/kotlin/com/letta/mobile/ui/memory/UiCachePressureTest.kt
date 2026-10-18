@@ -50,7 +50,7 @@ class UiCachePressureTest {
 
     /** An image loader cache of 100 bytes holding [count] 20-byte images, oldest first. */
     private fun loaderCacheHolding(count: Int): MemoryCache {
-        val cache = MemoryCache.Builder().maxSizeBytes(100).build()
+        val cache = MemoryCache.Builder().maxSizeBytes(100).weakReferencesEnabled(false).build()
         repeat(count) { cache[MemoryCache.Key("image-$it")] = MemoryCache.Value(SizedImage(20)) }
         return cache
     }
