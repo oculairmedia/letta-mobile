@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.mascot.AgentAvatar
+import com.letta.mobile.ui.shell.shortcuts.shortcutTextInput
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -302,6 +303,7 @@ private fun LettaSearchField(
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focusRequester)
+                .shortcutTextInput()
                 .testTag(SearchFieldTestTag),
             decorationBox = { inner ->
                 if (query.isEmpty()) {

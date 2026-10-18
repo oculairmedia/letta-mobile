@@ -174,7 +174,7 @@ internal fun nextPermissionMode(state: ChatPermissionModeUiState?): AppServerPer
     return options[(current + 1).mod(options.size)]
 }
 
-/** Shift+Tab, the key that cycles the permission mode at the prompt (as Letta Desktop's composer does). */
+/** Shift+Tab, catalogued as CyclePermission in ShortcutRegistry; handled here so the prompt keeps it. */
 internal fun isModeCycleKey(eventKey: Key, eventType: KeyEventType, shiftPressed: Boolean): Boolean {
     if (eventType != KeyEventType.KeyDown) return false
     return shiftPressed && eventKey == Key.Tab

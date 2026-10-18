@@ -43,6 +43,7 @@ import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
 import com.letta.mobile.ui.chat.surface.composer.LocalComposerPrimary
 import com.letta.mobile.ui.chat.surface.composer.ComposerFocusHandoff
 import com.letta.mobile.ui.chat.surface.composer.LocalComposerFocusHandoff
+import com.letta.mobile.ui.shell.shortcuts.BindComposerShortcuts
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -168,6 +169,7 @@ fun ChatSurface(
         recents = recents,
     )
     val focusHandoff = remember { ComposerFocusHandoff() }
+    BindComposerShortcuts(focusHandoff)
     // The thinking glow's shader, compiled once for the page rather than at every run's start.
     val glowShaders = rememberAmbientGlowShaders()
     // letta-mobile-ckmub.3.15 (S13): the page's messages go to the window's overlay queue (its own

@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.shell.shortcuts.shortcutTextInput
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -63,6 +64,7 @@ fun LettaPickerSearchField(
             modifier = fieldModifier
                 .weight(1f)
                 .focusRequester(focusRequester)
+                .shortcutTextInput()
                 .semantics { contentDescription = placeholder },
             decorationBox = { inner ->
                 Box(contentAlignment = Alignment.CenterStart) {

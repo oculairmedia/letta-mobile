@@ -5,7 +5,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import com.letta.mobile.data.chat.runtime.ConversationListGroups
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.ui.shell.shortcuts.ShortcutActions
+import com.letta.mobile.ui.shell.shortcuts.ShortcutChrome
+import com.letta.mobile.ui.shell.shortcuts.ShortcutLists
+import com.letta.mobile.ui.shell.shortcuts.ShortcutStepping
+import com.letta.mobile.ui.shell.shortcuts.ShellShortcutId
+import com.letta.mobile.ui.shell.shortcuts.handleShortcut
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.plugin.view.PluginViewsModel
@@ -82,12 +91,50 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                         onWidthChanged = { width ->
                             if (phone == null) layout.controller.dispatch(ShellLayoutEvent.WindowWidthChanged(width))
                         },
-                        onOpenCommandPalette = { context.overlays.commandPalette = true },
+                        onShortcut = rememberDesktopShortcutHandler(context, frame),
                     ),
                 ),
             )
         }
     }
+}
+
+@Composable
+private fun rememberDesktopShortcutHandler(
+    context: DesktopShellContext,
+    frame: DesktopShellFrame,
+): (ShellShortcutId) -> Unit {
+    val layout = context.core.layout.controller
+    val management = context.core.chatController.conversationManagement
+    val pinned by management.pinnedConversationIds.collectAsState()
+    val settled by management.marks.settled.collectAsState()
+    val conversationIds = remember(frame.lists.agentConversations, pinned, settled) {
+        desktopConversationOrder(frame.lists.agentConversations, ConversationListGroups(pinned, settled))
+    }
+    val currentConversation by rememberUpdatedState(frame.chatState.selectedConversationId)
+    val agentIds by rememberUpdatedState(frame.focus.railAgents.map { it.first })
+    val currentAgent by rememberUpdatedState(frame.focus.selectedAgentId)
+    val router = context.router
+    val navigator = context.navigator
+    val actions = ShortcutActions(
+        overlays = context.overlays,
+        navigate = { destination -> navigator.navigate(destination) },
+        chrome = ShortcutChrome(toggleSidebar = { layout.dispatch(ShellLayoutEvent.ToggleSidebar) }),
+        lists = ShortcutLists(
+            conversations = ShortcutStepping(
+                ids = { conversationIds },
+                current = { currentConversation },
+                open = { router.openConversation(ConversationId(it)) },
+            ),
+            agents = ShortcutStepping(
+                ids = { agentIds },
+                current = { currentAgent },
+                open = { router.openAgent(AgentId(it)) },
+            ),
+        ),
+    )
+    val latest = rememberUpdatedState(actions)
+    return remember { { id: ShellShortcutId -> handleShortcut(id, latest.value) } }
 }
 
 private fun desktopWorkspaceSlots(context: DesktopShellContext, frame: DesktopShellFrame) = LettaShellWorkspaceSlots(

@@ -115,35 +115,6 @@ internal fun DesktopChatControllerLifecycle(chatController: DesktopChatControlle
     }
 }
 
-/**
- * Cmd/Ctrl-K opens the command palette (Penpot shows the ⌘K hint). A global
- * AWT key dispatcher fires regardless of which Compose field has focus.
- */
-@Composable
-internal fun CommandPaletteKeyDispatcherEffect(onOpenPalette: () -> Unit) {
-    DisposableEffect(onOpenPalette) {
-        val focusManager = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager()
-        val dispatcher = commandPaletteKeyDispatcher(onOpenPalette)
-        focusManager.addKeyEventDispatcher(dispatcher)
-        onDispose { focusManager.removeKeyEventDispatcher(dispatcher) }
-    }
-}
-
-internal fun commandPaletteKeyDispatcher(onOpenPalette: () -> Unit): java.awt.KeyEventDispatcher =
-    java.awt.KeyEventDispatcher { event ->
-        if (isCommandPaletteKey(event)) {
-            onOpenPalette()
-            true
-        } else {
-            false
-        }
-    }
-
-private fun isCommandPaletteKey(event: java.awt.event.KeyEvent): Boolean =
-    event.id == java.awt.event.KeyEvent.KEY_PRESSED &&
-        event.keyCode == java.awt.event.KeyEvent.VK_K &&
-        (event.isControlDown || event.isMetaDown)
-
 /** Typed agent id for desktop library/panel operations. */
 @JvmInline
 internal value class DesktopAgentId(val value: String)

@@ -21,7 +21,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -36,6 +39,11 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.ui.haptics.HapticEffects
+import com.letta.mobile.ui.shell.shortcuts.ProvideShortcutHub
+import com.letta.mobile.ui.shell.shortcuts.ShellShortcutId
+import com.letta.mobile.ui.shell.shortcuts.ShortcutHelpOverlay
+import com.letta.mobile.ui.shell.shortcuts.ShortcutPlatform
+import com.letta.mobile.ui.shell.shortcuts.rememberShellShortcuts
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
 import kotlin.reflect.KClass
@@ -50,14 +58,38 @@ fun AdaptiveScaffold(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val destination = navBackStackEntry?.destination
     val insetPolicy = remember(destination) { destination.insetPolicy() }
+    var helpOpen by remember { mutableStateOf(false) }
+    val onShortcut = rememberAndroidShortcutHandler(navController) { helpOpen = !helpOpen }
 
-    AdaptiveScaffoldLayout(
-        expanded = LocalWindowSizeClass.current.isExpandedWidth,
-        insetPolicy = insetPolicy,
-        navigationRail = { LettaNavigationRail(navController = navController) },
-        modifier = modifier,
-        content = content,
-    )
+    ProvideShortcutHub {
+        AdaptiveScaffoldLayout(
+            expanded = LocalWindowSizeClass.current.isExpandedWidth,
+            insetPolicy = insetPolicy,
+            navigationRail = { LettaNavigationRail(navController = navController) },
+            modifier = modifier.then(rememberShellShortcuts(ShortcutPlatform.Android, onShortcut)),
+            content = content,
+        )
+        if (helpOpen) {
+            ShortcutHelpOverlay(onDismiss = { helpOpen = false }, platform = ShortcutPlatform.Android)
+        }
+    }
+}
+
+@Composable
+private fun rememberAndroidShortcutHandler(
+    navController: NavController,
+    onHelp: () -> Unit,
+): (ShellShortcutId) -> Unit {
+    val model: AndroidShortcutViewModel = hiltViewModel()
+    val conversations by model.conversations.collectAsStateWithLifecycle()
+    val agents by model.agents.collectAsStateWithLifecycle()
+    val lists = androidShortcutLists(conversations, agents, navController)
+    val latestLists = rememberUpdatedState(lists)
+    val latestHelp = rememberUpdatedState(onHelp)
+    val latestNav = rememberUpdatedState(navController)
+    return remember {
+        { id: ShellShortcutId -> handleAndroidShortcut(id, latestNav.value, latestLists.value, latestHelp.value) }
+    }
 }
 
 /**

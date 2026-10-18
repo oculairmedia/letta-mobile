@@ -6,7 +6,6 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -32,15 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.isMetaPressed
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
@@ -60,6 +50,9 @@ import com.letta.mobile.ui.shell.rail.railLightDismiss
 import com.letta.mobile.ui.platform.SharedUiMemoryPressure
 import com.letta.mobile.ui.a11y.AccessibilityTraversal
 import com.letta.mobile.ui.a11y.accessibilityTraversal
+import com.letta.mobile.ui.shell.shortcuts.ProvideShortcutHub
+import com.letta.mobile.ui.shell.shortcuts.ShellShortcutId
+import com.letta.mobile.ui.shell.shortcuts.rememberShellShortcuts
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanel
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.flow.drop
@@ -80,21 +73,26 @@ import kotlinx.coroutines.flow.drop
 fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspaceHost, modifier: Modifier = Modifier) {
     SideEffect { SharedUiMemoryPressure.install() }
     val drawer = host.drawer ?: remember { ShellWorkspaceDrawer() }
-    Surface(modifier = modifier.fillMaxSize().testTag(LettaShellWorkspaceTags.WORKSPACE), color = MaterialTheme.colorScheme.background) {
-        // The window's one overlay queue (snackbars, undo, banners), drawn over the whole shell.
-        OverlayHostRoot(rememberOverlayHost(), Modifier.fillMaxSize()) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .then(rememberPaletteShortcut(host.events.onOpenCommandPalette))
-                    .railLightDismiss(state.navigation.rail.expanded, host.actions.onRailDismiss),
-            ) {
-                BoxWithConstraints(Modifier.fillMaxSize()) {
-                    val width = maxWidth
-                    LaunchedEffect(width) { host.events.onWidthChanged(width.value) }
-                    WorkspaceColumn(WorkspaceFrame(state, host, drawer, workspaceFit(state.layout, width)))
+    ProvideShortcutHub {
+        Surface(
+            modifier = modifier.fillMaxSize().testTag(LettaShellWorkspaceTags.WORKSPACE),
+            color = MaterialTheme.colorScheme.background,
+        ) {
+            // The window's one overlay queue (snackbars, undo, banners), drawn over the whole shell.
+            OverlayHostRoot(rememberOverlayHost(), Modifier.fillMaxSize()) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .then(rememberShellShortcuts(host.events.shortcutPlatform, workspaceShortcutHandler(host.events)))
+                        .railLightDismiss(state.navigation.rail.expanded, host.actions.onRailDismiss),
+                ) {
+                    BoxWithConstraints(Modifier.fillMaxSize()) {
+                        val width = maxWidth
+                        LaunchedEffect(width) { host.events.onWidthChanged(width.value) }
+                        WorkspaceColumn(WorkspaceFrame(state, host, drawer, workspaceFit(state.layout, width)))
+                    }
+                    host.slots.overlays()
                 }
-                host.slots.overlays()
             }
         }
     }
@@ -275,21 +273,15 @@ private fun ShellMascotStage(focus: ShellRailFocus, agentPaneVisible: Boolean) {
     }
 }
 
-/**
- * Ctrl/Cmd+K anywhere in the workspace opens the command palette. The workspace takes focus once so
- * a page with nothing focused yet (a fresh browser tab) still hears the shortcut.
- */
-@Composable
-private fun rememberPaletteShortcut(onOpen: (() -> Unit)?): Modifier {
-    if (onOpen == null) return Modifier
-    val requester = remember { FocusRequester() }
-    LaunchedEffect(requester) { runCatching { requester.requestFocus() } }
-    return Modifier
-        .onPreviewKeyEvent { event ->
-            val palette = event.type == KeyEventType.KeyDown && event.key == Key.K && (event.isCtrlPressed || event.isMetaPressed)
-            if (palette) onOpen()
-            palette
+/** Search still opens through the legacy palette callback when the host has not bound the full keymap. */
+private fun workspaceShortcutHandler(events: ShellWorkspaceEvents): ((ShellShortcutId) -> Unit)? {
+    val handler = events.onShortcut
+    val palette = events.onOpenCommandPalette
+    if (handler == null && palette == null) return null
+    return { id ->
+        when {
+            handler != null -> handler(id)
+            id == ShellShortcutId.Search || id == ShellShortcutId.Find || id == ShellShortcutId.QuickOpen -> palette?.invoke()
         }
-        .focusRequester(requester)
-        .focusable()
+    }
 }
