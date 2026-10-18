@@ -487,8 +487,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
-      - name: Verify docs stay outside the app service worker
-        run: node --test android-compose/web/service-worker.test.cjs
+      - name: Verify documentation tooling
+        run: |
+          node --test android-compose/web/service-worker.test.cjs
+          python3 -m unittest discover -s scripts/tests -p test_api_doc_links.py -v
       - name: Generate shared API reference
         working-directory: android-compose
         run: ./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -PdokkaSourceRef=${{ github.sha }} :dokkaGeneratePublicationHtml
@@ -497,6 +499,8 @@ jobs:
           for module in . sharedLogic sharedUI core/ids core/runtime plugin-api; do
             test -s "android-compose/build/dokka/html/$module/index.html"
           done
+      - name: Check authored links into the generated reference
+        run: python3 scripts/ci/check-api-doc-links.py
       - uses: actions/upload-artifact@v4
         with:
           name: kotlin-api-docs
