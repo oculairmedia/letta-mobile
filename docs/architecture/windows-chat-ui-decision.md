@@ -1,6 +1,13 @@
 # Windows Chat UI Decision
 
-Status: superseded (2026-09-30) by `letta-mobile-bglj6.1`
+**Status:** Superseded decision (2026-09-30); platform-specific desktop chat is not the current product architecture.
+
+## Code audit — 2026-10-18
+
+The replacement is implemented: [ChatSurface](../../android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/ChatSurface.kt) is shared product UI and sharedUI declares Android/JVM/wasmJs. Desktop and Android bind ports/host services to it. The original “do not create sharedUI” recommendation below is historical. Use [kmp-module-map](kmp-module-map.md) and [sharedUI/build.gradle.kts](../../android-compose/sharedUI/build.gradle.kts), rather than starting another desktop renderer or assuming the replacement still needs a feature flag.
+
+## Original record
+
 Date: 2026-06-06
 Tracking bead: `letta-mobile-w1f7p`
 

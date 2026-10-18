@@ -1,5 +1,52 @@
 # Iroh agent address book — operator runbook
 
+**Current source contract (audited 2026-10-18):** the wrapper uses
+`HostEndpointAddressStore`, not the removed `FileIrohAgentAddressStore`.
+The file `~/.letta/iroh/agent-addresses.kv` contains one host record:
+
+```text
+host:<first-eight-node-id-hex>=<node-id>@<direct-addresses>
+```
+
+`A2aWiring.publishHost` writes that record from the wrapper endpoint at bind.
+It replaces legacy per-agent rows on write. Reachability is a host property;
+when `--local-backend-dir` is supplied, `LocalBackendAdminStore.agentExists`
+checks agent membership at lookup time. With no backend root, the store can
+answer host reachability but does not validate membership. Adding an agent to
+the backend does not require reseeding a per-agent address row. The CLI sender
+uses the same host store without its own membership oracle.
+
+The receiver shares the App Server wrapper's Iroh endpoint and
+`/letta/a2a/0` ALPN; `--a2a-port=-1` disables it, while another value enables
+it without binding a second endpoint. Per-agent keys remain lazy dial-time
+identities; they are separate from the host endpoint's published reachability.
+
+For read-only inspection on the host:
+
+```bash
+cat ~/.letta/iroh/agent-addresses.kv
+# Expect one host: row, not one row per agent.
+```
+
+Current implementations:
+
+- `android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/HostEndpointAddressStore.kt`
+- `android-compose/iroh-wrapper-cli/src/main/kotlin/com/letta/mobile/cli/commands/A2aWiring.kt`
+- `HostEndpointAddressStoreRegressionTest`, `HostEndpointAddressStoreBackendMembershipTest`.
+
+The old seed script below still writes legacy per-agent rows. Do not run it
+against a bound current wrapper as an agent-registration step: those rows are
+not read by the current store, and `--force` can replace its live host record
+until a subsequent wrapper bind republishes it. This is a tooling mismatch,
+not an instruction to restart production. No host was inspected or changed in
+this documentation audit.
+
+## Historical bn008.7 seed procedure
+
+The remainder records the original seed implementation and its acceptance
+checks. It is retained for provenance; use the current host contract above
+for new operations.
+
 > Status: implemented in [`letta-mobile-bn008.7`](https://github.com/oculairmedia/letta-mobile/pull/1122)
 > (PR title: `Seed host a2a address book + stable per-agent Iroh identities
 > (bn008.7)`).

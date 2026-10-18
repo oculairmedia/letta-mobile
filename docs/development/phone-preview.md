@@ -1,7 +1,7 @@
 # Phone preview on the desktop
 
 Iterate on the **mobile** UI of the shared KMP chat page (`sharedUI/.../ui/chat/surface/**`,
-epic letta-mobile-bglj6.1) from a Windows (or any JBR-capable) desktop, without an Android device or
+epic letta-mobile-bglj6.1) from Windows, without an Android device or
 emulator. The phone idiom is what `ChatSurfaceAppearance.platformStyle = ChatPlatformStyle.Touch`
 draws: `TouchComposerBar`, `TouchCanvasDock` (chat head, reply popup), the Touch canvas chrome (undo,
 redo and the more menu in the tool rail), the keyboard camera (`CanvasKeyboardCamera`) and the
@@ -16,6 +16,8 @@ mode is behind an environment flag, and the playground is its own source set.
 | Fixture playground | `./gradlew :desktop:runPhonePlayground` | no |
 | Either, with hot reload | `./gradlew :desktop:runPhoneHot` / `./gradlew :desktop:runPhonePlaygroundHot` | as above |
 
+The checked-in JBR download/launcher pins `windows-x64` and `bin/java.exe`; these
+Gradle runners are Windows-specific even though Compose itself is portable.
 On Windows, use `gradlew.bat` and set `JAVA_HOME` to a JDK 21+ for Gradle itself; the runners launch
 on the JetBrains Runtime that `:desktop:extractDesktopJbr` downloads (Jewel needs a 25+ runtime, and
 hot reload needs JBR). The first launch builds the native Mermaid and tablet libraries with `cargo`,

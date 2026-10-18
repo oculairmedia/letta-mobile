@@ -1,5 +1,7 @@
 # Design decision: editorial prose for chat
 
+> Source audit, 2026-10-18: The accepted Android typography values (bodyMedium 14/24, bodyLarge 16/26) and shared 8/24 message-spacing tokens are implemented. Serif remains a design proposal. Current `SharedMarkdownText` lets Android bind the richer renderer while desktop/web use the common renderer, so the historical Android markdown-padding recipe does not prove identical renderer behavior on every host.
+
 **Status:** proposed (token-level changes ready; serif body deferred for review)
 **Date:** June 2026
 **Scope:** `letta-mobile` chat reading surface only — the assistant/user prose
@@ -8,8 +10,9 @@ cards, A2UI surfaces, app chrome, or the desktop target.
 
 ## Why this doc exists
 
-`docs/DESIGN_SYSTEM.md` is the regeneratable spec — it captures *what* the
-tokens are. It does not capture *why*. This doc holds the intent behind a set
+`docs/DESIGN_SYSTEM.md` is a historical extracted token snapshot. Current token
+values live in Kotlin; design authority is documented by root `DESIGN.md` and
+`docs/design-sync-with-penpot.md`. This doc holds the intent behind a set
 of chat-typography token changes so the next person (or the Penpot review)
 understands the direction, not just the values.
 

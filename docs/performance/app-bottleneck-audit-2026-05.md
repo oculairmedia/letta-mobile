@@ -1,5 +1,7 @@
 # App performance bottleneck audit — 2026-05
 
+> Source audit, 2026-10-18: May audit snapshot. `bot` is not an included production module; current chat orchestration is under feature-chat, projection under sharedLogic, and shared rendering under sharedUI. The suggested extraction work and file names below are historical, not a fresh bottleneck measurement. See [pinch policy](chat-pinch-zoom.md) for its current implementation.
+
 This audit separates perceived slowness into server/network latency, client-side data loading, Compose rendering, and unnecessary repeated work. It is a pragmatic follow-up list, not a benchmark report; use the performance gate and JankStats docs for measured release tracking.
 
 ## Summary

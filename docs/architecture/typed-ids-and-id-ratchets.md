@@ -1,6 +1,6 @@
 # Typed ids and the id ratchets
 
-**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+**Status:** Current ID/ratchet reference; source-audited 2026-10-18. Counts in the introduction describe the initial scan.
 
 Bead: letta-mobile-by4vm.23. Ids in `sharedLogic` are still mostly raw `String`s. On main, when
 this note was written, the scan counted 1,842 raw `*Id: String` parameters across 462 files, plus
@@ -22,7 +22,7 @@ code should take the `com.letta.mobile.data.model` types. Merging the two sets i
 
 ## Adding a typed id
 
-1. Add a value class to `DomainIds.kt` in the existing style:
+1. Add a value class to `DomainIds.kt` in the existing style. The example below chooses blank rejection; existing IDs do not all reject blanks (`AgentId` currently permits them, while `RunId` rejects them):
 
    ```kotlin
    @JvmInline

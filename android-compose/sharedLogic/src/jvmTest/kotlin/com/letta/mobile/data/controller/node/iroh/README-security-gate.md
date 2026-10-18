@@ -3,7 +3,7 @@
 `IrohSecurityGateTest` is the consolidated, hermetic, adversarial regression
 suite for the Iroh auth/authz layer. It is **required for merge**: it lives in
 `:sharedLogic:jvmTest`, which the `shared-multiplatform` CI job runs via
-`./gradlew :sharedLogic:allTests` (see `.github/workflows/android.yml`), and
+`./gradlew :sharedLogic:jvmTest` (see `.github/workflows/android.yml`), and
 `shared-multiplatform` is a branch-protection required check.
 
 ## Coverage (threat matrix)

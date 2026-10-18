@@ -1,9 +1,8 @@
 # :avatar:core
 
-Renderer-independent avatar runtime core (commonMain only). This is the ONLY
-avatar module the app is allowed to depend on — renderer adapters (rive-android
-on Android, the native Rive bridge on desktop) implement these contracts and
-are wired in at the platform edge.
+Renderer-independent avatar runtime core (commonMain only). Portable avatar policy depends on this contract module. Platform hosts also
+depend on `:avatar:renderer-rive` to bind rendering (see `app/build.gradle.kts`);
+renderer internals stay at those platform edges.
 
 ## Design rules
 

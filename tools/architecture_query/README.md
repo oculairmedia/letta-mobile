@@ -36,3 +36,7 @@ The importer accepts common field aliases but keeps the source object in each ro
 ```bash
 python3 -m unittest discover -s tools/architecture_query/tests -v
 ```
+
+On Windows, the reserved-path regression fixture currently creates a directory containing
+`?`, which Windows rejects before exercising SQLite. The audit run had 9 passing tests
+and this one fixture error; it did not establish a fully green Windows suite.

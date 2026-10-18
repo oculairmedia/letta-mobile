@@ -1,6 +1,12 @@
 # Letta Code file/shell tools on Android access layers
 
-**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+**Status:** Historical design-only tool mapping (2026-05-02); proposed aliases are not an advertisement inventory.
+
+## Code audit — 2026-10-18
+
+This document itself scoped the bead as a mapping deliverable. The current advertised device facade is [DeviceActionExternalTool.NAME = device_action](../../android-compose/app/src/main/java/com/letta/mobile/runtime/actions/DeviceActionExternalTool.kt), with its command catalog handled by Android services. [SystemAccessCapabilityDefinitions](../../android-compose/app/src/main/java/com/letta/mobile/platform/systemaccess/SystemAccessCapabilityDefinitions.kt) owns capability IDs and [the registry](../../android-compose/app/src/main/java/com/letta/mobile/platform/systemaccess/SystemAccessCapabilityRegistry.kt) resolves/denies access. The tables below propose `android_app_file_*`, `android_root_*` and shell aliases; they must not be used as a list of tools a current agent can call. Discover current commands through `device_action` and inspect the runner rather than assuming an April/May alias landed. The shared App Server external-tool registry and host registration replaced the old Bot tool-sync design.
+
+## Original record
 
 **Date:** 2026-05-02
 

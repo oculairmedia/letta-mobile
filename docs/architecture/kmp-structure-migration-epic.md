@@ -1,6 +1,13 @@
 # Epic: KMP project structure migration
 
-**Status:** in progress (Phase 0–5q merged; Phase 6a entrypoint docs accepted)  
+**Status:** Historical migration sequence; implemented portions and remaining proposals must be read against the source map.
+
+## Code audit — 2026-10-18
+
+The original problem table is no longer a current inventory: `:core:domain` and sharedLogic's old Compose-UI source sets are absent; [sharedUI](../../android-compose/sharedUI/build.gradle.kts) serves Android/JVM/wasm. Repository caching/transport logic such as `CachedAgentRepository` and `CachedAllConversationsRepository` is shared; Android retains storage/session adapters and a remaining per-agent ConversationRepository. App paths remain `app/`, `desktop/`, `web/` in [settings](../../android-compose/settings.gradle.kts); the proposed `apps/*` move did not happen. Do not rerun the Beads import block as new work or treat phase labels as current tracker state. The `allTests` CI command below is historical: current required shared-multiplatform runs JVM tests plus native/wasm compiles, while browser tests are a separate workflow. See [current module map](kmp-module-map.md) and [CI workflow](../../.github/workflows/android.yml).
+
+## Original record
+
 **Priority:** P2  
 **Labels:** `kmp`, `architecture`, `migration`  
 **Related docs:**

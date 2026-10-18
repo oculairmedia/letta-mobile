@@ -8,7 +8,7 @@ into this repo (they change upstream and would go stale), so fetch on demand.
 ## The two things worth knowing
 
 **1. There is a machine-readable index.** `https://docs.letta.com/llms.txt`
-(~21KB) lists every page with a one-line description. Read it first when you do
+lists authored pages with a one-line description. Read it first when you do
 not already know which page you need.
 
 **2. Every page has a canonical markdown version.** Append `/index.md` to any
@@ -32,7 +32,7 @@ Any of these work; use whichever your harness supports:
 
 ```bash
 curl -s https://docs.letta.com/llms.txt | less
-curl -s https://docs.letta.com/platform/app-server/protocol-lifecycle/index.md
+curl -s https://docs.letta.com/self-hosting/app-server/protocol-lifecycle/index.md
 ```
 
 Claude Code and similar harnesses can use `WebFetch` on the same URLs. If you
@@ -40,15 +40,19 @@ have no network access at all, say so rather than guessing at Letta semantics.
 
 ## Page map (most relevant to this repo first)
 
+Checked against [the live index](https://docs.letta.com/llms.txt) on 2026-10-18.
+Upstream has moved App Server pages from `platform/app-server` to
+`self-hosting/app-server`; use the index to resolve future moves.
+
 Paths below are slugs — prefix with `https://docs.letta.com/` and suffix with
 `/index.md`.
 
 **App Server — the protocol this client speaks**
-- `platform/app-server` — overview
-- `platform/app-server/protocol-lifecycle` — connection, turns, frame lifecycle
-- `platform/app-server/external-tools` — external tool-call round trip
-- `platform/app-server/integration-patterns`
-- `platform/app-server/quickstart`
+- `self-hosting/app-server` — overview
+- `self-hosting/app-server/protocol-lifecycle` — connection, turns, frame lifecycle
+- `self-hosting/app-server/external-tools` — external tool-call round trip
+- `self-hosting/app-server/integration-patterns`
+- `self-hosting/app-server/quickstart`
 
 **Core concepts behind what our UI renders**
 - `concepts/memfs` — the memory filesystem behind core-memory blocks
@@ -56,7 +60,7 @@ Paths below are slugs — prefix with `https://docs.letta.com/` and suffix with
 - `concepts/stateful-agents`
 - `configuration/memory` — memory blocks
 - `configuration/skills`, `configuration/schedules`, `configuration/subagents`
-- `configuration/channels` (+ `channels/{custom,discord,signal,slack,telegram,whatsapp}`)
+- `self-hosting/channels/{custom,discord,signal,slack,telegram,whatsapp}`
 - `configuration/models`, `configuration/permissions`, `configuration/secrets`, `configuration/mods`
 
 **CLI / harness**
@@ -65,7 +69,7 @@ Paths below are slugs — prefix with `https://docs.letta.com/` and suffix with
 
 **SDK**
 - `agent-sdk`, `agent-sdk/quickstart`, `agent-sdk/reference`
-- `agent-sdk/remote-client`, `agent-sdk/remote-client/self-hosted`, `agent-sdk/deployment`
+- `agent-sdk/remote-client`, `agent-sdk/remote-client/reference`, `agent-sdk/sessions`
 
 **Reference**
 - `reference/changelog` — pin behavior to a version; useful when our pinned

@@ -1,8 +1,15 @@
 # KMP Best-Practices Migration Plan
 
+**Status:** Historical draft (created 2026-05-25); sequence and baseline descriptions are superseded by the implemented module graph.
+
+## Code audit — 2026-10-18
+
+The proposed split is implemented: [settings](../../android-compose/settings.gradle.kts) includes sharedLogic/sharedUI, `core:ids`, `core:runtime`, Android data and three runnable hosts. [sharedUI/build.gradle.kts](../../android-compose/sharedUI/build.gradle.kts) now declares Android/JVM/wasmJs, and [sharedLogic/build.gradle.kts](../../android-compose/sharedLogic/build.gradle.kts) separates portable contracts from JVM/Android integrations. The proposal's “optional shared UI later” phase is no longer the product direction; all product pages belong in sharedUI. Its placeholder-local-runtime/Koog sequence is also obsolete: the embedded App Server host is implemented. `ConversationStateHolder` references describe removed code; canonical storage/presentation now live in the shared timeline package. Use [kmp-module-map](kmp-module-map.md), [embedded integration](embed-letta-code-integration.md) and the current architecture tests for changes. The long-form third-party guidance and proposed APIs below remain the rationale of the original draft, not claims of current versions or completed phases.
+
+## Original record
+
 > **Status note (2026-10-13, letta-mobile-by4vm.34):** these files named below are no longer in the tree (deleted in the hard cut, or proposed and never landed): `ConversationStateHolder.kt`. Read references to them as historical; current code is the source of truth.
 
-Status: draft architecture plan
 Created: 2026-05-25
 Tracking bead: `letta-mobile-45eyc`
 

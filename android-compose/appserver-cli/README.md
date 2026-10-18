@@ -15,7 +15,7 @@ $env:JAVA_HOME="C:\Users\Emmanuel\.cache\jdk26-temurin\jdk-26.0.1+8"
 ```
 
 The zip is written under `appserver-cli/build/distributions/`. Unzip it and run
-`bin/meridian-app-server` or `bin/meridian-app-server.bat` with Java 17 or newer.
+`bin/meridian-app-server` or `bin/meridian-app-server.bat` with Java 21 or newer (the module targets JVM 21).
 
 ## Commands
 

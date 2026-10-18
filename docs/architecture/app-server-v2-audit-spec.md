@@ -1,6 +1,18 @@
 # App Server v2 and Meridian State Audit Specification
 
-Status: implemented-system snapshot for audit
+**Status:** Historical system audit and migration rationale; 2026-07-29 baseline and later appendices are not the current wire inventory.
+
+## Code audit — 2026-10-18
+
+The July baseline/hashes below are historical. Current [contract matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json) pins **0.34.14**, captured 2026-10-16, with 104 upstream commands and 113 messages; its full corpus includes 24 declaration files. Use its recorded hashes and [installed inventory](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json), not the old three-file corpus/hash in this record. This checks the captured package, not a remote host's current installation.
+
+The current [ownership matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json) has **130** operations: 57 App Server, 28 controller-native, 17 capability-gated unsupported, 10 plugin-host, 9 read-only local-backend-store and 9 VibeSync. There are 105 `none` and 25 `deny_fail_closed` fallback rows, zero shim fallbacks. `IrohAdminOwnershipMatrixTest` compares registered methods with the matrix; its constants are not a substitute for inspecting the handlers.
+
+Two old normative claims were reversed by implementation: read-only backend-file access is deliberately supported by [LocalBackendAdminStore](../../android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/LocalBackendAdminStore.kt), and workspace/secrets now have explicit [WorkspaceAdminHandlers](../../android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/WorkspaceAdminHandlers.kt) with capability checks. “No reads or writes” and “secrets are not exposed by generic Iroh admin routing” below are superseded migration requirements, not current facts. Writes must still go through the adopted owner rather than editing backend files.
+
+Source routing is [AdminRpcRegistry](../../android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/AdminRpcRegistry.kt), current runtime policy is `AppServerTurnEngine` and `data/context`, and deployment commands are in [the current deployment guide](app-server-controller-deploy.md). Production SHAs/addresses, operational completion, old gaps and evidence counts below apply to the dated record only.
+
+## Original record
 
 Snapshot date: 2026-07-29
 

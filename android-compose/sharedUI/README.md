@@ -1,17 +1,21 @@
 # `:sharedUI`
 
-Compose Multiplatform UI shared by Android and Desktop (wasm later).
+Compose Multiplatform UI shared by Android, desktop and browser (wasmJs).
 
-**Charter:** Composables, shared chat chrome (markdown/bubbles), A2UI renderer,
-and LettaIcons live here. Do **not** put transport, repositories, turn engines,
-or projection/reducers here — those stay in `:sharedLogic`.
+**Charter:** shared pages, shell, chat rows and composer, A2UI, canvas, mascot UI,
+icons and rendering belong here. Transport, repositories, turn engines and portable
+projection/reducers belong in `:sharedLogic`.
 
-**Depends on:** `:sharedLogic` (and Compose Multiplatform).
+**Targets:** Android, JVM and wasmJs, declared in `build.gradle.kts`. `skikoMain`
+shares rendering actuals between JVM and wasmJs.
 
-**Consumers:** `:designsystem` (`api`), `:feature-chat`, `:desktop`. `:app` receives shared UI
-transitively via designsystem.
+**Project dependencies:** commonMain exposes `:sharedLogic`, `:avatar:core` and
+`:drawbox`; skikoMain exposes `:avatar:renderer-rive`. JVM tests use
+`:sharedUI-devfixtures`. Third-party Compose/rendering dependencies are listed in
+the build script.
 
-**Kept in `:sharedLogic`:** chat timeline projector/presenter, streaming text
-smoother core, tool-display registries, and commonMain projection / token types.
+**Consumers:** `:designsystem`, `:feature-chat`, `:desktop`, `:web` and
+`:plugin-view`; Android `:app` receives the shared UI through its dependencies.
+New product UI goes here; platform modules bind navigation, lifecycle and services.
 
-See `docs/architecture/kmp-structure-migration-epic.md` Phase 3.
+See the root `AGENTS.md` ownership rule and `docs/architecture/kmp-module-map.md`.

@@ -32,7 +32,12 @@ Use semantic `MaterialTheme.typography` roles. Headlines use `headline*`, screen
 
 ## 4. Spacing & Layout
 
-Spacing follows a 4 dp base grid. Common values are 4, 8, 12, 16, 20, 24, and 32 dp. Compact web layouts use one content pane and top navigation; expanded web layouts reserve the 56 dp agent rail (`LettaDimens.Pane.railWidth`, widening to `railExpandedWidth`, 248 dp, when `ShellAgentRail` shows names) plus a 231 dp sidebar (`WideNavigationWidth` in `web/.../LettaWebApp.kt`). `LettaDimens.Pane.navWidth` (220 dp) is a settings page's left navigation column, not the shell sidebar. Chat messages and the composer remain constrained to 760 dp (`ChatColumnMaxWidth`) while the shell fills the viewport. Dimension constants live in `sharedUI/src/commonMain/.../theme/LettaDimens.kt`; keep this document and that file in agreement rather than restating values only here.
+Spacing follows a 4 dp base grid. Common values are 4, 8, 12, 16, 20, 24, and 32 dp.
+Shared dimensions live in `android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/theme/LettaDimens.kt`:
+`Pane.railWidth` is 56 dp, `railExpandedWidth` is 248 dp, and `navWidth` is 220 dp.
+The shared shell owns adaptive pane composition; do not derive it from the old web-only
+`WideNavigationWidth` constant, which is no longer present. `ChatColumnMaxWidth` in
+`sharedUI/.../ui/chat/ChatLayout.kt` constrains message/composer content to 760 dp.
 
 ## 5. Components
 
@@ -48,8 +53,8 @@ Spacing follows a 4 dp base grid. Common values are 4, 8, 12, 16, 20, 24, and 32
 
 ### Chat composer
 - **Structure**: centered 760 dp tonal input surface, multiline field, compact context controls, semantic send button, and desktop shortcut hint row.
-- **States**: disabled while unconfigured, connecting, loading history, or running a turn.
-- **Accessibility**: the disabled state follows the same truth as the connection label.
+- **States**: input acceptance comes from `ChatComposerUiState.acceptsInput`; sending requires a payload and `canSend`, or streaming with `canQueueWhileStreaming`. An active run can accept a queued draft. During streaming the action is Stop when cancellation is pending, queuing is unavailable, or the draft has no payload; otherwise it is Send (see `ComposerPolicy.kt`).
+- **Accessibility**: disabled input and action state follow the owner-provided composer capabilities; connection text alone is not the send policy.
 
 ### Chat messages
 - **User prompt**: full-width, quietly outlined `surfaceContainerLow` card within the readable column.

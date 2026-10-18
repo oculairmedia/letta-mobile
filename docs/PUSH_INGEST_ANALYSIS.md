@@ -1,5 +1,7 @@
 # Push Ingest Analysis (letta-mobile-o5zmj)
 
+> Source audit, 2026-10-18: Historical diagnosis of the pre-observer WS/shim path. Current Iroh observer ingestion is covered by `IrohObserverIngestionTest`; the assertion below that conversation-scoped push does not exist is not a description of the current implementation. Use the [two-client probe](iroh-two-client-live-sync-probe.md) for current transport acceptance.
+
 ## Summary
 
 Server-pushed messages from **out-of-band sources** (other agents, cron jobs, shim relays) do NOT update open conversation timelines. Users only see these messages after navigating away and back, forcing a timeline rehydration.

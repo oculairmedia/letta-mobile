@@ -18,6 +18,12 @@ Use `evidence/` for captured observations, `testing/` for validation procedures,
 [plan/](../plan/) holds historical planning; [poc/](../poc/) holds experimental code,
 not production modules. Existing historical filenames are retained unless misleading.
 
+## Source audit
+
+The [2026-10-18 audit](reference/documentation-audit-2026-10-18.md) covers every tracked
+Markdown input and links a per-file source/evidence ledger, including unverified historical
+and live claims. A passing freshness script is structural validation, not a full semantic audit.
+
 ## Documents
 
 ### General

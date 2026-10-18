@@ -1,6 +1,13 @@
 # Message Sync Architecture Migration Plan
 
-**Status:** Historical migration proposal (2026-04-16); POC validated on 2026-04-17.
+**Status:** Historical migration proposal (2026-04-16), with 2026-04-17 completion notes.
+
+## Code audit — 2026-10-18
+
+The POC validation report exists and the extracted timeline/reducers now live in [sharedLogic/data/timeline](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/timeline/). The proposed `core/src/.../sync` location and REST/SSE send choreography are historical. Current sends use shared `ChatSendCoordinator` and App Server turn execution; Android's canonical ledger/presentation is bound by `AndroidCanonicalTimelineRuntime`. See [current ingestion rules](external-transport-timeline-rules.md) and [boundary suites](chat-boundary-regression-harness.md). The original rollback/feature-flag proposal should not be treated as an available current switch; the document's own completion notes record that no runtime USE_TIMELINE_SYNC flag was used.
+
+## Original record
+
 See [validation results](poc-validation-results.md); this is not the current transport contract.
 **Date:** 2026-04-16
 **Author:** Huly - letta-mobile agent + Emmanuel

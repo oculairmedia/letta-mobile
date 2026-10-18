@@ -1,5 +1,13 @@
 # Handoff: Multi-Tool-Call Message Duplication Bug
 
+**Status:** Historical Android investigation/handoff; source-audited 2026-10-18.
+The `app/.../chat` paths and line numbers below predate the module/shared UI cuts.
+Current product rendering is in `android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/`
+and `ui/markdown/StreamingMarkdownDocument.kt`; Android host code is in `feature-chat/`.
+The captured device address, working-tree state, bead status and unmerged hypotheses
+are session evidence, not current deployment or implementation guarantees.
+Do not reintroduce the old SSE/client-mode pipeline or apply these snippets verbatim.
+
 **Bead**: `letta-mobile-3fnm` (P1, OPEN)
 **Date**: 2026-05-04
 **Device**: Pixel 9 Pro at 192.168.50.235:5555

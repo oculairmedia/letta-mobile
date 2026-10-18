@@ -1,6 +1,6 @@
 # Shared-module layering ratchet
 
-**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+**Status:** Current ratchet reference; source-audited 2026-10-18 against `SharedLayeringTest`, `KotlinSourcePolicy` and the architecture task filters.
 
 Bead: `letta-mobile-by4vm.27`. Gate: `SharedLayeringTest` in `android-compose/architecture-tests`,
 run by `./gradlew :architecture-tests:architectureTest` inside the required CI `test` job.
@@ -24,8 +24,7 @@ Both baselines only shrink. The test fails when:
 
 `KotlinSourcePolicy.productionScope` also now covers every non-test source set, not just the
 ones named `*Main`: sharedLogic `jvmAndAndroid`, every Android/JVM `main`, the app's
-`debug`/`release`/`root`/`play`/`sideload` sets and desktop `phonePlayground`. None of them
-broke a rule when they were added, so that check has no baseline.
+`debug`/`release`/`root`/`play`/`sideload` sets and desktop `phonePlayground`. That source-scope check has no baseline; vendored `drawbox` and generated paths are excluded by `KotlinSourcePolicy`. The cycle scan uses the explicitly listed source sets in the table, while the sharedLogic UI-package scan enumerates its non-test source sets.
 
 ## Shrinking a baseline
 

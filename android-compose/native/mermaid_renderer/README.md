@@ -1,44 +1,23 @@
-# Letta Mobile Mermaid Native Renderer Spike
+# Native Mermaid renderer
 
-This crate is the Android JNI spike for replacing Mermaid WebView rendering with
-an in-process Rust renderer.
+Rust renderer used through JNI by Android's `MermaidNativeBridge` and
+`MermaidDiagram` in `designsystem`. It renders Mermaid DSL to SVG in process;
+`src/lib.rs` applies Material theme colors and contrast adjustments. It no longer
+ignores the theme arguments.
 
-## What it does
+When the native library cannot load or rendering fails, the Android component
+shows `MermaidErrorFallback` with the source/error. There is no WebView fallback
+in the current component. Successful SVGs are displayed with Coil's SVG decoder.
 
-- accepts Mermaid DSL from Kotlin
-- renders SVG via `mermaid-rs-renderer`
-- returns SVG markup back through JNI
-- lets the Android UI display that SVG without a WebView
-
-## Current spike shape
-
-- `MermaidNativeBridge` in `designsystem` tries to load `libletta_mermaid_renderer.so`
-- when the native library is absent, the app silently falls back to the existing
-  WebView path
-- when the native library is present and returns SVG, `MermaidDiagram` renders it
-  as an image instead of using WebView
-
-## Build for Android
-
-From this directory:
+From this directory, a manual Android build is:
 
 ```bash
 cargo install cargo-ndk
 cargo ndk -t arm64-v8a -t armeabi-v7a -o ../../designsystem/src/main/jniLibs build --release
 ```
 
-That should produce:
-
-```text
-android-compose/designsystem/src/main/jniLibs/
-  arm64-v8a/libletta_mermaid_renderer.so
-  armeabi-v7a/libletta_mermaid_renderer.so
-```
-
-Once those files exist, the Android app will prefer the native SVG path.
-
-## Notes
-
-- this spike intentionally uses manual JNI to keep the first pass small
-- the Rust bridge currently ignores theme color arguments; it proves the render
-  path first, then we can improve theming and parity later
+This emits `libletta_mermaid_renderer.so` per ABI under the design-system
+`src/main/jniLibs` directory. The checked-in Kotlin loader uses the library name
+`letta_mermaid_renderer`; Android NDK, Rust targets and a compatible toolchain
+must be installed. This documentation audit inspected the Rust and Kotlin code;
+it did not rebuild native binaries or verify rendering on a device.

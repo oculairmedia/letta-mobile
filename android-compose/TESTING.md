@@ -8,7 +8,13 @@ The Android test suite is split into explicit tiers so local runs stay fast and 
 | --- | --- | --- | --- |
 | Unit | `@Tag("unit")` | Pure JVM logic, parsers, mappers, serializers, helper functions | `./gradlew :module:testUnit --max-workers=1` |
 | Integration | `@Tag("integration")` | Robolectric, Compose-backed tests, Android runtime setup, ViewModel wiring | `./gradlew :module:testIntegration --max-workers=1` |
-| Screenshot | `@Tag("screenshot")` | Paparazzi or Roborazzi visual regression tests | `./gradlew :module:testScreenshot --max-workers=1` |
+| Screenshot | Module-specific selection (see below) | Roborazzi visual regression tests | `./gradlew :module:testScreenshot --max-workers=1` |
+
+The tier aliases are declared in `app`, `feature-chat`, `designsystem` and
+`core:android-data` build scripts; they are not universal Gradle tasks. In `app`,
+`testScreenshot` uses JUnit Vintage and the `*ScreenshotTest` name filter, allowing
+no matching tests. The feature and design-system screenshot aliases filter the
+`screenshot` tag. A green alias alone therefore does not prove screenshots ran.
 
 `check` and each module's default debug unit-test task still run the full suite. In the app module, use `testRootDebugUnitTest` as the full-featured local default because the Play flavor intentionally disables privileged feature gates. The tiered tasks are additive filters for faster local verification and CI splitting.
 
@@ -28,11 +34,8 @@ Run these from `android-compose/`.
 ./gradlew :app:testIntegration --max-workers=1
 ./gradlew :app:testScreenshot --max-workers=1
 
-./gradlew :core:testUnit --max-workers=1
-./gradlew :core:testIntegration --max-workers=1
-
-./gradlew :bot:testUnit --max-workers=1
-./gradlew :bot:testIntegration --max-workers=1
+./gradlew :core:android-data:testUnit --max-workers=1
+./gradlew :core:android-data:testIntegration --max-workers=1
 
 ./gradlew :designsystem:testUnit --max-workers=1
 ./gradlew :designsystem:testIntegration --max-workers=1

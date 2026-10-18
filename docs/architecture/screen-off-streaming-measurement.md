@@ -1,6 +1,14 @@
 # Screen-Off Streaming Measurement Protocol
 
-**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+**Status:** Reusable device experiment with historical SSE-specific setup; use corrected prerequisites below.
+
+## Code audit — 2026-10-18
+
+Retain the scenario matrix and timestamp discipline, but instrument the actual current session channel. [ChatPushService](../../android-compose/app/src/main/java/com/letta/mobile/channel/ChatPushService.kt) no longer warms legacy timeline subscribers: missing `warmup.*` or `TimelineSync.streamSubscriber.opened` is not by itself failure. Its actual service events include `created`/`foregrounded`, `startCommand`, `destroyed`, `startForeground.failed` and start failures; [ChatPushAlarmScheduler](../../android-compose/app/src/main/java/com/letta/mobile/channel/ChatPushAlarmScheduler.kt) emits recovery scheduling/firing diagnostics and uses a 15-minute inexact alarm. Battery exemption is read through `BatteryOptimizationHelper`.
+
+For each run, record commit/APK flavor, runtime pin, transport (Iroh/direct/local), selected backend/agent/conversation, notification permission, foreground promotion result, exemption, remote trigger timestamp, first actual device receive/notification time and reopen/catch-up time separately. Exercise screen-on baseline, 5/15/30-minute screen-off idle, Wi-Fi/mobile data and safe recovery, both optimized and exempt. Compare observed active-channel reconnect/liveness telemetry rather than requiring removed SSE/REST or “client mode” paths. Treat the old specific event list and the `0d30f0ab` baseline below as historical instrumentation examples, not required present-day signals. No results were captured during this source audit.
+
+## Original record
 
 **Date:** 2026-05-02  
 **Bead:** `letta-mobile-jmzq.9`  

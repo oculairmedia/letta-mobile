@@ -1,8 +1,15 @@
 # Progressive Composer Affordances: Design & Migration Plan
 
+**Status:** Historical design (2026-06-11); shared composer and autocomplete have since shipped under different APIs.
+
+## Code audit — 2026-10-18
+
+The live composer is [ChatComposerPanel](../../android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/composer/ChatComposerPanel.kt), rendering shared session composer state/actions with touch and desktop layouts, queued sends, attachments and model/context/working-directory controls. [ComposerAutocomplete](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/composer/ComposerAutocomplete.kt) implements slash/mention token detection and replacement; [ComposerAutocompleteViews](../../android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/composer/ComposerAutocompleteViews.kt) owns shared rendering. Tests include `ComposerAutocompleteTest`, `ComposerAgentMentionUiTest` and `ChatComposerPanelUiTest`. The proposed Android-only dropdowns/provider classes in the old file map are not missing tasks to recreate: the implementation follows the shared-first boundary. Acceptance checkboxes below are the original design's criteria, not current completion status.
+
+## Original record
+
 > **Status note (2026-10-13, letta-mobile-by4vm.34):** these files named below are no longer in the tree (deleted in the hard cut, or proposed and never landed): `SlashCommandProvider.kt`, `MentionProvider.kt`, `PromptTemplateProvider.kt`, `SlashCommandAutoComplete.kt`, `MentionAutoComplete.kt`, `ChatComposer.kt`, `SlashDropdown.kt`, `MentionDropdown.kt`, `ComposerModelBadge.kt`. Read references to them as historical; current code is the source of truth.
 
-**Status:** Historical draft design spec (2026-06-11); baseline names and proposed APIs below are not a current implementation map.
 
 The current shared composer is [ChatComposerPanel](../../android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/composer/ChatComposerPanel.kt).
 References to `ChatComposer` below describe the original baseline or proposed work.

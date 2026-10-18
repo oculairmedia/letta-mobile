@@ -9,7 +9,7 @@ Lane C issue `letta-mobile-o7ob.3.4` extends the existing debug-only JankStats m
 - Release sessions are sampled at `1%` by default via `@string/sentry_jankstats_sample_rate`.
 - When a sampled session sees a janky frame above the 16ms frame budget, the monitor:
   - records a `Telemetry.event(tag="Jank", name="frame.sampled")`
-  - attaches bounded jank measurements to the active Sentry span / transaction
+  - attaches bounded jank measurements to the active Sentry transaction
 
 ## Sampling math
 
@@ -23,7 +23,7 @@ This keeps overhead low while still building up enough field evidence to spot re
 
 ## Sentry measurements emitted
 
-For each active span / transaction, the monitor maintains aggregated jank measurements:
+For each active transaction, the monitor maintains aggregated jank measurements:
 
 - `jank_frame_count`
 - `jank_frame_max_ms`
@@ -31,7 +31,7 @@ For each active span / transaction, the monitor maintains aggregated jank measur
 - `jank_frame_over_budget_ms`
 - `jank_frame_last_ms`
 
-To keep measurement cardinality bounded, only the first five janky frames on a given active span get per-frame detail keys:
+To keep measurement cardinality bounded, only the first five janky frames on a given active transaction get per-frame detail keys:
 
 - `jank_frame_1_ms`
 - `jank_frame_2_ms`
@@ -39,7 +39,7 @@ To keep measurement cardinality bounded, only the first five janky frames on a g
 - `jank_frame_4_ms`
 - `jank_frame_5_ms`
 
-If no active Sentry span exists when a janky frame arrives, the monitor still emits the local telemetry event but skips Sentry attachment.
+If no active Sentry transaction exists when a janky frame arrives, the monitor still emits the local telemetry event but skips Sentry attachment.
 
 ## Increasing the rate for targeted investigations
 

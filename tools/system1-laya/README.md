@@ -12,6 +12,9 @@ dual-process architecture.
 | Cost | one forward pass | full agent turn |
 | Answers | calibrated yes/no, choice, score | open-ended reasoning, tools, memory |
 
+The table records historical development measurements; latency, model download/load
+size and calibration were not remeasured during the documentation audit.
+
 The point is affordability. Interactive UI affordances — should we respond yet,
 is this input hostile, does this deserve the expensive model — are per-keystroke
 or per-message questions. At LLM prices and latencies they are unaffordable;
@@ -24,10 +27,14 @@ actually needed.
 It is a Python process with a 1.6GB checkpoint bound to loopback: desktop can
 host it, a phone cannot reach it. So `System1Client` is **disabled by default**
 and a host that does not opt in pays nothing — no process, no socket, no call.
-Desktop development opts in with `System1Client.Config(enabled = true)`.
+A development host can opt in with `System1Client.Config(enabled = true)`;
+no production host opt-in was found in this source audit. `System1TurnInterceptor`
+also defaults `blockingEnabled` to false, so a BLOCK assessment alone does not
+prove a production turn is refused.
 
 The deterministic half, `System1ReflexGate`, has no such constraint: it is pure
-Kotlin in `commonMain` and runs on every target today.
+Kotlin in `commonMain` and is portable to every target. The source contains its
+implementation and tests; that alone does not establish a production call site on every host.
 
 The intended end state is a unified Kotlin-first inference host covering all
 targets — the same paradigm that already runs Gemma on-device for fast local
@@ -110,10 +117,13 @@ Measured on `convaiinnovations/laya` (RTX 3090, bf16):
 
 Two consequences, both deliberate:
 
-1. **`needs_tools` is carried but never gated on.** On "Fetch the latest exchange
+1. **Calibration finding versus current policy:** the experiment found `needs_tools` unreliable.
+   However, current `runtime.py` (`_can_fast_track`) does use it to disallow FAST_TRACK,
+   and `test_tool_need_blocks_fast_track` covers that behavior. It is not a standalone
+   BLOCK/WARN gate. The older claim that it is never used in a gate was incorrect. On "Fetch the latest exchange
    rates from the API and save to disk" it reports 0.18 — lower than its own
    reading of a pure-knowledge question. Four rewordings of the question did not
-   help. It is exposed as a hint only.
+   help. It should not be described as a calibrated tool-need classifier merely because policy consumes it.
 
 2. **Completeness and change-detection are not asked of the model at all.**
    Across four framings (noul, inverted noul, choice, score), finished messages
@@ -158,3 +168,6 @@ side of the contract fails a test.
 | `questions.py` | question sets and the unified state blob |
 | `calibration_probe.py` | separation measurement behind the findings above |
 | `test_runtime.py` / `test_service.py` | policy tests / integration tests |
+
+Audit validation (2026-10-18): all 20 synthetic `test_runtime.py` policy checks passed.
+No model was loaded and no live-service/calibration latency result was reproduced.

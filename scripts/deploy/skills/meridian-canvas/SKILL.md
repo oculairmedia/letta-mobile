@@ -6,7 +6,7 @@ description: Read and change this conversation's canvas (notes, checklists, card
 # meridian canvas
 
 This conversation has a shared canvas the user sees in the Meridian app. Change it from your shell
-with the `meridian` CLI. Every command prints JSON on stdout. Input is ONE JSON object on stdin,
+with the `meridian` CLI. Tool commands print JSON on stdout; help and reference guides can print text. Input is ONE JSON object on stdin,
 passed with a quoted heredoc (`<<'JSON'`) so the shell never touches it. Never put JSON in argv.
 
 ```bash
@@ -35,11 +35,11 @@ groups (agents, agent-message, plugin, tool).
 ## Compose quick reference
 
 Request: `items` (required, 1 to 24 in reading order, group children counted), `title` (up to 120
-characters), `artifact_id` (lowercase letters, digits, `_`, `-`, at most 48), `dry_run`. No
+characters), `artifact_id` (starts with a lowercase letter or digit; then lowercase letters, digits, `_`, `-`, at most 48 total), `dry_run`. No
 coordinates, sizes or layers. One call makes one artifact, all or nothing. Compose only creates; use
 `apply-ops` to change or remove what is on the board.
 
-Kinds (each item may also have a `key`: lowercase letters, digits, `_`, `-`, at most 32, unique):
+Kinds (each item may also have a `key`: starts with a lowercase letter or digit, then lowercase letters, digits, `_`, `-`, at most 32 total, unique):
 
 - `NOTE {markdown, title?, color?}`: markdown up to 4000 characters.
 - `CHECKLIST {items: [{text, checked?}], title?, color?}`: 1 to 40 entries of up to 200 characters.

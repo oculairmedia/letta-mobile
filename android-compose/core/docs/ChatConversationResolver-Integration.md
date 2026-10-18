@@ -1,10 +1,16 @@
 # ChatConversationResolver Integration Guide
 
+**Status:** Historical proposal; not the current integration contract (audited 2026-10-18).
+`ChatConversationResolver` no longer exists in production source. Current conversation
+selection is coordinated by the `feature-chat` presentation stack and portable
+`sharedLogic` chat sessions. The snippets and checklist below describe the old
+proposal, not edits to apply to today’s ViewModel.
+
 ## Overview
 
 `ChatConversationResolver` extracts the conversation resolution logic from `AdminChatViewModel` into a reusable, testable component. This document describes how to integrate it into the ViewModel.
 
-## Current State (AdminChatViewModel)
+## Historical state (superseded)
 
 The ViewModel currently performs conversation resolution inline in its `init` block (~lines 140-240):
 

@@ -1,5 +1,7 @@
 # Letta Desktop reference: gap analysis for our client
 
+> Source audit, 2026-10-18: Comparison snapshot from 2026-10-08. Its Fnn gap list is not a current missing-feature inventory: shared `ConversationBranchController`, stream-integrity monitoring and the workspace relay are implemented. The [handoffs](../README.md#handoff) explain individual slices; current source and tests determine implementation, and `bd` determines remaining issue state. The external Electron binary and its private installation were not re-inspected in this repository audit.
+
 Date: 2026-10-08. Status: analysis. Implementation is tracked by the beads epic
 "Letta Desktop reference parity (client experience)", `letta-mobile-bzvro`. Function
 Fnn is child bead `letta-mobile-bzvro.nn`; for example, F07 is `letta-mobile-bzvro.7`.

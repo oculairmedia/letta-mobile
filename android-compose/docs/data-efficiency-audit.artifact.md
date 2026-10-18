@@ -1,5 +1,11 @@
 # Data-Efficiency Audit — LettaMobile Android
 
+**Status:** Historical audit snapshot, not a current backlog or runtime contract.
+The 2026-10-18 source audit found that its REST-era `core/data` paths and
+`LocalImageContextStripper` references have been removed. Counts and VALID labels
+below apply to the August snapshot only; remeasure against current `sharedLogic`
+App Server/Iroh sources before proposing a fix.
+
 **Date:** 2026-08-12 (Validated & Updated)
 **Scope:** `C:/letta-mobile/android-compose`
 **Stacks reviewed:** Ktor `HttpClient` (REST), App Server WebSocket transport, Room cache, repositories, background sync warmup paths.

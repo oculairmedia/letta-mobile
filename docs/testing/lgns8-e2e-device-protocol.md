@@ -1,5 +1,7 @@
 # lgns8 App Server v2 — On-Device End-to-End Acceptance Protocol
 
+> Source audit, 2026-10-18: Protocol written for the July train. For a new run record the actual APK package/build SHA (current debug builds use `com.letta.mobile.dev`), desktop/wrapper SHA and runtime pin, rather than the dated package/preconditions below. The two-client CLI probe covers transport sync; interactive steps still require separate device evidence. Recovery timings below are acceptance expectations, not a new measured guarantee.
+
 Feeds the lgns8.10 acceptance gate; closes the device-evidence gaps held open on
 lgns8.19 and noted across the epic. Every step names its evidence artifact.
 

@@ -1,5 +1,13 @@
 # Meridian Canvas Workspace: Phase P3.1 Live Iroh Sync Smoke Runbook
 
+**Status:** Historical Phase P3.1 direct-peer procedure. Current production
+canvas clients follow the authenticated App Server host through `IrohCanvasClient`
+and `IrohCanvasRelay`; see the adjacent README. The direct-peer APIs remain useful
+for transport investigation, but this is not the current application pairing flow.
+`LettaDatabase` is now schema 25; documents are owned by
+`NotebookCanvasDocumentStore` over `NotebookLocalStore`, not a second Room/JSON
+snapshot copy. Storage and schema values below describe the original phase.
+
 This runbook documents the multi-process live synchronization and peer presence verification for Phase P3.1 of the Meridian Canvas Workspace program.
 
 ---

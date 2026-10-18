@@ -1,7 +1,8 @@
 # letta-mobile-cli
 
 Headless CLI for driving Letta Mobile transport and timeline code paths without
-using a device. It is tracked by `letta-mobile-q9t4t`.
+using a device. Its legacy REST/replay commands remain diagnostic tools; production
+chat uses App Server/Iroh. It is tracked by `letta-mobile-q9t4t`.
 
 The CLI covers:
 
@@ -57,7 +58,7 @@ the headless reducer. Assertions are opt-in so recordings can be inspected even
 when they are intentionally bad fixtures.
 
 ```powershell
-.\gradlew.bat :cli:run -PcliArgs="replay --recording ..\core\src\test\resources\replay\ka770-duplicate-assistant.jsonl --conversation conv-ka770 --assert-no-dups --assert-otid-unique --assert-seq-monotonic"
+.\gradlew.bat :cli:run -PcliArgs="replay --recording core\android-data\src\test\resources\replay\ka770-duplicate-assistant.jsonl --conversation conv-ka770 --assert-no-dups --assert-otid-unique --assert-seq-monotonic"
 ```
 
 Mixed REST/WS hydration fixtures can include REST snapshot lines alongside

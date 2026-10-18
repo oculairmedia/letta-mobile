@@ -1,6 +1,12 @@
 # Letta Code-style Android host tools
 
-**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+**Status:** Historical pre-embedded-runtime design; LocalBotSession/BotToolRegistry path is superseded.
+
+## Code audit — 2026-10-18
+
+`LocalBotSession`, `BotToolRegistry`, `BotToolSync` and `LettaRuntimeClient` below describe the former architecture, not the current dispatch loop. Android now starts a stock App Server using [LibnodeAppServerLauncher](../../android-compose/app/src/main/java/com/letta/mobile/runtime/local/LibnodeAppServerLauncher.kt) under shared `LocalAppServerHost`; [DeviceActionExternalTool](../../android-compose/app/src/main/java/com/letta/mobile/runtime/actions/DeviceActionExternalTool.kt) supplies the `device_action` external tool. Device calls execute through the app's command runner; the HTTP bridge carries fetch/DNS, not device-tool routes. See [embedded integration](embed-letta-code-integration.md) and [current bridge comparison](mobile-embedded-bridge-vs-desktop.md). Keep new portable tool/registry logic in sharedLogic, Android hardware bindings in app, and shared approval/product UI in sharedUI rather than following the old Android-per-tool UI plan.
+
+## Original record
 
 **Date:** 2026-05-02  
 **Bead:** `letta-mobile-ifd7.1`  

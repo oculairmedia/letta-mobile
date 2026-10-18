@@ -2,7 +2,9 @@
 
 The Local runtime runs letta-code's App Server inside the app (`files/embedded-lettacode/`). Its
 agents, conversations and agent memory live in `files/embedded-lettacode/local-backend/`, which an
-app reinstall does not reset (only Room is).
+in-place APK update preserves. Uninstall/reinstall can remove app-private data;
+backup/restore policy may restore it. Do not treat uninstall as a safe way to keep
+local agent history.
 
 ## Model ids (letta-mobile-by4vm.121.1)
 

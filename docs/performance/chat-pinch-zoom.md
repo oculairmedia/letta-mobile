@@ -4,13 +4,13 @@
 
 Chat pinch-to-zoom is intentionally **visual-realtime, layout-deferred**.
 
-While the user's fingers are down, `ChatMessageList` updates a transient scale
+While the user's fingers are down, `TimelinePinchScale` updates a transient scale
 and applies it to the message list through `Modifier.graphicsLayer`. That keeps
 the gesture on the compositor path: no chat-wide text recomposition, markdown
 reparse, LazyColumn remeasure, or tool-output relayout on every pointer frame.
 
 When the user lifts, the gesture commits one snapped `fontScale` value through
-`onActiveFontScaleChange` and persists the setting through `onFontScaleChange`.
+`ChatActions.setFontScale`; the owning session/host persists that setting.
 That is the only true typography/layout reflow in the current interaction.
 
 <!-- live-path: android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/timeline/TimelinePinchZoom.kt -->
@@ -20,9 +20,6 @@ Current shared implementation (repository-relative paths):
 
 - `android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/timeline/TimelinePinchZoom.kt`
 - `android-compose/sharedUI/src/jvmTest/kotlin/com/letta/mobile/ui/chat/surface/timeline/TimelinePinchPreviewUiTest.kt`
-
-The callback names above describe the original Android implementation; the shared
-implementation commits through `ChatActions.setFontScale`.
 
 ## Why not raw realtime text reflow
 

@@ -1,6 +1,8 @@
 # App Performance Score History
 
 Quarterly review log for the official Android App Performance Score rubric.
+The entry and its due date below are historical Q2 evidence, not an October score;
+source audits cannot refresh measured startup/rendering scores.
 Run the review, record the score, and file any uncovered gaps as beads under
 `letta-mobile-o7ob`.
 
@@ -122,7 +124,7 @@ Dynamic rubric areas used here:
 - `docs/observability/sentry-anr-crash-budget.md`
 - `android-compose/perf/baselines.json`
 - `android-compose/baselineprofile/build.gradle.kts`
-- `android-compose/baselineprofile/src/androidTest/java/com/letta/mobile/baselineprofile/BaselineProfileGenerator.kt`
+- `android-compose/baselineprofile/src/main/java/com/letta/mobile/baselineprofile/BaselineProfileGenerator.kt`
 - `android-compose/app/build.gradle.kts`
 - `android-compose/app/src/main/java/com/letta/mobile/LettaApplication.kt`
 - `android-compose/app/src/main/java/com/letta/mobile/performance/ProductionJankStatsMonitor.kt`

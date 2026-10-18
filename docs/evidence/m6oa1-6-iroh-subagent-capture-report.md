@@ -1,5 +1,7 @@
 # m6oa1.6 Iroh Subagent Capture Report
 
+> Source audit, 2026-10-18: Preserved capture from 0.29.12; current runtime pins are newer. Its populated-snapshot failure is a historical observation, not a newly reproduced current defect. For recompiling today use `:cli:compileKotlin` (plain JVM), replacing the historical `:cli:compileDebugKotlin` command below. The committed JSONL retains capture provenance; live execution has not been repeated.
+
 ## Result
 
 A real isolated synchronous `Agent` dispatch was captured on 2026-08-31 using Node v24.18.0, `@letta-ai/letta-code` 0.29.12, the repository Iroh wrapper, and a fresh local backend. The child ran successfully and returned `AGENT_TOOL_CAPTURED`; the controller persisted the lifecycle as `CONTROLLER_NATIVE`/`COMPLETED`. The client-facing stream nevertheless failed after the populated native snapshot reached the controller because a `JsonArray` was read as a `JsonPrimitive`. This is a production-shape finding, not a fixture result.

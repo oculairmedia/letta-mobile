@@ -1,6 +1,12 @@
 # KMP Extraction Snapshot — 2026-06-06
 
-**Status:** Historical snapshot of 2026-06-06; paths and migration phases below describe that date. See [current module layout](../../README.md#module-layout).
+**Status:** Historical snapshot of 2026-06-06; implementation and target decisions below apply to that date.
+
+## Code audit — 2026-10-18
+
+The snapshot correctly remains dated. Its platform-specific desktop UI decision was later superseded by sharedUI; its `:core` paths, Android-owned protocol/repository list and stub-local-runtime assumptions do not describe the current tree. [settings](../../android-compose/settings.gradle.kts) now declares `:core:android-data`, sharedUI and web; [sharedUI's build](../../android-compose/sharedUI/build.gradle.kts) targets Android/JVM/wasmJs; `LocalAppServerHost` and the libnode launcher implement local execution. Use [current module map](kmp-module-map.md) and [embedded integration](embed-letta-code-integration.md). Historical source/path lists and branch-specific observations are preserved, not silently rewritten as if they existed in June.
+
+## Original record
 
 Last updated: 2026-06-06 on branch `codex/windows-chat-ui-decision`.
 

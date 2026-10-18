@@ -1,17 +1,17 @@
 # Release automation bootstrap
 
-Debug-only bootstrap for hands-off release verification.
+Debug and benchmark bootstrap for release verification. Shipping release builds reject imports.
 
-The app ships a debug-only importer that reads a one-shot credential payload
+The app ships a debug/benchmark automation importer that reads a one-shot credential payload
 from a plaintext staging preference, writes it into the normal encrypted
-`SettingsRepository` flow, and immediately clears the staging key. Release
+`SettingsRepository` flow, and immediately clears the staging key. Shipping release
 builds reject staged payloads, clear the staging key, and emit telemetry
 instead of importing credentials.
 
 ## Preconditions
 
 - A connected adb device or emulator.
-- A **debug** install of the app (`run-as` must work for `com.letta.mobile`).
+- A **debug** install of the app (`run-as` must work for the selected package, normally `com.letta.mobile.dev`).
 - A disposable non-production Letta identity.
 - Credentials exported in the shell environment — never in committed files,
   PR bodies, or commit messages.
@@ -23,7 +23,7 @@ The supported interface is environment variables:
 - `AUTOMATION_SERVER_URL` (or fallback `LETTA_SERVER_URL`)
 - `AUTOMATION_ACCESS_TOKEN` (or fallback `LETTA_TOKEN`)
 - optional `AUTOMATION_CONFIG_ID` (defaults to `automation-auth`)
-- optional `AUTOMATION_MODE` (`CLOUD` or `SELF_HOSTED`)
+- optional `AUTOMATION_MODE` (`SELF_HOSTED` or `LOCAL`)
 - optional `ANDROID_SERIAL` for multi-device setups
 - optional `APP_PACKAGE` / `APP_COMPONENT` if the install target changes
 
@@ -50,12 +50,14 @@ release gates:
 
 ```bash
 cd android-compose
-./gradlew :app:installDebug
+./gradlew :app:installRootDebug
 
 cd ..
 export AUTOMATION_SERVER_URL="iroh://<endpoint id>@<host>:<port>"
 export AUTOMATION_ACCESS_TOKEN="<disposable-token>"
-scripts/release/inject-automation-creds.sh
+APP_PACKAGE=com.letta.mobile.dev \
+  APP_COMPONENT=com.letta.mobile.dev/com.letta.mobile.MainActivity \
+  scripts/release/inject-automation-creds.sh
 ```
 
 What the script does:
@@ -143,8 +145,7 @@ orchestrator even though the standalone gate still enforces 6/6 HEALTHY.
 
 ## Safety model
 
-- Debug only: the importer implementation exists only under
-  `android-compose/app/src/debug`.
+- Debug uses `android-compose/app/src/debug`; benchmark uses the release-source implementation with `AutomationImportGate` enabled only for that non-shipping build type. Shipping release rejects imports.
 - Debug-only cleartext override: `android-compose/app/src/debug/res/xml/network_security_config.xml`
   allows disposable self-hosted LAN endpoints such as `http://192.168.x.x` for
   automation runs. Release builds still use the main network security config and

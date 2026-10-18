@@ -1,6 +1,12 @@
 # Android System Access Capability Matrix
 
-**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+**Status:** Historical capability proposal (2026-05-02); target checkmarks are not a shipped-feature inventory.
+
+## Code audit — 2026-10-18
+
+The three distribution flavors do exist in [app/build.gradle.kts](../../android-compose/app/build.gradle.kts). The current availability authority is [SystemAccessCapabilityDefinitions](../../android-compose/app/src/main/java/com/letta/mobile/platform/systemaccess/SystemAccessCapabilityDefinitions.kt), resolved by [DefaultSystemAccessCapabilityRegistry](../../android-compose/app/src/main/java/com/letta/mobile/platform/systemaccess/SystemAccessCapabilityRegistry.kt) against platform probes. The registry explicitly models unsupported, policy-gated and documentation-only capabilities and can deny tool access; a checkmark below is an intended target, not proof a backend or consent UI exists. Current model-facing device dispatch is [DeviceActionExternalTool](../../android-compose/app/src/main/java/com/letta/mobile/runtime/actions/DeviceActionExternalTool.kt) over the device command runner, not the removed LocalBotSession/BotToolRegistry loop. The proposed per-execution approval/audit expansion and external-manager policy discussion are design history, not a current certification or blanket availability claim.
+
+## Original record
 
 **Date:** 2026-05-02  
 **Bead:** `letta-mobile-n3x7`  

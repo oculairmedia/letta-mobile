@@ -1,5 +1,7 @@
 # LCP wire v1: the canvas plugin protocol
 
+> Source audit, 2026-10-18: The wire contract includes process and service framing; that does not mean both are hosted today. `PluginDriverHost` currently launches only process runtimes with empty `PluginSecrets`; `host.readElements` remains refused in v1. The concrete [trust model](plugin-trust-model.md) describes the implemented host subset.
+
 The protocol a `process` plugin (any language, a subprocess of the host) and a `service` plugin (a
 WebSocket server the host connects to) speak with the Letta host. It mirrors the Kotlin SPI of
 `:plugin-api` one to one (`CanvasPlugin` / `PluginHost`), so a plugin behaves the same whatever its

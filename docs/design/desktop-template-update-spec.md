@@ -1,5 +1,7 @@
 # Desktop App — Design-Template Update Spec
 
+> Source audit, 2026-10-18: June template translation, not the current feature-completion ledger. Cool-slate defaults are implemented in sharedLogic `ThemeTokens.kt`; `CustomColors.kt` now lives in sharedUI. Legacy `DesktopChatSurface.kt` has been removed; sharedUI chat rows and surface own current chat. Use the [module map](../architecture/kmp-module-map.md) and current source before resuming a phase.
+
 Date: 2026-06-21 (updated 2026-06-23 — re-applied after the U: drive reverted earlier edits: palette retune, Phases 4–8, scheduling feature, component inventory)
 Owner of execution: Claude Code (local, can run Gradle)
 Design source of truth: Penpot file "letta mobile", page **App Mockups v2** (mobile chat chrome, agent affordances, tokens). This spec translates that template into the `:desktop` Compose target.
@@ -8,7 +10,7 @@ Design source of truth: Penpot file "letta mobile", page **App Mockups v2** (mob
 > ```
 > cd android-compose
 > export JAVA_HOME=/path/to/jdk-26
-> ./gradlew --no-daemon :desktop:compileKotlinJvm   # or the desktop run task
+> ./gradlew --no-daemon :desktop:compileKotlin   # or the desktop run task
 > ./gradlew --no-daemon :designsystem:compileDebugKotlin :sharedLogic:compileKotlinMetadata
 > ```
 > Follow CLAUDE.md: track work with **bd** (not TodoWrite), run quality gates, and complete the session-close push protocol.

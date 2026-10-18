@@ -1,8 +1,10 @@
 # Android Project Work API Contract
 
-**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+**Status:** Historical external-service contract; production Android Project Work route is absent after the REST hard cut.
 
-Android uses the Vibe Sync Project / Beads Work API as the canonical project-work source for native project workspace screens.
+The endpoints below describe the intended Vibe Sync / Beads Work service contract, not a currently wired Android HTTP client. [ProjectWorkRepository](../../android-compose/core/android-data/src/main/java/com/letta/mobile/data/repository/ProjectWorkRepository.kt) defaults to `RemoteRoute.Absent(SessionRoute.PROJECT_WORK)` and states that no App Server backend serves this surface yet. Shared [CachedProjectWorkRepository](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/CachedProjectWorkRepository.kt) retains caching/mutation logic over an injected `ProjectWorkRemoteSource`; fake-source tests exercise that seam. Existing DTOs and tests do not establish live endpoint availability.
+
+The Iroh wrapper's `project.*` catalog is a separate bounded VibeSync integration; it does not wire the absent Project Work issue-mutation source. The ETag/idempotency/service guarantees below are the original external contract and were not live-verified in this audit.
 
 ## Canonical endpoints
 
@@ -51,9 +53,4 @@ The current Android data contract lives in:
 - ~~`ProjectApi.kt`~~, ~~`ProjectWorkApi.kt`~~ — removed with the Letta REST backend in the hard cut (letta-mobile-ckmub); no REST client remains
 - `android-compose/core/android-data/src/main/java/com/letta/mobile/data/repository/ProjectWorkRepository.kt`
 
-Focused coverage lives in:
-
-- `ProjectApiTest`
-- `ProjectWorkApiTest`
-- `ProjectRepositoryTest`
-- `ProjectWorkRepositoryTest`
+Current focused coverage includes `ProjectWorkRepositoryTest` and `SessionScopedProjectWorkRepositoryTest` under [Android data tests](../../android-compose/core/android-data/src/test/java/com/letta/mobile/data/). The former REST API tests/classes named by the original design are removed.

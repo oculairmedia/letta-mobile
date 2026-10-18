@@ -6,7 +6,8 @@ parity). Proven by the native desktop spike, letta-mobile-0s5bi (`native/desktop
 
 The model is the Grokbot one: a user picks a **shape** and a **colour** for each agent, and the
 character's **face** is driven by the app. Shape and colour are identity and never change on their
-own; the face is state and never persists. One `.riv`, one artboard, three inputs.
+own; the face is state and never persists. One `.riv`, one root artboard and a typed view-model contract (the table below,
+not the original three-input brief).
 
 ## 0. The v4 rig (current) - see `rive/mascot/README.md`
 
@@ -73,8 +74,8 @@ table to that list. Writer: `host` the app, `both` the app and the file's own po
 `AvatarState` keys, in order: `idle listening thinking waitingInput speaking error sleeping
 loading failed degraded working dreaming`. `working` (tool execution) and `dreaming`
 (sleep-time compute, distinct from quiet-hours `sleeping`) are new with letta-mobile-te3n1.5;
-`RiveAvatarContract.stateKey` still maps `WORKING` to `thinking` until the Kotlin side adopts
-them (the renderer is outside te3n1.5). Every new trigger is a one-shot on the `React` layer that
+`RiveAvatarContract.stateKey` maps `WORKING` to `working` and `DREAMING` to
+`dreaming`; `AvatarDirector` and `MascotPresenceSignals` supply those states. Every new trigger is a one-shot on the `React` layer that
 starts and ends at rest; with `reduceMotion` on, each plays one blink instead (`ReactCalm`).
 `impact` and `trickId` are read when `land` / `trick` fires, so write them first.
 
@@ -151,9 +152,14 @@ runtime's generated headers rather than guessed: opacity 18, colorValue 37, x/y 
 scaleX/Y 16/17, rotation 15, Rectangle corner radii 31/161/162/163 (link 164), Polygon points
 125 / cornerRadius 126, view-model colour value 555.
 
-## 2. Rollout: the mascot as the agent avatar everywhere (epic letta-mobile-wbin4; P2 = letta-mobile-24gbf, P4 = letta-mobile-jwntc)
+## 2. Historical rollout plan: the mascot as the agent avatar everywhere (epic letta-mobile-wbin4; P2 = letta-mobile-24gbf, P4 = letta-mobile-jwntc)
 
-What exists today (feat/kh094-mascot-identity-art):
+This section records the `feat/kh094-mascot-identity-art` rollout snapshot.
+Its TODOs and phase estimates are historical, not current completion claims.
+Current implementation: `AvatarDirector` / `GazeDirector` in avatar/core,
+`RiveAvatarContract` in renderer-rive, sharedUI `ui/mascot`, and platform host bindings.
+
+What existed at that snapshot:
 
 - The rig: v4 plate design with the human-touch art, entries with a blink shutter, facing +
   lean + arc + recede on turns, mass curves, breath with inflate and light, saccade layer,

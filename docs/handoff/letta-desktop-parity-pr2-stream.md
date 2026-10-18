@@ -1,5 +1,7 @@
 # Handoff: PR-2 stream integrity and live status (F06–F10)
 
+> Source audit, 2026-10-18: Historical PR-2 handoff. Its direct-socket-only limitation is superseded: the Iroh host now restamps `event_seq` per viewer and advertises the ordered-sequence capability, so clients can enable gap detection there. `EventSeqGapDetector` and `StreamIntegrityMonitor` are the current contract. Recorded test/branch state below belongs to the handoff.
+
 Branch `feat/letta-desktop-parity-stream` (off `origin/main` 6a1875771). Epic `letta-mobile-bzvro`,
 beads `letta-mobile-bzvro.6`–`.10` (claimed, in progress). Design: `docs/design/letta-desktop-reference-gap-analysis.md`
 (on PR #1810 branch `origin/docs/letta-desktop-gap-analysis`), §5 class B and §7.

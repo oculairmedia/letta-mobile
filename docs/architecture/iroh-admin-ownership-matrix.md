@@ -1,6 +1,14 @@
 # Iroh Admin RPC Ownership Matrix (lgns8.13)
 
-**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+**Status:** Historical migration decisions with later amendments; machine matrix and handlers define current ownership.
+
+## Code audit — 2026-10-18
+
+The current [machine matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json) declares **130** operations, not the 90 claimed by the old introduction or the 73-row original table. Owners are 57 `app_server_v2`, 28 `controller_native`, 17 `capability_gated_unsupported`, 10 `plugin_host`, 9 `local_backend_store`, 9 `vibesync_service`; no operation currently has a shim fallback. `AdminRpcRegistry.buildRouter` registers the actual handlers and `IrohAdminOwnershipMatrixTest` ratchets their parity.
+
+Current [WorkspaceAdminHandlers](../../android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/WorkspaceAdminHandlers.kt) includes explicit MemFS/files/secrets relay; the early fail-closed-secrets text below predates that adoption. [LocalBackendAdminStore](../../android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/LocalBackendAdminStore.kt) is the implemented read-only tier; its scope now exceeds the original six methods. The wrapper's [AppServerServeIrohCommand](../../android-compose/iroh-wrapper-cli/src/main/kotlin/com/letta/mobile/cli/commands/AppServerServeIrohCommand.kt) restores channels without the removed `--channels-host` opt-in. Preserve July skill/channel live observations as dated evidence; do not infer today's deployed upstream watcher behavior from them. The original table and issue-slice sequence below are history.
+
+## Original record
 
 Date: 2026-07-22
 
@@ -10,7 +18,7 @@ Beads: `letta-mobile-lgns8.13`
 > state ownership, cache invalidation, and audit procedure, start with
 > [App Server v2 and Meridian State Audit Specification](app-server-v2-audit-spec.md).
 > The machine-readable ownership matrix remains authoritative for the currently
-> registered method set (**90 methods**; owner/fallback counts in that doc and
+> registered method set (**90 methods at the time of that amendment**; historical owner/fallback counts in that doc and
 > `iroh-admin-ownership-matrix.json`). Counts below are historical (2026-07-22)
 > and must not be treated as current.
 

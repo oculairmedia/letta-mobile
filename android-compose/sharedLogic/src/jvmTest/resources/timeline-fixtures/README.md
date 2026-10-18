@@ -1,14 +1,19 @@
 # Timeline Fixtures
 
-This directory contains real captured wire frames for `FixtureReplayTest`. These allow us to test the `reduceStreamFrame` and `mergeServerMessages` logic against actual data that hit the device.
+This directory contains real captured wire frames for `FixtureReplayTest`. These allow us to test the `reduceStreamFrame` logic against actual data that hit the device.
 
 ## How to capture new fixtures
 
 You can capture new fixtures using `app-server-iroh-probe`:
 
 ```bash
-app-server-iroh-probe --dump-frames > raw_capture.jsonl
+./gradlew :cli:run --args="app-server-iroh-probe --backend <iroh-ticket> --dump-frames raw_capture.jsonl"
 ```
+
+The probe takes a file path for `--dump-frames`; stdout is not a fixture stream.
+Prepare the expectation header manually and ensure each following line decodes as
+`LettaMessage`, as `FixtureReplayTest.runFixture` requires. The test does not
+consume arbitrary transport envelopes or exercise history merging.
 
 ## Fixture Format (.jsonl)
 

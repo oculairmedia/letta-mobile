@@ -1,10 +1,19 @@
 # Screen-Off Streaming: Architecture Findings
 
+**Status:** Historical findings (2026-05-01); SSE-era service/transport inventory is superseded.
+
+## Code audit — 2026-10-18
+
+The service no longer warms legacy `TimelineRepository` loops or listens to their ingestion. [ChatPushService](../../android-compose/app/src/main/java/com/letta/mobile/channel/ChatPushService.kt) keeps the process/session channel and approval watcher alive with a lifecycle-owned scope; its KDoc explicitly identifies the canonical Android ledger as current. Notifications arrive from heartbeat/reply sources. `LocalBotSession`/REST client/SSE durability analysis below is not a current service dependency map.
+
+[ChatPushAlarmScheduler](../../android-compose/app/src/main/java/com/letta/mobile/channel/ChatPushAlarmScheduler.kt) implements a 15-minute inexact recovery alarm, and [BatteryOptimizationHelper](../../android-compose/app/src/main/java/com/letta/mobile/platform/BatteryOptimizationHelper.kt) implements exemption status/settings intents. These are actual code paths, not outstanding missing features. The original “what works today / missing” sections are scoped to May. No device run in this audit proves screen-off latency or delivery; use [the measurement protocol](screen-off-streaming-measurement.md) against the current channel and record real timestamps.
+
+## Original record
+
 > **Status note (2026-10-13, letta-mobile-by4vm.34):** these files named below are no longer in the tree (deleted in the hard cut, or proposed and never landed): `LettaApiClient.kt`. Read references to them as historical; current code is the source of truth.
 
 **Date:** 2026-05-01
 **Scope:** Why incoming messages may stop arriving when the device screen is off, and what the current architecture does (and does not) do to keep SSE/WebSocket subscribers alive.
-**Status:** Historical findings. Several remediation items below have since shipped (heartbeat parsing/watchdog, OkHttp ping interval, battery optimization exemption UI, and inexact alarm service recovery). Use [`screen-off-streaming-measurement.md`](screen-off-streaming-measurement.md) for the current validation protocol before making a wake-lock product decision.
 
 ---
 

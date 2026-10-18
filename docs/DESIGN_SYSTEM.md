@@ -1,5 +1,7 @@
 # Letta Design System Reference (extracted from code)
 
+> Source audit, 2026-10-18: The palette table below preserves the older grey snapshot: current `LettaColorTokens` uses dark surface `#13161B`, background `#0B0D11` and on-surface `#E6E9EF`. `LettaSpacingTokens` and sharedUI `LettaDimens` are distinct token APIs; do not substitute their short names without checking values.
+
 **Status:** Historical token snapshot; values and paths below may predate the shared UI migration.
 
 Design direction and policy: [DESIGN.md](../DESIGN.md) and [AGENTS.md](../AGENTS.md).

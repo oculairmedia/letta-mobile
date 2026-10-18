@@ -1,5 +1,7 @@
 # lgns8.10 acceptance evidence ledger
 
+> Source audit, 2026-10-18: Historical acceptance ledger as of 2026-08-01. PROVEN-LIVE describes observations on that date, not the current host. Current runtime pin is in `letta-code-runtime.properties`; do not promote old pending rows or infer current bead state from this snapshot. No live host/device evidence was re-captured in the documentation audit.
+
 Date: **2026-08-01** · Bead: `letta-mobile-lgns8.10` (shim-off parity,
 failure-injection, and multi-client acceptance gate) · Consumers:
 `letta-mobile-lgns8.11` (production cutover), `letta-mobile-eaczz.10` (device

@@ -1,5 +1,7 @@
 # UI cleanup & token adherence — handoff
 
+> Source audit, 2026-10-18: The numerical inventory and completion state below are a handoff snapshot, not a current lint run. The reusable `LettaSearch`/`LettaDimens` source remains the implementation reference; regenerate the worklist with the linter before claiming a new file.
+
 Work brief for agents doing the alignment pass. Epic: `letta-mobile-hzddx`.
 
 Supersedes nothing; `docs/ui-alignment-fanout.md` is the same job written before

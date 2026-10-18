@@ -1,6 +1,14 @@
 # LettaShim Retirement Implementation and Deployment Runbook
 
-Status: handoff instructions for the implementation agent
+**Status:** Historical July/August implementation and rollout runbook; source-verified corrections below take precedence over old commands.
+
+## Code audit — 2026-10-18
+
+The packaged production wrapper remains `:iroh-wrapper-cli`; `:appserver-cli` is the separate App Server supervisor/probe artifact. [AppServerServeIrohCommand](../../android-compose/iroh-wrapper-cli/src/main/kotlin/com/letta/mobile/cli/commands/AppServerServeIrohCommand.kt) no longer exposes `--channels-host` or generic `--admin-base-url`; channel restoration is part of wrapper wiring. Use [the wrapper module](../../android-compose/iroh-wrapper-cli/), [deployment scripts/templates](../../scripts/deploy/) and [current deployment guide](app-server-controller-deploy.md) when constructing a new deployment.
+
+The original “no direct access to backend files” objective was narrowed: [LocalBackendAdminStore](../../android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/LocalBackendAdminStore.kt) deliberately reads the configured root and never writes it. The current ownership matrix has no `shim_until_cutover` fallback. App Server remains the durable writer for adopted native mutations. The old snapshots, SHAs, service environment, cron/channel cutover results and remaining-work rows are evidence of their recorded dates; this audit did not inspect that host or establish its present service state. Stop-before-start channel ownership remains a required operational concern when applying the old rollback procedure, but removed flags cannot be used to achieve it.
+
+## Original record
 
 Last reviewed: 2026-07-27
 

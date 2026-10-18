@@ -1,5 +1,7 @@
 # Canvas Plugin Platform: Architecture Plan (revision 2)
 
+> Source audit, 2026-10-18: Parts of this plan are implemented: process-plugin hosting, the LCP wire layer, trust checks, and the shared view bridge. The plan also describes future jar/service runtimes and settings/secrets flows; `PluginDriverHost` currently accepts process runtimes only and creates empty `PluginSecrets`. Use [wire reference](../reference/canvas-plugin-wire-v1.md), [view bridge](../reference/plugin-view-bridge-v1.md), and [trust model](../reference/plugin-trust-model.md) for implemented guarantees. Bead progress below is the original planning snapshot.
+
 Epic: letta-mobile-s416w. Date: 2026-10-02. Status: **plan, validated against origin/main f1c96bb0e; revised after Emmanuel's decisions of 2026-10-02 (recorded on the epic). Group A (beads .1–.5) is unchanged from revision 1 and is in progress.**
 
 Emmanuel's decisions that drive this revision:

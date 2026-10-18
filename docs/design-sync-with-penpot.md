@@ -1,6 +1,11 @@
 # Design sync with Penpot — plan & status
 
-**Status:** validated infrastructure; workflow authority corrected July 2026.
+**Status:** design workflow and historical external-infrastructure observations; workflow authority corrected July 2026.
+Repository audit 2026-10-18: `scripts/sync-design-tokens.py` and the proposed
+`docs/.design-snapshot.json` are absent. The push/pull/verify commands below are
+a proposed interface, not executable repository tooling. Historical statements
+about Penpot API access, empty catalogs and live files have not been rechecked
+against that external service.
 The self-hosted Penpot API, access-token authentication, MCP server, native token
 catalog, canonical `letta mobile` file, and Kotlin-to-DTCG export path are all
 working. The mature, component-driven **App Mockups v2** page is the visual and
@@ -15,7 +20,7 @@ The repo has a token-driven Compose implementation in Kotlin
 (`android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/theme/`)
 and a mature product design in the self-hosted Penpot file **`letta mobile`**.
 The canonical design page is **App Mockups v2** (`9ad9fa5c-d4f1-80b2-8008-321c1ee404a4`).
-`docs/DESIGN_SYSTEM.md` is the regeneratable code-side token reference; Penpot is
+`docs/DESIGN_SYSTEM.md` is a historical code-side token snapshot; Penpot is
 the authority for visual language, component composition, variants, screen
 states, responsive layout intent, and linked journeys.
 
@@ -236,7 +241,7 @@ tokens in Penpot. The pull/merge machinery in this doc is deferred.
 
 ## File plan (in this repo)
 
-Once unblocked, the sync script lands here:
+Proposed files (the script and snapshot are not present in the audited checkout):
 
 ```
 letta-mobile/
@@ -248,7 +253,7 @@ letta-mobile/
 │   └── .design-snapshot.json     # last-synced token values (gitignored? TBD)
 ```
 
-The script is invoked as:
+Proposed command interface (not runnable until the script is implemented):
 
 ```bash
 # Push: code → spec → penpot

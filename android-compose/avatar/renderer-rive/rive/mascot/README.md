@@ -489,10 +489,12 @@ calls the same class):**
 - Drag tilt: the file now leans on `moveX` / `moveY` (te3n1.5); the host has to write them.
 - The idle glance moves the plate, not the glyph (the root cannot key a nested node); the
   glyph-only glance belongs in the editor pass.
-- Wander is not gated during `speaking`/`sleeping`; decide if it should be.
-- Kotlin identity slice (`1zti3`): picker, persistence, chat-header hero.
-- `working` and `dreaming` exist in the file (te3n1.5); `RiveAvatarContract.stateKey` still
-  writes `thinking` for `WORKING` and nothing produces `dreaming` until the Kotlin side adopts them.
+- Review the `Wander` layer conditions in `rig/machine.py` before changing its
+  state policy; the layer table above describes its asleep and working behavior.
+- The former identity-slice TODO is implemented: sharedUI has `MascotPicker`,
+  `MascotIdentityRegistry` and host bindings; use their source for current integration.
+- `working` and `dreaming` exist in the file and are adopted by Kotlin:
+  `RiveAvatarContract.stateKey` maps both directly, and `AvatarDirector` arbitrates them.
 - Placeholder glyphs (dreaming, thinkingOpen, content, startled, dizzy, trick) wait for the art
   pass, te3n1.7 - the list is in ARTIST.md.
 - Bone shear: `bone_pose()` keys crown/base `x` with Node.x (13), which a RootBone ignores - the

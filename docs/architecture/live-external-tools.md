@@ -1,6 +1,6 @@
 # Live external tools and re-advertisement
 
-**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+**Status:** Implemented registry/re-advertisement reference with a historical 0.29.12 live spike; source-audited 2026-10-18.
 
 Bead `letta-mobile-s416w.27`. Plan: `docs/design/canvas-plugin-platform-plan.md` section 6.3, decision R2.
 
@@ -19,14 +19,14 @@ need tools that come and go while the host runs.
   and removed with `addSource` / `removeSource`. The merged set is computed on each read
   (`DynamicToolSet`, lock-free copy-on-write). Names stay unique: a source cannot shadow a fixed
   tool, and the first source to claim a name keeps it. `toolsChanged` emits the new advertised set
-  each time it really changes. It never emits for a registry that only has fixed tools.
+  each time it really changes. The initial current set is skipped; membership revisions and definition changes trigger re-advertisement. Fast A→B→A source publications can be conflated by StateFlow; this is not an event log.
 - **Re-advertisement**: `DefaultAppServerController` owns an `ExternalToolReadvertiser`. On
   `toolsChanged`, it waits for a 500 ms debounce and then re-issues `runtime_start` for every
   runtime in its cache, which holds both controller-started and engine-started runtimes. The frame
   carries the scope, the client info and the whole current tool set, with `recover_approvals` and
   `force_device_status` off and no `mode` or `cwd`. `toolAdvertisementState`
   (`ToolAdvertisementState(pending)`) is true from the change until every runtime has been sent the
-  new set.
+  new set. A failed response is logged and the previous advertisement may remain upstream; `pending=false` means the pass completed, not that every server update succeeded. There is no immediate retry loop: reconnect or a later change re-sends the set.
 - **Vanished tools**: an agent's in-flight turn still lists a tool whose source was just removed
   (see below). A call to it gets the matched `is_error` result `tool '<name>' is no longer
   available`. It never hangs, and the dispatcher's result cache is unaffected: a replay of an
@@ -35,13 +35,13 @@ need tools that come and go while the host runs.
 
 ## Spike: does the App Server accept re-advertisement? (R2)
 
-**Yes.** A repeated `runtime_start` for a live runtime replaces its external tools, and the agent
+**In the recorded 0.29.12 run, yes.** A repeated `runtime_start` for a live runtime replaces its external tools, and the agent
 sees the change from its next turn. The fallback ("tools change at the next runtime start") was not
 needed.
 
 ### Source
 
-The source below is letta-code 0.29.12 `letta.js`, the pinned desktop runtime.
+The source below was letta-code 0.29.12 `letta.js`, the desktop pin at the time of this spike. The current pin is in [letta-code-runtime.properties](../../android-compose/letta-code-runtime/letta-code-runtime.properties); the spike was not rerun by this documentation audit.
 
 - `handleRuntimeStartCommand` calls
   `registerRuntimeExternalTools(runtime, connectionId, runtimeScope, parsed.external_tools ?? [])`.
@@ -56,8 +56,9 @@ The source below is letta-code 0.29.12 `letta.js`, the pinned desktop runtime.
   unregistered**. Every `runtime_start` (initial, reconnect or re-advertisement) must therefore carry
   the full current set.
 - `applyRuntimeStartState` changes `mode` and `cwd` only when the fields are present. It clears
-  `skill_sources` when that field is absent. The controller never sends `skill_sources`, so the
-  re-issue keeps them as they were.
+  `skill_sources` when that field is absent, according to the original source notes. The
+  controller omits that field; therefore those notes cannot establish preservation of skill
+  sources. Revalidate the pinned upstream implementation before depending on that behavior.
 
 ### Live run
 

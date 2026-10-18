@@ -97,7 +97,7 @@ Local quality: run `bash scripts/tests/ci-policy-scripts-test.sh`, then `bash sc
   - **Must-be-shared (never duplicate per platform):** repositories, view-state reducers, data mappers, formatters, caching/TTL/error-flow, request shaping.
   - **Anti-pattern to reject in review:** a platform module re-implementing a `sharedLogic` interface (e.g. `IAgentRepository`) with its own logic. If you need a shared interface implemented, implement the platform-neutral core in `commonMain` and inject the platform bit (e.g. the Ktor `HttpClient` engine). Duplicated implementations across `desktop/` and `core/android-data`/`app/` WILL drift — that is the regression this rule prevents (audit 2026-06-13, beads `letta-mobile-mqzkc`/`8h463`).
   - The `shared-multiplatform` required check (`:sharedLogic:jvmTest` + hostNative/wasmJs compiles) backstops this; keep it green.
-- **All UI is shared (`sharedUI`); platform modules are containers.** (Hard cut `letta-mobile-ckmub`, gate `letta-mobile-ckmub.7`; enforced for new files since `letta-mobile-by4vm.32`, not yet a required check.) `desktop/`, `app/`, `feature-*`, `web/` may contain only window/activity hosts, nav hosts that map routes to `sharedUI` pages, the platform's container for `LettaHost` (popover window vs bottom sheet), DI, and platform services (renderers, camera, clipboard, file access, tray, installer). A new screen, row, dialog, picker, sheet, header or settings card goes in `sharedUI/commonMain` and composes the shared primitives (`LettaPageScaffold`, `LettaHost`/`LettaPane`, `ShellHeader`, `RosterList`/`ListRow`, `LettaPicker`, `InspectorPane`, `SettingsSection`, `OverlayHost`, `SharedDocument`). Platform rendering differences go in a `sharedUI` expect/actual or a `LettaHost` binding, not a platform-module composable.
+- **New product UI is shared (`sharedUI`); platform modules are containers.** (Hard cut `letta-mobile-ckmub`, gate `letta-mobile-ckmub.7`; enforced for new files since `letta-mobile-by4vm.32`, not yet a required check.) `desktop/`, `app/`, `feature-*`, `web/` may contain only window/activity hosts, nav hosts that map routes to `sharedUI` pages, the platform's container for `LettaHost` (popover window vs bottom sheet), DI, and platform services (renderers, camera, clipboard, file access, tray, installer). Existing allowlisted Android chat scaffold/drawer chrome in `feature-chat` remains; shared content flows through `SharedChatPage` to `ChatSurface`. A new screen, row, dialog, picker, sheet, header or settings card goes in `sharedUI/commonMain` and composes the shared primitives (`LettaPageScaffold`, `LettaHost`/`LettaPane`, `ShellHeader`, `RosterList`/`ListRow`, `LettaPicker`, `InspectorPane`, `SettingsSection`, `OverlayHost`, `SharedDocument`). Platform rendering differences go in a `sharedUI` expect/actual or a `LettaHost` binding, not a platform-module composable.
   - `scripts/ci/platform-ui-gate.sh` enforces this. **PUI001** (error, never overridable): a new `@Composable` file under those trees fails unless it is listed in `scripts/ci/platform-ui-allowlist.txt`. **PUI004** (error): adding or raising an allowlist line fails unless the PR body carries a `Platform-UI-Reason: <why>` line — that reviewed reason is the only way a new platform file gets in. **PUI002** (warning for now): an allowlisted legacy file grew beyond its recorded line count (+5). Copying an existing surface instead of composing the primitives is a review blocker. Run it locally with `bash scripts/ci/platform-ui-gate.sh --enforce --diff-base origin/main` (set `PLATFORM_UI_REASON=...` to mirror the PR-body reason); `--update` regenerates the allowlist (each cut slice deletes its lines); self-test: `bash scripts/tests/platform-ui-gate-test.sh`. CI job: `Platform UI gate` in `.github/workflows/agents-policy.yml` — runs with `--enforce`, goes red on PUI001/PUI004, but is not a required check.
   - Android pages are edge-to-edge: `LettaPageScaffold` owns insets; no page calls `systemBars`/`statusBars`/`navigationBars`/`ime` padding itself (agents-policy rule `PUI-INSETS`, planned, greps for those calls outside `sharedUI` scaffold).
 
@@ -332,7 +332,7 @@ bd close <id>
 
 - **Source of truth**: the git tag `vX.Y.Z`.
 - **`versionName`** = tag minus the `v` prefix (e.g. `v0.1.0` → `0.1.0`). Local / PR / untagged builds fall back to `git describe --tags --match 'v[0-9]*' --dirty` (e.g. `0.1.0-3-gab12cd-dirty`).
-- **`versionCode`** = `MAJOR * 10000 + MINOR * 100 + PATCH`. Examples: `0.1.0 → 100`, `1.2.3 → 10203`, `10.0.0 → 100000`. Suffixes (`-rc.1`, `-3-gab12cd`, `-dirty`) are stripped before the math, so `v0.2.0-rc.1` and `v0.2.0` produce the **same** `versionCode`. Tag the GA release separately to bump.
+- **`versionCode`** = `MAJOR * 10000 + MINOR * 100 + PATCH`. Examples: `0.1.0 → 100`, `1.2.3 → 10203`, `10.0.0 → 100000`. Suffixes (`-rc.1`, `-3-gab12cd`, `-dirty`) are stripped before the math, so `v0.2.0-rc.1` and `v0.2.0` produce the **same** `versionCode`. A matching GA tag retains that code; increment the numeric version to increase it.
 - **Override** (rare — for one-off builds): `./gradlew assembleRelease -PversionNameOverride=0.1.0-hotfix`.
 
 ### Cutting a release
@@ -349,7 +349,7 @@ The `.github/workflows/release.yml` workflow picks up the tag, builds the signed
 
 - **Never** edit `versionCode` or `versionName` in `build.gradle.kts`. Both lines are computed values; manual edits will be overwritten on the next build.
 - **Never** push a tag from the command line as part of a feature PR. Tags are cut from `main` after a PR merges, not from the feature branch.
-- **Pre-releases**: use a hyphen-suffixed tag (`v0.2.0-rc.1`) — `softprops/action-gh-release` auto-marks the GitHub Release as a pre-release based on the hyphen.
+- **Pre-releases**: use a hyphen-suffixed tag (`v0.2.0-rc.1`) — the release workflow does not explicitly set `prerelease`, so verify the published release flag.
 
 ## Material Design System Rules
 
@@ -381,8 +381,8 @@ before changing widget payloads, catalog IDs, bindings, or renderer dispatch.
   - optional FAB slot
   - standardized loading / error / empty / content states
 - Reuse existing design-system components instead of rebuilding screen structure per feature.
-- `AllToolsScreen`, `AgentListScreen`, and `McpScreen` are the current reference implementations for this shell pattern.
-- The first dedicated reusable scaffold adopters should be `letta-mobile-bz40.2.2` (project grid home screen) and `letta-mobile-bz40.2.6` (active agents dashboard), then back-port the extracted scaffold to older admin/list screens as they are touched.
+- Those Android admin screens were legacy references; use `LettaPageScaffold` and the shared shell pages in `sharedUI/commonMain` for current implementations.
+- The earlier bz40 migration sequence is historical; do not recreate removed REST admin screens to satisfy it.
 
 #### Compose migration policy
 
@@ -523,7 +523,7 @@ Do not duplicate these — use `MaterialTheme.customColors.warningContainerColor
 ### 8. Prefer in-repo patterns first
 
 - Before inventing a new UI pattern, search for an existing implementation in the repo and reuse/adapt it.
-- The `android-compose/designsystem` module is the canonical home for reusable UI foundations. Add new shared components there rather than creating per-screen one-offs.
+- New portable UI foundations belong in `android-compose/sharedUI/commonMain`; `android-compose/designsystem` retains Android-specific components and legacy adapters.
 - Current reusable foundations include `ActionSheet`, `ConfirmDialog`, `EmptyState`, `ErrorContent`, themed top-bar defaults, and the shared design-system theme layer.
 
 ### 9. Design-system direction issues
@@ -534,7 +534,9 @@ Do not duplicate these — use `MaterialTheme.customColors.warningContainerColor
 - `letta-mobile-ns9n` — Standardize selection and emphasis components
 - `letta-mobile-k8x0` — Introduce tertiary color role across app UI
 
-### 10. Current design-system migration checklist
+### 10. Historical Android design-system migration checklist
+
+This list predates the shared UI hard cut. Many named screens were removed; it is a record of earlier targets, not instructions to restore them. Apply the component semantics to current shared pages instead.
 
 - **ActionSheet targets**
   - `FolderAdminScreen`, `ProviderAdminScreen`, `IdentityListScreen`, and other admin list cards with inline edit/delete icon rows should converge on an overflow or long-press `ActionSheet` for contextual actions.
@@ -549,9 +551,11 @@ Do not duplicate these — use `MaterialTheme.customColors.warningContainerColor
 - **CardGroup targets**
   - `ConfigScreen` and `AgentSettingsScreen` are the reference implementations.
   - Grouped admin/detail surfaces in `FolderAdminScreen`, `ProviderAdminScreen`, `IdentityListScreen`, `ArchiveAdminScreen`, `McpServerToolsScreen`, `RunMonitorScreen`, `JobMonitorScreen`, `MessageBatchMonitorScreen`, and `ToolDetailScreen` should migrate from flat `Column` dialog bodies toward `CardGroup` sections.
-- Treat this checklist as the default migration map when touching any of the above screens. Reuse the existing designsystem component before inventing a new layout or dialog pattern.
+- Confirm a target exists before applying this historical checklist. Prefer sharedUI primitives for current shared pages.
 
-### 11. Current old-style screen audit
+### 11. Historical old-style screen audit
+
+The screen names below describe the earlier Android tree. Current ownership is the sharedUI shell/page tree; this list does not certify that these surfaces still exist.
 
 - Most primary screens already use `LettaTopBarDefaults` plus the standardized `Scaffold` / top-bar shell. Treat shell migration as largely complete.
 - Remaining modernization work is concentrated in **dialogs, pickers, and admin/detail surfaces**, not the screen chrome itself.
@@ -574,7 +578,7 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
   toolchain resolution; without a discoverable JDK 17 the build fails with "Cannot find a Java
   installation … matching {languageVersion=17}". CI's GitHub runners ship JDK 17 by default; this VM
   needs it installed (Gradle auto-detects it under `/usr/lib/jvm`).
-- Android SDK: `$HOME/Android/Sdk` (platform 36, build-tools 36, platform-tools).
+- Android SDK: `$HOME/Android/Sdk` in the historical VM setup. Install the platform/build-tools required by `android-compose/gradle/libs.versions.toml`; do not assume a VM snapshot is still provisioned.
 - `JAVA_HOME`, `ANDROID_HOME`, and `PATH` are exported for interactive shells from `~/.bashrc`.
   Non-interactive scripts should set `JAVA_HOME=/usr/lib/jvm/jdk-26` explicitly.
 - `android-compose/local.properties` (`sdk.dir=…`, gitignored) is auto-created by the startup
@@ -594,9 +598,8 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
   **`@letta-ai/letta-code@0.34.14`** (`letta-code-runtime/letta-code-runtime.properties`), which
   is the wire contract (`app-server-v2-contract-matrix.json` `baseline.version`), the desktop's
   bundled runtime, the Android embedded runtime and what the `appserver-contract-baseline` CI job
-  installs; `LettaCodeVersionPinsTest` fails if they disagree. The Linux host also runs
-  **`0.34.14`** (the client still must not require a 0.34-only field of an older server: gate
-  0.34-only commands on an advertised capability); the restart-replay evidence was re-captured
+  installs; `LettaCodeVersionPinsTest` fails if they disagree. The source pin is not evidence of the running Linux host version; verify that host live. The client still must not require a 0.34-only field of an older server: gate
+  0.34-only commands on an advertised capability; the restart-replay evidence was re-captured
   at **`0.34.14`** on 2026-10-17 (it needs a live server + model provider to re-capture). The Android embedded runtime ships in the
   `full` release APK only (nodejs-mobile Node 18 plus the `node18-compat.cjs` preload, arm64-v8a
   only; since letta-mobile-by4vm.110.6 it is a loopback `letta server` the app dials over ws://

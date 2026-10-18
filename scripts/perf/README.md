@@ -5,7 +5,7 @@ Use `scripts/perf/capture-trace.sh` to collect a reproducible 10-second system t
 ## Quick start
 
 ```bash
-scripts/perf/capture-trace.sh
+scripts/perf/capture-trace.sh 10 com.letta.mobile.dev
 ```
 
 Optional arguments:
@@ -15,7 +15,9 @@ scripts/perf/capture-trace.sh 15 ca.oculair.meridian
 ```
 
 - First arg: duration in seconds (default `10`)
-- Second arg: Android app id passed to `perfetto --app` (default `ca.oculair.meridian`)
+- Second arg: Android app id passed to `perfetto --app` (script default `ca.oculair.meridian`, the release package; debug builds use `com.letta.mobile.dev`).
+- Set `ANDROID_SERIAL` to select a device.
+- Trace sections appear only when that build/runtime emits them; category selection alone does not guarantee every named app section is present.
 
 ## What the script records
 

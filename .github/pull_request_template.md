@@ -6,7 +6,7 @@
 
 - [ ] `./gradlew :app:compileRootDebugKotlin` (local)
 - [ ] `./gradlew :app:testRootDebugUnitTest` (local)
-- [ ] CI: `test` and `build-apk` green
+- [ ] CI: `test`, `build-apk-pass` and `shared-multiplatform` green
 - [ ] Manual verification: <!-- screenshot, device test, or N/A -->
 
 ## Beads

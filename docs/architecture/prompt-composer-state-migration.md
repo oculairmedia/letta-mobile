@@ -1,6 +1,12 @@
 # PromptComposerState migration note
 
-**Status:** Reference snapshot; implementation currency has not been revalidated. Consult the current module map and source before applying.
+**Status:** Implemented headless prototype; not the production composer state owner.
+
+## Code audit — 2026-10-18
+
+[PromptComposerState](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/runtime/PromptComposerState.kt) and `PromptComposerStateTest` remain, but a repository-wide symbol search finds no production caller outside its declaration. `beginSend` trims the payload and resets to a Sending state; `beginStreaming` only transitions from Sending and `stop` returns to Ready. There is no `markReady()` method, despite the old wiring suggestion below. Production [ChatComposerPanel](../../android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/composer/ChatComposerPanel.kt) reads `ChatComposerUiState`/`ChatActions` from the shared session. Do not introduce this second state machine into the live send path merely to complete the prototype's suggested migration.
+
+## Original record
 
 `PromptComposerState` lives in `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/runtime` as a small, headless state container for composer actions. It intentionally does not depend on Compose UI or prompt-bar.
 

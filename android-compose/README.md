@@ -6,7 +6,8 @@ power all three clients, and `app/` is only the Android host.
 
 ## Modules
 
-Every module below is declared in `settings.gradle.kts`.
+Gradle modules below are declared in `settings.gradle.kts`; the table also names
+their supporting source/config directories, which are not separate projects.
 
 | Module | Purpose | Required / additive tests |
 | --- | --- | --- |
@@ -27,7 +28,7 @@ Every module below is declared in `settings.gradle.kts`.
 | `avatar/core` / `avatar/renderer-rive` | Avatar models and Rive rendering | additive on path change |
 | `cli` / `appserver-cli` / `iroh-wrapper-cli` | JVM tooling, App Server contract probes, and the Iroh server wrapper (`meridian-iroh-wrapper`) | wrapper/CLI tasks in `shared-multiplatform`; additive `cli` tests |
 | `architecture-tests` / `quality/detekt-rules` | Module-boundary tests and custom static-analysis rules | `:architecture-tests:test`, `:quality:detekt-rules:check` (required `test`); `detekt` job (not required, but honest: fails only on findings outside each module's `detekt-baseline.xml`) |
-| `macrobenchmark` / `baselineprofile` / `perf` / `native` | Performance infrastructure and native libraries | `perf-gate` (required) |
+| `macrobenchmark` / `baselineprofile` (modules); `perf/` / `native/` (support directories) | Performance infrastructure and native libraries | `perf-scripts` on PRs; emulator `perf-gate` nightly/main and selected performance PRs (not branch-protection required) |
 | `build-logic` | Convention plugins: `com.letta.mobile.android.library`, `com.letta.mobile.kmp.library` (`build-logic/src/main/kotlin/com/letta/mobile/kmp/KmpLibraryPlugin.kt`), architecture-graph, embedded-runtime, JNI 16 KB | `:build-logic:test` (required `test`) |
 
 **Ownership rule:** portable feature *logic* lives in `sharedLogic/commonMain`, shared
@@ -45,9 +46,10 @@ Chat is split by responsibility, not by separate per-client implementations:
 - `:app` wires Android navigation, lifecycle, and dependency injection; `:desktop`
   and `:web` supply their own host bindings.
 
-For chat changes, put timeline/state and transport logic in `sharedLogic`, reusable
-Compose presentation in `sharedUI`, feature-specific UI in `feature-chat`, and
-Android-only integration in `app`. There is no `:chat` Gradle module or separate
+For chat changes, put portable timeline/state and transport logic in `sharedLogic`,
+all new pages and reusable Compose presentation in `sharedUI`, and Android lifecycle,
+ViewModel and DI bindings in `feature-chat` or `app`. Surviving feature UI is legacy
+covered by the platform UI allowlist, not the destination for new shared surfaces. There is no `:chat` Gradle module or separate
 `LettaChatClient` in this tree.
 
 ## Deleted Android screens
@@ -118,7 +120,7 @@ Run Gradle commands from this directory.
 and `:sharedUI`, so it renders the same shared pages the Android app does, and supplies only its own
 host bindings: window and single-instance handling, notifications, launcher integration and a
 bundled JBR 25 runtime. Android-only navigation, Hilt wiring, DataStore and foreground-service
-behavior stay behind portable boundaries in `sharedLogic`.
+bindings stay in Android modules; portable contracts and policies live in `sharedLogic`.
 
 Run it locally:
 
