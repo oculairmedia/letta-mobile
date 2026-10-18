@@ -90,8 +90,10 @@ internal fun rememberComposerImageAttacher(): ComposerImageAttacher {
  * opening the picker.
  */
 @Composable
-internal fun rememberComposerImagePicker(target: ComposerImagePickerTarget): () -> Unit {
-    val attacher = LocalComposerImageAttacher.current ?: rememberComposerImageAttacher()
+internal fun rememberComposerImagePicker(
+    target: ComposerImagePickerTarget,
+    attacher: ComposerImageAttacher = LocalComposerImageAttacher.current ?: rememberComposerImageAttacher(),
+): () -> Unit {
     SideEffect { attacher.bind(target) }
     val room = (target.maxAttachments - target.pendingCount).coerceAtLeast(0)
     // Android's multi-select photo picker needs a limit of at least two; extras are dropped below.
@@ -148,7 +150,7 @@ private suspend fun attachOne(
 
 /** [bytes] as an attachment, or null when they are not an image the platform decodes. */
 @OptIn(ExperimentalEncodingApi::class)
-internal fun encodeAttachment(
+fun encodeAttachment(
     bytes: ByteArray,
     limits: AttachmentLimits = AttachmentLimits.Default,
 ): MessageContentPart.Image? {
