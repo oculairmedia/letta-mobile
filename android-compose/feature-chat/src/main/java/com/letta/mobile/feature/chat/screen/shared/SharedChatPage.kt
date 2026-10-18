@@ -62,7 +62,7 @@ import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
 import com.letta.mobile.ui.chat.subagents.SubagentDualViewFrame
 import com.letta.mobile.ui.chat.subagents.rememberSubagentDualView
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
-import com.letta.mobile.ui.components.rememberReducedMotionEnabled
+import com.letta.mobile.ui.theme.rememberReducedMotionEnabled
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.markdown.LocalSharedRichMarkdownRenderer
 import com.letta.mobile.ui.theme.LocalReducedMotion
