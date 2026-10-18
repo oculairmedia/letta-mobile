@@ -183,11 +183,15 @@ def check_lifecycle() -> None:
     docs = list((ROOT / "docs").rglob("*.md"))
     docs.extend(ROOT / doc for doc in DOCS if (ROOT / doc).is_file())
     for path in docs:
-        text = path.read_text(encoding="utf-8")
-        for target in re.findall(r"<!-- live-path: ([^\n]+?) -->", text):
-            resolved = (ROOT / target).resolve()
-            if not resolved.is_relative_to(ROOT.resolve()) or not resolved.exists():
-                fail(path.relative_to(ROOT).as_posix(), f"missing live path ({target})")
+        check_live_paths(path)
+
+
+def check_live_paths(path: Path) -> None:
+    text = path.read_text(encoding="utf-8")
+    for target in re.findall(r"<!-- live-path: ([^\n]+?) -->", text):
+        resolved = (ROOT / target).resolve()
+        if not resolved.is_relative_to(ROOT.resolve()) or not resolved.exists():
+            fail(path.relative_to(ROOT).as_posix(), f"missing live path ({target})")
 
 
 def check_client_hosts(modules: list[str]) -> None:
