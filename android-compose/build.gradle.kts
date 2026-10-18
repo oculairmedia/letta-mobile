@@ -3,6 +3,7 @@ import io.gitlab.arturbosch.detekt.Detekt
 import io.gitlab.arturbosch.detekt.extensions.DetektExtension
 
 plugins {
+    id("com.letta.mobile.api-documentation")
     id("com.letta.mobile.architecture-graph")
     alias(libs.plugins.dependency.analysis) apply false
     alias(libs.plugins.kover)
@@ -34,6 +35,15 @@ plugins {
     // See docs/observability/kotzilla.md for the rationale on why we don't
     // ship the SDK in release APKs.
     alias(libs.plugins.kotzilla) apply false
+}
+
+// Aggregate portable APIs; generated output stays under ignored build/.
+dependencies {
+    add("dokka", project(":sharedLogic"))
+    add("dokka", project(":sharedUI"))
+    add("dokka", project(":core:ids"))
+    add("dokka", project(":core:runtime"))
+    add("dokka", project(":plugin-api"))
 }
 
 // Dependency Analysis is opt-in and advisory: AGP 9.2 is newer than the plugin's

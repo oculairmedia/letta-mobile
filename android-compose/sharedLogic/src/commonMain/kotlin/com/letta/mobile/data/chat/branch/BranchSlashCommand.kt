@@ -23,8 +23,8 @@ sealed interface BranchSlashCommand {
         const val FORK = "fork"
         const val BTW = "btw"
 
-        private val FORK_LINE = Regex("""^/fork(?:\s+(.+))?$""", RegexOption.DOT_MATCHES_ALL)
-        private val BTW_LINE = Regex("""^/btw\s+(.+)$""", RegexOption.DOT_MATCHES_ALL)
+        private val FORK_LINE = Regex("""^/fork(?:\s+([\s\S]+))?$""")
+        private val BTW_LINE = Regex("""^/btw\s+([\s\S]+)$""")
 
         /** The command [text] is, or null when it is an ordinary message (letta-code's own patterns). */
         fun parse(text: String): BranchSlashCommand? {

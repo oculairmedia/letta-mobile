@@ -20,6 +20,12 @@ class BranchSlashCommandTest {
     }
 
     @Test
+    fun commandsPreserveMultilineArguments() {
+        assertEquals(BranchSlashCommand.Fork("Plan\nB"), BranchSlashCommand.parse("/fork Plan\nB"))
+        assertEquals(BranchSlashCommand.Aside("why?\nExplain"), BranchSlashCommand.parse("/btw why?\nExplain"))
+    }
+
+    @Test
     fun otherTextIsAMessage() {
         assertNull(BranchSlashCommand.parse("/forklift now"))
         assertNull(BranchSlashCommand.parse("please /fork this"))

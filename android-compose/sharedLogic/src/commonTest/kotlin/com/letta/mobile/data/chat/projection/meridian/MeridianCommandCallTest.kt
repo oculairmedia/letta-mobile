@@ -110,6 +110,11 @@ class MeridianCommandCallTest {
     }
 
     @Test
+    fun multilineEnvironmentValueStillPrefixesTheInvocation() {
+        assertEquals(MeridianCommandCall(CanvasToolContract.LIST, "{}"), bash("FOO='first\nsecond' meridian canvas list"))
+    }
+
+    @Test
     fun chainedCommandsAroundOneInvocationAreRead() {
         val call = bash("cd /tmp && meridian canvas apply-ops --dry-run <<'OPS' | jq .\n{\"ops\":[]}\nOPS\necho ok")
         assertEquals(MeridianCommandCall(CanvasToolContract.APPLY_OPS, """{"ops":[],"dry_run":true}"""), call)

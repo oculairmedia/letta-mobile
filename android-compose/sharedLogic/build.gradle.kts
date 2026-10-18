@@ -2,6 +2,7 @@ import com.letta.mobile.kmp.hostNative
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
+    id("com.letta.mobile.api-documentation")
     id("org.jetbrains.kotlin.multiplatform")
     // jvmTarget 17 + catalog compileSdk/minSdk for the KMP targets (build-logic).
     id("com.letta.mobile.kmp.library")

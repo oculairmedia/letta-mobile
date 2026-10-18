@@ -471,6 +471,37 @@ jobs:
           ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs :sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs
           node sharedLogic/karma.config.test.cjs
 
+  api-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - name: Verify docs stay outside the app service worker
+        run: node --test android-compose/web/service-worker.test.cjs
+      - name: Generate shared API reference
+        working-directory: android-compose
+        run: ./gradlew --no-daemon -Pkotlin.compiler.execution.strategy=in-process -PdokkaSourceRef=${{ github.sha }} :dokkaGeneratePublicationHtml
+      - name: Check generated entry point
+        run: test -s android-compose/build/dokka/html/index.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-api-docs
+          path: android-compose/build/dokka/html/
+          if-no-files-found: error
+          retention-days: 30
+
   web-wasm:
     name: web-wasm
     runs-on: ubuntu-latest
@@ -539,15 +570,41 @@ jobs:
           find web/build -name index.html -print | head
           exit 1
 
-      - name: Upload GitHub Pages artifact
+      - name: Upload WASM site for combined Pages deployment
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
+          name: wasm-site
           path: android-compose/${{ steps.wasm-dist.outputs.path }}
+          if-no-files-found: error
+          retention-days: 1
+
+  assemble-web-pages:
+    name: assemble-web-pages
+    needs: [web-wasm, api-docs]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: wasm-site
+          path: public
+      - uses: actions/download-artifact@v4
+        with:
+          name: kotlin-api-docs
+          path: public/api
+      - name: Verify both site entry points
+        run: test -s public/index.html && test -s public/api/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
 
   deploy-web-pages:
     name: deploy-web-pages
-    needs: web-wasm
+    needs: assemble-web-pages
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -557,7 +614,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - name: Deploy WASM client to GitHub Pages
+      - name: Deploy WASM client and API reference to GitHub Pages
         id: deploy
         uses: actions/deploy-pages@v4
 
