@@ -249,12 +249,15 @@ internal class ImageBitmapCache(
      * big board holds only what is on (or was recently on) screen; one scrolled back to is decoded
      * again.
      */
-    fun trimToBudget() {
+    fun trimToBudget(budget: Long = budgetBytes) {
         var held = byId.values.sumOf { it.heldBytes() }
-        if (held <= budgetBytes) return
+        if (held <= budget) return
         val idle = byId.entries.filter { it.value.lastUse < frame }.sortedBy { it.value.lastUse }.map { it.key }.iterator()
-        while (held > budgetBytes && idle.hasNext()) held -= byId.remove(idle.next())?.heldBytes() ?: 0L
+        while (held > budget && idle.hasNext()) held -= byId.remove(idle.next())?.heldBytes() ?: 0L
     }
+
+    /** Memory pressure: drops every decoded image not drawn this frame; what is on screen stays. */
+    fun dropIdle() = trimToBudget(budget = 0L)
 
     fun retainOnly(liveIds: Set<String>) {
         if (byId.isEmpty()) return

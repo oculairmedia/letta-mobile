@@ -177,3 +177,11 @@ a whole new drawing to the renderer's caches. `exportJsonInBackground` serialise
 state on `Dispatchers.Default`. Text heights drifted after a load or import are reconciled in one
 `Intent.SyncTextMeasuredHeights` instead of one intent (a full pass over the drawing) per text
 block, which was quadratic. Tests: `DrawBoxControllerTest`.
+
+### 14. Boards release decoded images under memory pressure (letta-mobile-k5nbq.10)
+
+`DrawboxCachePressure.dropIdle()` asks every composed board to drop the decoded images it did not
+draw in its latest frame (`ImageBitmapCache.dropIdle`, the existing `trimToBudget` with a zero
+budget), so what is on screen stays. The request is a snapshot-state counter that each board's
+`rememberImageBitmapCache` watches on its own UI thread, so the host may bump it from any thread and
+the canvas never depends on host types. Tests: `ImageBitmapCachePressureTest`.

@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -26,7 +27,7 @@ import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState
 import com.letta.mobile.desktop.chat.DesktopChatConnectionState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
-import com.letta.mobile.desktop.runtime.runDesktopMemoryPressure
+import com.letta.mobile.desktop.runtime.installDesktopMemoryPressure
 import com.letta.mobile.desktop.workspace.DesktopWorkspaceFileViewerHost
 import dev.nucleusframework.application.NucleusApplicationScope
 import java.awt.Window
@@ -59,7 +60,7 @@ internal fun LettaDesktopApp(
 ) {
     // Launch on the fleet dashboard: it is the only view that says something
     // before a conversation is selected.
-    LaunchedEffect(Unit) { runDesktopMemoryPressure() }
+    DisposableEffect(Unit) { installDesktopMemoryPressure().let { onDispose(it::close) } }
     val navigator = rememberShellWorkspaceState(ShellDestination.Home)
     val context = rememberDesktopShellContext(shell, navigator)
     val chatState = context.chatState.value
