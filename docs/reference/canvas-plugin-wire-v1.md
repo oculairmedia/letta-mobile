@@ -65,6 +65,13 @@ they additionally document wire directions, deadlines, capabilities and errors.
 They are retained for protocol authors rather than maintained as a second
 handwritten Kotlin API inventory.
 
+From `android-compose/`, `./gradlew :sharedLogic:writeContractReferenceDocs` regenerates
+these tables and the canvas compose guide together using their existing renderers.
+`./gradlew :sharedLogic:checkContractReferenceDocs` rejects stale sections without
+editing them; normal `jvmTest` retains the same check. Both commands are offline
+and preserve authored text outside the markers. The standalone tables remain at
+`android-compose/sharedLogic/build/canvas-plugin-wire-v1-tables.md`.
+
 <!-- lcp_wire_tables:start -->
 | Method | Direction | Kind | Deadline | Capability | SPI member |
 |---|---|---|---|---|---|

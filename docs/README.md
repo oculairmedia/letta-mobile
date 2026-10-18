@@ -3,7 +3,7 @@
 Start with [README](../README.md) for product/module layout, [AGENTS](../AGENTS.md)
 for workflow and architecture rules, and [CONTRIBUTING](../CONTRIBUTING.md) for setup.
 [DESIGN](../DESIGN.md) defines design direction; [DESIGN_SYSTEM](DESIGN_SYSTEM.md)
-is a historical token snapshot, not a competing policy spec.
+is a usage reference with retained historical values, not a competing policy spec.
 
 ## Generated API reference
 
@@ -34,15 +34,32 @@ The [2026-10-18 audit](reference/documentation-audit-2026-10-18.md) covers every
 Markdown input and links a per-file source/evidence ledger, including unverified historical
 and live claims. A passing freshness script is structural validation, not a full semantic audit.
 
+## Maintaining this index
+
+Navigation below is generated from `git ls-files` Markdown paths under `docs/`,
+excluding this index. It uses each document's first heading (or filename when
+there is no heading), groups by directory, and skips files deleted in the working
+tree. Stage newly added or renamed documents before regenerating; untracked and
+ignored build output is outside this navigation's scope.
+
+```bash
+python scripts/docs/documentation-index.py --write
+python scripts/docs/documentation-index.py --check
+```
+
+Edit the introductory guidance here, not the marked navigation. Check mode is
+offline and fails on stale titles, paths, missing rows or duplicate rows.
+
+<!-- documentation-index:start -->
 ## Documents
 
 ### General
 
 - [letta-mobile Architecture Review](architecture-review.md)
-- [Design sync with Penpot — plan & status](design-sync-with-penpot.md)
-- [Letta Design System Reference (extracted from code)](DESIGN_SYSTEM.md)
-- [Iroh two-client live-sync probe (headless)](iroh-two-client-live-sync-probe.md)
-- [Push Ingest Analysis (letta-mobile-o5zmj)](PUSH_INGEST_ANALYSIS.md)
+- [Design sync with Penpot — plan &amp; status](design-sync-with-penpot.md)
+- [Letta Design System Reference \(extracted from code\)](DESIGN_SYSTEM.md)
+- [Iroh two-client live-sync probe \(headless\)](iroh-two-client-live-sync-probe.md)
+- [Push Ingest Analysis \(letta-mobile-o5zmj\)](PUSH_INGEST_ANALYSIS.md)
 - [Release automation bootstrap](RELEASE-AUTOMATION.md)
 - [Release Gate Ledger](RELEASE-GATE-LEDGER.md)
 - [Release checklist](RELEASE.md)
@@ -50,7 +67,7 @@ and live claims. A passing freshness script is structural validation, not a full
 - [Testing Flows with Turbine](testing-with-turbine.md)
 - [PRD: Tool Card Readability + Interaction Polish](tool-card-polish-prd.md)
 - [Desktop/Android UI alignment — fanout brief](ui-alignment-fanout.md)
-- [UI cleanup & token adherence — handoff](ui-token-adherence-handoff.md)
+- [UI cleanup &amp; token adherence — handoff](ui-token-adherence-handoff.md)
 
 ### architecture
 
@@ -59,16 +76,16 @@ and live claims. A passing freshness script is structural validation, not a full
 - [App Server Controller Deployment Guide](architecture/app-server-controller-deploy.md)
 - [App Server v2 and Meridian State Audit Specification](architecture/app-server-v2-audit-spec.md)
 - [Canonical JSON configurations](architecture/canonical-json.md)
-- [Chat app-transport-timeline boundary regression harness](architecture/chat-boundary-regression-harness.md)
+- [Chat transport and timeline boundary regression harness](architecture/chat-boundary-regression-harness.md)
 - [Letta Mobile Architecture Diagrams](architecture/diagrams.md)
 - [Distributed agent fabric foundation](architecture/distributed-agent-fabric-foundation.md)
 - [Embed Letta Code as on-device runtime - integration design](architecture/embed-letta-code-integration.md)
 - [External transport timeline ingestion and reconcile rules](architecture/external-transport-timeline-rules.md)
-- [Iroh Admin RPC Ownership Matrix (lgns8.13)](architecture/iroh-admin-ownership-matrix.md)
+- [Iroh Admin RPC Ownership Matrix \(lgns8.13\)](architecture/iroh-admin-ownership-matrix.md)
 - [KMP Best-Practices Migration Plan](architecture/kmp-best-practices-migration-plan.md)
 - [KMP Extraction Snapshot — 2026-06-06](architecture/kmp-extraction-snapshot-2026-06-06.md)
 - [KMP module map](architecture/kmp-module-map.md)
-- [Phase 6a — runnable entry points (docs + aliases deferred)](architecture/kmp-phase-6-entrypoints.md)
+- [Phase 6a — runnable entry points \(docs + aliases deferred\)](architecture/kmp-phase-6-entrypoints.md)
 - [Epic: KMP project structure migration](architecture/kmp-structure-migration-epic.md)
 - [Letta API Behavior Empirical Findings](architecture/letta-api-behaviors.md)
 - [Letta Code file/shell tools on Android access layers](architecture/letta-code-android-file-shell-tool-map.md)
@@ -77,17 +94,17 @@ and live claims. A passing freshness script is structural validation, not a full
 - [lgns8 epic: status, achievable scope, and the shim-retirement ceiling](architecture/lgns8-shim-retirement-snapshot-2026-07-31.md)
 - [Live external tools and re-advertisement](architecture/live-external-tools.md)
 - [Message Sync Architecture Migration Plan](architecture/message-sync-migration.md)
-- [Mobile embedded bridge vs. Letta Code desktop](architecture/mobile-embedded-bridge-vs-desktop.md)
+- [Mobile embedded bridge and desktop runtime hosting](architecture/mobile-embedded-bridge-vs-desktop.md)
 - [POC Validation Results](architecture/poc-validation-results.md)
-- [Progressive Composer Affordances: Design & Migration Plan](architecture/progressive-composer-affordances.md)
+- [Progressive Composer Affordances: Design &amp; Migration Plan](architecture/progressive-composer-affordances.md)
 - [Android Project Work API Contract](architecture/project-work-api-android-contract.md)
-- [PromptComposerState migration note](architecture/prompt-composer-state-migration.md)
+- [PromptComposerState prototype](architecture/prompt-composer-state-migration.md)
 - [Repository cache and paging policy](architecture/repository-cache-paging-policy.md)
 - [Screen-Off Streaming: Architecture Findings](architecture/screen-off-streaming-findings.md)
 - [Screen-Off Streaming Measurement Protocol](architecture/screen-off-streaming-measurement.md)
 - [Shared-module layering ratchet](architecture/shared-layering-ratchet.md)
 - [Stream-frame eviction instead of session teardown](architecture/stream-frame-eviction-spec.md)
-- [Timeline REST Snapshot Policy](architecture/timeline-rest-snapshot-policy.md)
+- [Timeline history snapshot and reconcile policy](architecture/timeline-rest-snapshot-policy.md)
 - [Typed ids and the id ratchets](architecture/typed-ids-and-id-ratchets.md)
 - [Windows Chat UI Decision](architecture/windows-chat-ui-decision.md)
 
@@ -98,23 +115,24 @@ and live claims. A passing freshness script is structural validation, not a full
 ### deploy
 
 - [Iroh agent address book — operator runbook](deploy/iroh-agent-address-book.md)
-- [Redeploy meridian-iroh-wrapper for the workspace relay (letta-mobile-bzvro.37)](deploy/workspace-relay-host-redeploy.md)
+- [Redeploy meridian-iroh-wrapper for the workspace relay \(letta-mobile-bzvro.37\)](deploy/workspace-relay-host-redeploy.md)
 
 ### design
 
-- [canvas.compose: validated implementation plan (v1)](design/canvas-compose-plan.md)
+- [canvas.compose: validated implementation plan \(v1\)](design/canvas-compose-plan.md)
 - [canvas.compose: prior-art research](design/canvas-compose-prior-art.md)
-- [Canvas Plugin Platform: Architecture Plan (revision 2)](design/canvas-plugin-platform-plan.md)
+- [Canvas Plugin Platform: Architecture Plan \(revision 2\)](design/canvas-plugin-platform-plan.md)
 - [Canvas Plugin Platform: Prior Art Research](design/canvas-plugin-platform-prior-art.md)
 - [Desktop App — Design-Template Update Spec](design/desktop-template-update-spec.md)
 - [Design decision: editorial prose for chat](design/editorial-prose.md)
 - [Letta Desktop reference: gap analysis for our client](design/letta-desktop-reference-gap-analysis.md)
 - [On-demand agent tools via the Meridian CLI](design/on-demand-tools-via-meridian-cli.md)
 - [Letta Onboarding And Desktop UI Review](design/onboarding-desktop-ui-review-2026-06.md)
-- [Prior-art survey: design-system & Penpot-sync references](design/starred-prior-art-survey.md)
+- [Prior-art survey: design-system &amp; Penpot-sync references](design/starred-prior-art-survey.md)
 
 ### development
 
+- [Generated Kotlin API reference](development/api-documentation.md)
 - [Phone preview on the desktop](development/phone-preview.md)
 
 ### evidence
@@ -124,9 +142,9 @@ and live claims. A passing freshness script is structural validation, not a full
 ### handoff
 
 - [flk.2 — Streaming Markdown Flicker Regression Notes](handoff/flk2-streaming-markdown-flicker.md)
-- [Handoff: PR-2 stream integrity and live status (F06–F10)](handoff/letta-desktop-parity-pr2-stream.md)
-- [Handoff: PR-5 Conversations and models (F15-F18)](handoff/letta-desktop-parity-pr5-conversations.md)
-- [Handoff: Letta Desktop parity PR-6 — memory browser, secrets vault, file mentions (F24–F26)](handoff/letta-desktop-parity-pr6-memory-workspace.md)
+- [Handoff: PR-2 stream integrity and live status \(F06–F10\)](handoff/letta-desktop-parity-pr2-stream.md)
+- [Handoff: PR-5 Conversations and models \(F15-F18\)](handoff/letta-desktop-parity-pr5-conversations.md)
+- [Handoff: Letta Desktop parity PR-6 — memory browser, secrets vault, file mentions \(F24–F26\)](handoff/letta-desktop-parity-pr6-memory-workspace.md)
 
 ### observability
 
@@ -137,22 +155,24 @@ and live claims. A passing freshness script is structural validation, not a full
 ### performance
 
 - [App performance bottleneck audit — 2026-05](performance/app-bottleneck-audit-2026-05.md)
-- [Chat timeline perf baseline — post-Rive-mobile snapshot (closing measurement)](performance/chat-perf-baseline-post-rive-mobile-2026-09-14.md)
+- [Chat timeline perf baseline — post-Rive-mobile snapshot \(closing measurement\)](performance/chat-perf-baseline-post-rive-mobile-2026-09-14.md)
 - [Chat timeline perf baseline — pre-Rive-mobile snapshot](performance/chat-perf-baseline-pre-rive-mobile-2026-09-13.md)
 - [Chat pinch-to-zoom performance note](performance/chat-pinch-zoom.md)
 - [Production JankStats Sampling](performance/jankstats-production-sampling.md)
 - [Android perf regression gate](performance/perf-gate.md)
 - [Mobile Chat Render / Streaming Hot-Path Audit](performance/PERF_AUDIT_mobile_render.md)
-- [Android performance playbook (v1)](performance/playbook.md)
+- [Android performance playbook \(v1\)](performance/playbook.md)
 - [App Performance Score History](performance/score-history.md)
 
 ### reference
 
-- [canvas_compose v1 reference](reference/canvas-compose-v1.md)
+- [canvas\_compose v1 reference](reference/canvas-compose-v1.md)
 - [LCP wire v1: the canvas plugin protocol](reference/canvas-plugin-wire-v1.md)
+- [Current App Server protocol and admin ownership reference](reference/current-app-server-protocol.md)
+- [Documentation source audit — 2026-10-18](reference/documentation-audit-2026-10-18.md)
 - [Looking up Letta documentation](reference/letta-docs.md)
 - [Plugin trust model](reference/plugin-trust-model.md)
-- [Plugin view bridge `lcp-view/1` — for plugin page authors](reference/plugin-view-bridge-v1.md)
+- [Plugin view bridge \`lcp-view/1\` — for plugin page authors](reference/plugin-view-bridge-v1.md)
 
 ### testing
 
@@ -164,3 +184,4 @@ and live claims. A passing freshness script is structural validation, not a full
 ### tooling
 
 - [Self-hosted code intelligence pilot](tooling/serena-scip-pilot.md)
+<!-- documentation-index:end -->

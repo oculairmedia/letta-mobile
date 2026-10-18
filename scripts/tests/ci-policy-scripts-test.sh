@@ -20,6 +20,14 @@ android_workflow="$SOURCE_ROOT/.github/workflows/android.yml"
 android_workflow_text="$(<"$android_workflow")"
 assert_contains "$android_workflow_text" '- "feat/**"'
 assert_contains "$android_workflow_text" '- "cursor/**"'
+assert_contains "$android_workflow_text" '- "codex/**"'
+push_triggers="$(awk '/^  push:$/ { active=1; next } active && /^  [[:alnum:]_]+:$/ { exit } active { print }' "$android_workflow")"
+pr_triggers="$(awk '/^  pull_request:$/ { active=1; next } active && /^  [[:alnum:]_]+:$/ { exit } active { print }' "$android_workflow")"
+for triggers in "$push_triggers" "$pr_triggers"; do
+  assert_contains "$triggers" '- "docs/**"'
+  assert_contains "$triggers" '- "scripts/docs/**"'
+  assert_contains "$triggers" '- "scripts/appserver/**"'
+done
 build_apk_job="$(
   awk '
     /^  build-apk:$/ { in_job = 1; next }
@@ -49,6 +57,10 @@ assert_not_contains "$test_job" ':app:compilePlayDebugKotlin'
 # run inside the REQUIRED test job, not only in the advisory graph workflow.
 assert_contains "$test_job" ':build-logic:test'
 assert_contains "$test_job" 'checkArchitectureBoundaries'
+assert_contains "$test_job" 'test_documentation_index.py'
+assert_contains "$test_job" 'scripts/docs/documentation-index.py --check'
+assert_contains "$test_job" 'scripts/appserver/generate-protocol-reference.test.mjs'
+assert_contains "$test_job" 'scripts/appserver/verify-v2-audit-doc.mjs'
 # Stacked PRs must diff additive modules against the GitHub PR base. Diffing
 # vs origin/main re-runs lower-stack modules and lets unrelated flakes fail
 # required `test` (StreamingMarkdownRecompositionGateTest on #1556).
@@ -82,6 +94,7 @@ assert_contains "$deploy_pages" "github.event_name == 'push' && github.ref == 'r
 perf_workflow="$(<"$SOURCE_ROOT/.github/workflows/android-perf.yml")"
 assert_contains "$perf_workflow" '- "feat/**"'
 assert_contains "$perf_workflow" '- "cursor/**"'
+assert_contains "$perf_workflow" '- "codex/**"'
 assert_contains "$perf_workflow" 'cache-read-only: ${{ github.event_name =='
 assert_contains "$perf_workflow" '  perf-gate:'
 assert_contains "$perf_workflow" 'Classify performance impact'
@@ -381,6 +394,18 @@ printf '\nSee [gone](docs/does-not-exist.md) and `:nope:assembleDebug`.\n' >>"$T
 if output="$(python3 "$docs_check" "$TMP/docs" 2>&1)"; then fail "broken link must fail docs-freshness"; fi
 assert_contains "$output" 'broken link (docs/does-not-exist.md)'
 assert_contains "$output" '`:nope:assembleDebug` does not start with a declared Gradle module'
+
+# Generated navigation percent-encodes filenames; the freshness gate must decode
+# the URL path and ignore query/fragment components before resolving it.
+docs_fixture
+mkdir -p "$TMP/docs/docs"
+printf '# Spaced title\n' >"$TMP/docs/docs/space name.md"
+printf '\n[valid](docs/space%%20name.md?view=source#heading)\n' >>"$TMP/docs/README.md"
+output="$(python3 "$docs_check" "$TMP/docs" 2>&1 || true)"
+assert_not_contains "$output" 'broken link (docs/space%20name.md?view=source#heading)'
+printf '\n[missing](docs/missing%%20name.md)\n' >>"$TMP/docs/README.md"
+output="$(python3 "$docs_check" "$TMP/docs" 2>&1 || true)"
+assert_contains "$output" 'broken link (docs/missing%20name.md)'
 # An includeBuild(...) build is a valid task prefix (`:build-logic:test` runs in `test`);
 # dropping the includeBuild makes the same reference fail.
 docs_fixture
