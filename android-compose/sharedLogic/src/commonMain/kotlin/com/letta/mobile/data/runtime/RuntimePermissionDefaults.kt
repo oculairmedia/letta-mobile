@@ -23,4 +23,11 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 object RuntimePermissionDefaults {
     /** Effective permission mode when none is cached or explicitly requested. */
     val DEFAULT_MODE: AppServerPermissionMode = AppServerPermissionMode.Unrestricted
+
+    /**
+     * letta-mobile-k5nbq.9 / uu3ol: the agent's saved mode when it has one, else [DEFAULT_MODE].
+     * A store that holds nothing still starts Unrestricted.
+     */
+    fun forAgent(defaults: AgentDefaults?): AppServerPermissionMode =
+        defaults?.effectivePermissionMode() ?: DEFAULT_MODE
 }

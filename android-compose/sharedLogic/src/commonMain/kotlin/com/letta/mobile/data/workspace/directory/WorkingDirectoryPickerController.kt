@@ -1,6 +1,7 @@
 package com.letta.mobile.data.workspace.directory
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.model.AgentId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -40,6 +41,8 @@ data class WorkingDirectoryPickerState(
     /** Where [currentCwd] is, when it is inside a letta-code worktree: the "in worktree" banner. */
     val worktree: WorktreeLocation? = null,
     val worktrees: WorktreeListState = WorktreeListState(),
+    /** The agent "Make default for this agent" would save for; null hides that control. */
+    val agentId: AgentId? = null,
 ) {
     val canGoUp: Boolean get() = devicePathOrNull(folder)?.parent != null
     val canCreateFolder: Boolean
@@ -47,6 +50,8 @@ data class WorkingDirectoryPickerState(
             createFolderUnavailableReason != null || isCreatingFolder -> false
             else -> folder != null
         }
+
+    val canMakeDefault: Boolean get() = agentId != null && folder != null
 }
 
 /** What the picker's controls do; [WorkingDirectoryPickerController] is the shared implementation. */
@@ -61,6 +66,9 @@ interface WorkingDirectoryPickerActions {
 
     /** Uses [path] as the conversation's working directory from the next turn, and closes. */
     fun choose(path: String)
+
+    /** Saves the browsed folder as this agent's default cwd for new conversations. */
+    fun makeDefault()
 
     fun dismiss()
 
@@ -93,12 +101,15 @@ class WorkingDirectoryPickerController(
     private val _state = MutableStateFlow(WorkingDirectoryPickerState())
     val state: StateFlow<WorkingDirectoryPickerState> = _state.asStateFlow()
 
+    /** letta-mobile-k5nbq.9: called with the browsed folder when "Make default for this agent" runs. */
+    var onMakeDefault: ((String) -> Unit)? = null
+
     private var browseJob: Job? = null
     private var worktreesJob: Job? = null
     private var createJob: Job? = null
 
     /** Opens on the conversation's [currentCwd] (when known), with its worktrees. */
-    fun open(currentCwd: String?) {
+    fun open(currentCwd: String?, agentId: AgentId? = null) {
         val cwd = devicePathOrNull(currentCwd)?.takeIf { it.isAbsolute }?.normalized
         _state.value = WorkingDirectoryPickerState(
             isOpen = true,
@@ -106,6 +117,7 @@ class WorkingDirectoryPickerController(
             recents = recents?.recent?.value.orEmpty(),
             createFolderUnavailableReason = if (folderCreator == null) WorkingDirectoryPickerGates.CREATE_FOLDER_UNAVAILABLE else null,
             worktree = WorktreePaths.locate(cwd),
+            agentId = agentId?.takeUnless { it.value.isBlank() },
         )
         if (cwd != null) {
             browse(cwd.value)
@@ -156,6 +168,12 @@ class WorkingDirectoryPickerController(
         recents?.record(chosen)
         dismiss()
         onChosen(chosen.value)
+    }
+
+    override fun makeDefault() {
+        val chosen = absoluteOrReport(_state.value.folder ?: return) ?: return
+        recents?.record(chosen)
+        onMakeDefault?.invoke(chosen.value)
     }
 
     override fun dismiss() {

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.workspace.directory
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.storage.SecureSettingsStore
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -122,6 +123,34 @@ class WorkingDirectoryPickerControllerTest {
 
         assertEquals(DirectoryBrowseErrors.NOT_FOUND, picker.state.value.error)
         assertEquals(emptyList(), picker.state.value.recents)
+    }
+
+    @Test
+    fun makeDefaultSavesTheBrowsedFolderWithoutClosing() = runTest {
+        val saved = mutableListOf<String>()
+        val picker = controller()
+        picker.onMakeDefault = { saved += it }
+        picker.open("/work", agentId = AgentId("agent-1"))
+        runCurrent()
+        picker.browse("/work/repo")
+        runCurrent()
+
+        picker.makeDefault()
+
+        assertEquals(listOf("/work/repo"), saved)
+        assertTrue(picker.state.value.isOpen)
+        assertEquals(AgentId("agent-1"), picker.state.value.agentId)
+        assertTrue(picker.state.value.canMakeDefault)
+    }
+
+    @Test
+    fun makeDefaultIsHiddenWithoutAnAgent() = runTest {
+        val picker = controller()
+        picker.open("/work")
+        runCurrent()
+        assertFalse(picker.state.value.canMakeDefault)
+        picker.makeDefault()
+        assertTrue(picker.state.value.isOpen)
     }
 
     @Test

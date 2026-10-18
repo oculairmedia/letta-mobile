@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,11 +28,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.data.agenteditor.AgentCreated
 import com.letta.mobile.data.agenteditor.AgentEditorActions
+import com.letta.mobile.data.agenteditor.AgentEditorCwdDefaults
 import com.letta.mobile.data.agenteditor.AgentEditorLinks
 import com.letta.mobile.data.agenteditor.AgentEditorOpeners
 import com.letta.mobile.data.agenteditor.AgentEditorSections
 import com.letta.mobile.data.agenteditor.AgentEditorState
 import com.letta.mobile.data.agenteditor.errorNote
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.runtime.StoredAgentDefaults
+import com.letta.mobile.ui.runtime.LocalAgentDefaults
 import com.letta.mobile.data.settings.SettingsAction
 import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsSectionModel
@@ -182,7 +187,13 @@ private class AgentEditorBodyInputs(
 
 @Composable
 private fun AgentEditorBody(inputs: AgentEditorBodyInputs, onOpen: (AgentEditorPane) -> Unit) {
-    val sections = AgentEditorSections(inputs.state, inputs.actions, inputs.openers(onOpen)).build()
+    val cwdDefaults = rememberAgentEditorCwd(inputs)
+    val sections = AgentEditorSections(
+        inputs.state,
+        inputs.actions,
+        inputs.openers(onOpen),
+        cwdDefaults,
+    ).build()
     Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.TopCenter) {
         Column(
             modifier = Modifier
@@ -200,7 +211,9 @@ private fun AgentEditorBody(inputs: AgentEditorBodyInputs, onOpen: (AgentEditorP
     }
 }
 
-private fun AgentEditorBodyInputs.openers(onOpen: (AgentEditorPane) -> Unit) = AgentEditorOpeners(
+private fun AgentEditorBodyInputs.openers(
+    onOpen: (AgentEditorPane) -> Unit,
+) = AgentEditorOpeners(
     mascotLabel = identity.current.label,
     onMascot = { onOpen(AgentEditorPane.Mascot) },
     onModel = { onOpen(AgentEditorPane.Model) },
@@ -211,6 +224,19 @@ private fun AgentEditorBodyInputs.openers(onOpen: (AgentEditorPane) -> Unit) = A
         secrets = options.panels.secrets?.let { { onOpen(AgentEditorPane.Secrets) } },
     ),
 )
+
+/** letta-mobile-k5nbq.9: the saved default cwd for an existing agent, from the host's settings store. */
+@Composable
+private fun rememberAgentEditorCwd(inputs: AgentEditorBodyInputs): AgentEditorCwdDefaults? {
+    val agentId = inputs.state.agentId?.takeIf { !inputs.state.creating } ?: return null
+    val fallback = remember(inputs.options.settings) { StoredAgentDefaults(inputs.options.settings) }
+    val repo = LocalAgentDefaults.current ?: fallback
+    val entries by repo.entries.collectAsState()
+    return AgentEditorCwdDefaults(
+        path = entries[agentId]?.cwd.orEmpty(),
+        onChange = { repo.setCwd(AgentId(agentId), it) },
+    )
+}
 
 /** The agent as it looks, its name beside it; in a host that frames the page, the Save too. */
 @Composable

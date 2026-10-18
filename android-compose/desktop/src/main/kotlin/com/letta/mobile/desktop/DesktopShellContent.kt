@@ -68,6 +68,7 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
     CompositionLocalProvider(
         LocalDesktopPermissionModeSettings provides context.core.bootstrap.dataBindings.permissionModeSettings,
         LocalAttentionPrefs provides context.core.attentionPrefs,
+        com.letta.mobile.ui.runtime.LocalAgentDefaults provides context.core.agentDefaults,
         LocalReducedMotion provides layout.reducedMotion,
     ) {
         ShellPluginViews(context.core.bootstrap.dataBindings.pluginViews) {

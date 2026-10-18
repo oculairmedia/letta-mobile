@@ -17,8 +17,12 @@ import com.letta.mobile.data.runtime.AppServerTurnStackSpec
 import com.letta.mobile.data.runtime.DurableTurnDelivery
 import com.letta.mobile.data.runtime.attachTurnStack
 import com.letta.mobile.data.runtime.permissionGovernedTurnStackSpec
+import com.letta.mobile.data.runtime.withWorkingDirectoryProvider
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.runtime.AgentDefaultsRepository
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.PermissionModeSettings
+import com.letta.mobile.data.runtime.cwd
 import com.letta.mobile.data.transport.appserver.AppServerReadinessExpectation
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -72,6 +76,8 @@ class DesktopAppServerChatGatewayBuilder(
     private val preflightProbe: suspend (String, String?) -> AppServerProbeResult? = ::probeDesktopAppServer,
     /** letta-mobile-bzvro.13: the app's one permission-mode settings; null runs every runtime Unrestricted, with no chip. */
     permissionModeSettings: PermissionModeSettings? = null,
+    /** letta-mobile-k5nbq.9: per-agent default cwd carried on a new conversation's `runtime_start`. */
+    private val agentDefaults: AgentDefaultsRepository? = null,
     /**
      * letta-mobile-by4vm.56: where an iroh:// session's generations come from, given the address,
      * the access token and the session's client scope. Tests substitute generations that need no
@@ -201,7 +207,10 @@ class DesktopAppServerChatGatewayBuilder(
             val turnEngine = router.attachTurnStack(
                 opened.client,
                 controllerScope,
-                desktopTurnStackSpec(toolRegistry, spec.permissionModes),
+                desktopTurnStackSpec(toolRegistry, spec.permissionModes)
+                    .withWorkingDirectoryProvider { command ->
+                        agentDefaults?.cwd(AgentId(command.agentId.value))
+                    },
             )
             engine = turnEngine
             return DesktopAppServerChatGateway(

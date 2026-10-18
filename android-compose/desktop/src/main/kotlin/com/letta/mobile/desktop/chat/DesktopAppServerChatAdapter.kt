@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.runtime.AgentDefaultsRepository
 import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.runtime.host.LocalAppServerLease
@@ -80,8 +81,14 @@ internal object DesktopAppServerChatGateways {
         return DesktopAppServerRuntimeConfig(serverUrl = config.serverUrl.trim().takeIf { it.isNotBlank() }) to null
     }
 
-    fun defaultFactory(permissionModeSettings: PermissionModeSettings? = null): DesktopAppServerChatGatewayFactory =
-        DesktopAppServerChatGatewayBuilder(permissionModeSettings = permissionModeSettings)
+    fun defaultFactory(
+        permissionModeSettings: PermissionModeSettings? = null,
+        agentDefaults: AgentDefaultsRepository? = null,
+    ): DesktopAppServerChatGatewayFactory =
+        DesktopAppServerChatGatewayBuilder(
+            permissionModeSettings = permissionModeSettings,
+            agentDefaults = agentDefaults,
+        )
 }
 
 internal suspend fun createDefaultDesktopChatGateway(
@@ -94,5 +101,6 @@ internal suspend fun createDefaultDesktopChatGateway(
 
 internal fun defaultDesktopAppServerGatewayFactory(
     permissionModeSettings: PermissionModeSettings? = null,
+    agentDefaults: AgentDefaultsRepository? = null,
 ): DesktopAppServerChatGatewayFactory =
-    DesktopAppServerChatGateways.defaultFactory(permissionModeSettings)
+    DesktopAppServerChatGateways.defaultFactory(permissionModeSettings, agentDefaults)
