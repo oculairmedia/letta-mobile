@@ -30,6 +30,7 @@ import com.letta.mobile.sharedui.resources.timeline_thinking_elapsed
 import com.letta.mobile.ui.chat.surface.timeline.rows.formatElapsedClock
 import com.letta.mobile.ui.chat.surface.timeline.rows.hasWaitingApproval
 import com.letta.mobile.ui.chat.surface.timeline.rows.rememberElapsedSeconds
+import com.letta.mobile.ui.a11y.politeLiveRegion
 import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.ChatTimelineDimens
@@ -86,6 +87,7 @@ internal fun ThinkingStatusText(
         color = scheme.onSurface,
         modifier = modifier
             .defaultMinSize(minHeight = ChatRowSpacing.thinkingTextMinHeight)
+            .politeLiveRegion()
             .thinkingSweep(scheme, sweep),
     )
 }

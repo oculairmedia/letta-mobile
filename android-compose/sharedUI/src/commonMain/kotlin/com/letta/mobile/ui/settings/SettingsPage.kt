@@ -77,7 +77,7 @@ class SettingsPageServices(
     /** Whether [group] has a standard section here (the Backend one always does). */
     private fun hasStandardSection(group: SettingsGroup, hasSavedToken: Boolean): Boolean = when (group) {
         SettingsGroup.Backend -> true
-        SettingsGroup.Appearance -> appearance?.isEmpty == false
+        SettingsGroup.Appearance -> true
         SettingsGroup.Chat -> chat?.isEmpty == false
         SettingsGroup.Notifications -> notifications?.attention != null
         SettingsGroup.Providers -> onOpenProviders != null

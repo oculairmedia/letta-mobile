@@ -195,10 +195,21 @@ class SettingsPageTest {
 
         assertEquals(listOf(SettingsGroup.Backend to emptyList()), services.visibleGroups(LettaConfig.Mode.LOCAL, afterFirstFrame = false))
         assertEquals(
-            listOf(SettingsGroup.Backend to listOf(local), SettingsGroup.About to listOf(about)),
+            listOf(
+                SettingsGroup.Backend to listOf(local),
+                SettingsGroup.Appearance to emptyList(),
+                SettingsGroup.About to listOf(about),
+            ),
             services.visibleGroups(LettaConfig.Mode.LOCAL, afterFirstFrame = true),
         )
-        assertEquals(listOf(SettingsGroup.Backend to emptyList(), SettingsGroup.About to listOf(about)), services.visibleGroups(LettaConfig.Mode.SELF_HOSTED, true))
+        assertEquals(
+            listOf(
+                SettingsGroup.Backend to emptyList(),
+                SettingsGroup.Appearance to emptyList(),
+                SettingsGroup.About to listOf(about),
+            ),
+            services.visibleGroups(LettaConfig.Mode.SELF_HOSTED, true),
+        )
     }
 
     @Test

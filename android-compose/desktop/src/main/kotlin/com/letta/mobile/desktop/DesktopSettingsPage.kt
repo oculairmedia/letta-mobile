@@ -32,7 +32,6 @@ import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.shellSettingsPage
 import com.letta.mobile.ui.shell.pages.plugins.rememberPluginsContributions
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
-import dev.nucleusframework.systemcolor.isSystemInHighContrast
 import dev.nucleusframework.systemcolor.systemAccentColor
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher
@@ -167,7 +166,6 @@ private fun rememberSystemAppearance() = systemAppearanceSection(
     dark = isSystemInDarkMode(),
     // sRGB toArgb() packs ARGB; the low 24 bits are the RGB channels.
     accentHex = systemAccentColor()?.let { "#%06X".format(it.toArgb() and RGB_MASK) },
-    highContrast = isSystemInHighContrast(),
 )
 
 /** The persisted default permission mode (letta-mobile-bzvro.13); Settings leaves its row out where none is provided. */

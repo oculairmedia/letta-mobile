@@ -2,9 +2,9 @@ package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import com.letta.mobile.ui.theme.jvmOsReducedMotion
 import java.awt.KeyEventDispatcher
 import java.awt.KeyboardFocusManager
-import java.awt.Toolkit
 import java.awt.event.KeyEvent
 
 /**
@@ -15,13 +15,7 @@ import java.awt.event.KeyEvent
  * normally rather than guessing. `-Dletta.reducedMotion=true` is available
  * as an explicit override for tests/screenshots.
  */
-internal fun desktopPrefersReducedMotion(): Boolean {
-    if (System.getProperty("letta.reducedMotion") == "true") return true
-    return runCatching {
-        val toolkit = Toolkit.getDefaultToolkit()
-        (toolkit.getDesktopProperty("win.uiEffects.animationsEnabled") as? Boolean)?.not()
-    }.getOrNull() ?: false
-}
+internal fun desktopPrefersReducedMotion(): Boolean = jvmOsReducedMotion()
 
 /** Global Ctrl/Cmd+B shortcut for the sidebar toggle, documented alongside Ctrl/Cmd+K for the palette. */
 @Composable

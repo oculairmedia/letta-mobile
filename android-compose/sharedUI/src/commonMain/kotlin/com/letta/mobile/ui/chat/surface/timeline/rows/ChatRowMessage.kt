@@ -43,6 +43,7 @@ import com.letta.mobile.ui.chat.branch.rememberMessageMenu
 import com.letta.mobile.ui.chat.render.bubbleStyle
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import com.letta.mobile.ui.chat.render.shouldPulseForStreamingReveal
+import com.letta.mobile.ui.a11y.politeLiveRegion
 import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.haptics.LettaHapticCue
@@ -312,7 +313,7 @@ internal fun AgentText(params: AgentTextParams) {
     }
     val hoverSource = remember { MutableInteractionSource() }
     val hovered by hoverSource.collectIsHoveredAsState()
-    Box(modifier = Modifier.fillMaxWidth().hoverable(hoverSource).testTag(ChatRowTestTags.AGENT_TEXT)) {
+    Box(modifier = Modifier.agentTextRoot(hoverSource, params.isStreaming)) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = ChatRowSpacing.bubblePaddingVertical),
             verticalArrangement = Arrangement.spacedBy(ChatRowSpacing.messagePart),
@@ -369,3 +370,9 @@ private fun DeliveryTime(timestamp: String) {
             .alpha(ChatRowAlpha.deliveryTime),
     )
 }
+
+private fun Modifier.agentTextRoot(hoverSource: MutableInteractionSource, streaming: Boolean): Modifier =
+    fillMaxWidth()
+        .hoverable(hoverSource)
+        .testTag(ChatRowTestTags.AGENT_TEXT)
+        .then(if (streaming) Modifier.politeLiveRegion() else Modifier)

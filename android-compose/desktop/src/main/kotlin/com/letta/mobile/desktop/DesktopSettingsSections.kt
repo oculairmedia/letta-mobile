@@ -257,14 +257,13 @@ private val RAIL_RECENCY_CHOICES: List<Pair<Int, String>> = listOf(
 )
 
 /** The OS appearance the window follows, as facts (Appearance group). */
-internal fun systemAppearanceSection(dark: Boolean, accentHex: String?, highContrast: Boolean): SettingsSectionModel = SettingsSectionModel(
+internal fun systemAppearanceSection(dark: Boolean, accentHex: String?): SettingsSectionModel = SettingsSectionModel(
     key = "desktop-system-appearance",
     title = "System appearance",
-    supporting = "Letta follows the OS theme, accent and contrast as they change.",
+    supporting = "Letta follows the OS theme and accent as they change. High contrast is the shared Appearance row.",
     rows = listOf(
         SettingsRow.Info("system-theme", "Theme", if (dark) "Dark" else "Light"),
         SettingsRow.Info("system-accent", "Accent", accentHex ?: "Letta default"),
-        SettingsRow.Info("system-contrast", "High contrast", if (highContrast) "On" else "Off"),
     ),
 )
 

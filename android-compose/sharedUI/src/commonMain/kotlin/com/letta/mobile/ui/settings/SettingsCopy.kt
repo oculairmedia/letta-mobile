@@ -24,6 +24,8 @@ object SettingsCopy {
     val DYNAMIC_COLOR = SettingsLabel("appearance-dynamic-color", "Dynamic colour", "Use your wallpaper's colours")
     val PRESET = SettingsLabel("appearance-theme-preset", "Colour preset")
     val HAPTICS = SettingsLabel("appearance-haptics", "Haptics", "Vibrate while replies and tools run")
+    val REDUCED_MOTION = SettingsLabel("appearance-reduced-motion", "Reduced motion", "Follows the system animation setting")
+    val HIGH_CONTRAST = SettingsLabel("appearance-high-contrast", "High contrast", "Stronger text and borders")
 
     val APPROVALS = SettingsLabel(
         "notifications-approvals",

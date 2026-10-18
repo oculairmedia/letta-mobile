@@ -23,6 +23,8 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.liftAboveKeyboard
 import com.letta.mobile.ui.chat.surface.touchStyle
+import com.letta.mobile.ui.a11y.AccessibilityTraversal
+import com.letta.mobile.ui.a11y.accessibilityTraversal
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -86,6 +88,7 @@ internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modi
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .accessibilityTraversal(AccessibilityTraversal.COMPOSER)
             .liftAboveKeyboard()
             // Docked, the bar sits in the panel's corner: the same inset on the sides and the bottom.
             .padding(
@@ -117,7 +120,7 @@ internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modi
 @Composable
 private fun TouchComposerPanel(model: ComposerModel, attachImage: () -> Unit, modifier: Modifier) {
     Column(
-        modifier = modifier.fillMaxWidth().liftAboveKeyboard(),
+        modifier = modifier.fillMaxWidth().accessibilityTraversal(AccessibilityTraversal.COMPOSER).liftAboveKeyboard(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Column(

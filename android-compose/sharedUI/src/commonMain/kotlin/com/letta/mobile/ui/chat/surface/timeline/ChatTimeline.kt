@@ -33,6 +33,8 @@ import com.letta.mobile.ui.chat.surface.timeline.rows.LocalApprovalStepper
 import com.letta.mobile.ui.chat.surface.timeline.rows.rememberApprovalStepper
 import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.mascot.mascotAvailable
+import com.letta.mobile.ui.a11y.AccessibilityTraversal
+import com.letta.mobile.ui.a11y.accessibilityTraversal
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -84,7 +86,7 @@ internal fun ChatTimeline(
     val density = LocalDensity.current
     val bottomReserve = if (state.a2uiSurfaces.isNotEmpty()) a2uiHeight else 0.dp
 
-    Box(modifier = modifier.then(pinchModifier)) {
+    Box(modifier = modifier.accessibilityTraversal(AccessibilityTraversal.TIMELINE).then(pinchModifier)) {
         Column(Modifier.fillMaxSize()) {
             val goal = state.goalStatus
             val goalActions = remember(actions, capabilities.goals) { GoalCardActions.of(actions, capabilities) }

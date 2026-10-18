@@ -31,6 +31,7 @@ fun List<SettingsSearchEntry>.matching(query: String): List<SettingsSearchEntry>
 /** The page's entries for [mode]: the standard rows its ports bind, then the platform sections' rows. */
 internal fun SettingsPageServices.searchEntries(mode: LettaConfig.Mode, hasSavedToken: Boolean): List<SettingsSearchEntry> =
     backendEntries(mode, hasSavedToken) +
+        accessibilityEntries() +
         appearance.entries() +
         chat.entries() +
         listOfNotNull(
@@ -72,6 +73,11 @@ private fun SettingsPageServices.backendEntries(mode: LettaConfig.Mode, hasSaved
     if (hasSavedToken) add(SettingsCopy.CLEAR_TOKEN.entry(SettingsGroup.Danger))
     backend.onIrohIdentityReset?.let { add(SettingsCopy.RESET_IDENTITY.entry(SettingsGroup.Danger)) }
 }
+
+private fun accessibilityEntries(): List<SettingsSearchEntry> = listOf(
+    SettingsCopy.REDUCED_MOTION.entry(SettingsGroup.Appearance),
+    SettingsCopy.HIGH_CONTRAST.entry(SettingsGroup.Appearance),
+)
 
 private fun AppearanceSettings?.entries(): List<SettingsSearchEntry> = if (this == null) {
     emptyList()

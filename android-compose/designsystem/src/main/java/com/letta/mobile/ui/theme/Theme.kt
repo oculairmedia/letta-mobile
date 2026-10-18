@@ -494,16 +494,20 @@ fun LettaTheme(
     } else {
         if (useDarkTheme) presetColors.darkScheme else presetColors.lightScheme
     }
-    val colorScheme = baseColorScheme.withLettaContrastBoost()
+    ProvideAccessibilityPolicy {
+        val highContrast = LocalHighContrast.current
+        val colorScheme = baseColorScheme.withLettaContrastBoost().let { boosted ->
+            if (highContrast) boosted.withHighContrast() else boosted
+        }
+        val customColors = deriveCustomColors(colorScheme)
 
-    val customColors = deriveCustomColors(colorScheme)
-
-    CompositionLocalProvider(LocalCustomColors provides customColors) {
-        MaterialExpressiveTheme(
-            colorScheme = colorScheme,
-            typography = Typography,
-            motionScheme = MotionScheme.expressive(),
-            content = content,
-        )
+        CompositionLocalProvider(LocalCustomColors provides customColors) {
+            MaterialExpressiveTheme(
+                colorScheme = colorScheme,
+                typography = Typography,
+                motionScheme = MotionScheme.expressive(),
+                content = content,
+            )
+        }
     }
 }
