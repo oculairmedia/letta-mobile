@@ -4,6 +4,11 @@ import android.app.Application
 import android.util.Log
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
+import com.letta.mobile.data.platform.MemoryCacheKind
+import com.letta.mobile.data.platform.MemoryPressure
+import com.letta.mobile.data.platform.MemoryPressureDefaults
+import com.letta.mobile.data.platform.MemoryPressureLevel
+import com.letta.mobile.platform.AndroidMemoryPressure
 import coil3.annotation.ExperimentalCoilApi
 import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
@@ -65,11 +70,25 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
         // before anything else so uncaught exceptions are captured from the start.
         crashReporter.install()
         setupGlobalExceptionHandler()
+        MemoryPressureDefaults.install()
+        MemoryPressure.current().caches.bind(MemoryCacheKind.Images) {
+            SingletonImageLoader.get(this).memoryCache?.clear()
+        }
         if (isRobolectricRuntime()) {
             return
         }
         deps.notebookLocalStore.startPolling(1_000)
         appStartupCoordinator.start(this)
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        MemoryPressure.emit(AndroidMemoryPressure.levelFor(level))
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        MemoryPressure.emit(MemoryPressureLevel.CRITICAL)
     }
 
     override fun newImageLoader(context: coil3.PlatformContext): ImageLoader {

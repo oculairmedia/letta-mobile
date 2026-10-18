@@ -58,6 +58,7 @@ fun LettaWebApp() {
     val focusedAgent = backend.agents.value.firstOrNull { it.id == workspace.focusedAgentId }
     val chat = rememberWebChatLoad(remember(app) { WebChatOpener(app.gateway::openChat) }, focusedAgent, connection)
     LaunchedEffect(chat) { (chat as? WebChatLoad.Ready)?.let { shell.chat.shown(it.port.target) } }
+    LaunchedEffect(Unit) { startWebMemoryPressure() }
     // letta-mobile-ckmub.17.5: the shared pages over the live session graph, as desktop binds them.
     val graph by app.gateway.sessionGraphProvider.currentGraph.collectAsState()
     val controllers = rememberShellLibraryControllers(app.gateway.sessionGraphProvider, app.services.sources, scope)
