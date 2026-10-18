@@ -47,7 +47,7 @@ import com.letta.mobile.ui.shell.ShellNavDrawerSheet
 import com.letta.mobile.ui.shell.rail.ShellLibraryRail
 import com.letta.mobile.ui.shell.rail.ShellRailFocus
 import com.letta.mobile.ui.shell.rail.railLightDismiss
-import com.letta.mobile.ui.platform.SharedUiMemoryPressure
+import com.letta.mobile.ui.memory.ReleaseCachesUnderPressure
 import com.letta.mobile.ui.a11y.AccessibilityTraversal
 import com.letta.mobile.ui.a11y.accessibilityTraversal
 import com.letta.mobile.ui.shell.shortcuts.ProvideShortcutHub
@@ -71,7 +71,7 @@ import kotlinx.coroutines.flow.drop
  */
 @Composable
 fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspaceHost, modifier: Modifier = Modifier) {
-    SideEffect { SharedUiMemoryPressure.install() }
+    ReleaseCachesUnderPressure()
     val drawer = host.drawer ?: remember { ShellWorkspaceDrawer() }
     ProvideShortcutHub {
         Surface(

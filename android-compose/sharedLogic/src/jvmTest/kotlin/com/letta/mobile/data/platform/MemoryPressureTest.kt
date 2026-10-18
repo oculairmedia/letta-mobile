@@ -1,125 +1,103 @@
 package com.letta.mobile.data.platform
 
-import com.letta.mobile.data.timeline.TimelineMessageId
-import com.letta.mobile.data.timeline.TimelinePressure
-import com.letta.mobile.data.timeline.TimelineVisibleSpan
-import com.letta.mobile.data.timeline.snapshot.TimelineScope
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TestTimeSource
 
-class MemoryPressureTest {
-    @BeforeTest
-    fun reset() {
-        MemoryPressure.resetForTest()
-        TimelinePressure.resetForTest()
-    }
-
-    @AfterTest
-    fun cleanup() {
-        MemoryPressure.resetForTest()
-        TimelinePressure.resetForTest()
-    }
-
+class MemoryPressureHubTest {
     @Test
-    fun criticalTrimsOpenConversationToVisiblePlusOnePage() {
-        val trimmed = mutableListOf<List<TimelineMessageId>>()
-        val session = TimelinePressure.current().attach(
-            TimelineScope("backend", "conversation"),
-            pageSize = 5,
-        ) { trimmed += it }
-        session.reportResident((0 until 20).map { TimelineMessageId("m$it") })
-        session.reportVisible(TimelineVisibleSpan(firstIndex = 8, count = 4))
+    fun onlyCriticalSignalsTrimResidentPages() = runTest {
+        val hub = MemoryPressureHub()
+        val trims = mutableListOf<Unit>()
+        val levels = mutableListOf<MemoryPressureLevel>()
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        backgroundScope.launch(dispatcher) { hub.criticalTrims().toList(trims) }
+        backgroundScope.launch(dispatcher) { hub.levels.toList(levels) }
 
-        MemoryPressure.emit(MemoryPressureLevel.CRITICAL)
+        hub.emit(MemoryPressureLevel.MODERATE)
+        hub.emit(MemoryPressureLevel.CRITICAL)
+        hub.emit(MemoryPressureLevel.MODERATE)
 
-        val expected = (3 until 17).map { TimelineMessageId("m$it") }
-        assertEquals(expected, session.residentIds())
-        assertEquals(listOf(expected), trimmed)
-    }
-
-    @Test
-    fun moderateDoesNotTrimTheTimeline() {
-        val session = TimelinePressure.current().attach(
-            TimelineScope("backend", "conversation"),
-            pageSize = 5,
-        ) { }
-        val all = (0 until 20).map { TimelineMessageId("m$it") }
-        session.reportResident(all)
-        session.reportVisible(TimelineVisibleSpan(firstIndex = 8, count = 4))
-
-        MemoryPressure.emit(MemoryPressureLevel.MODERATE)
-
-        assertEquals(all, session.residentIds())
-    }
-
-    @Test
-    fun criticalDropsImageCaches() {
-        var dropped = 0
-        MemoryPressure.current().caches.bind(MemoryCacheKind.Images) { dropped += 1 }
-        MemoryPressure.emit(MemoryPressureLevel.CRITICAL)
-        assertEquals(1, dropped)
-    }
-
-    @Test
-    fun moderateDropsImagesAndLeavesCanvas() {
-        var images = 0
-        var canvas = 0
-        val caches = MemoryPressure.current().caches
-        caches.bind(MemoryCacheKind.Images) { images += 1 }
-        caches.bind(MemoryCacheKind.Canvas) { canvas += 1 }
-        MemoryPressure.emit(MemoryPressureLevel.MODERATE)
-        assertEquals(1, images)
-        assertEquals(0, canvas)
-    }
-
-    @Test
-    fun criticalTightensRuntimeEventRetention() {
-        val log = BoundedRuntimeEventLog(normalCap = 64)
-        repeat(50) { log.append("e$it") }
-        MemoryPressure.current().events.bind(log)
-        MemoryPressure.emit(MemoryPressureLevel.CRITICAL)
-        assertEquals(RuntimeEventPressure.CRITICAL_CAP, log.size())
-        assertEquals((18 until 50).map { "e$it" }, log.snapshot())
-    }
-
-    @Test
-    fun publishStatsIsVisibleForDiagnostics() {
-        MemoryPressure.publishStats(HeapStats(usedBytes = 10, maxBytes = 100))
-        assertEquals(HeapStats(10, 100), MemoryPressure.stats.value)
+        assertEquals(1, trims.size)
+        assertEquals(
+            listOf(MemoryPressureLevel.MODERATE, MemoryPressureLevel.CRITICAL, MemoryPressureLevel.MODERATE),
+            levels,
+        )
     }
 }
 
-class HeapPressureTest {
+class HeapPressureGateTest {
+    private val clock = TestTimeSource()
+
+    private fun gate(floorWindow: Duration = Duration.ZERO) =
+        HeapPressureGate(floorWindow = floorWindow, repeatAfter = 30.seconds, timeSource = clock)
+
     @Test
-    fun mapsRatios() {
-        assertNull(HeapPressure.levelFor(74, 100))
-        assertEquals(MemoryPressureLevel.MODERATE, HeapPressure.levelFor(75, 100))
-        assertEquals(MemoryPressureLevel.CRITICAL, HeapPressure.levelFor(90, 100))
-        assertNull(HeapPressure.levelFor(10, 0))
+    fun liveReadingsReportARiseAtOnce() {
+        val gate = gate()
+
+        assertEquals(null, gate.offer(usedBytes = 60, maxBytes = 100))
+        assertEquals(MemoryPressureLevel.MODERATE, gate.offer(usedBytes = 80, maxBytes = 100))
+        assertEquals(MemoryPressureLevel.CRITICAL, gate.offer(usedBytes = 95, maxBytes = 100))
+    }
+
+    @Test
+    fun aHeldLevelIsReportedAgainOnlyAfterTheRepeatInterval() {
+        val gate = gate()
+        assertEquals(MemoryPressureLevel.CRITICAL, gate.offer(95, 100))
+
+        clock += 10.seconds
+        assertEquals(null, gate.offer(96, 100), "sustained pressure must not drop caches on every reading")
+        clock += 20.seconds
+        assertEquals(MemoryPressureLevel.CRITICAL, gate.offer(96, 100))
+    }
+
+    @Test
+    fun pressureThatClearsIsReportedAfreshWhenItReturns() {
+        val gate = gate()
+        assertEquals(MemoryPressureLevel.MODERATE, gate.offer(80, 100))
+        clock += 1.seconds
+        assertEquals(null, gate.offer(40, 100))
+        clock += 1.seconds
+        assertEquals(MemoryPressureLevel.MODERATE, gate.offer(80, 100))
+    }
+
+    @Test
+    fun garbageBetweenCollectionsIsNotPressure() {
+        // Raw usage climbs to nearly full before each collection and falls back after it.
+        val gate = gate(floorWindow = 30.seconds)
+        val sawtooth = listOf(40, 70, 95, 45, 75, 97, 42, 80, 96, 44)
+        val reported = sawtooth.mapNotNull { used ->
+            gate.offer(used.toLong(), 100).also { clock += 5.seconds }
+        }
+        assertEquals(emptyList(), reported)
+    }
+
+    @Test
+    fun retainedMemoryIsReportedOnceAWholeWindowStaysHigh() {
+        val gate = gate(floorWindow = 30.seconds)
+        val readings = (0..6).map { step ->
+            gate.offer(if (step % 2 == 0) 92 else 99, 100).also { clock += 5.seconds }
+        }
+        assertEquals(List(6) { null } + MemoryPressureLevel.CRITICAL, readings)
+    }
+
+    @Test
+    fun unusableReadingsAreIgnored() {
+        val gate = gate()
+        assertEquals(null, gate.offer(usedBytes = 10, maxBytes = 0))
+        assertEquals(null, gate.offer(usedBytes = -1, maxBytes = 100))
     }
 
     @Test
     fun effectiveMaxFallsBackToCommitted() {
         assertEquals(80, HeapPressure.effectiveMax(-1, 80))
         assertEquals(200, HeapPressure.effectiveMax(200, 80))
-    }
-}
-
-class TimelineKeepRangeTest {
-    @Test
-    fun visiblePlusOnePageEachSide() {
-        val range = TimelineVisibleSpan(8, 4).keepRange(pageSize = 5, residentCount = 20)
-        assertEquals(3 until 17, range)
-    }
-
-    @Test
-    fun unknownSpanKeepsANewestPage() {
-        val range = TimelineVisibleSpan(0, 0).keepRange(pageSize = 5, residentCount = 20)
-        assertEquals(0 until 6, range)
-        assertTrue(range.count() <= 6)
     }
 }

@@ -3,6 +3,8 @@ package com.letta.mobile.data.timeline
 import androidx.paging.LoadState
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.platform.MemoryPressureHub
+import com.letta.mobile.data.platform.MemoryPressureLevel
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -425,6 +427,75 @@ class CanonicalTimelinePagingTest {
             keys,
         )
         presentation.close()
+    }
+
+    /**
+     * letta-mobile-k5nbq.10: CRITICAL memory pressure must release resident pages, not merely forget
+     * which rows were presented. The reader scrolls through three pages, pressure lands, and Paging
+     * keeps a single page around the row being read.
+     */
+    @Test fun criticalPressureReleasesEveryPageButTheOneBeingRead() = runUiTest { ui ->
+        val store = InMemoryTimelineStore()
+        val session = CanonicalTimelineSession(
+            store, HistoryTransport(total = 12, pageSize = 4), scope, enabled = true,
+            budget = TimelinePageBudget(maxMetadataRows = 4, maxDecodedBodyBytes = 2L * 1024 * 1024),
+        )
+        val selection = assertIs<TimelineEngineOpen.Opened>(session.open()).selection
+        repeat(3) { assertEquals(TimelineEnginePageOutcome.Applied, session.loadOlder(selection)) }
+        val pressure = MemoryPressureHub()
+        val presenter = presenter<TimelineSettledRecord>()
+        ui.launch { session.paging(selection, trims = pressure.criticalTrims()).collectLatest { presenter.collectFrom(it) } }
+        advanceUntilIdle()
+        repeat(4) {
+            presenter[presenter.size - 1]
+            advanceUntilIdle()
+        }
+        val scrolled = presenter.size
+        val detail = { "ledgerRows=${store.rows.size} rows=${presenter.snapshot().items.map { it.key.identity.value }}" }
+        assertTrue(scrolled > 2 * 4, "the reader never held more than two pages: ${detail()}")
+        val readIndex = scrolled / 2
+        presenter[readIndex]
+        advanceUntilIdle()
+        val reading = presenter.snapshot().items[readIndex].key.identity
+
+        pressure.emit(MemoryPressureLevel.MODERATE)
+        advanceUntilIdle()
+        assertEquals(scrolled, presenter.size, "moderate pressure leaves the timeline alone: ${detail()}")
+
+        pressure.emit(MemoryPressureLevel.CRITICAL)
+        advanceUntilIdle()
+        presenter.assertIdle()
+        val kept = presenter.snapshot().items.map { it.key.identity }
+        assertTrue(kept.size <= 4, "more than one page survived: ${detail()}")
+        assertTrue(reading in kept, "the row being read was dropped: ${detail()}")
+    }
+
+    /** Older history served [pageSize] replies at a time, newest first, [total] in all. */
+    private class HistoryTransport(private val total: Int, private val pageSize: Int) :
+        TimelineTransport by unexpectedTimelineTransport() {
+        override suspend fun listConversationMessagePage(
+            request: TimelineRemotePageRequest,
+            progress: TimelinePageProgress?,
+        ): TimelineRemotePageResult {
+            val newest = when (val continuation = request.continuation) {
+                is TimelineContinuation.Before -> continuation.messageId.value.removePrefix("m-").toInt() - 1
+                else -> total - 1
+            }
+            val ids = (newest downTo maxOf(0, newest - pageSize + 1)).toList()
+            val records = ids.map { index ->
+                TimelineRemoteRecord(
+                    TimelineMessageId("m-$index"),
+                    AssistantMessage(
+                        id = "m-$index", contentRaw = JsonPrimitive("reply $index"),
+                        date = "2026-01-01T00:00:${index.toString().padStart(2, '0')}Z", logicalMessageId = "otid-m-$index",
+                    ),
+                    0,
+                )
+            }
+            val oldest = ids.last()
+            val next = if (oldest > 0) TimelineContinuation.Before(TimelineMessageId("m-$oldest")) else null
+            return TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration, records, next, next != null, 0)
+        }
     }
 
     /** One page of assistant replies, newest first, with no older history behind it. */
