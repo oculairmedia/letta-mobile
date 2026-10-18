@@ -57,6 +57,7 @@ import com.letta.mobile.ui.shell.ShellNavDrawerSheet
 import com.letta.mobile.ui.shell.rail.ShellLibraryRail
 import com.letta.mobile.ui.shell.rail.ShellRailFocus
 import com.letta.mobile.ui.shell.rail.railLightDismiss
+import com.letta.mobile.ui.platform.SharedUiMemoryPressure
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanel
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.flow.drop
@@ -75,6 +76,7 @@ import kotlinx.coroutines.flow.drop
  */
 @Composable
 fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspaceHost, modifier: Modifier = Modifier) {
+    SideEffect { SharedUiMemoryPressure.install() }
     val drawer = host.drawer ?: remember { ShellWorkspaceDrawer() }
     Surface(modifier = modifier.fillMaxSize().testTag(LettaShellWorkspaceTags.WORKSPACE), color = MaterialTheme.colorScheme.background) {
         // The window's one overlay queue (snackbars, undo, banners), drawn over the whole shell.

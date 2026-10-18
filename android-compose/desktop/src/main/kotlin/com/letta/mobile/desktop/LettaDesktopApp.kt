@@ -26,6 +26,7 @@ import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState
 import com.letta.mobile.desktop.chat.DesktopChatConnectionState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
+import com.letta.mobile.desktop.runtime.runDesktopMemoryPressure
 import com.letta.mobile.desktop.workspace.DesktopWorkspaceFileViewerHost
 import dev.nucleusframework.application.NucleusApplicationScope
 import java.awt.Window
@@ -58,6 +59,7 @@ internal fun LettaDesktopApp(
 ) {
     // Launch on the fleet dashboard: it is the only view that says something
     // before a conversation is selected.
+    LaunchedEffect(Unit) { runDesktopMemoryPressure() }
     val navigator = rememberShellWorkspaceState(ShellDestination.Home)
     val context = rememberDesktopShellContext(shell, navigator)
     val chatState = context.chatState.value
