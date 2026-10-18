@@ -624,7 +624,7 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun clearChatSearch() = chatSearchCoordinator.clear()
 
-    fun updateChatSearchSelection(selection: MessageSearchSelection) = chatSearchCoordinator.updateSelection(selection)
+    internal fun updateChatSearchSelection(selection: MessageSearchSelection) = chatSearchCoordinator.updateSelection(selection)
 
     fun setChatFontScale(scale: Float) {
         if (!scale.isFinite()) return
