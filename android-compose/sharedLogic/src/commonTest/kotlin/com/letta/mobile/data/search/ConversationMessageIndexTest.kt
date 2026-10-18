@@ -4,6 +4,8 @@ import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.model.ToolCall
+import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.UserMessage
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,7 +18,11 @@ import kotlinx.serialization.json.JsonPrimitive
 class ConversationMessageIndexTest {
     private val messages = mapOf(
         "c-1" to listOf(user("m-1", "Ask Emmanuel about the release"), assistant("m-2", "Done, shipped it.")),
-        "c-2" to listOf(assistant("m-3", "Nothing to report"), ReasoningMessage(id = "m-4", reasoning = "emmanuel thinks")),
+        "c-2" to listOf(
+            assistant("m-3", "Nothing to report"),
+            ReasoningMessage(id = "m-4", reasoning = "emmanuel thinks"),
+            ToolCallMessage(id = "m-5", toolCall = ToolCall(name = "bash", arguments = "echo emmanuel")),
+        ),
     )
     private var conversations = listOf(
         IndexedConversation("c-1", agentId = "a-1", revision = "r1"),
@@ -35,6 +41,15 @@ class ConversationMessageIndexTest {
         assertEquals(listOf("m-1"), hits.map { it.messageId })
         assertEquals("c-1", hits.single().conversationId)
         assertEquals("a-1", hits.single().agentId)
+    }
+
+    @Test
+    fun reasoningAndToolRolesAreFoundWhenSelected() = runTest {
+        val index = ConversationMessageIndex(reader, { conversations })
+        val reasoning = index.search(query("emmanuel", MessageSearchRole.Reasoning))
+        assertEquals(listOf("m-4"), reasoning.map { it.messageId })
+        val tool = index.search(query("emmanuel", MessageSearchRole.Tool))
+        assertEquals(listOf("m-5"), tool.map { it.messageId })
     }
 
     @Test
@@ -70,6 +85,9 @@ class ConversationMessageIndexTest {
         assertNull(ParsedSearchMessage("m-9", "a-1", "user", "hello", null, null).toSearchHit())
         assertNull(ParsedSearchMessage("m-9", "a-1", "user", " ", null, "c-9").toSearchHit())
     }
+
+    private fun query(text: String, role: MessageSearchRole) =
+        MessageSearchQuery(text, selection = MessageSearchSelection(roles = setOf(role)))
 
     private fun user(id: String, text: String): LettaMessage = UserMessage(id = id, contentRaw = JsonPrimitive(text))
 

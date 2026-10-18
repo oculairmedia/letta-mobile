@@ -151,10 +151,7 @@ internal fun LettaSearchScaffold(
         }
         if (parts == LettaSearchParts.FieldOnly) return@Column
 
-        if (config.scopes.isNotEmpty()) {
-            LettaSearchScopeRow(config)
-        }
-        config.toggle?.let { LettaSearchToggleRow(it) }
+        LettaSearchFilters(config)
 
         config.actions.forEach { action ->
             LettaSearchActionRow(action = action, query = query)
@@ -317,6 +314,16 @@ private fun LettaSearchField(
             },
         )
     }
+}
+
+/** Scopes, the agent-filter checkbox, and mode/role chips — pinned above the results. */
+@Composable
+private fun LettaSearchFilters(config: LettaSearchConfig) {
+    if (config.scopes.isNotEmpty()) {
+        LettaSearchScopeRow(config)
+    }
+    config.toggle?.let { LettaSearchToggleRow(it) }
+    LettaSearchChipRows(config.chipRows)
 }
 
 /** The scope buttons; they wrap rather than clip when the pane is only as wide as the header field. */

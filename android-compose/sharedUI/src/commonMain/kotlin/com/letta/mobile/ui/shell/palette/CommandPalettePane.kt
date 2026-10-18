@@ -15,9 +15,12 @@ import com.letta.mobile.ui.components.picker.PickerSearch
 import com.letta.mobile.ui.components.picker.PickerSection
 import com.letta.mobile.ui.components.picker.PickerSlots
 import com.letta.mobile.ui.components.picker.PickerTags
+import com.letta.mobile.data.search.MessageSearchSelection
+import com.letta.mobile.ui.search.LettaSearchChipRows
 import com.letta.mobile.ui.search.LettaSearchRow
 import com.letta.mobile.ui.search.LettaSearchRowLeading
 import com.letta.mobile.ui.search.LettaSearchSection
+import com.letta.mobile.ui.search.messageSearchChipRows
 import com.letta.mobile.ui.shell.header.UnifiedSearchHit
 import com.letta.mobile.ui.shell.header.UnifiedSearchKind
 import com.letta.mobile.ui.shell.header.UnifiedSearchQuery
@@ -43,8 +46,14 @@ internal val PaletteTags = PickerTags(search = CommandPaletteTags.SEARCH, rowPre
  * sections. The palette never narrows to the focused agent: it is how you reach the others.
  */
 @Composable
-internal fun rememberPaletteSections(sources: UnifiedSearchSources, query: String, recent: PaletteRecent? = null): List<PickerSection<LettaSearchRow>> {
-    val unified = rememberUnifiedSearchSections(UnifiedSearchQuery(query, filterToAgent = false, surface = UnifiedSearchSurface.Palette), sources)
+internal fun rememberPaletteSections(
+    sources: UnifiedSearchSources,
+    query: String,
+    recent: PaletteRecent? = null,
+    message: MessageSearchSelection = MessageSearchSelection(),
+): List<PickerSection<LettaSearchRow>> {
+    val asked = UnifiedSearchQuery(query, filterToAgent = false, surface = UnifiedSearchSurface.Palette, message = message)
+    val unified = rememberUnifiedSearchSections(asked, sources)
     return remember(unified, recent, sources) { paletteSections(unified, recent, sources) }
 }
 
@@ -81,7 +90,9 @@ internal fun PaletteRowLeading(row: LettaSearchRow) = LettaSearchRowLeading(row.
 @Composable
 fun CommandPalettePane(sources: UnifiedSearchSources, onOpen: (UnifiedSearchHit) -> Unit, onDismiss: () -> Unit) {
     var query by remember { mutableStateOf("") }
-    val sections = rememberPaletteSections(sources, query)
+    var message by remember { mutableStateOf(MessageSearchSelection()) }
+    val sections = rememberPaletteSections(sources, query, message = message)
+    val chips = messageSearchChipRows(sources.messageCapabilities, message) { message = it }
     LettaPicker(
         spec = LettaPickerSpec(
             sections = sections,
@@ -100,7 +111,10 @@ fun CommandPalettePane(sources: UnifiedSearchSources, onOpen: (UnifiedSearchHit)
             onDismiss = onDismiss,
         ),
         pane = PickerPane(testTag = CommandPaletteTags.PANE),
-        slots = PickerSlots(leading = { PaletteRowLeading(it.value) }),
+        slots = PickerSlots(
+            leading = { PaletteRowLeading(it.value) },
+            header = { LettaSearchChipRows(chips) },
+        ),
     )
 }
 

@@ -61,7 +61,11 @@ private fun indexedNewestFirst(conversations: List<ChatConversationSummary>): Li
 /** What the message search is asked for [query], or null when it should not run (no text, or out of scope). */
 internal fun messageQueryFor(query: UnifiedSearchQuery, sources: UnifiedSearchSources): MessageSearchQuery? {
     if (query.text.isBlank() || !query.includes(UnifiedSearchKind.Messages)) return null
-    return MessageSearchQuery(query.text.trim(), agentId = sources.agentId.takeIf { query.filterToAgent })
+    return MessageSearchQuery(
+        text = query.text.trim(),
+        agentId = sources.agentId.takeIf { query.filterToAgent },
+        selection = query.message,
+    )
 }
 
 private suspend fun searchOrEmpty(source: MessageSearchSource?, query: MessageSearchQuery): List<MessageSearchHit> {

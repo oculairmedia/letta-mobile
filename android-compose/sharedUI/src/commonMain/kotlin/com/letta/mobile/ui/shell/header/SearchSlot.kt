@@ -13,11 +13,14 @@ import com.letta.mobile.data.home.FleetSortKey
 import com.letta.mobile.data.home.HomePageActions
 import com.letta.mobile.data.home.HomeShellSearch
 import com.letta.mobile.data.home.HomeShortcut
+import com.letta.mobile.data.search.MessageSearchCapabilities
+import com.letta.mobile.data.search.MessageSearchSelection
 import com.letta.mobile.ui.search.LettaSearchConfig
 import com.letta.mobile.ui.search.LettaSearchOpenRequest
 import com.letta.mobile.ui.search.LettaSearchRow
 import com.letta.mobile.ui.search.LettaSearchSection
 import com.letta.mobile.ui.search.LettaSearchToggle
+import com.letta.mobile.ui.search.messageSearchChipRows
 import com.letta.mobile.ui.shell.pages.home.HomeSearchPlaceholder
 
 /**
@@ -57,6 +60,7 @@ data class ShellSearchContext(val onHome: Boolean = false, val inChat: Boolean =
 @Stable
 class ShellSearchFilters {
     var scopeId: String by mutableStateOf(UnifiedShellSearch.ALL)
+    var message: MessageSearchSelection by mutableStateOf(MessageSearchSelection())
     private var chosenFilterToAgent: Boolean? by mutableStateOf(null)
 
     fun filterToAgent(context: ShellSearchContext): Boolean = chosenFilterToAgent ?: context.inChat
@@ -89,12 +93,21 @@ fun rememberShellSearchSlot(
     val state by search.state.collectAsState()
     val filterToAgent = filters.filterToAgent(context)
     // On Home the page answers the query: nothing to search here (and no message search to run).
-    val query = UnifiedSearchQuery(state.query.takeIf { state.showsShellResults }.orEmpty(), filterToAgent, filters.scopeId)
+    val query = UnifiedSearchQuery(
+        text = state.query.takeIf { state.showsShellResults }.orEmpty(),
+        filterToAgent = filterToAgent,
+        scopeId = filters.scopeId,
+        message = filters.message,
+    )
     val sections = rememberUnifiedSearchSections(query, sources)
     return SearchSlot(
         query = state.query,
         onQuery = search::updateQuery,
-        config = if (state.showsShellResults) unifiedSearchConfig(filters, filterToAgent) else HomeSearchConfig,
+        config = if (state.showsShellResults) {
+            unifiedSearchConfig(filters, filterToAgent, sources.messageCapabilities)
+        } else {
+            HomeSearchConfig
+        },
         sections = if (state.showsShellResults) sections else emptyList(),
         onRowSelected = { row ->
             search.resultOpened()
@@ -104,7 +117,11 @@ fun rememberShellSearchSlot(
     )
 }
 
-private fun unifiedSearchConfig(filters: ShellSearchFilters, filterToAgent: Boolean) = LettaSearchConfig(
+private fun unifiedSearchConfig(
+    filters: ShellSearchFilters,
+    filterToAgent: Boolean,
+    capabilities: MessageSearchCapabilities,
+) = LettaSearchConfig(
     placeholder = "Search agents, conversations, messages, canvases",
     // The header field is always present; stealing focus on every recomposition would fight the
     // composer for the caret. The pane's own field still focuses when it opens.
@@ -117,6 +134,7 @@ private fun unifiedSearchConfig(filters: ShellSearchFilters, filterToAgent: Bool
         checked = filterToAgent,
         onCheckedChange = filters::setFilterToAgent,
     ),
+    chipRows = messageSearchChipRows(capabilities, filters.message) { filters.message = it },
 )
 
 /** On Home the field searches the page: Home's own wording, no scopes, filter or rows. */
