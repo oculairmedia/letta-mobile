@@ -50,28 +50,34 @@ class WorkingDirectoryPickerUiTest {
     }
     private val chosen = mutableListOf<String>()
 
-    private fun ComposeUiTest.show(
-        cwd: String?,
-        creator: FolderCreator? = null,
-        host: WorkingDirectoryPickerHost = WorkingDirectoryPickerHost(),
-        directorySource: WorkspaceDirectorySource = source,
-        agentId: String? = null,
-        onMakeDefault: (String) -> Unit = {},
-    ): WorkingDirectoryPickerController {
+    private class PickerShow(
+        val cwd: String?,
+        val creator: FolderCreator? = null,
+        val host: WorkingDirectoryPickerHost = WorkingDirectoryPickerHost(),
+        val directorySource: WorkspaceDirectorySource? = null,
+        val agentId: String? = null,
+        val onMakeDefault: (String) -> Unit = {},
+    )
+
+    private fun ComposeUiTest.show(cwd: String?) = show(PickerShow(cwd))
+
+    private fun ComposeUiTest.show(spec: PickerShow): WorkingDirectoryPickerController {
         // The fake answers at once, so the controller's work runs inline.
         val controller = WorkingDirectoryPickerController(
-            directorySource,
+            spec.directorySource ?: source,
             CoroutineScope(Dispatchers.Unconfined),
             onChosen = { chosen += it },
-            folderCreator = creator,
-        ).also { it.onMakeDefault = onMakeDefault }
+            folderCreator = spec.creator,
+        ).also { it.onMakeDefault = spec.onMakeDefault }
         setContent {
             MaterialTheme {
                 val state by controller.state.collectAsState()
-                Box(Modifier.width(1100.dp).height(900.dp)) { WorkingDirectoryPicker(state, controller, host = host) }
+                Box(Modifier.width(1100.dp).height(900.dp)) {
+                    WorkingDirectoryPicker(state, controller, host = spec.host)
+                }
             }
         }
-        runOnIdle { controller.open(cwd, agentId?.let(::AgentId)) }
+        runOnIdle { controller.open(spec.cwd, spec.agentId?.let(::AgentId)) }
         return controller
     }
 
@@ -87,7 +93,7 @@ class WorkingDirectoryPickerUiTest {
     @Test
     fun makeDefaultSavesTheFolderForTheAgentWithoutClosing() = runComposeUiTest {
         val saved = mutableListOf<String>()
-        show("/work/repo", agentId = "agent-1", onMakeDefault = { saved += it })
+        show(PickerShow("/work/repo", agentId = "agent-1", onMakeDefault = { saved += it }))
         onNodeWithTag(WorkingDirectoryPickerTags.MAKE_DEFAULT).performClick()
         runOnIdle {
             assertEquals(listOf("/work/repo"), saved)
@@ -130,7 +136,7 @@ class WorkingDirectoryPickerUiTest {
         val creator = FolderCreator { parent, name ->
             DevicePath(parent).child(FolderName(name)).value.also { tree[it] = emptyList() }
         }
-        show("/work/repo", creator = creator)
+        show(PickerShow("/work/repo", creator = creator))
         onNodeWithTag(WorkingDirectoryPickerTags.NEW_FOLDER).assertIsEnabled().performClick()
         onNodeWithTag(WorkingDirectoryPickerTags.NEW_FOLDER_NAME).performTextInput("notes")
         onNodeWithTag(WorkingDirectoryPickerTags.CREATE).performClick()
@@ -142,7 +148,15 @@ class WorkingDirectoryPickerUiTest {
     fun hostExtrasAppearWhenTheHostHasThem() = runComposeUiTest {
         val opened = mutableListOf<String>()
         var systemDialogs = 0
-        show("/work/repo", host = WorkingDirectoryPickerHost(openInFileManager = { opened += it }, pickWithSystemDialog = { systemDialogs++ }))
+        show(
+            PickerShow(
+                "/work/repo",
+                host = WorkingDirectoryPickerHost(
+                    openInFileManager = { opened += it },
+                    pickWithSystemDialog = { systemDialogs++ },
+                ),
+            ),
+        )
         onNodeWithTag(WorkingDirectoryPickerTags.FILE_MANAGER).performClick()
         onNodeWithTag(WorkingDirectoryPickerTags.SYSTEM_DIALOG).performClick()
         runOnIdle {
@@ -172,7 +186,7 @@ class WorkingDirectoryPickerUiTest {
     @Test
     fun whenBrowsingIsGatedTheReasonShowsAndATypedPathCanStillBeUsed() = runComposeUiTest {
         val gated = WorkspaceDirectorySource { throw DirectoryBrowseException(DirectoryBrowseErrors.BROWSE_UNAVAILABLE) }
-        show("/work/repo", directorySource = gated)
+        show(PickerShow("/work/repo", directorySource = gated))
         onNodeWithText(DirectoryBrowseErrors.BROWSE_UNAVAILABLE).assertExists()
         onNodeWithTag(WorkingDirectoryPickerTags.PATH).performTextReplacement("/srv/app")
         onNodeWithTag(WorkingDirectoryPickerTags.GO).performClick()

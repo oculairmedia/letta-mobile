@@ -171,12 +171,7 @@ class AppServerTurnEngine(
     /** letta-mobile-zxk2n.2: 0.34 delivery for this host (durable terminals, client preferences); off by default. */
     private val durableDelivery: DurableTurnDelivery = DurableTurnDelivery.OFF,
 ) : TurnEngine {
-    /**
-     * letta-mobile-k5nbq.9: directory a new conversation starts in when the agent has a saved
-     * default. Carried on ensureRuntime's `runtime_start` so the first turn is already there.
-     * Set from [AppServerTurnStackSpec], not a constructor argument (the engine is already at
-     * detekt's parameter cap).
-     */
+    /** letta-mobile-k5nbq.9: per-agent default cwd on `runtime_start`; set from the stack spec. */
     internal var workingDirectoryProvider: (TurnCommand) -> String? = { null }
     internal val approvalSender = ApprovalResponseSender(client, approvalDecisionCache, requestIdFactory)
 

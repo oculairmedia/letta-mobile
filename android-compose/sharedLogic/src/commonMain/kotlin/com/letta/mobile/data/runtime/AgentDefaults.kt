@@ -60,7 +60,7 @@ class StoredAgentDefaults(
 
     override fun setCwd(agentId: AgentId, cwd: String?) {
         val path = absoluteCwdOrNull(cwd)
-        if (cwd != null && cwd.isNotBlank() && path == null) return
+        if (rejectedRelativeCwd(cwd, path)) return
         update(agentId) { it.copy(cwd = path) }
     }
 
@@ -91,3 +91,7 @@ class StoredAgentDefaults(
 /** Absolute [cwd], normalized, or null when blank or not a full path. */
 internal fun absoluteCwdOrNull(cwd: String?): String? =
     devicePathOrNull(cwd)?.takeIf(DevicePath::isAbsolute)?.normalized?.value
+
+/** True when the user typed a path that is not an absolute directory. */
+private fun rejectedRelativeCwd(cwd: String?, path: String?): Boolean =
+    !cwd.isNullOrBlank() && path == null
