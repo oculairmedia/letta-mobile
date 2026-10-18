@@ -51,7 +51,6 @@ import com.letta.mobile.ui.memory.ReleaseCachesUnderPressure
 import com.letta.mobile.ui.a11y.AccessibilityTraversal
 import com.letta.mobile.ui.a11y.accessibilityTraversal
 import com.letta.mobile.ui.shell.shortcuts.ProvideShortcutHub
-import com.letta.mobile.ui.shell.shortcuts.ShellShortcutId
 import com.letta.mobile.ui.shell.shortcuts.rememberShellShortcuts
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanel
 import com.letta.mobile.ui.theme.LettaDimens
@@ -83,7 +82,7 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .then(rememberShellShortcuts(host.events.shortcutPlatform, workspaceShortcutHandler(host.events)))
+                        .then(rememberShellShortcuts(host.events.shortcuts))
                         .railLightDismiss(state.navigation.rail.expanded, host.actions.onRailDismiss),
                 ) {
                     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -270,18 +269,5 @@ private fun ShellMascotStage(focus: ShellRailFocus, agentPaneVisible: Boolean) {
         placedAgent = selectedAgentId
         val agent = selectedAgentId ?: return@LaunchedEffect
         if (stage != null) transport.transportTo(agent, stage) else transport.rest(agent)
-    }
-}
-
-/** Search still opens through the legacy palette callback when the host has not bound the full keymap. */
-private fun workspaceShortcutHandler(events: ShellWorkspaceEvents): ((ShellShortcutId) -> Unit)? {
-    val handler = events.onShortcut
-    val palette = events.onOpenCommandPalette
-    if (handler == null && palette == null) return null
-    return { id ->
-        when {
-            handler != null -> handler(id)
-            id == ShellShortcutId.Search || id == ShellShortcutId.Find || id == ShellShortcutId.QuickOpen -> palette?.invoke()
-        }
     }
 }

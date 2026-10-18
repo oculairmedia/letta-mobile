@@ -5,20 +5,12 @@ import com.letta.mobile.data.chat.runtime.ConversationStep
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellOverlays
 
-/** Overlay and navigation the keymap can drive. */
+/** Overlay and navigation the keymap can drive in the shared workspace. */
 class ShortcutActions(
     val overlays: ShellOverlays,
     val navigate: (ShellDestination) -> Unit,
-    val chrome: ShortcutChrome,
+    val toggleSidebar: () -> Unit,
     val lists: ShortcutLists,
-)
-
-/** Sidebar, composer focus, and rename — host chrome the catalog cannot reach alone. */
-class ShortcutChrome(
-    val toggleSidebar: () -> Unit = {},
-    val focusComposer: () -> Unit = {},
-    val rename: () -> Unit = {},
-    val openFilesystem: () -> Unit = {},
 )
 
 /** Ordered conversation and agent ids the prev/next chords step through. */
@@ -34,12 +26,34 @@ class ShortcutStepping(
     val open: (String) -> Unit = {},
 )
 
-/** Runs the catalog intent against the host's overlays, navigator, chrome and lists. */
+/**
+ * Every entry [handleShortcut] performs. A workspace host binds these minus the overlays it does
+ * not draw (the web has no rename dialog).
+ */
+val WorkspaceShortcuts: Set<ShellShortcutId> = setOf(
+    ShellShortcutId.Help,
+    ShellShortcutId.Search,
+    ShellShortcutId.Find,
+    ShellShortcutId.QuickOpen,
+    ShellShortcutId.NewConversation,
+    ShellShortcutId.Rename,
+    ShellShortcutId.Memory,
+    ShellShortcutId.FullscreenMemory,
+    ShellShortcutId.Schedules,
+    ShellShortcutId.Settings,
+    ShellShortcutId.PreviousConversation,
+    ShellShortcutId.NextConversation,
+    ShellShortcutId.PreviousAgent,
+    ShellShortcutId.NextAgent,
+    ShellShortcutId.ToggleSidebar,
+)
+
+/** Runs the catalog intent against the workspace's overlays, navigator, chrome and lists. */
 fun handleShortcut(id: ShellShortcutId, actions: ShortcutActions) {
     if (openOverlay(id, actions.overlays)) return
-    if (openPage(id, actions.navigate)) return
+    if (openPage(id, actions.navigate, actions.lists.agents.current())) return
     if (stepList(id, actions.lists)) return
-    runChrome(id, actions.chrome)
+    if (id == ShellShortcutId.ToggleSidebar) actions.toggleSidebar()
 }
 
 internal fun openOverlay(id: ShellShortcutId, overlays: ShellOverlays): Boolean {
@@ -53,12 +67,13 @@ internal fun openOverlay(id: ShellShortcutId, overlays: ShellOverlays): Boolean 
     return true
 }
 
-internal fun openPage(id: ShellShortcutId, navigate: (ShellDestination) -> Unit): Boolean {
-    val page = pageFor(id) ?: return false
+internal fun openPage(id: ShellShortcutId, navigate: (ShellDestination) -> Unit, agent: String?): Boolean {
+    val page = shortcutPage(id, agent) ?: return false
     navigate(page)
     return true
 }
 
+/** Steps the conversation or agent list for a prev/next entry; false for any other entry. */
 fun stepList(id: ShellShortcutId, lists: ShortcutLists): Boolean {
     val stepping = steppingOf(id, lists) ?: return false
     val target = ConversationNavigation.adjacent(stepping.ids(), stepping.current(), directionOf(id))
@@ -66,18 +81,10 @@ fun stepList(id: ShellShortcutId, lists: ShortcutLists): Boolean {
     return true
 }
 
-internal fun runChrome(id: ShellShortcutId, chrome: ShortcutChrome) {
-    when (id) {
-        ShellShortcutId.ToggleSidebar -> chrome.toggleSidebar()
-        ShellShortcutId.FocusComposer -> chrome.focusComposer()
-        ShellShortcutId.Filesystem, ShellShortcutId.FileTree -> chrome.openFilesystem()
-        else -> Unit
-    }
-}
-
-private fun pageFor(id: ShellShortcutId): ShellDestination? = when (id) {
-    ShellShortcutId.Memory, ShellShortcutId.FullscreenMemory -> ShellDestination.Memory()
-    ShellShortcutId.Schedules -> ShellDestination.Schedules()
+/** The page a page entry opens for [agent], or null when [id] is not a page entry. */
+fun shortcutPage(id: ShellShortcutId, agent: String?): ShellDestination? = when (id) {
+    ShellShortcutId.Memory, ShellShortcutId.FullscreenMemory -> ShellDestination.Memory(agent)
+    ShellShortcutId.Schedules -> ShellDestination.Schedules(agent)
     ShellShortcutId.Settings -> ShellDestination.Settings()
     else -> null
 }

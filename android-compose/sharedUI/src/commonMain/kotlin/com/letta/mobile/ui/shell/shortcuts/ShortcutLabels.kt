@@ -27,7 +27,6 @@ internal fun keyName(key: Key): String =
 private val KEY_NAMES: Map<Key, String> = mapOf(
     Key.Comma to ",",
     Key.Slash to "/",
-    Key.Grave to "`",
     Key.LeftBracket to "[",
     Key.RightBracket to "]",
     Key.DirectionUp to "Up",
@@ -41,7 +40,6 @@ private val KEY_NAMES: Map<Key, String> = mapOf(
     Key.F to "F",
     Key.B to "B",
     Key.Y to "Y",
-    Key.E to "E",
     Key.O to "O",
     Key.R to "R",
 )
