@@ -10,10 +10,7 @@ Bead `letta-mobile-s416w.27`. Plan: `docs/design/canvas-plugin-platform-plan.md`
 reached the App Server in the `external_tools` field of every `runtime_start`. Hot-loaded plugins
 need tools that come and go while the host runs.
 
-- **`ToolSource`** (`sharedLogic/.../controller/extras/ToolSource.kt`) is a set of tools that can
-  change: an `id` and a `StateFlow<List<ExternalTool>>`. `ToolSource.static(id, tools)` is a fixed
-  set, and `MutableToolSource` is one its owner republishes. A plugin host will add one source per
-  plugin.
+- The generated [ToolSource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.extras/-tool-source/index.html) and [MutableToolSource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.extras/-mutable-tool-source/index.html) references own the source/member contracts ([source](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/controller/extras/ToolSource.kt)). A plugin contributes one live source; the registry reads its current snapshot when advertising or dispatching.
 - **The registry** keeps its fixed tools as an immutable fast path. The host's canvas tools are part
   of that static set, and dispatch and advertisement for them work as before. Live sources are added
   and removed with `addSource` / `removeSource`. The merged set is computed on each read

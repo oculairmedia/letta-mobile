@@ -5,6 +5,16 @@ for workflow and architecture rules, and [CONTRIBUTING](../CONTRIBUTING.md) for 
 [DESIGN](../DESIGN.md) defines design direction; [DESIGN_SYSTEM](DESIGN_SYSTEM.md)
 is a historical token snapshot, not a competing policy spec.
 
+## Generated API reference
+
+Use the [Dokka API reference](https://oculairmedia.github.io/letta-mobile/api/)
+for shared Kotlin declarations, signatures and KDoc. Its publication is introduced
+by [PR #2119](https://github.com/oculairmedia/letta-mobile/pull/2119); the hosted links
+become available after that PR merges and its main deployment succeeds.
+Keep design intent, behavioral contracts, procedures and dated evidence here.
+Registry-generated wire tables remain useful: a Kotlin `JsonObject` declaration
+does not document the evaluated JSON schema or the supported widget catalog.
+
 Architecture documents require a `Status:` header. Label plans, historical evidence
 and unverified snapshots explicitly; a header alone does not certify freshness.
 When implementation ships, update the owning design's status and link its replacement.

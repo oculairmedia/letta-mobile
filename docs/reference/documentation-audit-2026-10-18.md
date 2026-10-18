@@ -62,3 +62,18 @@ as implementation repairs: `letta-mobile-3tmv6` (legacy seeder overwrites host r
 `letta-mobile-jigqk` (SCIP prerequisites), `letta-mobile-tvg5f` (inline merge-property mirror),
 `letta-mobile-omg9w` (Windows fixture), and `letta-mobile-tanw3` (archived POC fallback).
 Their live status is in beads; this list records the audit's disposition.
+
+## Follow-up: generated API ownership
+
+After the initial audit, the Dokka build in PR #2119 generated references for
+`sharedLogic`, `sharedUI`, `core:ids`, `core:runtime` and `plugin-api`. A follow-up
+pass removed copied declaration/property inventories from the JSON, ID, composer,
+external-tool, typed-protocol, design-token and canvas guides. Their replacements
+link to the actual generated type/member pages, checked against the local HTML.
+The initial downloadable ledger predates these removals; this section records
+their separate scope rather than claiming its document hashes cover later edits.
+
+This pass retained historical declarations, architectural invariants, examples,
+operating procedures and generated/test-locked wire tables. It also retained
+resolved token values, widget catalogs and evaluated schemas that Dokka does not
+render. API generation cannot certify those inventories or live deployment state.

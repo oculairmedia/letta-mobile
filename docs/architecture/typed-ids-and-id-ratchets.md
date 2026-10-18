@@ -10,12 +10,9 @@ PR at a time.
 
 ## Where things live
 
-| What | Where |
-|---|---|
-| Domain id value classes (`AgentId`, `ConversationId`, `MessageId`, `RunId`, `RequestId`, `PluginId`, …) | `android-compose/core/ids/src/commonMain/kotlin/com/letta/mobile/data/model/DomainIds.kt` |
-| Id string formats (`IdFormats`) | `android-compose/core/ids/src/commonMain/kotlin/com/letta/mobile/data/model/IdFormats.kt` |
-| Runtime-contract ids (`ToolCallId`, `ToolApprovalId`, `BackendId`, runtime `RunId`/`ConversationId`) | `android-compose/core/runtime/src/commonMain/kotlin/com/letta/mobile/runtime/` |
-| Ratchet test, scanner and baselines | `android-compose/architecture-tests/` (`TypedIdRepositoryArchitectureTest`, `IdRatchetScan`, `CountRatchetBaseline`, `id-literal-baseline.txt`, `raw-id-params-baseline.txt`) |
+The generated [domain ID package](https://oculairmedia.github.io/letta-mobile/api/core/ids/com.letta.mobile.data.model/index.html), [IdFormats](https://oculairmedia.github.io/letta-mobile/api/core/ids/com.letta.mobile.data.model/-id-formats/index.html) and [runtime contracts](https://oculairmedia.github.io/letta-mobile/api/core/runtime/com.letta.mobile.runtime/index.html) are the declaration inventories. Sources are [DomainIds.kt](../../android-compose/core/ids/src/commonMain/kotlin/com/letta/mobile/data/model/DomainIds.kt), [IdFormats.kt](../../android-compose/core/ids/src/commonMain/kotlin/com/letta/mobile/data/model/IdFormats.kt) and [core/runtime](../../android-compose/core/runtime/src/commonMain/kotlin/com/letta/mobile/runtime/).
+
+The scanners and baselines are separate tooling in [architecture-tests](../../android-compose/architecture-tests/): `TypedIdRepositoryArchitectureTest`, `IdRatchetScan`, `CountRatchetBaseline`, `id-literal-baseline.txt` and `raw-id-params-baseline.txt`. They are not part of the generated product API.
 
 `core/runtime` keeps its own `RunId` and `ConversationId` for the turn contracts. New data-layer
 code should take the `com.letta.mobile.data.model` types. Merging the two sets is follow-up work.

@@ -20,24 +20,41 @@ DrawBox acts exclusively as a local view/editor in `:sharedUI`. In-memory state,
 ```
 
 ## Operation Model
-All scene mutations are expressed as typed `CanvasOp` instances carrying:
-1. `opId`: Cryptographically random UUID/token for deduplication.
-2. `actorId`: Author identifier (`user:<id>` or `agent:<id>`).
-3. `lamport`: Logical timestamp incremented monotonically by the originating actor.
+All scene mutations are typed operations. The generated
+[CanvasOp API reference](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas/-canvas-op/index.html)
+contains the operation variants, serial names, fields and inherited identity/clock contract.
 
-### Supported Operations
-- `ReplaceSceneOp`: Full scene replacement (primarily used by AI agent diagram generators and baseline initializers).
-- `AddElementOp`: Adds a new element with a unique `elementId`.
-- `UpdateElementOp`: Updates an existing element identified by `elementId`.
-- `RemoveElementOp`: Removes an existing element by `elementId`.
-- `SetBackgroundOp`: Updates the canvas background color (`bgColor`).
-- `SetBackgroundPatternOp` (`set_background_pattern`): Sets the board's background pattern (kind, spacing, colour); scene-level, last writer wins.
-- `SetDocumentOp` (`set_document`): Upserts a block document (a note: Cascade v2 JSON) with its optional `frame`, `color`, `style`, `title`, geometry `owner` (`AUTO`/`EXPLICIT`/`USER`) and canvas_compose provenance (`compose`); null fields keep what the document has. Last writer wins per document.
-- `SetPluginElementOp` (`set_plugin_element`) / `RemovePluginElementOp` (`remove_plugin_element`): Upserts or removes a plugin element in the scene-root collection `_pluginElements` (type `ext:<pluginId>/<kind>`, `v`, world-unit `frame` + `owner`, `ref`, flat `props`, `snapshot` asset, `fallback` card, `meta`). Each part is its own last-writer-wins register (`CanvasLwwRegisters`, provenance under `_clock`, summarised as `_frame` and `_state`), so a person's move and a plugin's state update never overwrite each other; null fields keep what the element has; a removal clears every register older than itself and is kept as `_removed`. Envelope rules: `plugin/CanvasPluginElementSchema`; see `docs/design/canvas-plugin-platform-plan.md`. A person moves and removes them with `CanvasSession.movePluginElement(s)` / `removePluginElement` (`CanvasSessionPluginElements.kt`): a move names the frame register only, owned USER, so it and a concurrent plugin state update both survive. Each returns its `CanvasHistory` step (`plugin/CanvasPluginElementUndo`), which names only the registers the change touched, so undoing a move never rolls back plugin state. Entry fields and register clocks a newer build wrote are carried through this build's writes. Storage needs no layout change: the notebook keeps `_pluginElements` per entry and per field (`boardArrays`, layout 3), and Room and the desktop file stores hold the scene and the ops as they are.
-- `RemoveDocumentOp` (`remove_document`): Takes a block document off the board.
-- `SetArrowBindingOp` (`set_arrow_binding`): Binds (or unbinds) a connector's ends to block documents; last writer wins per connector.
-- `SetLabelOwnerOp` (`set_label_owner`): Records (or releases) the shape a label document belongs to, so ownership is never inferred from an id.
-- `BatchOp`: Atomic bundle of multiple operations applied in a single revision increment. canvas_compose publishes a whole artifact as one (`CanvasStampedBatch`); the inner ops keep their own ids and lamports.
+### Operation behavior
+
+Scene replacement is used for authoritative diagram generation and baseline initialization.
+Element edits address a stable element identity; background colour and pattern changes are
+scene-level last-writer-wins updates.
+
+Document upserts retain existing values for null fields and resolve last-writer-wins per
+document. Notes use Cascade v2 JSON; geometry ownership and canvas_compose provenance travel
+with the document. Removing a document takes its note off the board. Connector bindings resolve
+last-writer-wins per connector. Label ownership is recorded explicitly rather than inferred
+from an id.
+
+Plugin elements live in the scene-root `_pluginElements` collection. Each part is its own
+last-writer-wins register (`CanvasLwwRegisters`, provenance under `_clock`, summarised as `_frame`
+and `_state`), so a person's move and a plugin's state update never overwrite each other; null
+fields keep what the element has. A removal clears every register older than itself and is kept
+as `_removed`. Envelope rules are in `plugin/CanvasPluginElementSchema`; see
+`docs/design/canvas-plugin-platform-plan.md`.
+
+A person moves and removes plugin elements with `CanvasSession.movePluginElement(s)` /
+`removePluginElement` (`CanvasSessionPluginElements.kt`). A move names only the frame register,
+owned USER, so it and a concurrent plugin state update both survive. Each returns its
+`CanvasHistory` step (`plugin/CanvasPluginElementUndo`), which names only the registers the
+change touched, so undoing a move never rolls back plugin state. Entry fields and register clocks
+a newer build wrote are carried through this build's writes. Storage needs no layout change:
+the notebook keeps `_pluginElements` per entry and per field (`boardArrays`, layout 3), and Room
+and the desktop file stores hold the scene and the ops as they are.
+
+A batch applies its operations atomically in one revision increment. canvas_compose publishes
+a whole artifact as one batch (`CanvasStampedBatch`); inner operations retain their own ids
+and lamports.
 
 ## Agent tools
 

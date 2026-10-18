@@ -58,6 +58,13 @@ host. Either way the host closes the connection.
 
 ## Methods
 
+The [generated Kotlin method registry](https://oculairmedia.github.io/letta-mobile/api/plugin-api/com.letta.mobile.plugin.api/-lcp-method/index.html) lists SPI
+declarations; [LcpMethod source](../../android-compose/plugin-api/src/commonMain/kotlin/com/letta/mobile/plugin/api/LcpMethod.kt)
+defines them. The wire tables below are generated and checked by `LcpWireDocTest`;
+they additionally document wire directions, deadlines, capabilities and errors.
+They are retained for protocol authors rather than maintained as a second
+handwritten Kotlin API inventory.
+
 <!-- lcp_wire_tables:start -->
 | Method | Direction | Kind | Deadline | Capability | SPI member |
 |---|---|---|---|---|---|

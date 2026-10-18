@@ -413,37 +413,9 @@ Meridian intentionally types a subset of the complete upstream inventory.
 Unknown upstream frames are retained as unknown frames for diagnostics; their
 presence does not imply functional support.
 
-Typed top-level client commands:
+The typed declaration inventories are generated from the sealed hierarchies, including their `@SerialName` wire names: [client commands](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport.appserver/-app-server-command/index.html), [input payloads](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport.appserver/-app-server-input-payload/index.html) and [inbound frames](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport.appserver/-app-server-inbound-frame/index.html). Source: [AppServerCommand.kt](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/AppServerCommand.kt), [AppServerInputModels.kt](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/AppServerInputModels.kt) and [AppServerInboundFrame.kt](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/AppServerInboundFrame.kt).
 
-`auth`, `runtime_start`, `input`, `sync`, `abort_message`,
-`external_tool_call_response`, `admin_rpc`, `agent_list`, `agent_retrieve`,
-`agent_create`, `agent_update`, `agent_delete`, `conversation_list`,
-`conversation_retrieve`, `conversation_create`, `conversation_update`,
-`conversation_messages_list`, `conversation_compact`, `list_models`,
-`skill_enable`, `skill_disable`, `cron_list`, `cron_add`, `cron_get`,
-`cron_runs`, `cron_trigger`, `cron_update`, `cron_delete`, `cron_delete_all`,
-`get_reflection_settings`, `set_reflection_settings`
-
-Typed `input` payloads:
-
-`create_message`, `approval_response` with `allow` or `deny`
-
-Typed inbound frames:
-
-`auth_response`, `runtime_start_response`, `sync_response`,
-`abort_message_response`, `stream_delta`, `update_loop_status`,
-`update_device_status`, `update_queue`, `update_subagent_state`,
-`external_tool_call_request`, `control_request`, `admin_rpc_response`,
-`list_models_response`, `skill_enable_response`, `skill_disable_response`,
-`cron_list_response`, `cron_add_response`, `cron_get_response`,
-`cron_runs_response`, `cron_trigger_response`, `cron_update_response`,
-`cron_delete_response`, `cron_delete_all_response`,
-`get_reflection_settings_response`, `set_reflection_settings_response`,
-`agent_list_response`, `agent_retrieve_response`, `agent_create_response`,
-`agent_update_response`, `agent_delete_response`,
-`conversation_list_response`, `conversation_retrieve_response`,
-`conversation_create_response`, `conversation_update_response`,
-`conversation_messages_list_response`, `conversation_compact_response`
+Those pages describe the current Kotlin surface. The dated installed-upstream inventory and captured socket/retry evidence remain separate protocol evidence; generating Kotlin API docs does not validate upstream support or execution behavior.
 
 Meridian transport extensions:
 

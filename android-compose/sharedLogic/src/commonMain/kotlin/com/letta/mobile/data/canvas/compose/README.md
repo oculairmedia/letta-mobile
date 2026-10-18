@@ -34,13 +34,16 @@ Authoritative implementation files (sharedLogic `commonMain`, package
 
 ## Architecture
 
-Compose is not a second canvas. It is a compiler in front of the existing one:
+Compose is not a second canvas. It is a compiler in front of the existing one.
+The generated [compose API reference](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas.compose/-canvas-compose-service/compose.html)
+provides the current signature; [ComposeTarget](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas.compose/-compose-target/index.html)
+groups the destination canvas, scene/revision and originating tool call.
 
 ```
 agent tool call canvas_compose {items, artifact_id?, title?, canvas_id?, dry_run?}
   |  ExternalToolDispatcher (App Server) -> HostCanvasTools (Iroh host) | CanvasExternalTools (desktop)
   v
-CanvasComposeHosting.answer  ->  CanvasComposeService.compose(input, canvasId, sceneJson, revision, toolCallId, check, publish)
+CanvasComposeHosting.answer  ->  CanvasComposeService.compose
   |                                   |
   |                                   +-- CanvasComposeCompiler.compile -> ops + receipt | refusal
   |                                   +-- check: CanvasBatchValidator (the only validator; CanvasSceneValidator per op)

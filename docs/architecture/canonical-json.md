@@ -14,11 +14,7 @@ frame, a third turned a type change into a default value.
 
 ## The three instances
 
-| Instance | Bytes it handles | `ignoreUnknownKeys` | `isLenient` | `coerceInputValues` | `encodeDefaults` | `explicitNulls` |
-|---|---|---|---|---|---|---|
-| `LettaJson.wire` | App Server `/ws` frames, Iroh-relayed turn frames, the `plugins.*` admin_rpc bodies | true | false | false | false | false |
-| `LettaJson.adminRpc` | Letta REST bodies over Iroh `admin_rpc`, send-path decoder | true | true | true | false | false |
-| `LettaJson.persisted` | Files, Room JSON columns, preferences the app writes | true | false | false | true | true |
+The [generated configuration reference](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.serialization/-letta-json/index.html) owns the current flag matrix and property contracts: [wire](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.serialization/-letta-json/wire.html), [adminRpc](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.serialization/-letta-json/admin-rpc.html) and [persisted](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.serialization/-letta-json/persisted.html). These are generated from [LettaJson.kt](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/serialization/LettaJson.kt); do not copy their values into a second table here.
 
 All three keep the default `classDiscriminator = "type"`, which is what `AppServerInboundFrame` and
 `AppServerCommand` declare with `@JsonClassDiscriminator("type")`. The plugin types on the

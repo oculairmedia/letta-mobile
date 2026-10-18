@@ -10,12 +10,9 @@
 
 `PromptComposerState` lives in `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/runtime` as a small, headless state container for composer actions. It intentionally does not depend on Compose UI or prompt-bar.
 
-## First-pass scope
+## Generated prototype API
 
-- Tracks draft text and ready/sending/streaming lifecycle state.
-- Derives `canSend`, `canStop`, `isSending`, `isStreaming`, and `ready` from state.
-- Produces a `PromptComposerOutgoingPayload` during `beginSend()` and returns a reset sending state for UI/viewmodel handoff.
-- Includes cheap extension slots for attachment, template, and model metadata without implementing prompt-bar feature surfaces.
+[PromptComposerState](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.runtime/-prompt-composer-state/index.html) and [PromptComposerOutgoingPayload](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.runtime/-prompt-composer-outgoing-payload/index.html) own the property and action inventories. They are generated from [PromptComposerState.kt](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/runtime/PromptComposerState.kt). The transition semantics and production-ownership warning above remain relevant; the generated API does not make this unused prototype the live composer state.
 
 ## Suggested wiring path
 
