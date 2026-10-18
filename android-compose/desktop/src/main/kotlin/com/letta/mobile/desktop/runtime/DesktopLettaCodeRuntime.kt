@@ -128,6 +128,12 @@ internal object DesktopLocalRuntimeHost {
         applyPathDirectory = { DesktopRuntimeLaunchPreference.extraPathDirectory = it },
     )
 
+    /** letta-mobile-k5nbq.8: pinned MinGit into the per-user dir, then recheck so PATH and restart run. */
+    fun installPortableGit() {
+        DesktopRuntimeLaunchPreference.extraPathDirectory = PortableGitInstaller(portableGitRoot()).install()
+        gitEnvironment.refresh()
+    }
+
     /**
      * Reconnects the chat to a restarted child without killing it. The chat's reconnect closes its
      * old lease before the new gateway acquires one; a short-lived bridge lease keeps the owner

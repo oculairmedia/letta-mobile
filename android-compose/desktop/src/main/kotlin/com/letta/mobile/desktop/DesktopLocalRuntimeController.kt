@@ -35,6 +35,13 @@ internal data class DesktopRuntimeLaunchState(
     val isError: Boolean = false,
 )
 
+/** Progress of the Windows PortableGit download (letta-mobile-k5nbq.8). */
+internal data class DesktopGitInstallState(
+    val busy: Boolean = false,
+    val message: String? = null,
+    val isError: Boolean = false,
+)
+
 /** What the local-runtime settings need from the outside world; faked in tests. */
 internal interface DesktopLocalRuntimeBindings {
     val health: StateFlow<RuntimeHealth>
@@ -45,6 +52,10 @@ internal interface DesktopLocalRuntimeBindings {
 
     /** Checks for git again; blocking. */
     fun recheckGit()
+
+    /** Windows: download pinned PortableGit, then recheck. Throws on checksum mismatch. */
+    fun installPortableGit()
+
     fun currentLaunchState(store: SecureSettingsStore): DesktopRuntimeLaunchState
 }
 
@@ -61,6 +72,10 @@ internal object DefaultDesktopLocalRuntimeBindings : DesktopLocalRuntimeBindings
 
     override fun recheckGit() {
         DesktopLocalRuntimeHost.gitEnvironment.refresh()
+    }
+
+    override fun installPortableGit() {
+        DesktopLocalRuntimeHost.installPortableGit()
     }
 
     override fun currentLaunchState(store: SecureSettingsStore): DesktopRuntimeLaunchState {
@@ -105,6 +120,9 @@ internal class DesktopLocalRuntimeController(
 
     val git: StateFlow<DesktopGitStatus> get() = bindings.git
 
+    private val _gitInstall = MutableStateFlow(DesktopGitInstallState())
+    val gitInstall: StateFlow<DesktopGitInstallState> = _gitInstall.asStateFlow()
+
     fun forceRestart() = bindings.forceRestart()
 
     /** The card's on/off switch (G05): [on] false stops the runtime until it is turned on again. */
@@ -112,6 +130,16 @@ internal class DesktopLocalRuntimeController(
 
     fun recheckGit() {
         scope.launch { withContext(io) { bindings.recheckGit() } }
+    }
+
+    fun installGit() {
+        scope.launch {
+            _gitInstall.value = DesktopGitInstallState(busy = true)
+            val error = withContext(io) {
+                runCatching { bindings.installPortableGit() }.exceptionOrNull()?.message
+            }
+            _gitInstall.value = DesktopGitInstallState(busy = false, message = error, isError = error != null)
+        }
     }
 
     fun changeWorkingDirectory(path: String) {
@@ -172,8 +200,8 @@ internal fun DesktopGitStatus.describe(): String = when (this) {
         if (onInheritedPath) "Found in ${directory.path}." else "Found in ${directory.path} (added to the runtime's PATH)."
     is DesktopGitStatus.Missing -> when (platform) {
         DesktopGitPlatform.WINDOWS ->
-            "Not found. Memory sync, diffs and branches need Git. Install Git for Windows " +
-                "(or run winget install Git.Git); the runtime restarts by itself once it is installed."
+            "Not found. Memory sync, diffs and branches need Git. Install Git here " +
+                "(pinned Git for Windows MinGit); the runtime restarts once it is on PATH."
         DesktopGitPlatform.MAC ->
             "Not found. Memory sync, diffs and branches need Git. Run xcode-select --install in " +
                 "Terminal (or install Git); it is picked up automatically once installed."

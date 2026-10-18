@@ -112,6 +112,7 @@ private fun rememberLocalRuntimeContributions(inputs: DesktopSettingsInputs, act
     val health by runtime.health.collectAsState()
     val launchState by runtime.launch.collectAsState()
     val git by runtime.git.collectAsState()
+    val gitInstall by runtime.gitInstall.collectAsState()
     val uriHandler = LocalUriHandler.current
     var pendingDirectory by remember { mutableStateOf<String?>(null) }
     val workingDirectoryPicker = rememberDirectoryPickerLauncher(
@@ -123,10 +124,8 @@ private fun rememberLocalRuntimeContributions(inputs: DesktopSettingsInputs, act
     val runtimeActions = LocalRuntimeSectionActions(
         setRunning = runtime::setRunning,
         forceRestart = runtime::forceRestart,
-        recheckGit = runtime::recheckGit,
-        openUri = uriHandler::openUri,
-        pickWorkingDirectory = { workingDirectoryPicker.launch() },
-        resetWorkingDirectory = runtime::resetWorkingDirectory,
+        git = LocalRuntimeGitActions(runtime::recheckGit, runtime::installGit, uriHandler::openUri),
+        directory = LocalRuntimeDirectoryActions({ workingDirectoryPicker.launch() }, runtime::resetWorkingDirectory),
     )
     val directoryActions = LocalBackendDirectorySectionActions(
         pick = { backendDirectoryPicker.launch() },
@@ -138,7 +137,7 @@ private fun rememberLocalRuntimeContributions(inputs: DesktopSettingsInputs, act
         reset = actions.localBackendDirectory.onResetToDefault,
     )
     return listOf(
-        localRuntimeSection(health, git, launchState, runtimeActions),
+        localRuntimeSection(LocalRuntimeSectionState(health, git, launchState, gitInstall), runtimeActions),
         localRuntimeProviderSection(inputs.localRuntimeProvider, actions.localRuntimeProvider),
         localBackendDirectorySection(inputs.localBackendDirectory, pendingDirectory, directoryActions),
     ).map { SettingsContribution(SettingsGroup.Backend, it) }
