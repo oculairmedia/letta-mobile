@@ -53,6 +53,8 @@ import com.letta.mobile.ui.host.OverlayResponse
 import com.letta.mobile.ui.host.rememberOverlayHost
 import com.letta.mobile.ui.navigation.AdaptiveScaffold
 import com.letta.mobile.ui.navigation.AppNavGraph
+import com.letta.mobile.ui.theme.HighContrastPreference
+import com.letta.mobile.ui.theme.LocalHighContrastPreference
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.LettaTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -90,33 +92,25 @@ class MainActivity : ComponentActivity() {
             val snackbarDispatcher = remember { SnackbarDispatcher() }
             val agentDefaults = remember { StoredAgentDefaults(deps.secureSettingsStore) }
             val overlays = rememberOverlayHost()
-            val haptic = LocalHapticFeedback.current
-            val view = LocalView.current
             val appThemeState = settingsRepository.getTheme().collectAsStateWithLifecycle(initialValue = AppTheme.SYSTEM)
             val themePresetState = settingsRepository.getThemePreset().collectAsStateWithLifecycle(initialValue = ThemePreset.DEFAULT)
             val dynamicColorState = settingsRepository.getDynamicColor().collectAsStateWithLifecycle(initialValue = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
 
-            LaunchedEffect(Unit) {
-                // letta-mobile-ckmub.3.15: app screens' messages join the activity's one overlay queue.
-                snackbarDispatcher.messages.collect { message ->
-                    HapticEffects.reject(haptic, view)
-                    overlays.show(message.toOverlay())
-                }
-            }
-
+            SnackbarForwardingEffect(snackbarDispatcher, overlays)
             LastCrashSnackbarEffect(overlays)
             ChatPushServiceStartEffect()
 
-            LettaTheme(
-                appTheme = appThemeState.value,
-                themePreset = themePresetState.value,
-                dynamicColor = dynamicColorState.value,
+            CompositionLocalProvider(
+                LocalHighContrastPreference provides remember { HighContrastPreference(deps.secureSettingsStore) },
+                LocalSnackbarDispatcher provides snackbarDispatcher,
+                LocalWindowSizeClass provides windowSizeClass,
+                LocalAttentionPrefs provides deps.attentionPrefs,
+                LocalAgentDefaults provides agentDefaults,
             ) {
-                CompositionLocalProvider(
-                    LocalSnackbarDispatcher provides snackbarDispatcher,
-                    LocalWindowSizeClass provides windowSizeClass,
-                    LocalAttentionPrefs provides deps.attentionPrefs,
-                    LocalAgentDefaults provides agentDefaults,
+                LettaTheme(
+                    appTheme = appThemeState.value,
+                    themePreset = themePresetState.value,
+                    dynamicColor = dynamicColorState.value,
                 ) {
                     ProvideMascotShell(
                         agents = deps.agentRepository.agents,
@@ -143,6 +137,19 @@ class MainActivity : ComponentActivity() {
         // (Play Console) for accurate cold-start measurement beyond TTID. Called
         // once — subsequent calls on the same activity are no-ops.
         reportFullyDrawn()
+    }
+
+    @Composable
+    private fun SnackbarForwardingEffect(snackbarDispatcher: SnackbarDispatcher, overlays: OverlayHost) {
+        val haptic = LocalHapticFeedback.current
+        val view = LocalView.current
+        LaunchedEffect(Unit) {
+            // letta-mobile-ckmub.3.15: app screens' messages join the activity's one overlay queue.
+            snackbarDispatcher.messages.collect { message ->
+                HapticEffects.reject(haptic, view)
+                overlays.show(message.toOverlay())
+            }
+        }
     }
 
     /**

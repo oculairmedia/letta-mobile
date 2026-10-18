@@ -12,7 +12,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ca.oculair.meridian.R
 import com.letta.mobile.data.shell.ShellDestination
-import com.letta.mobile.ui.components.rememberReducedMotionEnabled
+import com.letta.mobile.ui.theme.rememberReducedMotionEnabled
 import com.letta.mobile.ui.memory.MemoryPageOptions
 import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.ShellPageDeps

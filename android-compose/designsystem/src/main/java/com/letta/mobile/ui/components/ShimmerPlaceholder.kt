@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 
 import com.letta.mobile.ui.motion.ChatMotionTokens
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.rememberReducedMotionEnabled
 
 @Composable
 fun shimmerColor(): Color {

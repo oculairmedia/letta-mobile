@@ -138,17 +138,13 @@ private fun runDesktopApplication(
             // Font scale is deliberately left alone: text is already sized by
             // the type scale, and scaling both compounds into unreadably small
             // labels.
-            val platformDensity = LocalDensity.current
-            val desktopDensity = remember(platformDensity) {
-                Density(
-                    density = platformDensity.density * DESKTOP_DENSITY_SCALE,
-                    fontScale = platformDensity.fontScale,
-                )
-            }
+            val desktopDensity = rememberDesktopDensity()
+            val highContrastPref = remember { com.letta.mobile.ui.theme.HighContrastPreference(DesktopPreferences.store) }
             CompositionLocalProvider(
                 LocalDensity provides desktopDensity,
                 LocalWindowExceptionHandlerFactory provides CrashReportingExceptionHandlerFactory,
                 LocalMermaidDiagramRenderer provides DesktopMermaidDiagramRenderer,
+                com.letta.mobile.ui.theme.LocalHighContrastPreference provides highContrastPref,
                 // The native Rive bridge draws every live mascot; the shared MascotAvatar reads it here,
                 // with the window-owned registry of identities, presence and the pointer.
                 com.letta.mobile.ui.mascot.LocalMascotHost provides com.letta.mobile.desktop.avatar.rive.DesktopMascotHost,
@@ -206,6 +202,17 @@ private fun runDesktopApplication(
                 }
             }
         }
+}
+
+@Composable
+private fun rememberDesktopDensity(): Density {
+    val platformDensity = LocalDensity.current
+    return remember(platformDensity) {
+        Density(
+            density = platformDensity.density * DESKTOP_DENSITY_SCALE,
+            fontScale = platformDensity.fontScale,
+        )
+    }
 }
 
 /**

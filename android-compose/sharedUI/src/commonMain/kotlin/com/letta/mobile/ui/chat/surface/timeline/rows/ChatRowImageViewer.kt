@@ -94,6 +94,7 @@ internal fun ChatImageViewerContent(
     val focusRequester = remember { FocusRequester() }
     val touch = touchStyle()
     val imageActions = LocalChatImageActions.current
+    val closeLabel = stringResource(Res.string.rows_close_viewer)
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -104,7 +105,7 @@ internal fun ChatImageViewerContent(
                 .fillMaxSize()
                 .testTag(ChatRowTestTags.IMAGE_VIEWER)
                 .background(if (touch) Color.Black else MaterialTheme.colorScheme.scrim.copy(alpha = ChatRowAlpha.viewerScrim))
-                .then(if (touch) Modifier else Modifier.clickable(onClick = onDismiss))
+                .then(if (touch) Modifier else Modifier.clickable(onClickLabel = closeLabel, onClick = onDismiss))
                 .onPreviewKeyEvent { event -> handleViewerKey(event, ViewerKeyTarget(pagerState, scope, onDismiss)) }
                 .focusRequester(focusRequester)
                 .focusable(),

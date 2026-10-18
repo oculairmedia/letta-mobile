@@ -45,6 +45,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -196,8 +198,20 @@ fun ShellRailAgentTile(
     cornerRadius: Dp = LettaDimens.Radius.sm,
     onClick: (() -> Unit)? = null,
 ) {
-    AgentOrb(index = entry.orbStyle, size = size, cornerRadius = cornerRadius, onClick = onClick, agentId = entry.agentId) {
-        Text(text = entry.initial, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
+    AgentOrb(
+        index = entry.orbStyle,
+        size = size,
+        cornerRadius = cornerRadius,
+        onClick = onClick,
+        agentId = entry.agentId,
+        modifier = Modifier.semantics { contentDescription = entry.tooltip },
+    ) {
+        Text(
+            text = entry.initial,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White,
+        )
     }
 }
 

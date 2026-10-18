@@ -37,6 +37,7 @@ import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import androidx.compose.ui.graphics.toArgb
 import com.google.android.material.color.utilities.Hct
 import com.letta.mobile.ui.theme.HctColorHarmonizer
+import com.letta.mobile.ui.theme.rememberReducedMotionEnabled
 import com.letta.mobile.util.Telemetry
 import kotlin.math.PI
 import kotlin.math.sin

@@ -22,7 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.unit.IntSize
-import com.letta.mobile.ui.components.rememberReducedMotionEnabled
+import com.letta.mobile.ui.theme.rememberReducedMotionEnabled
 import com.letta.mobile.ui.theme.LettaMotionTokens
 
 /**
