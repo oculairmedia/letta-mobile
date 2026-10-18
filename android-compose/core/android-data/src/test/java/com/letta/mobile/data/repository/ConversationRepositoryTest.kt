@@ -477,10 +477,44 @@ class ConversationRepositoryTest {
     }
 
     @Test
-    fun `no route offers neither cancel nor recompile off Iroh`() {
+    fun `off the channel a bound remote seam offers recompile but not cancelling another run`() {
         assertFalse(repository.canCancelConversationRuns())
-        assertFalse(repository.canRecompileConversations())
+        assertTrue(repository.canRecompileConversations())
     }
+
+    @Test
+    fun `off the channel with no remote seam nothing recompiles`() = runTest {
+        repository = ConversationRepository(
+            agentRepository = FakeAgentRepository(),
+            conversationDao = lazyOf(database.conversationDao()),
+            repositoryScope = repositoryScope,
+        )
+
+        assertFalse(repository.canRecompileConversations())
+        val error = runCatching { repository.recompileConversation(ConversationId("1"), false, null) }.exceptionOrNull()
+        assertTrue(error is AppServerRouteUnavailable)
+    }
+
+    @Test
+    fun `a direct dial recompiles once its in-process router advertises the relay`() = runTest {
+        val transport = FakeChannelTransport()
+        repository = ConversationRepository(
+            fakeApi,
+            FakeAgentRepository(),
+            lazyOf(database.conversationDao()),
+            repositoryScope = repositoryScope,
+            irohConversationListSource = IrohAdminRpcConversationListSource(transport, directSettings()),
+            transport = transport,
+        )
+
+        assertFalse("not connected yet", repository.canRecompileConversations())
+        transport.advertisedCapabilities = setOf(IrohConversationRecompileRpc.CAPABILITY)
+        assertTrue(repository.canRecompileConversations())
+    }
+
+    private fun directSettings() = FakeSettingsRepository(
+        initialActiveConfig = LettaConfig(id = "direct", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "ws://localhost:4500"),
+    )
 
     @Test
     fun `cancelConversation over Iroh aborts through the channel transport, not the remote seam`() = runTest {

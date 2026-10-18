@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface.composer
 
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.ContentResolver
 import android.content.Context
@@ -21,36 +22,42 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
-import java.io.ByteArrayOutputStream
+import com.letta.mobile.data.attachment.ImageIngressPolicy
+import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.composer_attach_not_an_image
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.getString
 
 /**
  * Gboard paste and cross-app image drop land on the view's rich-content receiver; Ctrl/Cmd+V
- * reads the clipboard URI. Bytes go through [ComposerImageAttacher] so they share the picker's
- * downscale (letta-mobile-k5nbq.7).
+ * reads the clipboard. Only the URIs are taken on the main thread: each image is read later on the
+ * IO dispatcher, capped at [ImageIngressPolicy.MAX_SOURCE_BYTES], then shares the picker's
+ * downscale through [ComposerImageAttacher] (letta-mobile-k5nbq.7, .15). The attacher starts
+ * reading as soon as the gesture lands, while the sender's read grant is still held.
  */
+internal actual val platformComposerImageIngress: (@Composable (ComposerImageAttacher) -> Modifier)? =
+    { attacher -> Modifier.androidImageIngress(attacher) }
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal actual fun Modifier.composerImageIngress(attacher: ComposerImageAttacher): Modifier {
+private fun Modifier.androidImageIngress(attacher: ComposerImageAttacher): Modifier {
     val context = LocalContext.current
     val latest = rememberUpdatedState(attacher)
     val resolver = context.contentResolver
     return contentReceiver(
         receiveContentListener = ReceiveContentListener { content ->
             if (!content.hasMediaType(MediaType.Image)) return@ReceiveContentListener content
-            val payloads = mutableListOf<ByteArray>()
-            val remaining = content.consume { item ->
-                val bytes = item.uri?.readImageBytes(resolver) ?: return@consume false
-                payloads += bytes
-                true
-            }
-            if (payloads.isNotEmpty()) latest.value.attach(imageBytesAsSources(payloads))
+            val uris = mutableListOf<Uri>()
+            val remaining = content.consume { item -> item.uri?.also(uris::add) != null }
+            if (uris.isNotEmpty()) latest.value.attach(uris.map { it.asImageSource(resolver) })
             remaining
         },
     ).onPreviewKeyEvent { event ->
         if (!event.isImagePasteChord()) return@onPreviewKeyEvent false
-        val payloads = clipboardImageBytes(context)
-        if (payloads.isEmpty()) return@onPreviewKeyEvent false
-        latest.value.attach(imageBytesAsSources(payloads))
+        val uris = clipboardImageUris(context)
+        if (uris.isEmpty()) return@onPreviewKeyEvent false
+        latest.value.attach(uris.map { it.asImageSource(resolver) })
         true
     }
 }
@@ -60,22 +67,26 @@ private fun androidx.compose.ui.input.key.KeyEvent.isImagePasteChord(): Boolean 
     return isCtrlPressed || isMetaPressed
 }
 
-private fun clipboardImageBytes(context: Context): List<ByteArray> {
+/** The clipboard's image URIs, decided from its description alone (no provider round trip). */
+private fun clipboardImageUris(context: Context): List<Uri> {
     val clip = (context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)?.primaryClip
         ?: return emptyList()
-    return (0 until clip.itemCount).mapNotNull { index ->
-        clip.getItemAt(index).uri?.readImageBytes(context.contentResolver)
+    if (!clip.description.hasMimeType(ImageMimeTypes)) return emptyList()
+    return (0 until clip.itemCount).mapNotNull { index -> clip.getItemAt(index).uri }
+}
+
+/** The image behind this URI, read on the IO dispatcher when the attacher gets to it. */
+private fun Uri.asImageSource(resolver: ContentResolver): ComposerImageSource = {
+    withContext(Dispatchers.IO) {
+        val mime = resolver.getType(this@asImageSource).orEmpty()
+        require(mime.isEmpty() || ClipDescription.compareMimeTypes(mime, ImageMimeTypes)) {
+            getString(Res.string.composer_attach_not_an_image)
+        }
+        val stream = checkNotNull(resolver.openInputStream(this@asImageSource)) {
+            getString(Res.string.composer_attach_not_an_image)
+        }
+        stream.use { readAtMost(ImageIngressPolicy.MAX_SOURCE_BYTES, it::read) } ?: imageTooLarge()
     }
 }
 
-private fun Uri.readImageBytes(resolver: ContentResolver): ByteArray? {
-    val mime = resolver.getType(this).orEmpty()
-    if (mime.isNotEmpty() && !mime.startsWith("image/")) return null
-    return runCatching {
-        resolver.openInputStream(this)?.use { stream ->
-            val out = ByteArrayOutputStream()
-            stream.copyTo(out)
-            out.toByteArray()
-        }
-    }.getOrNull()?.takeIf { it.isNotEmpty() }
-}
+private const val ImageMimeTypes = "image/*"
