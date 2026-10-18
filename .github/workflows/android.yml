@@ -493,8 +493,11 @@ jobs:
       - name: Generate shared API reference
         working-directory: android-compose
         run: ./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -PdokkaSourceRef=${{ github.sha }} :dokkaGeneratePublicationHtml
-      - name: Check generated entry point
-        run: test -s android-compose/build/dokka/html/index.html
+      - name: Check aggregate and module entry points
+        run: |
+          for module in . sharedLogic sharedUI core/ids core/runtime plugin-api; do
+            test -s "android-compose/build/dokka/html/$module/index.html"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: kotlin-api-docs
