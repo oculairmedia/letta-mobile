@@ -34,6 +34,8 @@ class DesktopLocalRuntimeControllerTest {
         var forceRestarts = 0
         val toggles = mutableListOf<String>()
         var gitChecks = 0
+        var gitInstalls = 0
+        var gitInstallError: String? = null
 
         override fun forceRestart() {
             forceRestarts += 1
@@ -49,6 +51,11 @@ class DesktopLocalRuntimeControllerTest {
 
         override fun recheckGit() {
             gitChecks += 1
+        }
+
+        override fun installPortableGit() {
+            gitInstalls += 1
+            gitInstallError?.let { error(it) }
         }
 
         override fun currentLaunchState(store: SecureSettingsStore) = DesktopRuntimeLaunchState(
@@ -125,7 +132,7 @@ class DesktopLocalRuntimeControllerTest {
 
     @Test
     fun gitDescriptionsPointAtTheFix() {
-        assertTrue(DesktopGitStatus.Missing(DesktopGitPlatform.WINDOWS).describe().contains("Git for Windows"))
+        assertTrue(DesktopGitStatus.Missing(DesktopGitPlatform.WINDOWS).describe().contains("Install Git"))
         assertTrue(DesktopGitStatus.Missing(DesktopGitPlatform.MAC).describe().contains("xcode-select --install"))
         assertTrue(
             DesktopGitStatus.Available(java.io.File("C:/Git/cmd"), onInheritedPath = false).describe()
@@ -140,4 +147,55 @@ class DesktopLocalRuntimeControllerTest {
         assertTrue(RuntimeHealth(restartPending = true, lastExitCode = 1).describe().startsWith("Crashed (exit 1)"))
         assertEquals("Running.", RuntimeHealth(active = true).describe())
     }
+
+    @Test
+    fun installGitRecordsAChecksumMismatch() = runTest(StandardTestDispatcher()) {
+        val bindings = FakeBindings().apply { gitInstallError = "PortableGit checksum mismatch" }
+        val controller = controller(bindings) {}
+        controller.installGit()
+        advanceUntilIdle()
+        assertEquals(1, bindings.gitInstalls)
+        assertEquals(true, controller.gitInstall.value.isError)
+        assertTrue(controller.gitInstall.value.message.orEmpty().contains("checksum mismatch"))
+    }
+
+    @Test
+    fun windowsMissingGitOffersInstallGit() {
+        val section = localRuntimeSection(
+            LocalRuntimeSectionState(
+                health = RuntimeHealth(),
+                git = DesktopGitStatus.Missing(DesktopGitPlatform.WINDOWS),
+                launch = DesktopRuntimeLaunchState(),
+            ),
+            unusedActions(),
+        )
+        val actions = section.rows.filterIsInstance<com.letta.mobile.data.settings.SettingsRow.Actions>()
+            .first { it.key == "runtime-git-actions" }
+            .actions
+        assertEquals(listOf("Install Git", "Check again"), actions.map { it.label })
+    }
+
+    @Test
+    fun macMissingGitKeepsTheXcodeHintAndGetGit() {
+        val section = localRuntimeSection(
+            LocalRuntimeSectionState(
+                health = RuntimeHealth(),
+                git = DesktopGitStatus.Missing(DesktopGitPlatform.MAC),
+                launch = DesktopRuntimeLaunchState(),
+            ),
+            unusedActions(),
+        )
+        val actions = section.rows.filterIsInstance<com.letta.mobile.data.settings.SettingsRow.Actions>()
+            .first { it.key == "runtime-git-actions" }
+            .actions
+        assertEquals(listOf("Get Git", "Check again"), actions.map { it.label })
+        assertTrue(DesktopGitStatus.Missing(DesktopGitPlatform.MAC).describe().contains("xcode-select --install"))
+    }
+
+    private fun unusedActions() = LocalRuntimeSectionActions(
+        setRunning = {},
+        forceRestart = {},
+        git = LocalRuntimeGitActions({}, {}, {}),
+        directory = LocalRuntimeDirectoryActions({}, {}),
+    )
 }

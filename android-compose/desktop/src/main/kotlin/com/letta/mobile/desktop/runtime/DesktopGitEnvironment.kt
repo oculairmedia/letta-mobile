@@ -103,6 +103,7 @@ internal class DesktopGitProbe(private val inputs: DesktopGitProbeInputs) {
             DesktopGitPlatform.WINDOWS -> listOfNotNull(
                 System.getenv("ProgramFiles")?.let { File(it, "Git/cmd") },
                 System.getenv("LOCALAPPDATA")?.let { File(it, "Programs/Git/cmd") },
+                portableGitCmdDirectory(),
             )
             DesktopGitPlatform.MAC -> listOf(
                 File("/Library/Developer/CommandLineTools/usr/bin"),

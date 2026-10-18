@@ -10,6 +10,7 @@ import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsSectionModel
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
+import com.letta.mobile.desktop.runtime.DesktopGitPlatform
 import com.letta.mobile.desktop.runtime.DesktopGitStatus
 import dev.nucleusframework.autolaunch.AutoLaunchState
 import java.io.File
@@ -39,32 +40,48 @@ internal data class DesktopLocalRuntimeProviderActions(
     val onSave: (baseUrl: String, apiKey: String?) -> Unit,
 )
 
+/** Git install/recheck and the download page; split off so the section actions stay four fields. */
+internal class LocalRuntimeGitActions(
+    val recheck: () -> Unit,
+    val install: () -> Unit,
+    val openPage: (String) -> Unit,
+)
+
+internal class LocalRuntimeDirectoryActions(
+    val pick: () -> Unit,
+    val reset: () -> Unit,
+)
+
 /** What the bundled-runtime section can ask for; the pickers and the browser belong to the container. */
 internal class LocalRuntimeSectionActions(
     val setRunning: (Boolean) -> Unit,
     val forceRestart: () -> Unit,
-    val recheckGit: () -> Unit,
-    val openUri: (String) -> Unit,
-    val pickWorkingDirectory: () -> Unit,
-    val resetWorkingDirectory: () -> Unit,
+    val git: LocalRuntimeGitActions,
+    val directory: LocalRuntimeDirectoryActions,
+)
+
+internal data class LocalRuntimeSectionState(
+    val health: RuntimeHealth,
+    val git: DesktopGitStatus,
+    val launch: DesktopRuntimeLaunchState,
+    val gitInstall: DesktopGitInstallState = DesktopGitInstallState(),
 )
 
 /** The bundled letta-code runtime: its health with start/stop/restart (F03), Git (G07) and its launch settings (F05). */
 internal fun localRuntimeSection(
-    health: RuntimeHealth,
-    git: DesktopGitStatus,
-    launch: DesktopRuntimeLaunchState,
+    state: LocalRuntimeSectionState,
     actions: LocalRuntimeSectionActions,
 ): SettingsSectionModel = SettingsSectionModel(
     key = "desktop-local-runtime",
     title = "Local runtime",
     rows = buildList {
+        val health = state.health
         add(SettingsRow.Info("runtime-health", "Health", if (health.active) "Running" else "Not running", healthTone(health)))
         add(SettingsRow.Note("runtime-health-detail", SettingsStatus(health.describe(), healthTone(health))))
         if (health.recentStderr.isNotEmpty()) add(SettingsRow.Code("runtime-stderr", health.recentStderr.joinToString("\n")))
         add(SettingsRow.Actions("runtime-run", runActions(health, actions)))
-        addAll(gitRows(git, actions))
-        addAll(launchRows(launch, actions))
+        addAll(gitRows(state.git, state.gitInstall, actions.git))
+        addAll(launchRows(state.launch, actions.directory))
     },
 )
 
@@ -81,31 +98,49 @@ private fun runActions(health: RuntimeHealth, actions: LocalRuntimeSectionAction
         )
     }
 
-private fun gitRows(git: DesktopGitStatus, actions: LocalRuntimeSectionActions): List<SettingsRow> {
+private fun gitRows(
+    git: DesktopGitStatus,
+    install: DesktopGitInstallState,
+    actions: LocalRuntimeGitActions,
+): List<SettingsRow> {
     val missing = git as? DesktopGitStatus.Missing
-    val line = SettingsRow.Note("runtime-git", SettingsStatus("Git: ${git.describe()}", if (missing != null) SettingsTone.Error else SettingsTone.Normal))
+    val tone = when {
+        install.isError || missing != null -> SettingsTone.Error
+        install.busy -> SettingsTone.Warning
+        else -> SettingsTone.Normal
+    }
+    val text = install.message?.let { "Git: $it" } ?: "Git: ${git.describe()}"
+    val line = SettingsRow.Note("runtime-git", SettingsStatus(if (install.busy) "Git: Installing pinned MinGit…" else text, tone))
     if (missing == null) return listOf(line)
+    return listOf(line, SettingsRow.Actions("runtime-git-actions", gitActions(missing, install, actions)))
+}
+
+private fun gitActions(
+    missing: DesktopGitStatus.Missing,
+    install: DesktopGitInstallState,
+    actions: LocalRuntimeGitActions,
+): List<SettingsAction> {
+    val idle = !install.busy
+    val installOrOpen = if (missing.platform == DesktopGitPlatform.WINDOWS) {
+        SettingsAction("runtime-git-install", "Install Git", primary = true, enabled = idle) { actions.install() }
+    } else {
+        SettingsAction("runtime-git-get", "Get Git", primary = true, enabled = idle) { actions.openPage(missing.platform.installUrl) }
+    }
     return listOf(
-        line,
-        SettingsRow.Actions(
-            "runtime-git-actions",
-            listOf(
-                SettingsAction("runtime-git-get", "Get Git", primary = true) { actions.openUri(missing.platform.installUrl) },
-                SettingsAction("runtime-git-recheck", "Check again") { actions.recheckGit() },
-            ),
-        ),
+        installOrOpen,
+        SettingsAction("runtime-git-recheck", "Check again", enabled = idle) { actions.recheck() },
     )
 }
 
-private fun launchRows(launch: DesktopRuntimeLaunchState, actions: LocalRuntimeSectionActions): List<SettingsRow> = buildList {
+private fun launchRows(launch: DesktopRuntimeLaunchState, directory: LocalRuntimeDirectoryActions): List<SettingsRow> = buildList {
     add(SettingsRow.Info("runtime-working-directory", "Default working directory", launch.effectiveWorkingDirectory.ifEmpty { "…" }))
     launch.message?.let { add(SettingsRow.Note("runtime-launch-message", SettingsStatus(it, if (launch.isError) SettingsTone.Error else SettingsTone.Positive))) }
     add(
         SettingsRow.Actions(
             "runtime-directory-actions",
             buildList {
-                add(SettingsAction("runtime-directory-change", "Change…") { actions.pickWorkingDirectory() })
-                if (launch.workingDirectory != null) add(SettingsAction("runtime-directory-reset", "Use Documents") { actions.resetWorkingDirectory() })
+                add(SettingsAction("runtime-directory-change", "Change…") { directory.pick() })
+                if (launch.workingDirectory != null) add(SettingsAction("runtime-directory-reset", "Use Documents") { directory.reset() })
             },
         ),
     )
