@@ -3,11 +3,13 @@
 **Status:** Completed source audit of 179 tracked Markdown inputs against code revision
 `8cad427f1c963710e949147a4d6b7690a13819ce`. This is a dated audit record, not a perpetual correctness guarantee.
 
-The [per-file ledger](documentation-audit-2026-10-18.json) records every input document,
+The [downloadable per-file ledger](https://raw.githubusercontent.com/oculairmedia/letta-mobile/5ff0932cd/docs/reference/documentation-audit-2026-10-18.json) records every input document,
 classification, findings, source/test evidence, changes and unverified claims. It includes
 root and hidden guidance, all 91 docs-tree files, all 59 nested Android/KMP files, tooling,
 experiments and vendored references. LF-normalized document hashes identify the reviewed text.
-This report and its ledger are generated audit outputs, outside the input inventory.
+This report and its ledger are audit outputs, outside the input inventory. The ledger
+is retained at an immutable Git revision and linked as a downloadable artifact; it is
+not part of the maintained documentation source tree.
 
 Three subagents audited architecture, the remaining docs tree, and nested module documentation.
 The primary audited root/hidden guidance and other tooling. A second review checked the root
