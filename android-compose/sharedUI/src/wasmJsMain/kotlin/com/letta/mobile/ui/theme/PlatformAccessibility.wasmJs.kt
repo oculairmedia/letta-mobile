@@ -4,21 +4,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 
 @Composable
-internal actual fun rememberOsReducedMotion(): Boolean =
-    remember { wasmMediaMatches(REDUCED_MOTION_QUERY) }
+internal actual fun rememberOsReducedMotion(): Boolean = remember { prefersReducedMotion() }
 
 @Composable
-internal actual fun rememberOsHighContrast(): Boolean = remember {
-    wasmMediaMatches(FORCED_COLORS_QUERY) || wasmMediaMatches(PREFERS_CONTRAST_QUERY)
-}
+internal actual fun rememberOsHighContrast(): Boolean =
+    remember { forcedColorsActive() || prefersMoreContrast() }
 
-private fun wasmMediaMatches(query: String): Boolean {
-    if (query.isEmpty()) return false
-    return js(
-        "typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia(query).matches",
-    )
-}
+private fun prefersReducedMotion(): Boolean =
+    js("typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches")
 
-private const val REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)"
-private const val FORCED_COLORS_QUERY = "(forced-colors: active)"
-private const val PREFERS_CONTRAST_QUERY = "(prefers-contrast: more)"
+private fun forcedColorsActive(): Boolean =
+    js("typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(forced-colors: active)').matches")
+
+private fun prefersMoreContrast(): Boolean =
+    js("typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(prefers-contrast: more)').matches")
