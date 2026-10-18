@@ -11,9 +11,10 @@ package com.letta.mobile.data.transport.appserver
 object LettaCodeContract {
     /**
      * THE pin: the protocol `.d.ts` corpus the Kotlin wire types are verified against, equal to the
-     * desktop and on-device runtimes. Hosts run at least this version; there is no compatibility
-     * path for older servers (no users yet, 2026-10-16). Decoding stays additive-tolerant so a
-     * newer server's extra fields never break a client.
+     * desktop and on-device runtimes. This is the supported baseline, not a claim that every
+     * runtime feature has the same introduction version. Durable input fields are separately
+     * gated by the advertised server version. Decoding remains additive-tolerant for extra fields;
+     * neither tolerance nor a field gate certifies support for another runtime release.
      */
     const val VERSION: String = "0.34.14"
 }

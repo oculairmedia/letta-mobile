@@ -55,7 +55,11 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('fetch', (event) => {
     const { request } = event;
+    const url = new URL(request.url);
+    const docsPath = new URL('api/', self.registration.scope).pathname;
+    // Dokka is a separate static site, not an app route or an offline app-shell fallback.
+    if (url.pathname === docsPath.slice(0, -1) || url.pathname.startsWith(docsPath)) return;
     // Only this site's own files; WebSocket and relay traffic never comes through here anyway.
-    if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
+    if (request.method !== 'GET' || url.origin !== self.location.origin) return;
     event.respondWith(networkFirst(event));
 });

@@ -111,6 +111,7 @@ Full notes: [`docs/architecture/kmp-phase-6-entrypoints.md`](docs/architecture/k
 | Canvas plugin platform | [plan](docs/design/canvas-plugin-platform-plan.md), [LCP wire v1](docs/reference/canvas-plugin-wire-v1.md), [view bridge v1](docs/reference/plugin-view-bridge-v1.md) |
 | Live external tools | [`docs/architecture/live-external-tools.md`](docs/architecture/live-external-tools.md) |
 | KMP module map | [`docs/architecture/kmp-module-map.md`](docs/architecture/kmp-module-map.md) |
+| Generated Kotlin API reference | [Published API docs](https://oculairmedia.github.io/letta-mobile/api/) (after the next successful main deployment); [generation guide](docs/development/api-documentation.md) |
 | Releasing | [`docs/RELEASE.md`](docs/RELEASE.md) |
 
 ## Quick start

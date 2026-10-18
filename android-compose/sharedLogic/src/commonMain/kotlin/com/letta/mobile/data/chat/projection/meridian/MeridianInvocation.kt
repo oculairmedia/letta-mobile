@@ -101,4 +101,4 @@ private const val HELP = "help"
 private val HELP_FLAGS = setOf("--help", "-h")
 private val ECHO_FLAGS = setOf("-n", "-e", "-E", "-ne", "-en")
 private val PREFIX_PROGRAMS = setOf("env", "exec", "command", "time", "nohup")
-private val ENV_ASSIGNMENT = Regex("[A-Za-z_][A-Za-z0-9_]*=.*", RegexOption.DOT_MATCHES_ALL)
+private val ENV_ASSIGNMENT = Regex("""[A-Za-z_][A-Za-z0-9_]*=[\s\S]*""")

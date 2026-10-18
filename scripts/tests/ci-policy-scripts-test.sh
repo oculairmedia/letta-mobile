@@ -57,6 +57,28 @@ assert_not_contains "$test_job" 'changed-gradle-modules.sh origin/main'
 gradle_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$test_job")"
 assert_eq "$gradle_invocations" '1'
 
+# One Pages deployment must contain both the app and generated API reference.
+# Uploading each site independently would let one replace the other.
+assemble_pages="$(
+  awk '/^  assemble-web-pages:$/ { active=1; next }
+       active && /^  [[:alnum:]_-]+:$/ { exit }
+       active { print }' "$android_workflow"
+)"
+assert_contains "$assemble_pages" 'needs: [web-wasm, api-docs]'
+assert_contains "$assemble_pages" 'name: wasm-site'
+assert_contains "$assemble_pages" 'name: kotlin-api-docs'
+assert_contains "$assemble_pages" 'path: public/api'
+assert_contains "$assemble_pages" 'test -s public/index.html && test -s public/api/index.html'
+assert_contains "$assemble_pages" "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+assert_eq "$(grep -c 'uses: actions/upload-pages-artifact@' "$android_workflow")" '1'
+deploy_pages="$(
+  awk '/^  deploy-web-pages:$/ { active=1; next }
+       active && /^  [[:alnum:]_-]+:$/ { exit }
+       active { print }' "$android_workflow"
+)"
+assert_contains "$deploy_pages" 'needs: assemble-web-pages'
+assert_contains "$deploy_pages" "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+
 perf_workflow="$(<"$SOURCE_ROOT/.github/workflows/android-perf.yml")"
 assert_contains "$perf_workflow" '- "feat/**"'
 assert_contains "$perf_workflow" '- "cursor/**"'

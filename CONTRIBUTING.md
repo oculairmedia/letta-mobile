@@ -128,6 +128,12 @@ Device install (the app has `play`/`sideload`/`root` distribution flavors, so na
 ./gradlew :app:installRootDebug
 ```
 
+## API documentation
+
+Generate the shared Kotlin API reference with Dokka; see
+[API documentation](docs/development/api-documentation.md) for local generation
+and CI downloads. Generated HTML is not committed.
+
 ## Pre-push PR readiness
 
 CI takes ~20 minutes per iteration, and the most common reason PRs loop through 2–4 review rounds is *avoidable* mechanical debt: stale-base phantom rollbacks, unused imports that detekt flags on every PR, and concurrent-collection defaults that sharedLogic transport code is expected to apply on first commit. **Before opening a PR, run the readiness checklist in [`AGENTS.md`](AGENTS.md)** — scope audit, sensitive-path grep, stale-base detection, mechanical-debt preflight. Catching these at dev cost saves a full CI cycle.

@@ -2,6 +2,7 @@
 # Add a family here, then delete the matching literals from module build files.
 # Do not bump versions in the same change that only relocates coordinates.
 [versions]
+dokka = "2.2.0"
 # Android SDK constants — consume via libs.versions.compileSdk/minSdk/targetSdk.
 compileSdk = "37"
 targetSdk = "36"
@@ -102,6 +103,7 @@ compose-desktop-material3 = "1.9.0"
 compose-desktop-material-icons = "1.7.3"
 
 [libraries]
+dokka-gradle-plugin = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokka" }
 androidx-paging-common = { module = "androidx.paging:paging-common", version.ref = "paging" }
 androidx-paging-runtime-ktx = { module = "androidx.paging:paging-runtime-ktx", version.ref = "paging" }
 androidx-paging-compose = { module = "androidx.paging:paging-compose", version.ref = "paging" }
