@@ -3,6 +3,7 @@ package com.letta.mobile.data.runtime
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.storage.JsonPreference
 import com.letta.mobile.data.storage.SecureSettingsStore
+import com.letta.mobile.data.workspace.directory.DefaultWorkingDirectoryStore
 import com.letta.mobile.data.workspace.directory.DevicePath
 import com.letta.mobile.data.workspace.directory.devicePathOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,12 +19,12 @@ import kotlinx.serialization.Serializable
 data class AgentDefaults(val cwd: String? = null)
 
 /** Read and change [AgentDefaults] for one agent. Platform-neutral; hosts only supply the storage. */
-interface AgentDefaultsRepository {
+interface AgentDefaultsRepository : DefaultWorkingDirectoryStore {
     val entries: StateFlow<Map<String, AgentDefaults>>
 
     fun defaults(agentId: AgentId): AgentDefaults
 
-    fun setCwd(agentId: AgentId, cwd: String?)
+    override fun setCwd(agentId: AgentId, cwd: String?)
 }
 
 /** [AgentDefaults.cwd] for [agentId], or null when that agent has none. */

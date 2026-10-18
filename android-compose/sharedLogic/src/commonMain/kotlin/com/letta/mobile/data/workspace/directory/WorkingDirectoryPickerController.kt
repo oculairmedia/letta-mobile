@@ -2,7 +2,6 @@ package com.letta.mobile.data.workspace.directory
 
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.runtime.AgentDefaultsRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -11,6 +10,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+/** Saves an agent's default working directory (letta-mobile-k5nbq.9). */
+fun interface DefaultWorkingDirectoryStore {
+    fun setCwd(agentId: AgentId, cwd: String?)
+}
 
 /** The worktrees letta-code made for one repository (its `.letta/worktrees` folders). */
 @Immutable
@@ -99,7 +103,7 @@ class WorkingDirectoryPickerController(
     private val recents: RecentFolders? = null,
     private val folderCreator: FolderCreator? = null,
     /** letta-mobile-k5nbq.9: where "Make default for this agent" saves; null hides that control. */
-    private val agentDefaults: AgentDefaultsRepository? = null,
+    private val agentDefaults: DefaultWorkingDirectoryStore? = null,
 ) : WorkingDirectoryPickerActions {
     private val _state = MutableStateFlow(WorkingDirectoryPickerState())
     val state: StateFlow<WorkingDirectoryPickerState> = _state.asStateFlow()
