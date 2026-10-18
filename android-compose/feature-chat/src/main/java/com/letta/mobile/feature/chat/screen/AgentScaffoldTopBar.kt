@@ -90,7 +90,12 @@ private fun rememberChatMessageSearchSlot(state: AgentScaffoldRuntimeState): Sea
     return SearchSlot(
         query = ui.searchQuery,
         onQuery = params.viewModel::updateChatSearchQuery,
-        config = ChatMessageSearch.config(placeholder, ui.isSearching),
+        config = ChatMessageSearch.config(
+            placeholder = placeholder,
+            isSearching = ui.isSearching,
+            selection = ui.searchSelection,
+            onSelection = params.viewModel::updateChatSearchSelection,
+        ),
         sections = sections,
         onRowSelected = { row ->
             val result = ChatMessageSearch.resultFor(row.id, ui.searchResults)

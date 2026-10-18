@@ -127,7 +127,7 @@ class MessageRepositoryTest {
 
     @Test
     fun `search delegates the exact request object`() = runTest {
-        val searchRequest = MessageSearchRequest(query = "needle", roles = listOf("assistant"), limit = 3)
+        val searchRequest = MessageSearchRequest(query = "needle", searchMode = "fts", limit = 3)
         val searchResult = MessageSearchResult(
             embeddedText = "needle result",
             message = JsonObject(mapOf("id" to JsonPrimitive("msg-1"))),

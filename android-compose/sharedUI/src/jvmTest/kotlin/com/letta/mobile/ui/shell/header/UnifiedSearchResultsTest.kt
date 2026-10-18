@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.shell.header
 
+import com.letta.mobile.data.search.MessageSearchCapabilities
+import com.letta.mobile.data.search.MessageSearchHit
 import com.letta.mobile.data.search.MessageSearchMode
 import com.letta.mobile.data.search.MessageSearchQuery
 import com.letta.mobile.data.search.MessageSearchRole
@@ -11,7 +13,11 @@ import kotlin.test.assertNull
 
 /** letta-mobile-k5nbq.5: the unified search's message query carries the mode and role chips. */
 class UnifiedSearchResultsTest {
-    private val search = MessageSearchSource { emptyList() }
+    private val search = object : MessageSearchSource {
+        override val capabilities = MessageSearchCapabilities.LOCAL
+
+        override suspend fun search(query: MessageSearchQuery): List<MessageSearchHit> = emptyList()
+    }
     private val sources = UnifiedSearchSources(agentId = "a-1", messageSearch = search)
 
     @Test

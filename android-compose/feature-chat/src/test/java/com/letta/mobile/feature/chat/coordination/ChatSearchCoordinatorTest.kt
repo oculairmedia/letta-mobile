@@ -5,6 +5,8 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.MessageSearchResult
+import com.letta.mobile.data.search.MessageSearchMode
+import com.letta.mobile.data.search.MessageSearchSelection
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import io.mockk.coEvery
@@ -180,6 +182,26 @@ class ChatSearchCoordinatorTest {
         coVerify(exactly = 0) { 
             repo.searchMessages(match { it.query == "first" })
         }
+    }
+
+    @Test
+    fun `picking a mode chip runs the live query again in that mode`() = runTest {
+        val scope = TestScope(UnconfinedTestDispatcher(testScheduler))
+        val repo = mockk<IMessageRepository>()
+        coEvery { repo.searchMessages(any()) } returns emptyList()
+        val uiState = MutableStateFlow(ChatUiState())
+        val coordinator = ChatSearchCoordinator(scope, repo, uiState, "agent1", { "conv1" }, remoteDebounceMs = 180L)
+
+        coordinator.updateQuery("deploy")
+        advanceTimeBy(180L)
+        runCurrent()
+        coordinator.updateSelection(MessageSearchSelection(mode = MessageSearchMode.Semantic))
+        advanceTimeBy(180L)
+        runCurrent()
+
+        coVerify(exactly = 1) { repo.searchMessages(match { it.query == "deploy" && it.searchMode == "fts" }) }
+        coVerify(exactly = 1) { repo.searchMessages(match { it.query == "deploy" && it.searchMode == "vector" }) }
+        assertEquals(MessageSearchMode.Semantic, uiState.value.searchSelection.mode)
     }
 
     @Test

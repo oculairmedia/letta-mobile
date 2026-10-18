@@ -4,44 +4,31 @@ import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.toParsed
 import com.letta.mobile.data.repository.api.IMessageRepository
-import com.letta.mobile.data.search.MessageSearchCapabilities
 import com.letta.mobile.data.search.MessageSearchQuery
-import com.letta.mobile.data.search.toRequest
+import com.letta.mobile.data.search.MessageSearchRole
+import com.letta.mobile.data.search.searchBackend
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
-import com.letta.mobile.ui.chat.render.ChatUiState
 internal class ChatSearchController(
     private val messageRepository: IMessageRepository,
 ) {
+    /** The loaded timeline's messages matching [query] whose role its chips select. */
     fun localResults(
-        query: String,
-        state: ChatUiState,
-        agentId: String,
-        conversationId: String?,
-    ): ImmutableList<ParsedSearchMessage> = localResults(
-        query = query,
-        messages = state.messages,
-        agentId = agentId,
-        conversationId = conversationId,
-    )
-
-    fun localResults(
-        query: String,
+        query: MessageSearchQuery,
         messages: List<UiMessage>,
-        agentId: String,
         conversationId: String?,
     ): ImmutableList<ParsedSearchMessage> {
-        val trimmedQuery = query.trim()
+        val trimmedQuery = query.text.trim()
         if (trimmedQuery.isBlank()) return persistentListOf()
         return messages
             .asSequence()
-            .filter { it.role == "user" || it.role == "assistant" }
+            .filter { query.selection.keeps(MessageSearchRole.fromBackend(it.role)) }
             .filter { it.content.contains(trimmedQuery, ignoreCase = true) }
             .map { message ->
                 ParsedSearchMessage(
                     messageId = message.id,
-                    agentId = agentId,
+                    agentId = query.agentId,
                     role = message.role,
                     content = message.content,
                     date = message.timestamp,
@@ -52,14 +39,10 @@ internal class ChatSearchController(
             .toImmutableList()
     }
 
-    suspend fun remoteResults(query: String, agentId: String): List<ParsedSearchMessage> =
-        remoteResults(MessageSearchQuery(text = query, agentId = agentId))
-
-    suspend fun remoteResults(query: MessageSearchQuery): List<ParsedSearchMessage> {
-        return messageRepository.searchMessages(query.toRequest(MessageSearchCapabilities.REMOTE))
-            .map { it.toParsed() }
+    /** Letta's message search for [query] (its mode and role chips), kept to [MessageSearchQuery.agentId]. */
+    suspend fun remoteResults(query: MessageSearchQuery): List<ParsedSearchMessage> =
+        query.searchBackend { request -> messageRepository.searchMessages(request).map { it.toParsed() } }
             .filter { it.agentId == query.agentId }
-    }
 
     fun mergeResults(
         local: List<ParsedSearchMessage>,

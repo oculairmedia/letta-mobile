@@ -13,6 +13,7 @@ import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.model.BackendKind
+import com.letta.mobile.data.search.MessageSearchSelection
 import com.letta.mobile.data.repository.routedBackendKind
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
@@ -622,6 +623,8 @@ internal class AdminChatViewModel @Inject constructor(
     fun updateChatSearchQuery(query: String) = chatSearchCoordinator.updateQuery(query)
 
     fun clearChatSearch() = chatSearchCoordinator.clear()
+
+    fun updateChatSearchSelection(selection: MessageSearchSelection) = chatSearchCoordinator.updateSelection(selection)
 
     fun setChatFontScale(scale: Float) {
         if (!scale.isFinite()) return
