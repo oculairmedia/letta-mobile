@@ -17,12 +17,9 @@ import com.letta.mobile.data.runtime.AppServerTurnStackSpec
 import com.letta.mobile.data.runtime.DurableTurnDelivery
 import com.letta.mobile.data.runtime.attachTurnStack
 import com.letta.mobile.data.runtime.permissionGovernedTurnStackSpec
-import com.letta.mobile.data.runtime.withWorkingDirectoryProvider
-import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AgentDefaultsRepository
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.PermissionModeSettings
-import com.letta.mobile.data.runtime.cwd
 import com.letta.mobile.data.transport.appserver.AppServerReadinessExpectation
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -207,10 +204,7 @@ class DesktopAppServerChatGatewayBuilder(
             val turnEngine = router.attachTurnStack(
                 opened.client,
                 controllerScope,
-                desktopTurnStackSpec(toolRegistry, spec.permissionModes)
-                    .withWorkingDirectoryProvider { command ->
-                        agentDefaults?.cwd(AgentId(command.agentId.value))
-                    },
+                desktopTurnStackSpec(toolRegistry, spec.permissionModes).copy(agentDefaults = agentDefaults),
             )
             engine = turnEngine
             return DesktopAppServerChatGateway(

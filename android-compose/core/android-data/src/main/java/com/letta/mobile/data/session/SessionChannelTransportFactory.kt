@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.routedBackendKind
 import com.letta.mobile.data.repository.usesAppServerChannel
+import com.letta.mobile.data.runtime.AgentDefaultsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
@@ -40,6 +41,12 @@ class SessionChannelTransportFactory @Inject constructor(
     private val notebookStore: com.letta.mobile.data.canvas.NotebookLocalStore? = null,
     /** Lazy: resolving it builds the runtime host, which only the first LOCAL_RUNTIME dial needs. */
     private val localRuntimeDialer: dagger.Lazy<LocalRuntimeDialer>? = null,
+    /**
+     * letta-mobile-k5nbq.12: an agent's saved default cwd, opened by a new conversation on a remote
+     * host (Iroh, direct ws://). Not the on-device runtime: its letta-code (0.26.1 ceiling) is not
+     * verified to answer the `get_cwd_map` read that keeps a chosen cwd from being replaced.
+     */
+    private val agentDefaults: AgentDefaultsRepository? = null,
 ) {
     fun create(
         scope: CoroutineScope,
@@ -62,6 +69,7 @@ class SessionChannelTransportFactory @Inject constructor(
                     // the identity a host paired; sealed with a Keystore key.
                     secretKeyStore = com.letta.mobile.data.security.KeystoreIrohIdentityStore.forApp(appContext),
                     externalToolRegistry = externalToolRegistry,
+                    agentDefaults = agentDefaults,
                     notebookStore = notebookStore,
                     // by4vm.50: cadence syncs only on unmetered + (charging or screen on).
                     syncBudget = AndroidSyncBudgetPolicy(appContext),
@@ -79,7 +87,7 @@ class SessionChannelTransportFactory @Inject constructor(
                 canvasClient?.detach()
                 reportChoice("local-runtime")
                 val dialer = localRuntimeDialer?.get() ?: return NoOpChannelTransport()
-                directTransport(scope, settingsRepository, dialer)
+                directTransport(scope, settingsRepository, agentDefaults = null, dialer = dialer)
             }
             BackendKind.DIRECT_WS -> {
                 canvasClient?.detach()
@@ -87,7 +95,7 @@ class SessionChannelTransportFactory @Inject constructor(
                 val serverUrl = activeConfig?.serverUrl?.trim()?.takeIf { activeConfig.usesAppServerChannel() }
                     ?: return NoOpChannelTransport().also { reportChoice("noop-no-app-server") }
                 reportChoice("direct-ws")
-                directTransport(scope, settingsRepository) { _ ->
+                directTransport(scope, settingsRepository, agentDefaults = agentDefaults) { _ ->
                     openDirectAppServerDial(AppServerWebSocketDial(serverUrl, activeConfig.accessToken), scope)
                 }
             }
@@ -98,10 +106,12 @@ class SessionChannelTransportFactory @Inject constructor(
     private fun directTransport(
         scope: CoroutineScope,
         settingsRepository: ISettingsRepository?,
+        agentDefaults: AgentDefaultsRepository?,
         dialer: DirectAppServerDialer,
     ): IChannelTransport = IrohChannelTransport(
         scope = scope,
         externalToolRegistry = externalToolRegistry,
+        agentDefaults = agentDefaults,
         directDialer = dialer,
         activeConfigProvider = { settingsRepository?.activeConfig?.value?.toConnectConfig() },
     )

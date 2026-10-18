@@ -1,6 +1,9 @@
 package com.letta.mobile.data.workspace.directory
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.runtime.AgentDefaultsRepository
+import com.letta.mobile.data.runtime.StoredAgentDefaults
+import com.letta.mobile.data.runtime.cwd
 import com.letta.mobile.data.storage.SecureSettingsStore
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -49,7 +52,15 @@ class WorkingDirectoryPickerControllerTest {
         source: WorkspaceDirectorySource = FakeSource(tree),
         recents: RecentFolders? = null,
         creator: FolderCreator? = null,
-    ) = WorkingDirectoryPickerController(source, backgroundScope, onChosen = { chosen += it }, recents = recents, folderCreator = creator)
+        defaults: AgentDefaultsRepository? = null,
+    ) = WorkingDirectoryPickerController(
+        source,
+        backgroundScope,
+        onChosen = { chosen += it },
+        recents = recents,
+        folderCreator = creator,
+        agentDefaults = defaults,
+    )
 
     @Test
     fun openingBrowsesTheConversationsDirectoryAndListsItsWorktrees() = runTest {
@@ -126,31 +137,39 @@ class WorkingDirectoryPickerControllerTest {
     }
 
     @Test
-    fun makeDefaultSavesTheBrowsedFolderWithoutClosing() = runTest {
-        val saved = mutableListOf<String>()
-        val picker = controller()
-        picker.onMakeDefault = { saved += it }
+    fun makeDefaultSavesTheBrowsedFolderAsTheAgentsDefaultWithoutClosing() = runTest {
+        val defaults = StoredAgentDefaults(MapStore())
+        val picker = controller(defaults = defaults)
         picker.open("/work", agentId = AgentId("agent-1"))
         runCurrent()
         picker.browse("/work/repo")
         runCurrent()
 
+        assertTrue(picker.state.value.canMakeDefault)
         picker.makeDefault()
 
-        assertEquals(listOf("/work/repo"), saved)
+        assertEquals("/work/repo", defaults.cwd(AgentId("agent-1")))
         assertTrue(picker.state.value.isOpen)
-        assertEquals(AgentId("agent-1"), picker.state.value.agentId)
-        assertTrue(picker.state.value.canMakeDefault)
+        assertEquals(emptyList(), chosen)
     }
 
     @Test
     fun makeDefaultIsHiddenWithoutAnAgent() = runTest {
-        val picker = controller()
+        val defaults = StoredAgentDefaults(MapStore())
+        val picker = controller(defaults = defaults)
         picker.open("/work")
         runCurrent()
         assertFalse(picker.state.value.canMakeDefault)
         picker.makeDefault()
-        assertTrue(picker.state.value.isOpen)
+        assertTrue(defaults.entries.value.isEmpty())
+    }
+
+    @Test
+    fun makeDefaultIsHiddenOnAHostThatKeepsNoAgentDefaults() = runTest {
+        val picker = controller()
+        picker.open("/work", agentId = AgentId("agent-1"))
+        runCurrent()
+        assertFalse(picker.state.value.canMakeDefault)
     }
 
     @Test

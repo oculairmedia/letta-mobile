@@ -11,7 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /** letta-mobile-by4vm.90: what a host varies in its App Server turn stack; every default is the engine's own. */
-class AppServerTurnStackSpec(
+data class AppServerTurnStackSpec(
     val clientInfo: AppServerRuntimeStartClientInfo = AppServerRuntimeStartClientInfo(name = "letta-mobile", version = "0.1"),
     val permissionMode: AppServerPermissionMode = RuntimePermissionDefaults.DEFAULT_MODE,
     val permissionModeProvider: (TurnCommand) -> AppServerPermissionMode = { permissionMode },
@@ -22,8 +22,8 @@ class AppServerTurnStackSpec(
     val autoAllowApprovals: Boolean = true,
     /** letta-mobile-zxk2n.2: durable terminals and client preferences, sent only to a host that supports them. */
     val durableDelivery: DurableTurnDelivery = DurableTurnDelivery.OFF,
-    /** letta-mobile-k5nbq.9: per-agent default cwd carried on `runtime_start`. */
-    val workingDirectoryProvider: (TurnCommand) -> String? = { null },
+    /** letta-mobile-k5nbq.9: the saved default cwd a conversation with no working directory yet starts in. */
+    val agentDefaults: AgentDefaultsRepository? = null,
 )
 
 /**
@@ -49,21 +49,6 @@ fun permissionGovernedTurnStackSpec(
     requestIdFactory = requestIdFactory,
     externalToolRegistry = externalToolRegistry,
     durableDelivery = durableDelivery,
-)
-
-/** letta-mobile-k5nbq.9: first-turn cwd on `runtime_start`, without growing [permissionGovernedTurnStackSpec]. */
-fun AppServerTurnStackSpec.withWorkingDirectoryProvider(
-    provider: (TurnCommand) -> String?,
-): AppServerTurnStackSpec = AppServerTurnStackSpec(
-    clientInfo = clientInfo,
-    permissionMode = permissionMode,
-    permissionModeProvider = permissionModeProvider,
-    onPermissionModeInForce = onPermissionModeInForce,
-    requestIdFactory = requestIdFactory,
-    externalToolRegistry = externalToolRegistry,
-    autoAllowApprovals = autoAllowApprovals,
-    durableDelivery = durableDelivery,
-    workingDirectoryProvider = provider,
 )
 
 /** letta-mobile-by4vm.90: the client -> router -> engine stack of desktop, web and Android Iroh: attaches, then [turnEngine]. */
@@ -96,8 +81,8 @@ fun AppServerRuntimeEventRouter.turnEngine(
     connectionGenerationProvider = connectionGenerationProvider,
     autoAllowApprovals = spec.autoAllowApprovals,
     durableDelivery = spec.durableDelivery,
+    agentDefaults = spec.agentDefaults,
 ).also { engine ->
-    engine.workingDirectoryProvider = spec.workingDirectoryProvider
     engine.answerApprovalReplaysFrom(this, scope)
     engine.acknowledgeTerminalsOutsideTurnsFrom(client, scope)
 }

@@ -169,9 +169,9 @@ class AppServerTurnEngine(
     private val autoAllowApprovals: Boolean = true,
     /** letta-mobile-zxk2n.2: 0.34 delivery for this host (durable terminals, client preferences); off by default. */
     private val durableDelivery: DurableTurnDelivery = DurableTurnDelivery.OFF,
+    /** letta-mobile-k5nbq.9: the saved default cwd a conversation with no working directory yet starts in. */
+    private val agentDefaults: AgentDefaultsRepository? = null,
 ) : TurnEngine {
-    /** letta-mobile-k5nbq.9: per-agent default cwd on `runtime_start`; set from the stack spec. */
-    internal var workingDirectoryProvider: (TurnCommand) -> String? = { null }
     internal val approvalSender = ApprovalResponseSender(client, approvalDecisionCache, requestIdFactory)
 
     /**
@@ -1504,7 +1504,7 @@ class AppServerTurnEngine(
             command.runtimeStart(
                 RuntimeStartExtras(
                     requestIdFactory(),
-                    workingDirectoryProvider(command),
+                    agentDefaults?.newConversationCwd(command, client, requestIdFactory),
                     turnPermissionMode,
                     clientInfo,
                 ),

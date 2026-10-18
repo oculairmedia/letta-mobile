@@ -5,6 +5,7 @@ import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.presence.ConversationRunRegistry
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.runtime.AgentDefaultsRepository
 import com.letta.mobile.data.storage.SecureSettingsStore
 import dagger.Lazy
 import io.mockk.mockk
@@ -22,6 +23,7 @@ class MainActivityDependenciesTest {
     private val secureSettingsStore = CountingLazy(mockk<SecureSettingsStore>())
     private val conversationRunRegistry = CountingLazy(mockk<ConversationRunRegistry>())
     private val attentionPrefs = CountingLazy(mockk<AttentionPrefsRepository>())
+    private val agentDefaults = CountingLazy(mockk<AgentDefaultsRepository>())
 
     private fun newDependencies() = MainActivityDependencies(
         lazySettingsRepository = settingsRepository,
@@ -30,6 +32,7 @@ class MainActivityDependenciesTest {
         lazySecureSettingsStore = secureSettingsStore,
         lazyConversationRunRegistry = conversationRunRegistry,
         lazyAttentionPrefs = attentionPrefs,
+        lazyAgentDefaults = agentDefaults,
     )
 
     @Test
@@ -41,6 +44,7 @@ class MainActivityDependenciesTest {
         assertEquals(0, secureSettingsStore.resolutions)
         assertEquals(0, conversationRunRegistry.resolutions)
         assertEquals(0, attentionPrefs.resolutions)
+        assertEquals(0, agentDefaults.resolutions)
     }
 
     @Test
@@ -52,6 +56,7 @@ class MainActivityDependenciesTest {
         assertSame(secureSettingsStore.value, dependencies.secureSettingsStore)
         assertSame(conversationRunRegistry.value, dependencies.conversationRunRegistry)
         assertSame(attentionPrefs.value, dependencies.attentionPrefs)
+        assertSame(agentDefaults.value, dependencies.agentDefaults)
         assertEquals(1, settingsRepository.resolutions)
     }
 

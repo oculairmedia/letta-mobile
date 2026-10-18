@@ -2,7 +2,6 @@ package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
-import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -32,18 +31,12 @@ class AgentDefaultsTest {
     }
 
     @Test
-    fun permissionModeAndCwdShareOneEntry() {
+    fun aClearedDefaultStaysClearedAfterARestart() {
         val store = InMemorySecureSettingsStore()
         val defaults = StoredAgentDefaults(store)
         defaults.setCwd(agent, "/work")
-        defaults.setPermissionMode(agent, AppServerPermissionMode.Strict)
-        val reloaded = StoredAgentDefaults(store).defaults(agent)
-        assertEquals("/work", reloaded.cwd)
-        assertEquals(AppServerPermissionMode.Strict, reloaded.permissionMode)
-        assertEquals(AppServerPermissionMode.Strict, reloaded.effectivePermissionMode())
-        assertEquals(AppServerPermissionMode.Unrestricted, AgentDefaults().effectivePermissionMode())
-        assertEquals(AppServerPermissionMode.Strict, RuntimePermissionDefaults.forAgent(reloaded))
-        assertEquals(AppServerPermissionMode.Unrestricted, RuntimePermissionDefaults.forAgent(null))
+        defaults.setCwd(agent, null)
+        assertNull(StoredAgentDefaults(store).cwd(agent))
     }
 
     @Test

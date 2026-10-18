@@ -2,10 +2,12 @@ package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ToolAudience
+import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.runtime.TurnCommand
+import com.letta.mobile.util.runCatchingCancellable
 
 /** Values `runtime_start` takes besides the turn's agent and conversation. */
 internal data class RuntimeStartExtras(
@@ -34,3 +36,25 @@ internal fun TurnCommand.runtimeStart(
     forceDeviceStatus = true,
     externalTools = tools?.advertisedToolsCommandGroups(audience = ToolAudience(agentId.value)),
 )
+
+/**
+ * letta-mobile-k5nbq.12: the `runtime_start.cwd` for [command] — its agent's saved default, only
+ * while the runtime keeps no working directory for the conversation. letta-code switches a
+ * conversation to any cwd `runtime_start` carries, and persists every chosen one in its cwd map
+ * (`get_cwd_map`; a conversation left in the boot directory has no entry). So a conversation whose
+ * folder was picked keeps it when its runtime starts again (a restart, a reconnect), and when the
+ * map cannot be read no cwd is sent: the runtime keeps whatever it has.
+ */
+internal suspend fun AgentDefaultsRepository.newConversationCwd(
+    command: TurnCommand,
+    client: AppServerClient,
+    requestIdFactory: () -> String,
+): String? {
+    val cwd = cwd(command.agentId) ?: return null
+    val map = runCatchingCancellable { client.getCwdMap(AppServerCommand.GetCwdMap(requestIdFactory())) }
+        .getOrNull()
+        ?.takeIf { it.success }
+        ?: return null
+    val scope = WorkingDirectoryScopeKey.of(command.agentId.value, command.conversationId.value)
+    return cwd.takeUnless { scope in map.cwdMap }
+}

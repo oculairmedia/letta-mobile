@@ -33,6 +33,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import com.letta.mobile.data.runtime.AgentDefaultsRepository
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
@@ -45,6 +46,7 @@ internal class IrohDialer(
     private val secretKeyStore: IrohSecretKeyStore = EphemeralIrohSecretKeyStore(),
     private val onConnectionLost: (reason: String, handle: IrohConnectionHandle?) -> Unit,
     private val externalToolRegistry: ExternalToolRegistry? = null,
+    private val agentDefaults: AgentDefaultsRepository? = null,
     // Create a fresh handler for each session; its peer policy is independent of App Server auth.
     private val notebookHandlerFactory: ((Endpoint, CoroutineScope) -> IrohNodeProtocolHandler?)? = null,
     private val bindEndpoint: suspend (ByteArray, List<ByteArray>) -> Endpoint = { secretKey, alpns ->
@@ -56,7 +58,7 @@ internal class IrohDialer(
     private val endpointMutex = Mutex()
 
     /** letta-mobile-by4vm.95: one engine and router for every dial of this transport, built on the first. */
-    private val transportEngine by lazy { IrohTransportEngine(scope, externalToolRegistry) }
+    private val transportEngine by lazy { IrohTransportEngine(scope, externalToolRegistry, agentDefaults) }
     private var hostEndpoint: Endpoint? = null
     private var hostNotebook: InboundNotebook? = null
 
