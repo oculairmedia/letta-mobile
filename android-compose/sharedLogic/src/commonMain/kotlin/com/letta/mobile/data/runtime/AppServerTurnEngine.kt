@@ -60,6 +60,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * only for the same agent/conversation pair. Hosts that share one App Server
  * process across several UI clients still need an external fanout controller.
  */
+@Suppress("LongParameterList")
 class AppServerTurnEngine(
     private val client: AppServerClient,
     private val mapper: AppServerRuntimeEventMapper = AppServerRuntimeEventMapper(),

@@ -63,6 +63,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * This keeps the existing mobile send coordinator and [WsChatBridge] path intact while
  * swapping only the transport underneath it. The embedded/local runtime path is not touched.
  */
+@Suppress("LongParameterList")
 class IrohChannelTransport(
     // letta-mobile-by4vm.10: optional parent context (dispatcher + lifetime bound). The transport
     // always runs its work in its OWN job ([transportJob]) and cancels it in [close]; a caller's
