@@ -17,13 +17,15 @@ object ShortcutGroups {
  */
 object ShortcutRegistry {
     val catalog: List<ShellShortcut> = listOf(
-        reserved(ShellShortcutId.Help, "Keyboard shortcuts", ShortcutGroups.GENERAL, Key.P),
+        // Ctrl+Shift+P is Firefox's private window and Ctrl+Shift+N Chrome's incognito one; pages
+        // cannot take either, so the web alternates avoid Shift there.
+        reserved(ShellShortcutId.Help, "Keyboard shortcuts", ShortcutGroups.GENERAL, Key.P, webAlternate = mod(Key.Slash)),
         entry(ShellShortcutId.Search, "Search", ShortcutGroups.GENERAL, mod(Key.K)),
-        entry(ShellShortcutId.Find, "Find in conversation", ShortcutGroups.GENERAL, mod(Key.F)),
+        entry(ShellShortcutId.Find, "Find in conversation", ShortcutGroups.GENERAL, mod(Key.F), ShortcutScope.OutsideText),
         entry(ShellShortcutId.QuickOpen, "Quick open", ShortcutGroups.GENERAL, mod(Key.O, shift = true)),
         entry(ShellShortcutId.Settings, "Settings", ShortcutGroups.GENERAL, mod(Key.Comma)),
-        reserved(ShellShortcutId.FocusComposer, "Focus composer", ShortcutGroups.CHAT, Key.L),
-        reserved(ShellShortcutId.NewConversation, "New conversation", ShortcutGroups.CHAT, Key.N),
+        reserved(ShellShortcutId.FocusComposer, "Focus composer", ShortcutGroups.CHAT, Key.L, webAlternate = mod(Key.L, shift = true)),
+        reserved(ShellShortcutId.NewConversation, "New conversation", ShortcutGroups.CHAT, Key.N, webAlternate = mod(Key.N, alt = true)),
         entry(ShellShortcutId.Rename, "Rename chat", ShortcutGroups.CHAT, mod(Key.R, alt = true)),
         ShellShortcut(
             id = ShellShortcutId.CyclePermission,
@@ -34,30 +36,39 @@ object ShortcutRegistry {
                 scope = ShortcutScope.Composer,
             ),
         ),
-        entry(ShellShortcutId.PreviousConversation, "Previous conversation", ShortcutGroups.CHAT, mod(Key.DirectionUp, shift = true)),
-        entry(ShellShortcutId.NextConversation, "Next conversation", ShortcutGroups.CHAT, mod(Key.DirectionDown, shift = true)),
+        entry(
+            ShellShortcutId.PreviousConversation, "Previous conversation", ShortcutGroups.CHAT,
+            mod(Key.DirectionUp, shift = true), ShortcutScope.OutsideText,
+        ),
+        entry(
+            ShellShortcutId.NextConversation, "Next conversation", ShortcutGroups.CHAT,
+            mod(Key.DirectionDown, shift = true), ShortcutScope.OutsideText,
+        ),
         entry(ShellShortcutId.PreviousAgent, "Previous agent", ShortcutGroups.AGENTS, mod(Key.LeftBracket, shift = true)),
         entry(ShellShortcutId.NextAgent, "Next agent", ShortcutGroups.AGENTS, mod(Key.RightBracket, shift = true)),
         entry(ShellShortcutId.Memory, "Memory", ShortcutGroups.PAGES, mod(Key.M)),
         entry(ShellShortcutId.FullscreenMemory, "Memory (full)", ShortcutGroups.PAGES, mod(Key.M, shift = true)),
         entry(ShellShortcutId.Schedules, "Schedules", ShortcutGroups.PAGES, mod(Key.Y, shift = true)),
-        entry(ShellShortcutId.Filesystem, "Filesystem", ShortcutGroups.PAGES, mod(Key.E, shift = true)),
-        entry(ShellShortcutId.FileTree, "File tree", ShortcutGroups.PAGES, mod(Key.B)),
-        entry(ShellShortcutId.Terminal, "Terminal", ShortcutGroups.PAGES, mod(Key.Grave)),
-        entry(ShellShortcutId.ToggleSidebar, "Toggle sidebar", ShortcutGroups.VIEW, mod(Key.Slash, shift = true)),
+        entry(ShellShortcutId.ToggleSidebar, "Toggle sidebar", ShortcutGroups.VIEW, mod(Key.B), ShortcutScope.OutsideText),
     )
 
-    /** The first catalog entry that matches [stroke] on [context], after the composer-focus rule. */
-    fun match(stroke: ShortcutKeystroke, context: ShortcutContext): ShellShortcutId? {
+    /** Entries the shared chat page performs itself, so every host with a composer has them. */
+    val composerOwned: Set<ShellShortcutId> = setOf(ShellShortcutId.FocusComposer, ShellShortcutId.CyclePermission)
+
+    /**
+     * The first entry [covers] accepts that matches [stroke] on [context], after the focus rule.
+     * A chord whose entry the host does not cover matches nothing, so the key reaches the field.
+     */
+    fun match(stroke: ShortcutKeystroke, context: ShortcutContext, covers: (ShellShortcutId) -> Boolean): ShellShortcutId? {
         if (!stroke.down) return null
-        val hit = catalog.firstOrNull { it.matches(stroke, context.platform) } ?: return null
+        val hit = catalog.firstOrNull { covers(it.id) && it.matches(stroke, context.platform) } ?: return null
         return if (shortcutAllowed(hit.scope, context)) hit.id else null
     }
 
-    /** Catalog entries grouped in overlay order. */
-    fun grouped(): List<Pair<String, List<ShellShortcut>>> {
+    /** The entries [covers] accepts, grouped in overlay order. */
+    fun grouped(covers: (ShellShortcutId) -> Boolean): List<Pair<String, List<ShellShortcut>>> {
         val order = listOf(ShortcutGroups.GENERAL, ShortcutGroups.CHAT, ShortcutGroups.AGENTS, ShortcutGroups.PAGES, ShortcutGroups.VIEW)
-        val byGroup = catalog.groupBy { it.group }
+        val byGroup = catalog.filter { covers(it.id) }.groupBy { it.group }
         return order.mapNotNull { group -> byGroup[group]?.let { group to it } }
     }
 }
@@ -66,11 +77,17 @@ object ShortcutRegistry {
 internal fun mod(key: Key, shift: Boolean = false, alt: Boolean = false): ShortcutChord =
     ShortcutChord(key, ShortcutModifiers(ctrlOrMeta = true, shift = shift, alt = alt))
 
-private fun entry(id: ShellShortcutId, label: String, group: String, chord: ShortcutChord): ShellShortcut =
-    ShellShortcut(id, label, group, ShortcutBinding(chord))
+private fun entry(
+    id: ShellShortcutId,
+    label: String,
+    group: String,
+    chord: ShortcutChord,
+    scope: ShortcutScope = ShortcutScope.Shell,
+): ShellShortcut = ShellShortcut(id, label, group, ShortcutBinding(chord, scope = scope))
 
-private fun reserved(id: ShellShortcutId, label: String, group: String, key: Key): ShellShortcut =
-    ShellShortcut(id, label, group, ShortcutBinding(mod(key), webAlternate = mod(key, shift = true)))
+/** Ctrl/Cmd+[key], which the browser keeps for itself; the web page binds [webAlternate] instead. */
+private fun reserved(id: ShellShortcutId, label: String, group: String, key: Key, webAlternate: ShortcutChord): ShellShortcut =
+    ShellShortcut(id, label, group, ShortcutBinding(mod(key), webAlternate = webAlternate))
 
 internal fun ShellShortcut.matches(stroke: ShortcutKeystroke, platform: ShortcutPlatform): Boolean =
     chordOn(platform).matches(stroke)
@@ -79,10 +96,11 @@ internal fun ShortcutChord.matches(stroke: ShortcutKeystroke): Boolean =
     key == stroke.key && modifiers == stroke.modifiers
 
 /**
- * Shell chords are ignored in text inputs other than the composer; composer-scoped chords
- * fire only while the prompt has focus.
+ * Shell chords are ignored in text inputs other than the composer; outside-text chords in every
+ * text input; composer-scoped chords fire only while the prompt has focus.
  */
-internal fun shortcutAllowed(scope: ShortcutScope, context: ShortcutContext): Boolean {
-    if (scope == ShortcutScope.Composer) return context.composerFocused
-    return !context.inTextInput || context.composerFocused
+internal fun shortcutAllowed(scope: ShortcutScope, context: ShortcutContext): Boolean = when (scope) {
+    ShortcutScope.Composer -> context.composerFocused
+    ShortcutScope.OutsideText -> !context.inTextInput && !context.composerFocused
+    ShortcutScope.Shell -> !context.inTextInput || context.composerFocused
 }

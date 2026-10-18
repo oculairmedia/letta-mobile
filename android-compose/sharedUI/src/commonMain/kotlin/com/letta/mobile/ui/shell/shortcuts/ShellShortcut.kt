@@ -10,6 +10,12 @@ enum class ShortcutScope {
     /** Ignored in text inputs other than the composer. */
     Shell,
 
+    /**
+     * Ignored in every text input, the composer too: the field owns these chords (selection
+     * extension on Ctrl+Shift+Up/Down, bold on Ctrl+B, find on Ctrl+F).
+     */
+    OutsideText,
+
     /** Only while the composer has focus (Shift+Tab permission cycle). */
     Composer,
 }
@@ -28,13 +34,10 @@ enum class ShellShortcutId {
     NextConversation,
     PreviousAgent,
     NextAgent,
-    Terminal,
     CyclePermission,
     ToggleSidebar,
     QuickOpen,
     Schedules,
-    Filesystem,
-    FileTree,
     Settings,
 }
 
@@ -91,4 +94,17 @@ data class ShellShortcut(
 fun ShellShortcut.chordOn(platform: ShortcutPlatform): ShortcutChord {
     val alternate = webAlternate
     return if (platform == ShortcutPlatform.Web && alternate != null) alternate else chord
+}
+
+/**
+ * A host's binding of the keymap: the [bound] verbs it actually performs through [onShortcut].
+ * A chord for any other entry is left to the focused field and is not listed in the help overlay,
+ * except the composer-owned entries ([ShortcutRegistry.composerOwned]) every chat page provides.
+ */
+class ShellShortcutBinding(
+    val platform: ShortcutPlatform,
+    val bound: Set<ShellShortcutId>,
+    val onShortcut: (ShellShortcutId) -> Unit,
+) {
+    fun covers(id: ShellShortcutId): Boolean = id in bound || id in ShortcutRegistry.composerOwned
 }

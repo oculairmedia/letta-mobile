@@ -3,6 +3,7 @@ package com.letta.mobile.desktop
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -10,10 +11,12 @@ import androidx.compose.runtime.rememberUpdatedState
 import com.letta.mobile.data.chat.runtime.ConversationListGroups
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.shell.shortcuts.ShortcutActions
-import com.letta.mobile.ui.shell.shortcuts.ShortcutChrome
+import com.letta.mobile.ui.shell.shortcuts.LocalShortcutHub
+import com.letta.mobile.ui.shell.shortcuts.ShellShortcutBinding
+import com.letta.mobile.ui.shell.shortcuts.ShortcutPlatform
 import com.letta.mobile.ui.shell.shortcuts.ShortcutLists
 import com.letta.mobile.ui.shell.shortcuts.ShortcutStepping
-import com.letta.mobile.ui.shell.shortcuts.ShellShortcutId
+import com.letta.mobile.ui.shell.shortcuts.WorkspaceShortcuts
 import com.letta.mobile.ui.shell.shortcuts.handleShortcut
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
@@ -92,7 +95,7 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                         onWidthChanged = { width ->
                             if (phone == null) layout.controller.dispatch(ShellLayoutEvent.WindowWidthChanged(width))
                         },
-                        onShortcut = rememberDesktopShortcutHandler(context, frame),
+                        shortcuts = rememberDesktopShortcuts(context, frame),
                     ),
                 ),
             )
@@ -101,10 +104,7 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
 }
 
 @Composable
-private fun rememberDesktopShortcutHandler(
-    context: DesktopShellContext,
-    frame: DesktopShellFrame,
-): (ShellShortcutId) -> Unit {
+private fun rememberDesktopShortcuts(context: DesktopShellContext, frame: DesktopShellFrame): ShellShortcutBinding {
     val layout = context.core.layout.controller
     val management = context.core.chatController.conversationManagement
     val pinned by management.pinnedConversationIds.collectAsState()
@@ -120,7 +120,7 @@ private fun rememberDesktopShortcutHandler(
     val actions = ShortcutActions(
         overlays = context.overlays,
         navigate = { destination -> navigator.navigate(destination) },
-        chrome = ShortcutChrome(toggleSidebar = { layout.dispatch(ShellLayoutEvent.ToggleSidebar) }),
+        toggleSidebar = { layout.dispatch(ShellLayoutEvent.ToggleSidebar) },
         lists = ShortcutLists(
             conversations = ShortcutStepping(
                 ids = { conversationIds },
@@ -135,7 +135,17 @@ private fun rememberDesktopShortcutHandler(
         ),
     )
     val latest = rememberUpdatedState(actions)
-    return remember { { id: ShellShortcutId -> handleShortcut(id, latest.value) } }
+    return remember { ShellShortcutBinding(ShortcutPlatform.Desktop, WorkspaceShortcuts) { id -> handleShortcut(id, latest.value) } }
+}
+
+/** Chords typed inside embedded Swing views reach the workspace's hub too (letta-mobile-k5nbq.11). */
+@Composable
+private fun DesktopSwingShortcuts() {
+    val hub = LocalShortcutHub.current
+    DisposableEffect(hub) {
+        val uninstall = installSwingShortcuts(hub)
+        onDispose { uninstall() }
+    }
 }
 
 private fun desktopWorkspaceSlots(context: DesktopShellContext, frame: DesktopShellFrame) = LettaShellWorkspaceSlots(
@@ -143,7 +153,10 @@ private fun desktopWorkspaceSlots(context: DesktopShellContext, frame: DesktopSh
     // letta-mobile-3io8k: model, context meter and Compact under the agent's name.
     agentCard = { DesktopAgentContextCard(context, frame) },
     sidePane = { DesktopShellBackgroundTasks(context, frame) },
-    overlays = { DesktopShellOverlays(context, frame) },
+    overlays = {
+        DesktopShellOverlays(context, frame)
+        DesktopSwingShortcuts()
+    },
 )
 
 /** The rail (the recents cut, expanding into the library) and the agent panel, bound to the window. */

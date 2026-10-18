@@ -14,7 +14,6 @@ import com.letta.mobile.ui.shell.palette.NewConversationDirectory
 import com.letta.mobile.ui.shell.palette.NewConversationPicker
 import com.letta.mobile.ui.shell.palette.newConversationAgents
 import com.letta.mobile.ui.shell.shortcuts.ShortcutHelpOverlay
-import com.letta.mobile.ui.shell.shortcuts.ShortcutPlatform
 
 /** What the workspace's overlays draw from. */
 @Immutable
@@ -48,13 +47,8 @@ const val NEW_CONVERSATION_RECENTS_LIMIT = 8
  * A host draws its own overlays (desktop's model picker, its identity reset) beside these.
  */
 @Composable
-fun ShellWorkspaceOverlays(
-    visibility: ShellOverlays,
-    data: ShellWorkspaceOverlayData,
-    actions: ShellWorkspaceOverlayActions,
-    platform: ShortcutPlatform = ShortcutPlatform.Desktop,
-) {
-    if (visibility.shortcutHelp) ShortcutHelpOverlay(onDismiss = { visibility.shortcutHelp = false }, platform = platform)
+fun ShellWorkspaceOverlays(visibility: ShellOverlays, data: ShellWorkspaceOverlayData, actions: ShellWorkspaceOverlayActions) {
+    if (visibility.shortcutHelp) ShortcutHelpOverlay(onDismiss = { visibility.shortcutHelp = false })
     if (visibility.newConversation) NewConversationOverlay(visibility, data, actions)
     if (visibility.commandPalette) {
         CommandPalettePane(

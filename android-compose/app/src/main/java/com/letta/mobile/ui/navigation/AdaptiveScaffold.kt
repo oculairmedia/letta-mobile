@@ -40,7 +40,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.shell.shortcuts.ProvideShortcutHub
-import com.letta.mobile.ui.shell.shortcuts.ShellShortcutId
+import com.letta.mobile.ui.shell.shortcuts.ShellShortcutBinding
 import com.letta.mobile.ui.shell.shortcuts.ShortcutHelpOverlay
 import com.letta.mobile.ui.shell.shortcuts.ShortcutPlatform
 import com.letta.mobile.ui.shell.shortcuts.rememberShellShortcuts
@@ -59,27 +59,27 @@ fun AdaptiveScaffold(
     val destination = navBackStackEntry?.destination
     val insetPolicy = remember(destination) { destination.insetPolicy() }
     var helpOpen by remember { mutableStateOf(false) }
-    val onShortcut = rememberAndroidShortcutHandler(navController) { helpOpen = !helpOpen }
+    val shortcuts = rememberAndroidShortcuts(navController) { helpOpen = !helpOpen }
 
     ProvideShortcutHub {
         AdaptiveScaffoldLayout(
             expanded = LocalWindowSizeClass.current.isExpandedWidth,
             insetPolicy = insetPolicy,
             navigationRail = { LettaNavigationRail(navController = navController) },
-            modifier = modifier.then(rememberShellShortcuts(ShortcutPlatform.Android, onShortcut)),
+            modifier = modifier.then(rememberShellShortcuts(shortcuts)),
             content = content,
         )
         if (helpOpen) {
-            ShortcutHelpOverlay(onDismiss = { helpOpen = false }, platform = ShortcutPlatform.Android)
+            ShortcutHelpOverlay(onDismiss = { helpOpen = false })
         }
     }
 }
 
 @Composable
-private fun rememberAndroidShortcutHandler(
+private fun rememberAndroidShortcuts(
     navController: NavController,
     onHelp: () -> Unit,
-): (ShellShortcutId) -> Unit {
+): ShellShortcutBinding {
     val model: AndroidShortcutViewModel = hiltViewModel()
     val conversations by model.conversations.collectAsStateWithLifecycle()
     val agents by model.agents.collectAsStateWithLifecycle()
@@ -88,7 +88,9 @@ private fun rememberAndroidShortcutHandler(
     val latestHelp = rememberUpdatedState(onHelp)
     val latestNav = rememberUpdatedState(navController)
     return remember {
-        { id: ShellShortcutId -> handleAndroidShortcut(id, latestNav.value, latestLists.value, latestHelp.value) }
+        ShellShortcutBinding(ShortcutPlatform.Android, AndroidShortcuts) { id ->
+            handleAndroidShortcut(id, latestNav.value, latestLists.value, latestHelp.value)
+        }
     }
 }
 

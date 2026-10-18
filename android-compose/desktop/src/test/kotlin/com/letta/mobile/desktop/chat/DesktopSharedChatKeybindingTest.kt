@@ -143,14 +143,15 @@ class DesktopSharedChatKeybindingTest {
         val idle = ShortcutContext(ShortcutPlatform.Desktop, inTextInput = false, composerFocused = false)
         val atPrompt = idle.copy(composerFocused = true)
         val typingElsewhere = idle.copy(inTextInput = true)
+        val everything: (ShellShortcutId) -> Boolean = { true }
         fun stroke(ctrl: Boolean, key: Key = Key.K, down: Boolean = true) =
             ShortcutKeystroke(key, down, ShortcutModifiers(ctrlOrMeta = ctrl))
 
-        assertEquals(ShellShortcutId.Search, ShortcutRegistry.match(stroke(ctrl = true), idle))
-        assertEquals(ShellShortcutId.Search, ShortcutRegistry.match(stroke(ctrl = true), atPrompt))
-        assertNull(ShortcutRegistry.match(stroke(ctrl = false), idle), "a plain K is typed into the prompt")
-        assertNull(ShortcutRegistry.match(stroke(ctrl = true, down = false), idle))
-        assertNull(ShortcutRegistry.match(stroke(ctrl = true, key = Key.J), idle))
-        assertNull(ShortcutRegistry.match(stroke(ctrl = true), typingElsewhere))
+        assertEquals(ShellShortcutId.Search, ShortcutRegistry.match(stroke(ctrl = true), idle, everything))
+        assertEquals(ShellShortcutId.Search, ShortcutRegistry.match(stroke(ctrl = true), atPrompt, everything))
+        assertNull(ShortcutRegistry.match(stroke(ctrl = false), idle, everything), "a plain K is typed into the prompt")
+        assertNull(ShortcutRegistry.match(stroke(ctrl = true, down = false), idle, everything))
+        assertNull(ShortcutRegistry.match(stroke(ctrl = true, key = Key.J), idle, everything))
+        assertNull(ShortcutRegistry.match(stroke(ctrl = true), typingElsewhere, everything))
     }
 }

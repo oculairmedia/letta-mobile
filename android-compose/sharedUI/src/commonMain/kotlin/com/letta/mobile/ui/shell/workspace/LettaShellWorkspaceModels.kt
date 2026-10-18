@@ -10,8 +10,7 @@ import androidx.compose.ui.Modifier
 import com.letta.mobile.ui.shell.ShellNavDrawerActions
 import com.letta.mobile.ui.shell.ShellNavDrawerState
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
-import com.letta.mobile.ui.shell.shortcuts.ShellShortcutId
-import com.letta.mobile.ui.shell.shortcuts.ShortcutPlatform
+import com.letta.mobile.ui.shell.shortcuts.ShellShortcutBinding
 import com.letta.mobile.ui.shell.rail.ShellAgentRailState
 import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
 import com.letta.mobile.ui.shell.rail.ShellRailMapping
@@ -101,11 +100,8 @@ class LettaShellWorkspaceHost(
 class ShellWorkspaceEvents(
     /** The workspace's measured width in dp, for the host's layout reducer. */
     val onWidthChanged: (Float) -> Unit = {},
-    /** Ctrl/Cmd+K anywhere in the workspace; null leaves search to [onShortcut]. */
-    val onOpenCommandPalette: (() -> Unit)? = null,
-    /** The shared keymap (letta-mobile-k5nbq.4); null leaves chords unmatched except search. */
-    val onShortcut: ((ShellShortcutId) -> Unit)? = null,
-    val shortcutPlatform: ShortcutPlatform = ShortcutPlatform.Desktop,
+    /** The host's binding of the shared keymap (letta-mobile-k5nbq.4); null leaves every chord to the focused field. */
+    val shortcuts: ShellShortcutBinding? = null,
 )
 
 /** The drawer's view of the navigation: the rail's orbs (its library stays the wide rail's) and the panel. */

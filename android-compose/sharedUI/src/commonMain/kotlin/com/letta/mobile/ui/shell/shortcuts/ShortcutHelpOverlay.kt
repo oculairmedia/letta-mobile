@@ -19,14 +19,14 @@ import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * Help overlay generated from [ShortcutRegistry] (letta-mobile-k5nbq.4). The chord column uses
- * [platform] so web reserved-key alternates show in the browser.
+ * Help overlay generated from [ShortcutRegistry] (letta-mobile-k5nbq.4): only the entries the
+ * window's [ShellShortcutBinding] covers, with the chords of its platform (the web's alternates in
+ * the browser).
  */
 @Composable
-fun ShortcutHelpOverlay(
-    onDismiss: () -> Unit,
-    platform: ShortcutPlatform = ShortcutPlatform.Desktop,
-) {
+fun ShortcutHelpOverlay(onDismiss: () -> Unit) {
+    val binding = LocalShortcutHub.current.binding ?: return
+    val platform = binding.platform
     val spec = LettaAlertSpec(
         title = "Keyboard shortcuts",
         buttons = LettaPaneButtons(dismiss = LettaPaneButton("Close", onDismiss)),
@@ -35,7 +35,7 @@ fun ShortcutHelpOverlay(
     )
     LettaAlertPane(spec, onDismiss) {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
-            ShortcutRegistry.grouped().forEach { (group, entries) ->
+            ShortcutRegistry.grouped(binding::covers).forEach { (group, entries) ->
                 item(key = group) { GroupTitle(group) }
                 items(entries, key = { it.id }) { shortcut ->
                     ShortcutRow(shortcut, platform)

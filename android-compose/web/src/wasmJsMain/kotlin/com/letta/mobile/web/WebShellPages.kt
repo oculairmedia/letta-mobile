@@ -41,7 +41,6 @@ import com.letta.mobile.ui.shell.workspace.ShellChatDestination
 import com.letta.mobile.ui.shell.workspace.ShellChatPage
 import com.letta.mobile.ui.shell.workspace.ShellChatWaiting
 import com.letta.mobile.ui.shell.workspace.ShellChatWaitingPage
-import com.letta.mobile.ui.shell.shortcuts.ShortcutPlatform
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceEvents
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceLayout
@@ -86,14 +85,13 @@ internal fun webWorkspace(shell: WebShell, page: WebPageInputs, header: ShellWor
                 },
                 agentCard = { BackendConnectionStatusRow(page.connection) },
                 overlays = {
-                    ShellWorkspaceOverlays(workspace.overlays, webOverlayData(shell), webOverlayActions(shell), ShortcutPlatform.Web)
+                    ShellWorkspaceOverlays(workspace.overlays, webOverlayData(shell), webOverlayActions(shell))
                 },
             ),
             drawer = shell.drawer,
             events = ShellWorkspaceEvents(
                 onWidthChanged = { shell.layout.dispatch(ShellLayoutEvent.WindowWidthChanged(it)) },
-                onShortcut = webShortcutHandler(shell),
-                shortcutPlatform = ShortcutPlatform.Web,
+                shortcuts = webShortcuts(shell),
             ),
         ),
     )
