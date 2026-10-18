@@ -74,6 +74,7 @@ internal fun macWorkspaceFlag(selectorName: String): Boolean? = runCatching {
     (Pointer.nativeValue(raw) and 0xFFL) != 0L
 }.getOrNull()
 
+@Suppress("FunctionNaming")
 private interface ObjCRuntime : Library {
     fun objc_getClass(name: String): Pointer?
     fun sel_registerName(name: String): Pointer?
