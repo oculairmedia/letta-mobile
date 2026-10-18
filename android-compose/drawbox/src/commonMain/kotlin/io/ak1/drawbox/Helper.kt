@@ -154,6 +154,7 @@ internal class ImageBitmapCache(
     private val scope: CoroutineScope,
     /** Decoded bytes kept before images not drawn lately are dropped (see [trimToBudget]). */
     private val budgetBytes: Long = DEFAULT_IMAGE_BUDGET_BYTES,
+    private val decode: (ByteArray, Int, Int) -> ImageBitmap? = ::decodeImageBitmapDownsampled,
 ) {
     private data class Entry(
         val gen: Long,
@@ -224,8 +225,10 @@ internal class ImageBitmapCache(
             mipLevelPx = mipLevelPx,
             bitmap = staleBitmap,
         ).also { it.lastUse = frame }
-        scope.launch(Dispatchers.Default) {
-            val decoded = decodeImageBitmapDownsampled(bytes, mipLevelPx, mipLevelPx)
+        scope.launch {
+            val decoded = kotlinx.coroutines.withContext(Dispatchers.Default) {
+                decode(bytes, mipLevelPx, mipLevelPx)
+            }
             // Only land the result if our generation is still current. A
             // newer request that arrived during the decode (fast resize,
             // new bytes) supersedes us; we drop the result.
