@@ -39,7 +39,7 @@ characters), `artifact_id` (starts with a lowercase letter or digit; then lowerc
 coordinates, sizes or layers. One call makes one artifact, all or nothing. Compose only creates; use
 `apply-ops` to change or remove what is on the board.
 
-Kinds (each item may also have a `key`: starts with a lowercase letter or digit, then lowercase letters, digits, `_`, `-`, at most 32 total, unique):
+Kinds (each item may also have a `key`: starts with a lowercase letter or digit, then lowercase letters, digits, `_`, `-`, at most 32, unique):
 
 - `NOTE {markdown, title?, color?}`: markdown up to 4000 characters.
 - `CHECKLIST {items: [{text, checked?}], title?, color?}`: 1 to 40 entries of up to 200 characters.
