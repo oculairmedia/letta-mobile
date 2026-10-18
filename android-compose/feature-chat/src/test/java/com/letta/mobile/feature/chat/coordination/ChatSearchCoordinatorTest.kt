@@ -10,76 +10,37 @@ import com.letta.mobile.data.search.MessageSearchSelection
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import io.mockk.coEvery
-import io.mockk.mockk
-import io.mockk.verify
 import io.mockk.coVerify
+import io.mockk.mockk
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Test
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Test
 
 class ChatSearchCoordinatorTest {
 
     @Test
     fun `updateQuery with blank string clears state`() = runTest {
-        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
-        val scope = TestScope(testDispatcher)
-        val repo = mockk<IMessageRepository>(relaxed = true)
-        val uiState = MutableStateFlow(
-            ChatUiState(
-                searchQuery = "old",
-                isSearchActive = true,
-                isSearching = true,
-                searchResults = persistentListOf(mockk())
-            )
-        )
-
-        val coordinator = ChatSearchCoordinator(
-            scope = scope,
-            messageRepository = repo,
-            uiState = uiState,
-            agentId = "agent1",
-            conversationId = { "conv1" }
-        )
+        val uiState = MutableStateFlow(populatedSearchState())
+        val coordinator = newCoordinator(uiState = uiState)
 
         coordinator.updateQuery("   ")
 
-        val state = uiState.value
-        assertEquals("", state.searchQuery)
-        assertFalse(state.isSearchActive)
-        assertFalse(state.isSearching)
-        assertTrue(state.searchResults.isEmpty())
+        assertSearchCleared(uiState.value)
     }
 
     @Test
     fun `updateQuery immediately updates local results and starts search`() = runTest {
-        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
-        val scope = TestScope(testDispatcher)
-        val repo = mockk<IMessageRepository>(relaxed = true)
-
-        val localMessage = UiMessage(
-            id = "msg1",
-            role = "user",
-            content = "hello world",
-            timestamp = "2024"
-        )
-        val uiState = MutableStateFlow(ChatUiState(messages = persistentListOf(localMessage)))
-
-        val coordinator = ChatSearchCoordinator(
-            scope = scope,
-            messageRepository = repo,
-            uiState = uiState,
-            agentId = "agent1",
-            conversationId = { "conv1" }
-        )
+        val uiState = MutableStateFlow(ChatUiState(messages = persistentListOf(localHelloMessage())))
+        val coordinator = newCoordinator(uiState = uiState)
 
         coordinator.updateQuery("hello")
 
@@ -94,10 +55,7 @@ class ChatSearchCoordinatorTest {
 
     @Test
     fun `remote debounce updates results and clears searching flag`() = runTest {
-        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
-        val scope = TestScope(testDispatcher)
         val repo = mockk<IMessageRepository>()
-        
         coEvery { repo.searchMessages(any()) } returns listOf(
             MessageSearchResult(
                 embeddedText = "remote hello",
@@ -108,89 +66,54 @@ class ChatSearchCoordinatorTest {
                     put("text", "remote hello")
                     put("date", "2024")
                     put("conversation_id", "conv1")
-                }
-            )
+                },
+            ),
         )
-
-        val localMessage = UiMessage(
-            id = "msg1",
-            role = "user",
-            content = "hello world",
-            timestamp = "2024"
-        )
-        val uiState = MutableStateFlow(ChatUiState(messages = persistentListOf(localMessage)))
-
-        val coordinator = ChatSearchCoordinator(
-            scope = scope,
-            messageRepository = repo,
-            uiState = uiState,
-            agentId = "agent1",
-            conversationId = { "conv1" },
-            remoteDebounceMs = 180L
-        )
+        val uiState = MutableStateFlow(ChatUiState(messages = persistentListOf(localHelloMessage())))
+        val coordinator = newCoordinator(repo = repo, uiState = uiState)
 
         coordinator.updateQuery("hello")
-        
-        // Before delay, only local
+
         assertEquals(1, uiState.value.searchResults.size)
         assertTrue(uiState.value.isSearching)
 
-        // Advance time
         advanceTimeBy(180L)
         runCurrent()
 
-        // After delay, both local and remote
         val state = uiState.value
         assertFalse(state.isSearching)
         assertEquals(2, state.searchResults.size)
         assertEquals("hello world", state.searchResults[0].content)
         assertEquals("remote hello", state.searchResults[1].content)
-        
         coVerify(exactly = 1) { repo.searchMessages(any()) }
     }
 
     @Test
     fun `concurrent queries cancel previous debounce`() = runTest {
-        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
-        val scope = TestScope(testDispatcher)
         val repo = mockk<IMessageRepository>()
-        
         coEvery { repo.searchMessages(any()) } returns emptyList()
-
         val uiState = MutableStateFlow(ChatUiState())
-
-        val coordinator = ChatSearchCoordinator(
-            scope = scope,
-            messageRepository = repo,
-            uiState = uiState,
-            agentId = "agent1",
-            conversationId = { "conv1" },
-            remoteDebounceMs = 180L
-        )
+        val coordinator = newCoordinator(repo = repo, uiState = uiState)
 
         coordinator.updateQuery("first")
         advanceTimeBy(100L)
-        runCurrent() // Partial delay
+        runCurrent()
         coordinator.updateQuery("second")
         advanceTimeBy(180L)
-        runCurrent() // Full delay for second
+        runCurrent()
 
-        // Only "second" should have fired remotely
-        coVerify(exactly = 1) { 
-            repo.searchMessages(match { it.query == "second" })
-        }
-        coVerify(exactly = 0) { 
-            repo.searchMessages(match { it.query == "first" })
-        }
+        assertEquals("second", uiState.value.searchQuery)
+        assertFalse(uiState.value.isSearching)
+        coVerify(exactly = 1) { repo.searchMessages(match { it.query == "second" }) }
+        coVerify(exactly = 0) { repo.searchMessages(match { it.query == "first" }) }
     }
 
     @Test
     fun `picking a mode chip runs the live query again in that mode`() = runTest {
-        val scope = TestScope(UnconfinedTestDispatcher(testScheduler))
         val repo = mockk<IMessageRepository>()
         coEvery { repo.searchMessages(any()) } returns emptyList()
         val uiState = MutableStateFlow(ChatUiState())
-        val coordinator = ChatSearchCoordinator(scope, repo, uiState, "agent1", { "conv1" }, remoteDebounceMs = 180L)
+        val coordinator = newCoordinator(repo = repo, uiState = uiState)
 
         coordinator.updateQuery("deploy")
         advanceTimeBy(180L)
@@ -206,28 +129,18 @@ class ChatSearchCoordinatorTest {
 
     @Test
     fun `remote query failure updates isSearching safely`() = runTest {
-        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
-        val scope = TestScope(testDispatcher)
         val repo = mockk<IMessageRepository>()
-        
         coEvery { repo.searchMessages(any()) } throws RuntimeException("Network Error")
-
         val uiState = MutableStateFlow(ChatUiState())
-
-        val coordinator = ChatSearchCoordinator(
-            scope = scope,
-            messageRepository = repo,
-            uiState = uiState,
-            agentId = "agent1",
-            conversationId = { "conv1" },
-            remoteDebounceMs = 180L
-        )
+        val coordinator = newCoordinator(repo = repo, uiState = uiState)
 
         try {
             coordinator.updateQuery("hello")
             advanceTimeBy(180L)
-        runCurrent()
-        } catch (e: Exception) {
+            runCurrent()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
             // gracefully handle android log missing in standard jvm tests
         }
 
@@ -238,28 +151,41 @@ class ChatSearchCoordinatorTest {
 
     @Test
     fun `clear resets state`() = runTest {
-        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
-        val scope = TestScope(testDispatcher)
-        val uiState = MutableStateFlow(
-            ChatUiState(
-                searchQuery = "old",
-                isSearchActive = true,
-                isSearching = true,
-                searchResults = persistentListOf(mockk())
-            )
-        )
-
-        val coordinator = ChatSearchCoordinator(
-            scope = scope,
-            messageRepository = mockk(),
-            uiState = uiState,
-            agentId = "agent1",
-            conversationId = { "conv1" }
-        )
+        val uiState = MutableStateFlow(populatedSearchState())
+        val coordinator = newCoordinator(uiState = uiState)
 
         coordinator.clear()
 
-        val state = uiState.value
+        assertSearchCleared(uiState.value)
+    }
+
+    private fun TestScope.newCoordinator(
+        repo: IMessageRepository = mockk(relaxed = true),
+        uiState: MutableStateFlow<ChatUiState> = MutableStateFlow(ChatUiState()),
+    ): ChatSearchCoordinator = ChatSearchCoordinator(
+        scope = TestScope(UnconfinedTestDispatcher(testScheduler)),
+        messageRepository = repo,
+        uiState = uiState,
+        agentId = "agent1",
+        conversationId = { "conv1" },
+        remoteDebounceMs = 180L,
+    )
+
+    private fun populatedSearchState(): ChatUiState = ChatUiState(
+        searchQuery = "old",
+        isSearchActive = true,
+        isSearching = true,
+        searchResults = persistentListOf(mockk()),
+    )
+
+    private fun localHelloMessage(): UiMessage = UiMessage(
+        id = "msg1",
+        role = "user",
+        content = "hello world",
+        timestamp = "2024",
+    )
+
+    private fun assertSearchCleared(state: ChatUiState) {
         assertEquals("", state.searchQuery)
         assertFalse(state.isSearchActive)
         assertFalse(state.isSearching)
