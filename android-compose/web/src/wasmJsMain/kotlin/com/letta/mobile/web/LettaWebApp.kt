@@ -1,6 +1,7 @@
 package com.letta.mobile.web
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -22,6 +23,8 @@ import com.letta.mobile.ui.shell.workspace.LettaShellWorkspace
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderBinding
 import com.letta.mobile.ui.shell.workspace.rememberShellLayoutController
 import com.letta.mobile.ui.shell.workspace.rememberShellWorkspaceHeader
+import com.letta.mobile.ui.theme.HighContrastPreference
+import com.letta.mobile.ui.theme.LocalHighContrastPreference
 import com.letta.mobile.ui.theme.SharedMaterialTheme
 import com.letta.mobile.web.chat.WebChatLoad
 import com.letta.mobile.web.chat.WebChatOpener
@@ -38,6 +41,7 @@ import kotlinx.coroutines.launch
 fun LettaWebApp() {
     val scope = rememberCoroutineScope()
     val app = remember { WebApp(scope) }
+    val highContrastPreference = remember(app) { HighContrastPreference(app.storage.settings) }
     val backend = app.backend
     val workspace = rememberShellWorkspaceState(ShellDestination.Chat())
     val config = backend.config.value
@@ -67,12 +71,14 @@ fun LettaWebApp() {
     val settings = webSettingsServices(backend.config, app.settingsStore)
     val page = WebPageInputs(chat, connection, app.canvas, settings, WebPagesSession(graph, controllers, app.services, onRosterChanged))
     val header = rememberShellWorkspaceHeader(ShellWorkspaceHeaderBinding(shell.navigator, layout, webSearch(shell, page), shell.chat::tab))
-    SharedMaterialTheme {
-        ProvideLettaHost(LettaHost.Pointer) {
-            // letta-mobile-ckmub.17.6: Rive mascots through the shared frame pipeline.
-            ProvideFrameMascots(remember { RiveCanvasRenderer() }, rememberMascotRegistry(backend.agents.value)) {
-                val bound = webWorkspace(shell, page, header)
-                LettaShellWorkspace(bound.state, bound.host)
+    CompositionLocalProvider(LocalHighContrastPreference provides highContrastPreference) {
+        SharedMaterialTheme {
+            ProvideLettaHost(LettaHost.Pointer) {
+                // letta-mobile-ckmub.17.6: Rive mascots through the shared frame pipeline.
+                ProvideFrameMascots(remember { RiveCanvasRenderer() }, rememberMascotRegistry(backend.agents.value)) {
+                    val bound = webWorkspace(shell, page, header)
+                    LettaShellWorkspace(bound.state, bound.host)
+                }
             }
         }
     }

@@ -135,6 +135,9 @@ kotlin {
 
         jvmMain {
             dependsOn(skikoMain)
+            dependencies {
+                implementation(libs.jna.platform)
+            }
         }
 
         wasmJsMain {

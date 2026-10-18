@@ -145,10 +145,14 @@ private fun runDesktopApplication(
                     fontScale = platformDensity.fontScale,
                 )
             }
+            val highContrastPreference = remember {
+                com.letta.mobile.ui.theme.HighContrastPreference(DesktopPreferences.store)
+            }
             CompositionLocalProvider(
                 LocalDensity provides desktopDensity,
                 LocalWindowExceptionHandlerFactory provides CrashReportingExceptionHandlerFactory,
                 LocalMermaidDiagramRenderer provides DesktopMermaidDiagramRenderer,
+                com.letta.mobile.ui.theme.LocalHighContrastPreference provides highContrastPreference,
                 // The native Rive bridge draws every live mascot; the shared MascotAvatar reads it here,
                 // with the window-owned registry of identities, presence and the pointer.
                 com.letta.mobile.ui.mascot.LocalMascotHost provides com.letta.mobile.desktop.avatar.rive.DesktopMascotHost,

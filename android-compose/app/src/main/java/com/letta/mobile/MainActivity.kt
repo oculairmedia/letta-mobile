@@ -53,6 +53,8 @@ import com.letta.mobile.ui.host.OverlayResponse
 import com.letta.mobile.ui.host.rememberOverlayHost
 import com.letta.mobile.ui.navigation.AdaptiveScaffold
 import com.letta.mobile.ui.navigation.AppNavGraph
+import com.letta.mobile.ui.theme.HighContrastPreference
+import com.letta.mobile.ui.theme.LocalHighContrastPreference
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.LettaTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -89,6 +91,7 @@ class MainActivity : ComponentActivity() {
             val windowSizeClass = calculateWindowSizeClass(this@MainActivity)
             val snackbarDispatcher = remember { SnackbarDispatcher() }
             val agentDefaults = remember { StoredAgentDefaults(deps.secureSettingsStore) }
+            val highContrastPreference = remember { HighContrastPreference(deps.secureSettingsStore) }
             val overlays = rememberOverlayHost()
             val haptic = LocalHapticFeedback.current
             val view = LocalView.current
@@ -107,16 +110,17 @@ class MainActivity : ComponentActivity() {
             LastCrashSnackbarEffect(overlays)
             ChatPushServiceStartEffect()
 
-            LettaTheme(
-                appTheme = appThemeState.value,
-                themePreset = themePresetState.value,
-                dynamicColor = dynamicColorState.value,
+            CompositionLocalProvider(
+                LocalHighContrastPreference provides highContrastPreference,
+                LocalSnackbarDispatcher provides snackbarDispatcher,
+                LocalWindowSizeClass provides windowSizeClass,
+                LocalAttentionPrefs provides deps.attentionPrefs,
+                LocalAgentDefaults provides agentDefaults,
             ) {
-                CompositionLocalProvider(
-                    LocalSnackbarDispatcher provides snackbarDispatcher,
-                    LocalWindowSizeClass provides windowSizeClass,
-                    LocalAttentionPrefs provides deps.attentionPrefs,
-                    LocalAgentDefaults provides agentDefaults,
+                LettaTheme(
+                    appTheme = appThemeState.value,
+                    themePreset = themePresetState.value,
+                    dynamicColor = dynamicColorState.value,
                 ) {
                     ProvideMascotShell(
                         agents = deps.agentRepository.agents,

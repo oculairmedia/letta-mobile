@@ -68,6 +68,7 @@ internal fun ChatImageAttachmentsGrid(
         return
     }
     val cellHeight = if (images.size == 1) ChatRowDimens.imageSingleHeight else ChatRowDimens.imageGridHeight
+    val openLabel = stringResource(Res.string.rows_attached_image)
     Row(
         modifier = modifier.testTag(ChatRowTestTags.IMAGE_GRID),
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -78,7 +79,7 @@ internal fun ChatImageAttachmentsGrid(
                 modifier = Modifier
                     .weight(1f)
                     .height(cellHeight)
-                    .clickable { tap.open(index) },
+                    .clickable(onClickLabel = openLabel) { tap.open(index) },
             )
         }
     }
@@ -97,6 +98,7 @@ internal fun ChatPromptImageGrid(
     val images = tap.images
     if (images.isEmpty()) return
     val single = images.size == 1
+    val openLabel = stringResource(Res.string.rows_attached_image)
     Row(
         modifier = modifier.testTag(ChatRowTestTags.IMAGE_GRID),
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
@@ -107,7 +109,7 @@ internal fun ChatPromptImageGrid(
                 modifier = Modifier
                     .weight(1f)
                     .height(if (single) ChatRowDimens.imageSingleHeight else ChatRowDimens.promptGridCellHeight)
-                    .clickable { tap.open(index) },
+                    .clickable(onClickLabel = openLabel) { tap.open(index) },
             )
         }
     }
@@ -123,6 +125,7 @@ internal fun ChatImageThumbnailStrip(
 ) {
     val images = tap.images
     if (images.isEmpty()) return
+    val openLabel = stringResource(Res.string.rows_attached_image)
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -133,7 +136,7 @@ internal fun ChatImageThumbnailStrip(
                 attachment = attachment,
                 modifier = Modifier
                     .size(width = ChatRowDimens.thumbnailWidth, height = ChatRowDimens.thumbnailHeight)
-                    .clickable { tap.open(index) },
+                    .clickable(onClickLabel = openLabel) { tap.open(index) },
             )
         }
         val hidden = images.size - ChatRowDimens.stripMaxImages
