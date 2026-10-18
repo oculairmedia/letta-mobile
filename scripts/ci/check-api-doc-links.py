@@ -21,8 +21,9 @@ class Anchors(HTMLParser):
         self.feed(text)
 
     def handle_starttag(self, tag: str, attrs):
+        anchor_attributes = {"id", "name"} if tag == "a" else {"id"}
         for key, value in attrs:
-            if value is not None and (key == "id" or (tag == "a" and key == "name")):
+            if key in anchor_attributes and value is not None:
                 self.values.add(value)
 
 
