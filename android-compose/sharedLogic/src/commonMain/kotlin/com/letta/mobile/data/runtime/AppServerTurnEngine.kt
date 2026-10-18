@@ -3,7 +3,6 @@ package com.letta.mobile.data.runtime
 import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
-import com.letta.mobile.data.controller.extras.ToolAudience
 import com.letta.mobile.data.controller.ApprovalSubmission
 import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
@@ -1502,22 +1501,14 @@ class AppServerTurnEngine(
         }
         val generationAtStart = connectionGenerationProvider()
         val response = client.runtimeStart(
-            AppServerCommand.RuntimeStart(
-                requestId = requestIdFactory(),
-                agentId = command.agentId.value,
-                conversationId = command.conversationId.value,
-                cwd = workingDirectoryProvider(command),
-                mode = turnPermissionMode,
-                clientInfo = clientInfo,
-                recoverApprovals = true,
-                forceDeviceStatus = true,
-                // lgns8.17(a): the engine issues runtime_start only when no
-                // controller scope was resolvable, so it must advertise the same
-                // external tools the controller would have — otherwise the tool set
-                // the App Server registers depends on which code path opened the
-                // runtime. Absent/empty => the field is omitted and the server can
-                // never emit an external_tool_call_request.
-                externalTools = externalToolRegistry?.advertisedToolsCommandGroups(audience = ToolAudience(command.agentId.value)),
+            command.runtimeStart(
+                RuntimeStartExtras(
+                    requestIdFactory(),
+                    workingDirectoryProvider(command),
+                    turnPermissionMode,
+                    clientInfo,
+                ),
+                externalToolRegistry,
             ),
         )
         Telemetry.event("IrohTurn", "runtimeStart.response", "success" to response.success, "hasRuntime" to (response.runtime != null), "error" to response.error)
