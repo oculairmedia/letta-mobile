@@ -26,7 +26,9 @@ import kotlin.time.Duration.Companion.milliseconds
  *   conversation's stored preferences.
  *
  * Each field is sent only to a server whose `app_server_info` names a letta-code version that
- * understands it ([LettaCodeDeliveryGates]), so an older host (the deployed 0.33.6) sees no new field.
+ * understands it ([LettaCodeDeliveryGates]). Missing, unreadable or earlier advertised versions
+ * omit that field. This gate does not certify an older release as supported or identify the
+ * version currently deployed on any host.
  */
 class DurableTurnDelivery(
     val consumerId: AppServerTerminalConsumerId? = null,
