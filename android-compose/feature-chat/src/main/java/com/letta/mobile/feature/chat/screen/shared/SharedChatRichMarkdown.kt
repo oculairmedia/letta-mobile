@@ -12,7 +12,7 @@ import com.letta.mobile.feature.chat.render.STREAMING_CURSOR
 import com.letta.mobile.feature.chat.render.shouldShowStreamingCursor
 import com.letta.mobile.feature.chat.render.streamingDisplayText
 import com.letta.mobile.ui.components.StreamingMarkdownText
-import com.letta.mobile.ui.components.rememberReducedMotionEnabled
+import com.letta.mobile.ui.theme.rememberReducedMotionEnabled
 import com.letta.mobile.ui.markdown.MarkdownPaint
 import com.letta.mobile.ui.markdown.SharedRichMarkdownRenderer
 import com.letta.mobile.ui.theme.LocalChatFontScale

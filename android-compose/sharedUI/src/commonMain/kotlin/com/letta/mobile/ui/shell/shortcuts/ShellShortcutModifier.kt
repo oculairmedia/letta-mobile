@@ -2,6 +2,7 @@ package com.letta.mobile.ui.shell.shortcuts
 
 import androidx.compose.foundation.focusable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -18,35 +19,24 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 
 /**
- * Ctrl/Cmd chords at the shared shell root. Composer-scoped chords (Shift+Tab) are left for
+ * Installs [binding] on the window's [ShortcutHub] and matches Ctrl/Cmd chords at the shared shell
+ * root. Composer-scoped chords (Shift+Tab) are left for
  * [com.letta.mobile.ui.chat.surface.composer.ComposerPolicy].
  */
 @Composable
-fun rememberShellShortcuts(
-    platform: ShortcutPlatform,
-    onShortcut: ((ShellShortcutId) -> Unit)?,
-): Modifier {
-    if (onShortcut == null) return Modifier
+fun rememberShellShortcuts(binding: ShellShortcutBinding?): Modifier {
     val hub = LocalShortcutHub.current
+    DisposableEffect(hub, binding) {
+        hub.binding = binding
+        onDispose { if (hub.binding === binding) hub.binding = null }
+    }
+    if (binding == null) return Modifier
     val requester = remember { FocusRequester() }
     LaunchedEffect(requester) { runCatching { requester.requestFocus() } }
     return Modifier
-        .onPreviewKeyEvent { event -> dispatchShellKey(event, hub.context(platform), hub, onShortcut) }
+        .onPreviewKeyEvent { event -> hub.dispatch(event.asStroke()) }
         .focusRequester(requester)
         .focusable()
-}
-
-internal fun dispatchShellKey(
-    event: KeyEvent,
-    context: ShortcutContext,
-    hub: ShortcutHub,
-    onShortcut: (ShellShortcutId) -> Unit,
-): Boolean {
-    val id = ShortcutRegistry.match(event.asStroke(), context) ?: return false
-    if (id == ShellShortcutId.CyclePermission) return false
-    if (id == ShellShortcutId.FocusComposer) hub.requestComposer()
-    onShortcut(id)
-    return true
 }
 
 internal fun KeyEvent.asStroke(): ShortcutKeystroke = ShortcutKeystroke(

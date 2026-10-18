@@ -82,7 +82,7 @@ private fun roleChipRow(
     onChange: (MessageSearchSelection) -> Unit,
 ): LettaSearchChipRow = LettaSearchChipRow(
     chips = capabilities.roles.map { role ->
-        LettaSearchChip(role.wire, role.label, role in selection.roles) {
+        LettaSearchChip(role.id, role.label, role in selection.roles) {
             onChange(selection.toggled(role))
         }
     },

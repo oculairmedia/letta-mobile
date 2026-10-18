@@ -1,6 +1,8 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.repository.api.IMessageRepository
+import com.letta.mobile.data.search.MessageSearchQuery
+import com.letta.mobile.data.search.MessageSearchSelection
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -36,12 +38,8 @@ internal class ChatSearchCoordinator(
             return
         }
 
-        val localResults = controller.localResults(
-            query = query,
-            state = uiState.value,
-            agentId = agentId,
-            conversationId = conversationId(),
-        )
+        val asked = MessageSearchQuery(text = query, agentId = agentId, selection = uiState.value.searchSelection)
+        val localResults = controller.localResults(asked, uiState.value.messages, conversationId())
         uiState.update {
             it.copy(
                 searchQuery = query,
@@ -54,17 +52,12 @@ internal class ChatSearchCoordinator(
         searchJob = scope.launch {
             delay(remoteDebounceMs.milliseconds)
             try {
-                val parsed = controller.remoteResults(query, agentId)
+                val parsed = controller.remoteResults(asked)
                 uiState.update { current ->
-                    if (current.searchQuery == query) {
+                    if (current.asks(asked)) {
                         current.copy(
                             searchResults = controller.mergeResults(
-                                local = controller.localResults(
-                                    query = query,
-                                    state = current,
-                                    agentId = agentId,
-                                    conversationId = conversationId(),
-                                ),
+                                local = controller.localResults(asked, current.messages, conversationId()),
                                 remote = parsed,
                             ),
                             isSearching = false,
@@ -78,11 +71,22 @@ internal class ChatSearchCoordinator(
             } catch (e: Exception) {
                 android.util.Log.w("AdminChatViewModel", "Chat search failed", e)
                 uiState.update { current ->
-                    if (current.searchQuery == query) current.copy(isSearching = false) else current
+                    if (current.asks(asked)) current.copy(isSearching = false) else current
                 }
             }
         }
     }
+
+    /** New mode or role chips: kept for the next query, and the live one runs again under them. */
+    fun updateSelection(selection: MessageSearchSelection) {
+        uiState.update { it.copy(searchSelection = selection) }
+        val query = uiState.value.searchQuery
+        if (query.isNotBlank()) updateQuery(query)
+    }
+
+    /** Whether this state still shows the search [asked] answers (no newer text or chips since). */
+    private fun ChatUiState.asks(asked: MessageSearchQuery): Boolean =
+        searchQuery == asked.text && searchSelection == asked.selection
 
     fun clear() {
         searchJob?.cancel()

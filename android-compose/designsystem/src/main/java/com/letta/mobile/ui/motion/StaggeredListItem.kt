@@ -23,7 +23,7 @@ import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import com.letta.mobile.ui.components.rememberReducedMotionEnabled
+import com.letta.mobile.ui.theme.rememberReducedMotionEnabled
 
 /** Per-index stagger delay. Single source of truth for the entrance cadence. */
 const val StaggerDelayPerIndexMs: Long = 30L

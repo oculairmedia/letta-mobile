@@ -9,7 +9,7 @@ import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.chat.projection.buildChatRenderModel
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.platform.MemoryPressureDefaults
+import com.letta.mobile.data.platform.MemoryPressure
 import com.letta.mobile.ui.common.GroupPosition
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -49,19 +49,10 @@ class CanonicalTimelinePresentation private constructor(
     private val streamedKeyAliasLock = SynchronizedObject()
     private val streamedKeyAliases = HashMap<TimelineMessageId, String>()
     private val adoptions = SettledLiveAdoptions()
-    private val pressureLedger = TimelinePressure.current()
-    private val pressure = pressureLedger.attach(
-        owner.selection.scope,
-        owner.session.engine.budget.maxMetadataRows,
-        ::applyPressureKeep,
-    )
 
     private val detached = kotlinx.coroutines.CompletableDeferred<Unit>()
     init {
-        MemoryPressureDefaults.install()
-        TimelinePressure.install()
         job.invokeOnCompletion {
-            pressureLedger.detach(pressure)
             (parentScope + NonCancellable).launch {
                 try {
                     coordinator.detach(lease)
@@ -108,9 +99,10 @@ class CanonicalTimelinePresentation private constructor(
         return true
     }
 
+    /** CRITICAL memory pressure drops every resident page but the one at the reading position. */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val settled: Flow<PagingData<Row>> = anchor.flatMapLatest { key ->
-        owner.session.paging(owner.selection, key, settledProjectionAdapter).map { page ->
+        owner.session.paging(owner.selection, key, settledProjectionAdapter, MemoryPressure.criticalTrims()).map { page ->
             page.filter { it.preparedPresentation !is TimelineSettledPresentation.Drop }
                 .map { record -> project(record, requireNotNull(record.preparedPresentation)) }
         }
@@ -228,21 +220,10 @@ class CanonicalTimelinePresentation private constructor(
         resident.value = presented
         residentOtids.value = residents.mapNotNullTo(mutableSetOf()) { it.otid.takeIf(String::isNotBlank) }
         residentServerIds.value = residents.mapNotNullTo(mutableSetOf()) { it.serverId.takeIf(String::isNotBlank) }
-        pressure.reportResident(residents.map { it.identity })
         val fences = owner.session.settling.value.map { it.fence } + listOfNotNull(owner.session.live.value?.fence)
         fences.forEach { fence ->
             scope.launch { coordinator.acknowledgeSettlement(owner, fence, presented) }
         }
-    }
-
-    fun reportVisible(firstIndex: Int, visibleCount: Int) {
-        if (!job.isActive) return
-        pressure.reportVisible(TimelineVisibleSpan(firstIndex, visibleCount))
-    }
-
-    private fun applyPressureKeep(kept: List<TimelineMessageId>) {
-        val keep = kept.toSet()
-        resident.value = resident.value.filterKeys { it in keep }
     }
 
     suspend fun readChunk(row: Row, offset: Long, maxBytes: Int): TimelineBodyChunk {

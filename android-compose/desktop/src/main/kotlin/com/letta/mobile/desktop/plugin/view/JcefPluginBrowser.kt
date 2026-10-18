@@ -82,6 +82,7 @@ internal class JcefPluginBrowser private constructor(
             client.addDownloadHandler(JcefNoDownloads)
             client.addContextMenuHandler(JcefNoContextMenu)
             client.addLoadHandler(LoadFaults(wiring))
+            client.addKeyboardHandler(JcefChordForwarder)
             val context = isolatedContext(ResourceHandler(wiring))
             val browser = client.createBrowser(wiring.server.url, false, false, context)
             return JcefPluginBrowser(client, context, router, browser, wiring.server.url)

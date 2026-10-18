@@ -316,12 +316,19 @@ open class ConversationRepository(
     override fun canCancelConversationRuns(): Boolean = irohCancelTransport() != null
 
     /**
-     * letta-mobile-by4vm.51: an Iroh host recompiles through its `conversation.recompile` relay (App
-     * Server `conversation_recompile`) when it advertises one; a wrapper deployed before the relay
-     * does not, and neither does the embedded runtime, so elsewhere only the [remote] seam (no
-     * production route) is left.
+     * letta-mobile-by4vm.51: exactly where [recompileConversation] has a route. A channel backend
+     * recompiles through the `conversation.recompile` relay (App Server `conversation_recompile`)
+     * when its host advertises one: an Iroh wrapper deployed after the relay, or a direct ws:// /
+     * on-device dial, whose in-process admin router advertises it once connected. Off the channel
+     * only the [remote] seam is left (no production route).
      */
-    override fun canRecompileConversations(): Boolean = irohRecompileSource() != null
+    override fun canRecompileConversations(): Boolean {
+        val channel = channelSource() ?: return remote.isBound
+        return channel.recompiler.supported
+    }
+
+    private fun channelSource(): IrohAdminRpcConversationListSource? =
+        irohConversationListSource?.takeIf { it.shouldUseIroh() }
 
     override suspend fun cancelConversation(id: ConversationId, agentId: AgentId?) {
         val channel = irohCancelTransport() ?: return remote.source().cancelConversation(id, agentId)
@@ -344,13 +351,9 @@ open class ConversationRepository(
     }
 
     private suspend fun recompileRoute(id: ConversationId, dryRun: Boolean, agentId: AgentId?): String {
-        val irohSource = irohConversationListSource?.takeIf { it.shouldUseIroh() }
-            ?: return remote.source().recompileConversation(id, dryRun, agentId)
+        val irohSource = channelSource() ?: return remote.source().recompileConversation(id, dryRun, agentId)
         return irohSource.recompiler.recompile(ConversationRecompileRequest(id.value, agentId?.value.orEmpty()), dryRun)
     }
-
-    private fun irohRecompileSource(): IrohAdminRpcConversationListSource? =
-        irohConversationListSource?.takeIf { it.shouldUseIroh() && it.recompiler.supported }
 
     override suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation =
         forkConversation(id, agentId, throughMessageId = null)

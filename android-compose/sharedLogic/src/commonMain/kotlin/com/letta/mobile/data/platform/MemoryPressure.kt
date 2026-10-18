@@ -1,11 +1,12 @@
 package com.letta.mobile.data.platform
 
-import kotlinx.atomicfu.atomic
-import kotlinx.atomicfu.locks.SynchronizedObject
-import kotlinx.atomicfu.locks.synchronized
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 
 /** How hard the host is pressing on resident memory. */
 enum class MemoryPressureLevel {
@@ -13,86 +14,38 @@ enum class MemoryPressureLevel {
     CRITICAL,
 }
 
-/** Last published heap sample. Diagnostics (zxk2n.18) can read [usedBytes] / [maxBytes]. */
-data class HeapStats(
-    val usedBytes: Long,
-    val maxBytes: Long,
-)
-
-fun interface MemoryPressureConsumer {
-    fun onPressure(level: MemoryPressureLevel)
-}
-
 /**
- * letta-mobile-k5nbq.2: one hub per process, owned by the first host that emits
- * or the first shared consumer that attaches. Mutable tables live on this
- * instance, not on a process-global object.
+ * letta-mobile-k5nbq.2: one signal, many owners. Hosts only [emit]; every cache that can shrink
+ * collects [levels] on the thread that owns it, so a host thread never reaches into UI-thread state.
  */
 class MemoryPressureHub {
-    val caches: MemoryCachePorts = MemoryCachePorts()
-    val events: RuntimeEventPressure = RuntimeEventPressure()
+    private val signals = MutableSharedFlow<MemoryPressureLevel>(
+        extraBufferCapacity = SIGNAL_BUFFER,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
 
-    private val lock = SynchronizedObject()
-    private val consumers = mutableListOf<MemoryPressureConsumer>()
-    private val last = MutableStateFlow<MemoryPressureLevel?>(null)
-    private val heap = MutableStateFlow<HeapStats?>(null)
+    val levels: SharedFlow<MemoryPressureLevel> = signals.asSharedFlow()
 
-    val lastLevel: StateFlow<MemoryPressureLevel?> = last.asStateFlow()
-    val stats: StateFlow<HeapStats?> = heap.asStateFlow()
-
+    /** Never suspends: hosts call this from OS callbacks and JMX notification threads. */
     fun emit(level: MemoryPressureLevel) {
-        last.value = level
-        dispatchBuiltins(level)
-        snapshotConsumers().forEach { it.onPressure(level) }
+        signals.tryEmit(level)
     }
 
-    fun publishStats(stats: HeapStats) {
-        heap.value = stats
-    }
+    /** One tick per CRITICAL signal: the cue to drop resident pages. */
+    fun criticalTrims(): Flow<Unit> = levels.filter { it == MemoryPressureLevel.CRITICAL }.map { }
 
-    fun register(consumer: MemoryPressureConsumer): () -> Unit = synchronized(lock) {
-        consumers += consumer
-        return { unregister(consumer) }
-    }
-
-    private fun dispatchBuiltins(level: MemoryPressureLevel) {
-        caches.drop(MemoryCacheKind.Images)
-        if (level != MemoryPressureLevel.CRITICAL) return
-        caches.drop(MemoryCacheKind.Canvas)
-        caches.drop(MemoryCacheKind.Attachments)
-        events.onCritical()
-    }
-
-    private fun unregister(consumer: MemoryPressureConsumer) = synchronized(lock) {
-        consumers.remove(consumer)
-    }
-
-    private fun snapshotConsumers(): List<MemoryPressureConsumer> = synchronized(lock) {
-        consumers.toList()
+    private companion object {
+        const val SIGNAL_BUFFER = 8
     }
 }
 
-/**
- * Hosts emit; shared consumers attach through [current]. The atomic slot is
- * the only process-wide field — the mutable tables live on [MemoryPressureHub].
- */
+/** The process's hub. Hosts emit into it; shared consumers collect from it. */
 object MemoryPressure {
-    private val installed = atomic<MemoryPressureHub?>(null)
+    private val hub = MemoryPressureHub()
 
-    fun current(): MemoryPressureHub {
-        installed.value?.let { return it }
-        val created = MemoryPressureHub()
-        return if (installed.compareAndSet(null, created)) created else requireNotNull(installed.value)
-    }
+    val levels: SharedFlow<MemoryPressureLevel> get() = hub.levels
 
-    fun emit(level: MemoryPressureLevel) = current().emit(level)
+    fun emit(level: MemoryPressureLevel) = hub.emit(level)
 
-    fun publishStats(stats: HeapStats) = current().publishStats(stats)
-
-    val lastLevel: StateFlow<MemoryPressureLevel?> get() = current().lastLevel
-    val stats: StateFlow<HeapStats?> get() = current().stats
-
-    internal fun resetForTest() {
-        installed.value = MemoryPressureHub()
-    }
+    fun criticalTrims(): Flow<Unit> = hub.criticalTrims()
 }

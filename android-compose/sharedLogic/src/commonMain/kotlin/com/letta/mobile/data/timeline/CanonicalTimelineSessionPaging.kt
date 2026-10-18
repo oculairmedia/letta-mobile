@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collectIndexed
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -27,6 +28,7 @@ fun CanonicalTimelineSession.paging(
     selection: TimelineEngineSelection,
     anchor: TimelinePageKey? = selection.anchor,
     settledProjectionAdapter: TimelineSettledProjectionAdapter = DefaultTimelineSettledProjectionAdapter,
+    trims: Flow<Unit> = emptyFlow(),
 ): Flow<PagingData<TimelineSettledRecord>> {
     val active = atomic<TimelineLedgerPagingSource?>(null)
     val pages = Pager(
@@ -42,6 +44,14 @@ fun CanonicalTimelineSession.paging(
     ).flow
     return channelFlow {
         val pump = launch { pages.collect { send(it) } }
+        // Memory pressure replaces the active source in place: Paging reloads one page around the
+        // reading position and drops every other page it held, without blanking the list.
+        launch {
+            trims.collect {
+                active.value?.invalidate()
+                Telemetry.event("TimelinePaging", "generation.trimmed", level = Telemetry.Level.DEBUG)
+            }
+        }
         // A superseded selection retires this generation without emitting, matching the prior contract.
         publication.distinctUntilChanged { old, new ->
             old.selection === new.selection && old.durableRevision == new.durableRevision

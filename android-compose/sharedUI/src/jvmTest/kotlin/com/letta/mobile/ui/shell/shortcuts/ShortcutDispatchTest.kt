@@ -24,14 +24,17 @@ class ShortcutDispatchTest {
     }
 
     @Test
-    fun memorySchedulesAndSettingsNavigate() {
+    fun pagesOpenForTheCurrentAgent() {
         val opened = mutableListOf<ShellDestination>()
-        val actions = actions(navigate = { opened += it })
+        val actions = actions(
+            navigate = { opened += it },
+            lists = ShortcutLists(agents = ShortcutStepping(ids = { listOf("ada", "bo") }, current = { "bo" })),
+        )
         handleShortcut(ShellShortcutId.Memory, actions)
         handleShortcut(ShellShortcutId.Schedules, actions)
         handleShortcut(ShellShortcutId.Settings, actions)
         assertEquals(
-            listOf(ShellDestination.Memory(), ShellDestination.Schedules(), ShellDestination.Settings()),
+            listOf(ShellDestination.Memory("bo"), ShellDestination.Schedules("bo"), ShellDestination.Settings()),
             opened,
         )
     }
@@ -76,15 +79,36 @@ class ShortcutDispatchTest {
     @Test
     fun sidebarChordTogglesChrome() {
         var toggled = 0
-        val actions = actions(chrome = ShortcutChrome(toggleSidebar = { toggled += 1 }))
+        val actions = actions(toggleSidebar = { toggled += 1 })
         handleShortcut(ShellShortcutId.ToggleSidebar, actions)
         assertEquals(1, toggled)
+    }
+
+    /** A workspace host binds [WorkspaceShortcuts]; each must do something there, or its chord would be swallowed. */
+    @Test
+    fun everyWorkspaceShortcutHasAnEffect() {
+        WorkspaceShortcuts.forEach { id ->
+            val effects = mutableListOf<String>()
+            val overlays = ShellOverlays()
+            val stepping = ShortcutStepping(ids = { listOf("a", "b", "c") }, current = { "b" }, open = { effects += "open $it" })
+            handleShortcut(
+                id,
+                ShortcutActions(
+                    overlays = overlays,
+                    navigate = { effects += "navigate $it" },
+                    toggleSidebar = { effects += "sidebar" },
+                    lists = ShortcutLists(conversations = stepping, agents = stepping),
+                ),
+            )
+            val overlayOpened = overlays.commandPalette || overlays.shortcutHelp || overlays.newConversation || overlays.renameChat
+            assertTrue(overlayOpened || effects.isNotEmpty(), "$id does nothing in the workspace")
+        }
     }
 }
 
 private fun actions(
     overlays: ShellOverlays = ShellOverlays(),
     navigate: (ShellDestination) -> Unit = {},
-    chrome: ShortcutChrome = ShortcutChrome(),
+    toggleSidebar: () -> Unit = {},
     lists: ShortcutLists = ShortcutLists(),
-) = ShortcutActions(overlays, navigate, chrome, lists)
+) = ShortcutActions(overlays, navigate, toggleSidebar, lists)

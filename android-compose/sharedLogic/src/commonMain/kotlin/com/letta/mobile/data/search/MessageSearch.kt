@@ -2,7 +2,6 @@ package com.letta.mobile.data.search
 
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
@@ -38,17 +37,11 @@ data class MessageSearchQuery(
  * Searches message text for the unified search. A host either asks its backend (a REST message
  * search) or keeps a [ConversationMessageIndex] over the App Server's per-conversation reads.
  */
-fun interface MessageSearchSource {
+interface MessageSearchSource {
+    /** The modes and roles this source can search; the search UI draws only these chips. */
+    val capabilities: MessageSearchCapabilities
+
     suspend fun search(query: MessageSearchQuery): List<MessageSearchHit>
-
-    fun capabilities(): MessageSearchCapabilities = MessageSearchCapabilities.LOCAL
-}
-
-/** A backend search result as a hit; null when it names no conversation to open or has no text. */
-fun ParsedSearchMessage.toSearchHit(): MessageSearchHit? {
-    val conversation = conversationId?.takeIf { it.isNotBlank() } ?: return null
-    val body = content?.takeIf { it.isNotBlank() } ?: return null
-    return MessageSearchHit(conversation, agentId, messageId, body, date, MessageSearchRole.fromWire(role))
 }
 
 /** A conversation the index may read: its id, its agent and a [revision] that changes when it gets new messages. */
@@ -59,18 +52,24 @@ fun interface ConversationMessageReader {
     suspend fun recentMessages(conversationId: String, limit: Int): List<LettaMessage>
 }
 
-/** How much the index reads: the newest [conversations] conversations, [messagesPerConversation] each, [parallelReads] at a time. */
+/**
+ * How much the index reads and keeps: the newest [conversations] conversations (also how many it
+ * holds in memory), [messagesPerConversation] each, [parallelReads] at a time, and at most
+ * [charactersPerMessage] of each message's text (a tool return can be a whole file).
+ */
 data class MessageIndexLimits(
     val conversations: Int = DEFAULT_CONVERSATIONS,
     val messagesPerConversation: Int = DEFAULT_MESSAGES,
     val parallelReads: Int = DEFAULT_PARALLEL_READS,
     val results: Int = DEFAULT_RESULTS,
+    val charactersPerMessage: Int = DEFAULT_CHARACTERS,
 ) {
     companion object {
         const val DEFAULT_CONVERSATIONS = 40
         const val DEFAULT_MESSAGES = 100
         const val DEFAULT_PARALLEL_READS = 4
         const val DEFAULT_RESULTS = 20
+        const val DEFAULT_CHARACTERS = 2_000
     }
 }
 
@@ -86,7 +85,11 @@ class ConversationMessageIndex(
     private val limits: MessageIndexLimits = MessageIndexLimits(),
 ) : MessageSearchSource {
     private val mutex = Mutex()
-    private val cache = HashMap<String, IndexedMessages>()
+
+    /** Least recently searched first, so the oldest entry is the one to drop. */
+    private val cache = LinkedHashMap<String, IndexedMessages>()
+
+    override val capabilities: MessageSearchCapabilities get() = MessageSearchCapabilities.LOCAL
 
     override suspend fun search(query: MessageSearchQuery): List<MessageSearchHit> {
         if (query.text.isBlank()) return emptyList()
@@ -105,11 +108,22 @@ class ConversationMessageIndex(
     }
 
     private suspend fun messagesOf(conversation: IndexedConversation): IndexedMessages {
-        mutex.withLock { cache[conversation.id]?.takeIf { it.revision == conversation.revision } }?.let { return it }
+        mutex.withLock { cachedAt(conversation) }?.let { return it }
         val read = readOrNull(conversation) ?: return IndexedMessages(conversation.revision, emptyList())
-        val messages = IndexedMessages(conversation.revision, read.mapNotNull { it.toHit(conversation) })
-        mutex.withLock { cache[conversation.id] = messages }
+        val hits = read.mapNotNull { it.toHit(conversation, limits.charactersPerMessage) }
+        val messages = IndexedMessages(conversation.revision, hits)
+        mutex.withLock { keep(conversation.id, messages) }
         return messages
+    }
+
+    private fun cachedAt(conversation: IndexedConversation): IndexedMessages? =
+        cache[conversation.id]?.takeIf { it.revision == conversation.revision }?.also { keep(conversation.id, it) }
+
+    /** Marks [id] most recently searched; past [MessageIndexLimits.conversations] entries the least recent go. */
+    private fun keep(id: String, messages: IndexedMessages) {
+        cache.remove(id)
+        cache[id] = messages
+        while (cache.size > limits.conversations) cache.remove(cache.keys.first())
     }
 
     private suspend fun readOrNull(conversation: IndexedConversation): List<LettaMessage>? {
@@ -123,9 +137,9 @@ class ConversationMessageIndex(
 }
 
 /** Indexes person, agent, reasoning and tool text; the query's role filter decides which of those run. */
-private fun LettaMessage.toHit(conversation: IndexedConversation): MessageSearchHit? {
+private fun LettaMessage.toHit(conversation: IndexedConversation, maxCharacters: Int): MessageSearchHit? {
     val searchable = searchableText() ?: return null
-    return MessageSearchHit(conversation.id, conversation.agentId, id, searchable.text, date, searchable.role)
+    return MessageSearchHit(conversation.id, conversation.agentId, id, searchable.text.take(maxCharacters), date, searchable.role)
 }
 
 private class SearchableText(val role: MessageSearchRole, val text: String)

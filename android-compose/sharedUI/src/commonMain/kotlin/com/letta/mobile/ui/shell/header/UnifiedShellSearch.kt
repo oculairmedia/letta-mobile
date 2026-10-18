@@ -38,7 +38,7 @@ data class UnifiedSearchSources(
     val messageSearch: MessageSearchSource? = null,
 ) {
     val messageCapabilities: MessageSearchCapabilities
-        get() = messageSearch?.capabilities() ?: MessageSearchCapabilities.NONE
+        get() = messageSearch?.capabilities ?: MessageSearchCapabilities.NONE
 }
 
 /** The kind of thing a unified search row opens. */

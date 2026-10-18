@@ -17,7 +17,6 @@ data class CancelAgentRunRequest(
 data class MessageSearchRequest(
     val query: String? = null,
     @SerialName("search_mode") val searchMode: String = "hybrid",
-    val roles: List<String>? = null,
     @SerialName("agent_id") val agentId: String? = null,
     @SerialName("conversation_id") val conversationId: String? = null,
     @SerialName("project_id") val projectId: String? = null,

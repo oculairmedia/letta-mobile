@@ -2,14 +2,12 @@ package com.letta.mobile.data.search
 
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.UserMessage
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
@@ -79,11 +77,24 @@ class ConversationMessageIndexTest {
     }
 
     @Test
-    fun aBackendResultBecomesAHitOnlyWithAConversationAndText() {
-        val hit = ParsedSearchMessage("m-9", "a-1", "user", "hello", "2026-10-01", "c-9").toSearchHit()
-        assertEquals(MessageSearchHit("c-9", "a-1", "m-9", "hello", "2026-10-01"), hit)
-        assertNull(ParsedSearchMessage("m-9", "a-1", "user", "hello", null, null).toSearchHit())
-        assertNull(ParsedSearchMessage("m-9", "a-1", "user", " ", null, "c-9").toSearchHit())
+    fun theIndexKeepsOnlyAsManyConversationsAsItReads() = runTest {
+        val index = ConversationMessageIndex(reader, { conversations }, MessageIndexLimits(conversations = 1))
+        index.search(MessageSearchQuery("emmanuel", agentId = "a-1"))
+        index.search(MessageSearchQuery("emmanuel", agentId = "a-2"))
+        index.search(MessageSearchQuery("emmanuel", agentId = "a-1"))
+        assertEquals(listOf("c-1", "c-2", "c-1"), reads)
+    }
+
+    @Test
+    fun aLongMessageIsIndexedOnlyUpToTheCharacterLimit() = runTest {
+        val long = mapOf("c-1" to listOf(user("m-1", "a".repeat(50) + " needle")))
+        val index = ConversationMessageIndex(
+            { id, _ -> long[id].orEmpty() },
+            { conversations.take(1) },
+            MessageIndexLimits(charactersPerMessage = 20),
+        )
+        assertTrue(index.search(MessageSearchQuery("needle")).isEmpty())
+        assertEquals(20, index.search(MessageSearchQuery("aaaa")).single().text.length)
     }
 
     private fun query(text: String, role: MessageSearchRole) =

@@ -247,7 +247,7 @@ fun DrawBox(
     // race-safe completion. Tied to the composable's scope so cancellation
     // and lifecycle follow the canvas. Mip-level keyed so a small placement
     // doesn't hold a source-resolution bitmap in memory.
-    val imageCache = remember(scope) { ImageBitmapCache(scope) }
+    val imageCache = rememberImageBitmapCache(scope)
     // Text layout cache: lay out each text block once per (id, text, style,
     // wrap width); reuse the result on subsequent frames. TextMeasurer is
     // composition-scoped and must come from rememberTextMeasurer.
@@ -1047,7 +1047,7 @@ fun DrawingPreview(
     val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
     val textCache = remember { TextLayoutCache() }
     val previewScope = rememberCoroutineScope()
-    val imageCache = remember(previewScope) { ImageBitmapCache(previewScope) }
+    val imageCache = rememberImageBitmapCache(previewScope)
     val shapeText = remember(bgColor) { ShapeTextPaint(hidden = false, chip = bgColor) }
     Canvas(modifier = modifier) {
         drawRect(color = bgColor)

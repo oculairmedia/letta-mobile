@@ -35,13 +35,9 @@ internal data class AndroidClientCommands(
 internal val LocalAndroidClientCommands = compositionLocalOf<AndroidClientCommands?> { null }
 
 /** `/recompile` through the conversation repository, refused where it reports no recompile route. */
-internal class RepositoryRecompileGateway(
-    private val repository: IConversationRepository,
-    private val iroh: Boolean,
-) : ConversationRecompileGateway {
+internal class RepositoryRecompileGateway(private val repository: IConversationRepository) : ConversationRecompileGateway {
     override suspend fun recompileConversation(request: ConversationRecompileRequest) {
-        val irohBlocked = iroh && !repository.canRecompileConversations()
-        if (irohBlocked) throw UnsupportedOperationException("no recompile route")
+        if (!repository.canRecompileConversations()) throw UnsupportedOperationException("no recompile route")
         repository.recompileConversation(
             ConversationId(request.conversationId),
             dryRun = false,
@@ -68,8 +64,9 @@ internal fun rememberAndroidClientCommands(state: AgentScaffoldRuntimeState, onR
             offered = offered,
             route = { command -> routeClientCommand(current, command, onRename) },
             // letta-mobile-by4vm.12/.51: the gateway asks the repository for a route when it runs (an
-            // Iroh host with the relay has one); without one the chat says recompile is unavailable.
-            recompileGateway = RepositoryRecompileGateway(repository, iroh),
+            // Iroh host with the relay, or a connected direct dial, has one); without one the chat
+            // says recompile is unavailable.
+            recompileGateway = RepositoryRecompileGateway(repository),
             recompileUnavailableReason = if (iroh) {
                 ConversationRecompileController.UNAVAILABLE_HOST_OUTDATED
             } else {

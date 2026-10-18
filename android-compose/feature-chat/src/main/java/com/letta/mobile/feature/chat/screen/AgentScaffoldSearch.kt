@@ -2,10 +2,13 @@ package com.letta.mobile.feature.chat.screen
 
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ParsedSearchMessage
+import com.letta.mobile.data.search.MessageSearchCapabilities
+import com.letta.mobile.data.search.MessageSearchSelection
 import com.letta.mobile.ui.components.searchResultSnippet
 import com.letta.mobile.ui.search.LettaSearchConfig
 import com.letta.mobile.ui.search.LettaSearchRow
 import com.letta.mobile.ui.search.LettaSearchSection
+import com.letta.mobile.ui.search.messageSearchChipRows
 import com.letta.mobile.util.formatRelativeTime
 
 /**
@@ -16,7 +19,13 @@ import com.letta.mobile.util.formatRelativeTime
 internal object ChatMessageSearch {
     const val SECTION_TITLE = "Messages"
 
-    fun config(placeholder: String, isSearching: Boolean) = LettaSearchConfig(
+    /** The pane's config; its chips are Letta's message search modes and roles, live in [selection]. */
+    fun config(
+        placeholder: String,
+        isSearching: Boolean,
+        selection: MessageSearchSelection,
+        onSelection: (MessageSearchSelection) -> Unit,
+    ) = LettaSearchConfig(
         placeholder = placeholder,
         // The header field is always present; it must not take the caret from the composer.
         autoFocus = false,
@@ -27,6 +36,7 @@ internal object ChatMessageSearch {
                 else -> "No results for \"$query\""
             }
         },
+        chipRows = messageSearchChipRows(MessageSearchCapabilities.REMOTE, selection, onSelection),
     )
 
     fun sections(

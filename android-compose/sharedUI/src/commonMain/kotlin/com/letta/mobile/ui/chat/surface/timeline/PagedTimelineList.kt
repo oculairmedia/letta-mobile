@@ -421,19 +421,10 @@ private fun RecordReadingPosition(
     // The index is an offset into the live overlay, which drains; read the CURRENT rows.
     val current = rememberUpdatedState(rows)
     LaunchedEffect(listState) {
-        snapshotFlow { readingProbe(listState) }
-            .collect { probe ->
-                val row = current.value.settledRowAt(probe.index) ?: return@collect
-                presentation.viewport = row.identity.value to probe.offset
-                presentation.reportVisible(probe.index, probe.visibleCount)
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                val row = current.value.settledRowAt(index) ?: return@collect
+                presentation.viewport = row.identity.value to offset
             }
     }
 }
-
-private data class ReadingProbe(val index: Int, val offset: Int, val visibleCount: Int)
-
-private fun readingProbe(listState: LazyListState): ReadingProbe = ReadingProbe(
-    index = listState.firstVisibleItemIndex,
-    offset = listState.firstVisibleItemScrollOffset,
-    visibleCount = listState.layoutInfo.visibleItemsInfo.size,
-)

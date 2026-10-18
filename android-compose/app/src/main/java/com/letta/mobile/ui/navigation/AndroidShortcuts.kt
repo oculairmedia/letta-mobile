@@ -10,7 +10,26 @@ import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.ui.shell.shortcuts.ShellShortcutId
 import com.letta.mobile.ui.shell.shortcuts.ShortcutLists
 import com.letta.mobile.ui.shell.shortcuts.ShortcutStepping
+import com.letta.mobile.ui.shell.shortcuts.shortcutPage
 import com.letta.mobile.ui.shell.shortcuts.stepList
+
+/**
+ * The entries the Android shell performs (letta-mobile-k5nbq.4). It has no command palette, rename
+ * dialog or collapsible sidebar, so search, find, quick open, rename and the sidebar chords stay
+ * with the focused field.
+ */
+internal val AndroidShortcuts: Set<ShellShortcutId> = setOf(
+    ShellShortcutId.Help,
+    ShellShortcutId.NewConversation,
+    ShellShortcutId.Memory,
+    ShellShortcutId.FullscreenMemory,
+    ShellShortcutId.Schedules,
+    ShellShortcutId.Settings,
+    ShellShortcutId.PreviousConversation,
+    ShellShortcutId.NextConversation,
+    ShellShortcutId.PreviousAgent,
+    ShellShortcutId.NextAgent,
+)
 
 /** Android destination and stepping for the shared keymap (letta-mobile-k5nbq.4). */
 internal fun androidShortcutLists(
@@ -22,33 +41,55 @@ internal fun androidShortcutLists(
     agents = agentStepping(agents, nav),
 )
 
+internal class AndroidShortcutNavigator(
+    val currentChatAgentId: String? = null,
+    val onFreshChat: (String) -> Unit = {},
+    val onNavigate: (ShellDestination) -> Unit = {},
+)
+
 internal fun handleAndroidShortcut(
     id: ShellShortcutId,
     nav: NavController,
     lists: ShortcutLists,
     onHelp: () -> Unit,
 ) {
-    if (id == ShellShortcutId.Help) {
-        onHelp()
-        return
+    handleAndroidShortcut(
+        id = id,
+        lists = lists,
+        onHelp = onHelp,
+        navigator = AndroidShortcutNavigator(
+            currentChatAgentId = currentChat(nav)?.agentId,
+            onFreshChat = { agentId ->
+                nav.navigate(AgentChatRoute(agentId = agentId, freshRouteKey = System.currentTimeMillis()))
+            },
+            onNavigate = nav::navigateTo,
+        ),
+    )
+}
+
+/**
+ * Runs an Android shell shortcut: `NewConversation` opens a fresh chat with
+ * [AndroidShortcutNavigator.currentChatAgentId] when a chat is on screen, or the conversation list
+ * (`ShellDestination.Chat()`) otherwise.
+ */
+internal fun handleAndroidShortcut(
+    id: ShellShortcutId,
+    lists: ShortcutLists,
+    onHelp: () -> Unit,
+    navigator: AndroidShortcutNavigator = AndroidShortcutNavigator(),
+) {
+    when (id) {
+        ShellShortcutId.Help -> onHelp()
+        ShellShortcutId.NewConversation -> {
+            val agentId = navigator.currentChatAgentId
+            if (agentId == null) navigator.onNavigate(ShellDestination.Chat()) else navigator.onFreshChat(agentId)
+        }
+        else -> {
+            if (stepList(id, lists)) return
+            val page = shortcutPage(id, currentAgentId(lists)) ?: return
+            navigator.onNavigate(page)
+        }
     }
-    if (openAndroidPage(id, nav, lists)) return
-    stepList(id, lists)
-}
-
-internal fun openAndroidPage(id: ShellShortcutId, nav: NavController, lists: ShortcutLists): Boolean {
-    val destination = androidDestination(id, lists) ?: return false
-    nav.navigateTo(destination)
-    return true
-}
-
-private fun androidDestination(id: ShellShortcutId, lists: ShortcutLists): ShellDestination? = when (id) {
-    ShellShortcutId.Search, ShellShortcutId.Find, ShellShortcutId.QuickOpen -> ShellDestination.Home
-    ShellShortcutId.NewConversation -> ShellDestination.Chat(lists.agents.ids().firstOrNull())
-    ShellShortcutId.Memory, ShellShortcutId.FullscreenMemory -> ShellDestination.Memory(currentAgentId(lists))
-    ShellShortcutId.Schedules -> ShellDestination.Schedules(currentAgentId(lists))
-    ShellShortcutId.Settings -> ShellDestination.Settings()
-    else -> null
 }
 
 private fun currentAgentId(lists: ShortcutLists): String? = lists.agents.current() ?: lists.agents.ids().firstOrNull()

@@ -19,7 +19,9 @@ class LettaSearchChipsTest {
     @Test
     fun aRemoteHostShowsEveryModeThenRoles() {
         val rows = messageSearchChipRows(MessageSearchCapabilities.REMOTE, MessageSearchSelection()) {}
-        assertEquals(listOf("hybrid", "semantic", "fts"), rows.first().chips.map { it.id })
+        assertEquals(listOf("hybrid", "vector", "fts"), rows.first().chips.map { it.id })
+        // Letta's search returns no tool traffic, so a backend host offers no Tool chip.
+        assertEquals(listOf("user", "assistant", "reasoning"), rows.last().chips.map { it.id })
         assertTrue(rows.first().exclusive)
         assertEquals(MessageSearchMode.Hybrid.label, rows.first().chips.first().label)
     }

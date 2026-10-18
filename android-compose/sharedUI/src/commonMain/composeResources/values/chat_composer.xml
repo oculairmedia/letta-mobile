@@ -19,6 +19,7 @@
     <string name="composer_attach_limit_reached">A message holds at most %1$d images.</string>
     <string name="composer_attach_failed">Could not attach that image: %1$s</string>
     <string name="composer_attach_not_an_image">not a readable image</string>
+    <string name="composer_attach_too_large">larger than %1$d MB</string>
     <string name="composer_model_fallback">Model</string>
     <string name="composer_model_search">Search models</string>
     <string name="composer_model_no_match">No models match “%1$s”</string>

@@ -97,6 +97,11 @@ class FakeConversationRepository(
         calls += "cancelConversation:${id.value}:${agentId?.value.orEmpty()}"
     }
 
+    /** What [canRecompileConversations] reports: whether this session has a recompile route. */
+    var canRecompile: Boolean = false
+
+    override fun canRecompileConversations(): Boolean = canRecompile
+
     override suspend fun recompileConversation(id: ConversationId, dryRun: Boolean, agentId: AgentId?): String {
         calls += "recompileConversation:${id.value}:$dryRun:${agentId?.value.orEmpty()}"
         return ""
