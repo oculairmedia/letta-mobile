@@ -5,6 +5,7 @@ import com.letta.mobile.data.controller.extras.ToolAudience
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.fanout.RuntimeSessionLink
 import com.letta.mobile.data.controller.reconnect.reattachRuntimes
+import com.letta.mobile.data.runtime.AgentDefaultsRepository
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.AppServerTurnStackSpec
 import com.letta.mobile.data.runtime.carryActiveLeasesInto
@@ -37,6 +38,8 @@ import java.util.UUID
 internal class IrohTransportEngine(
     private val scope: CoroutineScope,
     private val externalToolRegistry: ExternalToolRegistry?,
+    /** letta-mobile-k5nbq.12: the saved default cwd a conversation with no working directory yet starts in. */
+    private val agentDefaults: AgentDefaultsRepository? = null,
 ) {
     val client = IrohDialSwitchingClient(scope)
     val router = AppServerRuntimeEventRouter(connectionGenerationProvider = { client.generation })
@@ -136,6 +139,7 @@ internal class IrohTransportEngine(
             clientInfo = info.also { clientInfo = it },
             permissionMode = PERMISSION_MODE,
             externalToolRegistry = externalToolRegistry,
+            agentDefaults = agentDefaults,
         ),
     )
 

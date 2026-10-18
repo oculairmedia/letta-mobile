@@ -5,6 +5,7 @@ package com.letta.mobile.ui.agenteditor
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -36,6 +37,10 @@ import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
+import com.letta.mobile.data.runtime.AgentDefaultsRepository
+import com.letta.mobile.data.runtime.StoredAgentDefaults
+import com.letta.mobile.data.storage.InMemorySecureSettingsStore
+import com.letta.mobile.ui.runtime.LocalAgentDefaults
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LettaPaneTags
 import com.letta.mobile.ui.host.ProvideLettaHost
@@ -83,11 +88,18 @@ class AgentEditorPageTest {
         var openedMemory = false
     }
 
-    private fun ComposeUiTest.editor(backend: RecordingBackend, mode: AgentEditorMode, outcome: Outcome = Outcome()) {
+    private fun ComposeUiTest.editor(
+        backend: RecordingBackend,
+        mode: AgentEditorMode,
+        outcome: Outcome = Outcome(),
+        agentDefaults: AgentDefaultsRepository? = StoredAgentDefaults(InMemorySecureSettingsStore()),
+    ) {
         setContent {
             ProvideLettaHost(LettaHost.Pointer) {
-                SharedMaterialTheme {
-                    Box(Modifier.size(720.dp, 1400.dp)) { Editor(backend, mode, outcome) }
+                CompositionLocalProvider(LocalAgentDefaults provides agentDefaults) {
+                    SharedMaterialTheme {
+                        Box(Modifier.size(720.dp, 1400.dp)) { Editor(backend, mode, outcome) }
+                    }
                 }
             }
         }
@@ -131,6 +143,23 @@ class AgentEditorPageTest {
         row("name").assertTextContains("Ada")
         row("tool-t-search").assertExists()
         onNodeWithTag(AgentEditorPageTags.SAVE).assertIsNotEnabled()
+    }
+
+    @Test
+    fun theDefaultsRowShowsTheAgentsSavedCwd() = runComposeUiTest {
+        val defaults = StoredAgentDefaults(InMemorySecureSettingsStore())
+        defaults.setCwd(AgentId("a-1"), "/work/repo")
+        editor(RecordingBackend(ada, listOf(search, linear)), AgentEditorMode.Edit("a-1"), agentDefaults = defaults)
+
+        row("default-cwd").performScrollTo().assertTextContains("/work/repo")
+    }
+
+    @Test
+    fun aHostThatKeepsNoAgentDefaultsShowsNoDefaultsSection() = runComposeUiTest {
+        editor(RecordingBackend(ada, listOf(search, linear)), AgentEditorMode.Edit("a-1"), agentDefaults = null)
+
+        section(AgentEditorSectionKeys.TOOLS).assertExists()
+        section(AgentEditorSectionKeys.DEFAULTS).assertDoesNotExist()
     }
 
     @Test

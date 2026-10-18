@@ -51,6 +51,7 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import com.letta.mobile.data.transport.appserver.AppServerClient
+import com.letta.mobile.data.runtime.AgentDefaultsRepository
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import java.util.UUID
 
@@ -62,6 +63,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * This keeps the existing mobile send coordinator and [WsChatBridge] path intact while
  * swapping only the transport underneath it. The embedded/local runtime path is not touched.
  */
+@Suppress("LongParameterList")
 class IrohChannelTransport(
     // letta-mobile-by4vm.10: optional parent context (dispatcher + lifetime bound). The transport
     // always runs its work in its OWN job ([transportJob]) and cancels it in [close]; a caller's
@@ -79,6 +81,8 @@ class IrohChannelTransport(
     // bind to a paired peer).
     private val secretKeyStore: IrohSecretKeyStore = EphemeralIrohSecretKeyStore(),
     private val externalToolRegistry: ExternalToolRegistry? = null,
+    // letta-mobile-k5nbq.12: the agent's saved default cwd opens a conversation that has none yet.
+    private val agentDefaults: AgentDefaultsRepository? = null,
     private val notebookDirectory: java.nio.file.Path? = null,
     private val notebookPeers: (() -> Set<String>?)? = null,
     private val testDialer: (suspend (IrohConnectConfig) -> IrohConnectionHandle)? = null,
@@ -214,6 +218,7 @@ class IrohChannelTransport(
         secretKeyStore = secretKeyStore,
         onConnectionLost = { reason, handle -> supervisor.onConnectionLostAsync(reason, handle) },
         externalToolRegistry = externalToolRegistry,
+        agentDefaults = agentDefaults,
         notebookHandlerFactory = notebookHandlerFactory,
         syncBudget = syncBudget,
     )

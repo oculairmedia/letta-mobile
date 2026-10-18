@@ -12,7 +12,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.ui.mascot.ProvideMascotShell
-import com.letta.mobile.data.runtime.StoredAgentDefaults
 import com.letta.mobile.ui.notify.LocalAttentionPrefs
 import com.letta.mobile.ui.runtime.LocalAgentDefaults
 import androidx.compose.runtime.Composable
@@ -90,7 +89,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             val windowSizeClass = calculateWindowSizeClass(this@MainActivity)
             val snackbarDispatcher = remember { SnackbarDispatcher() }
-            val agentDefaults = remember { StoredAgentDefaults(deps.secureSettingsStore) }
             val overlays = rememberOverlayHost()
             val appThemeState = settingsRepository.getTheme().collectAsStateWithLifecycle(initialValue = AppTheme.SYSTEM)
             val themePresetState = settingsRepository.getThemePreset().collectAsStateWithLifecycle(initialValue = ThemePreset.DEFAULT)
@@ -105,7 +103,7 @@ class MainActivity : ComponentActivity() {
                 LocalSnackbarDispatcher provides snackbarDispatcher,
                 LocalWindowSizeClass provides windowSizeClass,
                 LocalAttentionPrefs provides deps.attentionPrefs,
-                LocalAgentDefaults provides agentDefaults,
+                LocalAgentDefaults provides deps.agentDefaults,
             ) {
                 LettaTheme(
                     appTheme = appThemeState.value,

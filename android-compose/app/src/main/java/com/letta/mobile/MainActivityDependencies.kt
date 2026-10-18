@@ -4,6 +4,7 @@ import com.letta.mobile.crash.CrashReporter
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.presence.ConversationRunRegistry
 import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.runtime.AgentDefaultsRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.storage.SecureSettingsStore
 import dagger.Lazy
@@ -32,6 +33,7 @@ class MainActivityDependencies @Inject constructor(
     private val lazySecureSettingsStore: Lazy<SecureSettingsStore>,
     private val lazyConversationRunRegistry: Lazy<ConversationRunRegistry>,
     private val lazyAttentionPrefs: Lazy<AttentionPrefsRepository>,
+    private val lazyAgentDefaults: Lazy<AgentDefaultsRepository>,
 ) {
     val settingsRepository: ISettingsRepository get() = lazySettingsRepository.get()
 
@@ -44,4 +46,7 @@ class MainActivityDependencies @Inject constructor(
 
     /** letta-mobile-bzvro.27: per-agent notification mutes, for the drawer card's switch. */
     val attentionPrefs: AttentionPrefsRepository get() = lazyAttentionPrefs.get()
+
+    /** letta-mobile-k5nbq.9: per-agent default cwd, the store the Iroh turn engine also reads. */
+    val agentDefaults: AgentDefaultsRepository get() = lazyAgentDefaults.get()
 }

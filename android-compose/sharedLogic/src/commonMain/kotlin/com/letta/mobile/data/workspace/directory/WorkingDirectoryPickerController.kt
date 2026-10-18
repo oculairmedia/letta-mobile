@@ -11,6 +11,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** Saves an agent's default working directory (letta-mobile-k5nbq.9). */
+fun interface DefaultWorkingDirectoryStore {
+    fun setCwd(agentId: AgentId, cwd: String?)
+}
+
 /** The worktrees letta-code made for one repository (its `.letta/worktrees` folders). */
 @Immutable
 data class WorktreeListState(
@@ -97,12 +102,11 @@ class WorkingDirectoryPickerController(
     private val onChosen: (String) -> Unit,
     private val recents: RecentFolders? = null,
     private val folderCreator: FolderCreator? = null,
+    /** letta-mobile-k5nbq.9: where "Make default for this agent" saves; null hides that control. */
+    private val agentDefaults: DefaultWorkingDirectoryStore? = null,
 ) : WorkingDirectoryPickerActions {
     private val _state = MutableStateFlow(WorkingDirectoryPickerState())
     val state: StateFlow<WorkingDirectoryPickerState> = _state.asStateFlow()
-
-    /** letta-mobile-k5nbq.9: called with the browsed folder when "Make default for this agent" runs. */
-    var onMakeDefault: ((String) -> Unit)? = null
 
     private var browseJob: Job? = null
     private var worktreesJob: Job? = null
@@ -117,7 +121,7 @@ class WorkingDirectoryPickerController(
             recents = recents?.recent?.value.orEmpty(),
             createFolderUnavailableReason = if (folderCreator == null) WorkingDirectoryPickerGates.CREATE_FOLDER_UNAVAILABLE else null,
             worktree = WorktreePaths.locate(cwd),
-            agentId = agentId?.takeUnless { it.value.isBlank() },
+            agentId = agentId?.takeIf { agentDefaults != null && it.value.isNotBlank() },
         )
         if (cwd != null) {
             browse(cwd.value)
@@ -171,9 +175,10 @@ class WorkingDirectoryPickerController(
     }
 
     override fun makeDefault() {
+        val agentId = _state.value.agentId ?: return
         val chosen = absoluteOrReport(_state.value.folder ?: return) ?: return
         recents?.record(chosen)
-        onMakeDefault?.invoke(chosen.value)
+        agentDefaults?.setCwd(agentId, chosen.value)
     }
 
     override fun dismiss() {

@@ -19,6 +19,7 @@ import com.letta.mobile.desktop.data.defaultDesktopStateDirectory
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
 import com.letta.mobile.desktop.workspace.DesktopWorkspaceSources
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectory
+import com.letta.mobile.ui.runtime.LocalAgentDefaults
 import com.letta.mobile.ui.shell.pages.workspace.WorkingDirectoryPicker
 import com.letta.mobile.ui.shell.pages.workspace.WorkingDirectoryPickerHost
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
@@ -67,9 +68,8 @@ internal fun rememberDesktopWorkingDirectoryPicker(onChosen: (String) -> Unit): 
     )
     val isLocal = localClient != null
     val recents = remember { RecentFolders(DesktopFileSecureSettingsStore(defaultDesktopStateDirectory().resolve(RECENT_FOLDERS_FILE))) }
-    val defaults = com.letta.mobile.ui.runtime.LocalAgentDefaults.current
-    val latestDefaults by rememberUpdatedState(defaults)
-    val controller = remember(scope, isLocal) {
+    val agentDefaults = LocalAgentDefaults.current
+    val controller = remember(scope, isLocal, agentDefaults) {
         val sources = DesktopWorkspaceSources()
         WorkingDirectoryPickerController(
             source = AppServerWorkspaceDirectorySource(client = sources::client, requestId = sources::requestId),
@@ -77,11 +77,8 @@ internal fun rememberDesktopWorkingDirectoryPicker(onChosen: (String) -> Unit): 
             onChosen = { path -> latestOnChosen(path) },
             recents = recents,
             folderCreator = if (isLocal) DesktopLocalFolderCreator else null,
-        ).also { picker ->
-            picker.onMakeDefault = { path ->
-                picker.state.value.agentId?.let { latestDefaults?.setCwd(it, path) }
-            }
-        }
+            agentDefaults = agentDefaults,
+        )
     }
     DisposableEffect(controller) { onDispose { controller.dismiss() } }
     val systemDialog = rememberDirectoryPickerLauncher(

@@ -21,6 +21,10 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.runtime.AgentDefaultsRepository
+import com.letta.mobile.data.runtime.StoredAgentDefaults
+import com.letta.mobile.data.runtime.cwd
+import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.data.workspace.directory.DirectoryBrowseException
 import com.letta.mobile.data.workspace.directory.DirectoryBrowseErrors
 import com.letta.mobile.data.workspace.directory.DirectoryListing
@@ -56,7 +60,7 @@ class WorkingDirectoryPickerUiTest {
         val host: WorkingDirectoryPickerHost = WorkingDirectoryPickerHost(),
         val directorySource: WorkspaceDirectorySource? = null,
         val agentId: String? = null,
-        val onMakeDefault: (String) -> Unit = {},
+        val agentDefaults: AgentDefaultsRepository? = null,
     )
 
     private fun ComposeUiTest.show(cwd: String?) = show(PickerShow(cwd))
@@ -68,7 +72,8 @@ class WorkingDirectoryPickerUiTest {
             CoroutineScope(Dispatchers.Unconfined),
             onChosen = { chosen += it },
             folderCreator = spec.creator,
-        ).also { it.onMakeDefault = spec.onMakeDefault }
+            agentDefaults = spec.agentDefaults,
+        )
         setContent {
             MaterialTheme {
                 val state by controller.state.collectAsState()
@@ -92,11 +97,11 @@ class WorkingDirectoryPickerUiTest {
 
     @Test
     fun makeDefaultSavesTheFolderForTheAgentWithoutClosing() = runComposeUiTest {
-        val saved = mutableListOf<String>()
-        show(PickerShow("/work/repo", agentId = "agent-1", onMakeDefault = { saved += it }))
+        val defaults = StoredAgentDefaults(InMemorySecureSettingsStore())
+        show(PickerShow("/work/repo", agentId = "agent-1", agentDefaults = defaults))
         onNodeWithTag(WorkingDirectoryPickerTags.MAKE_DEFAULT).performClick()
         runOnIdle {
-            assertEquals(listOf("/work/repo"), saved)
+            assertEquals("/work/repo", defaults.cwd(AgentId("agent-1")))
             assertEquals(true, chosen.isEmpty())
         }
         onNodeWithTag(WorkingDirectoryPickerTags.ROOT).assertExists()
@@ -104,7 +109,7 @@ class WorkingDirectoryPickerUiTest {
 
     @Test
     fun withoutAnAgentMakeDefaultIsHidden() = runComposeUiTest {
-        show("/work/repo")
+        show(PickerShow("/work/repo", agentDefaults = StoredAgentDefaults(InMemorySecureSettingsStore())))
         onNodeWithTag(WorkingDirectoryPickerTags.MAKE_DEFAULT).assertDoesNotExist()
     }
 

@@ -4,7 +4,8 @@ import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.attachTurnStack
-import com.letta.mobile.data.runtime.withWorkingDirectoryProvider
+import com.letta.mobile.data.runtime.StoredAgentDefaults
+import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -240,17 +241,16 @@ class DesktopAppServerChatGatewayBuilderTest {
     }
 
     @Test
-    fun desktopTurnEngine_runtimeStartCarriesTheAgentsDefaultCwd() = runTest {
-        val client = RecordingAppServerClient()
+    fun desktopTurnEngine_onlyANewConversationStartsInTheAgentsDefaultCwd() = runTest {
+        val client = RecordingAppServerClient(cwdMap = mapOf("conversation:conv-picked" to "/picked"))
+        val defaults = StoredAgentDefaults(InMemorySecureSettingsStore())
+        defaults.setCwd(com.letta.mobile.data.model.AgentId("agent-1"), "/work/repo")
         val eventRouter = AppServerRuntimeEventRouter()
-        val engine = eventRouter.attachTurnStack(
-            client,
-            this,
-            desktopTurnStackSpec().withWorkingDirectoryProvider { "/work/repo" },
-        )
+        val engine = eventRouter.attachTurnStack(client, this, desktopTurnStackSpec().copy(agentDefaults = defaults))
         try {
             runConversationTurnToCompletion(engine, client, "conv-new")
-            assertEquals("/work/repo", client.runtimeStarts.single().cwd)
+            runConversationTurnToCompletion(engine, client, "conv-picked")
+            assertEquals(listOf("/work/repo", null), client.runtimeStarts.map { it.cwd })
         } finally {
             eventRouter.detach()
         }
@@ -301,11 +301,14 @@ class DesktopAppServerChatGatewayBuilderTest {
      * conversation — the second call must hit the engine's cached runtime,
      * not reissue runtime_start.
      */
-    private class RecordingAppServerClient : AppServerClient {
+    private class RecordingAppServerClient(private val cwdMap: Map<String, String> = emptyMap()) : AppServerClient {
         val runtimeStarts = mutableListOf<AppServerCommand.RuntimeStart>()
         val contextManagementCalls = mutableListOf<String>()
         val eventsFlow = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 16)
         override val events: Flow<AppServerReceivedFrame> = eventsFlow
+
+        override suspend fun getCwdMap(command: AppServerCommand.GetCwdMap) =
+            AppServerInboundFrame.GetCwdMapResponse(requestId = command.requestId, success = true, cwdMap = cwdMap)
 
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse {
             runtimeStarts += command

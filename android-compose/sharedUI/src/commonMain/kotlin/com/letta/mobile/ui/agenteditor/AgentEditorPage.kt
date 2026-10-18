@@ -35,7 +35,6 @@ import com.letta.mobile.data.agenteditor.AgentEditorSections
 import com.letta.mobile.data.agenteditor.AgentEditorState
 import com.letta.mobile.data.agenteditor.errorNote
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.runtime.StoredAgentDefaults
 import com.letta.mobile.ui.runtime.LocalAgentDefaults
 import com.letta.mobile.data.settings.SettingsAction
 import com.letta.mobile.data.settings.SettingsRow
@@ -225,13 +224,15 @@ private fun AgentEditorBodyInputs.openers(
     ),
 )
 
-/** letta-mobile-k5nbq.9: the saved default cwd for an existing agent, from the host's settings store. */
+/**
+ * letta-mobile-k5nbq.9: an existing agent's saved default cwd, from the host's one
+ * [LocalAgentDefaults] (the store its turn engine reads). A host that binds none shows no row.
+ */
 @Composable
 private fun rememberAgentEditorCwd(inputs: AgentEditorBodyInputs): AgentEditorCwdDefaults? {
-    val agentId = inputs.state.agentId?.takeIf { !inputs.state.creating } ?: return null
-    val fallback = remember(inputs.options.settings) { StoredAgentDefaults(inputs.options.settings) }
-    val repo = LocalAgentDefaults.current ?: fallback
+    val repo = LocalAgentDefaults.current ?: return null
     val entries by repo.entries.collectAsState()
+    val agentId = inputs.state.agentId?.takeIf { !inputs.state.creating } ?: return null
     return AgentEditorCwdDefaults(
         path = entries[agentId]?.cwd.orEmpty(),
         onChange = { repo.setCwd(AgentId(agentId), it) },
