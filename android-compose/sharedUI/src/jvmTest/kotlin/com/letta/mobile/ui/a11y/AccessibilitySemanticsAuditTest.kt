@@ -241,7 +241,7 @@ private fun AccessibilityAuditMainColumn(modifier: Modifier = Modifier) {
                     role = "user",
                     content = "Audit prompt",
                     timestamp = "2026-07-19T12:00:00Z",
-                    imageAttachments = listOf(UiImageAttachment(mimeType = "image/png", base64 = "")),
+                    attachments = listOf(UiImageAttachment(mediaType = "image/png", base64 = "")),
                 ),
                 groupPosition = GroupPosition.None,
             ),
@@ -253,7 +253,6 @@ private fun AccessibilityAuditMainColumn(modifier: Modifier = Modifier) {
                     role = "assistant",
                     content = "Settled reply",
                     timestamp = "2026-07-19T12:01:00Z",
-                    reasoning = "Verified clickables",
                     toolCalls = listOf(
                         UiToolCall(
                             name = "shell",
