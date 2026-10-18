@@ -8,7 +8,7 @@ plugin keeps their visibility and source-link settings consistent.
 From `android-compose/`, with the Java/Android SDK setup in CONTRIBUTING.md:
 
 ```bash
-./gradlew --no-daemon -Pkotlin.compiler.execution.strategy=in-process :dokkaGeneratePublicationHtml
+./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process :dokkaGeneratePublicationHtml
 ```
 
 Open `android-compose/build/dokka/html/index.html`. Output stays under ignored
