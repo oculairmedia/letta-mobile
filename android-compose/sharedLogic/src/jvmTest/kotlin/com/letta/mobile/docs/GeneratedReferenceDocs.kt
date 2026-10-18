@@ -8,16 +8,17 @@ internal object GeneratedReferenceDocs {
 
     enum class Mode { Check, Write }
 
+    data class Markers(val start: String, val end: String)
+
     fun sync(
         document: File,
-        startMarker: String,
-        endMarker: String,
+        markers: Markers,
         generated: String,
         mode: Mode = configuredMode(),
     ) {
         check(document.isFile) { "Missing reference: ${document.absolutePath}" }
         val original = document.readText(Charsets.UTF_8)
-        val updated = replaceBody(original, startMarker, endMarker, generated)
+        val updated = replaceBody(original, markers, generated)
         when (mode) {
             Mode.Check -> check(original == updated) {
                 "${document.path} is stale; run ./gradlew :sharedLogic:writeContractReferenceDocs from android-compose/."
@@ -32,7 +33,8 @@ internal object GeneratedReferenceDocs {
         else -> error("Unsupported $MODE_PROPERTY=$value; expected check or write")
     }
 
-    private fun replaceBody(original: String, startMarker: String, endMarker: String, generated: String): String {
+    private fun replaceBody(original: String, markers: Markers, generated: String): String {
+        val (startMarker, endMarker) = markers
         require(startMarker.isNotEmpty() && endMarker.isNotEmpty() && startMarker != endMarker) {
             "Reference markers must be nonempty and distinct"
         }

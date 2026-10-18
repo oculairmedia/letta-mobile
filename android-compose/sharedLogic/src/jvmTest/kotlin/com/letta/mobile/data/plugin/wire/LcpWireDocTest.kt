@@ -19,7 +19,7 @@ class LcpWireDocTest {
         File("build").resolve("canvas-plugin-wire-v1-tables.md").apply { parentFile.mkdirs() }.writeText(tables + "\n")
 
         assertEquals(tables, methodTable() + "\n\n" + errorTable(), "The wire renderer must be deterministic")
-        GeneratedReferenceDocs.sync(File(DOC), START, END, tables)
+        GeneratedReferenceDocs.sync(File(DOC), MARKERS, tables)
     }
 
     private fun methodTable(): String = buildList {
@@ -44,5 +44,6 @@ class LcpWireDocTest {
         const val DOC = "../../docs/reference/canvas-plugin-wire-v1.md"
         const val START = "<!-- lcp_wire_tables:start -->"
         const val END = "<!-- lcp_wire_tables:end -->"
+        val MARKERS = GeneratedReferenceDocs.Markers(START, END)
     }
 }

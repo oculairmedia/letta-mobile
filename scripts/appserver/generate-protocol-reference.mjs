@@ -43,38 +43,53 @@ const table = (headings, rows) => [
 
 export function validateInputs({ inventory, ownership, contract }) {
   requireValue(inventory && ownership && contract, "all three fixtures are required");
-  const source = inventory.source;
-  requireValue(source && contract.baseline, "inventory.source and contract.baseline are required");
+  requireValue(inventory.source && contract.baseline, "inventory.source and contract.baseline are required");
+  validateInventory(inventory);
+  validateBaseline(inventory.source, contract.baseline);
+  validateOwnership(ownership);
+}
+
+function validateInventory({ source, commands, messages }) {
   for (const key of ["package", "version", "node_version", "protocol_declaration", "public_export", "reproduction"]) {
     nonempty(source[key], `source.${key}`);
   }
-  for (const key of ["protocol_sha256", "protocol_corpus_sha256"]) {
-    requireValue(/^[a-f0-9]{64}$/.test(source[key]), `source.${key} must be a lowercase SHA-256`);
-    requireValue(source[key] === contract.baseline[key], `${key} differs between inventory and contract`);
-  }
-  for (const key of ["package", "version"]) {
-    requireValue(source[key] === contract.baseline[key], `${key} differs between inventory and contract`);
-  }
-  requireValue(source.node_version === contract.baseline.node, "Node pin differs between inventory and contract");
   strings(source.protocol_corpus_files, "source.protocol_corpus_files");
-  strings(contract.baseline.protocol_corpus_files, "baseline.protocol_corpus_files");
-  requireValue(JSON.stringify(sorted(source.protocol_corpus_files)) === JSON.stringify(sorted(contract.baseline.protocol_corpus_files)), "protocol corpus files differ");
-  strings(inventory.commands, "commands");
-  strings(inventory.messages, "messages");
-  requireValue(ownership.enums && Array.isArray(ownership.operations) && ownership.operations.length > 0, "ownership enums and nonempty operations are required");
-  for (const key of ["owners", "fallbacks", "authorization_classes"]) strings(ownership.enums[key], `enums.${key}`);
-  const methods = new Set();
-  for (const operation of ownership.operations) {
-    requireValue(operation && typeof operation === "object", "operation must be an object");
-    for (const key of ["method", "owner", "fallback", "handler", "authorization_class", "public_contract"]) nonempty(operation[key], `operation.${key}`);
-    requireValue(!methods.has(operation.method), `duplicate method ${operation.method}`);
-    methods.add(operation.method);
-    for (const [field, values] of [["owner", "owners"], ["fallback", "fallbacks"], ["authorization_class", "authorization_classes"]]) {
-      requireValue(ownership.enums[values].includes(operation[field]), `unknown ${field} ${operation[field]}`);
-    }
-  }
+  strings(commands, "commands");
+  strings(messages, "messages");
   const upstreamSha = source.git_sha ?? source.git_commit ?? source.commit_sha;
   if (upstreamSha !== undefined) requireValue(/^[a-fA-F0-9]{40}$|^[a-fA-F0-9]{64}$/.test(upstreamSha), "source Git SHA must be a full SHA");
+}
+
+function validateBaseline(source, baseline) {
+  for (const key of ["protocol_sha256", "protocol_corpus_sha256"]) {
+    requireValue(/^[a-f0-9]{64}$/.test(source[key]), `source.${key} must be a lowercase SHA-256`);
+    requireValue(source[key] === baseline[key], `${key} differs between inventory and contract`);
+  }
+  for (const key of ["package", "version"]) {
+    requireValue(source[key] === baseline[key], `${key} differs between inventory and contract`);
+  }
+  requireValue(source.node_version === baseline.node, "Node pin differs between inventory and contract");
+  strings(baseline.protocol_corpus_files, "baseline.protocol_corpus_files");
+  requireValue(JSON.stringify(sorted(source.protocol_corpus_files)) === JSON.stringify(sorted(baseline.protocol_corpus_files)), "protocol corpus files differ");
+}
+
+function validateOwnership({ enums, operations }) {
+  requireValue(enums && Array.isArray(operations) && operations.length > 0, "ownership enums and nonempty operations are required");
+  for (const key of ["owners", "fallbacks", "authorization_classes"]) strings(enums[key], `enums.${key}`);
+  const methods = new Set();
+  for (const operation of operations) {
+    validateOperation(operation, enums);
+    requireValue(!methods.has(operation.method), `duplicate method ${operation.method}`);
+    methods.add(operation.method);
+  }
+}
+
+function validateOperation(operation, enums) {
+  requireValue(operation && typeof operation === "object", "operation must be an object");
+  for (const key of ["method", "owner", "fallback", "handler", "authorization_class", "public_contract"]) nonempty(operation[key], `operation.${key}`);
+  for (const [field, values] of [["owner", "owners"], ["fallback", "fallbacks"], ["authorization_class", "authorization_classes"]]) {
+    requireValue(enums[values].includes(operation[field]), `unknown ${field} ${operation[field]}`);
+  }
 }
 
 export function loadInputs(root = repositoryRoot) {

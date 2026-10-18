@@ -70,7 +70,7 @@ class GeneratedReferenceDocsTest {
     }
 
     private fun sync(document: File, generated: String, mode: GeneratedReferenceDocs.Mode) =
-        GeneratedReferenceDocs.sync(document, START, END, generated, mode)
+        GeneratedReferenceDocs.sync(document, MARKERS, generated, mode)
 
     private fun withDocument(test: (File) -> Unit) {
         val directory = createTempDirectory("generated-reference-test").toFile()
@@ -84,5 +84,6 @@ class GeneratedReferenceDocsTest {
     private companion object {
         const val START = "<!-- generated:start -->"
         const val END = "<!-- generated:end -->"
+        val MARKERS = GeneratedReferenceDocs.Markers(START, END)
     }
 }

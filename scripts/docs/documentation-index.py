@@ -73,20 +73,31 @@ def label(text: str) -> str:
     return re.sub(r"([\\`*_{}\[\]()!|])", r"\\\1", text)
 
 
-def navigation(root: Path) -> str:
+def document_groups(root: Path) -> dict[str, list[PurePosixPath]]:
+    """Partition the sorted document inventory by its directory below docs/."""
     groups: dict[str, list[PurePosixPath]] = {}
     for path in tracked_documents(root):
         relative = path.relative_to("docs")
         group = "" if relative.parent == PurePosixPath(".") else relative.parent.as_posix()
         groups.setdefault(group, []).append(path)
-    lines = ["## Documents", ""]
-    for group in sorted(groups, key=lambda value: (bool(value), value.casefold(), value)):
-        lines.extend(["### " + label(group or "General"), ""])
-        for path in groups[group]:
-            url = quote(path.relative_to("docs").as_posix(), safe="/-._~")
-            lines.append(f"- [{label(title(root / path))}]({url})")
-        lines.append("")
+    return groups
+
+
+def group_navigation(root: Path, group: str, paths: list[PurePosixPath]) -> str:
+    """Render one navigation section, including safe titles and relative URLs."""
+    lines = ["### " + label(group or "General"), ""]
+    for path in paths:
+        url = quote(path.relative_to("docs").as_posix(), safe="/-._~")
+        lines.append(f"- [{label(title(root / path))}]({url})")
+    lines.append("")
     return "\n".join(lines)
+
+
+def navigation(root: Path) -> str:
+    groups = document_groups(root)
+    ordered = sorted(groups, key=lambda value: (bool(value), value.casefold(), value))
+    sections = [group_navigation(root, group, groups[group]) for group in ordered]
+    return "\n".join(["## Documents", ""] + sections)
 
 
 def render(root: Path, current: str) -> str:

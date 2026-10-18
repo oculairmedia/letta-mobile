@@ -16,7 +16,7 @@ class CanvasComposeGuideDocTest {
         val guide = CanvasComposeGuide.text
         File("build").resolve("canvas-compose-guide.md").apply { parentFile.mkdirs() }.writeText(guide + "\n")
 
-        GeneratedReferenceDocs.sync(File(DOC), START, END, guide)
+        GeneratedReferenceDocs.sync(File(DOC), MARKERS, guide)
     }
 
     private companion object {
@@ -24,5 +24,6 @@ class CanvasComposeGuideDocTest {
         const val DOC = "../../docs/reference/canvas-compose-v1.md"
         const val START = "<!-- canvas_compose_guide:start -->"
         const val END = "<!-- canvas_compose_guide:end -->"
+        val MARKERS = GeneratedReferenceDocs.Markers(START, END)
     }
 }
