@@ -484,7 +484,6 @@ jobs:
         with:
           distribution: temurin
           java-version: 26
-      - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
