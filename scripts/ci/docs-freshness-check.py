@@ -24,6 +24,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else Path(__file__).resolve().parents[2])
 BUILD = ROOT / "android-compose"
@@ -157,7 +158,7 @@ def check_links() -> None:
     for doc, text in present_docs(DOCS):
         base = (ROOT / doc).parent
         for target in relative_links(text):
-            if not (base / target.split("#", 1)[0]).exists():
+            if not (base / unquote(urlsplit(target).path)).exists():
                 fail(doc, f"broken link ({target})")
 
 

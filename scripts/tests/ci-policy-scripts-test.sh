@@ -394,6 +394,18 @@ printf '\nSee [gone](docs/does-not-exist.md) and `:nope:assembleDebug`.\n' >>"$T
 if output="$(python3 "$docs_check" "$TMP/docs" 2>&1)"; then fail "broken link must fail docs-freshness"; fi
 assert_contains "$output" 'broken link (docs/does-not-exist.md)'
 assert_contains "$output" '`:nope:assembleDebug` does not start with a declared Gradle module'
+
+# Generated navigation percent-encodes filenames; the freshness gate must decode
+# the URL path and ignore query/fragment components before resolving it.
+docs_fixture
+mkdir -p "$TMP/docs/docs"
+printf '# Spaced title\n' >"$TMP/docs/docs/space name.md"
+printf '\n[valid](docs/space%%20name.md?view=source#heading)\n' >>"$TMP/docs/README.md"
+output="$(python3 "$docs_check" "$TMP/docs" 2>&1 || true)"
+assert_not_contains "$output" 'broken link (docs/space%20name.md?view=source#heading)'
+printf '\n[missing](docs/missing%%20name.md)\n' >>"$TMP/docs/README.md"
+output="$(python3 "$docs_check" "$TMP/docs" 2>&1 || true)"
+assert_contains "$output" 'broken link (docs/missing%20name.md)'
 # An includeBuild(...) build is a valid task prefix (`:build-logic:test` runs in `test`);
 # dropping the includeBuild makes the same reference fail.
 docs_fixture
