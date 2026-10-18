@@ -1,6 +1,5 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.ui.awt.SwingInteropViewGroup
 import com.letta.mobile.desktop.plugin.view.AwtChord
 import com.letta.mobile.desktop.plugin.view.cefChord
 import com.letta.mobile.ui.shell.shortcuts.ShellShortcutBinding
@@ -31,7 +30,7 @@ class DesktopShortcutsTest {
     fun embeddedSwingViewsAreForeignFocusOwners() {
         val view = JPanel()
         val field = JTextField()
-        SwingInteropViewGroup(0L, view).add(view)
+        foreignHost().add(view)
         view.add(field)
         assertEquals(ShortcutFocusOwner.ForeignView, swingFocusOwner(view))
         assertEquals(ShortcutFocusOwner.ForeignTextField, swingFocusOwner(field))
@@ -43,10 +42,14 @@ class DesktopShortcutsTest {
         val hub = ShortcutHub()
         hub.binding = ShellShortcutBinding(ShortcutPlatform.Desktop, WorkspaceShortcuts) { fired += it }
         val view = JPanel()
-        SwingInteropViewGroup(0L, view).add(view)
+        foreignHost().add(view)
         assertTrue(dispatchSwingShortcut(press(view, KeyEvent.VK_B), hub))
         assertFalse(dispatchSwingShortcut(press(JPanel(), KeyEvent.VK_B), hub), "Compose matches its own layer")
         assertEquals(listOf(ShellShortcutId.ToggleSidebar), fired)
+    }
+
+    private fun foreignHost(): JPanel = JPanel().apply {
+        putClientProperty(FOREIGN_SWING_VIEW_PROP, true)
     }
 
     @Test

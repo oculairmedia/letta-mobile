@@ -1,6 +1,5 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.ui.awt.SwingInteropViewGroup
 import androidx.compose.ui.input.key.Key
 import com.letta.mobile.data.chat.runtime.ConversationListGroups
 import com.letta.mobile.data.chat.runtime.ConversationListOrder
@@ -13,7 +12,7 @@ import java.awt.Component
 import java.awt.KeyEventDispatcher
 import java.awt.KeyboardFocusManager
 import java.awt.event.KeyEvent
-import javax.swing.SwingUtilities
+import javax.swing.JComponent
 import javax.swing.text.JTextComponent
 
 /**
@@ -46,10 +45,18 @@ internal fun dispatchSwingShortcut(event: KeyEvent, hub: ShortcutHub): Boolean {
 
 /** Null on the Compose layer; otherwise the kind of embedded Swing view [component] is. */
 internal fun swingFocusOwner(component: Component?): ShortcutFocusOwner? {
-    if (component == null) return null
-    if (SwingUtilities.getAncestorOfClass(SwingInteropViewGroup::class.java, component) == null) return null
+    if (component == null || !hasSwingInteropAncestor(component)) return null
     return if (component is JTextComponent) ShortcutFocusOwner.ForeignTextField else ShortcutFocusOwner.ForeignView
 }
+
+private fun hasSwingInteropAncestor(component: Component): Boolean =
+    generateSequence(component) { it.parent }.any { node ->
+        node.javaClass.name == SWING_INTEROP_GROUP_CLASS ||
+            (node as? JComponent)?.getClientProperty(FOREIGN_SWING_VIEW_PROP) == true
+    }
+
+internal const val FOREIGN_SWING_VIEW_PROP = "letta.foreignSwingView"
+private const val SWING_INTEROP_GROUP_CLASS = "androidx.compose.ui.awt.SwingInteropViewGroup"
 
 internal fun KeyEvent.asStroke(): ShortcutKeystroke = ShortcutKeystroke(
     key = Key(keyCode, keyLocation),
