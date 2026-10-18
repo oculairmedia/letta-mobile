@@ -86,8 +86,8 @@ class AndroidShortcutsTest {
         AndroidShortcuts.forEach { id ->
             val effects = mutableListOf<String>()
             val stepping = ShortcutStepping(
-                ids = { listOf("a", "b") },
-                current = { "a" },
+                ids = { listOf("a", "b", "c") },
+                current = { "b" },
                 open = { effects += "step:$it" },
             )
             handleAndroidShortcut(
@@ -95,7 +95,7 @@ class AndroidShortcutsTest {
                 lists = ShortcutLists(conversations = stepping, agents = stepping),
                 onHelp = { effects += "help" },
                 navigator = AndroidShortcutNavigator(
-                    currentChatAgentId = "a",
+                    currentChatAgentId = "b",
                     onFreshChat = { effects += "fresh:$it" },
                     onNavigate = { effects += "nav:$it" },
                 ),
