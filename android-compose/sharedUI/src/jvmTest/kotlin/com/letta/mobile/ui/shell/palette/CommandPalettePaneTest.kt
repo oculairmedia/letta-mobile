@@ -78,7 +78,9 @@ class CommandPalettePaneTest {
             override val capabilities = MessageSearchCapabilities.LOCAL
 
             override suspend fun search(query: MessageSearchQuery): List<MessageSearchHit> =
-                listOf(MessageSearchHit("c1", "a1", "m1", "Ask Emmanuel about the ${query.text} release")).takeIf { query.text == "emmanuel" }.orEmpty()
+                listOf(MessageSearchHit("c1", "a1", "m1", "Ask Emmanuel about the ${query.text} release"))
+                    .takeIf { query.text == "emmanuel" }
+                    .orEmpty()
         }
         setContent {
             ProvideLettaHost(LettaHost.Pointer) {

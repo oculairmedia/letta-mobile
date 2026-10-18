@@ -43,11 +43,18 @@ class MessageSearchRequestTest {
 
     @Test
     fun backendHitsAreKeptByTheSelectedRoles() = runTest {
-        val hits = listOf(hit("u", "user_message"), hit("a", "assistant_message"), hit("r", "reasoning_message"), hit("s", "system_message"))
+        val hits = listOf(
+            hit("u", "user_message"),
+            hit("a", "assistant_message"),
+            hit("r", "reasoning_message"),
+            hit("s", "system_message"),
+        )
         val defaults = MessageSearchQuery("q").searchBackend { hits }
         assertEquals(listOf("u", "a"), defaults.map { it.messageId })
-        val reasoningOnly = MessageSearchQuery("q", selection = MessageSearchSelection(roles = setOf(MessageSearchRole.Reasoning)))
-            .searchBackend { hits }
+        val reasoningOnly = MessageSearchQuery(
+            text = "q",
+            selection = MessageSearchSelection(roles = setOf(MessageSearchRole.Reasoning)),
+        ).searchBackend { hits }
         assertEquals(listOf("r"), reasoningOnly.map { it.messageId })
     }
 
