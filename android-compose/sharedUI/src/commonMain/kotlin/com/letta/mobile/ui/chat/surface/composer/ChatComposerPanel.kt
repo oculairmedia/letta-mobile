@@ -72,21 +72,13 @@ internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modi
         onIntent = inputs.onIntent,
         decisions = decisions,
     )
-    val attachImage = rememberComposerImagePicker(
-        ComposerImagePickerTarget(
-            maxAttachments = composer.maxAttachments,
-            pendingCount = composer.attachments.size,
-            limits = composer.attachmentLimits,
-            onPicked = actions::attachImage,
-            onError = actions::reportComposerError,
-        ),
-    )
+    val images = rememberComposerImages(composer, actions, modifier)
     if (touchStyle()) {
-        TouchComposerPanel(model, attachImage, modifier)
+        TouchComposerPanel(model, images.attach, images.modifier)
         return
     }
     Column(
-        modifier = modifier
+        modifier = images.modifier
             .fillMaxWidth()
             .accessibilityTraversal(AccessibilityTraversal.COMPOSER)
             .liftAboveKeyboard()
@@ -102,14 +94,38 @@ internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modi
     ) {
         ComposerAboveCard(model)
         if (mode == ChatSurfaceMode.Docked) {
-            DockedComposerBar(model, attachImage)
+            DockedComposerBar(model, images.attach)
         } else {
-            ComposerCompanionRow(model) { ComposerPromptCard(model, attachImage) }
+            ComposerCompanionRow(model) { ComposerPromptCard(model, images.attach) }
             if (inputs.platform.showKeyboardHints) {
                 ComposerHintRow(visible = composerHintVisible(composer), contextUsage = composer.contextUsage)
             }
         }
     }
+}
+
+private data class ComposerImages(val attach: () -> Unit, val modifier: Modifier)
+
+@Composable
+private fun rememberComposerImages(
+    composer: ChatComposerUiState,
+    actions: ChatActions,
+    modifier: Modifier,
+): ComposerImages {
+    val attacher = LocalComposerImageAttacher.current ?: rememberComposerImageAttacher()
+    return ComposerImages(
+        attach = rememberComposerImagePicker(
+            ComposerImagePickerTarget(
+                maxAttachments = composer.maxAttachments,
+                pendingCount = composer.attachments.size,
+                limits = composer.attachmentLimits,
+                onPicked = actions::attachImage,
+                onError = actions::reportComposerError,
+            ),
+            attacher,
+        ),
+        modifier = modifier.composerImageIngress(attacher),
+    )
 }
 
 /**
