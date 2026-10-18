@@ -113,6 +113,7 @@ private fun rememberComposerImages(
     modifier: Modifier,
 ): ComposerImages {
     val attacher = LocalComposerImageAttacher.current ?: rememberComposerImageAttacher()
+    val ingress = platformComposerImageIngress
     return ComposerImages(
         attach = rememberComposerImagePicker(
             ComposerImagePickerTarget(
@@ -124,7 +125,7 @@ private fun rememberComposerImages(
             ),
             attacher,
         ),
-        modifier = modifier.composerImageIngress(attacher),
+        modifier = if (ingress == null) modifier else modifier.then(ingress(attacher)),
     )
 }
 
