@@ -1,5 +1,7 @@
 # lgns8.10 acceptance evidence ledger
 
+> Source audit, 2026-10-18: Historical acceptance ledger as of 2026-08-01. PROVEN-LIVE describes observations on that date, not the current host. Current runtime pin is in `letta-code-runtime.properties`; do not promote old pending rows or infer current bead state from this snapshot. No live host/device evidence was re-captured in the documentation audit.
+
 Date: **2026-08-01** · Bead: `letta-mobile-lgns8.10` (shim-off parity,
 failure-injection, and multi-client acceptance gate) · Consumers:
 `letta-mobile-lgns8.11` (production cutover), `letta-mobile-eaczz.10` (device
@@ -218,7 +220,7 @@ each carry at least one PROVEN-LIVE row.
 
 `lgns8.11` (production cutover and lettashim retirement) is closed against this
 state — see the "lgns8.11 close-out — 2026-08-01" section of
-`docs/architecture/lgns8-epic-status-and-shim-retirement-ceiling.md` for the
+`docs/architecture/lgns8-shim-retirement-snapshot-2026-07-31.md` for the
 role-by-role retirement record, the rollback inventory, and why the lettashim
 **service-stop** belongs to `lgns8.25.1` rather than to `.11`. `lgns8.10` stays
 open on row 1 above; the epic stays open on `lgns8.10`.

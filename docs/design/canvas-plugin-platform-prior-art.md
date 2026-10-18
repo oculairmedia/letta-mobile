@@ -1,5 +1,7 @@
 # Canvas Plugin Platform: Prior Art Research
 
+> Source audit, 2026-10-18: The MCP-foundation recommendation in this research was superseded by [revision 2 of the plan](canvas-plugin-platform-plan.md). Current code implements LCP and `lcp-view/1`; this research does not prescribe the shipped protocol.
+
 Epic: letta-mobile-s416w. Date of research: 2026-10-02. Status: research input for the architect, not a decision.
 
 Conventions: every factual claim carries a URL. **[V]** = verified by fetching the cited page this session. **[S]** = taken from a search-result snippet only. **[U]** = unverified (general knowledge or inference; check before relying on it). Section 5 and 6 are our own design proposals, not facts about third parties.

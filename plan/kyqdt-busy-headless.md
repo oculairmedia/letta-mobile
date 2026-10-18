@@ -1,5 +1,10 @@
 # kyqdt-busy-mode: headless two-client gate for the kyqdt live bug
 
+**Status:** Historical implementation plan. Source-audited 2026-10-18: the probe
+now implements `--mode=kyqdt-busy` in `android-compose/cli/src/main/java/com/letta/mobile/cli/commands/AppServerIrohTwoClientProbeCommand.kt`.
+The worktree and merge instructions below describe the original session, not current work.
+This audit did not rerun the provider-backed busy gate.
+
 ## Goal
 Make the kyqdt busy-engine failure reproducible HEADLESSLY (no device, no human)
 and produce a structured verdict that names the owner + last-terminal + release-reason,

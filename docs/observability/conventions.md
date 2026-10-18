@@ -69,10 +69,9 @@ in-app inspector.
 - If a class has both VM-layer and domain-layer concerns, split the
   telemetry into two tags with distinct prefixes (e.g. `AdminChatVM`
   for user-visible state transitions vs `AdminChat.repo` for data).
-- Never create a new tag without adding a row to
-  `docs/observability/coverage-matrix.md`.
+- Record a new tag in the inventory below. There is no checked-in `coverage-matrix.md`.
 
-### Known tag inventory (canonical)
+### Selected tag inventory (not an exhaustive runtime registry)
 
 | Tag                  | Owner module                              | Purpose |
 |----------------------|-------------------------------------------|---------|
@@ -84,7 +83,7 @@ in-app inspector.
 | `Crash`              | app/crash/CrashReporter.kt                | crash persistence and previous-crash surfacing |
 | `ChatPushService`    | app/channel/ChatPushService.kt            | foreground service lifecycle |
 | `ChatComposerAttach` | app/ui/screens/chat/ChatComposerAttach.kt | attachment decoding |
-| `AdminChatVM`        | app/ui/screens/chat/AdminChatViewModel.kt | chat screen actions |
+| `AdminChatVM`        | feature-chat/.../screen/AdminChatViewModel.kt | chat screen actions |
 | `ChatHydration`      | feature-chat/coordination/ChatHydrationTrace.kt | debug-only initial chat-open ordering |
 | `Sentry`             | app/crash/SentryInitializer.kt            | upload lifecycle and transport outcomes |
 | `Perf`               | app/performance/DebugPerformanceMonitor.kt | debug instrumentation enabled state |
@@ -182,7 +181,7 @@ Use these EXACT spellings so dashboards can filter across subsystems:
 | `durationMs`       | Long    | elapsed wall time. Always `durationMs`, never `ms` / `duration` / `elapsed`. |
 | `backoffMs`        | Long    | current retry backoff.                        |
 | `attempt`          | Int     | 1-indexed retry attempt counter.              |
-| `errorClass`       | String  | `throwable.javaClass.simpleName`. Auto-injected by `Telemetry.error()`. |
+| `errorClass`       | String  | `throwable::class.simpleName`. Auto-injected by `Telemetry.error()`. |
 | `errorMessage`     | String  | `throwable.message`. Auto-injected by `Telemetry.error()`. |
 | `via`              | String  | short label disambiguating a branch (e.g. `apiException`). |
 | `result`           | String  | enum-like outcome for non-throwing branches (`ok` / `empty` / `decodeFailed`). |

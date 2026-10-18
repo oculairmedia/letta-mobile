@@ -3,8 +3,8 @@
 `app-server-iroh-two-client-probe` reproduces Emmanuel's entire manual
 two-device test loop with **no human and no physical screens**. It is the
 headless acceptance test for the Iroh multi-client live-sync feature
-(letta-mobile-r3i1z): two physical screens should never be needed to validate
-multi-client sync again.
+(letta-mobile-r3i1z): it validates transport/reducer sync without screens. Rendering, app lifecycle and
+platform resume behavior still need their own UI/device checks.
 
 ## What it does
 
@@ -47,9 +47,10 @@ printed ticket, runs the probe against it, and propagates the probe exit code.
 
 Point `--backend` at the live wrapper's Iroh URL (node id + `host:port` from
 `/var/log/meridian-iroh-wrapper.log`, e.g. `192.168.50.90:4501`). The redial
-round requires the wrapper build to carry deliverable A; if it does not, round 3
-fails loudly (`observer_never_received_terminal`) — that IS the signal that the
-wrapper needs the re-subscribe fix.
+round exercises the client's re-subscribe behavior against the wrapper's viewer
+registration/fanout support. A failure such as `observer_never_received_terminal`
+requires checking both client resubscription and host registration; it does not
+by itself identify a wrapper defect.
 
 ```bash
 cd android-compose

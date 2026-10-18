@@ -1,5 +1,7 @@
 # Typed ids and the id ratchets
 
+**Status:** Current ID/ratchet reference; source-audited 2026-10-18. Counts in the introduction describe the initial scan.
+
 Bead: letta-mobile-by4vm.23. Ids in `sharedLogic` are still mostly raw `String`s. On main, when
 this note was written, the scan counted 1,842 raw `*Id: String` parameters across 462 files, plus
 40 hardcoded id-prefix literals across 24 files. The fix is gradual: typed ids and one owner for
@@ -8,19 +10,16 @@ PR at a time.
 
 ## Where things live
 
-| What | Where |
-|---|---|
-| Domain id value classes (`AgentId`, `ConversationId`, `MessageId`, `RunId`, `RequestId`, `PluginId`, …) | `android-compose/core/ids/src/commonMain/kotlin/com/letta/mobile/data/model/DomainIds.kt` |
-| Id string formats (`IdFormats`) | `android-compose/core/ids/src/commonMain/kotlin/com/letta/mobile/data/model/IdFormats.kt` |
-| Runtime-contract ids (`ToolCallId`, `ToolApprovalId`, `BackendId`, runtime `RunId`/`ConversationId`) | `android-compose/core/runtime/src/commonMain/kotlin/com/letta/mobile/runtime/` |
-| Ratchet test, scanner and baselines | `android-compose/architecture-tests/` (`TypedIdRepositoryArchitectureTest`, `IdRatchetScan`, `CountRatchetBaseline`, `id-literal-baseline.txt`, `raw-id-params-baseline.txt`) |
+The generated [domain ID package](https://oculairmedia.github.io/letta-mobile/api/core/ids/com.letta.mobile.data.model/index.html), [IdFormats](https://oculairmedia.github.io/letta-mobile/api/core/ids/com.letta.mobile.data.model/-id-formats/index.html) and [runtime contracts](https://oculairmedia.github.io/letta-mobile/api/core/runtime/com.letta.mobile.runtime/index.html) are the declaration inventories. Sources are [DomainIds.kt](../../android-compose/core/ids/src/commonMain/kotlin/com/letta/mobile/data/model/DomainIds.kt), [IdFormats.kt](../../android-compose/core/ids/src/commonMain/kotlin/com/letta/mobile/data/model/IdFormats.kt) and [core/runtime](../../android-compose/core/runtime/src/commonMain/kotlin/com/letta/mobile/runtime/).
+
+The scanners and baselines are separate tooling in [architecture-tests](../../android-compose/architecture-tests/): `TypedIdRepositoryArchitectureTest`, `IdRatchetScan`, `CountRatchetBaseline`, `id-literal-baseline.txt` and `raw-id-params-baseline.txt`. They are not part of the generated product API.
 
 `core/runtime` keeps its own `RunId` and `ConversationId` for the turn contracts. New data-layer
 code should take the `com.letta.mobile.data.model` types. Merging the two sets is follow-up work.
 
 ## Adding a typed id
 
-1. Add a value class to `DomainIds.kt` in the existing style:
+1. Add a value class to `DomainIds.kt` in the existing style. The example below chooses blank rejection; existing IDs do not all reject blanks (`AgentId` currently permits them, while `RunId` rejects them):
 
    ```kotlin
    @JvmInline

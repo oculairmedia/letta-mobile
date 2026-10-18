@@ -1,5 +1,7 @@
 # flk.2 — Streaming Markdown Flicker Regression Notes
 
+> Source audit, 2026-10-18: The split-render fix below describes the original Android rich renderer, not a universal current host contract. Shared document/parser and flicker tests now live under sharedUI; `StreamingDisplayTextTest` lives in feature-chat. Desktop/web `SharedMarkdownText` reparses streaming markdown with `retainState = !isStreaming` and resets retention on non-prefix changes. Do not apply the original plain-Text-tail rule to that different renderer without its tests.
+
 **Date:** 2026-04-29
 **Branch:** current working branch
 **Reporter:** Emmanuel

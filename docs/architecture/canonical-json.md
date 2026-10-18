@@ -1,5 +1,7 @@
 # Canonical JSON configurations
 
+**Status:** Current configuration/ratchet reference; source-audited 2026-10-18. Migration counts below are introduction-time history.
+
 Bead: `letta-mobile-by4vm.20`. Code: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/serialization/LettaJson.kt`.
 
 ## Problem
@@ -12,11 +14,7 @@ frame, a third turned a type change into a default value.
 
 ## The three instances
 
-| Instance | Bytes it handles | `ignoreUnknownKeys` | `isLenient` | `coerceInputValues` | `encodeDefaults` | `explicitNulls` |
-|---|---|---|---|---|---|---|
-| `LettaJson.wire` | App Server `/ws` frames, Iroh-relayed turn frames, the `plugins.*` admin_rpc bodies | true | false | false | false | false |
-| `LettaJson.adminRpc` | Letta REST bodies over Iroh `admin_rpc`, send-path decoder | true | true | true | false | false |
-| `LettaJson.persisted` | Files, Room JSON columns, preferences the app writes | true | false | false | true | true |
+The [generated configuration reference](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.serialization/-letta-json/index.html) owns the current flag matrix and property contracts: [wire](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.serialization/-letta-json/wire.html), [adminRpc](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.serialization/-letta-json/admin-rpc.html) and [persisted](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.serialization/-letta-json/persisted.html). These are generated from [LettaJson.kt](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/serialization/LettaJson.kt); do not copy their values into a second table here.
 
 All three keep the default `classDiscriminator = "type"`, which is what `AppServerInboundFrame` and
 `AppServerCommand` declare with `@JsonClassDiscriminator("type")`. The plugin types on the
@@ -35,8 +33,7 @@ the rationale for each flag. In short:
   `HeadlessTimelineStore` has no `ignoreUnknownKeys` only because it never decodes; it writes
   diagnostic dumps with the same `encodeDefaults = true` stance.
 
-There is no lenient instance for tests. Every test in the tree decodes with `AppServerProtocol.json`
-or a production instance, so none needed one.
+Tests of the canonical configurations use the production instances; `LettaJsonTest` verifies flags, alias identity and encode/decode behavior. There is no separate canonical test-only instance.
 
 ## Why there are three instances and not two
 
@@ -54,7 +51,7 @@ would have changed behaviour:
 
 Consumers that depend on each:
 
-- `AppServerProtocol.json` decodes and encodes App Server frames in 23 production files, among
+- `AppServerProtocol.json` decodes and encodes App Server frames in production files, among
   them `AppServerInboundFrame`, `AppServerTurnEngine`, `AppServerTimelineTransport`,
   `AppServerAgentRepository`, `AppServerDiscovery`, `AppServerWorkspaceRelay`,
   `SettledTurnCollector` and `WasmAppServerSession`, and in every App Server contract test. It is
@@ -118,7 +115,4 @@ the App Server or Iroh path, and `CachedAgentRepository` has one `adminRpc`-iden
 next to one that is not. `LcpWire` and `CanvasPluginElements` have the `wire` flags but speak their
 own protocols, so tying them to the App Server wire configuration is a separate decision.
 
-`LettaJson.persisted` has no consumers yet. The 14 constructions that set exactly
-`ignoreUnknownKeys = true` and `encodeDefaults = true` (mostly file stores, for example
-`FileCanvasDeliveryStore`, `FileCanvasRelayStore` and `RoomMemFsStore`) match it flag for flag
-and are the next migration candidates. They are not on the wire path, so this change left them alone.
+`LettaJson.persisted` now has production consumers, including [JsonPreference](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/storage/JsonPreference.kt), [KeyValueCanvasStorage](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/KeyValueCanvasStorage.kt), `FileSwarmOutbox`, `SwarmDeviceProfile` and `PluginAssetQuotaFile`. The introduction-time migration counts above are not a current scan. Compare all flags before moving any remaining ad-hoc construction; the baseline and scanner define current debt.

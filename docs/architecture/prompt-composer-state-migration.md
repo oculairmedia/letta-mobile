@@ -1,19 +1,15 @@
-# PromptComposerState migration note
+# PromptComposerState prototype
 
-`PromptComposerState` lives in `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/runtime` as a small, headless state container for composer actions. It intentionally does not depend on Compose UI or prompt-bar.
+**Status:** Historical headless prototype; not the production composer state owner (source audit 2026-10-18).
 
-## First-pass scope
+The prototype explored composer actions and send transitions without a Compose dependency.
+Its [implementation](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/runtime/PromptComposerState.kt)
+and tests remain, but there is no production caller. The generated
+[PromptComposerState API](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.runtime/-prompt-composer-state/index.html)
+and [outgoing payload API](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.runtime/-prompt-composer-outgoing-payload/index.html)
+document that experiment.
 
-- Tracks draft text and ready/sending/streaming lifecycle state.
-- Derives `canSend`, `canStop`, `isSending`, `isStreaming`, and `ready` from state.
-- Produces a `PromptComposerOutgoingPayload` during `beginSend()` and returns a reset sending state for UI/viewmodel handoff.
-- Includes cheap extension slots for attachment, template, and model metadata without implementing prompt-bar feature surfaces.
-
-## Suggested wiring path
-
-1. Keep existing composer UI behavior unchanged until the send path can be adapted safely.
-2. In the chat viewmodel, map existing text and image draft fields into `PromptComposerState`.
-3. Call `beginSend()` from the existing send action, pass `PromptComposerOutgoingPayload` into the current message send gateway, and render `nextState` immediately so the visible draft resets.
-4. Move stream callbacks to `beginStreaming()`, `markReady()`, and `stop()` once the active stream cancellation path is consolidated.
-
-The current PR stops at the shared headless contract and tests because replacing the live composer wiring would touch UI, image attachment policy, and runtime send cancellation in one change.
+Production [ChatComposerPanel](../../android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/composer/ChatComposerPanel.kt)
+reads `ChatComposerUiState` and `ChatActions` through the shared chat session. Do not add the
+prototype as a second state machine in the live send path; changes belong with that session's
+composer ownership and the shared UI policy.

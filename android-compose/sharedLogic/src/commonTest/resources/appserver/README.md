@@ -3,6 +3,11 @@
 These fixtures document the Letta Code App Server v2 frame contract used by the
 shared client tests.
 
+**Status:** Historical 0.27.15 smoke evidence. Channel-labelled transcript lines
+and permissive DTO descriptions below are capture-era behavior, not the current
+client contract. Today the client uses one `/ws` connection and the 0.34.14
+contract; see the transport package README and the JVM contract matrix.
+
 ## Verified sources
 
 Checked on 2026-06-24 against `@letta-ai/letta-code@0.27.15`:

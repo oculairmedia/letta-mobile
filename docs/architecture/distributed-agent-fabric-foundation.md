@@ -1,7 +1,16 @@
 # Distributed agent fabric foundation
 
-**Status:** Accepted for foundation work; production packaging remains gated on
-the Automerge Java license-file issue.
+**Status:** Accepted foundation decision with implemented notebook transport; original packaging/license gate is historical and unresolved by this source audit.
+
+## Code audit — 2026-10-18
+
+The endpoint/ALPN integration is no longer only a “next slice”: [AutomergeIrohRepoProtocol](../../android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/AutomergeIrohRepoProtocol.kt) implements `meridian/automerge-repo/1`, peer allowlisting, framing and Samod transport; [IrohNodeEndpoint](../../android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint.kt) routes injected protocol handlers on the existing endpoint. `AppServerServeIrohCommand` wires a notebook repository when notebook directory and peer IDs are configured. SharedLogic's JVM/Android source set depends on Automerge 0.0.9, so the original header's “do not ship until” sentence is not a description of an enforced Gradle packaging gate.
+
+The source confirms transport/store use, not that the historical license-text concern has been resolved or that a general replicated-agent authority/election implementation exists. The next-step paragraph below predates the notebook implementation. Keep Home authority/leases as separate design work and use the actual protocol/host bindings for current integration. `AutomergeIrohRepoInteropTest` remains opt-in live QUIC coverage; it was not rerun for this docs-only audit.
+
+## Original record
+
+The original acceptance was conditional on resolving the Automerge Java license-file issue.
 
 ## Decision
 

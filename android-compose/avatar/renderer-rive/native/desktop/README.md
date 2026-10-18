@@ -24,8 +24,9 @@ Nothing beyond VS 2022 C++ tools, the Windows SDK, Git for Windows and Python 3 
 **One command** (what CI runs; the steps below are what it does):
 
 ```bash
+cd android-compose
 bash avatar/renderer-rive/native/desktop/build-bridge.sh D:/rb/work D:/rb/out
-cd android-compose && ./gradlew :desktop:run -PriveBridge=D:/rb/out/rive_desktop_bridge.dll
+./gradlew :desktop:run -PriveBridge=D:/rb/out/rive_desktop_bridge.dll
 ```
 
 The rive-runtime commit is pinned in `rive-runtime.version`; a work dir already holding a built
@@ -48,6 +49,7 @@ checks it is in the app image and uploads it as the `rive-desktop-bridge-<run>` 
 
    ```bash
    git clone https://github.com/rive-app/rive-runtime && cd rive-runtime
+   git checkout "$(cat <this-dir>/rive-runtime.version)"
    git apply <this dir>/tools/rive-runtime-texture-include.patch
    cd renderer
    export RIVE_PREMAKE_ARGS="--with_rive_text --with_rive_layout --no_gl"
@@ -98,12 +100,13 @@ checks it is in the app image and uploads it as the `rive-desktop-bridge-<run>` 
    `C:/rive-spike/`. If a relaunch dies in Skiko's D3D redrawer, the previous window was still
    exiting; launch again.
 
-## Result (Windows 11, RTX 3090)
+## Historical spike result (Windows 11, RTX 3090)
 
 - A feathered community file (glow, blurred body, glass rim) renders identically to Rive's WebGL2
   runtime; its state machine triggers fire from Kotlin.
-- The shipped mascot is driven by the unchanged `RiveAvatarRuntime` over the desktop sink:
-  `speaking` turns green with `mouthOpen` opening the mouth, `error` turns red.
+- The spike drove `RiveAvatarRuntime` through the desktop sink. Its original
+  speaking/error color changes describe the spike asset; the current mascot keeps
+  shape/color as identity and uses expression/motion for state (see `MASCOT.md`).
 - Render + readback: ~5-6 ms per frame at ~1050x1050 px, on the UI thread.
 
 ## Open questions for productionising

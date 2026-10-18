@@ -1,24 +1,23 @@
 # Letta Design System Reference (extracted from code)
 
-Source of truth: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/theme/`
-and `android-compose/designsystem/src/main/java/com/letta/mobile/ui/theme/`.
+**Status:** Design usage reference with retained historical value snapshots. Public declaration inventories link to generated API; presets, Android typography and resolved aliases below are not fully represented by Dokka.
 
-This document is the **canonical spec** that drives all design work in this repo. It was
-extracted directly from the Compose `object` declarations so any change to those files
-invalidates this document and it must be regenerated.
+Design direction and policy: [DESIGN.md](../DESIGN.md) and [AGENTS.md](../AGENTS.md).
+Current implementation: [shared UI theme](../android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/theme/)
+and [Android design system theme](../android-compose/designsystem/src/main/java/com/letta/mobile/ui/theme/).
+When this snapshot disagrees with code, code determines implemented token values;
+use the design policy to decide intended behavior.
 
 ## 1. Color Tokens
 
-### `LettaColorTokens` — base palette
-- **Dark surfaces**: surface `#121212`, surfaceVariant `#1E1E1E`, surfaceContainer `#2A2A2A`, background `#0A0A0A`
-- **Dark primary**: primary `#00BFA5` (Material A700 teal), primaryVariant `#009688` (teal 500)
-- **Dark text**: onSurface `#E0E0E0`, onSurfaceVariant `#BDBDBD`, outline `#424242`
-- **Dark error**: error `#CF6679`, onError `#000000`
-- **Light surfaces**: surface `#FAFAFA`, surfaceVariant `#EEEEEE`, surfaceContainer `#E0E0E0`, background `#FFFFFF`
-- **Light primary**: primary `#00897B` (teal 600), primaryVariant `#00695C` (teal 800)
-- **Light text**: onSurface `#1A1A1A`, onSurfaceVariant `#424242`, outline `#BDBDBD`
-- **Light error**: error `#B00020`, onError `#FFFFFF`
-- **Accents**: tealAccent `#1DE9B6`, cyanAccent `#00E5FF`, amberAccent `#FFD740`
+### Base palette
+
+Current palette constants and their values are in the
+[generated `LettaColorTokens` API](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.ui.theme/-letta-color-tokens/index.html).
+The [source](../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/theme/ThemeTokens.kt)
+uses hexadecimal ARGB; Dokka emits numeric constant values. This replaces the
+older grey-palette copy, which had drifted from the implemented cool-slate
+palette. Use semantic roles for product UI rather than copying raw values.
 
 ### `LettaThemeTokens` — 6 theme presets
 Each preset has **light + dark** variants. Eight color roles per mode: `primary`, `primaryContainer`, `secondary`, `tertiary`, `background`, `surface`, `surfaceVariant`, `outline`.
@@ -34,33 +33,22 @@ Each preset has **light + dark** variants. Eight color roles per mode: `primary`
 
 User can swap themes via the `ThemePreset` enum at runtime (theme picker UI exists).
 
-### `CustomColors` — semantic color roles
-Beyond Material 3, the app defines its own semantic colors:
-- **Chat bubbles**: `userBubbleBgColor`, `agentBubbleBgColor`, `reasoningBubbleBgColor`, `toolBubbleBgColor`, `systemMessageColor`, `dateSeparatorColor`
-- **Text**: `textPrimary`, `textSecondary`, `textDisabled`, `textLink`, `textOnPrimary`
-- **Status**: `errorTextColor`, `warningTextColor`, `successColor` (each with `*ContainerColor` and `harmonized*` variants — the `HctColorHarmonizer` blends status colors with the active theme primary to keep accents coherent)
-- **Connection**: `onlineColor`, `offlineColor`, `reconnectingColor`
-- **Icons**: `iconPrimary`, `iconSecondary`, `iconAccent`
-- **Fresh accent**: `freshAccent`, `onFreshAccent`, `freshAccentContainer`, `onFreshAccentContainer` (for unread/new item states)
-- **Selection**: `selectionContainer`, `onSelectionContainer`, `selectionIndicator` (warm↔cool complement of primary)
-- **Borders**: `borderDefault`, `borderFocused`, `borderCritical`
+### Semantic color roles
+
+The [generated `CustomColors` API](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.theme/-custom-colors/index.html) owns the
+property inventory. Read [the implementation](../android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/theme/CustomColors.kt)
+for derived values. Keep status colors harmonized with the active theme rather
+than hardcoding replacements; fresh/unread accents and selection colors express
+separate states from errors, warnings and connectivity.
 
 ## 2. Spacing Scale
 
-`LettaSpacingTokens` — density-independent pixels.
-
-| Token | dp |
-|---|---|
-| `none` | 0 |
-| `xxxs` | 2 |
-| `xxs` | 4 |
-| `xs` | 6 |
-| `sm` | 8 |
-| `md` | 12 |
-| `lg` | 16 |
-| `xl` | 24 |
-| `xxl` | 32 |
-| `xxxl` | 64 |
+The [generated `LettaSpacingTokens` API](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.ui.theme/-letta-spacing-tokens/index.html) lists
+scale members and literal values in density-independent pixels. Its
+[source](../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/theme/DesignTokens.kt)
+also shows aliases; Dokka omits initializer values for aliases. The tables below
+retain the semantic mapping and resolved aliases rather than duplicating the
+literal scale inventory.
 
 ### Semantic spacing tokens
 | Token | Value | Use |
@@ -74,25 +62,18 @@ Beyond Material 3, the app defines its own semantic colors:
 | `iconGap` | 12dp | Gap between icon and adjacent text |
 | `chipGap` | 8dp | Gap between chips |
 
-### Chat-specific tokens
-| Token | dp |
-|---|---|
-| `bubblePaddingHorizontal` | 10 |
-| `bubblePaddingVertical` | 7 |
-| `messageSpacing` (grouped) | 8 |
-| `ungroupedMessageSpacing` | 24 |
-| `bubbleRadius` | 12 |
-| `codeBlockRadius` | 8 |
-| `composerAttachIconSize` | 18 |
-| `composerAttachButtonSize` | 36 |
-| `avatarSize` | 24 |
-| `iconSizeSmall` | 14 |
-| `borderWidthThin` | 1 |
-| `chipMinHeight` | 32 |
-| `chipPaddingVertical` | 6 |
-| `chipPaddingHorizontal` | 12 |
-| `chipRingSize` | 20 |
-| `chipRingStroke` | 2 |
+### Chat-specific aliases
+
+Literal chat dimensions are in the generated spacing API above. The aliases that
+Dokka does not resolve to numbers are:
+
+| Alias | Resolved value | Purpose |
+|---|---|---|
+| `messageSpacing` | 8dp | Beat within the same speaker's turn |
+| `ungroupedMessageSpacing` | 24dp | Section break between speakers or runs |
+| `bubbleRadius` / `codeBlockRadius` | 12dp / 8dp | Message and code surfaces |
+| `avatarSize` | 24dp | Avatar slot |
+| `chipPaddingVertical` / `chipPaddingHorizontal` | 6dp / 12dp | Chip content insets |
 
 ## 3. Typography
 
@@ -139,31 +120,24 @@ Beyond Material 3, the app defines its own semantic colors:
 - `prominentListRadius` = 16dp (lg)
 - `actionRadius` = 8dp (sm)
 
-## 5. Elevation
+## 5. Elevation, motion and sizing APIs
 
-`LettaElevationTokens` (in dp):
-- `none` 0, `low` 1
-- `actionSheetItemResting` 2, `actionSheetItemPressed` 4
-- `floatingBannerTonal` 3, `floatingBannerShadow` 6
+The generated references own these constant inventories and literal values:
 
-## 6. Motion
+- [Elevation](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.ui.theme/-letta-elevation-tokens/index.html).
+- [Motion durations](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.ui.theme/-letta-motion-tokens/index.html).
+- [Sizing and breakpoints](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.ui.theme/-letta-sizing-tokens/index.html).
 
-`LettaMotionTokens` (milliseconds):
-- `StreamingSize` 60, `ContentSize` 220
-- `Enter` 190, `Exit` 130
-- `FastFadeIn` 120, `FastFadeOut` 90
-- `Chip` 150
+All three come from [DesignTokens.kt](../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/theme/DesignTokens.kt).
+Motion intent and easing choices remain design decisions; a duration declaration
+does not replace the geometry and navigation rules in [DESIGN.md](../DESIGN.md).
 
-## 7. Sizing
+## 6. Chat tokens
 
-`LettaSizingTokens`:
-- `compactWidthBreakpoint` 600dp (window-size-class compact/medium)
-- `readableDialogMaxWidth` 1000dp (cap for dialog content)
-- `diagramPreviewMinHeight` 120dp
+[Generated `LettaChatTokens` API](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.ui.theme/-letta-chat-tokens/index.html) lists the holders;
+the resolved values below are retained because Dokka does not expand their
+object initializers.
 
-## 8. Chat tokens
-
-`LettaChatTokens`:
 - `shapes.bubbleRadiusDp` 12, `shapes.codeBlockRadiusDp` 8
 - `dimens.bubbleMaxWidthFraction` 0.88 (88% of parent width)
 - `dimens.contentPaddingHorizontalDp` 12
@@ -182,10 +156,10 @@ Beyond Material 3, the app defines its own semantic colors:
 
 ## Module map
 
-- `sharedLogic` (`commonMain`) — token definitions (DPI-agnostic, used by Android + Desktop JVM targets)
-- `designsystem` (`main`) — Compose MaterialTheme wiring, custom semantic colors, shape/elevation, `Theme` composable
-- `app` — screens, navigation, ViewModels; consumes the themes
-- `chat` — chat-specific dimensions and bubble rendering
+- `sharedLogic/commonMain` — portable scalar token definitions.
+- `sharedUI/commonMain` — semantic colors, shared theme and product chat rendering.
+- `designsystem/main` — Android MaterialTheme/font and rich-renderer bindings.
+- `app` / `feature-chat` — Android host, platform services and ViewModel bindings.
 
 ## What "regimented design" should add (gaps)
 

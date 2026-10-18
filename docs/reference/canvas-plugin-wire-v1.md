@@ -1,5 +1,7 @@
 # LCP wire v1: the canvas plugin protocol
 
+> Source audit, 2026-10-18: The wire contract includes process and service framing; that does not mean both are hosted today. `PluginDriverHost` currently launches only process runtimes with empty `PluginSecrets`; `host.readElements` remains refused in v1. The concrete [trust model](plugin-trust-model.md) describes the implemented host subset.
+
 The protocol a `process` plugin (any language, a subprocess of the host) and a `service` plugin (a
 WebSocket server the host connects to) speak with the Letta host. It mirrors the Kotlin SPI of
 `:plugin-api` one to one (`CanvasPlugin` / `PluginHost`), so a plugin behaves the same whatever its
@@ -55,6 +57,13 @@ A plugin that speaks none of the offered versions answers `-32004` with
 host. Either way the host closes the connection.
 
 ## Methods
+
+The [generated Kotlin method registry](https://oculairmedia.github.io/letta-mobile/api/plugin-api/com.letta.mobile.plugin.api/-lcp-method/index.html) lists SPI
+declarations; [LcpMethod source](../../android-compose/plugin-api/src/commonMain/kotlin/com/letta/mobile/plugin/api/LcpMethod.kt)
+defines them. The wire tables below are generated and checked by `LcpWireDocTest`;
+they additionally document wire directions, deadlines, capabilities and errors.
+They are retained for protocol authors rather than maintained as a second
+handwritten Kotlin API inventory.
 
 <!-- lcp_wire_tables:start -->
 | Method | Direction | Kind | Deadline | Capability | SPI member |

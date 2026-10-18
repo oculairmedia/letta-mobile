@@ -51,6 +51,12 @@ truth. If you edit it, re-run `install.sh` for every agent that has it
 installed and have them `/reload` — nothing here auto-syncs a running
 agent's copy.
 
+Source audit: `frame-shape-capture.mod.ts` requires at least three captures and
+two distinct coarse field sets before coverage passes. This is structural diversity,
+not proof that every behavioral hypothesis is discriminated. Installer/mod-loader
+compatibility and `/reload` behavior require the target Letta harness and were not
+executed in this audit.
+
 ## Workflow
 
 1. **Capture** — call the `capture_frame_shape` tool with a `seam_id` and

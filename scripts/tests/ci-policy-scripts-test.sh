@@ -362,6 +362,7 @@ docs_fixture() {
   (cd "$SOURCE_ROOT" && for f in README.md CONTRIBUTING.md CLAUDE.md AGENTS.md \
     android-compose/README.md android-compose/settings.gradle.kts \
     android-compose/gradle/wrapper/gradle-wrapper.properties \
+    android-compose/appserver-cli/src/test/resources/appserver/restart-replay-evidence.json \
     scripts/bootstrap-branch-protection.sh .github/workflows/*.yml; do
       mkdir -p "$TMP/docs/$(dirname "$f")" && cp "$f" "$TMP/docs/$f"
     done)
@@ -389,5 +390,32 @@ assert_not_contains "$output" '`:build-logic:test` does not start'
 sed -i.bak '/includeBuild("build-logic")/d' "$TMP/docs/android-compose/settings.gradle.kts"
 if output="$(python3 "$docs_check" "$TMP/docs" 2>&1)"; then fail "unknown build prefix must fail docs-freshness"; fi
 assert_contains "$output" '`:build-logic:test` does not start with a declared Gradle module'
+
+docs_fixture
+mkdir -p "$TMP/docs/docs/architecture"
+printf '# A design\n\nNo lifecycle declared.\n' >"$TMP/docs/docs/architecture/example.md"
+output="$(python3 "$docs_check" "$TMP/docs" 2>&1 || true)"
+assert_contains "$output" 'example.md: missing Status header'
+printf '\n**Status:** Historical design.\n<!-- live-path: missing/source.kt -->\n' >>"$TMP/docs/docs/architecture/example.md"
+output="$(python3 "$docs_check" "$TMP/docs" 2>&1 || true)"
+assert_not_contains "$output" 'example.md: missing Status header'
+assert_contains "$output" 'missing live path (missing/source.kt)'
+mkdir -p "$TMP/docs/missing"
+touch "$TMP/docs/missing/source.kt"
+output="$(python3 "$docs_check" "$TMP/docs" 2>&1 || true)"
+assert_not_contains "$output" 'missing live path (missing/source.kt)'
+
+docs_fixture
+sed -i.bak 's/three clients/two clients/' "$TMP/docs/CLAUDE.md"
+output="$(python3 "$docs_check" "$TMP/docs" 2>&1 || true)"
+assert_contains "$output" 'says two clients/apps but Gradle declares three client hosts'
+sed -i.bak '/Browser WASM host/d' "$TMP/docs/CLAUDE.md"
+output="$(python3 "$docs_check" "$TMP/docs" 2>&1 || true)"
+assert_contains "$output" 'missing client host :web in module map'
+
+docs_fixture
+printf '\nThe restart-replay evidence stays at 0.0.1 until re-captured live.\n' >>"$TMP/docs/CLAUDE.md"
+output="$(python3 "$docs_check" "$TMP/docs" 2>&1 || true)"
+assert_contains "$output" 'restart-replay claim 0.0.1 differs from captured evidence'
 
 echo "ci policy script tests: PASS"

@@ -1,5 +1,7 @@
 # Desktop/Android UI alignment — fanout brief
 
+> Source audit, 2026-10-18: The counts below are the original work-brief snapshot. Re-run `python scripts/ui-design-lint.py --summary` for the current tree; use [the later handoff](ui-token-adherence-handoff.md) for the implemented reusable-search pattern.
+
 Work brief for parallel agents. Epic: `letta-mobile-hzddx`.
 
 ## The problem, in numbers

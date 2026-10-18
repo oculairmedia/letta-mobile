@@ -1,6 +1,10 @@
 # Release Gate Ledger
 
-Tracks the current verify-release gate policy and the most recent orchestrator runs.
+Historical REST/SSE orchestrator ledger. The auto-policy mirrors `gates.yaml` and
+`scripts/release/verify-release.sh`, including their obsolete ambiguous app task names;
+it is not the current required CI gate list. The recorded runs are April 2026
+evidence. See [RELEASE.md](RELEASE.md) and `.github/workflows/android.yml` for
+current release validation.
 
 ## Gate Policy
 

@@ -84,7 +84,7 @@ There is an existing CLI, but it has no canvas commands.
 
 | Artifact | What it is | Agent-reachable today? |
 |---|---|---|
-| `android-compose/cli` (`LettaMobileCli`, `CliktCommand(name = "meridian")`) | Developer JVM CLI: `dump-timeline`, `replay`, probes, `agent-message send`, `peer …`, `app-server-serve-iroh` (the REST/admin-shim commands were removed in by4vm.111). Plain Kotlin/JVM module, run via `./gradlew :cli:run`. | No. It has no installable distribution. |
+| `android-compose/cli` (`LettaMobileCli`, `CliktCommand(name = "meridian")`) | Developer JVM CLI: `dump-timeline`, `replay`, probes, `agent-message send`, `peer …`, `app-server-serve-iroh` (the REST/admin-shim commands were removed in by4vm.111). Plain Kotlin/JVM module, run via `./gradlew :cli:run`. | The JVM application plugin now provides `installDist`/`distZip`; this still does not implement the proposed canvas/tool IPC commands. |
 | `android-compose/iroh-wrapper-cli` → `bin/meridian-iroh-wrapper` | The packaged production host (systemd `meridian-iroh-wrapper.service`): `app-server-serve-iroh`, `pair`, `agent-message send`. Kept deliberately narrow. | Only indirectly: the host shells out to it for `agent_message_send` via `--meridian-binary`. |
 | `appserver-cli` → `bin/meridian-app-server` | App Server launcher/probe tooling | No |
 

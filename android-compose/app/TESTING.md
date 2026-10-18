@@ -1,21 +1,19 @@
 # App snapshot testing
 
-App-owned screenshot tests use Roborazzi. Run the app screenshot tier with:
+Run commands from `android-compose/`. The former `RunBlockScreenshotTest` was
+removed during the shared UI cut; a Gradle filter naming it does not validate the
+current run-block renderer.
+
+The renderer now lives in
+`sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/timeline/rows/ChatRowRunBlock.kt`.
+Its JVM Compose regression suite is
+`sharedUI/src/jvmTest/kotlin/com/letta/mobile/ui/chat/surface/timeline/rows/ChatRowRunBlockSummaryUiTest.kt`:
 
 ```bash
-./gradlew :app:testScreenshot --max-workers=1
+./gradlew :sharedUI:jvmTest --tests '*ChatRowRunBlockSummaryUiTest'
 ```
 
-RunBlock snapshots moved with the composable into `:feature-chat`. Use:
-
-```bash
-./gradlew :feature-chat:verifyRoborazziDebug --tests com.letta.mobile.feature.chat.RunBlockScreenshotTest --max-workers=1
-```
-
-Regenerate feature-chat baselines after intentional RunBlock visual changes:
-
-```bash
-./gradlew :feature-chat:recordRoborazziDebug --tests com.letta.mobile.feature.chat.RunBlockScreenshotTest --max-workers=1
-```
-
-This project uses Roborazzi for app/feature screenshots. Paparazzi is currently not functional in this repo environment; see `letta-mobile-zwsk` for the broader tooling follow-up.
+This is a UI behavior test, not a Roborazzi image-baseline recorder. Android
+modules retain their configured Roborazzi/tier tasks for surviving Android tests;
+check the actual test class before choosing a `--tests` filter. `:app:testScreenshot`
+uses Vintage plus `*ScreenshotTest` and permits no matching tests.

@@ -1,5 +1,13 @@
 # A2UI Android Renderer Phase 0 Decision
 
+**Status:** Historical decision (2026-05-17); renderer implemented in shared modules, not the proposed new Android module.
+
+## Code audit — 2026-10-18
+
+The decision to implement an in-repo renderer was carried out with a different module boundary: [A2uiRenderer](../../android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiRenderer.kt) is shared Compose UI and [A2uiProtocol](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiProtocol.kt) / `A2uiSurfaceManager` own portable protocol/state. `settings.gradle.kts` declares no `:a2ui-renderer`, `:a2ui-core` or `:a2ui-compose` project. Use the [catalog authoring guide](../../android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/README.md) for current payload/catalog rules. The candidate build/license observations below remain measurements of those checkouts on the recorded date, not current upstream guarantees.
+
+## Original record
+
 Date: 2026-05-17
 Bead: `letta-mobile-51xm.1`
 

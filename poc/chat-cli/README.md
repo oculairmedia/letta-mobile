@@ -1,6 +1,8 @@
 # Letta Timeline POC CLI
 
-Proof of concept for Matrix-style message sync architecture.
+**Status:** Historical REST/SSE timeline experiment (April 2026), not a production transport.
+Source-audited 2026-10-18 against this directory's `Main.kt`, `SyncLoop.kt`, `LettaApi.kt`,
+`Timeline.kt` and standalone build. The app now uses the App Server/Iroh path in sharedLogic.
 
 **Purpose:** Validate the otid-based timeline design in isolation before touching mobile code.
 
@@ -11,6 +13,9 @@ Proof of concept for Matrix-style message sync architecture.
 ## Quick start
 
 ```bash
+# From the repository root:
+cd poc/chat-cli
+
 # Build
 ./gradlew installDist
 
@@ -27,7 +32,7 @@ Proof of concept for Matrix-style message sync architecture.
 ## Environment
 
 - `LETTA_BASE_URL` — defaults to `http://192.168.50.90:8289`
-- `LETTA_TOKEN` — defaults to embedded admin token
+- `LETTA_TOKEN` — required operator override for any intentional live run. The old code has a hard-coded fallback credential; it must not be assumed valid or safe for a current deployment. This audit did not use it.
 
 ## Commands
 
@@ -41,7 +46,7 @@ Proof of concept for Matrix-style message sync architecture.
 
 ## Architecture
 
-Three files, ~500 LOC:
+Core model/transport/mutator files (plus the `Main.kt` REPL):
 
 - `Timeline.kt` — data model with invariants (ordered events, unique otids)
 - `LettaApi.kt` — minimal HTTP client with streaming support
@@ -51,7 +56,7 @@ Matrix-style txn_id pattern via Letta's `otid` field. Local events are shown opt
 
 ## Validation
 
-See `/opt/stacks/letta-mobile/docs/architecture/poc-validation-results.md` for scenario results.
+See [historical scenario results](../../docs/architecture/poc-validation-results.md). Those captures were not re-run against a live service in this audit.
 
 ## Related beads
 

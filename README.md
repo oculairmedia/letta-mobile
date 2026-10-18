@@ -10,6 +10,9 @@ Multiplatform project: one shared domain module (`sharedLogic`) and one shared C
 Browser client (Iroh WASM, shipped in #1205): https://oculairmedia.github.io/letta-mobile/
 
 
+Documentation index and lifecycle conventions: [docs/README.md](docs/README.md).
+Historical planning and experiments live in [plan/](plan/) and [poc/](poc/).
+
 ## Features
 
 - **Agent management** — create, edit, clone, import, delete, and organize agents; one shared agent editor and new-agent flow used by every client
@@ -41,8 +44,8 @@ App modules live under [`android-compose/`](android-compose/); repository-level 
 architecture docs live in [`scripts/`](scripts/) and [`docs/`](docs/). Every Gradle module is
 declared in [`android-compose/settings.gradle.kts`](android-compose/settings.gradle.kts).
 
-The structure is shared-first: as of October 2026 the two shared modules hold roughly eight times
-as much Kotlin as the Android `app` module, and `app/` is a host rather than the product.
+The structure is shared-first: portable domain and UI implementations live in the shared
+modules; `app/` provides the Android host rather than owning the whole product.
 
 | Path | Purpose |
 |---|---|
@@ -55,7 +58,7 @@ as much Kotlin as the Android `app` module, and `app/` is a host rather than the
 | `feature-chat/` | Chat feature UI, presentation state and coordination (the `AdminChatViewModel` stack) |
 | `designsystem/` | Reusable Compose UI, theming, and dialogs |
 | `core/android-data/` | Android data bindings, repositories, Room database, data sources |
-| `core/runtime/` | Turn engine, runtime event fanout |
+| `core/runtime/` | Portable runtime contracts, IDs, projection and outbox; AppServerTurnEngine/fanout implementations live in sharedLogic |
 | `core/ids/` | Shared identifiers; wire schemas are source packages under `core/schemas/`, not a `:core:schemas` Gradle module |
 | `core/testutil/` | Shared test doubles and harnesses |
 | `plugin-api/` `plugin-api-testkit/` `plugin-view/` | The Kotlin SPI a JVM-runtime canvas plugin implements (its DTOs are the LCP wire shapes), the conformance test kit for plugin authors, and the WebView host that renders a plugin's UI |
@@ -154,7 +157,7 @@ Coverage uploads run on `main` via `codecov.yml`, not as a required PR check.
 
 Versioning is **tag-driven**. `vX.Y.Z` is the single source of truth for `versionName` and
 `versionCode`. CI builds on tag push and creates a GitHub Release. Each release ships a
-signed Android APK (embedded runtime included), Windows desktop installers (`.exe` + `.msi`),
+signed Android APKs (`full` with embedded runtime and `lite` without it), Windows desktop installers (`.exe` + `.msi`),
 and a Linux Iroh wrapper distribution. Pre-release suffix: `v0.2.0-rc.1`. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full
 release flow.
 

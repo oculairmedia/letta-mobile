@@ -2,14 +2,15 @@
 
 ## Project Overview
 
-Letta Mobile is a Kotlin Multiplatform project that ships **two clients** from one `sharedLogic` codebase:
+Letta Mobile is a Kotlin Multiplatform project that ships **three clients** from one `sharedLogic` codebase:
 
-- **Android app** (`com.letta.mobile` / `.dev`) — Compose UI, Hilt, Room, Material 3, A2UI renderer.
+- **Android app** (`ca.oculair.meridian` release / `com.letta.mobile.dev` debug) — Compose UI, Hilt, Room, Material 3, A2UI renderer.
 - **Compose Desktop** — same `sharedLogic`, Skiko rendering, packaged CLI.
+- **Browser WASM** — shared domain and Compose UI, with browser host bindings.
 
-The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The WebSocket App Server is reached over a single bidirectional `/ws` connection. There is ONE letta-code pin, `@letta-ai/letta-code@0.34.14`, in `android-compose/letta-code-runtime/letta-code-runtime.properties` (= wire contract = desktop bundled runtime = Android embedded runtime = `appserver-contract-baseline` CI job); the embedded runtime ships in the `full` release APK (nodejs-mobile Node 18, arm64-v8a only, a loopback App Server the app dials over ws:// through the same channel as an Iroh host, letta-mobile-by4vm.110.6; the `lite` APK has no runtime, see `docs/RELEASE.md`); the Linux host still runs 0.33.6 until redeployed; restart-replay evidence stays at 0.29.12 until re-captured live. All pins are tabulated in `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`.
+The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The WebSocket App Server is reached over a single bidirectional `/ws` connection. There is ONE letta-code pin, `@letta-ai/letta-code@0.34.14`, in `android-compose/letta-code-runtime/letta-code-runtime.properties` (= wire contract = desktop bundled runtime = Android embedded runtime = `appserver-contract-baseline` CI job); the embedded runtime ships in the `full` release APK (nodejs-mobile Node 18, arm64-v8a only, a loopback App Server the app dials over ws:// through the same channel as an Iroh host, letta-mobile-by4vm.110.6; the `lite` APK has no runtime, see `docs/RELEASE.md`); the deployed host version must be checked live rather than inferred from this pin; restart-replay evidence was re-captured at 0.34.14 on 2026-10-17. All pins are tabulated in `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`.
 
-**Location:** `/opt/stacks/letta-mobile`
+**Location:** use the current checkout root; `/opt/stacks/letta-mobile` is the historical Linux host path.
 **Build root:** `android-compose/` (the Gradle workspace)
 **GitHub:** `oculairmedia/letta-mobile`
 
@@ -29,7 +30,7 @@ The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The W
 cd android-compose
 cp -f local.properties.example local.properties
 export JAVA_HOME="/usr/lib/jvm/jdk-26"      # CI parity
-./gradlew :app:assembleDebug                # Android APK
+./gradlew :app:assembleRootDebug                # Android APK
 ./gradlew :desktop:run                      # Compose Desktop (needs a display; on a headless VM use DISPLAY=:1 and SOFTWARE rendering)
 ```
 
@@ -40,36 +41,41 @@ export JAVA_HOME="/usr/lib/jvm/jdk-26"      # CI parity
 
 To iterate on the phone UI from a desktop (`:desktop:runPhone`, `:desktop:runPhonePlayground`, hot reload), see `docs/development/phone-preview.md`.
 
-For App Server contract work, also provision Node `v24.18.0` and the contract `@letta-ai/letta-code@0.34.14`; restart-replay evidence was re-captured at 0.34.14 on 2026-10-17 (see the App Server section of `AGENTS.md`). Anything "verified against a 0.33/0.34 server" is desktop/remote-only, never the embedded Android runtime.
+For App Server contract work, also provision Node `v24.18.0` and the contract `@letta-ai/letta-code@0.34.14`; restart-replay evidence was re-captured at 0.34.14 on 2026-10-17 (see the App Server section of `AGENTS.md`). The embedded runtime uses the same package pin; platform capability and Node 18 compatibility still require embedded-runtime validation.
 
 ---
 
 ## Module map
 
+Module and source paths below are relative to `android-compose/` unless prefixed with `docs/`.
+
 | Module | Purpose |
 |---|---|
-| `app/` | Android app — screens, navigation, ViewModels, Hilt DI |
-| `feature-chat/` | Android host of the shared chat page — ViewModels, Hilt bindings and platform glue around the `sharedUI` chat surface |
+| `app/` | Android host — navigation, ViewModels, Hilt DI and containers around shared pages |
+| `feature-chat/` | Android chat route/scaffold and AdminChatViewModel, lifecycle/voice/DI bindings; `ChatScreen` hosts `SharedChatPage` and sharedUI `ChatSurface` content |
 | `core/android-data/` | Repositories, Room DB, transport-bound data sources |
 | `core/runtime/` | App Server runtime contracts, turn lifecycle interfaces |
-| `core/ids/` `core/schemas/` | Shared identifiers and wire-shape schemas |
+| `core/ids/` | Shared identifiers; wire schemas live in source packages |
 | `designsystem/` | Reusable Android Compose UI, theming, and dialogs |
 | `sharedLogic/` | **KMP shared module** — platform-neutral domain, transports, timeline, repositories and runtime |
 | `sharedUI/` | **KMP Compose UI** — the shared Compose UI for Android, Desktop and web: pages, chat surface, A2UI renderer, LettaIcons, primitives |
 | `desktop/` | Compose Desktop — windowing, Ktor engine, OS lock, installer |
-| `cli/` `appserver-cli/` | JVM tooling for probes, restart-replay evidence, shim-off parity gates |
+| `web/` | Browser WASM host and browser API bindings |
+| `cli/` `appserver-cli/` `iroh-wrapper-cli/` | JVM tooling, contract probes and the production Iroh server wrapper |
+
+**Documentation:** start at [docs/README.md](docs/README.md) for ownership, status conventions and historical material.
 
 **Important directories:**
 - `docs/reference/letta-docs.md` — **how to look up Letta's own docs** (index at `docs.letta.com/llms.txt`, canonical markdown at any page + `/index.md`, plus a page map). Read Letta docs instead of guessing at agent/memory/App-Server semantics; they are fetched on demand, not vendored.
 - `sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/README.md` — shared Android/Desktop A2UI renderer and catalog authoring guide (read before touching A2UI payloads, catalog IDs, or renderer dispatch)
-- `app/src/main/java/com/letta/mobile/ui/screens/` — Android screen composables
+- `app/src/main/java/com/letta/mobile/ui/screens/` — Android host containers; product pages live under `sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/`
 - `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/` — Iroh + App Server transports (platform-neutral)
 - `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/runtime/AppServerTurnEngine.kt` — App Server turn engine; `RuntimeEventFanout` is in `data/controller/fanout/`
 - `appserver-cli/` — JVM probe toolchain for App Server contract verification
 
 **The cardinal rule:** feature logic goes in `sharedLogic/commonMain`. Platform modules (`app/`, `desktop/`) only bind. Duplicating repository logic across `app/` and `desktop/` is the documented anti-pattern — the `shared-multiplatform` required CI gate backstops this.
 
-**All UI is shared (`sharedUI`); platform modules are containers** (hard cut `letta-mobile-ckmub`, gate `letta-mobile-ckmub.7`; advisory now, required from slice S20). `desktop/`, `app/`, `feature-*`, `web/` may contain only window/activity hosts, nav hosts that map routes to `sharedUI` pages, the platform's `LettaHost` container (popover window vs bottom sheet), DI, and platform services (renderers, camera, clipboard, file access, tray, installer). New screens, rows, dialogs, pickers, sheets, headers and settings cards go in `sharedUI/commonMain` and compose the shared primitives (`LettaPageScaffold`, `LettaHost`/`LettaPane`, `ShellHeader`, `RosterList`/`ListRow`, `LettaPicker`, `InspectorPane`, `SettingsSection`, `OverlayHost`, `SharedDocument`); platform rendering differences go in a `sharedUI` expect/actual or a `LettaHost` binding. `scripts/ci/platform-ui-gate.sh` (CI job `platform-ui-gate`) fails a new `@Composable` file under those trees unless it is in `scripts/ci/platform-ui-allowlist.txt` with a `Platform-UI-Reason:` line in the PR body, and fails an allowlisted legacy file that grows past its recorded line count (+5). Copying a surface instead of composing the primitives is a review blocker. Android pages are edge-to-edge: `LettaPageScaffold` owns insets; pages never call `systemBars`/`statusBars`/`navigationBars`/`ime` padding themselves. Full rule text: `AGENTS.md` → Module map.
+**New product UI belongs in `sharedUI`; platform modules are containers** (policy for new UI; legacy platform surfaces remain in the explicit allowlist). The existing `feature-chat` Android scaffold/drawer chrome remains allowlisted; shared page content lives in `sharedUI`. New files in `desktop/`, `app/`, `feature-*`, `web/` may contain only window/activity hosts, nav hosts that map routes to `sharedUI` pages, the platform's `LettaHost` container (popover window vs bottom sheet), DI, and platform services (renderers, camera, clipboard, file access, tray, installer). New screens, rows, dialogs, pickers, sheets, headers and settings cards go in `sharedUI/commonMain` and compose the shared primitives (`LettaPageScaffold`, `LettaHost`/`LettaPane`, `ShellHeader`, `RosterList`/`ListRow`, `LettaPicker`, `InspectorPane`, `SettingsSection`, `OverlayHost`, `SharedDocument`); platform rendering differences go in a `sharedUI` expect/actual or a `LettaHost` binding. `scripts/ci/platform-ui-gate.sh` (CI job name `Platform UI gate`) fails a new `@Composable` file under those trees unless it is in `scripts/ci/platform-ui-allowlist.txt` with a `Platform-UI-Reason:` line in the PR body, and warns when an allowlisted legacy file grows past its recorded line count (+5). Copying a surface instead of composing the primitives is a review blocker. Android pages are edge-to-edge: `LettaPageScaffold` owns insets; pages never call `systemBars`/`statusBars`/`navigationBars`/`ime` padding themselves. Full rule text: `AGENTS.md` → Module map.
 
 ---
 

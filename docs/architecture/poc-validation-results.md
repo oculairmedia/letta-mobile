@@ -1,5 +1,13 @@
 # POC Validation Results
 
+**Status:** Historical empirical report (2026-04-17); POC coverage is not current App Server validation.
+
+## Code audit — 2026-10-18
+
+The retained [poc/chat-cli](../../poc/chat-cli/) build is a separate experiment. Production timeline semantics now live in [sharedLogic/data/timeline](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/timeline/) and sends in shared `ChatSendCoordinator` / `AppServerTurnEngine`. The report mixes live, fake and design-only passes: its own out-of-scope section excludes live drop recovery, long streams and historical scroll pagination. Therefore “all eight pass” below means the recorded mixture, not eight live end-to-end scenarios or proof of today's concurrency/retry semantics. Use [current boundary suites](chat-boundary-regression-harness.md). Preserve the old server observations as dated evidence.
+
+## Original record
+
 **Date:** 2026-04-17
 **Bead:** letta-mobile-iuq8
 **POC location:** `/opt/stacks/letta-mobile/poc/chat-cli/`

@@ -1,5 +1,7 @@
 # Mobile Chat Render / Streaming Hot-Path Audit
 
+> Source audit, 2026-10-18: June measured audit, preserved with original device numbers. The render-model builder now lives in sharedLogic and row/geometry rendering in sharedUI; legacy `feature-chat/.../ChatMessageList.kt` is removed. The findings below are dated hypotheses/fixes, not a new assertion that each hot path still exists. Verify the current shared projector/renderer before starting a follow-up.
+
 **Scope:** `android-compose/feature-chat` + `android-compose/designsystem` chat render & streaming pipeline.
 **Date:** 2026-06-05
 **Auditor:** Hephaestus (subagent)

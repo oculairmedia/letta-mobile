@@ -1,5 +1,7 @@
 # Handoff: PR-5 Conversations and models (F15-F18)
 
+> Source audit, 2026-10-18: Historical PR-5 branch/test state. Current fork/edit/rerun orchestration is shared in `ConversationBranchController.kt` (with `ConversationBranchControllerTest`); the older `ConversationBranchRunner.kt` name below has been replaced. Re-evaluate paged-timeline/Android limitations against that controller and current `bd` state before treating them as open gaps.
+
 Branch `feat/letta-desktop-parity-conversations` (one commit on top of `origin/main` 4a520a24d, rebased after
 #1802 shared nav drawer landed). Spec: `docs/design/letta-desktop-reference-gap-analysis.md` (PR #1810),
 section 5 F15-F18. Beads `letta-mobile-bzvro.15`-`.18` (claimed, open). Follow-ups filed: `.31`, `.32`, `.33`.

@@ -7,7 +7,7 @@ Android Ktor (OkHttp), and Android-bound repository implementations live here.
 Do **not** add portable domain logic, transport contracts, or reducers — those
 belong in `:sharedLogic/commonMain` (see `docs/architecture/kmp-module-map.md`).
 
-Consumers: `:app`, `:feature-*`, `:designsystem`, `:cli`, `:core:testutil`.
+Consumers: `:app`, `:feature-*`, `:designsystem`, `:core:testutil`.
 Desktop does **not** depend on this module; it binds through `:sharedLogic`
 plus `desktop/data` adapters.
 

@@ -66,7 +66,7 @@ Example on Windows Git Bash:
 
 ```bash
 cat > android-compose/local.properties <<'EOF'
-sdk.dir=C:\Users\<you>\AppData\Local\Android\Sdk
+sdk.dir=C:/Users/<you>/AppData/Local/Android/Sdk
 EOF
 
 export JAVA_HOME="/c/Program Files/Eclipse Adoptium/jdk-26"
@@ -182,14 +182,15 @@ The `.github/workflows/release.yml` workflow fires on the tag push and publishes
 
 | Asset | What it is |
 |---|---|
-| `letta-mobile-<tag>-prod.apk` | The signed `play-release` APK with the embedded runtime (package `com.letta.mobile`). This **is** the prod artifact; the old `-embedded` name is gone. |
+| `letta-mobile-<tag>-full.apk` | Signed play-release APK with embedded runtime and LiteRT-LM; arm64 only. |
+| `letta-mobile-<tag>-lite.apk` | Signed play-release APK without those runtimes; same `ca.oculair.meridian` package and signing key. |
 | `exe/*.exe`, `msi/*.msi` | Windows desktop installers |
 | `*.tar` | The Linux Iroh wrapper distribution (`meridian-iroh-wrapper`) that the server binaries ship from |
 | `*.yml` | Installer manifest with per-file `sha512` and size |
 
 The workflow verifies the embedded runtime is present in the APK, and checks Automerge JNI and 16 KiB ELF LOAD alignment, before attaching anything. Do not separately upload a locally built APK or create a second release.
 
-**Pre-releases**: append a hyphen suffix to the tag — `v0.2.0-rc.1`, `v1.0.0-beta` — and `softprops/action-gh-release` auto-marks the GitHub Release as a pre-release. `versionCode` ignores the suffix, so a `v0.2.0-rc.1` build has the same `versionCode` as `v0.2.0`. Tag the GA release `v0.2.0` separately to bump `versionCode` to the next tier.
+**Pre-releases**: append a hyphen suffix to the tag — `v0.2.0-rc.1`, `v1.0.0-beta` — the workflow currently does not set the action's `prerelease` input; verify the release flag when publishing a prerelease. `versionCode` ignores the suffix, so a `v0.2.0-rc.1` build has the same `versionCode` as `v0.2.0`. The matching GA tag has the same `versionCode`; increasing it requires a larger numeric version.
 
 **Mistake recovery**: delete the tag and the release before anyone downloads.
 

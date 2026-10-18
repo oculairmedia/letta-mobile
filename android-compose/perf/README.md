@@ -19,7 +19,10 @@ Tracks issue `letta-mobile-o7ob.4.1`.
 The `perf-scripts` job runs `python3 -m unittest discover -s perf -p 'test_*.py'`
 and `scripts/ci/baseline-profile-staleness.py` (warns when the committed
 Baseline Profile no longer resolves) on every PR, main push and nightly run.
-The `perf-gate` macrobenchmark itself runs nightly and on main pushes, not on PRs.
+The `perf-gate` macrobenchmark runs nightly and on main pushes. On PRs it runs
+only for workflow/perf/macrobenchmark changes or an explicit `[perf:rebaseline]`
+title, as selected in `.github/workflows/android-perf.yml`; it is not a
+branch-protection required check.
 
 ## Workflow
 

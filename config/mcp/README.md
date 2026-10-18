@@ -32,5 +32,6 @@ tool_timeout_sec = 120
 
 No environment variables or credentials are required. `serve` uses stdio and
 starts with the checked-in project file. Use `scripts/mcp/serena.sh clean` to
-remove this worktree's Serena/uv cache, logs, and project data. It only removes
-`.local/serena` and `.local/uv`, never `~/.serena` or another worktree.
+remove this worktree's Serena/uv cache, logs, and project data. It removes this worktree cache root's `serena/`, `uv/` and `xdg/` directories (by default
+`.local/serena`, `.local/uv`, `.local/xdg`), never `~/.serena` or another worktree.
+`uvx`, Bash, `timeout` and standard Unix utilities must be available; setup can require network access.

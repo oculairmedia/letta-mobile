@@ -1,5 +1,13 @@
 # Letta API Behavior Empirical Findings
 
+**Status:** Historical REST-server observations (2026-04-17 / 2026-05-10); not a current App Server contract.
+
+## Code audit — 2026-10-18
+
+The production hard cut removed the Letta REST client; the current [AppServerTimelineTransport](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/AppServerTimelineTransport.kt) and `AppServerTurnEngine` use App Server commands/events. OTID suffix ordering, 200-response persistence assumptions, and the `uuid` cleanup-error exception below were empirical observations of the named REST deployment. They must not be generalized into App Server retry/idempotency or error-suppression rules. The gateway reducer and canonical semantic writer use explicit identities and tested ordering/reconcile rules; see [current ingestion rules](external-transport-timeline-rules.md). No old server was contacted during this audit.
+
+## Original record
+
 **Date:** 2026-04-17
 **Latest validation:** 2026-05-10
 **Beads:** letta-mobile-mdlg, letta-mobile-ar2w

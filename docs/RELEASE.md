@@ -1,6 +1,15 @@
 # Release checklist
 
-Minimal gate for cutting a letta-mobile release. The preferred entrypoint is
+The older REST/SSE verification tooling below is retained for its original backend.
+It is not sufficient to certify the current App Server/Iroh release: its build tasks
+are ambiguous with today's app flavors, and its sync/stream gates exercise the
+legacy HTTP subscriber rather than the canonical Iroh chat ledger. For the current
+source gates use `:app:compileRootDebugKotlin`, `:app:testRootDebugUnitTest`, and
+`:sharedLogic:allTests :desktop:test` when shared logic changes; run the
+[Iroh two-client probe](iroh-two-client-live-sync-probe.md) and the
+[device protocol](testing/lgns8-e2e-device-protocol.md) for transport evidence.
+
+The historical entrypoint is
 `make verify-release`, which runs the currently wired gates in prereq order,
 skips gates whose prerequisites are unavailable, and writes a local report to
 `reports/verify-release-<timestamp>.md`.
@@ -82,13 +91,14 @@ the `TimelineSync` subsystem is emitting events during normal use:
 
 - `streamSubscriber.opened` appears when a run starts.
 - `streamSubscriber.eventReceived` appears per SSE frame.
-- `streamSubscriber.ingested` / `streamSubscriber.deduped` track ingestion.
+- `streamSubscriber.ingested` / `streamSubscriber.eventDeduped` track ingestion.
 - `streamSubscriber.idle404` appears while idle (roughly at the backoff
   cadence: 2s → 4s → 8s → 16s → 30s).
 - `streamSubscriber.closed` appears after each run finishes.
 
-If **any** of these categories are completely missing during a 60s live
-session, observability has regressed — block the release.
+These events belong to the legacy SSE subscriber. Their absence on an Iroh chat
+is expected and does not diagnose a release regression; inspect Iroh/controller
+telemetry and the canonical ledger instead.
 
 ## 4. Build & packaging
 
@@ -115,7 +125,10 @@ alignment on their 64-bit ABIs.
 build one locally: `./gradlew :app:assemblePlayRelease` (lite) or add the two flags (full; needs
 Node and the NDK helpers under `app/libs/embedded-*`).
 
-## 4a. Orchestrated verify-release entrypoint
+The same workflow also builds Windows EXE/MSI installers and a Linux Iroh wrapper
+distribution; the two APKs are only its Android outputs.
+
+## 4a. Historical orchestrated verify-release entrypoint
 
 ```bash
 make verify-release \

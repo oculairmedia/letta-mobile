@@ -1,5 +1,7 @@
 # Handoff: Letta Desktop parity PR-6 — memory browser, secrets vault, file mentions (F24–F26)
 
+> Source audit, 2026-10-18: Historical PR-6 branch and verification record. The original direct-only workspace limitation is superseded by the implemented 11-method Iroh workspace relay (`AppServerWorkspaceRelay.kt`, `WorkspaceAdminHandlers.kt`). See the [relay runbook](../deploy/workspace-relay-host-redeploy.md); this audit does not establish that a particular host is running it. Historical draft-PR and Android-binding status below must not be read as current issue state.
+
 Epic `letta-mobile-bzvro`; design `docs/design/letta-desktop-reference-gap-analysis.md` (PR #1810, §5 F24–F26, §7 PR-6).
 Beads: `letta-mobile-bzvro.24` (F24), `.25` (F25), `.26` (F26), follow-up `.37` (Iroh relay). All claimed, left open.
 

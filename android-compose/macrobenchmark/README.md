@@ -55,7 +55,8 @@ The `:baselineprofile` module owns both ART profile generators:
 
 The broad CUJ generator emits `baseline-prof.txt`; the launcher-only
 `StartupProfileGenerator` uses `includeInStartupProfile = true` so AGP also
-emits `startup-prof.txt`. AGP 8.9 enables DEX layout optimization by default,
+emits `startup-prof.txt`. The configured AGP version is in `gradle/libs.versions.toml`; the build
+consumes the generated startup profile. Since AGP 8.9, DEX layout optimization is enabled by default,
 so release/benchmark builds consume the Startup Profile without extra Gradle
 flags.
 
@@ -102,7 +103,8 @@ Reports p50/p90/p95/p99 per-frame render times plus jank counts.
 
 ## CI gate
 
-Thresholds live in `perf/baselines.json` at the repo root. The CI job
+Thresholds live in `android-compose/perf/baselines.json` (or
+`perf/baselines.json` from the Gradle root). The CI job
 parses the `*-benchmarkData.json` output and fails the build if any
 measured metric exceeds `baseline + tolerance`. The canonical CI device
 is the API 33 `pixel_6` emulator. Re-baselining is an explicit commit.

@@ -1,5 +1,13 @@
 # lgns8 epic: status, achievable scope, and the shim-retirement ceiling
 
+**Status:** Historical epic record (2026-07-31 through 2026-08-01 addenda); no assertion of present host or tracker state.
+
+## Code audit — 2026-10-18
+
+The record includes dated August 1 addenda, despite its snapshot filename. Its host/runtime versions, release SHAs, open-bead lists and service-stop ceiling are historical. Current source declares no shim fallback in [the ownership matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json); `AppServerServeIrohCommand` wires the packaged wrapper without `--channels-host`, and `WorkspaceAdminHandlers` adopts additional native MemFS/secrets/file operations that were part of the old ceiling. Use [deployment guide](app-server-controller-deploy.md) and current handlers to determine available capabilities. The old instruction to retain a particular rollback worktree is evidence of the 2026-08-01 incident, not a requirement to preserve a user's unrelated old checkout today.
+
+## Original record
+
 Date: 2026-07-23 · **rewritten 2026-07-31 for `letta-mobile-lgns8.9`** (admin-REST
 ceiling recomputed), with the shim-only-surfaces disposition and the
 train/channels addendum retained below.

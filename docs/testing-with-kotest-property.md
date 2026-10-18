@@ -2,7 +2,7 @@
 
 `io.kotest:kotest-property` is the standard harness for invariant tests on merge logic, value classes, and protocol validators — code paths where example-based tests keep missing edge cases. It generates many inputs per run and shrinks failures to a minimal counter-example, so a broken invariant surfaces as the smallest input that breaks it instead of a one-off repro.
 
-Reference bead: `letta-mobile-3wo3`. Worked example: `TimelineSyncMergePropertyTest` in `core/src/test/java/com/letta/mobile/data/timeline/`.
+Reference bead: `letta-mobile-3wo3`. Worked example: `TimelineSyncMergePropertyTest` in `android-compose/core/android-data/src/test/java/com/letta/mobile/data/timeline/`.
 
 ## Why
 
@@ -21,7 +21,7 @@ A property test states the invariant directly:
 }
 ```
 
-If someone changes the production merge to do anything other than plain concatenation (snapshot-replace, prefix-drop, "near-snapshot" heuristics), this property fails on the smallest counter-example. The shrinker reports e.g. `["a", "ab"]` instead of the original randomly-generated 17-element list, so the failure is immediately diagnosable.
+This illustrative fold tests a locally defined concatenation rule, not the production merge. The existing worked example also defines that fold inline, so a production-only regression need not fail it. For a regression guard, call the production reducer/merge function from the property; use the worked example's `hasAlreadyIngestedStreamFrame` properties as examples that actually call production behavior. The shrinker reports e.g. `["a", "ab"]` instead of the original randomly-generated 17-element list, so the failure is immediately diagnosable.
 
 ## Pattern
 
@@ -56,7 +56,7 @@ A 1000-iteration property test on pure functions runs in well under 2s; the bead
 When you spot a new property-test candidate:
 
 - [ ] State the invariant in plain English first. If you can't, you don't have a property — write an example test instead.
-- [ ] Confirm `kotest-property` is on the module's test classpath. Currently: `:core`, `:feature-chat`.
+- [ ] Confirm `kotest-property` is on the module's test classpath. Current examples: `:core:android-data`, `:feature-chat`; inspect their build files before adding a property.
 - [ ] Tag `@Tag("unit")` for pure-logic properties; `@Tag("integration")` for anything that touches Robolectric / Room / Hilt.
 - [ ] Pick a generator that overlaps the production input space (sizes, character classes, null-ability) — too narrow misses bugs, too wide finds bugs in your generator instead.
 - [ ] If the property fails with an opaque message, attach `withClue { ... }` to the assertion so the shrunk counter-example is actionable.

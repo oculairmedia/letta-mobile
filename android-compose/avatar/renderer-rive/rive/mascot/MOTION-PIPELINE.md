@@ -1,6 +1,10 @@
 # Motion pipeline: how Disney's paper tools fit the rig, and how to collapse the loop
 
-Status: plan, 2026-09-14. Companion to README.md (the loop as it is today) and MASCOT.md.
+Status: historical plan and probe findings, 2026-09-14. Audited 2026-10-18:
+`review.py` and the proposed Harness/Luau path are not present in the tracked
+implementation. Read `README.md`, `probe.py`, `test_probe.py`, `test_rig.py` and
+`rig/seams.py` for the working loop. Proposed commands below are not an executable
+current runbook. Companion to README.md and MASCOT.md.
 The archival source is the Disney practice summarised in the technical report the product owner
 provided: Graham's action analysis (1935-37), Thomas & Johnston's codification (1981), Stanchfield's
 lectures, timing charts, the exposure sheet, pose-to-pose, the pencil test and the sweatbox.

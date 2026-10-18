@@ -1,5 +1,7 @@
 # Redeploy meridian-iroh-wrapper for the workspace relay (letta-mobile-bzvro.37)
 
+> Source audit, 2026-10-18: The 11-method relay is present in the audited source (`WorkspaceRelayMethod` and `WorkspaceAdminHandlers`). The branch-specific PR/commit instructions below describe the original rollout; for a new deployment choose a reviewed release SHA explicitly and verify it, rather than assuming the latest main commit is the bzvro.37 squash. This audit did not inspect the running host or restart services.
+
 Audience: the agent operating the **Linux host** that runs `meridian-iroh-wrapper.service`
 (Iroh QUIC :4501 ⇄ App Server `ws://127.0.0.1:4500`). Every command below runs **on that
 host, as root**, unless marked otherwise.

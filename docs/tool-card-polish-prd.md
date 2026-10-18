@@ -1,5 +1,7 @@
 # PRD: Tool Card Readability + Interaction Polish
 
+> Source audit, 2026-10-18: Historical PR #341 implementation record. `ChatToolCallCards.kt` no longer exists. Current shared rows live in `sharedUI/.../ui/chat/surface/timeline/rows/ChatRowToolCard.kt`: completed tools start collapsed, failures/running/image tools start expanded, and subagent dispatches use a dedicated card. Evaluate new polish against that implementation, not the deleted card API.
+
 ## Status
 Draft / implemented in PR #341 (`fix/toolcard-dedup`) with follow-up polish hooks.
 

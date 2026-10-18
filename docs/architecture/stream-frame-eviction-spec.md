@@ -1,5 +1,15 @@
 # Stream-frame eviction instead of session teardown
 
+**Status:** Historical proposal (2026-08-23); transport-level DROP_OLDEST remains unimplemented, but the analyzed routing bottleneck has changed.
+
+## Code audit — 2026-10-18
+
+Current [AppServerInboundDelivery](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/AppServerInboundDelivery.kt) has **three** bounded queues: primary arrival-ordered inbound plus derived control and stream views. All retain fail-fast generation overflow at 1024; it does not implement the proposal's `streamResyncRequests`/DROP_OLDEST contract. Production routing consumes the ordered path rather than rebuilding it with `mergedFrames`.
+
+[RuntimeEventFanout](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/controller/fanout/RuntimeEventFanout.kt) now uses `trySend` and detaches a full subscriber with scoped overflow cancellation/notification. Thus the later appendix's description of a suspending fanout router and re-merged control/stream path is historical, not a current failure proof. `RuntimeEventFanoutOverflowTest` tests isolated subscriber pressure; the transport tests retain bounded failure and ordering checks. A future lossy transport still needs end-to-end repair for all affected consumers; a local reconcile alone does not prove a remote viewer repaired. Incident totals and causal uncertainties below remain unresolved historical observations, not current throughput measurements.
+
+## Original record
+
 Design spec for `letta-mobile-aggeh` option (b), scoped down to the specific
 failure observed on 2026-08-23. **Not implemented — this is for review.**
 

@@ -1,18 +1,19 @@
 # Embed Letta Code as on-device runtime - integration design
 
-**Status:** Day 0 spike complete 2026-05-26 02:00 EDT. Highest-risk unknown
-(Node 22 requirement) resolved. Full Android spike pending - 1-2 day budget.
+**Status:** Implemented local App Server reference with historical spike sections; source-audited 2026-10-18.
+
+Current code is [LocalAppServerHost](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/runtime/host/LocalAppServerHost.kt), [LibnodeAppServerLauncher](../../android-compose/app/src/main/java/com/letta/mobile/runtime/local/LibnodeAppServerLauncher.kt) and [AndroidLocalAppServerLaunchSource](../../android-compose/app/src/main/java/com/letta/mobile/runtime/local/AndroidLocalAppServerLaunchSource.kt). [Runtime pins](../../android-compose/letta-code-runtime/letta-code-runtime.properties), the [embedded CI workflow](../../.github/workflows/embedded-runtime-node18.yml) and [release configuration](../../.github/workflows/release.yml) define packaging and validation. The Decision/Spike bead statuses and TL;DR compatibility story below are May/June history, not unresolved present-day blockers.
 
 **Decision bead:** `lcp-59c` (P1, open)
 **Spike bead:** `lcp-59c.1` (P1, open)
 **Filed by:** Emmanuel + Meridian, 2026-05-26 01:30am EDT.
 
-This doc is the canonical project-side reference for the
+This doc records the original project-side design for the
 embed-Letta-Code-via-nodejs-mobile pivot. It is grounded in a source-tree review
 of `sepivip/SeekerClaw`, a shipping production app using the same pattern, and
 a live Day 0 spike confirming Node-version compatibility.
 
-## TL;DR
+## Original May/June spike summary
 
 - Letta Code is TS/Node end-to-end and already has `letta --backend local`.
 - Instead of reimplementing the local runtime in Kotlin, embed nodejs-mobile in
@@ -96,7 +97,7 @@ The embedded App Server wedge was version-blocked:
 | --- | --- | --- | --- |
 | `@letta-ai/letta-code@0.26.1` | `>=18` | `letta app-server --help` falls back to the normal CLI help; package tarball has no `app-server` or protocol-v2 assets. | Compatible with nodejs-mobile 18.20.4, but no App Server entrypoint. |
 | `@letta-ai/letta-code@0.27.15` | `>=22.19.0` | Host CLI exposes `app-server` and protocol-v2 assets; local loopback smoke reached `runtime_start -> input -> stream_delta -> sync -> abort_message` on Node v24.13.1. | App Server available for host adapters, but incompatible with the current Android nodejs-mobile 18.20.4 runtime. |
-| `@letta-ai/letta-code@0.34.14` (the pin) | `>=22` declared | Boots on 18.20.4 with `runtime/node18-compat.cjs` as the first preload (the App Server path needs only the `crypto` global; `toWellFormed` and `getBuiltinModule` are the other shims hit). `embedded-runtime-node18` CI proves headless and `server --listen` on every relevant PR. | Headless stream-json today; App Server loopback lands with letta-mobile-by4vm.110.5/.6. |
+| `@letta-ai/letta-code@0.34.14` (the pin) | `>=22` declared | Boots on 18.20.4 with `runtime/node18-compat.cjs` as the first preload (the App Server path needs only the `crypto` global; `toWellFormed` and `getBuiltinModule` are the other shims hit). `embedded-runtime-node18` CI proves headless and `server --listen` on every relevant PR. | App Server loopback is implemented via LocalAppServerHost and LibnodeAppServerLauncher. The headless smoke remains CI coverage, not the app protocol. |
 | nodejs-mobile Android | 18.20.4 | Current pinned embedded libnode in `android-compose/letta-code-runtime/letta-code-runtime.properties`. | The engine every bump must boot on. |
 
 ### CI: `embedded-runtime-node18`
@@ -138,7 +139,7 @@ sign-off (letta-mobile-by4vm.110.7).
 | `@vscode/ripgrep` | Android binary availability. | Fall back to JS search. |
 | `ws` | Pure JS. | No action needed. |
 
-## Spike Gates
+## Historical Spike Gates
 
 1. `node::Start()` boots hello.js in a foreground service.
 2. Bundled `letta.js --backend local` reaches a steady state.
@@ -149,7 +150,7 @@ sign-off (letta-mobile-by4vm.110.7).
 Hard stop if Node cannot boot, `node-pty` cannot be stubbed, boot time exceeds
 30 seconds on a real device, or APK size exceeds 150 MB.
 
-## Roadmap Impact
+## Historical Roadmap Impact
 
 If this works, `letta-mobile-hua6` is no longer the primary implementation plan
 for Android. It should remain available as a future pluggable engine experiment,

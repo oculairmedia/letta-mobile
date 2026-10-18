@@ -1,338 +1,148 @@
 # QR Pairing Protocol
 
-**Status:** Accepted design  
-**Gate:** Approved for CLI, Desktop, and Mobile QR implementation  
-**Parent epic:** `letta-mobile-sixv8` — ZEDRA-pattern QR pairing across CLI/Desktop/Mobile  
-**Protocol task:** `letta-mobile-7b9on`  
-**Date:** 2026-08-12  
-**Owner:** Letta Mobile / Meridian Architecture  
+**Status:** Implemented v1 contract, source-audited 2026-10-18. This replaces the
+2026-08-12 proposal's unimplemented public-signature verification claims.
+**Scope:** Shared minting, link parsing, confirmation and redemption. Live device
+interoperability and deployed host configuration were not re-run in this audit.
 
----
+## 1. Scope
 
-## 1. Scope and Parent Epic
+QR pairing bootstraps trust to an Iroh host. Pairing grants only the capabilities
+and optional agent scope chosen by the administrator; it does not independently
+authorize arbitrary terminal access. The shared implementation serves client hosts.
 
-This document defines the protocol contract for exchanging a pairing invitation through a QR code. It is the architectural gate consumed by:
+## 2. Trust boundary
 
-- `letta-mobile-gw0h1` — CLI QR rendering.
-- `letta-mobile-nonza` — Desktop QR display and trust establishment.
-- `letta-mobile-g2d2i` — Mobile QR scanning and invite generation.
+The envelope contains a bearer invite secret and the host's node identity. Treat
+QR images and links as credentials. The user confirms the host fingerprint; the
+Iroh/QUIC connection authenticates the expected node. The scanner does **not**
+verify the envelope's host-private HMAC offline. Public Ed25519 envelope verification
+was proposed in the original design but is not implemented.
 
-The scope is deliberately limited to peer identity, invite validity, transport encoding, redemption, and revocation. It does not define terminal authorization, command policy, execution-location selection, or a second pairing RPC. The parent epic separates the future execution-location selector into its own work.
+## 3. RPC surface
 
-The gate is complete once each child can implement against the canonical payload and wire decision below without choosing a competing schema.
+`PairingAdminHandlers` registers methods when a pairing service is configured.
+The authenticated connection also requires `admin.full` for these admin methods:
 
-## 2. Problem Statement
+- `pair.invite.create`, `pair.invite.list`, `pair.invite.revoke`
+- `pair.peer.list`, `pair.peer.get`, `pair.peer.rename`
+- `pair.peer.set_capabilities`, `pair.peer.set_agents`, `pair.peer.revoke`
 
-Pairing currently requires an already-authenticated wrapper peer to mint an invitation, but a new CLI, desktop, or mobile client needs an air-gap-friendly way to receive that invitation. Typing a long secret manually is error-prone, and displaying a bare secret does not identify the minting node, bound the invitation in time, or make tampering evident.
+Create accepts optional `name`, `ttl_ms`, `qr`, `role`, `capabilities`, `agent_ids`.
+The default name is `paired-peer`; default TTL is five minutes, nonpositive TTL
+uses that default, and positive TTL is capped at one hour. Default grant is chat,
+not admin. Supported role presets are chat, desktop, vibesync and admin; explicit
+capabilities must be known. Agent IDs can narrow the grant.
 
-We need a small, cross-platform QR pairing primitive that:
+## 4. One minting authority
 
-- Names the node that minted the invitation.
-- Carries a high-entropy secret that can authorize one pairing.
-- Bounds the invitation's lifetime.
-- Lets the receiver verify integrity and issuer identity.
-- Can be encoded and decoded by CLI, desktop, and mobile implementations.
-- Supports immediate and explicit revocation without turning an invite into a durable credential.
+Use `pair.invite.create`, not a parallel `pair.qr` RPC. Request `qr: true` for
+QR fields. Without a usable signer/node configuration, the handler omits QR fields
+rather than publishing an unsigned QR. The reply includes `invite_id`, `invite`,
+`deep_link`, `expires_at_ms`, `suggested_name`, and when configured `qr_invite`
+and `pair_link`.
 
-The QR is an out-of-band transport, not a new trust model. Once a receiver redeems a valid invite and pairing succeeds, it receives whatever capabilities and authority the host intentionally grants to paired peers.
+## 5. Payload format
 
-## 3. Existing Protocol Surface
-
-### 3.1 RPC location and registration
-
-`PairingAdminHandlers.kt` registers the authenticated wrapper RPC:
-
-```text
-pair.invite.create
-```
-
-The handler is registered only when an `IrohPairingService` is configured. It runs behind the connection's authentication gate, so only an already-authenticated peer can mint an invite or manage pairings.
-
-The method set also contains peer administration operations:
-
-```text
-pair.peer.list
-pair.peer.get
-pair.peer.rename
-pair.peer.set_capabilities
-pair.peer.revoke
-```
-
-### 3.2 Current request payload
-
-The current request is a JSON object with two optional fields:
-
-```json
-{
-  "name": "paired-peer",
-  "ttl_ms": 300000
-}
-```
-
-| Field | Type | Required | Meaning |
-|---|---|---:|---|
-| `name` | string | No | Suggested display name; blank values become `paired-peer`. |
-| `ttl_ms` | integer | No | Requested validity duration in milliseconds. |
-
-The handler defaults the name to `paired-peer` and the TTL to the pairing service's existing default. It prunes expired invitations before creating a new one.
-
-### 3.3 Current response payload
-
-The current `pair.invite.create` response is:
-
-```json
-{
-  "invite": "letta-invite:<secret>",
-  "deep_link": "<existing deep-link representation>",
-  "expires_at_ms": 1783872000000,
-  "suggested_name": "paired-peer"
-}
-```
-
-| Field | Type | Meaning |
-|---|---|---|
-| `invite` | string | Minted secret prefixed with `IrohPairingService.INVITE_TOKEN_PREFIX`. |
-| `deep_link` | string | Existing deep-link representation generated by the service. |
-| `expires_at_ms` | integer | Absolute expiry time in Unix epoch milliseconds. |
-| `suggested_name` | string | Suggested name supplied to the pairing service. |
-
-The secret is returned only to the authenticated caller. It must not be included in telemetry, logs, or error text.
-
-### 3.4 What is missing
-
-The existing RPC is the lifecycle owner for minted invitations, but its response does not yet provide the complete QR wire contract. It lacks a minting node identifier, an integrity signature over the invitation, and a versioned QR encoding. QR-specific additions therefore belong in an additive response shape rather than a parallel RPC.
-
-The existing deep link may continue to be returned for backward compatibility. It is an application convenience; it is not the canonical QR transport defined below.
-
-## 4. Wire Format Decision
-
-**Decision: extend the existing `pair.invite.create` RPC. Do not introduce a parallel `pair.qr` RPC.**
-
-This is the dispatcher decision for `gw0h1` and all other children. They call `pair.invite.create`, request a QR-capable representation, and render that response. A `pair.qr` name is not part of v1.
-
-The extension is additive and versioned:
-
-- Existing callers that do not set a QR request option continue receiving the current fields.
-- A caller may request the QR representation without breaking existing response consumers.
-- The canonical QR value is a new, explicitly named response field.
-- QR rendering and redemption must ignore unknown legacy fields.
-- Service code remains responsible for secret generation, expiry, and one-time redemption.
-
-The extension should be introduced through a request flag such as `qr: true`. The precise shared-model name is an implementation detail, but the protocol contract is the response field `qr_invite` defined in the next section.
-
-This decision avoids two minting authorities, divergent expiry behavior, duplicate secret creation, and incompatible surfaces. It also matches the CLI child, which already assumes reuse of `pair.invite.create`.
-
-## 5. Payload Format
-
-### 5.1 Canonical JSON payload
-
-The QR payload is a versioned JSON object with exactly these logical fields:
+### 5.1 Canonical envelope
 
 ```json
 {
   "version": 1,
-  "node_id": "<minting iroh node id>",
-  "signed_secret": "<signed invitation secret>",
+  "node_id": "<64-hex host node identity>",
+  "signed_secret": "invite:<one-time-secret>",
   "expires_at_ms": 1783872000000,
-  "signature": "<base64url issuer signature>"
+  "signature": "<host-private base64url HMAC>"
 }
 ```
 
-| Field | Type | Required | Validation and semantics |
-|---|---|---:|---|
-| `version` | integer | Yes | Must equal `1` for this contract. Reject unknown major versions. |
-| `node_id` | string | Yes | Identifier/public-key reference of the minting iroh node. The exact representation is the node's established iroh public identity encoding. |
-| `signed_secret` | string | Yes | Invitation secret value with the server's `letta-invite:` prefix and the pairing service's existing high-entropy token representation. |
-| `expires_at_ms` | integer | Yes | Absolute expiry in Unix epoch milliseconds. The receiver rejects values in the past or beyond its clock-skew policy. |
-| `signature` | string | Yes | Issuer signature over a canonical serialization of `version`, `node_id`, `signed_secret`, and `expires_at_ms`. |
+`PairQrEnvelope` emits compact JSON. The canonical message signed by
+`HmacPairQrSigner` is version, node_id, signed_secret, expires_at_ms in that order,
+without the signature member. HMAC-SHA256 is keyed by the host's persistent
+`IrohSecretKeyStore`; the signature is not publicly verifiable from node_id.
 
-The phrase “signed secret” means the secret itself is included in the signed message, not that the field is an opaque pre-signed blob. The signature must bind the node ID, secret, and expiry together.
+### 5.2 Scanner validation
 
-The canonical signed message uses a deterministic representation. For v1, implementations use compact JSON with these members in this exact order and no insignificant whitespace:
+`ScannedInviteParser` requires version 1, a 64-hex node ID (normalized lowercase),
+a nonempty `invite:` credential, and positive expiry. It tolerates unknown fields
+and currently does not require or verify `signature`. Missing/invalid required
+fields produce a format error; an unsupported version is reported separately.
 
-```text
-{"version":1,"node_id":"<node_id>","signed_secret":"<signed_secret>","expires_at_ms":1783872000000}
-```
+### 5.3 Reachability
 
-The signature algorithm is the minting node's established iroh-compatible signing primitive, preferably Ed25519 over the node's identity key. Implementations must use the identity/key type associated with `node_id` rather than accepting an arbitrary caller-selected key ID.
+The envelope has no address. `PairLink` wraps it as
+`meridian://pair?qr=<envelope>&dial=<percent-encoded hint>`. A hint can be a ticket,
+node/address or host:port, but the redeemer must still target the envelope's node.
+`IrohPairingRedeemer` rejects an explicit hint naming a different node.
 
-### 5.2 Relationship to the current invite response
+## 6. Invitation lifecycle and revocation
 
-The recommended extended response is:
+The service atomically consumes an invite for a new peer, checks stored expiry,
+and persists the peer with the invite's grant. An already paired node returns
+`AlreadyPaired` before consuming an invite; repeated requests are not universally
+reported as replay failures. A consumed invite cannot pair a second new peer.
 
-```json
-{
-  "invite": "letta-invite:<secret>",
-  "qr_invite": "letta-qr-v1.<base64url-json>",
-  "deep_link": "<existing deep-link representation>",
-  "expires_at_ms": 1783872000000,
-  "suggested_name": "paired-peer"
-}
-```
+`pair.invite.list` returns non-secret pending metadata. `pair.invite.revoke`
+takes a non-secret `invite_id`; `pair.peer.revoke` removes established trust.
+Pending-invite restart persistence depends on the configured `PairingInviteStore`.
+Do not assume that every restart purges invitations.
 
-`invite`, `deep_link`, `expires_at_ms`, and `suggested_name` preserve the current RPC contract. `qr_invite` carries the canonical QR payload. The same underlying secret, suggested name, and expiry must appear in both representations.
+## 7. Transport and redemption
 
-A consumer that already uses `invite` should not be forced to decode QR data. A QR-only consumer validates `qr_invite` and then uses its `signed_secret` value when presenting the secret to the pairing service. The canonical field names above are the protocol contract; exact response-wrapper naming may remain backward-compatible through an additional alias if the implementation team requires one.
+### 7.1 Encoding
 
-### 5.3 Length and size
+The envelope is `letta-qr-v1.<base64url-json>`. The parser accepts optional
+base64url padding (`ABSENT_OPTIONAL`), not a requirement for missing padding to fail.
+`PairLink` accepts bare envelopes, `meridian://pair?…`, `letta://pair?…`, and
+those URI schemes with a slash before the query.
 
-The payload is designed for QR capacity without custom binary codecs. Base64url encoding of compact JSON, including a prefix, is expected to remain comfortably within a standard QR version at the supported token sizes. A QR implementation must report an error rather than silently truncate if its encoder cannot fit the complete value.
+### 7.2 Confirmation
 
-No node address, relay hint, capability list, display name, or deep link belongs in the canonical v1 payload. Optional metadata is intentionally deferred to a versioned future extension.
+`PairingFlow` parses and checks expiry, then enters `ConfirmHost`. It allows a
+30-second local clock-skew margin; the host still enforces its stored deadline.
+Confirmation invokes the redeemer with a bounded timeout. Cancellation prevents
+late responses from being persisted. A successful result is saved and activated.
 
-## 6. Invitation and Revocation Semantics
+### 7.3 Authentication
 
-### 6.1 One-shot redemption
+The Iroh connection authenticates the expected node identity; the host validates
+the invite secret and one-shot lifecycle. There is no scanner-side public signature
+check. Do not present the HMAC field as offline proof of issuer authenticity.
 
-An invitation is a one-shot capability. The first receiver to redeem the secret and complete pairing consumes it. A second redemption attempt fails, even if the first attempt has not yet completed a connection handshake.
+## 8. Historical design reference
 
-The service must atomically compare the secret and mark the invitation redeemed. Race conditions between simultaneous scanners must not permit two successful pairings from one invitation.
+The original design followed the ZEDRA generate/scan/confirm/redeem interaction.
+The external BookStack/reference artifacts are not vendored; this source audit does
+not validate their contents or assert schema compatibility with another product.
 
-Successful pairing is distinct from QR scanning. Scanning, decoding, or signature validation does not consume the invitation. Consumption occurs at redemption, after validity checks.
+## 9. Tests and evidence
 
-### 6.2 Expiry window
+Source fixtures cover parser/link handling, flow cancellation/expiry, admin handlers
+and service replay behavior. These are code-level evidence, not proof of a currently
+running server or successful camera scan on every device.
 
-The default validity is five minutes (300,000 ms). A caller may request a shorter lifetime. The service may cap any requested TTL to its configured maximum; it must not silently grant a longer lifetime than requested.
+## 10. Source map
 
-The absolute `expires_at_ms` is authoritative. The receiver should reject an invite when its current time is at or after expiry. A small implementation-defined clock-skew allowance is acceptable for comparisons, but it must be bounded and documented by the client.
+Paths are relative to `android-compose/sharedLogic/src/`:
 
-Expired invitations remain invalid and should be removed by the existing prune operation. Pruning is housekeeping, not an additional redemption path.
+- `commonMain/kotlin/com/letta/mobile/data/pairing/ScannedInvite.kt`
+- `commonMain/kotlin/com/letta/mobile/data/pairing/PairLink.kt`
+- `commonMain/kotlin/com/letta/mobile/data/pairing/PairingFlow.kt`
+- `jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohPairingRedeemer.kt`
+- `jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/PairQrSigner.kt`
+- `jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/PairingAdminHandlers.kt`
+- `jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/IrohPairingService.kt`
+- `commonTest/kotlin/com/letta/mobile/data/pairing/PairingFlowTest.kt`
+- `jvmTest/kotlin/com/letta/mobile/data/controller/node/iroh/PairingAdminHandlersTest.kt`
+- `jvmTest/kotlin/com/letta/mobile/data/controller/node/iroh/IrohPairingServiceTest.kt`
 
-### 6.3 Manual revocation
+## 11. Remaining verification
 
-The existing `pair.peer.revoke` RPC revokes an already-created peer relationship by `node_id`; it does not revoke an unconsumed secret by itself. A pre-redemption manual-revoke operation is not part of v1 because the existing `pair.invite.create` surface has no stable invite ID or listing RPC.
+Live camera/deep-link entry, host readiness, network reachability and store persistence
+must be checked in the intended deployment. Public envelope signatures would be a
+new feature, not a documentation promise about the existing HMAC implementation.
 
-The supported v1 controls are therefore:
+## 12. Tracking
 
-- Short TTL and one-shot redemption for normal expiry.
-- Existing `pair.peer.revoke` after a peer has been established, to remove the trust relationship and prevent future use under that pairing.
-- Service restart/purge behavior according to the pairing service's existing persistence policy for unconsumed invitations.
-
-A future explicit `pair.invite.revoke` must refer to an unconsumed invite by a non-secret identifier, require authenticated admin access, and preserve the same atomic one-shot semantics. It must not be added as an undocumented `pair.qr` side effect.
-
-### 6.4 Failed attempts and disclosure
-
-Invalid signatures, wrong versions, expired payloads, unknown nodes, malformed secrets, and already-consumed tokens return a generic failure. They must not disclose whether a secret exists beyond the existing service contract. QR screenshots and decoded secrets should be handled as sensitive credentials by every client.
-
-## 7. Transport Encoding
-
-### 7.1 QR value format
-
-The QR contains a single URI-like text value:
-
-```text
-letta-qr-v1.<base64url-json>
-```
-
-- `letta-qr-v1` is the versioned scheme and human/debug discriminator.
-- `.` separates the scheme from the encoded payload.
-- `base64url-json` is unpadded URL-safe base64 (or explicitly padded base64url if the QR implementation requires it), encoding the compact canonical JSON payload.
-- Decoding must reject missing padding, invalid characters, trailing data, or decoded bytes that are not valid JSON.
-- Decoded JSON must be an object with the exact required field set and supported field types.
-- Unknown fields are ignored only if the implementation is explicitly running a compatibility policy; v1 producers must not add them.
-
-### 7.2 Why base64url JSON
-
-We adopt base64url JSON rather than raw JSON or CBOR for v1:
-
-- URI and QR text handling is uniform across CLI TTYs, desktop, and mobile.
-- JSON is readable during development and maps directly to Kotlin serialization models.
-- base64url is safe in QR text and avoids shell/URI metacharacter issues.
-- The complete signed envelope remains one scan result.
-- CBOR and raw JSON can be reconsidered only if measured payload size or a concrete future binary requirement justifies them.
-
-### 7.3 Canonicalization and verification
-
-The receiver performs these steps in order:
-
-1. Confirm the `letta-qr-v1.` prefix.
-2. Decode base64url bytes and parse compact JSON.
-3. Require `version == 1` and all four logical payload fields.
-4. Reject malformed or expired timestamps.
-5. Resolve the minting identity from `node_id` using the established iroh identity material.
-6. Recompute the canonical signed message.
-7. Verify the issuer signature before attempting redemption.
-8. Reject if the secret format, service state, or redemption response is invalid.
-9. Redeem only once and persist the resulting peer relationship.
-
-Signature verification precedes network redemption. A scanner must never echo a full secret or signature in UI error messages.
-
-## 8. ZEDRA Reference and Adoption
-
-The parent epic describes ZEDRA's pairing interaction as a host/CLI generating a QR invitation and a phone scanning it to establish trust. The local dispatch notes indicate that the screenshot/source is not available in this repository, so the reference is behavioral and architectural rather than a copied wire schema.
-
-ZEDRA is a reference for:
-
-- A QR as the out-of-band bootstrap mechanism.
-- A small, visual, operator-friendly pairing flow.
-- A server/client exchange in which the receiving client acts on the invite.
-- A pairing primitive that is independent of terminal UI details.
-
-We do not claim to copy a ZEDRA payload field layout or signature algorithm without a source artifact. For v1, we adopt the ZEDRA pattern—generate, scan, verify, redeem—and retain the existing `pair.invite.create` lifecycle and iroh identity. Our additions are explicit because our trust boundary needs them: version, minting node identity, signed secret, absolute expiry, and integrity signature.
-
-Future adoption of a newly documented ZEDRA field must be versioned and compatibility-tested. It should not silently change the meaning of `node_id`, `signed_secret`, `expires_at_ms`, or `signature` in v1.
-
-## 9. Compatibility and Security Requirements
-
-The following requirements apply to all child implementations:
-
-- Preserve existing `pair.invite.create` callers and fields.
-- Use one RPC and one source of truth for invitation creation.
-- Generate secrets with the existing pairing service's cryptographic randomness.
-- Never log, persist in telemetry, or place secrets in QR error messages.
-- Sign the version, node ID, secret, and expiry as one message.
-- Reject unknown major versions and invalid signatures.
-- Enforce expiry before redemption.
-- Make redemption atomic and one-shot.
-- Keep QR encoding deterministic enough to test with fixtures.
-- Test malformed JSON, wrong version, altered secret, altered expiry, altered node ID, bad signature, expired invite, and replayed invite.
-- Do not treat possession of a QR as authorization to execute terminal commands; pairing is the trust boundary, while host policy grants capabilities.
-
-## 10. Implementation Contract for Child Beads
-
-### `letta-mobile-gw0h1` — CLI
-
-- Calls `pair.invite.create` with the requested name and TTL.
-- Requests the QR-capable representation.
-- Decodes the QR result only to render text or PNG.
-- Prints text QR to stdout by default and supports `--qr-format png=...` for headless use.
-- Does not introduce `pair.qr`.
-
-### `letta-mobile-nonza` — Desktop
-
-- Uses the same `pair.invite.create` request and `qr_invite` representation.
-- Displays a QR in the first-run/install pairing surface.
-- Verifies the payload before attempting redemption.
-- Applies the existing paired-peer capabilities and host policy.
-
-### `letta-mobile-g2d2i` — Mobile
-
-- Scans and verifies the common QR value in client mode.
-- Generates the same value in server mode.
-- Supports both phone-scans-host and other-device-scans-phone flows.
-- Never requires platform-specific payload changes.
-
-## 11. Open Questions and Follow-up
-
-- Confirm the exact iroh node ID encoding and canonical signature bytes during implementation.
-- Confirm the service's persistence policy for unconsumed invites across restarts.
-- Define the bounded clock-skew allowance in the shared pairing library.
-- If operators need revoke-before-redemption, add an authenticated, ID-based `pair.invite.revoke` operation in a separate task.
-- If QR size becomes limiting, consider a versioned CBOR payload only after compatibility fixtures and scanner tests exist.
-
-These follow-ups do not reopen the current gate: v1 is unambiguously the `pair.invite.create` extension with the base64url JSON QR value described above.
-
-## 12. References and Cross-links
-
-- BookStack page 708: **ZEDRA-Pattern Pairing & Terminal Pane Across Surfaces (2026-08-12)** — `http://bookstack.meridian.local/books/meridian-architecture/page/zedra-pattern-pairing-terminal-pane-across-surfaces-2026-08-12` (durable design-of-record; chapter 707, book 701).
-- Parent epic: `letta-mobile-sixv8`.
-- Protocol design task: `letta-mobile-7b9on`.
-- CLI QR rendering child: `letta-mobile-gw0h1`.
-- Desktop QR child: `letta-mobile-nonza`.
-- Mobile QR child: `letta-mobile-g2d2i`.
-- Existing RPC: `android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/PairingAdminHandlers.kt`.
-- Existing handler tests: `android-compose/sharedLogic/src/jvmTest/kotlin/com/letta/mobile/data/controller/node/iroh/PairingAdminHandlersTest.kt`.
-- Existing wrapper wiring: `android-compose/iroh-wrapper-cli/src/main/kotlin/com/letta/mobile/cli/commands/AppServerServeIrohCommand.kt`.
-- Reference formatting: `reference/federated-git-memory-plan.md`.
-
-**Final decision:** extend `pair.invite.create`; encode its versioned `node_id + signed_secret + expires_at_ms + signature` JSON as a `letta-qr-v1` base64url value, and do not create a parallel `pair.qr` RPC.
+Original design: `letta-mobile-7b9on`, parent `letta-mobile-sixv8`.
+Implementation contracts in source supersede the original proposed signature policy.

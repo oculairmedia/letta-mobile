@@ -20,24 +20,41 @@ DrawBox acts exclusively as a local view/editor in `:sharedUI`. In-memory state,
 ```
 
 ## Operation Model
-All scene mutations are expressed as typed `CanvasOp` instances carrying:
-1. `opId`: Cryptographically random UUID/token for deduplication.
-2. `actorId`: Author identifier (`user:<id>` or `agent:<id>`).
-3. `lamport`: Logical timestamp incremented monotonically by the originating actor.
+All scene mutations are typed operations. The generated
+[CanvasOp API reference](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas/-canvas-op/index.html)
+contains the operation variants, serial names, fields and inherited identity/clock contract.
 
-### Supported Operations
-- `ReplaceSceneOp`: Full scene replacement (primarily used by AI agent diagram generators and baseline initializers).
-- `AddElementOp`: Adds a new element with a unique `elementId`.
-- `UpdateElementOp`: Updates an existing element identified by `elementId`.
-- `RemoveElementOp`: Removes an existing element by `elementId`.
-- `SetBackgroundOp`: Updates the canvas background color (`bgColor`).
-- `SetBackgroundPatternOp` (`set_background_pattern`): Sets the board's background pattern (kind, spacing, colour); scene-level, last writer wins.
-- `SetDocumentOp` (`set_document`): Upserts a block document (a note: Cascade v2 JSON) with its optional `frame`, `color`, `style`, `title`, geometry `owner` (`AUTO`/`EXPLICIT`/`USER`) and canvas_compose provenance (`compose`); null fields keep what the document has. Last writer wins per document.
-- `SetPluginElementOp` (`set_plugin_element`) / `RemovePluginElementOp` (`remove_plugin_element`): Upserts or removes a plugin element in the scene-root collection `_pluginElements` (type `ext:<pluginId>/<kind>`, `v`, world-unit `frame` + `owner`, `ref`, flat `props`, `snapshot` asset, `fallback` card, `meta`). Each part is its own last-writer-wins register (`CanvasLwwRegisters`, provenance under `_clock`, summarised as `_frame` and `_state`), so a person's move and a plugin's state update never overwrite each other; null fields keep what the element has; a removal clears every register older than itself and is kept as `_removed`. Envelope rules: `plugin/CanvasPluginElementSchema`; see `docs/design/canvas-plugin-platform-plan.md`. A person moves and removes them with `CanvasSession.movePluginElement(s)` / `removePluginElement` (`CanvasSessionPluginElements.kt`): a move names the frame register only, owned USER, so it and a concurrent plugin state update both survive. Each returns its `CanvasHistory` step (`plugin/CanvasPluginElementUndo`), which names only the registers the change touched, so undoing a move never rolls back plugin state. Entry fields and register clocks a newer build wrote are carried through this build's writes. Storage needs no layout change: the notebook keeps `_pluginElements` per entry and per field (`boardArrays`, layout 3), and Room and the desktop file stores hold the scene and the ops as they are.
-- `RemoveDocumentOp` (`remove_document`): Takes a block document off the board.
-- `SetArrowBindingOp` (`set_arrow_binding`): Binds (or unbinds) a connector's ends to block documents; last writer wins per connector.
-- `SetLabelOwnerOp` (`set_label_owner`): Records (or releases) the shape a label document belongs to, so ownership is never inferred from an id.
-- `BatchOp`: Atomic bundle of multiple operations applied in a single revision increment. canvas_compose publishes a whole artifact as one (`CanvasStampedBatch`); the inner ops keep their own ids and lamports.
+### Operation behavior
+
+Scene replacement is used for authoritative diagram generation and baseline initialization.
+Element edits address a stable element identity; background colour and pattern changes are
+scene-level last-writer-wins updates.
+
+Document upserts retain existing values for null fields and resolve last-writer-wins per
+document. Notes use Cascade v2 JSON; geometry ownership and canvas_compose provenance travel
+with the document. Removing a document takes its note off the board. Connector bindings resolve
+last-writer-wins per connector. Label ownership is recorded explicitly rather than inferred
+from an id.
+
+Plugin elements live in the scene-root `_pluginElements` collection. Each part is its own
+last-writer-wins register (`CanvasLwwRegisters`, provenance under `_clock`, summarised as `_frame`
+and `_state`), so a person's move and a plugin's state update never overwrite each other; null
+fields keep what the element has. A removal clears every register older than itself and is kept
+as `_removed`. Envelope rules are in `plugin/CanvasPluginElementSchema`; see
+`docs/design/canvas-plugin-platform-plan.md`.
+
+A person moves and removes plugin elements with `CanvasSession.movePluginElement(s)` /
+`removePluginElement` (`CanvasSessionPluginElements.kt`). A move names only the frame register,
+owned USER, so it and a concurrent plugin state update both survive. Each returns its
+`CanvasHistory` step (`plugin/CanvasPluginElementUndo`), which names only the registers the
+change touched, so undoing a move never rolls back plugin state. Entry fields and register clocks
+a newer build wrote are carried through this build's writes. Storage needs no layout change:
+the notebook keeps `_pluginElements` per entry and per field (`boardArrays`, layout 3), and Room
+and the desktop file stores hold the scene and the ops as they are.
+
+A batch applies its operations atomically in one revision increment. canvas_compose publishes
+a whole artifact as one batch (`CanvasStampedBatch`); inner operations retain their own ids
+and lamports.
 
 ## Agent tools
 
@@ -70,7 +87,7 @@ The `canvas.*` tools an agent sees are defined once in `CanvasToolContract` and 
    - Canvas synchronization operates over a dedicated Iroh QUIC ALPN (`meridian/canvas-sync/1`).
    - Ephemeral peer presence and cursor telemetry operate over dedicated Iroh QUIC ALPN (`meridian/canvas-presence/1`).
    - Canvas operations and presence are **never** multiplexed onto App Server WebSocket chat frames.
-   - **Current Status (P3.1)**:
+   - **Direct-peer transport capability (original P3.1 surface; production uses the host relay below)**:
      - `IrohCanvasSyncTransport`: Full live endpoint lifecycle with accept loop, dial APIs (`connectToPeer`, `connectToPeerByTicket`), length-prefixed binary framing, and historical catch-up via `requestCatchUpSinceLamport`. Fallback to `LoopbackCanvasSyncTransport` when endpoint is absent.
      - `IrohCanvasPresenceTransport`: Full live endpoint lifecycle with accept loop, dial APIs, length-prefixed framing, and 10-second TTL heartbeat with background reaper. Fallback to `InMemoryCanvasPresenceTransport` when endpoint is absent.
      - Multi-process verification runbook available at `CANVAS-P31-IROH-SMOKE.md`.
@@ -98,7 +115,7 @@ The `canvas.*` tools an agent sees are defined once in `CanvasToolContract` and 
    - **A canvas always has an ACL.** `CanvasSession.create` and `CanvasCreateTool` default to owner `local_user` (the actor the local human edits as) plus the creating agent as a writer when one is known; with no agent the canvas is owner-only. A null ACL is only ever a pre-P4 document and is treated as unrestricted. 
    - **External tools carry the transport identity.** Every `canvas_*` tool takes its caller from the runtime agent scope the App Server stamped on the tool-call frame and refuses a call without one; `agent_id` in the tool input is never consulted, and every `apply_ops` operation (including nested batches) is rebound to the caller before it is validated, logged, broadcast or stamped into provenance. `canvas_create` and `canvas_list` only reveal an existing conversation canvas to a caller its ACL lets read, and agent-scoped listing applies the same read check as a direct lookup.
    - **One canvas per conversation.** `CanvasDocumentStore.createForConversationIfAbsent` makes lookup-and-insert one atomic step (the notebook repository's canvas lock; the in-memory mutex), so racing creators — `canvas_create` calls or `CanvasSession.getOrCreateForConversation` — share a canvas.
-   - **Writes without a live session are optimistic.** Tool calls dispatch concurrently, so `replace_scene` / `apply_ops` against a canvas no `CanvasSession` holds persist through `CanvasDocumentStore.upsertIfRevision`; a call whose read revision is no longer current gets a `Conflict` error and must re-read, instead of overwriting the other writer under the same revision. The desktop store serialises writes per directory across store instances (an in-process lock keyed by the directory) and across processes (an OS lock on `.store.lock`), so the check holds however many stores point at `~/.letta/canvas`.
+   - **Writes without a live session are optimistic.** Tool calls dispatch concurrently, so `replace_scene` / `apply_ops` against a canvas no `CanvasSession` holds persist through `CanvasDocumentStore.upsertIfRevision`; a call whose read revision is no longer current gets a `Conflict` error and must re-read, instead of overwriting the other writer under the same revision. Production Android and desktop bindings use `NotebookCanvasDocumentStore` over `NotebookLocalStore` (`app/di/DatabaseModule.kt`, `desktop/canvas/DesktopCanvasHostSync.kt`). The older `DesktopCanvasDocumentStore` still implements directory/OS locking for its legacy JSON store and diagnostic callers; it is not the production document owner.
 
 8. **In-Session Checkpoint History & Restore (P4.3)**:
    - `CanvasSession` records snapshots (`CanvasCheckpoint`) in a bounded in-memory ring (`MAX_CHECKPOINTS = 30`).

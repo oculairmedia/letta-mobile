@@ -30,9 +30,11 @@ uses broad `pkill` patterns.
 
 ## scip-java Kotlin/JVM pilot
 
-`scip-java` is pinned to `v0.13.1` with its published SHA-256. Current project
-inputs are Gradle 9.4.1, Kotlin 2.4.0, AGP 9.2.0, and JVM target 17 (21 for
-`appserver-cli`). Upstream supports Gradle Kotlin indexing but explicitly lists
+`scip-java` is pinned to `v0.13.1` with its published SHA-256. The original pilot
+inputs were Gradle 9.4.1, Kotlin 2.4.0, AGP 9.2.0, and JVM target 17 (21 for
+`appserver-cli`). The current Kotlin version is 2.4.10 and desktop targets JVM 21;
+`doctor()` still hard-codes the old Kotlin version, so it rejects this checkout
+before indexing. `pilot.env` also still names the removed `:core:domain` module. Upstream supports Gradle Kotlin indexing but explicitly lists
 Android Gradle integration as unsupported. This build is an Android/KMP
 multi-project, so successful indexing is not claimed.
 
@@ -41,14 +43,14 @@ this stack requires JDK 21 or newer; the script uses the common Linux JDK 21
 path when present or accepts an explicit `SCIP_JAVA_HOME`. It asks scip-java to
 compile only representative JVM/shared tasks:
 
-- `:core:domain:compileKotlin`
+- `:core:domain:compileKotlin` (obsolete; module removed)
 - `:core:ids:compileKotlinJvm`
 - `:core:runtime:compileKotlinJvm`
 - `:sharedLogic:compileKotlinJvm`
 
 It does not modify settings, module build files, build logic, or CI workflows.
-Validation on the pinned stack reaches the representative compilation tasks but
-fails because scip-java's `AnalyzerRegistrar` is binary-incompatible with Kotlin
+Historical validation on the old pinned stack reached the representative compilation tasks but
+failed because scip-java's `AnalyzerRegistrar` is binary-incompatible with Kotlin
 2.4.0 (`AbstractMethodError: CompilerPluginRegistrar.getPluginId`). Therefore
 this repository does not currently produce a SCIP artifact. The script preserves
 the log and exits clearly instead of creating a placeholder index.

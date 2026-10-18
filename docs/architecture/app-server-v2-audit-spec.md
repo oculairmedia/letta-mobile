@@ -1,6 +1,18 @@
 # App Server v2 and Meridian State Audit Specification
 
-Status: implemented-system snapshot for audit
+**Status:** Historical system audit and migration rationale; 2026-07-29 baseline and later appendices are not the current wire inventory.
+
+## Code audit — 2026-10-18
+
+The July baseline/hashes below are historical. Current [contract matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json) pins **0.34.14**, captured 2026-10-16, with 104 upstream commands and 113 messages; its full corpus includes 24 declaration files. Use its recorded hashes and [installed inventory](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json), not the old three-file corpus/hash in this record. This checks the captured package, not a remote host's current installation.
+
+The current [ownership matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json) has **130** operations: 57 App Server, 28 controller-native, 17 capability-gated unsupported, 10 plugin-host, 9 read-only local-backend-store and 9 VibeSync. There are 105 `none` and 25 `deny_fail_closed` fallback rows, zero shim fallbacks. `IrohAdminOwnershipMatrixTest` compares registered methods with the matrix; its constants are not a substitute for inspecting the handlers.
+
+Two old normative claims were reversed by implementation: read-only backend-file access is deliberately supported by [LocalBackendAdminStore](../../android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/LocalBackendAdminStore.kt), and workspace/secrets now have explicit [WorkspaceAdminHandlers](../../android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/WorkspaceAdminHandlers.kt) with capability checks. “No reads or writes” and “secrets are not exposed by generic Iroh admin routing” below are superseded migration requirements, not current facts. Writes must still go through the adopted owner rather than editing backend files.
+
+Source routing is [AdminRpcRegistry](../../android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/AdminRpcRegistry.kt), current runtime policy is `AppServerTurnEngine` and `data/context`, and deployment commands are in [the current deployment guide](app-server-controller-deploy.md). Production SHAs/addresses, operational completion, old gaps and evidence counts below apply to the dated record only.
+
+## Original record
 
 Snapshot date: 2026-07-29
 
@@ -401,37 +413,9 @@ Meridian intentionally types a subset of the complete upstream inventory.
 Unknown upstream frames are retained as unknown frames for diagnostics; their
 presence does not imply functional support.
 
-Typed top-level client commands:
+The typed declaration inventories are generated from the sealed hierarchies, including their `@SerialName` wire names: [client commands](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport.appserver/-app-server-command/index.html), [input payloads](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport.appserver/-app-server-input-payload/index.html) and [inbound frames](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.transport.appserver/-app-server-inbound-frame/index.html). Source: [AppServerCommand.kt](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/AppServerCommand.kt), [AppServerInputModels.kt](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/AppServerInputModels.kt) and [AppServerInboundFrame.kt](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/AppServerInboundFrame.kt).
 
-`auth`, `runtime_start`, `input`, `sync`, `abort_message`,
-`external_tool_call_response`, `admin_rpc`, `agent_list`, `agent_retrieve`,
-`agent_create`, `agent_update`, `agent_delete`, `conversation_list`,
-`conversation_retrieve`, `conversation_create`, `conversation_update`,
-`conversation_messages_list`, `conversation_compact`, `list_models`,
-`skill_enable`, `skill_disable`, `cron_list`, `cron_add`, `cron_get`,
-`cron_runs`, `cron_trigger`, `cron_update`, `cron_delete`, `cron_delete_all`,
-`get_reflection_settings`, `set_reflection_settings`
-
-Typed `input` payloads:
-
-`create_message`, `approval_response` with `allow` or `deny`
-
-Typed inbound frames:
-
-`auth_response`, `runtime_start_response`, `sync_response`,
-`abort_message_response`, `stream_delta`, `update_loop_status`,
-`update_device_status`, `update_queue`, `update_subagent_state`,
-`external_tool_call_request`, `control_request`, `admin_rpc_response`,
-`list_models_response`, `skill_enable_response`, `skill_disable_response`,
-`cron_list_response`, `cron_add_response`, `cron_get_response`,
-`cron_runs_response`, `cron_trigger_response`, `cron_update_response`,
-`cron_delete_response`, `cron_delete_all_response`,
-`get_reflection_settings_response`, `set_reflection_settings_response`,
-`agent_list_response`, `agent_retrieve_response`, `agent_create_response`,
-`agent_update_response`, `agent_delete_response`,
-`conversation_list_response`, `conversation_retrieve_response`,
-`conversation_create_response`, `conversation_update_response`,
-`conversation_messages_list_response`, `conversation_compact_response`
+Those pages describe the current Kotlin surface. The dated installed-upstream inventory and captured socket/retry evidence remain separate protocol evidence; generating Kotlin API docs does not validate upstream support or execution behavior.
 
 Meridian transport extensions:
 
@@ -453,7 +437,7 @@ The current machine matrix contains 89 registered methods:
 
 `admin_rest_service` is retired (letta-mobile-lgns8.9): the count is **0** and
 `LETTA_IROH_ADMIN_REST_BASE_URL` is no longer consumed. See
-`lgns8-epic-status-and-shim-retirement-ceiling.md` for the per-method
+`lgns8-shim-retirement-snapshot-2026-07-31.md` for the per-method
 disposition and the remaining upstream write ceiling.
 
 Exact method rows, authorization classes, data stores, native discriminants,

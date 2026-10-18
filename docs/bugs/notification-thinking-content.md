@@ -2,7 +2,15 @@
 
 **Date:** 2026-05-04
 **Severity:** Low
-**Status:** Open
+**Status:** historical report; current-device reproduction not established.
+
+Source audit 2026-10-18: `ChatPushService` now owns foreground-service lifecycle,
+not the proposed `BotStreamChunk` selection below. Current delivery passes a
+`NotificationCandidate.previewText` through `NotificationDeliveryCoordinator`
+and `NotificationContentSanitizer`; see their tests under `app/src/test/.../channel`.
+The last-chunk snippets are a historical hypothesis, not a verified fix for the
+current pipeline. A new reproduction must identify the candidate producer and
+check assistant versus reasoning message types before changing selection.
 
 ## Issue
 
@@ -51,5 +59,5 @@ val finalResponse = chunks
 
 ## Related
 
-- See `screen-off-streaming-findings.md` for notification architecture context
+- See [screen-off-streaming findings](../architecture/screen-off-streaming-findings.md) for notification architecture context
 - WsBotClient stream events: `assistant`, `reasoning`, `tool_call`, `tool_result`

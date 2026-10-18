@@ -33,6 +33,12 @@ Source of truth: `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin
 
 ## `window.lettaView`
 
+Kotlin host declarations: [ViewMethod](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin.view/-view-method/index.html) and
+[LcpView limits](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin.view/-lcp-view/index.html). The table below describes
+the injected JavaScript API, whose callable surface is implemented by
+[LcpViewShim](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/view/LcpViewShim.kt);
+it is not a duplicate Kotlin declaration inventory.
+
 | Member | What it does |
 |---|---|
 | `version` | `"1"`, the `viewVersion` that `ready()` announces |

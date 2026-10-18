@@ -32,9 +32,9 @@ existing Lane C1 transaction set:
 5. **Lane C1 transactions** — `app.startup`, `chat.sync_cycle`,
    `chat.send_message`, `bot.turn`, and `composer.keystroke_to_render`.
 
-The startup tiles intentionally reuse the transaction taxonomy from
-`docs/performance/sentry-taxonomy.md` instead of inventing a second set of
-performance names.
+The startup tiles query the committed dashboard transaction names. The previously
+referenced `docs/performance/sentry-taxonomy.md` is absent; current producers are
+`SentryInitializer` and the tracing helpers under `app/.../crash` and `sharedLogic/.../util`.
 
 ## Alert rules
 
@@ -113,7 +113,4 @@ Before marking the bead done in a fresh environment:
 ## Related
 
 - `letta-mobile-o7ob.3.1` — Sentry transaction taxonomy
-- `docs/performance/sentry-taxonomy.md`
-- `docs/observability/grafana-crash-sentry.json`
-- `docs/observability/grafana-crash-sentry-alerts.yaml`
 - `docs/RELEASE.md`

@@ -4,6 +4,10 @@ Repository-owned templates for the host-side pieces added under
 `letta-mobile-jsfrn`. Like the other files in this directory these are
 **templates, not live units** — installing them is a separate step.
 
+**Audit scope (2026-10-18):** template paths, probe/watchdog and adopter behavior were
+checked against repository scripts. The 2026-08-23 host measurements, upstream bundled
+line numbers and claims about installed units were not independently reproduced.
+
 ## The incident these exist for
 
 On 2026-08-23 the App Server stopped responding. All three Iroh peers dropped
@@ -154,9 +158,10 @@ but GC/heap telemetry is required to confirm V8 pressure.
   merely busy. One dump cannot tell those apart, which is the whole question.
 - `/var/log/meridian-iroh-wrapper-gc.log` — GC and safepoint pauses.
 
-On the next occurrence, the latency series decides which side owns the problem:
-a spike means the App Server's loop stalled (the wrapper is innocent); flat
-latency while the wrapper stalls means the wrapper is at fault.
+On the next occurrence, correlate the latency series with wrapper, host and GC evidence.
+A spike can implicate the App Server path or shared host pressure; it does not prove
+the wrapper is innocent. Flat probe latency during a wrapper stall narrows the search
+but does not by itself establish a wrapper root cause.
 
 ## Gotchas worth not rediscovering
 

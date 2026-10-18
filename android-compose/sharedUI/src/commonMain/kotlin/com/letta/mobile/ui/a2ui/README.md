@@ -295,7 +295,7 @@ A surface is untrusted. `A2uiSurfaceLimits` (sharedLogic) sets the budgets
 | Rendered instances per surface pass | 5,000 | `A2uiRenderBudget`; past it nodes render `RENDER_LIMIT` placeholders |
 | Instances of one component per list-item scope | 16 | flattens diamond DAGs (`children: [b, b]` per level) |
 | Depth | 32 | unchanged cycle/depth guard |
-| Text per binding | 64 KiB | longer values are cut |
+| Text per binding | 65,536 characters (`String.length`) | longer values are cut; not a UTF-8 byte budget |
 
 Keep real payloads well inside these; page long lists server-side.
 
@@ -533,12 +533,14 @@ Supported schedule modes are `cron`, `every`, and `at`.
 
 Every widget or catalog change should update the smallest useful test set:
 
-- Protocol or parsing changes: `A2uiProtocolTest`
-- Data model or JSON Pointer changes: `A2uiDataModelTest`
-- Surface lifecycle and message folding: `A2uiSurfaceManagerTest`
+- Protocol or parsing changes: sharedLogic `A2uiProtocolCommonTest`
+- Data model or JSON Pointer changes: sharedLogic `A2uiDataModelCommonTest`
+- Surface lifecycle and message folding: sharedLogic `A2uiSurfaceManagerCommonTest`
 - Renderer behavior and interactions: `A2uiRendererTest`
 - Visual regression: `A2uiRendererScreenshotTest`
-- WS action round trips: `A2uiToolApprovalRoundTripTest`
+- Approval action origin and submission: sharedUI `A2uiToolApprovalActionOriginTest`
+  and feature-chat `A2uiToolApprovalSubmissionTest` (these are hermetic action tests,
+  not a live WS round-trip test)
 
 For new authoring examples, add one JSON fixture-style test in
 `A2uiRendererTest` before relying on a live agent. The test should prove:
@@ -550,8 +552,10 @@ For new authoring examples, add one JSON fixture-style test in
 
 ## Compatibility Notes
 
-- A2UI support is opt-in through the WS hello capability declaration. Keep
-  `A2UI_DEFAULT_SUPPORTED_CATALOGS` and `A2UI_DEFAULT_SUPPORTED_WIDGETS` honest.
+- `A2uiCapabilityDeclaration` retains the legacy hello capability shape. Current
+  product transport is App Server/Iroh; do not infer a live shim hello handshake
+  from this DTO. Keep `A2UI_DEFAULT_SUPPORTED_CATALOGS` and
+  `A2UI_DEFAULT_SUPPORTED_WIDGETS` aligned with renderer support.
 - Unknown A2UI envelopes parse as `A2uiMessage.Unknown`; unknown widgets render
   a placeholder.
 - Do not remove accepted aliases (`onClick`, flat `action.name`,

@@ -5,6 +5,17 @@ and the Grafana dashboard + alert rules that consume it.
 
 Tracking: `letta-mobile-mge5.6`.
 
+**Scope correction (source audit 2026-10-18):** this is the retained legacy HTTP/SSE
+subscriber contract, implemented by `runStreamSubscriber` in
+`android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/timeline/TimelineSyncStreamSubscriber.kt`.
+Current Android `ChatPushService` explicitly no longer warms or listens to those
+legacy loops; the canonical chat ledger and Iroh observer path own current chat.
+A quiet SSE dashboard therefore cannot diagnose current Iroh delivery.
+The implementation also emits `heartbeat`, `silenceTimeout` and `watchdogReconnect`
+events; `eventReceived` counts decoded message frames, not every SSE `data:` line.
+Dashboard/alert files are provisioning inputs; deployment and log shipping have
+not been verified by this source audit.
+
 ## Telemetry contract
 
 All events are emitted under tag `TimelineSync`.
@@ -12,7 +23,7 @@ All events are emitted under tag `TimelineSync`.
 | Name                             | When                                                                 | Attributes                                                        |
 |----------------------------------|----------------------------------------------------------------------|-------------------------------------------------------------------|
 | `streamSubscriber.opened`        | SSE connection established; server acknowledged with 200 + stream    | `conversationId`                                                  |
-| `streamSubscriber.eventReceived` | Every SSE frame parsed (1 per `data:` line)                          | `conversationId`, `messageType`, `runId`                          |
+| `streamSubscriber.eventReceived` | Each decoded `TimelineStreamFrame.Message`                          | `conversationId`, `messageType`, `runId`                          |
 | `streamSubscriber.ingested`      | A frame produced a novel timeline append (fires after `eventReceived`) | `conversationId`, `serverId`, `messageType`                       |
 | `streamSubscriber.eventDeduped`  | A frame was recognised as already-seen and dropped                    | `conversationId`, `reason` (`otidSeen` \| `approvalAlreadyDecided`), plus `otid` / `approvalRequestId` |
 | `streamSubscriber.closed`        | Stream ended cleanly (run finished)                                   | `conversationId`, `durationMs` (since opened), `eventsReceived`   |
@@ -22,9 +33,8 @@ All events are emitted under tag `TimelineSync`.
 Notes:
 
 - There is **no** `streamSubscriber.dormant` event. The subscriber does not
-  gate on `subscriptionCount` — it runs for the full process lifetime while
-  `ChatPushService` keeps the JVM alive. This is intentional (see comment
-  on `runStreamSubscriber` in `TimelineSyncLoop.kt`).
+  gate on `subscriptionCount`; an instantiated legacy loop owns its subscriber
+  until cancellation. `ChatPushService` no longer creates those loops for current chat.
 - Events are delivered to every registered sink: Logcat (always), the
   in-app inspector (dev builds), and, if wired, a remote exporter.
 

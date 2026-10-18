@@ -1,5 +1,7 @@
 # letta-mobile Architecture Review
 
+> Source audit, 2026-10-18: Historical May architecture assessment. Current settings include sharedUI, desktop, web and iroh-wrapper-cli; sharedUI is implemented rather than optional. The Koog/REST-era target shape below must not be used as the current runtime map. See [module map](architecture/kmp-module-map.md) and [README](../README.md).
+
 Updated 2026-05-25 after the SessionGraph/session-scoped repository work,
 external transport naming, the first timeline gateway slice, and the
 ConversationStateHolder shadow fold.
