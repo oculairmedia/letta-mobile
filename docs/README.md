@@ -132,6 +132,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 
 ### development
 
+- [Generated Kotlin API reference](development/api-documentation.md)
 - [Phone preview on the desktop](development/phone-preview.md)
 
 ### evidence
