@@ -6,14 +6,17 @@ on:
     paths:
       - ".github/workflows/android.yml"
       - "android-compose/**"
+      - "docs/**"
       - "third_party/overmorrow/**"
       - "scripts/ci/**"
       - "scripts/tests/**"
+      - "scripts/docs/**"
+      - "scripts/appserver/**"
       - "*.md"
       - "scripts/bootstrap-branch-protection.sh"
   pull_request:
     # Required contexts (test / build-apk-pass / shared-multiplatform) must report
-    # on stacked letta/**, feat/**, and cursor/** PRs as well as PRs into main.
+    # on stacked letta/**, feat/**, cursor/** and codex/** PRs as well as main.
     # pull_request.branches filters the PR *base*, not the head — Cloud Agent
     # reviews targeting feat/* or cursor/* otherwise never get Android APK CI.
     # Do not infer those results from the base branch.
@@ -22,6 +25,7 @@ on:
       - "letta/**"
       - "feat/**"
       - "cursor/**"
+      - "codex/**"
     paths:
       # Broadened to all workflow files so a PR that only edits CI config still
       # triggers the required checks (test/build-apk-pass/shared-multiplatform).
@@ -49,6 +53,8 @@ on:
       - "third_party/overmorrow/**"
       - "scripts/ci/**"
       - "scripts/tests/**"
+      - "scripts/docs/**"
+      - "scripts/appserver/**"
       - "scripts/deploy/**"
       - "scripts/mcp/**"
       - "scripts/scip/**"
@@ -131,6 +137,14 @@ jobs:
       - name: Check docs match the tree
         working-directory: ${{ github.workspace }}
         run: python3 scripts/ci/docs-freshness-check.py
+
+      - name: Check generated documentation
+        working-directory: ${{ github.workspace }}
+        run: |
+          python3 -m unittest discover -s scripts/tests -p test_documentation_index.py -v
+          python3 scripts/docs/documentation-index.py --check
+          node --test scripts/appserver/generate-protocol-reference.test.mjs
+          node scripts/appserver/verify-v2-audit-doc.mjs
 
       # Additive module tests: when a PR only (or also) touches feature/designsystem/
       # desktop/cli trees, run those unit tests in addition to the base set.

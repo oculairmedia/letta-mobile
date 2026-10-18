@@ -194,3 +194,40 @@ kotlin {
         }
     }
 }
+
+// Offline reference tooling reuses the two parity tests and their authoritative renderers.
+// Normal jvmTest keeps check mode; only the explicit write task changes Markdown bodies.
+val contractReferenceJvmTests = tasks.named<Test>("jvmTest")
+val contractReferenceDocuments = files(
+    "../../docs/reference/canvas-compose-v1.md",
+    "../../docs/reference/canvas-plugin-wire-v1.md",
+)
+
+contractReferenceJvmTests.configure {
+    // Required CI runs these parity tests through jvmTest, including on docs-only changes.
+    inputs.files(contractReferenceDocuments).withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("letta.contractReferenceDocs.mode", "check")
+}
+
+listOf("check" to "checkContractReferenceDocs", "write" to "writeContractReferenceDocs").forEach { (mode, taskName) ->
+    tasks.register<Test>(taskName) {
+        group = "documentation"
+        description = "${mode.replaceFirstChar { it.uppercase() }} generated canvas and LCP reference sections offline."
+        dependsOn("jvmTestClasses")
+        val referenceTests = contractReferenceJvmTests.get()
+        testClassesDirs = referenceTests.testClassesDirs
+        classpath = referenceTests.classpath
+        workingDir = project.projectDir
+        systemProperty("letta.contractReferenceDocs.mode", mode)
+        filter {
+            includeTestsMatching("com.letta.mobile.data.canvas.compose.CanvasComposeGuideDocTest")
+            includeTestsMatching("com.letta.mobile.data.plugin.wire.LcpWireDocTest")
+            isFailOnNoMatchingTests = true
+        }
+        inputs.files(contractReferenceDocuments).withPathSensitivity(PathSensitivity.RELATIVE)
+        // A write must run even after a prior check; a check must inspect the current docs.
+        outputs.upToDateWhen { false }
+        outputs.cacheIf { false }
+        if (mode == "check") mustRunAfter("writeContractReferenceDocs")
+    }
+}

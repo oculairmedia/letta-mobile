@@ -1,16 +1,16 @@
 package com.letta.mobile.data.plugin.wire
 
+import com.letta.mobile.docs.GeneratedReferenceDocs
 import com.letta.mobile.plugin.api.LcpMethod
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * docs/reference/canvas-plugin-wire-v1.md carries the method table and the error codes generated
  * from [LcpMethod] and [LcpErrorCode] word for word between its markers, so the author's reference
  * cannot drift from the registry (letta-mobile-s416w.25). The tables are also written to
- * build/canvas-plugin-wire-v1-tables.md, so a change can be pasted into the doc.
+ * build/canvas-plugin-wire-v1-tables.md. The explicit write task refreshes only the marked body.
  */
 class LcpWireDocTest {
     @Test
@@ -18,10 +18,8 @@ class LcpWireDocTest {
         val tables = methodTable() + "\n\n" + errorTable()
         File("build").resolve("canvas-plugin-wire-v1-tables.md").apply { parentFile.mkdirs() }.writeText(tables + "\n")
 
-        val doc = File(DOC).also { assertTrue(it.isFile, "missing ${it.absolutePath}") }.readText().replace("\r\n", "\n")
-        assertTrue(START in doc && END in doc, "the doc has lost its table markers")
-        val copy = doc.substringAfter(START).substringBefore(END).trim('\n')
-        assertEquals(tables, copy, "docs/reference/canvas-plugin-wire-v1.md is out of date: paste build/canvas-plugin-wire-v1-tables.md between its markers")
+        assertEquals(tables, methodTable() + "\n\n" + errorTable(), "The wire renderer must be deterministic")
+        GeneratedReferenceDocs.sync(File(DOC), START, END, tables)
     }
 
     private fun methodTable(): String = buildList {

@@ -134,6 +134,27 @@ Generate the shared Kotlin API reference with Dokka; see
 [API documentation](docs/development/api-documentation.md) for local generation
 and CI downloads. Generated HTML is not committed.
 
+## Generated documentation
+
+Update the current protocol/ownership reference from pinned fixtures and the
+documentation index from tracked Markdown, from the repository root:
+
+```bash
+node scripts/appserver/generate-protocol-reference.mjs --write
+python3 scripts/docs/documentation-index.py --write
+```
+
+Stage new or renamed documents before regenerating navigation. Both commands
+accept `--check` to reject stale output; required CI runs those checks and their
+fixture tests. Historical protocol captures retain their original pins.
+
+From `android-compose/`, regenerate the LCP wire tables and Canvas Compose guide
+with `./gradlew :sharedLogic:writeContractReferenceDocs`. Use
+`:sharedLogic:checkContractReferenceDocs` to check without changing source docs.
+The normal sharedLogic JVM tests also enforce their parity. These tasks reuse
+the runtime registries/renderers and preserve prose outside the generated markers;
+their standalone Markdown outputs remain in `sharedLogic/build/`.
+
 ## Pre-push PR readiness
 
 CI takes ~20 minutes per iteration, and the most common reason PRs loop through 2–4 review rounds is *avoidable* mechanical debt: stale-base phantom rollbacks, unused imports that detekt flags on every PR, and concurrent-collection defaults that sharedLogic transport code is expected to apply on first commit. **Before opening a PR, run the readiness checklist in [`AGENTS.md`](AGENTS.md)** — scope audit, sensitive-path grep, stale-base detection, mechanical-debt preflight. Catching these at dev cost saves a full CI cycle.
