@@ -41,34 +41,55 @@ internal fun androidShortcutLists(
     agents = agentStepping(agents, nav),
 )
 
+internal class AndroidShortcutNavigator(
+    val currentChatAgentId: String? = null,
+    val onFreshChat: (String) -> Unit = {},
+    val onNavigate: (ShellDestination) -> Unit = {},
+)
+
 internal fun handleAndroidShortcut(
     id: ShellShortcutId,
     nav: NavController,
     lists: ShortcutLists,
     onHelp: () -> Unit,
 ) {
-    when (id) {
-        ShellShortcutId.Help -> onHelp()
-        ShellShortcutId.NewConversation -> openNewConversation(nav)
-        else -> {
-            if (stepList(id, lists)) return
-            val page = shortcutPage(id, currentAgentId(lists)) ?: return
-            nav.navigateTo(page)
-        }
-    }
+    handleAndroidShortcut(
+        id = id,
+        lists = lists,
+        onHelp = onHelp,
+        navigator = AndroidShortcutNavigator(
+            currentChatAgentId = currentChat(nav)?.agentId,
+            onFreshChat = { agentId ->
+                nav.navigate(AgentChatRoute(agentId = agentId, freshRouteKey = System.currentTimeMillis()))
+            },
+            onNavigate = nav::navigateTo,
+        ),
+    )
 }
 
 /**
- * A fresh chat with the agent of the chat on screen; anywhere else the conversation list, where
- * the person picks the agent.
+ * Runs an Android shell shortcut: `NewConversation` opens a fresh chat with
+ * [AndroidShortcutNavigator.currentChatAgentId] when a chat is on screen, or the conversation list
+ * (`ShellDestination.Chat()`) otherwise.
  */
-internal fun openNewConversation(nav: NavController) {
-    val agentId = currentChat(nav)?.agentId
-    if (agentId == null) {
-        nav.navigateTo(ShellDestination.Chat())
-        return
+internal fun handleAndroidShortcut(
+    id: ShellShortcutId,
+    lists: ShortcutLists,
+    onHelp: () -> Unit,
+    navigator: AndroidShortcutNavigator = AndroidShortcutNavigator(),
+) {
+    when (id) {
+        ShellShortcutId.Help -> onHelp()
+        ShellShortcutId.NewConversation -> {
+            val agentId = navigator.currentChatAgentId
+            if (agentId == null) navigator.onNavigate(ShellDestination.Chat()) else navigator.onFreshChat(agentId)
+        }
+        else -> {
+            if (stepList(id, lists)) return
+            val page = shortcutPage(id, currentAgentId(lists)) ?: return
+            navigator.onNavigate(page)
+        }
     }
-    nav.navigate(AgentChatRoute(agentId = agentId, freshRouteKey = System.currentTimeMillis()))
 }
 
 private fun currentAgentId(lists: ShortcutLists): String? = lists.agents.current() ?: lists.agents.ids().firstOrNull()

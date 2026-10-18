@@ -67,8 +67,8 @@ internal fun openOverlay(id: ShellShortcutId, overlays: ShellOverlays): Boolean 
     return true
 }
 
-internal fun openPage(id: ShellShortcutId, navigate: (ShellDestination) -> Unit, agentId: String?): Boolean {
-    val page = shortcutPage(id, agentId) ?: return false
+internal fun openPage(id: ShellShortcutId, navigate: (ShellDestination) -> Unit, agent: String?): Boolean {
+    val page = shortcutPage(id, agent) ?: return false
     navigate(page)
     return true
 }
@@ -81,10 +81,10 @@ fun stepList(id: ShellShortcutId, lists: ShortcutLists): Boolean {
     return true
 }
 
-/** The page a page entry opens for [agentId], or null when [id] is not a page entry. */
-fun shortcutPage(id: ShellShortcutId, agentId: String?): ShellDestination? = when (id) {
-    ShellShortcutId.Memory, ShellShortcutId.FullscreenMemory -> ShellDestination.Memory(agentId)
-    ShellShortcutId.Schedules -> ShellDestination.Schedules(agentId)
+/** The page a page entry opens for [agent], or null when [id] is not a page entry. */
+fun shortcutPage(id: ShellShortcutId, agent: String?): ShellDestination? = when (id) {
+    ShellShortcutId.Memory, ShellShortcutId.FullscreenMemory -> ShellDestination.Memory(agent)
+    ShellShortcutId.Schedules -> ShellDestination.Schedules(agent)
     ShellShortcutId.Settings -> ShellDestination.Settings()
     else -> null
 }
