@@ -233,7 +233,12 @@ private fun rememberDesktopChatSurfaceHost(
             openModelPicker = { latest.openModelPicker() },
             resolveAgentName = agentNames::get,
             pickWorkingDirectory = if (supportsWorkingDirectory) {
-                { directoryPicker.open(port.composer.value.workingDirectory?.path) }
+                {
+                    directoryPicker.open(
+                        currentCwd = port.composer.value.workingDirectory?.path,
+                        agentId = port.uiState.value.agentId,
+                    )
+                }
             } else {
                 null
             },

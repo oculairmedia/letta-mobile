@@ -19,6 +19,8 @@ import com.letta.mobile.ui.shell.pages.ShellLibrarySources
 import com.letta.mobile.ui.shell.pages.rememberShellLibraryControllers
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.notify.StoredAttentionPrefs
+import com.letta.mobile.data.runtime.AgentDefaultsRepository
+import com.letta.mobile.data.runtime.StoredAgentDefaults
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
@@ -65,6 +67,8 @@ internal data class DesktopShellCore(
     val localConfig: DesktopLocalConfigState,
     /** letta-mobile-bzvro.27: per-agent notification mutes, kept in the settings store. */
     val attentionPrefs: AttentionPrefsRepository,
+    /** letta-mobile-k5nbq.9: per-agent default cwd (and uu3ol's permission mode). */
+    val agentDefaults: AgentDefaultsRepository,
 )
 
 /** The per-backend panels and libraries behind the shell's destinations. */
@@ -97,10 +101,11 @@ internal fun rememberDesktopShellCore(): DesktopShellCore {
     val chatScope = rememberCoroutineScope()
     val railPrefs = rememberDesktopRailPrefs(bootstrap.secureSettingsStore)
     val attentionPrefs = remember(bootstrap.secureSettingsStore) { StoredAttentionPrefs(bootstrap.secureSettingsStore) }
+    val agentDefaults = remember(bootstrap.secureSettingsStore) { StoredAgentDefaults(bootstrap.secureSettingsStore) }
     val canvasShell = rememberDesktopCanvasShell(chatScope)
     val nucleusController = rememberDesktopNucleusController(chatScope)
     val iroh = rememberDesktopIrohLink(bootstrap, chatScope)
-    val chatController = rememberShellChatController(bootstrap, chatScope, iroh)
+    val chatController = rememberShellChatController(bootstrap, chatScope, iroh, agentDefaults)
     val localConfig = rememberDesktopLocalConfigState(
         scope = chatScope,
         secureSettingsStore = bootstrap.secureSettingsStore,
@@ -123,6 +128,7 @@ internal fun rememberDesktopShellCore(): DesktopShellCore {
         chatController = chatController,
         localConfig = localConfig,
         attentionPrefs = attentionPrefs,
+        agentDefaults = agentDefaults,
     )
 }
 
@@ -175,11 +181,13 @@ private fun rememberShellChatController(
     bootstrap: DesktopConfigBootstrap,
     chatScope: CoroutineScope,
     iroh: DesktopIrohLink,
+    agentDefaults: AgentDefaultsRepository,
 ): DesktopChatController {
     val runtime = DesktopChatRuntime(
         bootstrapState = bootstrap.bootstrapState,
         chatScope = chatScope,
         dataBindings = bootstrap.dataBindings,
+        agentDefaults = agentDefaults,
     )
     return rememberDesktopChatController(
         DesktopChatControllerBindings(

@@ -123,6 +123,7 @@ class AgentEditorPageTest {
             AgentEditorSectionKeys.MODEL,
             AgentEditorSectionKeys.PROMPT,
             AgentEditorSectionKeys.TOOLS,
+            AgentEditorSectionKeys.DEFAULTS,
             AgentEditorSectionKeys.MORE,
             AgentEditorSectionKeys.DANGER,
         ).forEach { section(it).assertExists() }
@@ -161,6 +162,7 @@ class AgentEditorPageTest {
 
         onNodeWithTag(ShellHeaderTags.TITLE).assertTextContains("New agent")
         section(AgentEditorSectionKeys.STARTER).assertExists()
+        section(AgentEditorSectionKeys.DEFAULTS).assertDoesNotExist()
         section(AgentEditorSectionKeys.DANGER).assertDoesNotExist()
         section(AgentEditorSectionKeys.MORE).assertDoesNotExist()
         onNodeWithTag(AgentEditorPageTags.SAVE).assertTextContains("Create").assertIsNotEnabled()

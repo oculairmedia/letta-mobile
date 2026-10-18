@@ -204,6 +204,7 @@ internal data class DesktopChatRuntime(
     val bootstrapState: DesktopBootstrapState,
     val chatScope: CoroutineScope,
     val dataBindings: DesktopDataBindings,
+    val agentDefaults: com.letta.mobile.data.runtime.AgentDefaultsRepository? = null,
 )
 
 internal data class DesktopChatControllerBindings(
@@ -291,7 +292,10 @@ private fun buildDesktopChatController(
             }
                 ?: createDefaultDesktopChatGateway(
                     runtime.bootstrapState.config,
-                    appServerGatewayFactory = defaultDesktopAppServerGatewayFactory(runtime.dataBindings.permissionModeSettings),
+                    appServerGatewayFactory = defaultDesktopAppServerGatewayFactory(
+                        runtime.dataBindings.permissionModeSettings,
+                        runtime.agentDefaults,
+                    ),
                 )
         },
         agentNamesByIdProvider = { agentIds ->

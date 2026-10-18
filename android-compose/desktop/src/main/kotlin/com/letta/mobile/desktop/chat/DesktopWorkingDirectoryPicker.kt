@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.workspace.directory.AppServerWorkspaceDirectorySource
 import com.letta.mobile.data.workspace.directory.DirectoryBrowseException
 import com.letta.mobile.data.workspace.directory.FolderCreator
@@ -46,7 +47,8 @@ internal class DesktopWorkingDirectoryPicker(
     val controller: WorkingDirectoryPickerController,
     val host: WorkingDirectoryPickerHost,
 ) {
-    fun open(currentCwd: String?) = controller.open(currentCwd)
+    fun open(currentCwd: String?, agentId: String? = null) =
+        controller.open(currentCwd, agentId?.let(::AgentId))
 }
 
 /** The picker for [port]'s conversation (the shared chat page). */
@@ -65,6 +67,8 @@ internal fun rememberDesktopWorkingDirectoryPicker(onChosen: (String) -> Unit): 
     )
     val isLocal = localClient != null
     val recents = remember { RecentFolders(DesktopFileSecureSettingsStore(defaultDesktopStateDirectory().resolve(RECENT_FOLDERS_FILE))) }
+    val defaults = com.letta.mobile.ui.runtime.LocalAgentDefaults.current
+    val latestDefaults by rememberUpdatedState(defaults)
     val controller = remember(scope, isLocal) {
         val sources = DesktopWorkspaceSources()
         WorkingDirectoryPickerController(
@@ -73,7 +77,11 @@ internal fun rememberDesktopWorkingDirectoryPicker(onChosen: (String) -> Unit): 
             onChosen = { path -> latestOnChosen(path) },
             recents = recents,
             folderCreator = if (isLocal) DesktopLocalFolderCreator else null,
-        )
+        ).also { picker ->
+            picker.onMakeDefault = { path ->
+                picker.state.value.agentId?.let { latestDefaults?.setCwd(it, path) }
+            }
+        }
     }
     DisposableEffect(controller) { onDispose { controller.dismiss() } }
     val systemDialog = rememberDirectoryPickerLauncher(

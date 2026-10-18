@@ -20,6 +20,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.workspace.directory.DirectoryBrowseException
 import com.letta.mobile.data.workspace.directory.DirectoryBrowseErrors
 import com.letta.mobile.data.workspace.directory.DirectoryListing
@@ -54,6 +55,8 @@ class WorkingDirectoryPickerUiTest {
         creator: FolderCreator? = null,
         host: WorkingDirectoryPickerHost = WorkingDirectoryPickerHost(),
         directorySource: WorkspaceDirectorySource = source,
+        agentId: String? = null,
+        onMakeDefault: (String) -> Unit = {},
     ): WorkingDirectoryPickerController {
         // The fake answers at once, so the controller's work runs inline.
         val controller = WorkingDirectoryPickerController(
@@ -61,14 +64,14 @@ class WorkingDirectoryPickerUiTest {
             CoroutineScope(Dispatchers.Unconfined),
             onChosen = { chosen += it },
             folderCreator = creator,
-        )
+        ).also { it.onMakeDefault = onMakeDefault }
         setContent {
             MaterialTheme {
                 val state by controller.state.collectAsState()
                 Box(Modifier.width(1100.dp).height(900.dp)) { WorkingDirectoryPicker(state, controller, host = host) }
             }
         }
-        runOnIdle { controller.open(cwd) }
+        runOnIdle { controller.open(cwd, agentId?.let(::AgentId)) }
         return controller
     }
 
@@ -79,6 +82,24 @@ class WorkingDirectoryPickerUiTest {
         onNodeWithTag(WorkingDirectoryPickerTags.USE).assertIsEnabled().performClick()
         runOnIdle { assertEquals(listOf("/work/repo/app"), chosen) }
         onNodeWithTag(WorkingDirectoryPickerTags.ROOT).assertDoesNotExist()
+    }
+
+    @Test
+    fun makeDefaultSavesTheFolderForTheAgentWithoutClosing() = runComposeUiTest {
+        val saved = mutableListOf<String>()
+        show("/work/repo", agentId = "agent-1", onMakeDefault = { saved += it })
+        onNodeWithTag(WorkingDirectoryPickerTags.MAKE_DEFAULT).performClick()
+        runOnIdle {
+            assertEquals(listOf("/work/repo"), saved)
+            assertEquals(true, chosen.isEmpty())
+        }
+        onNodeWithTag(WorkingDirectoryPickerTags.ROOT).assertExists()
+    }
+
+    @Test
+    fun withoutAnAgentMakeDefaultIsHidden() = runComposeUiTest {
+        show("/work/repo")
+        onNodeWithTag(WorkingDirectoryPickerTags.MAKE_DEFAULT).assertDoesNotExist()
     }
 
     @Test

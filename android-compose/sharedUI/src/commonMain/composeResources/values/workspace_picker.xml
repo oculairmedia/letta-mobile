@@ -19,6 +19,7 @@
     <string name="cwd_picker_empty">No sub-folders here.</string>
     <string name="cwd_picker_more">More folders are not shown. Type a path to go further.</string>
     <string name="cwd_picker_use">Use this folder</string>
+    <string name="cwd_picker_make_default">Make default for this agent</string>
     <string name="cwd_picker_next_turn">Applies from the next turn.</string>
     <string name="cwd_picker_in_worktree">In worktree %1$s</string>
     <string name="cwd_picker_back_to_repository">Back to repository</string>

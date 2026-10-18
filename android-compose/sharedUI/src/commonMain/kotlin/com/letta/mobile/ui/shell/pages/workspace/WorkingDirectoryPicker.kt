@@ -72,6 +72,7 @@ import com.letta.mobile.sharedui.resources.cwd_picker_system_dialog
 import com.letta.mobile.sharedui.resources.cwd_picker_title
 import com.letta.mobile.sharedui.resources.cwd_picker_up
 import com.letta.mobile.sharedui.resources.cwd_picker_use
+import com.letta.mobile.sharedui.resources.cwd_picker_make_default
 import com.letta.mobile.sharedui.resources.cwd_picker_worktree_search
 import com.letta.mobile.sharedui.resources.cwd_picker_worktrees
 import com.letta.mobile.ui.components.picker.LettaPickerContent
@@ -123,6 +124,7 @@ object WorkingDirectoryPickerTags {
     const val BACK_TO_REPOSITORY = "cwd-picker-back-to-repository"
     const val WORKTREE_SEARCH = "cwd-picker-worktree-search"
     const val USE = "cwd-picker-use"
+    const val MAKE_DEFAULT = "cwd-picker-make-default"
     const val FOLDER_ROW = "cwd-picker-folder-"
     const val RECENT_ROW = "cwd-picker-recent-"
     const val WORKTREE_ROW = "cwd-picker-worktree-"
@@ -416,6 +418,12 @@ private fun PickerFooter(state: WorkingDirectoryPickerState, actions: WorkingDir
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
+        if (state.canMakeDefault) {
+            TextButton(
+                onClick = actions::makeDefault,
+                modifier = Modifier.testTag(WorkingDirectoryPickerTags.MAKE_DEFAULT),
+            ) { Text(stringResource(Res.string.cwd_picker_make_default)) }
+        }
         val folder = state.folder
         Button(
             onClick = { folder?.let(actions::choose) },

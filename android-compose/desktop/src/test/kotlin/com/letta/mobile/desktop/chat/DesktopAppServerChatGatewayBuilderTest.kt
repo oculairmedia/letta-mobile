@@ -4,6 +4,7 @@ import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.attachTurnStack
+import com.letta.mobile.data.runtime.withWorkingDirectoryProvider
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -229,9 +230,27 @@ class DesktopAppServerChatGatewayBuilderTest {
             val start = client.runtimeStarts.single()
             assertEquals(AppServerPermissionMode.Unrestricted, start.mode)
             assertEquals("conv-1", start.conversationId)
+            assertEquals(null, start.cwd)
             // letta-mobile-4rxis: letta-code owns context management; the desktop engine must not
             // read the agent, stamp a window, list messages or compact before a turn.
             assertEquals(emptyList(), client.contextManagementCalls)
+        } finally {
+            eventRouter.detach()
+        }
+    }
+
+    @Test
+    fun desktopTurnEngine_runtimeStartCarriesTheAgentsDefaultCwd() = runTest {
+        val client = RecordingAppServerClient()
+        val eventRouter = AppServerRuntimeEventRouter()
+        val engine = eventRouter.attachTurnStack(
+            client,
+            this,
+            desktopTurnStackSpec().withWorkingDirectoryProvider { "/work/repo" },
+        )
+        try {
+            runConversationTurnToCompletion(engine, client, "conv-new")
+            assertEquals("/work/repo", client.runtimeStarts.single().cwd)
         } finally {
             eventRouter.detach()
         }

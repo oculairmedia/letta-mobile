@@ -22,6 +22,8 @@ class AppServerTurnStackSpec(
     val autoAllowApprovals: Boolean = true,
     /** letta-mobile-zxk2n.2: durable terminals and client preferences, sent only to a host that supports them. */
     val durableDelivery: DurableTurnDelivery = DurableTurnDelivery.OFF,
+    /** letta-mobile-k5nbq.9: per-agent default cwd carried on `runtime_start`. */
+    val workingDirectoryProvider: (TurnCommand) -> String? = { null },
 )
 
 /**
@@ -47,6 +49,21 @@ fun permissionGovernedTurnStackSpec(
     requestIdFactory = requestIdFactory,
     externalToolRegistry = externalToolRegistry,
     durableDelivery = durableDelivery,
+)
+
+/** letta-mobile-k5nbq.9: first-turn cwd on `runtime_start`, without growing [permissionGovernedTurnStackSpec]. */
+fun AppServerTurnStackSpec.withWorkingDirectoryProvider(
+    provider: (TurnCommand) -> String?,
+): AppServerTurnStackSpec = AppServerTurnStackSpec(
+    clientInfo = clientInfo,
+    permissionMode = permissionMode,
+    permissionModeProvider = permissionModeProvider,
+    onPermissionModeInForce = onPermissionModeInForce,
+    requestIdFactory = requestIdFactory,
+    externalToolRegistry = externalToolRegistry,
+    autoAllowApprovals = autoAllowApprovals,
+    durableDelivery = durableDelivery,
+    workingDirectoryProvider = provider,
 )
 
 /** letta-mobile-by4vm.90: the client -> router -> engine stack of desktop, web and Android Iroh: attaches, then [turnEngine]. */
@@ -80,6 +97,7 @@ fun AppServerRuntimeEventRouter.turnEngine(
     autoAllowApprovals = spec.autoAllowApprovals,
     durableDelivery = spec.durableDelivery,
 ).also { engine ->
+    engine.workingDirectoryProvider = spec.workingDirectoryProvider
     engine.answerApprovalReplaysFrom(this, scope)
     engine.acknowledgeTerminalsOutsideTurnsFrom(client, scope)
 }

@@ -6,6 +6,8 @@ import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsSectionModel
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
+import com.letta.mobile.data.workspace.directory.DevicePath
+import com.letta.mobile.data.workspace.directory.WorkingDirectoryPickerGates
 
 /**
  * Where the editor's link rows go, each null when this host has no such page (the row is left out).
@@ -20,6 +22,9 @@ data class AgentEditorLinks(
 ) {
     val isEmpty: Boolean get() = listOf(memory, schedules, channels, dreaming, secrets).all { it == null }
 }
+
+/** The agent's saved default cwd; [onChange] persists it (blank clears). */
+data class AgentEditorCwdDefaults(val path: String, val onChange: (String) -> Unit)
 
 /** The page's own panes the rows open (the mascot, model and tool pickers), and what [mascotLabel] reads. */
 data class AgentEditorOpeners(
@@ -38,6 +43,7 @@ object AgentEditorSectionKeys {
     const val MODEL = "agent-model"
     const val PROMPT = "agent-prompt"
     const val TOOLS = "agent-tools"
+    const val DEFAULTS = "agent-defaults"
     const val MORE = "agent-more"
     const val DANGER = "agent-danger"
 }
@@ -51,6 +57,7 @@ class AgentEditorSections(
     private val state: AgentEditorState,
     private val actions: AgentEditorActions,
     private val openers: AgentEditorOpeners,
+    private val defaultCwd: AgentEditorCwdDefaults? = null,
 ) {
     private val form get() = state.form
 
@@ -60,6 +67,7 @@ class AgentEditorSections(
         model(),
         prompt(),
         tools(),
+        defaults(),
         more(),
         danger(),
     )
@@ -158,6 +166,20 @@ class AgentEditorSections(
         return SettingsSectionModel(AgentEditorSectionKeys.TOOLS, "Tools", rows + manage, supporting = supporting)
     }
 
+    private fun defaults(): SettingsSectionModel? {
+        val cwd = defaultCwd ?: return null
+        val row = SettingsRow.Text(
+            key = DEFAULT_CWD_KEY,
+            title = "Default working directory",
+            value = cwd.path,
+            placeholder = "New chats start here",
+            supporting = "New conversations for this agent start in this folder",
+            problem = ::cwdProblem,
+            onChange = cwd.onChange,
+        )
+        return SettingsSectionModel(AgentEditorSectionKeys.DEFAULTS, "Defaults", listOf(row))
+    }
+
     private fun more(): SettingsSectionModel? {
         val links = openers.links.takeIf { !state.creating && !it.isEmpty } ?: return null
         val rows = listOfNotNull(
@@ -192,7 +214,13 @@ class AgentEditorSections(
         const val DEFAULT_EFFORT = "default"
         const val PROMPT_LINES = 6
         const val COMPACT_KEY = "compact-profile"
+        const val DEFAULT_CWD_KEY = "default-cwd"
         const val COMPACT_SUPPORTING = "Short instructions, a few core tools and no skills list, so a small model stays fast and on topic."
+
+        fun cwdProblem(path: String): String? {
+            if (path.isBlank()) return null
+            return WorkingDirectoryPickerGates.NOT_ABSOLUTE.takeUnless { DevicePath(path).isAbsolute }
+        }
     }
 }
 
