@@ -1,5 +1,7 @@
 # Data-Efficiency Audit — LettaMobile Android
 
+Source paths below are relative to the `android-compose/` Gradle root.
+
 **Status:** Historical audit snapshot, not a current backlog or runtime contract.
 The 2026-10-18 source audit found that its REST-era `core/data` paths and
 `LocalImageContextStripper` references have been removed. Counts and VALID labels

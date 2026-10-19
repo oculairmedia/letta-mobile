@@ -27,7 +27,7 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
  * The encoder contract is intentionally narrow: a 2D bool matrix the
  * renderer can paint. Tests live in:sharedLogic jvmTest.
  *
- * seealso: `reference/qr-pairing-protocol.md` §7 (transport encoding).
+ * seealso: `docs/reference/qr-pairing-protocol.md` §7 (transport encoding).
  */
 object QrCode {
 

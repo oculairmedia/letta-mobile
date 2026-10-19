@@ -24,7 +24,7 @@ import kotlinx.serialization.json.put
  *
  * When the caller sets `qr: true`, the response
  * carries an additive `qr_invite` field (the `letta-qr-v1.<base64url>` wire
- * format from `reference/qr-pairing-protocol.md` §5.1 + §7.1) and, since
+ * format from `docs/reference/qr-pairing-protocol.md` §5.1 + §7.1) and, since
  * a scannable `pair_link` that adds the host's dial
  * address. Existing fields (`invite`, `deep_link`, `expires_at_ms`,
  * `suggested_name`) are unchanged.

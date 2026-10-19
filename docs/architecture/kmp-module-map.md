@@ -2,7 +2,7 @@
 
 **Status:** Current source map; audited 2026-10-18 against Gradle declarations and isolation tests.
 
-The product Gradle root is `android-compose/`. Its [settings](../../android-compose/settings.gradle.kts) declare the included projects; optional root `cli/` and `poc/chat-cli/` builds are separate graphs.
+The product Gradle root is `android-compose/`. Its [settings](../../android-compose/settings.gradle.kts) declare the included projects; `poc/chat-cli/` is a separate experimental build. The unused root REST-era `cli/` build has been removed; the supported developer CLI is `:cli` in this graph.
 
 | Project | Current responsibility / targets |
 |---|---|
@@ -24,4 +24,4 @@ The [sharedLogic build](../../android-compose/sharedLogic/build.gradle.kts) and 
 
 `SharedLogicIsolationTest` prevents sharedLogic from depending on platform/UI modules. `SharedUiIsolationTest` requires sharedLogic and forbids platform apps, Android data/features/designsystem and plugin-view. It does **not** restrict sharedUI to only one project dependency: avatar/core, drawbox and the Skia renderer support are current dependencies; test fixtures are a test dependency. Both tests live in [architecture-tests](../../android-compose/architecture-tests/src/test/kotlin/com/letta/mobile/architecture/).
 
-The [migration epic](kmp-structure-migration-epic.md) is a historical sequence, not the current graph. wasm sharedUI is implemented. Physical `apps/*` moves remain a proposal: the actual project paths are still `app/`, `desktop/`, `web/`.
+The [migration epic](kmp-structure-migration-epic.md) is a historical sequence, not the current graph. wasm sharedUI is implemented. The [entrypoint layout decision](kmp-phase-6-entrypoints.md) retains `app/`, `desktop/`, and `web/`; the historical `apps/*` proposal is not pending implementation.

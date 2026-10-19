@@ -1,5 +1,7 @@
 # Iroh image replay investigation
 
+Source paths below are relative to the `android-compose/` Gradle root.
+
 **Status:** Source audit updated 2026-10-18. Client request shaping verified;
 provider history behavior remains unverified without an upstream request capture.
 
