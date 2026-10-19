@@ -111,7 +111,10 @@ class SessionHomePageSourceTest {
     fun entrySharesAnActiveRequestAndRetryRecoversAFailure() = runTest {
         val pending = CompletableDeferred<Unit>()
         val tools = FakeTools(Result.failure(IrohGuardException()), beforeCount = { pending.await() })
-        val source = SessionHomePageSource(FixedGraphProvider(HomeGraph(tools = tools, runs = FakeRuns(IrohGuardException()))), backgroundScope)
+        val source = SessionHomePageSource(
+            FixedGraphProvider(HomeGraph(tools = tools, runs = FakeRuns(IrohGuardException()))),
+            backgroundScope,
+        )
         source.start()
         runCurrent()
         source.refresh()
@@ -258,7 +261,10 @@ class SessionHomePageSourceTest {
         private fun unused(): Nothing = error("Home does not read this repository")
     }
 
-    private class FakeTools(var count: Result<Int> = Result.success(0), private val beforeCount: suspend () -> Unit = {}) : IToolRepository {
+    private class FakeTools(
+        var count: Result<Int> = Result.success(0),
+        private val beforeCount: suspend () -> Unit = {},
+    ) : IToolRepository {
         var countCalls = 0
         private val tools = MutableStateFlow<List<Tool>>(emptyList())
         override fun getTools(): StateFlow<List<Tool>> = tools
