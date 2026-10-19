@@ -63,6 +63,8 @@ Module and source paths below are relative to `android-compose/` unless prefixed
 | `web/` | Browser WASM host and browser API bindings |
 | `cli/` `appserver-cli/` `iroh-wrapper-cli/` | JVM tooling, contract probes and the production Iroh server wrapper |
 
+Read the package ownership boundaries and extension points before changing shared code: [sharedLogic](android-compose/sharedLogic/Module.md), [sharedUI](android-compose/sharedUI/Module.md), [core:ids](android-compose/core/ids/Module.md), [core:runtime](android-compose/core/runtime/Module.md), and [plugin-api](android-compose/plugin-api/Module.md). The [API overview](android-compose/Module.md) explains the modules and platform/source-set tags.
+
 **Documentation:** start at [docs/README.md](docs/README.md) for ownership, status conventions and historical material.
 
 **Important directories:**
