@@ -186,6 +186,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           python3 -m unittest discover -s scripts/tests -p test_api_package_coverage.py -v
+          python3 -m unittest discover -s scripts/tests -p test_changed_kotlin_code.py -v
           python3 scripts/ci/check-api-package-coverage.py
           python3 -m unittest discover -s scripts/tests -p test_kdoc_hygiene.py -v
           python3 scripts/ci/check-kdoc-hygiene.py

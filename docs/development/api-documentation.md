@@ -192,94 +192,10 @@ KDoc also needs review: generated pages repeat stale comments faithfully.
 Generation and link gates prove the publication is buildable and navigable;
 they do not prove the runtime behavior described in prose.
 
-The API docs job also writes an advisory progress summary: missing-documentation signature/source-set
-entries per module, the previous count, and reductions relative to the immutable
-comparison commit. A reduction is **resolved or removed (unclassified)**, not necessarily
-new documentation. There is no coverage percentage or inferred public-API denominator.
-The summary flags up to 20 existing gaps whose generated API page contains a source link
-to a changed file; the complete list is attached to the Dokka diagnostics artifact.
-This is page-level association, not a claim that the undocumented declaration changed.
-It introduces no additional merge gate; the shrinking baseline remains the enforcement.
 
-Keep diagnostics and local report output inside the checkout. In CI, only the exact
-runner-provided `GITHUB_STEP_SUMMARY` path may sit outside it. Git comparison refs
-are validated and resolved to a full immutable object ID before comparison.
-
-## Public API review contract
-
-The API documentation convention enables Kotlin's built-in ABI validation for
-all five published modules. The required `test` CI job runs `apiCheck`, which
-compares compiler-derived public signatures with the checked-in `api` and `api-android` dumps.
-A public signature change fails until its dump is explicitly regenerated:
-
-```bash
-cd android-compose
-./gradlew apiCheck
-./gradlew :sharedLogic:apiDump  # substitute the module whose API changed
-```
-
-Review and commit the generated signature diff with the implementation, and
-review the affected `Module.md` ownership and extension-point descriptions.
-The dump is an API snapshot, not a debt allowance: legitimate API additions and
-removals are allowed but must appear in the PR. CI never runs `apiDump` to
-silently accept changes. These tasks delegate to Kotlin's `checkKotlinAbi` and
-`updateKotlinAbi`; declarations are derived from compiled outputs rather than a
-source-text heuristic. No packages or declarations are excluded by this policy.
-
-See [Kotlin ABI validation](https://kotlinlang.org/docs/gradle-binary-compatibility-validation.html)
-for the underlying format and platform support.
-
-Kotlin 2.4.10 does not include the AGP 9 KMP Android target in its built-in
-extraction task. The convention therefore also extracts Android compilation
-class files with Kotlin's `abi-tools-embeddable` and checks `api-android/android.api`.
-Both paths participate in `apiCheck` and `apiDump`. The Android-specific mutation
-fixture prevents this target from silently falling out of coverage. Once the
-pinned Kotlin version supports this target directly, migrate its snapshot into
-the built-in format and remove the companion tasks in the same reviewed change.
-
-The repository chooses `hostNative` from the build host OS. Modules with that
-target keep separate reference roots under `api/linux_x64` and `api/mingw_x64`
-(Windows). `apiDump` and `apiCheck` select the real compiler target automatically,
-so Windows developers can update and verify contracts locally without Linux.
-Each root includes the complete Kotlin dump, including JVM and Wasm declarations:
-this intentional duplication uses Kotlin's supported whole-directory validator,
-rather than rewriting target identities or relying on internal task APIs.
-Android references remain shared under `api-android`; modules without host-native
-targets keep their host-independent `api` root.
-
-Both Linux and Windows API checks gate the required `test` status. A common API
-change requires updated snapshots on both hosts. Run `apiDump` on each host or
-retrieve the actual signatures from its CI artifact, review the signature diff,
-and commit the corresponding host root. CI never updates references itself and
-stops at the first failure. Artifacts may therefore contain only outputs completed
-before that failure; missing output is not evidence that a contract is unchanged.
-The artifacts are `api-contract-<commit>` (Linux) and
-`api-contract-windows-<commit>` (Windows). Preserve the real compiler output bytes;
-never relabel one platform's dump as another. macOS uses its own compiler target
-root (`api/macos_arm64` or `api/macos_x64`); initialize it with `apiDump` before
-checking on a Mac. Linux and Windows are the CI-verified host contracts.
-
-To prepare both host snapshots from any workstation, dispatch the isolated
-capture workflow on the branch containing the intended API change:
-
-```bash
-gh workflow run api-contract-capture.yml --ref your-branch
-gh run list --workflow api-contract-capture.yml --branch your-branch
-gh run download RUN_ID --dir api-capture
-```
-
-The Linux/Windows jobs run only `apiDump` and upload actual compiler outputs with
-`source-commit.txt` and `host.txt`; they neither commit changes nor change the
-required checks. Verify the recorded source SHA matches your reviewed checkout.
-For each module, copy its `build/kotlin/abi` contents into the matching reference
-root (`api/linux_x64`, `api/mingw_x64`, or host-independent `api`), and its
-`build/api-contract/android.api` into `api-android/android.api`. Review and commit
-the resulting diff, then require both checks to pass. A failed capture publishes
-no artifact; resolve its compilation failure rather than accepting partial data.
-
-Before this workflow reaches the default branch (GitHub's prerequisite for
-manual dispatch), or for an explicit capture from a local commit, push that
-commit to a temporary `codex/api-capture/<name>` branch. The narrow push trigger
-runs the same capture jobs. Verify artifact provenance, then delete the temporary
-remote branch after retrieving the outputs. This does not bypass PR checks or
-publish a deployment.
+The required Kotlin guardrail scan compares code with the PR merge base before
+selecting changed files. Comment-only edits do not bring unchanged runtime debt
+into scope. New files, code or literal changes, and malformed source remain in
+scope; staged and uncommitted edits are included locally. Git failures stop the
+scan rather than returning an empty selection. This selection does not change
+detekt rules or debt baselines.
