@@ -19,7 +19,7 @@ internal object PackageImportGraph {
             .sorted()
     }
 
-    private fun edges(files: List<SourceFileImports>): Set<Pair<String, String>> {
+    fun edges(files: List<SourceFileImports>): Set<Pair<String, String>> {
         val declared = files.map(SourceFileImports::packageName).toSet()
         return files.flatMap { file ->
             file.imports

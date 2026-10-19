@@ -62,6 +62,8 @@ val architectureTest = tasks.register<Test>("architectureTest") {
         .withPropertyName("chatControllerSurfaceBaseline").withPathSensitivity(PathSensitivity.RELATIVE)
     reports.junitXml.required.set(true)
     reports.html.required.set(true)
+    outputs.file(rootProject.layout.buildDirectory.file("reports/structure/sources.jsonl"))
+        .withPropertyName("structureSourceExport")
 }
 
 // JsonInstanceRatchetTest (letta-mobile-by4vm.20) reads production sources and its baseline off

@@ -218,6 +218,26 @@ jobs:
           fi
           ./gradlew "${tasks[@]}"
 
+      - name: Enforce structural documentation limits
+        working-directory: ${{ github.workspace }}
+        env:
+          STRUCTURE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          python3 -m unittest discover -s tools/structure_report/tests -v
+          base="${STRUCTURE_BASE:-$(git rev-parse HEAD^)}"
+          python3 tools/structure_report/structure_report.py --base-ref "$base"
+
+      - name: Upload generated structure report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-structure-report
+          path: |
+            android-compose/build/reports/structure/index.html
+            android-compose/build/reports/structure/report.json
+          if-no-files-found: warn
+          retention-days: 30
+
       # :sharedUI:jvmTest runs here as an additive task. Its Skiko UI tests can
       # fail on Linux alone (font metrics), and the console log carries neither
       # assertion messages nor stdout, so keep the reports when this job fails.
@@ -601,7 +621,7 @@ jobs:
 
   assemble-web-pages:
     name: assemble-web-pages
-    needs: [web-wasm, api-docs]
+    needs: [web-wasm, api-docs, test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -616,8 +636,12 @@ jobs:
         with:
           name: kotlin-api-docs
           path: public/api
+      - uses: actions/download-artifact@v4
+        with:
+          name: kotlin-structure-report
+          path: public/structure
       - name: Verify both site entry points
-        run: test -s public/index.html && test -s public/api/index.html
+        run: test -s public/index.html && test -s public/api/index.html && test -s public/structure/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public

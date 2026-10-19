@@ -39,6 +39,33 @@ deployment state or prove behavior described in a comment.
 
 Reference: [Dokka Gradle documentation](https://kotlinlang.org/docs/dokka-gradle.html).
 
+## Generated structure report
+
+The required `test` job also generates a [structure report](https://oculairmedia.github.io/letta-mobile/structure/),
+published beside the API reference and attached to each PR as `kotlin-structure-report`.
+It reuses the architecture tests' Konsist production scope and package import
+resolver; the module-direction section is the existing boundary gate's report,
+not a second rule inventory. The advisory architecture export job generates the
+same report. Reports under `android-compose/build/reports/structure/` are generated,
+not checked in.
+
+Named Kotlin classes, interfaces and objects (including nested types, excluding
+local/anonymous types) count once per module/qualified name/kind across platforms.
+Aliases and Java declarations are outside this metric. Packages allow 50 types;
+existing larger packages have exact limits in `architecture-tests/structure-baseline.json`.
+Cyclic import edges are baselined by identity, including cycles longer than two
+packages. New debt fails; improvements require deleting/lowering stale entries.
+CI also compares the baseline with the immutable PR base SHA, so regenerating it
+cannot authorize growth. After a reduction, run the generator with `--write-baseline`
+and the same `--base-ref`; it writes observed values but still rejects growth.
+
+Public declaration, mirrored-name and probe/sample tables are review candidates,
+not dead-code proofs or hard gates. The consumer heuristic checks top-level public
+names for mentions in other production Kotlin files, conservatively including
+comments and strings. Same-file calls, aliases, reflection, generated code and
+external plugin consumers need manual review. Import edges are source evidence,
+not resolved call graphs. These limitations are displayed in the generated page.
+
 ## Linking to generated APIs
 
 Link to the full published URL, including `/letta-mobile/api/`, so Markdown read
