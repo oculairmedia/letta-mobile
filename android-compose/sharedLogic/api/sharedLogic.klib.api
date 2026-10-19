@@ -1,5 +1,5 @@
 // Klib ABI Dump
-// Targets: [mingwX64.hostNative, wasmJs]
+// Targets: [linuxX64.hostNative, wasmJs]
 // Rendering settings:
 // - Signature version: 2
 // - Show manifest properties: true
@@ -66922,7 +66922,7 @@ final suspend fun com.letta.mobile.data.transport.appserver/awaitAppServerReadin
 final suspend fun com.letta.mobile.data.transport.appserver/openAppServerWebSocket(com.letta.mobile.data.transport.appserver/AppServerWebSocketDial, io.ktor.client/HttpClient, kotlinx.coroutines/CoroutineScope): com.letta.mobile.data.transport.appserver/AppServerWebSocketConnection // com.letta.mobile.data.transport.appserver/openAppServerWebSocket|openAppServerWebSocket(com.letta.mobile.data.transport.appserver.AppServerWebSocketDial;io.ktor.client.HttpClient;kotlinx.coroutines.CoroutineScope){}[0]
 final suspend inline fun <#A: kotlin/Any?> com.letta.mobile.util/runCatchingCancellable(kotlin.coroutines/SuspendFunction0<#A>): kotlin/Result<#A> // com.letta.mobile.util/runCatchingCancellable|runCatchingCancellable(kotlin.coroutines.SuspendFunction0<0:0>){0§<kotlin.Any?>}[0]
 
-// Targets: [mingwX64.hostNative]
+// Targets: [linuxX64.hostNative]
 final class com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta : kotlinx.atomicfu.locks/SynchronizedObject { // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta|null[0]
     constructor <init>() // com.letta.mobile.data.timeline/PendingTimelinePersistenceDelta.<init>|<init>(){}[0]
 

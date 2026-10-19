@@ -124,6 +124,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-project-v1-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/settings.gradle.kts', 'android-compose/**/*.gradle.kts', 'android-compose/gradle/libs.versions.toml', 'android-compose/gradle.properties') }}-
 
+      - name: Cache Konan (Kotlin/Native) toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-konan-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/sharedLogic/build.gradle.kts') }}
+          restore-keys: |
+            ${{ runner.os }}-konan-
+
       - name: Test CI policy scripts
         working-directory: ${{ github.workspace }}
         run: bash scripts/tests/ci-policy-scripts-test.sh

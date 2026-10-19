@@ -1,0 +1,2132 @@
+public final class com/letta/mobile/runtime/AgentFile {
+	public static final field Companion Lcom/letta/mobile/runtime/AgentFile$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/Map;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-_p4QJ-E ()Ljava/lang/String;
+	public final fun component2-pDYQXuc ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/Long;
+	public final fun component6 ()Ljava/util/Map;
+	public final fun copy-Q2OJYuI (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/Map;)Lcom/letta/mobile/runtime/AgentFile;
+	public static synthetic fun copy-Q2OJYuI$default (Lcom/letta/mobile/runtime/AgentFile;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/runtime/AgentFile;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDisplayName ()Ljava/lang/String;
+	public final fun getId-_p4QJ-E ()Ljava/lang/String;
+	public final fun getMetadata ()Ljava/util/Map;
+	public final fun getMimeType ()Ljava/lang/String;
+	public final fun getPath-pDYQXuc ()Ljava/lang/String;
+	public final fun getSizeBytes ()Ljava/lang/Long;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/AgentFile$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/AgentFile$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/AgentFile;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/AgentFile;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/AgentFile$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/AgentFileId {
+	public static final field Companion Lcom/letta/mobile/runtime/AgentFileId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/runtime/AgentFileId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/AgentFileId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/AgentFileId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-_TEzBlU (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-nhNfH0w (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/AgentFileId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ApprovalDiffPreview {
+	public static final field Companion Lcom/letta/mobile/runtime/ApprovalDiffPreview$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/runtime/ApprovalDiffPreview;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/ApprovalDiffPreview;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/ApprovalDiffPreview;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNote ()Ljava/lang/String;
+	public final fun getPath ()Ljava/lang/String;
+	public final fun getUnifiedDiff ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun isEmpty ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/ApprovalDiffPreview$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/ApprovalDiffPreview$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/ApprovalDiffPreview;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/ApprovalDiffPreview;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ApprovalDiffPreview$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/BackendCapabilities {
+	public static final field Companion Lcom/letta/mobile/runtime/BackendCapabilities$Companion;
+	public fun <init> (ZZZZZZZ)V
+	public final fun component1 ()Z
+	public final fun component2 ()Z
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun component5 ()Z
+	public final fun component6 ()Z
+	public final fun component7 ()Z
+	public final fun copy (ZZZZZZZ)Lcom/letta/mobile/runtime/BackendCapabilities;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/BackendCapabilities;ZZZZZZZILjava/lang/Object;)Lcom/letta/mobile/runtime/BackendCapabilities;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSupportsAgentFileExport ()Z
+	public final fun getSupportsAgentFileImport ()Z
+	public final fun getSupportsApprovals ()Z
+	public final fun getSupportsMemFs ()Z
+	public final fun getSupportsStreaming ()Z
+	public final fun getSupportsToolEvents ()Z
+	public final fun getSupportsToolExecution ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/BackendCapabilities$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/BackendCapabilities$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/BackendCapabilities;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/BackendCapabilities;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/BackendCapabilities$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/BackendDescriptor {
+	public static final field Companion Lcom/letta/mobile/runtime/BackendDescriptor$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/BackendKind;Ljava/lang/String;Lcom/letta/mobile/runtime/BackendCapabilities;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-DVvX2l4 ()Ljava/lang/String;
+	public final fun component2-t4PSxKQ ()Ljava/lang/String;
+	public final fun component3 ()Lcom/letta/mobile/runtime/BackendKind;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Lcom/letta/mobile/runtime/BackendCapabilities;
+	public final fun copy-QgVtr5E (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/BackendKind;Ljava/lang/String;Lcom/letta/mobile/runtime/BackendCapabilities;)Lcom/letta/mobile/runtime/BackendDescriptor;
+	public static synthetic fun copy-QgVtr5E$default (Lcom/letta/mobile/runtime/BackendDescriptor;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/BackendKind;Ljava/lang/String;Lcom/letta/mobile/runtime/BackendCapabilities;ILjava/lang/Object;)Lcom/letta/mobile/runtime/BackendDescriptor;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBackendId-DVvX2l4 ()Ljava/lang/String;
+	public final fun getCapabilities ()Lcom/letta/mobile/runtime/BackendCapabilities;
+	public final fun getKind ()Lcom/letta/mobile/runtime/BackendKind;
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getRuntimeId-t4PSxKQ ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/BackendDescriptor$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/BackendDescriptor$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/BackendDescriptor;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/BackendDescriptor;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/BackendDescriptor$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/BackendId {
+	public static final field Companion Lcom/letta/mobile/runtime/BackendId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/runtime/BackendId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/BackendId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/BackendId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-Dqkg8Qc (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-35QAh8w (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/BackendId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/BackendKind : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/runtime/BackendKind$Companion;
+	public static final field LocalLettaCode Lcom/letta/mobile/runtime/BackendKind;
+	public static final field RemoteLetta Lcom/letta/mobile/runtime/BackendKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/runtime/BackendKind;
+	public static fun values ()[Lcom/letta/mobile/runtime/BackendKind;
+}
+
+public final class com/letta/mobile/runtime/BackendKind$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/CompactionStats {
+	public static final field Companion Lcom/letta/mobile/runtime/CompactionStats$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/Integer;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/Long;
+	public final fun component3 ()Ljava/lang/Long;
+	public final fun component4 ()Ljava/lang/Long;
+	public final fun component5 ()Ljava/lang/Integer;
+	public final fun component6 ()Ljava/lang/Integer;
+	public final fun copy (Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/Integer;)Lcom/letta/mobile/runtime/CompactionStats;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/CompactionStats;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/letta/mobile/runtime/CompactionStats;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContextTokensAfter ()Ljava/lang/Long;
+	public final fun getContextTokensBefore ()Ljava/lang/Long;
+	public final fun getContextWindow ()Ljava/lang/Long;
+	public final fun getMessagesCountAfter ()Ljava/lang/Integer;
+	public final fun getMessagesCountBefore ()Ljava/lang/Integer;
+	public final fun getTrigger ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/CompactionStats$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/CompactionStats$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/CompactionStats;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/CompactionStats;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/CompactionStats$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ConversationId {
+	public static final field Companion Lcom/letta/mobile/runtime/ConversationId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/runtime/ConversationId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/ConversationId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/ConversationId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-nPN8fL4 (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-qcVo3B4 (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ConversationId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/EpochMillis {
+	public static final field Companion Lcom/letta/mobile/runtime/EpochMillis$Companion;
+	public static final synthetic fun box-impl (J)Lcom/letta/mobile/runtime/EpochMillis;
+	public static fun constructor-impl (J)J
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (JLjava/lang/Object;)Z
+	public static final fun equals-impl0 (JJ)Z
+	public final fun getValue ()J
+	public fun hashCode ()I
+	public static fun hashCode-impl (J)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (J)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()J
+}
+
+public final synthetic class com/letta/mobile/runtime/EpochMillis$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/EpochMillis$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-vGXoTMs (Lkotlinx/serialization/encoding/Decoder;)J
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-HcYJTM0 (Lkotlinx/serialization/encoding/Encoder;J)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/EpochMillis$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/InMemoryRuntimeEventOutbox : com/letta/mobile/runtime/RuntimeEventOutbox {
+	public fun <init> (Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;)V
+	public fun append (Lcom/letta/mobile/runtime/RuntimeEventDraft;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun appendAll (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun events-lOxAFFY (J)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class com/letta/mobile/runtime/MemFsCommit {
+	public static final field Companion Lcom/letta/mobile/runtime/MemFsCommit$Companion;
+	public synthetic fun <init> (Ljava/lang/String;JLjava/lang/String;Lcom/letta/mobile/runtime/MemFsOperation;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-Cc3pvFw ()Ljava/lang/String;
+	public final fun component2-ouAtX2E ()J
+	public final fun component3-pDYQXuc ()Ljava/lang/String;
+	public final fun component4 ()Lcom/letta/mobile/runtime/MemFsOperation;
+	public final fun component5-NfOwbT0 ()J
+	public final fun copy-SasDG60 (Ljava/lang/String;JLjava/lang/String;Lcom/letta/mobile/runtime/MemFsOperation;J)Lcom/letta/mobile/runtime/MemFsCommit;
+	public static synthetic fun copy-SasDG60$default (Lcom/letta/mobile/runtime/MemFsCommit;Ljava/lang/String;JLjava/lang/String;Lcom/letta/mobile/runtime/MemFsOperation;JILjava/lang/Object;)Lcom/letta/mobile/runtime/MemFsCommit;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCreatedAt-NfOwbT0 ()J
+	public final fun getId-Cc3pvFw ()Ljava/lang/String;
+	public final fun getOperation ()Lcom/letta/mobile/runtime/MemFsOperation;
+	public final fun getPath-pDYQXuc ()Ljava/lang/String;
+	public final fun getRevision-ouAtX2E ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/MemFsCommit$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/MemFsCommit$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/MemFsCommit;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/MemFsCommit;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/MemFsCommit$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/MemFsCommitId {
+	public static final field Companion Lcom/letta/mobile/runtime/MemFsCommitId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/runtime/MemFsCommitId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/MemFsCommitId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/MemFsCommitId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-fowzuH8 (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-J6RikzY (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/MemFsCommitId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/MemFsFile {
+	public static final field Companion Lcom/letta/mobile/runtime/MemFsFile$Companion;
+	public synthetic fun <init> (Ljava/lang/String;JLjava/lang/String;Lcom/letta/mobile/runtime/MemFsMetadata;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;JLjava/lang/String;Lcom/letta/mobile/runtime/MemFsMetadata;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-pDYQXuc ()Ljava/lang/String;
+	public final fun component2-ouAtX2E ()J
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Lcom/letta/mobile/runtime/MemFsMetadata;
+	public final fun copy-Cn3J4Pw (Ljava/lang/String;JLjava/lang/String;Lcom/letta/mobile/runtime/MemFsMetadata;)Lcom/letta/mobile/runtime/MemFsFile;
+	public static synthetic fun copy-Cn3J4Pw$default (Lcom/letta/mobile/runtime/MemFsFile;Ljava/lang/String;JLjava/lang/String;Lcom/letta/mobile/runtime/MemFsMetadata;ILjava/lang/Object;)Lcom/letta/mobile/runtime/MemFsFile;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContent ()Ljava/lang/String;
+	public final fun getMetadata ()Lcom/letta/mobile/runtime/MemFsMetadata;
+	public final fun getPath-pDYQXuc ()Ljava/lang/String;
+	public final fun getRevision-ouAtX2E ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/MemFsFile$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/MemFsFile$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/MemFsFile;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/MemFsFile;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/MemFsFile$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/MemFsMetadata {
+	public static final field Companion Lcom/letta/mobile/runtime/MemFsMetadata$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/Set;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;)Lcom/letta/mobile/runtime/MemFsMetadata;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/MemFsMetadata;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/runtime/MemFsMetadata;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getMimeType ()Ljava/lang/String;
+	public final fun getTags ()Ljava/util/Set;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/MemFsMetadata$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/MemFsMetadata$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/MemFsMetadata;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/MemFsMetadata;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/MemFsMetadata$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/MemFsOperation : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/runtime/MemFsOperation$Companion;
+	public static final field Delete Lcom/letta/mobile/runtime/MemFsOperation;
+	public static final field Write Lcom/letta/mobile/runtime/MemFsOperation;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/runtime/MemFsOperation;
+	public static fun values ()[Lcom/letta/mobile/runtime/MemFsOperation;
+}
+
+public final class com/letta/mobile/runtime/MemFsOperation$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/MemFsPath {
+	public static final field Companion Lcom/letta/mobile/runtime/MemFsPath$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/runtime/MemFsPath;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/MemFsPath$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/MemFsPath$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-DWJCGNM (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-R3KxkHM (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/MemFsPath$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/MemFsRevision : java/lang/Comparable {
+	public static final field Companion Lcom/letta/mobile/runtime/MemFsRevision$Companion;
+	public static final synthetic fun box-impl (J)Lcom/letta/mobile/runtime/MemFsRevision;
+	public synthetic fun compareTo (Ljava/lang/Object;)I
+	public fun compareTo-66Hp2kc (J)I
+	public static fun compareTo-66Hp2kc (JJ)I
+	public static fun constructor-impl (J)J
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (JLjava/lang/Object;)Z
+	public static final fun equals-impl0 (JJ)Z
+	public final fun getValue ()J
+	public fun hashCode ()I
+	public static fun hashCode-impl (J)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (J)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()J
+}
+
+public final synthetic class com/letta/mobile/runtime/MemFsRevision$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/MemFsRevision$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-4NZF7B8 (Lkotlinx/serialization/encoding/Decoder;)J
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-S8lnfRs (Lkotlinx/serialization/encoding/Encoder;J)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/MemFsRevision$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/PermissionSuggestion {
+	public static final field Companion Lcom/letta/mobile/runtime/PermissionSuggestion$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/runtime/PermissionSuggestion;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/PermissionSuggestion;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/PermissionSuggestion;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()Ljava/lang/String;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/PermissionSuggestion$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/PermissionSuggestion$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/PermissionSuggestion;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/PermissionSuggestion;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/PermissionSuggestion$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RunId {
+	public static final field Companion Lcom/letta/mobile/runtime/RunId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/runtime/RunId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RunId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RunId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-9q-cxfA (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-Ool3YKQ (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RunId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventDraft {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventDraft$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeEventSource;Lcom/letta/mobile/runtime/RuntimeEventPayload;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeEventSource;Lcom/letta/mobile/runtime/RuntimeEventPayload;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-DVvX2l4 ()Ljava/lang/String;
+	public final fun component2-t4PSxKQ ()Ljava/lang/String;
+	public final fun component3-hzr7vF4 ()Ljava/lang/String;
+	public final fun component4-DG2_Wys ()Ljava/lang/String;
+	public final fun component5-qu2xs0U ()Ljava/lang/String;
+	public final fun component6 ()Lcom/letta/mobile/runtime/RuntimeEventSource;
+	public final fun component7 ()Lcom/letta/mobile/runtime/RuntimeEventPayload;
+	public final fun copy-U3drb0Q (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeEventSource;Lcom/letta/mobile/runtime/RuntimeEventPayload;)Lcom/letta/mobile/runtime/RuntimeEventDraft;
+	public static synthetic fun copy-U3drb0Q$default (Lcom/letta/mobile/runtime/RuntimeEventDraft;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeEventSource;Lcom/letta/mobile/runtime/RuntimeEventPayload;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventDraft;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId-hzr7vF4 ()Ljava/lang/String;
+	public final fun getBackendId-DVvX2l4 ()Ljava/lang/String;
+	public final fun getConversationId-DG2_Wys ()Ljava/lang/String;
+	public final fun getPayload ()Lcom/letta/mobile/runtime/RuntimeEventPayload;
+	public final fun getRunId-qu2xs0U ()Ljava/lang/String;
+	public final fun getRuntimeId-t4PSxKQ ()Ljava/lang/String;
+	public final fun getSource ()Lcom/letta/mobile/runtime/RuntimeEventSource;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventDraft$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventDraft$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventDraft;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventDraft;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventDraft$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventEnvelope {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventEnvelope$Companion;
+	public synthetic fun <init> (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLcom/letta/mobile/runtime/RuntimeEventSource;ILcom/letta/mobile/runtime/RuntimeEventPayload;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLcom/letta/mobile/runtime/RuntimeEventSource;ILcom/letta/mobile/runtime/RuntimeEventPayload;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-twxv5bg ()J
+	public final fun component10 ()I
+	public final fun component11 ()Lcom/letta/mobile/runtime/RuntimeEventPayload;
+	public final fun component2-Eu06Y6Y ()Ljava/lang/String;
+	public final fun component3-DVvX2l4 ()Ljava/lang/String;
+	public final fun component4-t4PSxKQ ()Ljava/lang/String;
+	public final fun component5-hzr7vF4 ()Ljava/lang/String;
+	public final fun component6-DG2_Wys ()Ljava/lang/String;
+	public final fun component7-qu2xs0U ()Ljava/lang/String;
+	public final fun component8-NfOwbT0 ()J
+	public final fun component9 ()Lcom/letta/mobile/runtime/RuntimeEventSource;
+	public final fun copy-33zYa6k (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLcom/letta/mobile/runtime/RuntimeEventSource;ILcom/letta/mobile/runtime/RuntimeEventPayload;)Lcom/letta/mobile/runtime/RuntimeEventEnvelope;
+	public static synthetic fun copy-33zYa6k$default (Lcom/letta/mobile/runtime/RuntimeEventEnvelope;JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLcom/letta/mobile/runtime/RuntimeEventSource;ILcom/letta/mobile/runtime/RuntimeEventPayload;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventEnvelope;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId-hzr7vF4 ()Ljava/lang/String;
+	public final fun getBackendId-DVvX2l4 ()Ljava/lang/String;
+	public final fun getConversationId-DG2_Wys ()Ljava/lang/String;
+	public final fun getCreatedAt-NfOwbT0 ()J
+	public final fun getEventId-Eu06Y6Y ()Ljava/lang/String;
+	public final fun getOffset-twxv5bg ()J
+	public final fun getPayload ()Lcom/letta/mobile/runtime/RuntimeEventPayload;
+	public final fun getRunId-qu2xs0U ()Ljava/lang/String;
+	public final fun getRuntimeId-t4PSxKQ ()Ljava/lang/String;
+	public final fun getSchemaVersion ()I
+	public final fun getSource ()Lcom/letta/mobile/runtime/RuntimeEventSource;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventEnvelope$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventEnvelope$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventEnvelope;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventEnvelope;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventEnvelope$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventId {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeEventId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-6QKvrR8 (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-gGbAzPE (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventKt {
+	public static final field RUNTIME_EVENT_SCHEMA_VERSION I
+	public static final fun isAdvisory (Lcom/letta/mobile/runtime/RuntimeEventPayload;)Z
+	public static final fun isPresentationOnly (Lcom/letta/mobile/runtime/RuntimeEventPayload;)Z
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventOffset : java/lang/Comparable {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventOffset$Companion;
+	public static final synthetic fun box-impl (J)Lcom/letta/mobile/runtime/RuntimeEventOffset;
+	public synthetic fun compareTo (Ljava/lang/Object;)I
+	public fun compareTo-lOxAFFY (J)I
+	public static fun compareTo-lOxAFFY (JJ)I
+	public static fun constructor-impl (J)J
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (JLjava/lang/Object;)Z
+	public static final fun equals-impl0 (JJ)Z
+	public final fun getValue ()J
+	public fun hashCode ()I
+	public static fun hashCode-impl (J)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (J)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()J
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventOffset$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventOffset$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-wIkAJ68 (Lkotlinx/serialization/encoding/Decoder;)J
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize--L-U4eo (Lkotlinx/serialization/encoding/Encoder;J)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventOffset$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/runtime/RuntimeEventOutbox {
+	public fun append (Lcom/letta/mobile/runtime/RuntimeEventDraft;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun appendAll (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun events-lOxAFFY (J)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventOutbox$DefaultImpls {
+	public static fun append (Lcom/letta/mobile/runtime/RuntimeEventOutbox;Lcom/letta/mobile/runtime/RuntimeEventDraft;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$Companion;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$AgentFileExported : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$AgentFileExported$Companion;
+	public fun <init> (Lcom/letta/mobile/runtime/AgentFile;)V
+	public final fun component1 ()Lcom/letta/mobile/runtime/AgentFile;
+	public final fun copy (Lcom/letta/mobile/runtime/AgentFile;)Lcom/letta/mobile/runtime/RuntimeEventPayload$AgentFileExported;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$AgentFileExported;Lcom/letta/mobile/runtime/AgentFile;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$AgentFileExported;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFile ()Lcom/letta/mobile/runtime/AgentFile;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$AgentFileExported$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$AgentFileExported$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$AgentFileExported;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$AgentFileExported;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$AgentFileExported$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$AgentFileImported : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$AgentFileImported$Companion;
+	public fun <init> (Lcom/letta/mobile/runtime/AgentFile;)V
+	public final fun component1 ()Lcom/letta/mobile/runtime/AgentFile;
+	public final fun copy (Lcom/letta/mobile/runtime/AgentFile;)Lcom/letta/mobile/runtime/RuntimeEventPayload$AgentFileImported;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$AgentFileImported;Lcom/letta/mobile/runtime/AgentFile;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$AgentFileImported;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFile ()Lcom/letta/mobile/runtime/AgentFile;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$AgentFileImported$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$AgentFileImported$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$AgentFileImported;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$AgentFileImported;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$AgentFileImported$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$ApprovalClassified : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalClassified$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;Ljava/util/List;Ljava/util/List;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalClassified;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalClassified;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalClassified;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAutoAllowedToolCallIds ()Ljava/util/List;
+	public final fun getAutoDeniedToolCallIds ()Ljava/util/List;
+	public final fun getUserInputToolCallIds ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$ApprovalClassified$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalClassified$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalClassified;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalClassified;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$ApprovalClassified$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$ApprovalRequested : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalRequested$Companion;
+	public fun <init> (Lcom/letta/mobile/runtime/ToolApprovalRequest;)V
+	public final fun component1 ()Lcom/letta/mobile/runtime/ToolApprovalRequest;
+	public final fun copy (Lcom/letta/mobile/runtime/ToolApprovalRequest;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalRequested;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalRequested;Lcom/letta/mobile/runtime/ToolApprovalRequest;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalRequested;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRequest ()Lcom/letta/mobile/runtime/ToolApprovalRequest;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$ApprovalRequested$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalRequested$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalRequested;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalRequested;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$ApprovalRequested$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$ApprovalResolved : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalResolved$Companion;
+	public fun <init> (Lcom/letta/mobile/runtime/ToolApprovalDecision;)V
+	public final fun component1 ()Lcom/letta/mobile/runtime/ToolApprovalDecision;
+	public final fun copy (Lcom/letta/mobile/runtime/ToolApprovalDecision;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalResolved;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalResolved;Lcom/letta/mobile/runtime/ToolApprovalDecision;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalResolved;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDecision ()Lcom/letta/mobile/runtime/ToolApprovalDecision;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$ApprovalResolved$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalResolved$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalResolved;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$ApprovalResolved;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$ApprovalResolved$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$CommandFinished : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$CommandFinished$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZZZ)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Z
+	public final fun component5 ()Z
+	public final fun component6 ()Z
+	public final fun component7 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZZZ)Lcom/letta/mobile/runtime/RuntimeEventPayload$CommandFinished;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$CommandFinished;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZZZILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$CommandFinished;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCommandId ()Ljava/lang/String;
+	public final fun getDimOutput ()Z
+	public final fun getInput ()Ljava/lang/String;
+	public final fun getOutput ()Ljava/lang/String;
+	public final fun getPreformatted ()Z
+	public final fun getSlash ()Z
+	public final fun getSuccess ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$CommandFinished$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$CommandFinished$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$CommandFinished;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$CommandFinished;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$CommandFinished$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$CommandStarted : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$CommandStarted$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Z)Lcom/letta/mobile/runtime/RuntimeEventPayload$CommandStarted;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$CommandStarted;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$CommandStarted;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCommandId ()Ljava/lang/String;
+	public final fun getInput ()Ljava/lang/String;
+	public final fun getSlash ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$CommandStarted$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$CommandStarted$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$CommandStarted;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$CommandStarted;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$CommandStarted$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$CompactionFinished : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$CompactionFinished$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/runtime/CompactionStats;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/runtime/CompactionStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/runtime/CompactionStats;
+	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/runtime/CompactionStats;)Lcom/letta/mobile/runtime/RuntimeEventPayload$CompactionFinished;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$CompactionFinished;Ljava/lang/String;Lcom/letta/mobile/runtime/CompactionStats;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$CompactionFinished;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStats ()Lcom/letta/mobile/runtime/CompactionStats;
+	public final fun getSummary ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$CompactionFinished$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$CompactionFinished$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$CompactionFinished;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$CompactionFinished;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$CompactionFinished$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$CompactionStarted : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$CompactionStarted$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeEventPayload$CompactionStarted;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$CompactionStarted;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$CompactionStarted;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTrigger ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$CompactionStarted$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$CompactionStarted$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$CompactionStarted;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$CompactionStarted;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$CompactionStarted$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$ExternalTransportFrame : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$ExternalTransportFrame$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ExternalTransportFrame;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$ExternalTransportFrame;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ExternalTransportFrame;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBody ()Ljava/lang/String;
+	public final fun getFrameId ()Ljava/lang/String;
+	public final fun getTransportMessageId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$ExternalTransportFrame$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$ExternalTransportFrame$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ExternalTransportFrame;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$ExternalTransportFrame;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$ExternalTransportFrame$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$LocalUserAppend : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$LocalUserAppend$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeEventPayload$LocalUserAppend;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$LocalUserAppend;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$LocalUserAppend;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLocalMessageId ()Ljava/lang/String;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$LocalUserAppend$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$LocalUserAppend$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$LocalUserAppend;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$LocalUserAppend;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$LocalUserAppend$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$LoopPhaseChanged : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$LoopPhaseChanged$Companion;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeEventPayload$LoopPhaseChanged;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$LoopPhaseChanged;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$LoopPhaseChanged;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStatus ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$LoopPhaseChanged$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$LoopPhaseChanged$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$LoopPhaseChanged;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$LoopPhaseChanged;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$LoopPhaseChanged$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$MemFsCommitObserved : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$MemFsCommitObserved$Companion;
+	public fun <init> (Lcom/letta/mobile/runtime/MemFsCommit;)V
+	public final fun component1 ()Lcom/letta/mobile/runtime/MemFsCommit;
+	public final fun copy (Lcom/letta/mobile/runtime/MemFsCommit;)Lcom/letta/mobile/runtime/RuntimeEventPayload$MemFsCommitObserved;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$MemFsCommitObserved;Lcom/letta/mobile/runtime/MemFsCommit;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$MemFsCommitObserved;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCommit ()Lcom/letta/mobile/runtime/MemFsCommit;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$MemFsCommitObserved$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$MemFsCommitObserved$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$MemFsCommitObserved;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$MemFsCommitObserved;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$MemFsCommitObserved$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$RemoteStreamFrame : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$RemoteStreamFrame$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeEventPayload$RemoteStreamFrame;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$RemoteStreamFrame;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$RemoteStreamFrame;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBody ()Ljava/lang/String;
+	public final fun getFrameId ()Ljava/lang/String;
+	public final fun getMessageId ()Ljava/lang/String;
+	public final fun getMessageType ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$RemoteStreamFrame$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$RemoteStreamFrame$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$RemoteStreamFrame;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$RemoteStreamFrame;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$RemoteStreamFrame$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$RestSnapshotReconcile : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$RestSnapshotReconcile$Companion;
+	public fun <init> (Ljava/lang/String;I)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()I
+	public final fun copy (Ljava/lang/String;I)Lcom/letta/mobile/runtime/RuntimeEventPayload$RestSnapshotReconcile;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$RestSnapshotReconcile;Ljava/lang/String;IILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$RestSnapshotReconcile;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMessageCount ()I
+	public final fun getSnapshotId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$RestSnapshotReconcile$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$RestSnapshotReconcile$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$RestSnapshotReconcile;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$RestSnapshotReconcile;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$RestSnapshotReconcile$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$RetryNotice : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$RetryNotice$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;IIJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;IIJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun component5 ()J
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;IIJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeEventPayload$RetryNotice;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$RetryNotice;Ljava/lang/String;Ljava/lang/String;IIJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$RetryNotice;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAttempt ()I
+	public final fun getDelayMs ()J
+	public final fun getErrorCode ()Ljava/lang/String;
+	public final fun getMaxAttempts ()I
+	public final fun getMessage ()Ljava/lang/String;
+	public final fun getProvider ()Ljava/lang/String;
+	public final fun getReason ()Ljava/lang/String;
+	public final fun getRetryKind ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$RetryNotice$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$RetryNotice$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$RetryNotice;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$RetryNotice;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$RetryNotice$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$RetryRequested : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$RetryRequested$Companion;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeEventPayload$RetryRequested;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$RetryRequested;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$RetryRequested;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLocalMessageId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$RetryRequested$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$RetryRequested$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$RetryRequested;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$RetryRequested;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$RetryRequested$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$RunLifecycleChanged : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$RunLifecycleChanged$Companion;
+	public fun <init> (Lcom/letta/mobile/runtime/RuntimeRunStatus;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/letta/mobile/runtime/RuntimeRunStatus;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/runtime/RuntimeRunStatus;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/runtime/RuntimeRunStatus;Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeEventPayload$RunLifecycleChanged;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$RunLifecycleChanged;Lcom/letta/mobile/runtime/RuntimeRunStatus;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$RunLifecycleChanged;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public final fun getStatus ()Lcom/letta/mobile/runtime/RuntimeRunStatus;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$RunLifecycleChanged$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$RunLifecycleChanged$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$RunLifecycleChanged;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$RunLifecycleChanged;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$RunLifecycleChanged$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$SendMarkedFailed : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$SendMarkedFailed$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeEventPayload$SendMarkedFailed;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$SendMarkedFailed;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$SendMarkedFailed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLocalMessageId ()Ljava/lang/String;
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$SendMarkedFailed$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$SendMarkedFailed$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$SendMarkedFailed;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$SendMarkedFailed;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$SendMarkedFailed$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$SendMarkedSent : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$SendMarkedSent$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeEventPayload$SendMarkedSent;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$SendMarkedSent;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$SendMarkedSent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLocalMessageId ()Ljava/lang/String;
+	public final fun getServerMessageId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$SendMarkedSent$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$SendMarkedSent$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$SendMarkedSent;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$SendMarkedSent;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$SendMarkedSent$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$StatusNotice : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$StatusNotice$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeEventPayload$StatusNotice;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$StatusNotice;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$StatusNotice;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLevel ()Ljava/lang/String;
+	public final fun getMessage ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$StatusNotice$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$StatusNotice$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$StatusNotice;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$StatusNotice;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$StatusNotice$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$ToolCallObserved : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$ToolCallObserved$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-8d1HVHA ()Ljava/lang/String;
+	public final fun component2-La_berw ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy-bMDQdTk (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ToolCallObserved;
+	public static synthetic fun copy-bMDQdTk$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$ToolCallObserved;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ToolCallObserved;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArgumentsJson ()Ljava/lang/String;
+	public final fun getToolCallId-8d1HVHA ()Ljava/lang/String;
+	public final fun getToolName-La_berw ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$ToolCallObserved$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$ToolCallObserved$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ToolCallObserved;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$ToolCallObserved;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$ToolCallObserved$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$ToolReturnObserved : com/letta/mobile/runtime/RuntimeEventPayload {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventPayload$ToolReturnObserved$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/runtime/ToolExecutionStatus;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-8d1HVHA ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/runtime/ToolExecutionStatus;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy-bnBevmQ (Ljava/lang/String;Lcom/letta/mobile/runtime/ToolExecutionStatus;Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ToolReturnObserved;
+	public static synthetic fun copy-bnBevmQ$default (Lcom/letta/mobile/runtime/RuntimeEventPayload$ToolReturnObserved;Ljava/lang/String;Lcom/letta/mobile/runtime/ToolExecutionStatus;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ToolReturnObserved;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBody ()Ljava/lang/String;
+	public final fun getStatus ()Lcom/letta/mobile/runtime/ToolExecutionStatus;
+	public final fun getToolCallId-8d1HVHA ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeEventPayload$ToolReturnObserved$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventPayload$ToolReturnObserved$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeEventPayload$ToolReturnObserved;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeEventPayload$ToolReturnObserved;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventPayload$ToolReturnObserved$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventProjector {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeEventProjector;
+	public final fun reduce (Lcom/letta/mobile/runtime/RuntimeProjection;Lcom/letta/mobile/runtime/RuntimeEventEnvelope;)Lcom/letta/mobile/runtime/RuntimeProjection;
+	public final fun replay (Lcom/letta/mobile/runtime/RuntimeProjection;Ljava/lang/Iterable;)Lcom/letta/mobile/runtime/RuntimeProjection;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventSource : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeEventSource$Companion;
+	public static final field ExternalTransport Lcom/letta/mobile/runtime/RuntimeEventSource;
+	public static final field LocalRuntime Lcom/letta/mobile/runtime/RuntimeEventSource;
+	public static final field LocalUser Lcom/letta/mobile/runtime/RuntimeEventSource;
+	public static final field RemoteLetta Lcom/letta/mobile/runtime/RuntimeEventSource;
+	public static final field RestSnapshot Lcom/letta/mobile/runtime/RuntimeEventSource;
+	public static final field System Lcom/letta/mobile/runtime/RuntimeEventSource;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeEventSource;
+	public static fun values ()[Lcom/letta/mobile/runtime/RuntimeEventSource;
+}
+
+public final class com/letta/mobile/runtime/RuntimeEventSource$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeFrame {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeFrame$Companion;
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeEventSource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeEventSource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/letta/mobile/runtime/RuntimeEventSource;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeEventSource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeFrame;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeFrame;Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeEventSource;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeFrame;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBody ()Ljava/lang/String;
+	public final fun getFrameId ()Ljava/lang/String;
+	public final fun getMessageId ()Ljava/lang/String;
+	public final fun getMessageType ()Ljava/lang/String;
+	public final fun getSource ()Lcom/letta/mobile/runtime/RuntimeEventSource;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeFrame$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeFrame$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeFrame;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeFrame;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeFrame$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeId {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-x39xM4s (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-3ylkO8s (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeLocalDelivery : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeLocalDelivery$Companion;
+	public static final field Failed Lcom/letta/mobile/runtime/RuntimeLocalDelivery;
+	public static final field Retrying Lcom/letta/mobile/runtime/RuntimeLocalDelivery;
+	public static final field Sending Lcom/letta/mobile/runtime/RuntimeLocalDelivery;
+	public static final field Sent Lcom/letta/mobile/runtime/RuntimeLocalDelivery;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeLocalDelivery;
+	public static fun values ()[Lcom/letta/mobile/runtime/RuntimeLocalDelivery;
+}
+
+public final class com/letta/mobile/runtime/RuntimeLocalDelivery$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeLocalMessage {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeLocalMessage$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeLocalDelivery;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeLocalDelivery;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lcom/letta/mobile/runtime/RuntimeLocalDelivery;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeLocalDelivery;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeLocalMessage;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/RuntimeLocalMessage;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/RuntimeLocalDelivery;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeLocalMessage;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDelivery ()Lcom/letta/mobile/runtime/RuntimeLocalDelivery;
+	public final fun getFailureReason ()Ljava/lang/String;
+	public final fun getLocalMessageId ()Ljava/lang/String;
+	public final fun getServerMessageId ()Ljava/lang/String;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeLocalMessage$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeLocalMessage$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeLocalMessage;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeLocalMessage;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeLocalMessage$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeProjection {
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeProjection$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;JLjava/util/Set;Ljava/util/Set;Lkotlinx/collections/immutable/ImmutableList;Lkotlinx/collections/immutable/ImmutableList;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/letta/mobile/runtime/MemFsRevision;Ljava/util/Map;Ljava/lang/String;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;JLjava/util/Set;Ljava/util/Set;Lkotlinx/collections/immutable/ImmutableList;Lkotlinx/collections/immutable/ImmutableList;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/letta/mobile/runtime/MemFsRevision;Ljava/util/Map;Ljava/lang/String;Ljava/lang/Integer;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-DVvX2l4 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/util/Map;
+	public final fun component11 ()Ljava/util/Map;
+	public final fun component12-OfM8xsY ()Lcom/letta/mobile/runtime/MemFsRevision;
+	public final fun component13 ()Ljava/util/Map;
+	public final fun component14 ()Ljava/lang/String;
+	public final fun component15 ()Ljava/lang/Integer;
+	public final fun component2-t4PSxKQ ()Ljava/lang/String;
+	public final fun component3-twxv5bg ()J
+	public final fun component4 ()Ljava/util/Set;
+	public final fun component5 ()Ljava/util/Set;
+	public final fun component6 ()Lkotlinx/collections/immutable/ImmutableList;
+	public final fun component7 ()Lkotlinx/collections/immutable/ImmutableList;
+	public final fun component8 ()Ljava/util/Map;
+	public final fun component9 ()Ljava/util/Map;
+	public final fun copy-A3EpC58 (Ljava/lang/String;Ljava/lang/String;JLjava/util/Set;Ljava/util/Set;Lkotlinx/collections/immutable/ImmutableList;Lkotlinx/collections/immutable/ImmutableList;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/letta/mobile/runtime/MemFsRevision;Ljava/util/Map;Ljava/lang/String;Ljava/lang/Integer;)Lcom/letta/mobile/runtime/RuntimeProjection;
+	public static synthetic fun copy-A3EpC58$default (Lcom/letta/mobile/runtime/RuntimeProjection;Ljava/lang/String;Ljava/lang/String;JLjava/util/Set;Ljava/util/Set;Lkotlinx/collections/immutable/ImmutableList;Lkotlinx/collections/immutable/ImmutableList;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/letta/mobile/runtime/MemFsRevision;Ljava/util/Map;Ljava/lang/String;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/letta/mobile/runtime/RuntimeProjection;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentFiles ()Ljava/util/Map;
+	public final fun getBackendId-DVvX2l4 ()Ljava/lang/String;
+	public final fun getFrames ()Lkotlinx/collections/immutable/ImmutableList;
+	public final fun getIgnoredEventIds ()Ljava/util/Set;
+	public final fun getLastOffset-twxv5bg ()J
+	public final fun getLastSnapshotId ()Ljava/lang/String;
+	public final fun getLastSnapshotMessageCount ()Ljava/lang/Integer;
+	public final fun getLocalMessages ()Lkotlinx/collections/immutable/ImmutableList;
+	public final fun getMemFsRevision-OfM8xsY ()Lcom/letta/mobile/runtime/MemFsRevision;
+	public final fun getPendingApprovals ()Ljava/util/Map;
+	public final fun getResolvedApprovals ()Ljava/util/Map;
+	public final fun getRunStatuses ()Ljava/util/Map;
+	public final fun getRuntimeId-t4PSxKQ ()Ljava/lang/String;
+	public final fun getSeenEventIds ()Ljava/util/Set;
+	public final fun getToolExecutions ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/RuntimeProjection$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeProjection$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/RuntimeProjection;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/RuntimeProjection;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeProjection$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeRunStatus : java/lang/Enum {
+	public static final field Cancelled Lcom/letta/mobile/runtime/RuntimeRunStatus;
+	public static final field Companion Lcom/letta/mobile/runtime/RuntimeRunStatus$Companion;
+	public static final field Completed Lcom/letta/mobile/runtime/RuntimeRunStatus;
+	public static final field Failed Lcom/letta/mobile/runtime/RuntimeRunStatus;
+	public static final field Running Lcom/letta/mobile/runtime/RuntimeRunStatus;
+	public static final field Started Lcom/letta/mobile/runtime/RuntimeRunStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/runtime/RuntimeRunStatus;
+	public static fun values ()[Lcom/letta/mobile/runtime/RuntimeRunStatus;
+}
+
+public final class com/letta/mobile/runtime/RuntimeRunStatus$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/RuntimeUserInputTools {
+	public static final field ASK_USER_QUESTION Ljava/lang/String;
+	public static final field EXIT_PLAN_MODE Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/runtime/RuntimeUserInputTools;
+	public final fun getNames ()Ljava/util/Set;
+	public final fun requiresUserInput (Ljava/lang/String;)Z
+}
+
+public final class com/letta/mobile/runtime/ToolApprovalDecision {
+	public static final field Companion Lcom/letta/mobile/runtime/ToolApprovalDecision$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/ToolApprovalDecisionValue;Lcom/letta/mobile/runtime/ToolApprovalScope;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/ToolApprovalDecisionValue;Lcom/letta/mobile/runtime/ToolApprovalScope;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-OqMkDuE ()Ljava/lang/String;
+	public final fun component2-8d1HVHA ()Ljava/lang/String;
+	public final fun component3 ()Lcom/letta/mobile/runtime/ToolApprovalDecisionValue;
+	public final fun component4 ()Lcom/letta/mobile/runtime/ToolApprovalScope;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy-MH1hyrU (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/ToolApprovalDecisionValue;Lcom/letta/mobile/runtime/ToolApprovalScope;Ljava/lang/String;)Lcom/letta/mobile/runtime/ToolApprovalDecision;
+	public static synthetic fun copy-MH1hyrU$default (Lcom/letta/mobile/runtime/ToolApprovalDecision;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/ToolApprovalDecisionValue;Lcom/letta/mobile/runtime/ToolApprovalScope;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/ToolApprovalDecision;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getApprovalId-OqMkDuE ()Ljava/lang/String;
+	public final fun getCallId-8d1HVHA ()Ljava/lang/String;
+	public final fun getDecision ()Lcom/letta/mobile/runtime/ToolApprovalDecisionValue;
+	public final fun getResponse ()Ljava/lang/String;
+	public final fun getScope ()Lcom/letta/mobile/runtime/ToolApprovalScope;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/ToolApprovalDecision$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/ToolApprovalDecision$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/ToolApprovalDecision;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/ToolApprovalDecision;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolApprovalDecision$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolApprovalDecisionValue : java/lang/Enum {
+	public static final field Approved Lcom/letta/mobile/runtime/ToolApprovalDecisionValue;
+	public static final field Companion Lcom/letta/mobile/runtime/ToolApprovalDecisionValue$Companion;
+	public static final field Denied Lcom/letta/mobile/runtime/ToolApprovalDecisionValue;
+	public static final field TimedOut Lcom/letta/mobile/runtime/ToolApprovalDecisionValue;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/runtime/ToolApprovalDecisionValue;
+	public static fun values ()[Lcom/letta/mobile/runtime/ToolApprovalDecisionValue;
+}
+
+public final class com/letta/mobile/runtime/ToolApprovalDecisionValue$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolApprovalId {
+	public static final field Companion Lcom/letta/mobile/runtime/ToolApprovalId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/runtime/ToolApprovalId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/ToolApprovalId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/ToolApprovalId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-3HCo8yI (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-1C_nhVg (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolApprovalId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolApprovalMode : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/runtime/ToolApprovalMode$Companion;
+	public static final field NeverRequire Lcom/letta/mobile/runtime/ToolApprovalMode;
+	public static final field RequireForEveryCall Lcom/letta/mobile/runtime/ToolApprovalMode;
+	public static final field RequireForSensitiveTools Lcom/letta/mobile/runtime/ToolApprovalMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/runtime/ToolApprovalMode;
+	public static fun values ()[Lcom/letta/mobile/runtime/ToolApprovalMode;
+}
+
+public final class com/letta/mobile/runtime/ToolApprovalMode$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolApprovalRequest {
+	public static final field Companion Lcom/letta/mobile/runtime/ToolApprovalRequest$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/util/List;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-OqMkDuE ()Ljava/lang/String;
+	public final fun component2-8d1HVHA ()Ljava/lang/String;
+	public final fun component3-La_berw ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/util/List;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Ljava/util/List;
+	public final fun copy-Z4uynX8 (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/util/List;)Lcom/letta/mobile/runtime/ToolApprovalRequest;
+	public static synthetic fun copy-Z4uynX8$default (Lcom/letta/mobile/runtime/ToolApprovalRequest;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/runtime/ToolApprovalRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getApprovalId-OqMkDuE ()Ljava/lang/String;
+	public final fun getArgumentsPreview ()Ljava/lang/String;
+	public final fun getBlockedPath ()Ljava/lang/String;
+	public final fun getCallId-8d1HVHA ()Ljava/lang/String;
+	public final fun getDiffs ()Ljava/util/List;
+	public final fun getPrompt ()Ljava/lang/String;
+	public final fun getSuggestions ()Ljava/util/List;
+	public final fun getToolName-La_berw ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/ToolApprovalRequest$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/ToolApprovalRequest$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/ToolApprovalRequest;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/ToolApprovalRequest;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolApprovalRequest$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolApprovalScope : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/runtime/ToolApprovalScope$Companion;
+	public static final field Forever Lcom/letta/mobile/runtime/ToolApprovalScope;
+	public static final field Once Lcom/letta/mobile/runtime/ToolApprovalScope;
+	public static final field Session Lcom/letta/mobile/runtime/ToolApprovalScope;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/runtime/ToolApprovalScope;
+	public static fun values ()[Lcom/letta/mobile/runtime/ToolApprovalScope;
+}
+
+public final class com/letta/mobile/runtime/ToolApprovalScope$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolCallId {
+	public static final field Companion Lcom/letta/mobile/runtime/ToolCallId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/runtime/ToolCallId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/ToolCallId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/ToolCallId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-9rL6veU (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-bawu-so (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolCallId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolExecutionProjection {
+	public static final field Companion Lcom/letta/mobile/runtime/ToolExecutionProjection$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/ToolExecutionStatus;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/ToolExecutionStatus;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-8d1HVHA ()Ljava/lang/String;
+	public final fun component2-ZaZZCLE ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Lcom/letta/mobile/runtime/ToolExecutionStatus;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun copy-1V322AM (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/ToolExecutionStatus;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/runtime/ToolExecutionProjection;
+	public static synthetic fun copy-1V322AM$default (Lcom/letta/mobile/runtime/ToolExecutionProjection;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/ToolExecutionStatus;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/ToolExecutionProjection;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArgumentsJson ()Ljava/lang/String;
+	public final fun getBody ()Ljava/lang/String;
+	public final fun getCallId-8d1HVHA ()Ljava/lang/String;
+	public final fun getErrorMessage ()Ljava/lang/String;
+	public final fun getName-ZaZZCLE ()Ljava/lang/String;
+	public final fun getStatus ()Lcom/letta/mobile/runtime/ToolExecutionStatus;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/ToolExecutionProjection$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/ToolExecutionProjection$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/ToolExecutionProjection;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/ToolExecutionProjection;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolExecutionProjection$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolExecutionStatus : java/lang/Enum {
+	public static final field Cancelled Lcom/letta/mobile/runtime/ToolExecutionStatus;
+	public static final field Companion Lcom/letta/mobile/runtime/ToolExecutionStatus$Companion;
+	public static final field Failed Lcom/letta/mobile/runtime/ToolExecutionStatus;
+	public static final field Pending Lcom/letta/mobile/runtime/ToolExecutionStatus;
+	public static final field Running Lcom/letta/mobile/runtime/ToolExecutionStatus;
+	public static final field Succeeded Lcom/letta/mobile/runtime/ToolExecutionStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/runtime/ToolExecutionStatus;
+	public static fun values ()[Lcom/letta/mobile/runtime/ToolExecutionStatus;
+}
+
+public final class com/letta/mobile/runtime/ToolExecutionStatus$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolName {
+	public static final field Companion Lcom/letta/mobile/runtime/ToolName$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/runtime/ToolName;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/ToolName$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/ToolName$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-q68jYQc (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-Zhmzw4A (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolName$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolPolicy {
+	public static final field Companion Lcom/letta/mobile/runtime/ToolPolicy$Companion;
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/runtime/ToolApprovalMode;Ljava/util/Set;Ljava/util/Set;)V
+	public synthetic fun <init> (Lcom/letta/mobile/runtime/ToolApprovalMode;Ljava/util/Set;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/runtime/ToolApprovalMode;
+	public final fun component2 ()Ljava/util/Set;
+	public final fun component3 ()Ljava/util/Set;
+	public final fun copy (Lcom/letta/mobile/runtime/ToolApprovalMode;Ljava/util/Set;Ljava/util/Set;)Lcom/letta/mobile/runtime/ToolPolicy;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/ToolPolicy;Lcom/letta/mobile/runtime/ToolApprovalMode;Ljava/util/Set;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/runtime/ToolPolicy;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAllowedTools ()Ljava/util/Set;
+	public final fun getApprovalMode ()Lcom/letta/mobile/runtime/ToolApprovalMode;
+	public final fun getDeniedTools ()Ljava/util/Set;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/ToolPolicy$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/ToolPolicy$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/ToolPolicy;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/ToolPolicy;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/ToolPolicy$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/TurnCommand {
+	public static final field Companion Lcom/letta/mobile/runtime/TurnCommand$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/TurnInput;Lcom/letta/mobile/runtime/MemFsRevision;Lcom/letta/mobile/runtime/ToolPolicy;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/TurnInput;Lcom/letta/mobile/runtime/MemFsRevision;Lcom/letta/mobile/runtime/ToolPolicy;Ljava/util/Map;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-DVvX2l4 ()Ljava/lang/String;
+	public final fun component2-t4PSxKQ ()Ljava/lang/String;
+	public final fun component3-zqmzO_A ()Ljava/lang/String;
+	public final fun component4-1iB-n_M ()Ljava/lang/String;
+	public final fun component5 ()Lcom/letta/mobile/runtime/TurnInput;
+	public final fun component6-OfM8xsY ()Lcom/letta/mobile/runtime/MemFsRevision;
+	public final fun component7 ()Lcom/letta/mobile/runtime/ToolPolicy;
+	public final fun component8 ()Ljava/util/Map;
+	public final fun copy-ZX-EfXg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/TurnInput;Lcom/letta/mobile/runtime/MemFsRevision;Lcom/letta/mobile/runtime/ToolPolicy;Ljava/util/Map;)Lcom/letta/mobile/runtime/TurnCommand;
+	public static synthetic fun copy-ZX-EfXg$default (Lcom/letta/mobile/runtime/TurnCommand;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/runtime/TurnInput;Lcom/letta/mobile/runtime/MemFsRevision;Lcom/letta/mobile/runtime/ToolPolicy;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/runtime/TurnCommand;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId-zqmzO_A ()Ljava/lang/String;
+	public final fun getBackendId-DVvX2l4 ()Ljava/lang/String;
+	public final fun getConversationId-1iB-n_M ()Ljava/lang/String;
+	public final fun getInput ()Lcom/letta/mobile/runtime/TurnInput;
+	public final fun getMemFsRevision-OfM8xsY ()Lcom/letta/mobile/runtime/MemFsRevision;
+	public final fun getMetadata ()Ljava/util/Map;
+	public final fun getRuntimeId-t4PSxKQ ()Ljava/lang/String;
+	public final fun getToolPolicy ()Lcom/letta/mobile/runtime/ToolPolicy;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/TurnCommand$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/TurnCommand$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/TurnCommand;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/TurnCommand;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/TurnCommand$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/runtime/TurnEngine {
+	public abstract fun runTurn (Lcom/letta/mobile/runtime/TurnCommand;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class com/letta/mobile/runtime/TurnImagePart {
+	public static final field Companion Lcom/letta/mobile/runtime/TurnImagePart$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/runtime/TurnImagePart;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/TurnImagePart;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/TurnImagePart;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBase64 ()Ljava/lang/String;
+	public final fun getMediaType ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/TurnImagePart$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/TurnImagePart$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/TurnImagePart;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/TurnImagePart;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/TurnImagePart$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/runtime/TurnInput {
+	public static final field Companion Lcom/letta/mobile/runtime/TurnInput$Companion;
+}
+
+public final class com/letta/mobile/runtime/TurnInput$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/TurnInput$ToolApprovalResponse : com/letta/mobile/runtime/TurnInput {
+	public static final field Companion Lcom/letta/mobile/runtime/TurnInput$ToolApprovalResponse$Companion;
+	public fun <init> (Lcom/letta/mobile/runtime/ToolApprovalDecision;)V
+	public final fun component1 ()Lcom/letta/mobile/runtime/ToolApprovalDecision;
+	public final fun copy (Lcom/letta/mobile/runtime/ToolApprovalDecision;)Lcom/letta/mobile/runtime/TurnInput$ToolApprovalResponse;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/TurnInput$ToolApprovalResponse;Lcom/letta/mobile/runtime/ToolApprovalDecision;ILjava/lang/Object;)Lcom/letta/mobile/runtime/TurnInput$ToolApprovalResponse;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDecision ()Lcom/letta/mobile/runtime/ToolApprovalDecision;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/TurnInput$ToolApprovalResponse$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/TurnInput$ToolApprovalResponse$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/TurnInput$ToolApprovalResponse;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/TurnInput$ToolApprovalResponse;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/TurnInput$ToolApprovalResponse$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/TurnInput$UserMessage : com/letta/mobile/runtime/TurnInput {
+	public static final field Companion Lcom/letta/mobile/runtime/TurnInput$UserMessage$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/runtime/TurnInput$UserMessage;
+	public static synthetic fun copy$default (Lcom/letta/mobile/runtime/TurnInput$UserMessage;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/runtime/TurnInput$UserMessage;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAttachments ()Ljava/util/List;
+	public final fun getContentPartsJson ()Ljava/lang/String;
+	public final fun getImageParts ()Ljava/util/List;
+	public final fun getLocalMessageId ()Ljava/lang/String;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/runtime/TurnInput$UserMessage$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/runtime/TurnInput$UserMessage$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/runtime/TurnInput$UserMessage;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/runtime/TurnInput$UserMessage;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/runtime/TurnInput$UserMessage$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
