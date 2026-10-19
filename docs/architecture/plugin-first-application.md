@@ -19,12 +19,13 @@ Packaging, dynamic code loading and contribution registration are separate conce
 A bundled KMP extension participates without runtime code loading; installed
 extensions must enter the same contribution and provider resolution model.
 
-## Current implementation: source-backed inventory
+## Source audit baseline: 2026-10-19
 
-The current plugin system extends canvas content and agent actions. It provides a
-foundation, but does not currently expose arbitrary application feature registration.
-Evidence below describes source at the start of this proposal; follow the linked
-declarations rather than interpreting this inventory as a generated API reference.
+The implementation claims in this section describe the pre-migration audit at
+commit [`c38fce1536b77bd893eb676f2a33fd8f4f4d4d12`](https://github.com/oculairmedia/letta-mobile/tree/c38fce1536b77bd893eb676f2a33fd8f4f4d4d12).
+At that baseline, plugins extend canvas content and agent actions, without arbitrary
+application feature registration. Relative declaration links help locate ownership;
+this dated evidence is not a generated API reference or a claim about later revisions.
 
 | Existing boundary | Implemented responsibility and limit |
 | --- | --- |
@@ -43,12 +44,13 @@ declarations rather than interpreting this inventory as a generated API referenc
 
 ### Runtime and platform limits
 
-[PluginDriverHost](../../android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/host/PluginDriverHost.kt)
+At the audited commit,
+[PluginDriverHost](https://github.com/oculairmedia/letta-mobile/blob/c38fce1536b77bd893eb676f2a33fd8f4f4d4d12/android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/host/PluginDriverHost.kt)
 constructs ProcessPluginDriver directly. That
-[driver](../../android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/host/ProcessPluginDriver.kt)
+[driver](https://github.com/oculairmedia/letta-mobile/blob/c38fce1536b77bd893eb676f2a33fd8f4f4d4d12/android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/host/ProcessPluginDriver.kt)
 rejects a runtime that is not PluginRuntime.Process. JVM and service variants in
 the manifest are declarations, not evidence of implemented execution support.
-The launch boundary currently supplies setting defaults and an empty secrets
+The audited launch boundary supplies setting defaults and an empty secrets
 container; persisted overrides and secret delivery need implementation before
 features can rely on them.
 
@@ -59,6 +61,12 @@ and JVM targets, with Android WebView and desktop JCEF bindings.
 [WebShellPages](../../android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/WebShellPages.kt)
 explicitly supplies UnavailablePluginCatalog. Browser plugin parity is therefore
 work to implement, rather than a capability to assume.
+
+The runtime-hosting provider foundation is underway in `letta-mobile-wtioi.2`,
+after this audit; it is not shipped behavior at the baseline above. The agreed scope
+still requires all six infrastructure provider families and both bundled and
+runtime-installed extensions. This first slice does not complete that migration or
+establish browser execution support.
 
 ## Proposed architecture: contracts, kernel and distribution
 
