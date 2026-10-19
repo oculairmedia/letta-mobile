@@ -52,8 +52,9 @@ Both builds must succeed before the combined site can deploy.
 CI pins source links to the checked-out commit using `-PdokkaSourceRef=<sha>`.
 Local generation defaults to `main`; pass your commit or branch to link your
 current revision. Public/protected production declarations are included and
-generated files are suppressed. Existing missing KDocs do not fail generation;
-generation errors do. This is not a claim of complete KDoc coverage.
+generated files are suppressed. Missing KDocs are checked against a shrinking diagnostic baseline for the
+runtime and plugin API modules and shared extension packages. Other packages
+remain outside that coverage policy; generation errors fail the build.
 
 Keep architecture decisions, operating procedures, design intent and measured
 evidence in hand-written docs. Generate API shapes from source and keep runtime
@@ -115,6 +116,40 @@ The required `test` status aggregates `test-workload` and `api-docs`. Both run i
 parallel; generation errors, missing linked declarations and failed tests all
 block that status. The aggregate runs even when a dependency is skipped or
 cancelled and accepts only explicit success from both jobs.
+
+## Maintaining the KDoc contract
+
+`api-docs` captures actual Dokka `Undocumented:` diagnostics for `:core:runtime`,
+`:plugin-api`, and the shared controller extras, timeline, transport API, App Server and chat
+session packages. Each baseline entry retains its module, overload signature
+and source set. Counts are printed per module, but removing documentation on one
+API cannot be offset by documenting a different API. `:core:runtime` must have
+zero missing comments and cannot be baselined.
+
+The checker rejects new undocumented signatures, stale baseline entries, and
+baseline additions relative to the PR base commit. It also rejects failed or
+cached module generation: cached HTML cannot replay documentation warnings.
+The monitored Dokka tasks therefore run freshly, while other Gradle tasks may
+still use their caches.
+
+After documenting or removing an existing API, capture a successful build and
+refresh the baseline from its diagnostics, then review the resulting deletions:
+
+```bash
+cd android-compose
+set -o pipefail
+./gradlew --no-daemon --no-parallel --max-workers=2 --console=plain \
+  -Pkotlin.compiler.execution.strategy=in-process \
+  :core:runtime:dokkaGenerateModuleHtml :plugin-api:dokkaGenerateModuleHtml \
+  :sharedLogic:dokkaGenerateModuleHtml 2>&1 | tee dokka-diagnostics.log
+cd ..
+python3 scripts/ci/check-api-doc-undocumented.py android-compose/dokka-diagnostics.log --write-baseline
+python3 scripts/ci/check-api-doc-undocumented.py android-compose/dokka-diagnostics.log --diff-base origin/main
+```
+
+Writing a baseline records evidence; it does not authorize new debt. New public
+APIs in the monitored packages need KDoc. Describe semantics and constraints,
+including constructor properties and enum entries, rather than repeating names.
 
 ## Automation boundaries and next increments
 

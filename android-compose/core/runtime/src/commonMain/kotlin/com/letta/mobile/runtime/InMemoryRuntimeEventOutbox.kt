@@ -6,6 +6,14 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+/**
+ * Process-lifetime outbox that serializes batches with a mutex.
+ * Offsets begin at one in draft order. Collectors replay retained rows and follow later snapshots.
+ * All rows remain resident and are lost with this instance: this is not a durable restart log.
+ *
+ * @param eventIdFactory assigns IDs for drafts/offsets; uniqueness is the caller’s responsibility.
+ * @param clock supplies the recorded time separately for each envelope.
+ */
 class InMemoryRuntimeEventOutbox(
     private val eventIdFactory: (RuntimeEventDraft, RuntimeEventOffset) -> RuntimeEventId,
     private val clock: () -> EpochMillis,

@@ -1,9 +1,11 @@
 package com.letta.mobile.docs
 
 import org.gradle.testkit.runner.GradleRunner
+import org.gradle.testkit.runner.TaskOutcome
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -15,20 +17,23 @@ class ApiDocumentationPluginTest {
     fun `aggregates module and package overviews with KDoc and revision links`() {
         projectDir.resolve("settings.gradle.kts").writeText("""
             rootProject.name = "api-fixture"
-            include(":contract")
+            include(":core:runtime", ":sharedLogic")
         """.trimIndent())
         projectDir.resolve("build.gradle.kts").writeText("""
             plugins { id("com.letta.mobile.api-documentation") }
             repositories { mavenCentral() }
-            dependencies { add("dokka", project(":contract")) }
+            dependencies {
+                add("dokka", project(":core:runtime"))
+                add("dokka", project(":sharedLogic"))
+            }
         """.trimIndent())
         projectDir.resolve("Module.md").writeText("""
             # Module Letta Mobile API
             Shared contracts connect the product hosts through portable Kotlin domain and rendering APIs.
         """.trimIndent())
-        val module = projectDir.resolve("contract").apply { mkdirs() }
+        val module = projectDir.resolve("core/runtime").apply { mkdirs() }
         module.resolve("Module.md").writeText("""
-            # Module :contract
+            # Module :core:runtime
             Extension authors implement this contract while the host owns lifecycle and capability enforcement.
 
             # Package example
@@ -47,14 +52,34 @@ class ApiDocumentationPluginTest {
                 package example
                 /** A clock carried by a shared contract. */
                 class ApiClock
+                class MissingContractDoc
                 internal class HiddenClock
             """.trimIndent())
         }
-        GradleRunner.create()
+        val shared = projectDir.resolve("sharedLogic").apply { mkdirs() }
+        shared.resolve("build.gradle.kts").writeText(module.resolve("build.gradle.kts").readText())
+        shared.resolve("src/main/kotlin/Extension.kt").apply {
+            parentFile.mkdirs()
+            writeText("package com.letta.mobile.data.timeline.api; class MissingExtensionDoc")
+        }
+        shared.resolve("src/main/kotlin/Outside.kt").writeText("package example; class ExistingUngatedDebt")
+        val runner = GradleRunner.create()
             .withProjectDir(projectDir)
             .withPluginClasspath()
-            .withArguments("dokkaGeneratePublicationHtml", "-PdokkaSourceRef=fixture-sha", "--configuration-cache")
-            .build()
+            .withArguments(
+                "dokkaGeneratePublicationHtml", "-PdokkaSourceRef=fixture-sha", "--configuration-cache",
+                "--build-cache", "--no-parallel", "--max-workers=2", "-Pkotlin.compiler.execution.strategy=in-process",
+            )
+        val result = runner.build()
+        val repeated = runner.build()
+        assertEquals(TaskOutcome.SUCCESS, repeated.task(":core:runtime:dokkaGenerateModuleHtml")?.outcome)
+        assertEquals(TaskOutcome.SUCCESS, repeated.task(":sharedLogic:dokkaGenerateModuleHtml")?.outcome)
+        assertTrue(repeated.output.contains("Undocumented: example/MissingContractDoc/"))
+
+        assertTrue(result.output.contains("Undocumented: example/MissingContractDoc/"))
+        assertFalse(result.output.contains("Undocumented: example/ApiClock/"))
+        assertTrue(result.output.contains("Undocumented: com.letta.mobile.data.timeline.api/MissingExtensionDoc/"))
+        assertFalse(result.output.contains("Undocumented: example/ExistingUngatedDebt/"))
 
         val publication = projectDir.resolve("build/dokka/html")
         assertTrue(publication.resolve("index.html").isFile)
