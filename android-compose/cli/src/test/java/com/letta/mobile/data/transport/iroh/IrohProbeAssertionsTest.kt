@@ -443,7 +443,7 @@ class IrohProbeAssertionsTest {
     @Test
     fun `hydrate heavy classifier checks completeness and budget`() {
         assertEquals(
-            emptyList(),
+            emptyList<String>(),
             IrohProbeAssertions.classifyHydrateHeavy(seededCount = 24, listedCount = 24, wallMs = 900, budgetMs = 10_000),
         )
         assertEquals(
