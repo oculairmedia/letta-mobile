@@ -3,6 +3,7 @@
 import argparse
 from html.parser import HTMLParser
 import importlib.util
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -58,7 +59,7 @@ class ApiPage(HTMLParser):
 
 
 def changed_paths(root, diff_base):
-    resolved = subprocess.run(["git", "rev-parse", "--verify", "--end-of-options", diff_base + "^{commit}"], cwd=root, check=True, capture_output=True, text=True).stdout.strip()
+    resolved = ratchet.resolve_commit(root, diff_base)
     output = subprocess.run(["git", "diff", "--name-only", "-z", resolved, "HEAD", "--"], cwd=root, check=True, capture_output=True).stdout
     return set(output.decode("utf-8").split("\0")) - {""}
 
@@ -150,6 +151,13 @@ def render_summary(current, prior, gaps):
     return "\n".join(lines) + "\n"
 
 
+def summary_path(path, root):
+    runner_summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if runner_summary and path.resolve() == Path(runner_summary).resolve():
+        return path.resolve()
+    return ratchet.repository_path(path, root)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
@@ -158,15 +166,15 @@ def main():
     parser.add_argument("--details", type=Path, required=True)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
-    text = args.log.read_text(encoding="utf-8-sig")
+    text = ratchet.repository_path(args.log, root).read_text(encoding="utf-8-sig")
     ratchet.require_fresh_generation(text)
     current = ratchet.warnings_from_log(text)
     prior = ratchet.previous_baseline(root, root / ratchet.BASELINE, args.diff_base)
     existing = current if prior is None else current & prior
     gaps = page_gaps(root, existing, changed_paths(root, args.diff_base))
-    with args.summary.open("a", encoding="utf-8") as output:
+    with summary_path(args.summary, root).open("a", encoding="utf-8") as output:
         output.write(render_summary(current, prior, gaps))
-    args.details.write_text("".join(f"{gap}\t{path}\n" for gap, path in gaps), encoding="utf-8")
+    ratchet.repository_path(args.details, root).write_text("".join(f"{gap}\t{path}\n" for gap, path in gaps), encoding="utf-8")
 
 
 if __name__ == "__main__":

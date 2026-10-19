@@ -187,6 +187,10 @@ to a changed file; the complete list is attached to the Dokka diagnostics artifa
 This is page-level association, not a claim that the undocumented declaration changed.
 It introduces no additional merge gate; the shrinking baseline remains the enforcement.
 
+Keep diagnostics and local report output inside the checkout. In CI, only the exact
+runner-provided `GITHUB_STEP_SUMMARY` path may sit outside it. Git comparison refs
+are validated and resolved to a full immutable object ID before comparison.
+
 ## Public API review contract
 
 The API documentation convention enables Kotlin's built-in ABI validation for

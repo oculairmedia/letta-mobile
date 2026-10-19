@@ -92,12 +92,28 @@ def compare(warnings, baseline):
     return errors
 
 
-def previous_baseline(root, baseline, diff_base):
-    relative = baseline.resolve().relative_to(root.resolve()).as_posix()
+def resolve_commit(root, diff_base):
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_./~^\-]*", diff_base):
+        raise ValueError("Comparison ref must be a plain Git ref or revision")
     resolved = subprocess.run(["git", "rev-parse", "--verify", "--end-of-options", diff_base + "^{commit}"], cwd=root, capture_output=True, text=True, encoding="utf-8")
     if resolved.returncode:
         raise ValueError(f"Cannot resolve baseline comparison ref {diff_base}")
     commit = resolved.stdout.strip()
+    if not re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", commit):
+        raise ValueError("Git comparison ref did not resolve to a full object ID")
+    return commit
+
+
+def repository_path(path, root):
+    resolved = path.resolve()
+    if not resolved.is_relative_to(root.resolve()):
+        raise ValueError("Documentation input/output path must stay within the repository")
+    return resolved
+
+
+def previous_baseline(root, baseline, diff_base):
+    relative = baseline.resolve().relative_to(root.resolve()).as_posix()
+    commit = resolve_commit(root, diff_base)
     tree = subprocess.run(["git", "ls-tree", "--name-only", commit, "--", relative], cwd=root, capture_output=True, text=True, encoding="utf-8", check=True)
     if not tree.stdout.strip():
         return None  # First introduction is explicit; subsequent versions may only shrink.
@@ -142,15 +158,13 @@ def write_baseline(warnings, baseline):
 
 
 def execute(args):
-    text = args.log.read_text(encoding="utf-8-sig")
+    text = repository_path(args.log, args.root).read_text(encoding="utf-8-sig")
     require_fresh_generation(text)
     warnings = warnings_from_log(text)
     runtime_gaps = sorted(item for item in warnings if item.startswith(":core:runtime "))
     if runtime_gaps:
         raise ValueError("core:runtime must be fully documented; no baseline allowed:\n" + "\n".join(runtime_gaps))
-    baseline = args.root / args.baseline
-    if not baseline.resolve().is_relative_to(args.root.resolve()):
-        raise ValueError("Baseline must stay within the repository")
+    baseline = repository_path(args.root / args.baseline, args.root)
     if args.write_baseline:
         write_baseline(warnings, baseline)
     else:

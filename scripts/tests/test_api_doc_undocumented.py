@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location(
     "api_undocumented", Path(__file__).resolve().parents[1] / "ci/check-api-doc-undocumented.py",
@@ -23,6 +24,25 @@ def build_log(signatures=()):
 
 
 class ApiDocUndocumentedTest(unittest.TestCase):
+    def test_git_refs_reject_options_and_require_full_resolved_object_id(self):
+        with patch.object(ratchet.subprocess, "run") as run:
+            with self.assertRaises(ValueError):
+                ratchet.resolve_commit(Path.cwd(), "--help")
+            run.assert_not_called()
+            run.return_value = subprocess.CompletedProcess([], 0, stdout="--unexpected\n")
+            with self.assertRaises(ValueError):
+                ratchet.resolve_commit(Path.cwd(), "HEAD")
+            run.return_value = subprocess.CompletedProcess([], 0, stdout="a" * 40 + "\n")
+            self.assertEqual("a" * 40, ratchet.resolve_commit(Path.cwd(), "origin/main"))
+
+    def test_repository_paths_reject_parent_escape(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "repo"
+            root.mkdir()
+            self.assertEqual(root / "dokka.log", ratchet.repository_path(root / "dokka.log", root))
+            with self.assertRaises(ValueError):
+                ratchet.repository_path(root / ".." / "outside.log", root)
+
     def test_retains_dokka_callable_and_platform_identity_with_duplicate_diagnostics(self):
         android = CLASS.replace("(main)", "(android)")
         output = "\x1b[33m" + build_log([CLASS]) + "\x1b[0m\n"

@@ -3,6 +3,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location("progress", Path(__file__).resolve().parents[1] / "ci/api-doc-progress.py")
 progress = importlib.util.module_from_spec(SPEC)
@@ -18,6 +19,19 @@ def page(identity, path):
 
 
 class ProgressTest(unittest.TestCase):
+    def test_only_runner_provided_summary_may_be_outside_repository(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "repo"
+            root.mkdir()
+            runner_file = Path(temporary) / "runner-summary.md"
+            with patch.dict(progress.os.environ, {"GITHUB_STEP_SUMMARY": str(runner_file)}):
+                self.assertEqual(runner_file, progress.summary_path(runner_file, root))
+                with self.assertRaises(ValueError):
+                    progress.summary_path(Path(temporary) / "other.md", root)
+            with patch.dict(progress.os.environ, {}, clear=True):
+                with self.assertRaises(ValueError):
+                    progress.summary_path(runner_file, root)
+
     def test_reductions_never_claim_documentation_gain_or_coverage(self):
         summary = progress.render_summary({ONE}, {ONE, TWO}, [])
         self.assertIn("| `:plugin-api` | 1 | 2 | -1 | 1 |", summary)
