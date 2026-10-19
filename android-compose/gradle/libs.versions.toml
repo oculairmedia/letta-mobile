@@ -134,6 +134,7 @@ junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher
 junit-vintage-engine = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit-jupiter" }
 
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
+kotlin-abi-tools = { module = "org.jetbrains.kotlin:abi-tools-embeddable", version.ref = "kotlin" }
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }

@@ -1,0 +1,763 @@
+// Klib ABI Dump
+// Targets: [mingwX64.hostNative, wasmJs]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <LettaMobile.core:ids>
+final class com.letta.mobile.data.model/CanvasId { // com.letta.mobile.data.model/CanvasId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/CanvasId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/CanvasId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/CanvasId.value.<get-value>|<get-value>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.model/CanvasId.component1|component1(){}[0]
+    final fun copy(kotlin/String = ...): com.letta.mobile.data.model/CanvasId // com.letta.mobile.data.model/CanvasId.copy|copy(kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/CanvasId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/CanvasId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/CanvasId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/CanvasId> { // com.letta.mobile.data.model/CanvasId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/CanvasId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/CanvasId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/CanvasId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/CanvasId // com.letta.mobile.data.model/CanvasId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/CanvasId) // com.letta.mobile.data.model/CanvasId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.CanvasId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/CanvasId.Companion|null[0]
+        final const val CONVERSATION_PREFIX // com.letta.mobile.data.model/CanvasId.Companion.CONVERSATION_PREFIX|{}CONVERSATION_PREFIX[0]
+            final fun <get-CONVERSATION_PREFIX>(): kotlin/String // com.letta.mobile.data.model/CanvasId.Companion.CONVERSATION_PREFIX.<get-CONVERSATION_PREFIX>|<get-CONVERSATION_PREFIX>(){}[0]
+        final const val PREFIX // com.letta.mobile.data.model/CanvasId.Companion.PREFIX|{}PREFIX[0]
+            final fun <get-PREFIX>(): kotlin/String // com.letta.mobile.data.model/CanvasId.Companion.PREFIX.<get-PREFIX>|<get-PREFIX>(){}[0]
+
+        final fun forConversation(com.letta.mobile.data.model/ConversationId): com.letta.mobile.data.model/CanvasId // com.letta.mobile.data.model/CanvasId.Companion.forConversation|forConversation(com.letta.mobile.data.model.ConversationId){}[0]
+        final fun generate(): com.letta.mobile.data.model/CanvasId // com.letta.mobile.data.model/CanvasId.Companion.generate|generate(){}[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/CanvasId> // com.letta.mobile.data.model/CanvasId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/A2uiComponentId { // com.letta.mobile.data.model/A2uiComponentId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/A2uiComponentId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/A2uiComponentId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/A2uiComponentId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/A2uiComponentId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/A2uiComponentId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/A2uiComponentId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/A2uiComponentId> { // com.letta.mobile.data.model/A2uiComponentId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/A2uiComponentId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/A2uiComponentId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/A2uiComponentId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/A2uiComponentId // com.letta.mobile.data.model/A2uiComponentId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/A2uiComponentId) // com.letta.mobile.data.model/A2uiComponentId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.A2uiComponentId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/A2uiComponentId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/A2uiComponentId> // com.letta.mobile.data.model/A2uiComponentId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/A2uiSurfaceId { // com.letta.mobile.data.model/A2uiSurfaceId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/A2uiSurfaceId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/A2uiSurfaceId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/A2uiSurfaceId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/A2uiSurfaceId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/A2uiSurfaceId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/A2uiSurfaceId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/A2uiSurfaceId> { // com.letta.mobile.data.model/A2uiSurfaceId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/A2uiSurfaceId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/A2uiSurfaceId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/A2uiSurfaceId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/A2uiSurfaceId // com.letta.mobile.data.model/A2uiSurfaceId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/A2uiSurfaceId) // com.letta.mobile.data.model/A2uiSurfaceId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.A2uiSurfaceId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/A2uiSurfaceId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/A2uiSurfaceId> // com.letta.mobile.data.model/A2uiSurfaceId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/AgentId { // com.letta.mobile.data.model/AgentId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/AgentId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/AgentId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/AgentId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/AgentId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/AgentId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/AgentId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/AgentId> { // com.letta.mobile.data.model/AgentId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/AgentId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/AgentId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/AgentId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.model/AgentId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/AgentId) // com.letta.mobile.data.model/AgentId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.AgentId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/AgentId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/AgentId> // com.letta.mobile.data.model/AgentId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/BlockId { // com.letta.mobile.data.model/BlockId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/BlockId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/BlockId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/BlockId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/BlockId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/BlockId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/BlockId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/BlockId> { // com.letta.mobile.data.model/BlockId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/BlockId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/BlockId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/BlockId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/BlockId // com.letta.mobile.data.model/BlockId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/BlockId) // com.letta.mobile.data.model/BlockId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.BlockId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/BlockId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/BlockId> // com.letta.mobile.data.model/BlockId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/CanvasActorId { // com.letta.mobile.data.model/CanvasActorId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/CanvasActorId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/CanvasActorId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/CanvasActorId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/CanvasActorId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/CanvasActorId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/CanvasActorId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/CanvasActorId> { // com.letta.mobile.data.model/CanvasActorId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/CanvasActorId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/CanvasActorId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/CanvasActorId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/CanvasActorId // com.letta.mobile.data.model/CanvasActorId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/CanvasActorId) // com.letta.mobile.data.model/CanvasActorId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.CanvasActorId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/CanvasActorId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/CanvasActorId> // com.letta.mobile.data.model/CanvasActorId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/CanvasArtifactId { // com.letta.mobile.data.model/CanvasArtifactId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/CanvasArtifactId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/CanvasArtifactId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/CanvasArtifactId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/CanvasArtifactId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/CanvasArtifactId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/CanvasArtifactId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/CanvasArtifactId> { // com.letta.mobile.data.model/CanvasArtifactId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/CanvasArtifactId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/CanvasArtifactId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/CanvasArtifactId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/CanvasArtifactId // com.letta.mobile.data.model/CanvasArtifactId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/CanvasArtifactId) // com.letta.mobile.data.model/CanvasArtifactId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.CanvasArtifactId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/CanvasArtifactId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/CanvasArtifactId> // com.letta.mobile.data.model/CanvasArtifactId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/CanvasCheckpointId { // com.letta.mobile.data.model/CanvasCheckpointId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/CanvasCheckpointId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/CanvasCheckpointId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/CanvasCheckpointId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/CanvasCheckpointId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/CanvasCheckpointId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/CanvasCheckpointId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/CanvasCheckpointId> { // com.letta.mobile.data.model/CanvasCheckpointId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/CanvasCheckpointId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/CanvasCheckpointId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/CanvasCheckpointId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/CanvasCheckpointId // com.letta.mobile.data.model/CanvasCheckpointId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/CanvasCheckpointId) // com.letta.mobile.data.model/CanvasCheckpointId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.CanvasCheckpointId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/CanvasCheckpointId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/CanvasCheckpointId> // com.letta.mobile.data.model/CanvasCheckpointId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/CanvasElementId { // com.letta.mobile.data.model/CanvasElementId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/CanvasElementId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/CanvasElementId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/CanvasElementId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/CanvasElementId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/CanvasElementId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/CanvasElementId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/CanvasElementId> { // com.letta.mobile.data.model/CanvasElementId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/CanvasElementId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/CanvasElementId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/CanvasElementId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/CanvasElementId // com.letta.mobile.data.model/CanvasElementId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/CanvasElementId) // com.letta.mobile.data.model/CanvasElementId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.CanvasElementId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/CanvasElementId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/CanvasElementId> // com.letta.mobile.data.model/CanvasElementId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/CanvasNoteId { // com.letta.mobile.data.model/CanvasNoteId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/CanvasNoteId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/CanvasNoteId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/CanvasNoteId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/CanvasNoteId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/CanvasNoteId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/CanvasNoteId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/CanvasNoteId> { // com.letta.mobile.data.model/CanvasNoteId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/CanvasNoteId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/CanvasNoteId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/CanvasNoteId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/CanvasNoteId // com.letta.mobile.data.model/CanvasNoteId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/CanvasNoteId) // com.letta.mobile.data.model/CanvasNoteId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.CanvasNoteId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/CanvasNoteId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/CanvasNoteId> // com.letta.mobile.data.model/CanvasNoteId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/CanvasOpId { // com.letta.mobile.data.model/CanvasOpId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/CanvasOpId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/CanvasOpId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/CanvasOpId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/CanvasOpId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/CanvasOpId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/CanvasOpId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/CanvasOpId> { // com.letta.mobile.data.model/CanvasOpId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/CanvasOpId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/CanvasOpId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/CanvasOpId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/CanvasOpId // com.letta.mobile.data.model/CanvasOpId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/CanvasOpId) // com.letta.mobile.data.model/CanvasOpId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.CanvasOpId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/CanvasOpId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/CanvasOpId> // com.letta.mobile.data.model/CanvasOpId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/CatalogRevision { // com.letta.mobile.data.model/CatalogRevision|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/CatalogRevision.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/CatalogRevision.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/CatalogRevision.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/CatalogRevision.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/CatalogRevision.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/CatalogRevision.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/CatalogRevision> { // com.letta.mobile.data.model/CatalogRevision.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/CatalogRevision.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/CatalogRevision.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/CatalogRevision.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/CatalogRevision // com.letta.mobile.data.model/CatalogRevision.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/CatalogRevision) // com.letta.mobile.data.model/CatalogRevision.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.CatalogRevision){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/CatalogRevision.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/CatalogRevision> // com.letta.mobile.data.model/CatalogRevision.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/ConversationId { // com.letta.mobile.data.model/ConversationId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/ConversationId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/ConversationId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/ConversationId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/ConversationId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/ConversationId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/ConversationId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/ConversationId> { // com.letta.mobile.data.model/ConversationId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/ConversationId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/ConversationId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/ConversationId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/ConversationId // com.letta.mobile.data.model/ConversationId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/ConversationId) // com.letta.mobile.data.model/ConversationId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.ConversationId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/ConversationId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/ConversationId> // com.letta.mobile.data.model/ConversationId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/FolderId { // com.letta.mobile.data.model/FolderId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/FolderId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/FolderId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/FolderId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/FolderId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/FolderId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/FolderId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/FolderId> { // com.letta.mobile.data.model/FolderId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/FolderId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/FolderId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/FolderId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/FolderId // com.letta.mobile.data.model/FolderId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/FolderId) // com.letta.mobile.data.model/FolderId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.FolderId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/FolderId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/FolderId> // com.letta.mobile.data.model/FolderId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/GroupId { // com.letta.mobile.data.model/GroupId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/GroupId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/GroupId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/GroupId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/GroupId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/GroupId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/GroupId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/GroupId> { // com.letta.mobile.data.model/GroupId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/GroupId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/GroupId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/GroupId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/GroupId // com.letta.mobile.data.model/GroupId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/GroupId) // com.letta.mobile.data.model/GroupId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.GroupId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/GroupId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/GroupId> // com.letta.mobile.data.model/GroupId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/HostId { // com.letta.mobile.data.model/HostId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/HostId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/HostId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/HostId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/HostId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/HostId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/HostId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/HostId> { // com.letta.mobile.data.model/HostId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/HostId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/HostId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/HostId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/HostId // com.letta.mobile.data.model/HostId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/HostId) // com.letta.mobile.data.model/HostId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.HostId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/HostId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/HostId> // com.letta.mobile.data.model/HostId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/IdentityId { // com.letta.mobile.data.model/IdentityId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/IdentityId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/IdentityId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/IdentityId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/IdentityId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/IdentityId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/IdentityId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/IdentityId> { // com.letta.mobile.data.model/IdentityId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/IdentityId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/IdentityId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/IdentityId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/IdentityId // com.letta.mobile.data.model/IdentityId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/IdentityId) // com.letta.mobile.data.model/IdentityId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.IdentityId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/IdentityId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/IdentityId> // com.letta.mobile.data.model/IdentityId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/McpServerId { // com.letta.mobile.data.model/McpServerId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/McpServerId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/McpServerId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/McpServerId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/McpServerId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/McpServerId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/McpServerId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/McpServerId> { // com.letta.mobile.data.model/McpServerId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/McpServerId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/McpServerId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/McpServerId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/McpServerId // com.letta.mobile.data.model/McpServerId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/McpServerId) // com.letta.mobile.data.model/McpServerId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.McpServerId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/McpServerId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/McpServerId> // com.letta.mobile.data.model/McpServerId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/MessageId { // com.letta.mobile.data.model/MessageId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/MessageId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/MessageId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/MessageId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/MessageId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/MessageId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/MessageId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/MessageId> { // com.letta.mobile.data.model/MessageId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/MessageId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/MessageId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/MessageId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/MessageId // com.letta.mobile.data.model/MessageId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/MessageId) // com.letta.mobile.data.model/MessageId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.MessageId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/MessageId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/MessageId> // com.letta.mobile.data.model/MessageId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/ModelRouteId { // com.letta.mobile.data.model/ModelRouteId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/ModelRouteId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/ModelRouteId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/ModelRouteId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/ModelRouteId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/ModelRouteId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/ModelRouteId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/ModelRouteId> { // com.letta.mobile.data.model/ModelRouteId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/ModelRouteId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/ModelRouteId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/ModelRouteId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/ModelRouteId // com.letta.mobile.data.model/ModelRouteId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/ModelRouteId) // com.letta.mobile.data.model/ModelRouteId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.ModelRouteId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/ModelRouteId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/ModelRouteId> // com.letta.mobile.data.model/ModelRouteId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/PluginId { // com.letta.mobile.data.model/PluginId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/PluginId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/PluginId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/PluginId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/PluginId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/PluginId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/PluginId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/PluginId> { // com.letta.mobile.data.model/PluginId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/PluginId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/PluginId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/PluginId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/PluginId // com.letta.mobile.data.model/PluginId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/PluginId) // com.letta.mobile.data.model/PluginId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.PluginId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/PluginId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/PluginId> // com.letta.mobile.data.model/PluginId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/ProjectId { // com.letta.mobile.data.model/ProjectId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/ProjectId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/ProjectId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/ProjectId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/ProjectId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/ProjectId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/ProjectId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/ProjectId> { // com.letta.mobile.data.model/ProjectId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/ProjectId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/ProjectId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/ProjectId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/ProjectId // com.letta.mobile.data.model/ProjectId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/ProjectId) // com.letta.mobile.data.model/ProjectId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.ProjectId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/ProjectId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/ProjectId> // com.letta.mobile.data.model/ProjectId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/ProviderDefinitionId { // com.letta.mobile.data.model/ProviderDefinitionId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/ProviderDefinitionId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/ProviderDefinitionId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/ProviderDefinitionId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/ProviderDefinitionId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/ProviderDefinitionId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/ProviderDefinitionId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/ProviderDefinitionId> { // com.letta.mobile.data.model/ProviderDefinitionId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/ProviderDefinitionId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/ProviderDefinitionId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/ProviderDefinitionId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/ProviderDefinitionId // com.letta.mobile.data.model/ProviderDefinitionId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/ProviderDefinitionId) // com.letta.mobile.data.model/ProviderDefinitionId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.ProviderDefinitionId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/ProviderDefinitionId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/ProviderDefinitionId> // com.letta.mobile.data.model/ProviderDefinitionId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/ProviderFieldId { // com.letta.mobile.data.model/ProviderFieldId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/ProviderFieldId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/ProviderFieldId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/ProviderFieldId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/ProviderFieldId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/ProviderFieldId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/ProviderFieldId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/ProviderFieldId> { // com.letta.mobile.data.model/ProviderFieldId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/ProviderFieldId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/ProviderFieldId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/ProviderFieldId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/ProviderFieldId // com.letta.mobile.data.model/ProviderFieldId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/ProviderFieldId) // com.letta.mobile.data.model/ProviderFieldId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.ProviderFieldId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/ProviderFieldId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/ProviderFieldId> // com.letta.mobile.data.model/ProviderFieldId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/ProviderId { // com.letta.mobile.data.model/ProviderId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/ProviderId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/ProviderId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/ProviderId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/ProviderId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/ProviderId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/ProviderId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/ProviderId> { // com.letta.mobile.data.model/ProviderId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/ProviderId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/ProviderId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/ProviderId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/ProviderId // com.letta.mobile.data.model/ProviderId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/ProviderId) // com.letta.mobile.data.model/ProviderId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.ProviderId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/ProviderId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/ProviderId> // com.letta.mobile.data.model/ProviderId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/ProviderInstanceId { // com.letta.mobile.data.model/ProviderInstanceId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/ProviderInstanceId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/ProviderInstanceId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/ProviderInstanceId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/ProviderInstanceId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/ProviderInstanceId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/ProviderInstanceId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/ProviderInstanceId> { // com.letta.mobile.data.model/ProviderInstanceId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/ProviderInstanceId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/ProviderInstanceId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/ProviderInstanceId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/ProviderInstanceId // com.letta.mobile.data.model/ProviderInstanceId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/ProviderInstanceId) // com.letta.mobile.data.model/ProviderInstanceId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.ProviderInstanceId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/ProviderInstanceId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/ProviderInstanceId> // com.letta.mobile.data.model/ProviderInstanceId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/ProviderRevision { // com.letta.mobile.data.model/ProviderRevision|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/ProviderRevision.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/ProviderRevision.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/ProviderRevision.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/ProviderRevision.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/ProviderRevision.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/ProviderRevision.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/ProviderRevision> { // com.letta.mobile.data.model/ProviderRevision.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/ProviderRevision.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/ProviderRevision.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/ProviderRevision.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/ProviderRevision // com.letta.mobile.data.model/ProviderRevision.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/ProviderRevision) // com.letta.mobile.data.model/ProviderRevision.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.ProviderRevision){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/ProviderRevision.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/ProviderRevision> // com.letta.mobile.data.model/ProviderRevision.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/RequestId { // com.letta.mobile.data.model/RequestId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/RequestId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/RequestId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/RequestId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/RequestId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/RequestId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/RequestId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/RequestId> { // com.letta.mobile.data.model/RequestId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/RequestId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/RequestId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/RequestId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/RequestId // com.letta.mobile.data.model/RequestId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/RequestId) // com.letta.mobile.data.model/RequestId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.RequestId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/RequestId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/RequestId> // com.letta.mobile.data.model/RequestId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/RunId { // com.letta.mobile.data.model/RunId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/RunId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/RunId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/RunId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/RunId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/RunId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/RunId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/RunId> { // com.letta.mobile.data.model/RunId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/RunId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/RunId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/RunId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/RunId // com.letta.mobile.data.model/RunId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/RunId) // com.letta.mobile.data.model/RunId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.RunId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/RunId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/RunId> // com.letta.mobile.data.model/RunId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final value class com.letta.mobile.data.model/ToolId { // com.letta.mobile.data.model/ToolId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.data.model/ToolId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.data.model/ToolId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.data.model/ToolId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.model/ToolId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.model/ToolId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.model/ToolId.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.data.model/ToolId> { // com.letta.mobile.data.model/ToolId.$serializer|null[0]
+        final val descriptor // com.letta.mobile.data.model/ToolId.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.data.model/ToolId.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.data.model/ToolId.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.data.model/ToolId // com.letta.mobile.data.model/ToolId.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.data.model/ToolId) // com.letta.mobile.data.model/ToolId.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.data.model.ToolId){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.data.model/ToolId.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.model/ToolId> // com.letta.mobile.data.model/ToolId.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final object com.letta.mobile.data.model/IdFormats { // com.letta.mobile.data.model/IdFormats|null[0]
+    final const val AGENT_PREFIX // com.letta.mobile.data.model/IdFormats.AGENT_PREFIX|{}AGENT_PREFIX[0]
+        final fun <get-AGENT_PREFIX>(): kotlin/String // com.letta.mobile.data.model/IdFormats.AGENT_PREFIX.<get-AGENT_PREFIX>|<get-AGENT_PREFIX>(){}[0]
+    final const val CLIENT_MESSAGE_PREFIX // com.letta.mobile.data.model/IdFormats.CLIENT_MESSAGE_PREFIX|{}CLIENT_MESSAGE_PREFIX[0]
+        final fun <get-CLIENT_MESSAGE_PREFIX>(): kotlin/String // com.letta.mobile.data.model/IdFormats.CLIENT_MESSAGE_PREFIX.<get-CLIENT_MESSAGE_PREFIX>|<get-CLIENT_MESSAGE_PREFIX>(){}[0]
+    final const val COMPOSER_MESSAGE_PREFIX // com.letta.mobile.data.model/IdFormats.COMPOSER_MESSAGE_PREFIX|{}COMPOSER_MESSAGE_PREFIX[0]
+        final fun <get-COMPOSER_MESSAGE_PREFIX>(): kotlin/String // com.letta.mobile.data.model/IdFormats.COMPOSER_MESSAGE_PREFIX.<get-COMPOSER_MESSAGE_PREFIX>|<get-COMPOSER_MESSAGE_PREFIX>(){}[0]
+    final const val DEFAULT_CONVERSATION_ID // com.letta.mobile.data.model/IdFormats.DEFAULT_CONVERSATION_ID|{}DEFAULT_CONVERSATION_ID[0]
+        final fun <get-DEFAULT_CONVERSATION_ID>(): kotlin/String // com.letta.mobile.data.model/IdFormats.DEFAULT_CONVERSATION_ID.<get-DEFAULT_CONVERSATION_ID>|<get-DEFAULT_CONVERSATION_ID>(){}[0]
+    final const val DEFAULT_CONVERSATION_PREFIX // com.letta.mobile.data.model/IdFormats.DEFAULT_CONVERSATION_PREFIX|{}DEFAULT_CONVERSATION_PREFIX[0]
+        final fun <get-DEFAULT_CONVERSATION_PREFIX>(): kotlin/String // com.letta.mobile.data.model/IdFormats.DEFAULT_CONVERSATION_PREFIX.<get-DEFAULT_CONVERSATION_PREFIX>|<get-DEFAULT_CONVERSATION_PREFIX>(){}[0]
+
+    final val OPTIMISTIC_PREFIXES // com.letta.mobile.data.model/IdFormats.OPTIMISTIC_PREFIXES|{}OPTIMISTIC_PREFIXES[0]
+        final fun <get-OPTIMISTIC_PREFIXES>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.model/IdFormats.OPTIMISTIC_PREFIXES.<get-OPTIMISTIC_PREFIXES>|<get-OPTIMISTIC_PREFIXES>(){}[0]
+
+    final fun defaultConversationIdFor(kotlin/String): kotlin/String // com.letta.mobile.data.model/IdFormats.defaultConversationIdFor|defaultConversationIdFor(kotlin.String){}[0]
+    final fun hasDefaultConversationPrefix(kotlin/String?): kotlin/Boolean // com.letta.mobile.data.model/IdFormats.hasDefaultConversationPrefix|hasDefaultConversationPrefix(kotlin.String?){}[0]
+    final fun isDefaultConversation(com.letta.mobile.data.model/ConversationId): kotlin/Boolean // com.letta.mobile.data.model/IdFormats.isDefaultConversation|isDefaultConversation(com.letta.mobile.data.model.ConversationId){}[0]
+    final fun isDefaultConversation(kotlin/String?): kotlin/Boolean // com.letta.mobile.data.model/IdFormats.isDefaultConversation|isDefaultConversation(kotlin.String?){}[0]
+    final fun isOptimisticMessageId(com.letta.mobile.data.model/MessageId): kotlin/Boolean // com.letta.mobile.data.model/IdFormats.isOptimisticMessageId|isOptimisticMessageId(com.letta.mobile.data.model.MessageId){}[0]
+    final fun isOptimisticMessageId(kotlin/String?): kotlin/Boolean // com.letta.mobile.data.model/IdFormats.isOptimisticMessageId|isOptimisticMessageId(kotlin.String?){}[0]
+    final fun stripAgentPrefix(com.letta.mobile.data.model/AgentId): kotlin/String // com.letta.mobile.data.model/IdFormats.stripAgentPrefix|stripAgentPrefix(com.letta.mobile.data.model.AgentId){}[0]
+    final fun stripAgentPrefix(kotlin/String): kotlin/String // com.letta.mobile.data.model/IdFormats.stripAgentPrefix|stripAgentPrefix(kotlin.String){}[0]
+}
+
+final fun (com.letta.mobile.data.model/AgentId).com.letta.mobile.data.model/isLettaCodeEphemeralWorker(): kotlin/Boolean // com.letta.mobile.data.model/isLettaCodeEphemeralWorker|isLettaCodeEphemeralWorker@com.letta.mobile.data.model.AgentId(){}[0]
