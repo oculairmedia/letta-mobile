@@ -104,6 +104,18 @@ published API links in tracked Markdown against local generated pages and HTML
 anchors. It ignores fenced examples and never relies on the currently deployed
 site, so renamed or removed symbols can fail the PR before deployment.
 
+In module/package overviews, make concrete API references links to their generated
+declaration pages. Plain backticks remain appropriate for source-set names, module
+names and example values; they do not create a checked symbol reference. When an
+API moves or is renamed, update its overview link in the same PR. A link proves
+that the published declaration exists, not that prose about its platform or
+behavior is accurate; review those claims against the declaration's source sets.
+
+The required `test` status aggregates `test-workload` and `api-docs`. Both run in
+parallel; generation errors, missing linked declarations and failed tests all
+block that status. The aggregate runs even when a dependency is skipped or
+cancelled and accepts only explicit success from both jobs.
+
 ## Automation boundaries and next increments
 
 The 2026-10-18 follow-up audit distinguishes declaration documentation from

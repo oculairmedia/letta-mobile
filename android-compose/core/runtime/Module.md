@@ -4,9 +4,9 @@ Portable contracts for executing agent turns and recording/replaying their event
 This module depends on typed domain identities from `:core:ids`; it does not bind
 an Android service, socket, model provider, filesystem or Compose renderer.
 
-Use `TurnCommand` and `TurnEngine` at the execution boundary. Engine drafts become
-`RuntimeEventEnvelope` records through a `RuntimeEventOutbox`, and
-`RuntimeEventProjector` folds those records into replay state. The included
+Use [TurnCommand](https://oculairmedia.github.io/letta-mobile/api/core/runtime/com.letta.mobile.runtime/-turn-command/index.html) and [TurnEngine](https://oculairmedia.github.io/letta-mobile/api/core/runtime/com.letta.mobile.runtime/-turn-engine/index.html) at the execution boundary. Engine drafts become
+[RuntimeEventEnvelope](https://oculairmedia.github.io/letta-mobile/api/core/runtime/com.letta.mobile.runtime/-runtime-event-envelope/index.html) records through a [RuntimeEventOutbox](https://oculairmedia.github.io/letta-mobile/api/core/runtime/com.letta.mobile.runtime/-runtime-event-outbox/index.html), and
+[RuntimeEventProjector](https://oculairmedia.github.io/letta-mobile/api/core/runtime/com.letta.mobile.runtime/-runtime-event-projector/index.html) folds those records into replay state. The included
 in-memory outbox retains all events for its instance lifetime; durable hosts must
 choose an appropriate persistent implementation instead of assuming this module
 provides restart storage.
@@ -21,6 +21,6 @@ and tools requiring a real human answer also remain distinct contracts.
 Portable turn inputs, approvals, runtime event envelopes, replay projection and virtual file/memory
 descriptors define the execution boundary here. Outbox offsets must not be treated as upstream
 transport sequence numbers, and data-layer and runtime `ConversationId`/`RunId` wrappers require
-explicit conversion. Hosts extend execution and durability through `TurnEngine` and
-`RuntimeEventOutbox`; implementations must preserve event identity and replay ordering rather
+explicit conversion. Hosts extend execution and durability through [TurnEngine](https://oculairmedia.github.io/letta-mobile/api/core/runtime/com.letta.mobile.runtime/-turn-engine/index.html) and
+[RuntimeEventOutbox](https://oculairmedia.github.io/letta-mobile/api/core/runtime/com.letta.mobile.runtime/-runtime-event-outbox/index.html); implementations must preserve event identity and replay ordering rather
 than introduce UI or platform dependencies into these contracts.

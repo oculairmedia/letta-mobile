@@ -73,6 +73,24 @@ class ApiDocLinksTest(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("generate the API publication first", result.stderr)
 
+    def test_overview_reference_fails_when_declaration_is_renamed(self):
+        subprocess.run(["git", "init", "--quiet", str(self.root)], check=True)
+        declaration = self.api / "sharedLogic/contract.html"
+        declaration.write_text("<h1>Contract</h1>", encoding="utf-8")
+        overview = self.root / "Module.md"
+        overview.write_text(
+            f"# Module :sharedLogic\nUse [Contract]({links.API_URL}sharedLogic/contract.html).\n",
+            encoding="utf-8",
+        )
+        subprocess.run(["git", "-C", str(self.root), "add", "Module.md"], check=True)
+        self.assertEqual((1, []), links.check_documents(self.root, self.api))
+        declaration.rename(declaration.with_name("renamed-contract.html"))
+        count, errors = links.check_documents(self.root, self.api)
+        self.assertEqual(1, count)
+        self.assertEqual(1, len(errors))
+        self.assertIn("Module.md:", errors[0])
+        self.assertIn("page is absent", errors[0])
+
 
 if __name__ == "__main__":
     unittest.main()
