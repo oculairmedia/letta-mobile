@@ -72,6 +72,10 @@ val mascotResources = rootProject.layout.projectDirectory.dir("avatar/renderer-r
 kotlin {
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
+        compilerOptions {
+            // A missing graphics symbol must fail linking rather than become a runtime stub.
+            freeCompilerArgs.add("-Xpartial-linkage-loglevel=error")
+        }
         browser {
             commonWebpackConfig {
                 outputFileName = "letta-web.js"
@@ -87,6 +91,8 @@ kotlin {
             resources.srcDir(mascotResources)
             dependencies {
                 implementation(npm(riveFramesPackage.asFile))
+                // Match the browser runtime: older compile APIs leave missing symbols in Wasm.
+                implementation(libs.skiko.web)
                 implementation(project(":sharedLogic"))
                 // letta-mobile-o4ygk.4.5: the shared Compose UI (the chat page, the canvas, the
                 // theme). Its Compose Multiplatform runtime, foundation, material3, ui and icons
@@ -120,9 +126,9 @@ tasks.named("wasmJsProcessResources") {
 // (skiko.mjs + skiko.wasm), older than the Skiko the shared UI links against: :sharedUI resolves
 // Compose UI 1.12 (through :drawbox and coil), whose Skia bindings import functions the old
 // runtime lacks, so the page fails to instantiate. Serve the runtime that matches the classpath.
-// Keep this in step with the org.jetbrains.skiko:skiko version on wasmJsRuntimeClasspath; it goes
-// once the Compose plugin matches the resolved Compose (letta-mobile-o4ygk.4.10).
-val webSkikoRuntimeVersion = "0.150.1"
+// Use the same catalog entry for the Kotlin API above and the browser runtime. Matching only
+// the JS runtime leaves source calls linked against an older Skiko ABI.
+val webSkikoRuntimeVersion = libs.versions.web.skiko.get()
 configurations.matching { it.name == "COMPOSE_SKIKO_JS_WASM_RUNTIME" }.configureEach {
     resolutionStrategy.force("org.jetbrains.skiko:skiko-js-wasm-runtime:$webSkikoRuntimeVersion")
 }

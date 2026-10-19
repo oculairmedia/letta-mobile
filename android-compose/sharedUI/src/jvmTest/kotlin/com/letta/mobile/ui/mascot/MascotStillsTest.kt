@@ -3,6 +3,10 @@ package com.letta.mobile.ui.mascot
 import androidx.compose.ui.graphics.ImageBitmap
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.avatar.core.MascotShape
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
@@ -77,6 +81,28 @@ class MascotStillsTest {
         stills.ensure(violet)
         assertNull(stills.get(violet))
         assertEquals(1, captured.size)
+    }
+
+    @Test
+    fun aCancelledTileDoesNotMarkItsIdentityAsFailed() = runTest {
+        val started = CompletableDeferred<Unit>()
+        var attempts = 0
+        val stills = MascotStills("a1", null, capture = {
+            attempts++
+            if (attempts == 1) {
+                started.complete(Unit)
+                awaitCancellation()
+            }
+            byteArrayOf(1)
+        }, decode = { bitmap })
+        val tile = launch { stills.ensure(violet) }
+        started.await()
+        tile.cancelAndJoin()
+
+        stills.ensure(violet)
+
+        assertEquals(2, attempts)
+        assertNotNull(stills.get(violet))
     }
 
     @Test

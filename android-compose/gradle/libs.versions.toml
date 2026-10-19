@@ -89,6 +89,7 @@ jcefmaven = "146.0.10"
 rive = "11.12.0"
 jna = "5.17.0"
 skiko = "0.9.37.3"
+web-skiko = { strictly = "0.150.1" }
 kotzilla = "2.3.3"
 # Gradle plugin versions that have no library sibling above.
 kover = "0.9.8"
@@ -260,6 +261,7 @@ jewel-decorated-window = { module = "org.jetbrains.jewel:jewel-decorated-window"
 compose-desktop-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-desktop-material3" }
 compose-desktop-material-icons = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "compose-desktop-material-icons" }
 skiko-awt = { module = "org.jetbrains.skiko:skiko-awt", version.ref = "skiko" }
+skiko-web = { module = "org.jetbrains.skiko:skiko", version.ref = "web-skiko" }
 kuiver = { module = "io.github.justdeko:kuiver", version.ref = "kuiver" }
 colorpicker = { module = "codes.side:colorpicker", version.ref = "colorpicker" }
 texty = { module = "com.arjunjadeja:texty", version.ref = "texty" }
