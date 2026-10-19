@@ -61,12 +61,15 @@ def sections(path):
         key = (kind, name.strip())
         if key in result:
             raise ValueError(f"{path}: duplicate {kind} {name}")
-        paragraphs = re.split(r"\n\s*\n", body.strip())
-        prose = paragraphs[0] if paragraphs else ""
-        if prose.startswith("#") or len(prose.split()) < 10:
+        if not has_introductory_paragraph(body):
             raise ValueError(f"{path}: {kind} {name} needs an introductory paragraph")
         result[key] = body
     return result
+
+
+def has_introductory_paragraph(body):
+    prose = re.split(r"\n\s*\n", body.strip())[0]
+    return not prose.startswith("#") and len(prose.split()) >= 10
 
 
 def published_modules(root):
@@ -82,33 +85,42 @@ def published_modules(root):
     return sorted(modules)
 
 
-def source_packages(module):
+def verify_standard_source_roots(module):
+    """Do not silently skip manually configured source directories."""
     build_file = module / "build.gradle.kts"
     if build_file.exists():
         build = code_without_comments(build_file.read_text(encoding="utf-8"), mask_strings=True)
         if re.search(r"\b(?:srcDirs?|setSrcDirs)\b", build):
             raise ValueError(f"{build_file}: custom source roots require updating package discovery")
-    packages = set()
-    for path in production_source_files(module):
-        text = code_without_comments(path.read_text(encoding="utf-8-sig"), mask_strings=True)
-        matches = re.findall(r"(?m)^\s*package\s+([\w.]+)[ \t]*(?:;|(?=\n|$))", text)
-        if len(matches) != 1:
-            raise ValueError(f"{path}: expected one named package declaration")
-        packages.add(matches[0])
-    return packages
+
+
+def declared_package(path):
+    text = code_without_comments(path.read_text(encoding="utf-8-sig"), mask_strings=True)
+    matches = re.findall(r"(?m)^\s*package\s+([\w.]+)[ \t]*(?:;|(?=\n|$))", text)
+    if len(matches) != 1:
+        raise ValueError(f"{path}: expected one named package declaration")
+    return matches[0]
+
+
+def source_packages(module):
+    verify_standard_source_roots(module)
+    return {declared_package(path) for path in production_source_files(module)}
+
+
+def is_production_source_set(path):
+    if not path.is_dir() or "test" in path.name.lower():
+        return False
+    if re.fullmatch(r"main|.+Main|jvmAndAndroid", path.name):
+        return True
+    if language_source_files(path):
+        raise ValueError(f"{path}: unrecognized production source set; update package discovery")
+    return False
 
 
 def production_source_sets(module):
     # Includes the configured jvmAndAndroid intermediate source set and plain
     # JVM main, alongside KMP *Main. Test source sets never enter the publication.
-    sources = []
-    for path in sorted(module.glob("src/*")):
-        if not path.is_dir() or "test" in path.name.lower():
-            continue
-        if path.name == "main" or path.name.endswith("Main") or path.name == "jvmAndAndroid":
-            sources.append(path)
-        elif language_source_files(path):
-            raise ValueError(f"{path}: unrecognized production source set; update package discovery")
+    sources = sorted(path for path in module.glob("src/*") if is_production_source_set(path))
     if not sources:
         raise ValueError(f"{module}: no production source sets found")
     return sources
@@ -151,9 +163,8 @@ def check_module_overview(name, module):
     problems = package_overview_problems(overview, entries, packages)
     if ("Module", name) not in entries:
         problems.insert(0, f"{overview}: missing # Module {name}")
-    for kind, declared_name in entries:
-        if kind == "Module" and declared_name != name:
-            problems.append(f"{overview}: unexpected # Module {declared_name}")
+    declared_modules = {declared for kind, declared in entries if kind == "Module"}
+    problems.extend(f"{overview}: unexpected # Module {declared}" for declared in sorted(declared_modules - {name}))
     return len(packages), problems
 
 
@@ -161,8 +172,6 @@ def check(root):
     problems = []
     total = 0
     published = published_modules(root)
-    if not published:
-        problems.append("No Dokka aggregate modules found; update the overview check for the aggregate DSL")
     modules = [("Letta Mobile API", root / "android-compose")]
     modules += [(name, module_directory(root, name)) for name in published]
     for name, module in modules:
