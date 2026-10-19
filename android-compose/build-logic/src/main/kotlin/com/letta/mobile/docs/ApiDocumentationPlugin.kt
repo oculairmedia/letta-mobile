@@ -11,13 +11,16 @@ class ApiDocumentationPlugin : Plugin<Project> {
     override fun apply(project: Project) {
         project.pluginManager.apply("org.jetbrains.dokka")
         val dokka = project.extensions.getByType(DokkaExtension::class.java)
+        val moduleOverview = project.layout.projectDirectory.file("Module.md").asFile
         dokka.moduleName.set(if (project == project.rootProject) "Letta Mobile API" else project.path)
         dokka.dokkaPublications.named("html") {
             outputDirectory.set(project.layout.buildDirectory.dir("dokka/html"))
+            if (project == project.rootProject && moduleOverview.isFile) includes.from(moduleOverview)
             // Gate generation first; existing missing KDocs are not a new coverage policy.
             failOnWarning.set(false)
         }
         dokka.dokkaSourceSets.configureEach {
+            if (moduleOverview.isFile) includes.from(moduleOverview)
             documentedVisibilities.set(setOf(VisibilityModifier.Public, VisibilityModifier.Protected))
             reportUndocumented.set(false)
             suppressGeneratedFiles.set(true)

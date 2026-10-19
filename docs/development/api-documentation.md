@@ -5,6 +5,13 @@ Dokka generates the API reference from declarations and KDoc in `sharedLogic`,
 aggregates those modules; the `com.letta.mobile.api-documentation` convention
 plugin keeps their visibility and source-link settings consistent.
 
+The [API overview](../../android-compose/Module.md) introduces these modules and
+explains platform tags. Each published module owns a `Module.md` beside its build
+file, with `# Module :module-name` and `# Package fully.qualified.name` sections.
+Read and update those sections when package ownership or extension points change;
+Dokka includes the same prose in the module and package pages. Describe purpose,
+boundaries and integration seams rather than copying declaration inventories.
+
 From `android-compose/`, with the Java/Android SDK setup in CONTRIBUTING.md:
 
 ```bash
