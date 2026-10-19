@@ -178,6 +178,15 @@ KDoc also needs review: generated pages repeat stale comments faithfully.
 Generation and link gates prove the publication is buildable and navigable;
 they do not prove the runtime behavior described in prose.
 
+The API docs job also writes an advisory progress summary: missing-documentation signature/source-set
+entries per module, the previous count, and reductions relative to the immutable
+comparison commit. A reduction is **resolved or removed (unclassified)**, not necessarily
+new documentation. There is no coverage percentage or inferred public-API denominator.
+The summary flags up to 20 existing gaps whose generated API page contains a source link
+to a changed file; the complete list is attached to the Dokka diagnostics artifact.
+This is page-level association, not a claim that the undocumented declaration changed.
+It introduces no additional merge gate; the shrinking baseline remains the enforcement.
+
 ## Public API review contract
 
 The API documentation convention enables Kotlin's built-in ABI validation for
