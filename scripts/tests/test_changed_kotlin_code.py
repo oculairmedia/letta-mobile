@@ -54,6 +54,15 @@ class ChangedKotlinCodeTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 selector.code_tokens(text)
 
+    def test_crlf_and_lf_comments_compare_consistently(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "Example.kt"
+            original = b'/** old */\r\nval x = """first\r\nsecond""" // old\r\n'
+            source.write_bytes(b'/** improved */\nval x = """first\nsecond""" // new\n')
+            self.assertFalse(selector.code_changed(source, original))
+            source.write_bytes(b'/** improved */\r\nval x = """first\r\nchanged"""\r\n')
+            self.assertTrue(selector.code_changed(source, original))
+
     def test_nested_template_strings_cannot_hide_following_code(self):
         prefix = 'val x = "${call("a // ${nested("}")}")}"; '
         self.assertNotEqual(selector.code_tokens(prefix + 'unsafe()'), selector.code_tokens(prefix + 'safe()'))
