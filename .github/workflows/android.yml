@@ -607,6 +607,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -619,9 +620,33 @@ jobs:
           node --test android-compose/web/service-worker.test.cjs
           python3 -m unittest discover -s scripts/tests -p test_api_doc_links.py -v
           python3 scripts/ci/check-api-package-coverage.py
+          python3 -m unittest discover -s scripts/tests -p test_api_doc_undocumented.py -v
+          python3 -m unittest discover -s scripts/tests -p test_api_doc_progress.py -v
       - name: Generate shared API reference
         working-directory: android-compose
-        run: ./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -PdokkaSourceRef=${{ github.sha }} :dokkaGeneratePublicationHtml
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -PdokkaSourceRef=${{ github.sha }} --console=plain :dokkaGeneratePublicationHtml 2>&1 | tee dokka-diagnostics.log
+      - name: Report documentation progress (advisory)
+        continue-on-error: true
+        env:
+          DOCS_DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
+        run: python3 scripts/ci/api-doc-progress.py android-compose/dokka-diagnostics.log --diff-base "$DOCS_DIFF_BASE" --summary "$GITHUB_STEP_SUMMARY" --details android-compose/dokka-changed-file-gaps.txt
+      - name: Enforce the shrinking KDoc baseline
+        env:
+          DOCS_DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
+        run: python3 scripts/ci/check-api-doc-undocumented.py android-compose/dokka-diagnostics.log --diff-base "$DOCS_DIFF_BASE"
+      - name: Preserve Dokka diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dokka-diagnostics
+          path: |
+            android-compose/dokka-diagnostics.log
+            android-compose/dokka-changed-file-gaps.txt
+          if-no-files-found: error
+          retention-days: 7
       - name: Check aggregate and module entry points
         run: |
           for module in . sharedLogic sharedUI core/ids core/runtime plugin-api; do

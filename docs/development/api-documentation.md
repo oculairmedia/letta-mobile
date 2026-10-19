@@ -52,8 +52,9 @@ Both builds must succeed before the combined site can deploy.
 CI pins source links to the checked-out commit using `-PdokkaSourceRef=<sha>`.
 Local generation defaults to `main`; pass your commit or branch to link your
 current revision. Public/protected production declarations are included and
-generated files are suppressed. Existing missing KDocs do not fail generation;
-generation errors do. This is not a claim of complete KDoc coverage.
+generated files are suppressed. Missing KDocs are checked against a shrinking diagnostic baseline for the
+runtime and plugin API modules and shared extension packages. Other packages
+remain outside that coverage policy; generation errors fail the build.
 
 Keep architecture decisions, operating procedures, design intent and measured
 evidence in hand-written docs. Generate API shapes from source and keep runtime
@@ -111,10 +112,45 @@ API moves or is renamed, update its overview link in the same PR. A link proves
 that the published declaration exists, not that prose about its platform or
 behavior is accurate; review those claims against the declaration's source sets.
 
-The required `test` status aggregates `test-workload` and `api-docs`. Both run in
-parallel; generation errors, missing linked declarations and failed tests all
-block that status. The aggregate runs even when a dependency is skipped or
-cancelled and accepts only explicit success from both jobs.
+The required `test` status aggregates `test-workload`, `api-docs` and
+`api-contract-windows`. These run in parallel; generation errors, missing linked
+declarations, changed API signatures and failed tests all block that status.
+The aggregate runs even when a dependency is skipped or cancelled and accepts
+only explicit success from all three jobs.
+
+## Maintaining the KDoc contract
+
+`api-docs` captures actual Dokka `Undocumented:` diagnostics for `:core:runtime`,
+`:plugin-api`, and the shared controller extras, timeline, transport API, App Server and chat
+session packages. Each baseline entry retains its module, overload signature
+and source set. Counts are printed per module, but removing documentation on one
+API cannot be offset by documenting a different API. `:core:runtime` must have
+zero missing comments and cannot be baselined.
+
+The checker rejects new undocumented signatures, stale baseline entries, and
+baseline additions relative to the PR base commit. It also rejects failed or
+cached module generation: cached HTML cannot replay documentation warnings.
+The monitored Dokka tasks therefore run freshly, while other Gradle tasks may
+still use their caches.
+
+After documenting or removing an existing API, capture a successful build and
+refresh the baseline from its diagnostics, then review the resulting deletions:
+
+```bash
+cd android-compose
+set -o pipefail
+./gradlew --no-daemon --no-parallel --max-workers=2 --console=plain \
+  -Pkotlin.compiler.execution.strategy=in-process \
+  :core:runtime:dokkaGenerateModuleHtml :plugin-api:dokkaGenerateModuleHtml \
+  :sharedLogic:dokkaGenerateModuleHtml 2>&1 | tee dokka-diagnostics.log
+cd ..
+python3 scripts/ci/check-api-doc-undocumented.py android-compose/dokka-diagnostics.log --write-baseline
+python3 scripts/ci/check-api-doc-undocumented.py android-compose/dokka-diagnostics.log --diff-base origin/main
+```
+
+Writing a baseline records evidence; it does not authorize new debt. New public
+APIs in the monitored packages need KDoc. Describe semantics and constraints,
+including constructor properties and enum entries, rather than repeating names.
 
 ## Automation boundaries and next increments
 
@@ -142,6 +178,19 @@ reference without requiring a live host.
 KDoc also needs review: generated pages repeat stale comments faithfully.
 Generation and link gates prove the publication is buildable and navigable;
 they do not prove the runtime behavior described in prose.
+
+The API docs job also writes an advisory progress summary: missing-documentation signature/source-set
+entries per module, the previous count, and reductions relative to the immutable
+comparison commit. A reduction is **resolved or removed (unclassified)**, not necessarily
+new documentation. There is no coverage percentage or inferred public-API denominator.
+The summary flags up to 20 existing gaps whose generated API page contains a source link
+to a changed file; the complete list is attached to the Dokka diagnostics artifact.
+This is page-level association, not a claim that the undocumented declaration changed.
+It introduces no additional merge gate; the shrinking baseline remains the enforcement.
+
+Keep diagnostics and local report output inside the checkout. In CI, only the exact
+runner-provided `GITHUB_STEP_SUMMARY` path may sit outside it. Git comparison refs
+are validated and resolved to a full immutable object ID before comparison.
 
 ## Public API review contract
 
