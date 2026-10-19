@@ -74,11 +74,13 @@ The following categories describe proposed responsibilities, not existing APIs o
 approved module names. Choose module boundaries after proving the first slice.
 
 - **Extension contracts:** portable descriptors, contribution identities, service
-  contracts, lifecycle results and navigation data. No feature implementation imports.
+  contracts, lifecycle results and navigation data. Contracts and kernel have no
+  Compose, Clikt or feature implementation imports.
 - **Kernel:** validates contributions, resolves dependencies, owns lifecycle and
   dispatches generic requests. It knows contracts and identities, not product names.
-- **Shared shell/rendering adapters:** render registered navigation, commands,
-  settings and page content; host native Compose and external-page presentations.
+- **Shared shell/rendering adapters:** replaceable provider extensions for chrome,
+  navigation rendering, commands, settings and page presentation. Distribution
+  assembly selects these adapters; presentation belongs outside the kernel.
 - **Feature extensions:** own product state, data policy, controllers, UI and
   their contributions. Communication uses explicit contracts, not sibling imports.
 - **Distribution assembly:** selects bundled extensions and platform bindings.
@@ -99,11 +101,16 @@ An extension descriptor needs a stable publisher-qualified identity, version and
 supported contract range. Contributions need stable IDs, ownership and supported
 platforms. Define these semantics before selecting Kotlin class names or JSON shapes.
 
+Descriptors, route IDs and runtime kinds use open contribution identities: adding
+an extension must not require another product or runtime enum case. The current v1
+sealed PluginRuntime declaration remains a limitation until its contract migrates.
+
 | Contribution | Required behavior |
 | --- | --- |
 | Routes and native pages | Stable route identity and typed/validated arguments; shared Compose implementation may supply content. Unknown or disabled routes render a generic unavailable state. |
 | Navigation entries | Reference registered routes, carry labels/order/context, and disappear when their owner is unavailable. No product-specific enum switch in shell chrome. |
-| Commands and agent tools | Declarative identity/input contract and owned handler; enforce collisions explicitly. Reuse ToolSource where its existing semantics fit. |
+| Commands and agent tools | Owned handlers and declarative input/identity contracts include CLI commands, help and menus as well as agent tools. Enforce collisions explicitly; reuse ToolSource where its semantics fit. |
+| Shell and presentation providers | Replaceable shared chrome, navigation renderers and native/external presentation adapters; resolve dependencies and lifecycle through the same provider contracts. |
 | Search providers | Owned query execution with cancellation, result identity and a registered destination/action. Disable removes results and cancels outstanding queries. |
 | Settings sections | Owned schema/presentation and persistence contract; preserve secret separation. Removing UI does not imply deleting stored settings. |
 | Infrastructure providers | Typed slots for transport, storage, authentication, telemetry, runtime hosting and OS integration; explicit provided/required contract identities, version compatibility and deterministic selection. Consumers do not reach into implementations. |
@@ -208,8 +215,8 @@ not completion of this stage; installed-extension parity remains subsequent work
 ## Enforcement and verification proposal
 
 Reuse the repository's architecture tooling to enforce dependency direction:
-kernel/contracts cannot import feature implementations; platform hosts cannot
-construct concrete feature controllers or infrastructure providers directly;
+kernel/contracts cannot import Compose, Clikt or feature implementations;
+platform hosts cannot construct concrete feature controllers or infrastructure providers directly;
 sibling extensions use explicit contracts, including infrastructure consumers.
 Distribution assembly is the declared exception and must remain isolated from
 runtime shell dispatch. Ratchet existing violations down during migration; never
