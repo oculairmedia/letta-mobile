@@ -16,7 +16,7 @@ import java.util.Base64
  *  - `GET /v1/tools` / `/v1/tools/{id}` -> `BUILTIN_TOOL_DEFINITIONS.map(vanillaTool)`,
  *    a hard-coded 14-entry list of client-side letta-code tools. No store read.
  *  - `GET /v1/providers` -> formerly a constant here; now live `list_connect_providers`
- *    ([ProviderAdminHandlers],).
+ *    ([ProviderAdminHandlers]).
  *  - `GET /v1/models/embedding` -> a single hard-coded embedding descriptor.
  *  - `GET /v1/folders|/v1/groups|/v1/identities|/v1/jobs|/v1/archives|/v1/mcp-servers`
  *    -> `stubList` — literally `json(res, 200, [])`. The letta-code local backend

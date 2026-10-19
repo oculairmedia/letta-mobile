@@ -71,7 +71,7 @@ internal object RunStatusTestTags {
 }
 
 /**
- *  (F07) /.8 (F08): one line above the composer saying what the agent is
+ * One line above the composer saying what the agent is
  * doing right now ("Waiting for the model…", "Retrying (2/5) in 4 s"), the server's latest status
  * message, and a card per server-side command (running, then its output until dismissed).
  *

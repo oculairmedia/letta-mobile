@@ -335,7 +335,7 @@ internal fun QueueRemovalDisposition?.cancelsLeaseOnceProjected(projected: Boole
  *
  * Only the `dequeued` removal of THIS input's client message id ends the queued
  * wait. A `stream_delta` is not start evidence: while this input is pending or
- * queued it may belong to the turn ahead (review of PR #1661). Servers that
+ * queued it may belong to the turn ahead. Servers that
  * answer `queued` (0.32+) also send `update_queue.removed`.
  *
  *  ( race 2): a terminal that beats this input's ack first waits for it.

@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 
 /**
- * The one page frame every shared page renders in (hard cut P2,). It owns the
+ * The one page frame every shared page renders in. It owns the
  * window's system-bar, display-cutout and keyboard insets exactly once, so the page underneath never
  * pads for them itself (no `statusBarsPadding`/`navigationBarsPadding`/`systemBarsPadding`/
  * `imePadding` in a page; `PageInsetModifierGuardTest` holds that line).

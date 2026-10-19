@@ -12,7 +12,7 @@ import kotlinx.serialization.json.contentOrNull
  *
  * Enforcement is centralized here so it cannot be forgotten by a handler:
  *  - requests: any admin_rpc params / runtime frame naming an out-of-scope
- *    `agent_id` (top level or under `runtime`; all of them,) are denied before dispatch;
+ *    `agent_id` (top level or under `runtime`; all of them) are denied before dispatch;
  *  - results: listings (`agent.list`, `conversation.list`, …) drop rows that
  *    belong to out-of-scope agents.
  *

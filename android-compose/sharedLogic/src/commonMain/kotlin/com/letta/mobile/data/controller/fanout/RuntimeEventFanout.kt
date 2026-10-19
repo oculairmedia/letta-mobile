@@ -440,8 +440,8 @@ class RuntimeEventFanout(
 
     /**
      * A server-initiated control frame that reached NO subscriber because every
-     * target overflowed is retained exactly like one that arrived with no subscriber
-     *, so the successor lease (the retried turn) still answers it
+     * target overflowed is retained exactly like one that arrived with no subscriber,
+     * so the successor lease (the retried turn) still answers it
      * instead of the server blocking forever. Then the owner is asked to resync.
      */
     private fun onSubscribersOverflowed(

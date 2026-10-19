@@ -558,7 +558,7 @@ class AppServerTurnEngine(
     fun busyRuntimeKeys(): List<TurnRuntimeKey> = leases.busySlots().map { it.key }
 
     /**
-     * SENSING (a,): two or more leases are active at once.
+     * SENSING: two or more leases are active at once.
      * Impossible before this bead (one global slot) and the whole point of it —
      * so the concurrency must be observable, with the exact key set, rather than
      * inferred from the absence of busy errors.
@@ -633,7 +633,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile folder-settings #2: reads the working directory the
+     * Reads the working directory the
      * runtime currently uses for [agentId]/[conversationId] via `get_cwd_map`
      * — the full per-conversation map plus the process boot directory as the
      * fallback for scopes that were never customized. Returns null only on a
@@ -647,7 +647,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     * Letta-mobile folder-settings #2 / changes the working
+     * Changes the working
      * directory for [agentId]/[conversationId] with `change_device_state{cwd}` and
      * confirms it from the matching `update_device_status` (bounded wait, see
      * [DeviceStateChanger]). Never re-issues `runtime_start`: that replays full
@@ -908,7 +908,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     *  +  bookkeeping for ONE mapped draft:
+     * Bookkeeping for one mapped draft:
      * record the tool_call_ids this turn emitted/returned, and open or resolve
      * the user-input approval gate that pauses the idle watchdog.
      *
@@ -1619,7 +1619,7 @@ class AppServerTurnEngine(
      * Emit synthetic ToolReturnObserved drafts for every tool_call_id
      * that was emitted but never returned. No-op when all emitted calls have returns.
      *
-     * fix(no-settle-on-clean-completion,): this must be called
+     * To avoid settling tools prematurely on clean completion, this must be called
      * ONLY on ABNORMAL turn ends — cancellation, idle timeout, stream error, or a
      * terminal lifecycle whose status is Failed/Cancelled. It must NEVER be
      * called for a clean Completed terminal (delayed-settle quiet window,

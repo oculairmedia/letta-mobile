@@ -35,7 +35,7 @@ sealed interface ChatSurfaceIntent {
 
     /**
      * Swipe up on the full-screen prompt card, or its "Open canvas" item. Keeps the shipped
-     * #1614 direction: full-screen chat -> canvas.
+     * direction: full-screen chat -> canvas.
      */
     @Serializable
     @SerialName("open_canvas")

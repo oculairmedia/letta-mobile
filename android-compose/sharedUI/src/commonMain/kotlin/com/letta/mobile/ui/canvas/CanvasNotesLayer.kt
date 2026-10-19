@@ -81,7 +81,7 @@ import com.letta.mobile.ui.theme.LettaDimens
  * was never placed (a legacy frameless note) gets the slot the shared placement engine gives it
  * ([framelessFrames], from `CanvasComposePlacement.placeFrameless`), so two never overlap.
  *
- * How a card is sized follows its geometry owner (canvas_compose,): an
+ * How a card is sized follows its geometry owner (`canvas_compose`): an
  * AUTO-owned or frameless note fits its content within its booked frame (see [NoteSizing]); an
  * EXPLICIT or USER frame is drawn as stored. Fitting is local: it never writes geometry back.
  *
@@ -89,7 +89,7 @@ import com.letta.mobile.ui.theme.LettaDimens
  * handles. Its expand button asks the host, through [onExpand], to open it large; while
  * [expandedNoteId] is open elsewhere the card only previews the text.
  *
- * A card is board content, so it is laid out in world units ([InWorldUnits],):
+ * A card is board content, so it is laid out in world units ([InWorldUnits]):
  * its type is the same proportion of the note on every display and at any system font scale. The
  * [viewport] is read in layout and draw only: a pan or zoom never recomposes a card.
  */

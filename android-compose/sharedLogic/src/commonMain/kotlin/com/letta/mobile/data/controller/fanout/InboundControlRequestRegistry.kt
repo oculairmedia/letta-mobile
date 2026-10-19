@@ -76,7 +76,7 @@ class InboundControlRequestRegistry {
         val state: State = State.Pending,
         val leaseToken: Long? = null,
         /**
-         * (c) / PR #1077 review (P1): the claim is held by an invocation
+         * The claim is held by an invocation
          * that deliberately OUTLIVES its turn lease (external tools run on a
          * detached job so a slow tool cannot stall frame ingestion). A detached
          * claim must survive [releaseClaimsForLease] — otherwise the turn's

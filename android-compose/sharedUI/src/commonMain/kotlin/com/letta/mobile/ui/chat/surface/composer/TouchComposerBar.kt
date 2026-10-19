@@ -225,7 +225,7 @@ private fun <T> chipSpec(): AnimationSpec<T> {
 /**
  * Top and bottom padding. Legacy: 24 dp at rest, easing to 12 dp as the keyboard rises (driven by
  * the inset itself, so it tracks the keyboard frame by frame). The bar runs flush to the screen's
- * bottom edge (legacy ChatScreen's bottomInsetDp = 0,): the opaque bar sits
+ * bottom edge (legacy ChatScreen's bottomInsetDp = 0): the opaque bar sits
  * under the navigation bar, which draws over its bottom padding, instead of growing by the
  * navigation inset and floating its controls ~48 dp up on three-button devices.
  */

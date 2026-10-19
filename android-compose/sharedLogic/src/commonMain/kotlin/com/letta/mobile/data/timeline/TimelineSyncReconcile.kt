@@ -518,7 +518,7 @@ private fun Timeline.recentTailContainsEquivalent(incoming: TimelineEvent.Confir
  * reconciled copy instead of appending a duplicate. Matching real run ids, or
  * either side missing a run id (REST reconcile responses often omit run_id),
  * count as the same logical message. Only two DIFFERENT real run ids — the
- * recycled-server-id-across-runs case from #780 — are treated as distinct.
+ * recycled-server-id-across-runs case — are treated as distinct.
  */
 private fun TimelineEvent.Confirmed.sharesRunIdentityWith(
     incoming: TimelineEvent.Confirmed,

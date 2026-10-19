@@ -17,10 +17,10 @@ interface MemoryBlockContentPort {
     /** Writes and commits the block (MemFS-backed on the App Server). */
     suspend fun save(ref: MemoryBlockRef, value: String): Block
 
-    /** bfooy.5: creates and commits a new block under [agentId]; fails if [label] exists. */
+    /** Creates and commits a new block under [agentId]; fails if [label] exists. */
     suspend fun create(agentId: String, label: String, value: String): Block
 
-    /** bfooy.5: deletes the block and commits the deletion. */
+    /** Deletes the block and commits the deletion. */
     suspend fun delete(ref: MemoryBlockRef)
 }
 

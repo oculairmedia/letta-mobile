@@ -3,8 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.util.Telemetry
 
 /**
- * Diagnostic dump for the hydration-duplication bug family
- * ( / 3j6 / 16li).
+ * Diagnostic dump for duplicate timeline events during hydration.
  *
  * Emits one Telemetry event per [TimelineEvent] in [timeline], tagged with
  * [phase] and [conversationId] so a captured ring buffer can be diffed

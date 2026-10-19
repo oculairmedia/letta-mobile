@@ -46,7 +46,7 @@ import com.letta.mobile.ui.theme.LettaDimens
  * [options]. At or above [LettaDimens.Pane.wideBreakpoint] the page is one scrolling column with the
  * composer up top and the full fleet table; below it the composer docks at the bottom like a phone
  * chat bar and the page leads with running work and recent conversations, then an agent avatar row
- * and a one-line stats strip ([homeCompactDashboard],).
+ * and a one-line stats strip ([homeCompactDashboard]).
  *
  * [HomePageOptions.document] is the Letta Code mod seam: a recognised A2UI document replaces the
  * native page.

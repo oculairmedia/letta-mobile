@@ -32,7 +32,7 @@ data class MemoryBlockDeletion(
     val error: String? = null,
 )
 
-/** Create / delete actions on core-memory blocks (bfooy.5). */
+/** Create / delete actions on core-memory blocks. */
 interface MemoryBlockLifecycleActions {
     fun beginCreate()
     fun updateCreateLabel(text: String)

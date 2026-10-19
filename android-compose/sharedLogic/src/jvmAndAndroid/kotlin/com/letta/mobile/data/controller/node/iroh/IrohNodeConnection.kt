@@ -145,7 +145,7 @@ class IrohNodeConnection(
         }
     }
     /**
-     * Auth + grants for this connection (/.6,): pre-authenticated
+     * Auth + grants for this connection: pre-authenticated
      * only when the policy vouches for THIS NodeId or it is paired; a revoked
      * pairing tears the connection down. See [PeerSessionAuth].
      */
@@ -176,7 +176,7 @@ class IrohNodeConnection(
         IrohFrameCodec.FRAME_PART_CAPABILITY in peerCapabilities.get()
 
     /**
-     * eaczz.3: this connection's single viewer handle onto its own turn/stream
+     * This connection's single viewer handle onto its own turn/stream
      * BiStream. Built once when the stream opens in [serve] (it needs the
      * stream's [SendStream]) and reused for every conversation this connection
      * views. It reuses the connection's per-connection [eventSeq] and
@@ -187,7 +187,7 @@ class IrohNodeConnection(
     private var viewerRegistration: ViewerRegistration? = null
 
     /**
-     * eaczz.3: this connection's viewer subscription state (Option A de-scope
+     * This connection's viewer subscription state (Option A de-scope
      * rule). Built alongside [selfViewer] once the turn stream opens; null when
      * there is no [connectionRegistry] (legacy/test constructions). Both
      * subscription signals — runtime_start and message.list — call
@@ -196,10 +196,10 @@ class IrohNodeConnection(
     private var viewerSubscription: ConversationViewerSubscription? = null
 
     /**
-     * eaczz.3: build this connection's [selfViewer] once, bound to the turn
+     * Build this connection's [selfViewer] once, bound to the turn
      * stream's [SendStream]. Idempotent — later calls return the existing handle
      * so every conversation this connection views shares ONE viewer identity
-     * (so [ConnectionRegistry.unregisterAll] can drop them all on disconnect).
+     * (so [ConnectionRegistry.release] can drop them all on disconnect).
      */
     private fun ensureSelfViewer(streamSend: SendStream): IrohViewerHandle {
         selfViewer?.let { return it }
@@ -229,7 +229,7 @@ class IrohNodeConnection(
     }
 
     /**
-     * eaczz.3: register this connection as the viewer of [conversationId],
+     * Register this connection as the viewer of [conversationId],
      * applying the Option A de-scope rule (a new signal for a DIFFERENT
      * conversation unregisters the prior one first). No-op when there is no
      * registry / no live stream (subscription is null). Safe to call from either

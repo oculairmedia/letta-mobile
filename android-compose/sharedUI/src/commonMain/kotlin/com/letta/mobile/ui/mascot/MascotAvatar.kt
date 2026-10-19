@@ -141,7 +141,7 @@ fun MascotLive(
      */
     sceneKey: String = agentId,
     /**
-     * The character answers touch and pointer (hover, poke, pet, double-click tricks;). On
+     * The character answers touch and pointer (hover, poke, pet, double-click tricks). On
      * by default wherever it is a control; a seat that takes input without a click (a hero with an
      * edit pencil) turns it on too, and one that must leave every touch to what is under it, off.
      */

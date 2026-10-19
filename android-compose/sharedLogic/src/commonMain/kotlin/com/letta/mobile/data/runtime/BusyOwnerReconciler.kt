@@ -42,7 +42,7 @@ internal class BusyOwnerReconciler(
     }
 
     /**
-     * SENSING (c,): the LEGITIMATE busy, a second turn for the SAME
+     * SENSING: the LEGITIMATE busy, a second turn for the SAME
      * {agent, conversation} runtime. letta-code permits at most one active turn per runtime, so
      * this rejection of [rejected] preserves the server contract rather than serializing the app.
      */

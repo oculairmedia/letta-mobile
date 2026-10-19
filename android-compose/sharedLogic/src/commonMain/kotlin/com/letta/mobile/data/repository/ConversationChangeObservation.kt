@@ -5,7 +5,7 @@ import com.letta.mobile.data.transport.api.IChannelTransport
 
 /**
  * Reacts to `conversation_updated` pushes on [transport] (Meridian sends them after every
- * conversation write from any client,) by calling [onChanged]. Shared by every
+ * conversation write from any client) by calling [onChanged]. Shared by every
  * conversation list so Android and desktop follow other devices the same way; pair it with
  * [observeReconnectRefresh], since pushes sent while a client was offline are lost.
  */

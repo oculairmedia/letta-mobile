@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * What the Plugins page reads and asks of the host's plugin registry. The
- * real one (C7,) rides admin_rpc `plugins.*`; until it lands every client binds
+ * real one rides admin_rpc `plugins.*`; until it lands every client binds
  * [UnavailablePluginCatalog].
  *
  * Installing is two steps, so the owner sees what a package asks for before anything runs:

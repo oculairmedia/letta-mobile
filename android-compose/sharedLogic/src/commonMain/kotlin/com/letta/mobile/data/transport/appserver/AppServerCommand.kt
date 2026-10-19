@@ -339,7 +339,7 @@ sealed interface AppServerCommand {
     ) : AppServerCommand
 
     /**
-     * bfooy.5: the native owner of an agent memory-block delete. Removes one
+     * The native owner of an agent memory-block delete. Removes one
      * MemFS file and commits the deletion so HEAD moves (idempotent upstream:
      * an already-absent file succeeds without a commit).
      */
@@ -449,7 +449,7 @@ sealed interface AppServerCommand {
 
     /**
      * Reads the FULL per-conversation working-directory map the runtime
-     * currently holds (letta-mobile folder-settings #2): every
+     * currently holds: every
      * `agent:<id>::conversation:default` / `conversation:<id>` scope key it
      * knows a working directory for, plus the process's boot directory as
      * the fallback for scopes absent from the map. Not scoped to one

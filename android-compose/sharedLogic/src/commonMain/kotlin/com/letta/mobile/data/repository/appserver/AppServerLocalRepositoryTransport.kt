@@ -27,10 +27,10 @@ interface AppServerLocalRepositoryTransport {
     /** `block.update_agent`: the App Server writes and commits `memory/system/<label>.md`. */
     suspend fun updateAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): JsonElement
 
-    /** bfooy.5 `block.create_agent`: a new committed `memory/system/<label>.md`. */
+    /** `block.create_agent`: a new committed `memory/system/<label>.md`. */
     suspend fun createAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): JsonElement
 
-    /** bfooy.5 `block.delete_agent`: a committed delete of `memory/system/<label>.md`. */
+    /** `block.delete_agent`: a committed delete of `memory/system/<label>.md`. */
     suspend fun deleteAgentBlock(target: AgentBlockTarget)
 }
 

@@ -326,7 +326,7 @@ private const val ELAPSED_TICK_MILLIS = 1_000L
 
 /**
  * The calls in full, one step row ([ToolStepList]) each: in the window's inspector
- * (docked when wide, a sheet when compact;), titled with the run's line.
+ * (docked when wide, a sheet when compact), titled with the run's line.
  */
 @Composable
 private fun ToolRunDetailsSheet(

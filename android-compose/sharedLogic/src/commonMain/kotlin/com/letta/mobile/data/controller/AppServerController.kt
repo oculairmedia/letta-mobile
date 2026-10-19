@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.emptyFlow
  * - Providing sync/abort operations
  * - Exposing connection lifecycle state
  *
- * This is the orchestration layer ON TOP of the protocol client (#685): it holds
+ * This is the orchestration layer ON TOP of the protocol client: it holds
  * canonical runtimes, manages connection state, and presents the lifecycle API
  * that the rest of the app (fanout, registry) will build on.
  *

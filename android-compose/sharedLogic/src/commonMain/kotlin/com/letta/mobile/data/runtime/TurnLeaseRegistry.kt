@@ -24,11 +24,10 @@ data class TurnRuntimeKey(val agentId: String, val conversationId: String) {
 /**
  * ALL per-turn engine state for ONE runtime key.
  *
- * Before this bead every field here was a single process-wide slot on
+ * Previously every field here was a single process-wide slot on
  * [AppServerTurnEngine], so a turn on conversation B was rejected
  * ("iroh_turn_engine_busy") purely because conversation A held the one lease —
- * the last unkeyed slot of the defect class (the transport
- * was keyed in PR #1055, the coordinator in PR #1056).
+ * the transport and coordinator already kept separate state per conversation.
  *
  * Atomic fields are private and reached through accessors: kotlinx-atomicfu's
  * JVM transformer rejects an atomic field touched from another class.
@@ -104,7 +103,7 @@ internal class TurnLeaseSlot(val key: TurnRuntimeKey) {
 /**
  * Bounded, recency-ordered registry of [TurnLeaseSlot]s.
  *
- * Mirrors the ChatSendCoordinator reference implementation merged in PR #1056:
+ * Mirrors the ChatSendCoordinator reference implementation:
  * cap [MAX_TRACKED_RUNTIME_KEYS], evict SETTLED entries oldest-first, NEVER drop
  * a tracking entry (the map exceeds the cap instead, telemetered), and re-insert
  * on access so ordering is recency rather than first-seen.
@@ -159,7 +158,7 @@ internal class TurnLeaseRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS
     }
 
     companion object {
-        /** Same cap as ChatSendCoordinator's turn-state map (PR #1056). */
+        /** Same cap as ChatSendCoordinator's turn-state map. */
         const val MAX_TRACKED_RUNTIME_KEYS: Int = 32
     }
 }

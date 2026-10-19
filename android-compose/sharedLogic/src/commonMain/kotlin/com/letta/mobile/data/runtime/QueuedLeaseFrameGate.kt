@@ -7,7 +7,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- *  (PR #1661 review): keeps a QUEUED lease from adopting the turn ahead of it.
+ * Keeps a QUEUED lease from adopting the turn ahead of it.
  *
  * While this lease's input waits in the server queue its own run does not exist yet, so every
  * run-bearing frame on the runtime belongs to another turn (another viewer's, or one parked on an

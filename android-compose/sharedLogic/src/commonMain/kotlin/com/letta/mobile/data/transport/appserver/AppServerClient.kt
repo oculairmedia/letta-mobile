@@ -167,7 +167,7 @@ interface AppServerClient {
     suspend fun writeMemoryFile(command: AppServerCommand.WriteMemoryFile): AppServerInboundFrame.WriteMemoryFileResponse =
         throw UnsupportedOperationException("WriteMemoryFile is not supported by this client")
 
-    /** bfooy.5: native owner of agent memory-block deletes (`block.delete_agent`). */
+    /** Native owner of agent memory-block deletes (`block.delete_agent`). */
     suspend fun deleteMemoryFile(command: AppServerCommand.DeleteMemoryFile): AppServerInboundFrame.DeleteMemoryFileResponse =
         throw UnsupportedOperationException("DeleteMemoryFile is not supported by this client")
 

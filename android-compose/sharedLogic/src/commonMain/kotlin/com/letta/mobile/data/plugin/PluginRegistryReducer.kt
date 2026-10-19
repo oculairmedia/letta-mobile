@@ -90,7 +90,7 @@ sealed interface PluginTransition {
 }
 
 /**
- * The registry's pure transitions (plan section 6.1,): install, update with
+ * The registry's pure transitions (plan section 6.1): install, update with
  * rollback, enable, disable, remove, consent, settings, secrets and the driver's lifecycle. File I/O
  * and drivers are elsewhere (.28/.30); this decides only what the next state is, or why there is
  * none. Packages are pinned by hash: a version is installed from one hash only, an update must

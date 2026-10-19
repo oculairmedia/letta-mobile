@@ -61,7 +61,7 @@ internal class ObserverWriteQueue(
 }
 
 /**
- * eaczz.4 — the fanout core. Owns a single turn's per-connection frame-shaping
+ * The fanout core. Owns a single turn's per-connection frame-shaping
  * state (open-tool_call tracking + terminal-dedup)
  * and fans EACH already-stamped wire DELTA BODY out to EVERY viewer of
  * the turn's conversation — not just the initiator.
@@ -77,14 +77,14 @@ internal class ObserverWriteQueue(
  *    per-viewer ordering + seq monotonicity + frame-part capability gating stay
  *    intact and shape parity holds.
  *  - Fanout is best-effort per viewer: a slow/dead observer that fails its write
- *    never breaks the loop or the initiator's turn (eaczz.6).
+ *    never breaks the loop or the initiator's turn.
  *
  * CRITICAL ISOLATION: mid-turn redial PARKING is INITIATOR-scoped. Only the
  * initiator's frames are tracked for parking (via [trackInitiatorFrame]); a
  * failing observer is never parked. Observers reconcile via message.list on
- * reconnect (eaczz.6), so they get no parking here.
+ * reconnect, so they get no parking here.
  *
- * eaczz.6 — OBSERVER LIFECYCLE / CONVERGENCE:
+ * OBSERVER LIFECYCLE / CONVERGENCE:
  *  - JOIN MID-TURN: an observer that subscribes (via its own message.list
  *    hydrate) AFTER the turn started may miss the earliest deltas, but it always
  *    reconciles-to-final. Because [snapshotViewers] re-reads the registry on
@@ -94,7 +94,7 @@ internal class ObserverWriteQueue(
  *    terminal + the joiner's own message.list hydrate close the rest. It never
  *    gets initiator parking (parking is initiator-only).
  *  - DISCONNECT MID-TURN: the connection's disconnect path unregisters it
- *    (eaczz.1 unregisterAll); the next [snapshotViewers] no longer contains it,
+ *    ([ConnectionRegistry.release]); the next [snapshotViewers] no longer contains it,
  *    so the broadcaster stops writing to it — the initiator is unaffected.
  *  - RECONNECT: on redial the observer re-subscribes (message.list) and
  *    reconciles to the same final timeline; it gets NO parking replay.
@@ -121,7 +121,7 @@ internal class ConversationTurnFanout(
      */
     private val trackInitiatorFrame: (deltaJson: String) -> Unit = {},
     /**
-     * eaczz.6 fault isolation: de-register a failed/wedged OBSERVER viewer from
+     * Fault isolation: de-register a failed/wedged OBSERVER viewer from
      * the SAME registry the fanout reads from ([viewersFor]) so the broadcaster
      * stops writing to a dead peer on subsequent deltas. Never invoked for the
      * initiator (which follows the parking path, not de-registration). No-op when
@@ -129,7 +129,7 @@ internal class ConversationTurnFanout(
      */
     private val unregisterViewer: suspend (conversationId: String, viewer: ViewerHandle) -> Unit = { _, _ -> },
     /**
-     * eaczz.6 non-blocking fanout: bounded per-OBSERVER write timeout. A wedged
+     * Non-blocking fanout: bounded per-OBSERVER write timeout. A wedged
      * QUIC observer stream that does not complete a write within this window is
      * treated as failed, de-registered, and skipped on later deltas — so one dead
      * peer cannot serially stall the fanout. The INITIATOR viewer is NEVER subject
@@ -379,7 +379,7 @@ internal class ConversationTurnFanout(
     }
 
     /**
-     * eaczz.5 — live user-echo fanout. Synthesize a `user_message` wire delta for
+     * Live user-echo fanout. Synthesize a `user_message` wire delta for
      * the sender's prompt and fan it out to EVERY viewer at turn start, BEFORE
      * any assistant stream. Observers render it as a fresh user row so the prompt
      * appears before the reply; the initiator collapses it against its own
@@ -455,7 +455,7 @@ internal class ConversationTurnFanout(
      * deterministically from the (redial-resent) input rather than from live
      * turn frames — so it must not consume a parking slot.
      *
-     * eaczz.6 — NON-BLOCKING FANOUT + FAULT ISOLATION. EVERY viewer's writes,
+     * NON-BLOCKING FANOUT + FAULT ISOLATION. EVERY viewer's writes,
      * initiator included, enter the connection-owned
      * [ObserverWriteQueue], so a normal delta does not wait on any network write
      * at all. Each viewer has one ordered job chain, preserving frame order and

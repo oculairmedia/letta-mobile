@@ -4,8 +4,8 @@ import com.letta.mobile.util.Telemetry
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Authentication + authorization state of ONE Iroh App Server connection
- *, separated from the QUIC plumbing in
+ * Authentication + authorization state of ONE Iroh App Server connection,
+ * separated from the QUIC plumbing in
  * [IrohNodeConnection] so every fail-closed decision is unit-testable.
  *
  * Decision order for an auth frame:

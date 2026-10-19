@@ -9,7 +9,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * `lcp-view/1` (plan section 7.2,): the view bridge between a plugin page and
+ * `lcp-view/1` (plan section 7.2): the view bridge between a plugin page and
  * its host. JSON-RPC 2.0 over postMessage with a fixed method set; nothing outside it is answered.
  */
 object LcpView {

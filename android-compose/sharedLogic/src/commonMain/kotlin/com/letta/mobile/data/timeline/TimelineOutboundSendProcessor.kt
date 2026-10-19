@@ -50,7 +50,7 @@ internal class TimelineOutboundSendProcessor(
      */
     private val onSendStreamEnded: suspend () -> Unit = {},
     /**
-     *  (Codex #902 finding 1): the REST/timeline-
+     * The REST/timeline-
      * transport send path (this class) previously never signaled the
      * dangling-tool-call resolver's turn lifecycle — only the WS/iroh
      * ChatSendCoordinator path did, via TimelineRepository.turnStarted /

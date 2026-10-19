@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * What the server's `can_use_tool` control request offered for one parked tool call
- * ( /.12), keyed by tool call so the approval card, which is
+ * What the server's `can_use_tool` control request offered for one parked tool call,
+ * keyed by tool call so the approval card, which is
  * projected from the streamed `approval_request_message`, can find it.
  *
  * An entry exists only while the request genuinely waits on the person: the engine records it

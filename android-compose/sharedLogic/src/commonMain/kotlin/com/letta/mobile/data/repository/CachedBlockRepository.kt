@@ -61,7 +61,7 @@ open class CachedBlockRepository(
         updateAgentBlock(target.agentId, target.label, params)
 
     /**
-     * bfooy.5: Iroh uses the committed agent-scoped route; plain HTTP Letta has
+     * Iroh uses the committed agent-scoped route; plain HTTP Letta has
      * global blocks, so it creates one and attaches it to the agent.
      */
     override suspend fun createAgentBlock(target: AgentBlockTarget, value: String): Block =

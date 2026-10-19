@@ -86,7 +86,7 @@ suspend fun openDirectAppServerDial(
 
 /**
  * The HTTP client for direct App Server sockets on Android and the JVM: CIO, because the shared
- * frame ceiling needs an engine that honours `maxFrameSize` (OkHttp refuses it,).
+ * frame ceiling needs an engine that honours `maxFrameSize` (OkHttp refuses it).
  */
 fun directAppServerHttpClient(): HttpClient = HttpClient(CIO) {
     install(WebSockets) { applyAppServerFrameLimits() }

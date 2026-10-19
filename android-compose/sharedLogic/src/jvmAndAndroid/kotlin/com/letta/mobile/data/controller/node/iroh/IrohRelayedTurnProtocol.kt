@@ -407,7 +407,7 @@ internal suspend fun relayDraft(
 /**
  * Input_accepted / loop status / turn_finished for the initiator.
  *
- * eaczz.5: live user-echo fanout. Before the assistant stream, [echo] goes out as a snapshot
+ * Live user-echo fanout. Before the assistant stream, [echo] goes out as a snapshot
  * `user_message` delta so OBSERVERS see the sender's prompt immediately, in order, ahead of
  * the reply. The initiator does NOT double-render: the echo carries the sender's otid
  * (== clientMsgId), which the reducer collapses against its optimistic Local row. It goes out
@@ -428,7 +428,7 @@ internal fun relayedTurnProtocol(
     afterAccepted = { echo?.let { runCatching { fanout.broadcastUserEcho(it.clientMessageId, it.text, it.contentParts) } } },
 )
 
-/** The sender's prompt, echoed to observers once its input is accepted (eaczz.5). */
+/** The sender's prompt, echoed to observers once its input is accepted. */
 internal class RelayedUserEcho(val clientMessageId: String, val text: String, val contentParts: JsonArray?)
 
 /** One relayed input's node-side state, for its failure path. */

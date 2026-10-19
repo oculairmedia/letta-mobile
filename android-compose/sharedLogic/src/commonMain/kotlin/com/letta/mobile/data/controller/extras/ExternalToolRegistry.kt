@@ -198,7 +198,7 @@ class ExternalToolRegistry(
 
     /**
      * [invoke] on behalf of [caller]: its agent and conversation, and the request's `tool_call_id`
-     * ([ExternalToolCaller.toolCallId],).
+     * ([ExternalToolCaller.toolCallId]).
      */
     suspend fun invoke(toolName: String, input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
         val tool = toolsByName[toolName] ?: dynamicTools.find(toolName)

@@ -102,8 +102,7 @@ data class LettaSearchAnchor(
  * The pane OVERLAYS the field-shaped trigger ([PaneAnchor.OverStart], at the
  * trigger's own width): its input sits exactly where the trigger was and the
  * scopes, filter and results hang directly beneath it, so the window shows ONE
- * search input, never the trigger's copy of the query above a second field
- * (#1606 had this, S6's move to [LettaPane] lost it). The
+ * search input, never the trigger's copy of the query above a second field. The
  * trigger draws nothing while the pane covers it. Escape (the pane's own key
  * handling) or a click outside closes the pane and the trigger shows the live
  * query again.

@@ -19,15 +19,14 @@ import kotlinx.coroutines.flow.StateFlow
  * reconstructed at submit time.
  *
  * Claim/lease/connection-generation ownership of inbound control requests stays
- * in [com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry]
- * ( / PR #1040 + #1061). Duplicating a generation fence here would
+ * in [com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry]. Duplicating a generation fence here would
  * create a second, divergent source of truth for the same request identity.
  *
  * WHY IT IS KEYED BY RUNTIME
- *  made the gate set double as the idle-watchdog pause
- * signal, and keyed it per runtime so an unanswered
+ * The gate set also supplies the idle-watchdog pause
+ * signal and is keyed per runtime so an unanswered
  * AskUserQuestion in conversation A can neither pause conversation B's watchdog
- * nor be cleared by B's terminal. Both properties are preserved verbatim: every
+ * nor be cleared by B's terminal. Both properties rely on the same scope: every
  * mutation a turn performs is scoped to its own [TurnRuntimeKey].
  *
  * The two by-tool-call-id lookups ([approvalIdFor], [clearIfMatches]) scan every

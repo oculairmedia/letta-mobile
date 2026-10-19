@@ -118,7 +118,7 @@ enum class SubagentChipState {
  * | source | precedence | authority |
  * |---------------------|-----------:|-----------|
  * | [CORRELATOR_OBSERVED] | 10 | inferred locally from parent tool_call frames — weakest; can create a chip but never overrule a real registry |
- * | [HTTP_REGISTRY]       | 20 | LettaShim HTTP registry (TTL + breaker, letta-mobile-#1011) — a remote cache, may be stale |
+ * | [HTTP_REGISTRY]       | 20 | LettaShim HTTP registry (TTL + breaker) — a remote cache, may be stale |
  * | [CONTROLLER_NATIVE]   | 30 | `update_subagent_state` from the App Server the controller owns — the source of truth |
  *
  * RULE: an observation is applied only when its source precedence is **>=**

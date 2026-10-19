@@ -6,7 +6,7 @@ import androidx.compose.runtime.Immutable
  * The device workspace the agent works in, read-only: what `@` mentions
  * search and the file viewer reads. [AppServerWorkspaceFileSource] serves it over an App Server
  * connection; tests fake it. The working directory comes from the caller: today the
- * conversation's cwd, later the typed device status (F19,).
+ * conversation's cwd, later the typed device status.
  */
 interface WorkspaceFileSource {
     /** Up to [limit] paths containing [query], relative to [cwd] (the server's directory when null). */

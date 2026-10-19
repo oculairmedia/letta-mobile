@@ -54,7 +54,7 @@ internal fun <T> duplicates(values: List<T>, at: ManifestPointer): List<SchemaPr
 }
 
 /**
- * The manifest rules a schema cannot say (plan section 3.1,): the contract
+ * The manifest rules a schema cannot say (plan section 3.1): the contract
  * version the host supports, capabilities that what the manifest declares needs, origins, setting
  * defaults, tool names and descriptions. Runtime paths and templates are [PluginRuntimeRules];
  * element kinds and pages are [PluginContentRules]. Each problem is at its JSON pointer.
@@ -62,8 +62,8 @@ internal fun <T> duplicates(values: List<T>, at: ManifestPointer): List<SchemaPr
 object PluginManifestRules {
     /**
      * The LCP contract major this host speaks. Inlined (not `PluginApi.CONTRACT_VERSION`) so the
-     * manifest rules stay in commonMain without pulling `:plugin-api` onto Android/wasm
-     *; `PluginContractVersionTest` (jvmTest) holds the two equal.
+     * manifest rules stay in commonMain without pulling `:plugin-api` onto Android/wasm;
+     * `PluginContractVersionTest` (jvmTest) holds the two equal.
      */
     const val CONTRACT_VERSION: Int = 1
 

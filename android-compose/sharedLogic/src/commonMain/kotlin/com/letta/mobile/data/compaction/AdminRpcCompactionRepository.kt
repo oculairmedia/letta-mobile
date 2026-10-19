@@ -13,7 +13,7 @@ import kotlinx.serialization.json.put
  *
  * A host that predates the relay answers "Unknown method" and one without a native App Server
  * client `capability_unavailable`: both are [CompactionOutcome.Unsupported], so the button hides
- * rather than failing (the Tool Detail pattern, #1827). A transport with no admin_rpc at all (a
+ * rather than failing (the Tool Detail pattern). A transport with no admin_rpc at all (a
  * direct App Server session) is unsupported the same way.
  */
 class AdminRpcCompactionRepository(

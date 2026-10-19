@@ -6,7 +6,7 @@ import com.letta.mobile.plugin.api.PluginApi
 import kotlinx.serialization.json.Json
 
 /**
- * LCP wire v1 (plan section 5,): the Letta Canvas Plugin protocol a `process`
+ * LCP wire v1 (plan section 5): the Letta Canvas Plugin protocol a `process`
  * plugin speaks as NDJSON on stdio and a `service` plugin speaks as WebSocket text frames. JSON-RPC
  * 2.0, UTF-8, one message per line or frame. The reference for authors is
  * `docs/reference/canvas-plugin-wire-v1.md`; the golden transcripts are under

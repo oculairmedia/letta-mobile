@@ -17,7 +17,7 @@ data class PluginRateLimit(val amount: Long, val window: Duration = 1.seconds) {
 }
 
 /**
- * How often each plugin may call `host.emit` and `host.log` (plan: trust minimum,):
+ * How often each plugin may call `host.emit` and `host.log`:
  * [emit] and [log] are per plugin, over a sliding window, so a burst cannot dodge the limit by
  * straddling a second boundary. One instance may be shared by every plugin of a host; each is
  * counted on its own. In memory: a restarted host starts every plugin afresh, which is fine at a

@@ -82,7 +82,7 @@ internal class AdminRpcStreamServer(
      */
     private val maxReassembledBytes: Int = IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES,
     /**
-     * eaczz.3: per-connection observer of admin_rpc method calls. admin_rpc runs
+     * Per-connection observer of admin_rpc method calls. admin_rpc runs
      * on its own BiStream(s), disjoint from the turn/stream BiStream, so the
      * shared [router] handlers (e.g. static ConversationAdminHandlers.message.list)
      * carry NO connection identity. This hook lets the owning [IrohNodeConnection]
@@ -319,7 +319,7 @@ internal class AdminRpcStreamServer(
     }
 
     /**
-     * eaczz.3: let the owning connection observe an authenticated method call
+     * Let the owning connection observe an authenticated method call
      * (e.g. subscribe as a viewer on message.list) before dispatch.
      * Best-effort: a failing hook must never break the RPC.
      */

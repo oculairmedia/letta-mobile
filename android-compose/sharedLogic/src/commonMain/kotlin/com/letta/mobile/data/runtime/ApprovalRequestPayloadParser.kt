@@ -10,7 +10,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 
 /**
- *  /.12: reads the optional parts of a `can_use_tool` control request
+ * Reads the optional parts of a `can_use_tool` control request
  * (`permission_suggestions`, `blocked_path`, `diffs`).
  *
  * Every read is FAIL-SOFT: this runs inside the turn collect loop over raw server frames, so a

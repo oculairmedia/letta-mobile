@@ -46,7 +46,7 @@ class StepSliderCallbacks(
 )
 
 /**
- *  / joigh: a discrete slider over [StepSliderSpec.count] stops — the reasoning
+ * A discrete slider over [StepSliderSpec.count] stops — the reasoning
  * effort and the context limit. It snaps to stops (with a haptic tick per stop where the platform
  * has haptics), names the value beside it and to accessibility, moves one stop per arrow key
  * (Material's own slider keys), and applies only when the drag is released (or a key or

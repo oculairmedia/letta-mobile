@@ -57,7 +57,7 @@ internal class ChatRowMotion(private val reduced: Boolean) {
     }
 
     /**
-     * The tool card unfurl (legacy LettaMotion.unfurlEnter,): the body opens
+     * The tool card unfurl (legacy LettaMotion.unfurlEnter): the body opens
      * from the leading edge and downwards at once, so it reads as the card opening rather than
      * content appearing. Mirrored on collapse.
      */

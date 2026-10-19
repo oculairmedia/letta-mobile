@@ -38,7 +38,7 @@ import com.letta.mobile.ui.theme.LettaDimens
  */
 
 /**
- * The stacked bar. [autoCompactAt] (a share of the window,) draws a tick where
+ * The stacked bar. [autoCompactAt] (a share of the window) draws a tick where
  * letta-code auto-compacts, so the threshold reads against the sections that will reach it.
  */
 @Composable

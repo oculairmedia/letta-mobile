@@ -290,14 +290,14 @@ fun groupMessagesForRender(
  * item's LazyColumn [ChatRenderItem.key] is globally unique, even if two
  * distinct items legitimately (or buggily) resolve to the same run id.
  *
- * The #337 [runKey] normaliser prevents the `run-run-<id>` double-prefix
+ * The [runKey] normaliser prevents the `run-run-<id>` double-prefix
  * collision, but it does NOT guarantee uniqueness when two distinct render
  * items map to the same single-prefixed `run-<id>` key. Before this pass a
  * repeated run id crashed the LazyColumn with
  * `IllegalArgumentException: Key "run-<id>" was already used`.
  *
  * We keep the FIRST occurrence's key verbatim (preserving the stable slot
- * identity / #337 behaviour for the common, already-unique case) and only
+ * identity behaviour for the common, already-unique case) and only
  * suffix subsequent collisions with their stable per-item discriminator —
  * so a duplicate degrades into a distinct-but-stable slot instead of a hard
  * crash. In a correct snapshot no item is rewritten, so this is a no-op.

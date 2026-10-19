@@ -92,7 +92,7 @@ internal object BranchIds {
 }
 
 /**
- *  /.16, picks the message a fork goes through, from a
+ * Picks the message a fork goes through, from a
  * conversation's messages (oldest first): the server's own list when the backend can read it (its
  * ids are the ones a fork accepts), else the timeline the page shows.
  *

@@ -20,7 +20,7 @@ import kotlinx.atomicfu.locks.synchronized
  *
  * Only meaningful on a transport that delivers every frame of the connection. A relay that filters
  * frames per viewer shows legitimate holes unless it re-stamps the sequence per viewer. The Iroh host
- * does (one counter per viewer connection, drawn under its stream write lock,)
+ * does (one counter per viewer connection, drawn under its stream write lock)
  * and says so with [StreamIntegrityMonitor.EVENT_SEQ_ORDERED_CAPABILITY]; clients enable detection on
  * direct sockets and on Iroh.
  */

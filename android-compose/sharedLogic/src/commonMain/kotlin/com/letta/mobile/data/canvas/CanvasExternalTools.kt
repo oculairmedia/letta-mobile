@@ -178,7 +178,7 @@ private suspend fun executeReplaceScene(
 
 /**
  * [ops] written as the caller's, each stamped after the board's clock as the Iroh host stamps them
- * ([CanvasStampedBatch.separately],): through the live session when the board is
+ * ([CanvasStampedBatch.separately]): through the live session when the board is
  * open, else into the store, conditional on the revision this call read.
  */
 private suspend fun commitOpsUpdate(

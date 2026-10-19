@@ -13,7 +13,7 @@ import kotlinx.serialization.json.put
  * A host that predates the relay answers "Unknown method", one without a native App Server client
  * or with a letta-code that has no `/context-limit` answers `capability_unavailable`, and a
  * transport with no admin_rpc at all says so: all three are [ContextLimitOutcome.Unsupported], so
- * the slider hides rather than failing (the Tool Detail pattern, #1827).
+ * the slider hides rather than failing (the Tool Detail pattern).
  */
 class AdminRpcContextLimitRepository(
     private val rpc: AdminRpcInvoker,

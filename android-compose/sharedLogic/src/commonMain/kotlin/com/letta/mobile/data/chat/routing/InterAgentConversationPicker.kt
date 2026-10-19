@@ -5,7 +5,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.api.IConversationRepository
 
 /**
- *  — pick "the conversation where an inter-agent
+ * Picks "the conversation where an inter-agent
  * message lives" on the OTHER agent's side.
  *
  * Each agent owns its own conversation id space, and the sender's
@@ -20,8 +20,8 @@ import com.letta.mobile.data.repository.api.IConversationRepository
  * the target agent's conversation list and land on the same conversation
  * the router chose — no letta-code change, no tool-result change.
  *
- * Reads via [IConversationRepository.listConversationsForAgent]
- *, which dispatches to the wrapper's
+ * Reads via [IConversationRepository.listConversationsForAgent],
+ * which dispatches to the wrapper's
  * conversation.list_agent admin_rpc. The picker and the router share one
  * implementation (IrohAgentMessageRouter.pickMostRecentInteractive) so
  * they can never disagree about "which conversation."
@@ -31,8 +31,8 @@ import com.letta.mobile.data.repository.api.IConversationRepository
  *     call. If the recipient created a newer INTERACTIVE conversation
  *     between the exchange and the tap, the recency pick differs from
  *     what the router chose at receive time. That is inherent to any
- *     client-side re-derivation and is why the bead still tracks an
- *     appserver-side `routingConversationId` as the deterministic answer.
+ *     client-side re-derivation and is why an
+ *     appserver-side `routingConversationId` would provide a deterministic answer.
  *   - If the target agent has zero INTERACTIVE conversations, returns
  *     null and the caller falls through to appserver-resolved fresh
  *     conversation creation.

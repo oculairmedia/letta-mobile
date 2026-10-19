@@ -9,7 +9,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 
 /**
- * Persists a chosen mascot identity (moved from feature-editagent,): in the
+ * Persists a chosen mascot identity (moved from feature-editagent): in the
  * device cache at once (so this client shows it offline and before the roster refreshes) and on the
  * agent's metadata through [push] (so every client shows it).
  *

@@ -146,9 +146,9 @@ private data class MergeSignals(
     val forwardIncrement: Boolean get() = incrementalForwardAppend && incomingIsForwardDelta
 
     /**
-     *  + an identical frame is only dropped when the stream is
-     * known to be cumulative (seq-id ordering OR stable-otid stream shape). Ungating EQUAL broke
-     * wucn: an incremental token can be byte-identical to the accumulator and must APPEND.
+     * An identical frame is only dropped when the stream is
+     * known to be cumulative (seq-id ordering OR stable-otid stream shape). An incremental token
+     * can be byte-identical to the accumulator and must APPEND.
      */
     val cumulativeShapeAccepted: Boolean get() = isCumulativeStream || canUseSnapshotMerge
 

@@ -4,7 +4,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * A per-connection viewer of a conversation's live turn stream (eaczz.2 owns
+ * A per-connection viewer of a conversation's live turn stream ([IrohViewerHandle] owns
  * the write-path/frame-shaping detail; this is the identity the registry keys
  * on). One [IrohNodeConnection] produces one ViewerHandle per conversation it
  * views over its lifetime.
@@ -16,7 +16,7 @@ interface ViewerHandle {
     /**
      * Best-effort write of an already-shaped wire frame to this viewer's stream.
      * MUST NOT throw into the caller (a slow/dead observer must never block the
-     * initiator's turn — eaczz.6). Returns false if the write failed so the
+     * initiator's turn). Returns false if the write failed so the
      * registry/fanout can de-register a dead viewer.
      */
     suspend fun writeFrame(frame: String): Boolean
@@ -50,7 +50,7 @@ class ViewerRegistration internal constructor(
 
 /**
  * Process-scoped registry mapping conversationId -> the set of live
- * [ViewerHandle]s currently viewing that conversation (eaczz.1). Owned by
+ * [ViewerHandle]s currently viewing that conversation. Owned by
  * [IrohNodeEndpoint] and shared across all connections so a turn on one
  * connection can fan its frames out to every connection viewing the same
  * conversation.

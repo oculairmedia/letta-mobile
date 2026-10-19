@@ -130,7 +130,7 @@ private fun rememberProjectPins(settings: SecureSettingsStore): ProjectPinStore 
 private fun ProjectSummary.agentIdOrNull(): AgentId? = lettaAgentId?.value?.takeIf { it.isNotBlank() }?.let(::AgentId)
 
 /**
- * Providers ( /.6.1): the shared settings pane over the host's [session], the
+ * Providers: the shared settings pane over the host's [session], the
  * one its model picker and Models sheet read, so a change here shows there at once.
  */
 fun shellProvidersPage(session: ModelControlSession) = ShellPageContent<ShellDestination.Providers> { _, modifier ->

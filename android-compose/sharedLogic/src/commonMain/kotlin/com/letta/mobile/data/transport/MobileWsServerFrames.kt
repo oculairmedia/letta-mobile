@@ -299,7 +299,7 @@ sealed interface ServerFrame {
     ) : ServerFrame
 
     /**
-     *  — Spec §11/§3.4: a single replayed (or
+     * Spec §11/§3.4: a single replayed (or
      * live-tailed) entry from a Run's `frames.jsonl`, emitted in
      * response to a `subscribe` request.
      *
@@ -322,7 +322,7 @@ sealed interface ServerFrame {
     ) : ServerFrame
 
     /**
-     *  — Spec §11/§3.4: terminal envelope for a
+     * Spec §11/§3.4: terminal envelope for a
      * subscription. Emitted once the Run reaches a terminal status
      * AND the live-tail has caught up. Client should drop any
      * persisted cursor for this run.

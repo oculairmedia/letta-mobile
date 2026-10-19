@@ -19,8 +19,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * `external_tool_call_request` — claim, generation fencing, bounded invocation,
  * result caching and the matched `external_tool_call_response`.
  *
- * Extracted verbatim from `AppServerTurnEngine` ( +  +
- *  + PR #1077); no behaviour change. The engine keeps only the
+ * Handles external tool execution for `AppServerTurnEngine`. The engine keeps only the
  * decisions that genuinely need a turn lease — WHICH generation is validated for
  * a frame, and WHETHER a request is unleased — and hands the rest here.
  *

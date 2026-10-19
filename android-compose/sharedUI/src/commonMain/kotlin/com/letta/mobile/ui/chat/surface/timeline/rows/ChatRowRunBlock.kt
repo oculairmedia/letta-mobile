@@ -140,7 +140,7 @@ internal class RunBlockPlan(
 
     /**
      * Lifted whenever the header shows, working or settled: legacy's settled geometry, held from the
-     * run's first frame so settling never moves it (no jump,).
+     * run's first frame so settling never moves it (no jump).
      */
     val body: RunBodyState get() = RunBodyState(visible, collapsed, lifted = headerVisible)
 

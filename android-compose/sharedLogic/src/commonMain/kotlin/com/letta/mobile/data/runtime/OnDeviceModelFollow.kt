@@ -29,7 +29,7 @@ import kotlinx.serialization.json.put
  * (letta.js:116099 `resolvePiModelForAgent`), and its pi-ai layer clamps every request's output to
  * `window - prompt estimate - 4,096` (letta.js:26056 `clampMaxTokensToContext`,:26105
  * `CONTEXT_SAFETY_TOKENS = 4096`). A limit at the engine's real window (4,096 or 8,192, stored on
- * agents while #2094 advertised it) therefore asks the model for 1 token. On-device records get
+ * agents while the model catalog advertised it) therefore asks the model for 1 token. On-device records get
  * [OnDeviceServedModel.lettaCodeWindow] instead: the engine window plus pi-ai's margin, so the clamp
  * leaves exactly the engine's room; the bridge itself enforces the engine window (overflow 422).
  *

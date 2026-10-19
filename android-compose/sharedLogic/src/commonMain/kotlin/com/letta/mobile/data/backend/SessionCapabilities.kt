@@ -78,7 +78,7 @@ object SessionRouteMatrix {
 
     /**
      * Android: every backend is an App Server reached through the session's channel (an Iroh host, a
-     * ws:// address, or the on-device runtime's loopback server,), whose
+     * ws:// address, or the on-device runtime's loopback server), whose
      * admin_rpc is the Iroh host's router or the same router run in process.
      */
     private fun android(kind: BackendKind?): Set<SessionRoute> = when (kind) {

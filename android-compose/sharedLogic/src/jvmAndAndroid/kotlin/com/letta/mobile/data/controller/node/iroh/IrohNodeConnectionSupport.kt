@@ -14,7 +14,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
 /**
- * Server-process-scoped dedupe for client message ids (P3,).
+ * Server-process-scoped dedupe for client message ids.
  *
  * Moving this off a per-[IrohNodeConnection] set means a redial that re-delivers
  * the SAME `client_message_id` on a fresh connection is still recognised as a
@@ -170,7 +170,7 @@ internal class TurnFrameTracker(
 }
 
 /**
- * eaczz.3: per-connection conversation-viewer subscription with the Option A
+ * Per-connection conversation-viewer subscription with the Option A
  * de-scope rule.
  *
  * A single [IrohNodeConnection] owns ONE [ViewerHandle] identity (its
@@ -253,7 +253,7 @@ internal object IrohEventSeqAllocator {
  * Tracks tool_call ids opened by a turn's stream frames and closed by their
  * matching tool_return frames, so on failure/abort the server can synthesize a
  * terminal `tool_return(status=error, "cancelled")` for anything still open
- * (P3,) — no tool_call is left dangling without a return.
+ * — no tool_call is left dangling without a return.
  */
 internal class OpenToolCallTracker {
     private val open = LinkedHashSet<String>()

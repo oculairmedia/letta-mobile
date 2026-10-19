@@ -120,7 +120,7 @@ enum class ShellSkillsSection { Skills, Tools }
 
 /**
  * A Settings anchor. A pairing link opened from outside lands on [Pairing]; its secret never rides
- * the route. [About] is the diagnostics section (the desktop's Overview opens it,).
+ * the route. [About] is the diagnostics section (the desktop's Overview opens it).
  */
 enum class ShellSettingsSection { Pairing, About }
 

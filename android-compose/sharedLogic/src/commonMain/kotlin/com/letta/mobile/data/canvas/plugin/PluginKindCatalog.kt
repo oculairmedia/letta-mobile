@@ -10,7 +10,7 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * The props schemas of the plugin kinds a host knows, by element type and schema version (plan
- * section 4.3,).
+ * section 4.3).
  *
  * The validator asks it: a kind it knows has its props held to the schema, and a kind it does not
  * know is accepted on the envelope alone with a WARN (D11), so a board relayed by a host without

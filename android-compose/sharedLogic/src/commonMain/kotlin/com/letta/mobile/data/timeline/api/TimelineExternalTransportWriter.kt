@@ -94,7 +94,7 @@ interface TimelineExternalTransportWriter {
      * Signals that a turn ended on
      * [conversationId]. Whenever unresolved tool-call cards remain, the
      * timeline schedules a bounded canonical-record-driven resolve sweep —
-     * on EVERY completion, clean or abnormal (Codex #902 review finding 3).
+     * on EVERY completion, clean or abnormal.
      * [clean] is telemetry-only: it does not gate whether the sweep is
      * scheduled, since a non-clean turn's OWN calls are already settled
      * synchronously elsewhere and never show up as unresolved; what this

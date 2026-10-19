@@ -358,7 +358,7 @@ class CanvasSession(
     }
 
     /**
-     * An agent's checked ops (canvas_apply_ops on an app's own App Server,),
+     * An agent's checked ops (canvas_apply_ops on an app's own App Server),
      * each rebound to [actorId] and stamped after this session's clock as the Iroh host stamps them
      * after its log's ([CanvasStampedBatch.separately]), then committed as one revision and published
      * op by op. An update the agent sends is newer than the board it read, whatever clock it wrote.
@@ -389,7 +389,7 @@ class CanvasSession(
 
     /**
      * Writes a block document (Cascade JSON) as a local op, as [write] says (its frame, owner and
-     * compose provenance among the rest,); a no-op when nothing would change.
+     * compose provenance among the rest); a no-op when nothing would change.
      */
     suspend fun writeDocument(write: CanvasDocumentWrite): CanvasDocument? {
         val op = CanvasOp.SetDocumentOp(

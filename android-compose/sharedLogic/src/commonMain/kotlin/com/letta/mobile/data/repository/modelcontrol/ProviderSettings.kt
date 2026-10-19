@@ -14,7 +14,7 @@ package com.letta.mobile.data.repository.modelcontrol
  *    endpoint is refused (`provider_name` is only accepted with OAuth tokens).
  *  - Subscription (OAuth) providers: the host only accepts finished tokens; it
  *    does not run a browser or device-code login. The app runs the login for
- *    the providers it knows ([ProviderOAuthKind],) and
+ *    the providers it knows ([ProviderOAuthKind]) and
  *    hands the tokens over; for any other the working path is the host's own
  *    terminal (`letta`, then `/connect`), with a "Check again".
  */

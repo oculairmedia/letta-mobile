@@ -989,7 +989,7 @@ class TimelineSyncLoop(
      * cards remain — on EVERY completion path, clean or abnormal.
      *
      * [clean] is passed through to the resolver for telemetry only; it does
-     * NOT gate whether the sweep is scheduled (Codex #902 finding 3). If it
+     * NOT gate whether the sweep is scheduled. If it
      * did, an abnormal (cancel/timeout/error) completion of turn N+1 would
      * call [DanglingToolCallResolver.cancelPendingSweep] on `turnStarted()`
      * for N+1 and then never reschedule anything on its own abnormal

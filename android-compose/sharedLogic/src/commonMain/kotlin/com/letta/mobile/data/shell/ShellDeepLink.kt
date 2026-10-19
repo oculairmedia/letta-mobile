@@ -8,7 +8,7 @@ sealed interface ShellLink {
     data class Open(val destination: ShellDestination) : ShellLink
 
     /**
-     * A scan-to-pair link (`meridian://pair?…` / `letta://pair?…`,). It carries
+     * A scan-to-pair link (`meridian://pair?…` / `letta://pair?…`). It carries
      * a one-time secret: hosts hand it over in memory and open their pairing surface; it is never
      * a route argument and never printed.
      */

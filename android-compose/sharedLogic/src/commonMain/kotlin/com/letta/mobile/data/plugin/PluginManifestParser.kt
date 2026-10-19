@@ -16,7 +16,7 @@ sealed interface PluginManifestResult {
 }
 
 /**
- * Reads a `letta-plugin.json` strictly (plan section 3.1,): the JSON is held to
+ * Reads a `letta-plugin.json` strictly (plan section 3.1): the JSON is held to
  * [PluginManifestSchema] (unknown fields refused, capabilities a closed enum), decoded with no
  * unknown keys ignored, then held to [PluginManifestRules]. A manifest with any problem is refused
  * whole, with every problem it has.

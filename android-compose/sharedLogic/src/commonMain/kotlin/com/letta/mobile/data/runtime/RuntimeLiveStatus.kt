@@ -5,7 +5,7 @@ import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
 
 /**
- *  /.8 (F07, F08): what the shared chat page's status line says about the
+ * What the shared chat page's status line says about the
  * running turn, beyond "a run is in flight": the loop's phase, a provider retry in progress, the
  * server's latest status message, and the server-side commands it is running or just ran.
  *

@@ -65,7 +65,7 @@ fun BackgroundTasksPanel(
  * The panel in the window's inspector (S13): docked on the right of a
  * wide window's [com.letta.mobile.ui.host.InspectorFrame], a sheet when compact. The inspector
  * draws the title and close. [onOpenConversation] opens a row's conversation (the chat's subagent
- * dual view,); null hides "View conversation".
+ * dual view); null hides "View conversation".
  */
 @Composable
 fun BackgroundTasksSidePane(subagents: List<SubagentEntry>, onClose: () -> Unit, onOpenConversation: OpenSubagentConversation? = null) {

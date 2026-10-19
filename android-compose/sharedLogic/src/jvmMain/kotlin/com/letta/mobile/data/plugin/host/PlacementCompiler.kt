@@ -36,7 +36,7 @@ fun interface PluginCanvasAccess {
 }
 
 /**
- * Turns one plugin's `host.emit` into canvas ops (plan: trust minimum,).
+ * Turns one plugin's `host.emit` into canvas ops.
  *
  * Ownership is by element id prefix, not a registry: the host mints every id the plugin places as
  * `p-<pluginId>-<suffix>` (plugin ids have no `-`, so no plugin's prefix is another's), and an

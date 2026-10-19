@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 /**
- * A plugin's `letta-plugin.json` (plan section 3.1,): the contract between a
+ * A plugin's `letta-plugin.json` (plan section 3.1): the contract between a
  * package and the host. Only [PluginManifestParser] builds one, after [PluginManifestSchema] and
  * [PluginManifestRules] have held the document, so every instance is valid.
  *

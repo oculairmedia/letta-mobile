@@ -1876,7 +1876,7 @@ class ChatSendCoordinator(
      * An abnormal end (not a clean completion) — this
      * turn's OWN calls are already settled synchronously by AppServerTurnEngine on
      * disconnect/cancel/error paths, so they won't show up as unresolved here.
-     * Still call turnEnded unconditionally (Codex #902 review finding 3): a
+     * Still call turnEnded unconditionally: a
      * DIFFERENT, earlier turn's dangling card may have had its sweep cancelled by
      * this turn's turnStarted and needs this call to reschedule it, or it would
      * spin forever.

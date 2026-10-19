@@ -98,7 +98,7 @@ class IrohNodeEndpoint(
     private var _adminRpcRouter: AdminRpcRouter? = null
 
     /**
-     * eaczz.1: ONE registry shared across every connection this endpoint
+     * One registry shared across every connection this endpoint
      * accepts. Maps conversationId -> the set of live viewer handles, enabling
      * a turn on one connection to fan its frames out to all connections viewing
      * the same conversation.

@@ -6,25 +6,25 @@ import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
 /**
- *  — the durable, keyed subagent-chip registry.
+ * Durable, keyed subagent-chip registry.
  *
  * ## The defect class
- * Same shape as durable state that should be KEYED lived
+ * Durable state that should have been keyed previously lived
  * in one process-wide, in-RAM slot. For subagent chips this produced two
  * complementary failures:
  *  - restart the controller and every chip vanishes while its worker keeps
  *    running (a "completed" that never happened), and
  *  - a chip whose worker died has nothing that can ever clear it, so it spins
- *    forever (' production symptom).
+ *    forever.
  *
  * ## What this owns
  *  1. **Durable, keyed state.** Chips are keyed by
  *     ([SubagentChipKey]: conversationId, agentId, toolCallId) and written
  *     through a [SubagentRegistryStore] on every mutation, so a restart
  *     rehydrates rather than starting empty. Two parents never share a slot.
- *  2. **Source precedence** ([SubagentChipSource],): a
+ *  2. **Source precedence** ([SubagentChipSource]): a
  *     weaker producer can never overwrite a stronger one's fact.
- *  3. **Lifecycle enforcement** ([SubagentChipState],):
+ *  3. **Lifecycle enforcement** ([SubagentChipState]):
  *     illegal transitions are rejected + telemetered, never applied.
  *  4. **Reconciliation** ([reconcile]): on restart / reconnect, persisted chips
  *     with no live counterpart become [SubagentChipState.ORPHANED] with

@@ -29,7 +29,7 @@ fun sendStreamSink(send: SendStream): ViewerFrameSink = object : ViewerFrameSink
 }
 
 /**
- * eaczz.2 — a per-connection viewer of a conversation's live turn stream.
+ * A per-connection viewer of a conversation's live turn stream.
  *
  * The frame-shape contract is stateful PER TURN PER CONNECTION: assistant
  * text is accumulated cumulatively and its id rewritten to `cm-stream-<otid>`;
@@ -47,7 +47,7 @@ fun sendStreamSink(send: SendStream): ViewerFrameSink = object : ViewerFrameSink
  * points; the stamped ones draw event_seq under the stream lock. All are
  * best-effort: a failed write returns false so the broadcaster can de-register a
  * dead viewer, and never throws into the caller
- * (a slow/dead observer must never block the initiator's turn — eaczz.6).
+ * (a slow/dead observer must never block the initiator's turn).
  */
 internal class IrohViewerHandle(
     override val connectionId: String,

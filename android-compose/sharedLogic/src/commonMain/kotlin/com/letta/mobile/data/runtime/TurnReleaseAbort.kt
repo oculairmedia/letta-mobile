@@ -77,7 +77,7 @@ internal class OrphanedTurnAborter(
     }
 
     /**
-     * Review of PR #1661: `abort_message` without a run id aborts WHATEVER run is active on the
+     * `abort_message` without a run id aborts WHATEVER run is active on the
      * runtime, which may be another viewer's turn, and it also pauses the server queue.
      *
      *  - A lease still [TurnLeasePhase.Queued] has no run of its own: the active run belongs to

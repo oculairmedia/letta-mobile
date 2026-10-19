@@ -53,7 +53,7 @@ data class AgentsPageState(
  * ([ShellAgentLibrary], the desktop's expanded rail) as a page: search, pinned agents first, the rest
  * by space, each with its mascot or orb and the orb's menu (Open, Pin, Agent settings). [actions] is
  * the rail's own action set; [onReload] reloads the roster (the error's Retry, and the pull on touch
- * through [LettaRefreshable],). [modifier] carries the host frame's insets.
+ * through [LettaRefreshable]). [modifier] carries the host frame's insets.
  */
 @Composable
 fun AgentsPage(

@@ -66,7 +66,7 @@ class WorkspaceFileViewerController(
     /**
      * Opens [path]; a relative one resolves against [cwd]. With no [cwd], a relative path is
      * [memoryAgentId]'s memory file only when the caller passes it (a memory tool's
-     * `system/human/…`,); any other relative path cannot be opened, and is
+     * `system/human/…`); any other relative path cannot be opened, and is
      * never read from the host's own working directory.
      */
     fun open(path: String, cwd: String?, memoryAgentId: String? = null) {
