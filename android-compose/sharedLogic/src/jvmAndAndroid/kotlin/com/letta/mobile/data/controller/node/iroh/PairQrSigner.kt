@@ -11,7 +11,7 @@ import javax.crypto.spec.SecretKeySpec
 
 /**
  * The QR issuance seam for the `pair.invite.create` extension
- * defined by `reference/qr-pairing-protocol.md`.
+ * defined by `docs/reference/qr-pairing-protocol.md`.
  *
  * The wire format is `letta-qr-v1.<base64url-json>` whose body is
  * `{ version, node_id, signed_secret, expires_at_ms, signature }`. The signature
@@ -30,7 +30,7 @@ import javax.crypto.spec.SecretKeySpec
  *. The wire format is identical
  * either way: a base64url-encoded signature blob over the canonical message.
  *
- * seealso: `reference/qr-pairing-protocol.md` §5, §7, §10.
+ * seealso: `docs/reference/qr-pairing-protocol.md` §5, §7, §10.
  */
 fun interface PairQrSigner {
     /**

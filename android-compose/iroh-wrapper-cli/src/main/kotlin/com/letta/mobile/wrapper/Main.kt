@@ -23,7 +23,7 @@ import com.letta.mobile.cli.commands.PairCommand
  *
  * letta-mobile-gw0h1 (sixv8.2): a second subcommand, `pair`, is registered so
  * operators can mint a QR-encoded invite (`letta-qr-v1.<base64url-json>` from
- * `reference/qr-pairing-protocol.md` §5.1 + §7.1) without bringing up the
+ * `docs/reference/qr-pairing-protocol.md` §5.1 + §7.1) without bringing up the
  * full wrapper. The wire format is the protocol's contract; this command is
  * the renderer only.
  *

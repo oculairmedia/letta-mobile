@@ -121,4 +121,4 @@ To confirm the dashboard actually works against a live app:
 
 If step 4 shows nothing but step 5 shows idle ticks, the subscriber is
 connecting but the server's resume-stream multiplexing is broken (see the
-`make verify-stream` release gate for the same failure mode).
+historical `verify-stream` gate in the [April release ledger](../RELEASE-GATE-LEDGER.md) for the same failure mode; that executable gate has been removed).

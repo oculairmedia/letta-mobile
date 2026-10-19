@@ -11,7 +11,7 @@ import kotlinx.serialization.json.longOrNull
 
 /**
  * A pairing invite read off a QR / deep link, decoded
- * from the `letta-qr-v1` envelope (reference/qr-pairing-protocol.md §5/§7).
+ * from the `letta-qr-v1` envelope (docs/reference/qr-pairing-protocol.md §5/§7).
  *
  * Trust model: the envelope's HMAC signature is host-private and cannot be
  * verified here (protocol §7.3 note). The trust anchor is [nodeId]: the client

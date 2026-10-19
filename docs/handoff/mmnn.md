@@ -10,8 +10,8 @@ Do not reintroduce the old SSE/client-mode pipeline or apply these snippets verb
 
 ## Current state
 
-**Commit:** 72f5ec9e — "stable height floor via derivedStateOf — only updates at paragraph boundaries"  
-**Build:** installed on Pixel 9 Pro 192.168.50.235:5555  
+**Commit:** 72f5ec9e — "stable height floor via derivedStateOf — only updates at paragraph boundaries"
+**Build:** installed on Pixel 9 Pro 192.168.50.235:5555
 **Status:** text/paragraph flicker mostly fixed; TABLE row flicker remains
 
 ---
