@@ -50,6 +50,27 @@ test_job="$(
   ' "$android_workflow"
 )"
 assert_contains "$test_job" 'Run Android verification task graph'
+assert_contains "$test_job" 'name: test-workload'
+required_test_job="$(
+  awk '/^  required-test:$/ { active=1; next }
+       active && /^  [[:alnum:]_-]+:$/ { exit }
+       active { print }' "$android_workflow"
+)"
+assert_contains "$required_test_job" 'name: test'
+assert_contains "$required_test_job" 'needs: [test, api-docs]'
+assert_contains "$required_test_job" 'if: always()'
+assert_contains "$required_test_job" 'TEST_RESULT: ${{ needs.test.result }}'
+assert_contains "$required_test_job" 'DOCS_RESULT: ${{ needs.api-docs.result }}'
+required_test_script="$(sed -n '/run: |/,$p' <<<"$required_test_job" | tail -n +2)"
+for test_result in success failure cancelled skipped; do
+  for docs_result in success failure cancelled skipped; do
+    if TEST_RESULT="$test_result" DOCS_RESULT="$docs_result" bash -e -c "$required_test_script"; then
+      [[ "$test_result/$docs_result" == success/success ]] || fail "required test accepted $test_result/$docs_result"
+    else
+      [[ "$test_result/$docs_result" != success/success ]] || fail "required test rejected successful jobs"
+    fi
+  done
+done
 assert_contains "$test_job" ':app:compileSideloadDebugKotlin'
 assert_not_contains "$test_job" ':app:compileRootDebugKotlin'
 assert_not_contains "$test_job" ':app:compilePlayDebugKotlin'

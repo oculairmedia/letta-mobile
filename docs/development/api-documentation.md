@@ -12,6 +12,22 @@ Read and update those sections when package ownership or extension points change
 Dokka includes the same prose in the module and package pages. Describe purpose,
 boundaries and integration seams rather than copying declaration inventories.
 
+The required `test` job and the `api-docs` job enforce package coverage:
+
+```bash
+python3 scripts/ci/check-api-package-coverage.py
+python3 -m unittest discover -s scripts/tests -p test_api_package_coverage.py -v
+```
+
+Run these from the repository root. The checker discovers published modules from
+the root Dokka dependencies and compares their production Kotlin/Java packages
+with overview sections. Missing, orphaned, duplicate or empty sections fail;
+fenced examples and comments do not count. Test sources and generated build
+output are excluded. Unknown source-set conventions or aggregate dependency
+syntax fail rather than silently reduce coverage; update discovery alongside
+such build changes. There is no package baseline to regenerate. This checks
+coverage, not the semantic accuracy of ownership claims, which still needs review.
+
 From `android-compose/`, with the Java/Android SDK setup in CONTRIBUTING.md:
 
 ```bash
@@ -87,6 +103,18 @@ Run this from the repository root. The `api-docs` job runs it too, checking
 published API links in tracked Markdown against local generated pages and HTML
 anchors. It ignores fenced examples and never relies on the currently deployed
 site, so renamed or removed symbols can fail the PR before deployment.
+
+In module/package overviews, make concrete API references links to their generated
+declaration pages. Plain backticks remain appropriate for source-set names, module
+names and example values; they do not create a checked symbol reference. When an
+API moves or is renamed, update its overview link in the same PR. A link proves
+that the published declaration exists, not that prose about its platform or
+behavior is accurate; review those claims against the declaration's source sets.
+
+The required `test` status aggregates `test-workload` and `api-docs`. Both run in
+parallel; generation errors, missing linked declarations and failed tests all
+block that status. The aggregate runs even when a dependency is skipped or
+cancelled and accepts only explicit success from both jobs.
 
 ## Automation boundaries and next increments
 
