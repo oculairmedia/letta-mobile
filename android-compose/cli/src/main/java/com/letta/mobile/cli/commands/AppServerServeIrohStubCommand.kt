@@ -16,6 +16,7 @@ import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import kotlin.system.exitProcess
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -94,14 +95,15 @@ internal class AppServerServeIrohStubCommand : CliktCommand(
             "process tree) cannot hold the UDP port forever. 0 = run until killed.",
     ).long().default(15 * 60 * 1000L)
 
-    override fun run() = runBlocking {
-        val scope = CoroutineScope(Dispatchers.IO)
+    override fun run() = runBlocking(Dispatchers.IO) {
         try {
-            serve(scope)
+            serve(this)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             System.err.println("[iroh-stub-server] Error: ${e.message}")
             e.printStackTrace()
-            scope.cancel()
+            cancel()
             exitProcess(1)
         }
     }
