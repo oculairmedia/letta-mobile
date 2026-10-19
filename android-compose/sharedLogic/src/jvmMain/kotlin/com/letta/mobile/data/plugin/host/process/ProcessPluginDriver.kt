@@ -1,12 +1,24 @@
-package com.letta.mobile.data.plugin.host
+package com.letta.mobile.data.plugin.host.process
 
 import com.letta.mobile.data.model.PluginId
-import com.letta.mobile.data.plugin.PluginCapability
-import com.letta.mobile.data.plugin.PluginManifest
 import com.letta.mobile.data.plugin.PluginRuntime
-import com.letta.mobile.data.plugin.PluginSecrets
 import com.letta.mobile.data.plugin.PluginTemplates
 import com.letta.mobile.data.plugin.TemplateResolution
+import com.letta.mobile.data.plugin.host.CrashLedger
+import com.letta.mobile.data.plugin.host.CrashPolicy
+import com.letta.mobile.data.plugin.host.PluginDriver
+import com.letta.mobile.data.plugin.host.PluginDriverState
+import com.letta.mobile.data.plugin.host.PluginHostEvent
+import com.letta.mobile.data.plugin.host.PluginHostEvents
+import com.letta.mobile.data.plugin.host.PluginLaunchException
+import com.letta.mobile.data.plugin.host.PluginLaunchSpec
+import com.letta.mobile.data.plugin.host.ProcessCaps
+import com.letta.mobile.data.plugin.host.ProcessConfinementSource
+import com.letta.mobile.data.plugin.host.ProcessHostEnvironment
+import com.letta.mobile.data.plugin.host.ProcessLaunchPlan
+import com.letta.mobile.data.plugin.host.ProcessLaunchPlanner
+import com.letta.mobile.data.plugin.host.StdioLcpTransport
+import com.letta.mobile.data.plugin.host.SystemdScopeProbe
 import com.letta.mobile.data.plugin.wire.InitializeParams
 import com.letta.mobile.data.plugin.wire.LcpCallException
 import com.letta.mobile.data.plugin.wire.LcpErrorCode
@@ -19,6 +31,11 @@ import com.letta.mobile.plugin.api.ActionResult
 import com.letta.mobile.plugin.api.ElementEvent
 import com.letta.mobile.plugin.api.HostInfo
 import com.letta.mobile.plugin.api.PluginHealth
+import java.io.IOException
+import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,39 +52,26 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.JsonObject
-import java.io.IOException
-import java.nio.file.Path
-import java.util.concurrent.TimeUnit
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
-
-/**
- * One installed `process` plugin, as the host runs it: the package it lives in, its resolved
- * settings and secrets, and the capabilities the user consented to (only those consented AND still
- * declared reach the capability guard).
- */
-class ProcessPluginSpec(
-    val manifest: PluginManifest,
-    val packageDir: Path,
-    val settings: JsonObject,
-    val secrets: PluginSecrets,
-    val consentedCapabilities: Set<PluginCapability>,
-)
 
 /** The knobs of a [ProcessPluginDriver]; the timeouts default to the [com.letta.mobile.plugin.api.LcpMethod] deadlines. */
 data class ProcessDriverOptions(
+    /** Host identity sent during LCP initialization. */
     val hostInfo: HostInfo,
     /** The only host variable the plugin inherits, and where a bare `runtime.command` is looked up. */
     val path: String = System.getenv("PATH").orEmpty(),
+    /** Confinement policy used by the launch planner on this host. */
     val confinement: ProcessConfinementSource = SystemdScopeProbe.DEFAULT,
+    /** Process memory, CPU, task and Node heap limits. */
     val caps: ProcessCaps = ProcessCaps(),
+    /** Interval between health probes while the plugin runs. */
     val healthInterval: Duration = 30.seconds,
+    /** Health-call deadline override; null retains the protocol default. */
     val healthTimeout: Duration? = null,
+    /** Action-call deadline override; null retains the protocol default. */
     val invokeTimeout: Duration? = null,
     /** How long a stopping plugin gets between SIGTERM and SIGKILL. */
     val killGrace: Duration = 5.seconds,
+    /** Restart budget, observation window and delay bounds. */
     val crashPolicy: CrashPolicy = CrashPolicy(),
     /** Each stderr line, already scrubbed of the plugin's secrets. */
     val onStderr: (String) -> Unit = {},
@@ -91,7 +95,7 @@ data class ProcessDriverOptions(
  * The supervisor runs in the caller's [scope] and ends with [stop], a fault, or that scope.
  */
 class ProcessPluginDriver(
-    private val spec: ProcessPluginSpec,
+    private val spec: PluginLaunchSpec,
     private val handlers: LcpHostHandlers,
     private val scope: CoroutineScope,
     private val options: ProcessDriverOptions,

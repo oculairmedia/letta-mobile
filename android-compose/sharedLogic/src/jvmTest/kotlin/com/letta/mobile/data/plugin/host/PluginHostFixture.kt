@@ -6,13 +6,10 @@ import com.letta.mobile.data.canvas.InMemoryCanvasRelayStore
 import com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.plugin.host.process.ProcessDriverOptions
+import com.letta.mobile.data.plugin.host.process.ProcessPluginDriverProvider
 import com.letta.mobile.data.storage.InMemoryAssetStore
 import com.letta.mobile.plugin.api.HostInfo
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.serialization.json.JsonObject
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files
@@ -20,6 +17,11 @@ import java.nio.file.Path
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.serialization.json.JsonObject
 
 /**
  * A [PluginHostRuntime] over a temp plugins dir, an in-memory canvas, and `.lcp` packages built in
@@ -32,14 +34,16 @@ class PluginHostFixture(val pluginsDir: Path = Files.createTempDirectory("plugin
     private val kinds = LateBoundPluginKinds()
     val backend = HostCanvasBackend(CanvasRelayHost(relayStore, hostId = { "host-1" }), relayStore, InMemoryHostCanvasDirectory(), kinds = kinds)
 
-    fun runtime(): PluginHostRuntime {
+    fun runtime(providers: PluginDriverProviders? = null): PluginHostRuntime {
         val options = ProcessDriverOptions(
             hostInfo = HostInfo("letta-test-host", "0"),
             path = "/usr/bin:/bin",
             confinement = ProcessConfinementSource { ProcessConfinement.Unconfined },
             healthInterval = 1.minutes,
         )
-        return PluginHostRuntime(PluginHostConfig(pluginsDir, backend, InMemoryAssetStore(), options, nowMs = { NOW }), scope)
+        val selected = providers ?: PluginDriverProviders(listOf(ProcessPluginDriverProvider(options)))
+        val config = PluginHostConfig(pluginsDir, backend, InMemoryAssetStore(), selected, nowMs = { NOW })
+        return PluginHostRuntime(config, scope)
             .also { kinds.target = it.kinds }
     }
 

@@ -8,6 +8,8 @@ import com.letta.mobile.data.plugin.PluginSecretDecl
 import com.letta.mobile.data.plugin.PluginSecrets
 import com.letta.mobile.data.plugin.PluginSettingField
 import com.letta.mobile.data.plugin.PluginSettingType
+import com.letta.mobile.data.plugin.host.process.ProcessDriverOptions
+import com.letta.mobile.data.plugin.host.process.ProcessPluginDriver
 import com.letta.mobile.data.plugin.wire.LcpHostHandlers
 import com.letta.mobile.data.plugin.wire.LcpPluginSession
 import com.letta.mobile.data.plugin.wire.RecordingHost
@@ -15,6 +17,12 @@ import com.letta.mobile.plugin.api.ActionCall
 import com.letta.mobile.plugin.api.ActionContext
 import com.letta.mobile.plugin.api.ActionOrigin
 import com.letta.mobile.plugin.api.HostInfo
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
@@ -23,12 +31,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.io.File
-import java.nio.file.Files
-import java.nio.file.Path
-import java.util.concurrent.CopyOnWriteArrayList
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
 
 /** A [ProcessPluginDriver] over [FakeLcpPlugin] in a fresh package directory. */
 class ProcessDriverFixture(
@@ -44,7 +46,7 @@ class ProcessDriverFixture(
     val stderr: MutableList<String> = CopyOnWriteArrayList()
     val host = RecordingHost()
     val driver = ProcessPluginDriver(
-        spec = ProcessPluginSpec(
+        spec = PluginLaunchSpec(
             manifest = manifest,
             packageDir = packageDir,
             settings = buildJsonObject { put("greeting", "hello from settings") },

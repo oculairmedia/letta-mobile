@@ -19,6 +19,9 @@ import com.letta.mobile.data.plugin.PluginState
 import com.letta.mobile.data.plugin.PluginTransition
 import com.letta.mobile.data.plugin.ZipPluginPackageReader
 import com.letta.mobile.data.storage.AssetStore
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.time.Clock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,16 +30,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.nio.file.Files
-import java.nio.file.Path
-import kotlin.time.Clock
 
 /** What the host runtime is built from. [backend] must be built with this runtime's [PluginHostRuntime.kinds]. */
 class PluginHostConfig(
     val pluginsDir: Path,
     val backend: HostCanvasBackend,
     val assets: AssetStore,
-    val driverOptions: ProcessDriverOptions,
+    /** Explicit distribution-selected executors; no implicit fallback is constructed by the host. */
+    val driverProviders: PluginDriverProviders,
     val nowMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 )
 
@@ -81,7 +82,7 @@ class PluginHostRuntime(private val config: PluginHostConfig, scope: CoroutineSc
     /** Every plugin's asset bytes of the trailing day, kept at `<pluginsDir>/asset-quota.json` across restarts. */
     private val quota = PluginAssetQuota(nowMs = config.nowMs, file = PluginAssetQuotaFile(config.pluginsDir.resolve(PluginAssetQuotaFile.FILE)))
 
-    private val drivers = PluginDriverHost(config.backend, config.assets, kinds, config.driverOptions, scope, quota)
+    private val drivers = PluginDriverHost(config.backend, config.assets, kinds, config.driverProviders, scope, quota)
     private val invoker = PluginToolInvoker(drivers::live)
 
     /** Every enabled plugin's agent tools; replaced whole on each change. */
