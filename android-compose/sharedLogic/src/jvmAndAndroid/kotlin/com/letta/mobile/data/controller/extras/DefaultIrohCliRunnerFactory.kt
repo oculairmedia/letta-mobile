@@ -1,7 +1,7 @@
 package com.letta.mobile.data.controller.extras
 
 /**
- *  (1vuec): JVM/Android `actual` for
+ *  JVM/Android `actual` for
  * [defaultIrohCliRunnerOrNull]. Returns a singleton [DefaultIrohCliRunner]
  * that uses `ProcessBuilder` + stdin body piping.
  *

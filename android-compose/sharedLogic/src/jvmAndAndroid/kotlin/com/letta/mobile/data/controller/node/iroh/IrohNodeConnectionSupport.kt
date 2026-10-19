@@ -59,7 +59,7 @@ class ProcessScopedClientMessageDedupe(
 
 /**
  * Server-process-scoped store of terminal frames that could NOT be delivered
- * because the control/stream channel died mid-turn (P3, q71yi root cause).
+ * because the control/stream channel died mid-turn.
  *
  * Keyed by `client_message_id` — the one id the client re-presents when it
  * redials and re-sends the same turn. On that re-send the server replays the

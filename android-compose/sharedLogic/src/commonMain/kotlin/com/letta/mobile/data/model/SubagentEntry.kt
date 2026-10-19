@@ -22,8 +22,7 @@ import kotlinx.serialization.Transient
  *    ephemeral subagents by authoritative parent identity WITHOUT inferring
  *    from the display name. Both are optional + nullable: older shims omit
  *    them, and the shim emits null when the parent identity is not in scope
- *    at the ingesting call site. Origination moves to the Kotlin App Server
- *    later in epic m6oa1.
+ *    at the ingesting call site.
  *
  * Status vocabulary (§13.2): `running` | `completed` | `failed` |
  * `cancelled`. `cancelled`  is the NON-CLEAN terminal
@@ -111,7 +110,7 @@ object SubagentStatus {
      * process/session/run died without writing a completion frame. The shim's
      * reaper finalizes such entries `cancelled` so the chip stops being stuck
      * `running` forever. Rendered as a terminal (failed-styled) chip that
-     * lingers then dismisses (29h9u).
+     * lingers then dismisses.
      */
     const val CANCELLED = "cancelled"
 

@@ -10,19 +10,19 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
- *  (1vuec).
+ *
  *
  * The agent-visible Iroh agent-to-agent messaging tool, distinct from
  * letta-code's `matrix_agent_message`:
  *
  *   - **matrix_agent_message** (letta-code upstream): agent ↔ HUMAN surface
  *     via Matrix / Facebook Messenger. Stays unchanged — this bead is
- *     explicitly NOT a re-point of that tool. See bn008-phase2-handoff §1
+ *     explicitly NOT a re-point of that tool. See the handoff design
  *     "Architecture distinction".
  *
  *   - **agent_message_send** (this tool): agent ↔ AGENT surface via the
  *     `meridian agent-message send` CLI binary, which itself uses the Iroh
- *     a2a ALPN (bn008 Layer 1 substrate). Injected into every agent's
+ *     a2a ALPN (direct messaging substrate). Injected into every agent's
  *     runtime_start `external_tools` so the model sees it without operator
  *     intervention.
  *
@@ -35,7 +35,7 @@ import kotlinx.serialization.json.put
  * ## Multi-line bodies
  * The body is supplied to the CLI binary via `--body-file -` (stdin). This
  * is the load-bearing choice — using `--body "<...>"` here would re-create
- * the Meridian→Lester regression from bn008-phase2-handoff risk #1, where
+ * the Meridian→Lester regression in multi-line message forwarding, where
  * a multi-line body collapsed to "". The pinned regression test
  * `multiLineBodyRoundTripsViaStdin` exercises the full stdin path with a
  * body containing newlines, quotes, ampersands, and a URL.

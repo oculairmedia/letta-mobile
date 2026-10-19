@@ -274,7 +274,7 @@ private fun Modifier.mascotTapSemantics(gestures: MascotGestureEffects): Modifie
 /** The body's hit area; tests find the character's touchable part by it. */
 internal const val MASCOT_HIT_AREA_TAG = "mascot-hit-area"
 
-/** The body's share of a tile and how far below the tile's centre it sits (see the 8yee3 framing note). */
+/** The body's share of a tile and how far below the tile's centre it sits. */
 private const val BODY_FRACTION = 0.62f
 private const val BODY_DROP_FRACTION = 0.06f
 

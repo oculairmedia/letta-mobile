@@ -108,7 +108,7 @@ data class StreamTextMergeResult(
  * "The quick brown fox jumps over the lazy dog " equals the accumulator at
  * that point). On an incremental stream that delta is a genuine forward token
  * and MUST append; ungating EQUAL/CUMULATIVE on the byte shape alone (the
- * original bn008 fix) drops the 5th fragment. The shape signal must come from
+ * original merge fix) drops the 5th fragment. The shape signal must come from
  * the stream SHAPE — not the per-frame content. Defaults to false so existing
  * callers keep the historical append behaviour.
  */

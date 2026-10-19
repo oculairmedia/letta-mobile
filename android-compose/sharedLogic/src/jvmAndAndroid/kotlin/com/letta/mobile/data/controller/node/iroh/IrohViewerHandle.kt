@@ -31,7 +31,7 @@ fun sendStreamSink(send: SendStream): ViewerFrameSink = object : ViewerFrameSink
 /**
  * eaczz.2 — a per-connection viewer of a conversation's live turn stream.
  *
- * The h30cy frame-shape contract is stateful PER TURN PER CONNECTION: assistant
+ * The frame-shape contract is stateful PER TURN PER CONNECTION: assistant
  * text is accumulated cumulatively and its id rewritten to `cm-stream-<otid>`;
  * each wire frame carries a per-connection monotonic `event_seq` and a fresh
  * `idempotency_key`; frame-part chunking is gated on the peer's advertised

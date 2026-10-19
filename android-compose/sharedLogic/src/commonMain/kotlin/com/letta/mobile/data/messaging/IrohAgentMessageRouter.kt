@@ -53,7 +53,7 @@ class IrohAgentMessageRouter(
      * Decide where an inbound message goes. [candidates] are the target agent's
      * conversations with busy state (any order); most-recent is picked by
      * lastMessageAt/updatedAt among the INTERACTIVE ones. When
-     * [targetConversationId] is non-null (5m1qy), the message routes to that
+     * [targetConversationId] is non-null, the message routes to that
      * exact conversation instead of the most-recent-interactive pick.
      */
     fun route(

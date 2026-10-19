@@ -88,7 +88,7 @@ data class ActiveSubagent(
      */
     val subagentAgentId: String? = null,
     /**
-     * /r2sh2: the subagent's own conversation id when the
+     * The subagent's own conversation id when the
      * shim supplies one. Mobile must not infer this from the parent
      * conversation or from a default conversation id; when absent, callers
      * must resolve it from the registry/detail source or refuse navigation.
@@ -267,7 +267,7 @@ data class ActiveSubagent(
          *  (RC4): progress is now a new tool call, and a
          * model routinely thinks for well over a minute between tool calls,
          * so the old 35s (dvobc, todo-change semantics) flagged healthy work.
-         * Five minutes matches the stuck-suspected soft threshold of d9a7p.
+         * Five minutes is the stuck-suspected soft threshold.
          */
         const val STUCK_THRESHOLD_MS: Long = 5 * 60_000L
 
@@ -343,7 +343,7 @@ fun ImmutableList<ActiveSubagent>.withLingeringTerminals(now: Long): ImmutableLi
  * [ActiveSubagent], the same on every client. The id is the `toolCallId`, else the `taskId`
  * (a background dispatch), else a synthetic key so the ring keeps a stable slot.
  *  - an entry with a `taskId` but no `toolCallId` is a background tool task.
- *  -  / r2sh2: the subagent's agent and conversation ids are carried when present;
+ *  - The subagent's agent and conversation ids are carried when present;
  *    the conversation is never guessed.
  *  - the wire `todo_progress` drives the ring's determinate fill.
  *  -  (RC4): the stuck baseline is the host's last observed progress, never the start.

@@ -44,7 +44,7 @@ import com.letta.mobile.ui.shell.nowactive.NowActiveRunControls
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
-/** The collapsed sidebar's overflow: its sections stay one click away (o5m90 AC #6). */
+/** The collapsed sidebar's overflow: its sections stay one click away. */
 @Immutable
 data class ShellSidebarOverflow(
     val mode: WorkPlayMode,
@@ -54,7 +54,7 @@ data class ShellSidebarOverflow(
 )
 
 /**
- * The header's sidebar control: the one control that survives collapse (o5m90 AC #1), so it also
+ * The header's sidebar control: the one control that survives collapse, so it also
  * anchors focus when the sidebar closes ([focusRequester]). In a compact window it opens the drawer.
  */
 @Immutable

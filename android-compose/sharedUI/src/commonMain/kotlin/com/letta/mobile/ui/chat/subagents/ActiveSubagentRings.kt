@@ -49,11 +49,11 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlin.time.Clock
 
 /**
- *  + i2f23: CIRCULAR progress rings stacked on the RIGHT
+ *  Circular progress rings stacked on the RIGHT
  * edge of the chat surface with DETERMINATE fill driven by per-subagent
  * `todo_progress`. REPLACES the ActiveSubagentBar chip presentation.
  *
- * LIFECYCLE (consolidated from xm8qk + q6v8b + od488 + i2f23):
+ * Lifecycle:
  *  - BORN: ring appears with a small "started" sliver (~8% arc). When
  *    todo_progress arrives the ring transitions to determinate fill
  *    (0→360° sweep tracked to completed/total).

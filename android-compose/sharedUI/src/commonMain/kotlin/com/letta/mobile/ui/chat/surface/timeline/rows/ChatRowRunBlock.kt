@@ -266,7 +266,7 @@ private fun RunHeader(state: RunHeaderState) {
 
 /**
  * The run's steps under its header. A lifted body rises the header's floor under its label plus its
- * first step's beat, easing (legacy jqiu3: by layout, so the lifted distance leaves no band below):
+ * first step's beat, easing (by layout, so the lifted distance leaves no band below):
  * the first step starts right under the summary label, whether that step is a work step (the grouped
  * beat) or the run's prose opening a section (the ungrouped one).
  */

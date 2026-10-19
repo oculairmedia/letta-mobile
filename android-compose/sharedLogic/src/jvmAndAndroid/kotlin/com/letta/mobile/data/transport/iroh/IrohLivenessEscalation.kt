@@ -37,7 +37,7 @@ internal enum class ProbeTimeoutVerdict(val congested: Boolean) {
     /** Nothing else in flight: the probe timeout is the only signal (pre- rule). */
     NO_IN_FLIGHT(congested = false),
 
-    /** Something completed inside the window — the path is alive, just slow (parg0). */
+    /** Something completed inside the window — the path is alive, just slow. */
     RECENT_PROOF_OF_LIFE(congested = true),
 
     /** In-flight admin_rpcs are themselves timing out back to back: the path is dead. */
@@ -54,7 +54,7 @@ internal enum class ProbeTimeoutVerdict(val congested: Boolean) {
  * Classifies a timed-out liveness probe.
  *
  * INCIDENT (2026-09-25): a Tailscale path flap black-holed the phone's Iroh connection
- * for ~40 s. Six admin_rpcs were in flight, so the parg0 rule ("young in-flight work ⇒
+ * for ~40 s. Six admin_rpcs were in flight, so the liveness rule ("young in-flight work ⇒
  * congestion") soft-failed every probe and no redial happened; each request waited out
  * the full 30 s admin_rpc timeout. In-flight work is only evidence of CONGESTION when
  * the path is still answering. Order matters:
@@ -63,7 +63,7 @@ internal enum class ProbeTimeoutVerdict(val congested: Boolean) {
  *  3. ≥ [DEAD_PATH_RPC_TIMEOUTS] back-to-back admin_rpc timeouts in the window → dead;
  *  4. the oldest in-flight admin_rpc is older than the probe budget → dead: the probe
  *     and that request both waited [timeoutMs] on the same path and neither got a byte;
- *  5. otherwise the in-flight work is too young to judge → congested (unchanged parg0).
+ *  5. otherwise the in-flight work is too young to judge → congested.
  */
 internal fun classifyProbeTimeout(
     evidence: AdminRpcPathEvidence,

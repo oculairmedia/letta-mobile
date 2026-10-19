@@ -1,7 +1,7 @@
 package com.letta.mobile.data.controller.extras
 
 /**
- *  (1vuec): host-native (macOS / Linux /
+ *  host-native (macOS / Linux /
  * Windows native) `actual` for [defaultIrohCliRunnerOrNull]. Returns null —
  * the native target doesn't ship the JVM/Android ProcessBuilder, and no
  * native CLI binary path is configured. The tool surface degrades to a

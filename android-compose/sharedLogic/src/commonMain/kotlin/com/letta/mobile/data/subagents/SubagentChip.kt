@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
  * Before this bead the chip state was whatever `status` string the last
  * observed frame carried, so a chip could silently move backwards
  * (`completed` → `running`) or be marked terminal by something that is not an
- * authoritative subagent lifecycle event (5hihw: chips rendered "completed"
+ * authoritative subagent lifecycle event (chips rendered "completed"
  * as soon as the PARENT assistant turn finished). The state machine below is
  * the single place a chip's lifecycle may advance, and every illegal
  * transition is rejected and telemetered rather than applied.
@@ -86,7 +86,7 @@ enum class SubagentChipState {
         /**
          * Map an observed wire `status` string onto the state machine. Unknown
          * vocabulary is conservatively treated as [OBSERVED] (pending) rather
-         * than as a terminal — never invent a completion (5hihw).
+         * than as a terminal — never invent a completion.
          */
         fun fromWireStatus(status: String?): SubagentChipState = when (val raw = status?.trim()?.lowercase()) {
             null, "" -> OBSERVED

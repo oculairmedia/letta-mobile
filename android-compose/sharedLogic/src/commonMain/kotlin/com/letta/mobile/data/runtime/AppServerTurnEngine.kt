@@ -82,7 +82,7 @@ class AppServerTurnEngine(
      * the engine's single-turn lock is released and subsequent sends are not
      * permanently jammed. This is progress-based (reset on every matching frame),
      * NOT a total-duration cap — a long but actively-streaming turn is fine.
-     * Guards the c0qm0 jam: a real App Server that never emits a terminal
+     * Guards a stuck turn: a real App Server that never emits a terminal
      * stop_reason would otherwise block client.events.collect forever, leaving
      * activeTurn locked so every later send() silently no-ops ("Thinking..." hang).
      */
@@ -106,7 +106,7 @@ class AppServerTurnEngine(
      */
     private val eventRouter: AppServerRuntimeEventRouter? = null,
     /**
-     * lgns8 / qhlo0: when the controller has already started a runtime, reuse its
+     * When the controller has already started a runtime, reuse its
      * canonical scope instead of issuing a duplicate runtime_start from the engine.
      */
     private val runtimeScopeResolver: suspend (TurnCommand) -> AppServerRuntimeScope? = { null },
@@ -140,7 +140,7 @@ class AppServerTurnEngine(
         Long,
     ) -> Unit = { _, _, _ -> },
     /**
-     *  / pr3wf / 1rekc: injectable millisecond time source.
+     *  Injectable millisecond time source.
      *
      * EVERY wall-clock read in this engine (idle-watchdog deadlines, lease
      * `acquiredAtMs` / held-duration telemetry, terminal timestamps) goes through
@@ -1256,7 +1256,7 @@ class AppServerTurnEngine(
      *
      * The watchdog runs CONCURRENTLY so a fully-silent turn (no frames at all)
      * still trips — checking only inside `collect` would never fire during
-     * silence, which is exactly the c0qm0 hang.
+     * silence, which is exactly a stuck turn.
      *
      * the frame loop runs under its own job, `collection`.
      * Whatever ends the turn (a terminal frame, the delayed settle window, the
@@ -1774,7 +1774,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     *  / o0atv: telemetry for a matched terminal lifecycle draft.
+     *  Telemetry for a matched terminal lifecycle draft.
      * Kept out of [collectTurnWithIdleWatchdog] to avoid Complex Method regressions.
      */
     /** The settle window closed on a completed turn: its run is settled. */

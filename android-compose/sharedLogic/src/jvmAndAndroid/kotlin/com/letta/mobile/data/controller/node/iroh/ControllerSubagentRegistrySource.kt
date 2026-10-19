@@ -86,7 +86,7 @@ class ControllerSubagentRegistrySource(
 
     /**
      * The parent turn ended. Background subagents
-     * legitimately outlive the turn that dispatched them (5hihw), so this does
+     * legitimately outlive the turn that dispatched them, so this does
      * NOT end running chips: [DurableSubagentRegistry.markParentTurnEnded] stays
      * a lifecycle no-op. The turn end is only a trigger for the stale-chip TTL,
      * which ends chips nobody has reported for [DurableSubagentRegistry.STALE_RUNNING_AFTER_MS].

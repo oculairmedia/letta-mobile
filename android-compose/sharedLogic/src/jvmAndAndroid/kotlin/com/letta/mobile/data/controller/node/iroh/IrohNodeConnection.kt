@@ -107,12 +107,12 @@ class IrohNodeConnection(
     /**
      * Server-process-scoped duplicate-suppression for client message ids. Shared
      * across connections so a redial re-delivery of the same turn does not
-     * double-run (P3, 3wq5g). Injectable for tests.
+     * double-run. Injectable for tests.
      */
     private val clientMessageDedupe: ProcessScopedClientMessageDedupe = SHARED_CLIENT_MESSAGE_DEDUPE,
     /**
      * Server-process-scoped store of terminal frames dropped when a channel died
-     * mid-turn, replayed on redial re-send (P3, q71yi). Injectable for tests.
+     * mid-turn, replayed on redial re-send. Injectable for tests.
      */
     private val parkedTerminals: ParkedTerminalStore = SHARED_PARKED_TERMINALS,
     /**

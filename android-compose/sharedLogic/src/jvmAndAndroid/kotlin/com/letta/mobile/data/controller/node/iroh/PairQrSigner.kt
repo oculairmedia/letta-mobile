@@ -11,7 +11,7 @@ import javax.crypto.spec.SecretKeySpec
 
 /**
  * The QR issuance seam for the `pair.invite.create` extension
- * defined by `reference/qr-pairing-protocol.md` (doctrine 11, gate bead 7b9on).
+ * defined by `reference/qr-pairing-protocol.md`.
  *
  * The wire format is `letta-qr-v1.<base64url-json>` whose body is
  * `{ version, node_id, signed_secret, expires_at_ms, signature }`. The signature

@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- *  (1vuec): the JVM/Android [IrohCliRunner]
+ *  the JVM/Android [IrohCliRunner]
  * that actually spawns `meridian agent-message send` as a subprocess.
  *
  * The CLI binary is configurable: the production wrapper distribution

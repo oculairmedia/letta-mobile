@@ -414,7 +414,7 @@ class IrohChannelTransport(
      * Recovery is announced PER CONVERSATION. Every
      * interrupted conversation, plus every still-nonterminal live turn that has
      * no interrupted snapshot, gets its own [RedialWhileTurnActive]. The
-     * pre-or40x version could only ever announce ONE conversation because it
+     * previous version could only ever announce ONE conversation because it
      * read single global slots.
      */
     private fun notifyRedialIfTurnActive() {
@@ -644,7 +644,7 @@ class IrohChannelTransport(
 
     /**
      * Cancel HONORS ITS ARGUMENT. Only [conversationId]'s own
-     * turn and send job are touched. The pre-or40x implementation was keyed in
+     * turn and send job are touched. The previous implementation was keyed in
      * name only — it read the single global `activeTurn`/`activeSendJob` and so
      * aborted and cancelled whichever conversation happened to occupy the slot.
      * That is the reported "cancelling one conversation froze the other".

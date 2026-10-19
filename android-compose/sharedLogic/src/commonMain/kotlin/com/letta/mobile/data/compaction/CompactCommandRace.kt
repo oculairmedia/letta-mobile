@@ -46,7 +46,7 @@ data class CommandAnswer(val success: Boolean, val output: String?) {
 }
 
 /**
- *  / 3kble: runs [command] and answers with its response or its
+ *  Runs [command] and answers with its response or its
  * `slash_command_end` on the same conversation, whichever comes first. letta-code 0.26.1 (the
  * embedded Android runtime) never sends an `execute_command_response`; the delta is its only
  * completion. The stream is subscribed before the command is sent.

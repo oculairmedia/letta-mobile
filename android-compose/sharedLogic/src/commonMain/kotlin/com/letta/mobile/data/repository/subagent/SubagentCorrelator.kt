@@ -9,7 +9,7 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * The Kotlin App Server's own Agent-tool_call
- * correlation reducer — the first migration step of epic m6oa1
+ * correlation reducer
  * (lettashim → Kotlin App Server). This is the Kotlin analogue of the
  * shim's `ingestParentFrame`, but STRICTLY scoped to dispatch + return
  * correlation:

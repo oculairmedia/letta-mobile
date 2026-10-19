@@ -272,7 +272,7 @@ class ChatTimelineProjector {
     }
 
     /**
-     * g87l6 scope guard: full-path no-change suppression exists for
+     * Scope guard: full-path no-change suppression exists for
      * high-frequency streaming churn whose rendered output is identical to the
      * previous snapshot. Empty timelines (open/close heartbeats) are rare,
      * carry lifecycle meaning (loading-clear), and stay contractual FULL

@@ -63,7 +63,7 @@ import kotlin.time.Duration.Companion.milliseconds
  *   test scheduler in unit tests).
  * @param reportConnectionLost the supervisor's loss entry point. Attribution is
  *   MANDATORY: an unattributed report landing after a redial destroys the healthy
- *   NEW handle (the r3i1z regression), so the dying handle is always passed along.
+ *   NEW handle, so the dying handle is always passed along.
  */
 internal class IrohLivenessProbe(
     private val intervalMs: Long,
@@ -372,7 +372,7 @@ internal class IrohLivenessProbe(
 }
 
 /**
- * k7yyc: true when [this] (or any cause in its chain) is a frame codec decode/size
+ * True when [this] (or any cause in its chain) is a frame codec decode/size
  * rejection — a per-request payload fault that must fail only the request, never
  * trigger a transport reconnect.
  */

@@ -71,7 +71,7 @@ class ConversationModels(
     private var catalogFollow: Job? = null
 
     /**
-     * Per-conversation model overrides: the host's (seeded from each conversation list, dxz5s) and
+     * Per-conversation model overrides: the host's (seeded from each conversation list) and
      * this session's picks. The effective model otherwise comes from the conversation's agent.
      */
     val picks = ConversationModelSelections()

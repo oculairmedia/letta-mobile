@@ -117,7 +117,7 @@ internal class ConversationTurnFanout(
     /**
      * Initiator-only parking hook: records a delta body JSON so a mid-turn
      * redial can replay it. MUST NOT run per-observer (parking is initiator
-     * scoped — q71yi). No-op when the turn is not parkable (no client_message_id).
+     * scoped). No-op when the turn is not parkable (no client_message_id).
      */
     private val trackInitiatorFrame: (deltaJson: String) -> Unit = {},
     /**
@@ -306,7 +306,7 @@ internal class ConversationTurnFanout(
         }
     }
 
-    /** Flush a synthetic cancelled tool_return for every still-open tool_call (8s45p), fanned out. */
+    /** Flush a synthetic cancelled tool_return for every still-open tool_call, fanned out. */
     suspend fun flushOpenToolCalls() {
         val openIds = openToolCalls.openIds()
         if (openIds.isEmpty()) return
@@ -403,7 +403,7 @@ internal class ConversationTurnFanout(
      * Content parts (images) are carried verbatim: when [contentParts] is a JSON
      * array we forward it as `content`; otherwise the plain [text] string.
      *
-     * NOT parked: parking (q71yi) replays the INITIATOR's own live turn tail on
+     * NOT parked: parking replays the INITIATOR's own live turn tail on
      * redial; the user echo is derived deterministically from the resent input
      * and the reconnecting initiator re-owns its optimistic row, so echoing it is
      * pure fanout — it must NOT count toward initiator parking (which stays
@@ -536,7 +536,7 @@ internal class ConversationTurnFanout(
     }
 
     /**
-     * tg7b8: partition a viewer snapshot into the initiator (0 or 1 entry)
+     * Partition a viewer snapshot into the initiator (0 or 1 entry)
      * and the observers (the rest). Centralized here so the call site
      * doesn't need to repeat the `===` / `connectionId` identity dance
      * — the same identity check [broadcastDeltaBodyNoPark] used inline.

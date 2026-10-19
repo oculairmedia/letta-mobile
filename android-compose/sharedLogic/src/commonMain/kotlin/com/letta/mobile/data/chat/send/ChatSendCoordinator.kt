@@ -1361,7 +1361,7 @@ class ChatSendCoordinator(
      * conversations/turns through this same flow; counting those marked a
      * failing turn as delivered and suppressed its failure notice. Scope:
      * never from replay, only while a turn is active, only when the frame's
-     * conversation (when tagged — r3i1z) matches, and only when the message's
+     * conversation (when tagged) matches, and only when the message's
      * run id matches the active run. Synthetic iroh-run-* placeholders are
      * treated as unknown (run-id promotion may not have landed yet); untagged
      * frames fall back to active-turn scoping. A run id is NOT required — a
@@ -1380,7 +1380,7 @@ class ChatSendCoordinator(
         return runMatchesActiveTurn(state, message.runId)
     }
 
-    /** Untagged frames (r3i1z) fall back to active-turn scoping. */
+    /** Untagged frames fall back to active-turn scoping. */
     private fun frameConversationMatchesActive(
         state: ConversationTurnState,
         frameConversationId: String?,
