@@ -13,6 +13,7 @@ import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
 import com.letta.mobile.data.storage.SecureSettingsStore
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +26,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -47,7 +51,8 @@ fun interface HomeMessageSearch {
 /**
  * [HomePageSource] over the session graph, shared by every host: the agent, tool and (where the
  * backend has a global block store) block catalogs, the tool / block counts and the last day's token
- * usage. A graph switch (backend change) reloads everything. A local runtime has no server-side
+ * usage. A graph switch (backend change) and each transport reconnection reload the figures;
+ * [refresh] coalesces page-entry and Retry requests while a load is active. A local runtime has no server-side
  * tools, blocks or runs, so it reports zeros without asking.
  */
 class SessionHomePageSource<Graph : SessionRepositoryGraph>(
@@ -71,13 +76,21 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
         followJob = scope.launch {
             sessionGraphProvider.currentGraph.collectLatest { graph ->
                 reloadStats(graph)
-                followCatalog(graph)
+                coroutineScope {
+                    launch { followCatalog(graph) }
+                    graph.channelTransport.state
+                        .map { it is ChannelTransportState.Connected }
+                        .distinctUntilChanged()
+                        .drop(1)
+                        .collect { connected -> if (connected) reloadStats(graph) }
+                }
             }
         }
     }
 
     override fun refresh() {
-        reloadStats(sessionGraphProvider.current)
+        // Entering Home during the initial load shares that request instead of restarting it.
+        if (statsJob?.isActive != true) reloadStats(sessionGraphProvider.current)
     }
 
     override suspend fun searchMessages(query: String): List<ParsedSearchMessage> =
