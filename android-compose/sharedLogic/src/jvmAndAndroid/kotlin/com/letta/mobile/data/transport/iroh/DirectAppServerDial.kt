@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import java.util.UUID
 import kotlin.time.Duration
+import com.letta.mobile.data.controller.node.iroh.AdminRpcNativeSources
 
 /**
  * One dial of a plain ws:// App Server that [IrohChannelTransport]
@@ -70,7 +71,12 @@ suspend fun openDirectAppServerDial(
     val connection = runCatching { openAppServerWebSocket(target, httpClient, scope) }
         .onFailure { releaseAll() }
         .getOrThrow()
-    val router = AdminRpcRegistry.buildRouter(nativeClient = connection.client, localBackendDir = localBackendDir)
+    val router = AdminRpcRegistry.buildRouter(
+        native = AdminRpcNativeSources(
+            nativeClient = connection.client,
+            localBackendDir = localBackendDir,
+        ),
+    )
     return DirectAppServerDial(
         client = connection.client,
         connectionState = connection.connectionState,

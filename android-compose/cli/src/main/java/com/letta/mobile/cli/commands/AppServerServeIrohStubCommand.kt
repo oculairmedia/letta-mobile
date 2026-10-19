@@ -12,16 +12,20 @@ import com.letta.mobile.cli.probe.ProbeStubController
 import com.letta.mobile.cli.probe.ProbeStubNativeClient
 import com.letta.mobile.cli.probe.ProbeStubStore
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
-import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
-import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import kotlin.system.exitProcess
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration.Companion.seconds
+import com.letta.mobile.data.controller.node.iroh.AdminRpcNativeSources
+import com.letta.mobile.data.controller.node.iroh.IrohEndpointBinding
+import com.letta.mobile.data.controller.node.iroh.AdminRpcHostServices
 
 /**
  * Hermetic stub app-server over Iroh for the probe CI gate (letta-mobile-q5iiv).
@@ -91,14 +95,15 @@ internal class AppServerServeIrohStubCommand : CliktCommand(
             "process tree) cannot hold the UDP port forever. 0 = run until killed.",
     ).long().default(15 * 60 * 1000L)
 
-    override fun run() = runBlocking {
-        val scope = CoroutineScope(Dispatchers.IO)
+    override fun run() = runBlocking(Dispatchers.IO) {
         try {
-            serve(scope)
+            serve(this)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             System.err.println("[iroh-stub-server] Error: ${e.message}")
             e.printStackTrace()
-            scope.cancel()
+            cancel()
             exitProcess(1)
         }
     }
@@ -162,8 +167,10 @@ internal class AppServerServeIrohStubCommand : CliktCommand(
         }
         return IrohNodeEndpoint(
             scope = scope,
-            bindAddr = "0.0.0.0:$irohPort",
-            secretKeyPath = irohSecretKeyPath,
+            binding = IrohEndpointBinding(
+                bindAddr = "0.0.0.0:$irohPort",
+                secretKeyPath = irohSecretKeyPath,
+            ),
             authPolicy = authPolicy,
         )
     }
@@ -178,9 +185,12 @@ internal class AppServerServeIrohStubCommand : CliktCommand(
         val nativeClient = ProbeStubNativeClient(store)
         val controller = ProbeStubController(store, behavior)
         val adminRpcRouter = AdminRpcRegistry.buildRouter(
-            adminBaseUrl = adminBaseUrl,
-            controller = controller,
-            nativeClient = nativeClient,
+            services = AdminRpcHostServices(
+                controller = controller,
+            ),
+            native = AdminRpcNativeSources(
+                nativeClient = nativeClient,
+            ),
         )
         irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
         println(

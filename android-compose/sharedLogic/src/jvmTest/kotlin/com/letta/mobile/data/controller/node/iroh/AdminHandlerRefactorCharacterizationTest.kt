@@ -47,7 +47,7 @@ class AdminHandlerRefactorCharacterizationTest {
         val transport = FakeTransport()
         AdminProxyClient.defaultTransportFactory = { transport }
 
-        val router = AdminRpcRegistry.buildRouter(adminBaseUrl = "http://test")
+        val router = AdminRpcRegistry.buildRouter()
 
         suspend fun checkNativeFailClosed(method: String, params: kotlinx.serialization.json.JsonObject?) {
             transport.lastMethod = null

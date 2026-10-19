@@ -305,7 +305,6 @@ sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ConversationForkHandler.kt 1
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ConversationTurnFanout.kt 4
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/FileTurnIdentityStore.kt 4
-sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/IrohAuthPolicy.kt 5
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/IrohBearerAuthVerifier.kt 6
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/IrohNodeConnection.kt 11
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/IrohNodeConnectionSupport.kt 3
@@ -333,6 +332,7 @@ sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/SubagentAdminHandlers.kt 3
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/SubagentRegistryPublisher.kt 2
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/TurnIdentityBinding.kt 2
+sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy.kt 5
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/mapper/ApiToDomainMessageMapper.kt 2
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/CachedMessageRepository.kt 5
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/MessageRepositoryFetch.kt 3

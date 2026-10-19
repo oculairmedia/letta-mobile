@@ -31,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,7 +58,6 @@ import com.letta.mobile.data.home.HomeStatTile
 import com.letta.mobile.data.home.relativeAgeLabel
 import com.letta.mobile.data.home.statTiles
 import com.letta.mobile.data.home.subtitle
-import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.home.FleetBarSpark
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
@@ -78,28 +78,30 @@ internal fun HomeHeader(page: HomePageScope) {
                 }
             }
             if (page.wide && page.options.showSearch) HomeSearchField(page, Modifier.width(WideSearchWidth))
-            LettaRefreshAction(refreshing = false, onRefresh = page.actions::refresh, modifier = Modifier.testTag(HomePageTags.REFRESH))
             page.options.headerActions?.invoke(this)
         }
         if (!page.wide && page.options.showSearch) HomeSearchField(page, Modifier.fillMaxWidth())
-        page.state.stats.error?.let { HomeErrorBanner(it) }
+        page.state.stats.error?.let { HomeErrorBanner(it, page.actions::refresh, page.state.stats.loading) }
     }
 }
 
 /** A backend figure failed to load; the rest of the page still works, so this is a note, not a wall. */
 @Composable
-private fun HomeErrorBanner(message: String) {
+private fun HomeErrorBanner(message: String, onRetry: () -> Unit, loading: Boolean) {
     Surface(
         color = MaterialTheme.colorScheme.errorContainer,
         shape = RoundedCornerShape(LettaDimens.Radius.sm),
         modifier = Modifier.fillMaxWidth().testTag(HomePageTags.ERROR),
     ) {
-        Text(
-            text = message,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = LettaDimens.Space.md)) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f).padding(vertical = LettaDimens.Space.sm),
+            )
+            TextButton(onClick = onRetry, enabled = !loading) { Text("Retry") }
+        }
     }
 }
 

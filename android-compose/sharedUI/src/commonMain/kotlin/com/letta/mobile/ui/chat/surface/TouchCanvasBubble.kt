@@ -35,7 +35,7 @@ internal fun rememberTouchBubble(frame: ChatSurfaceFrame, state: CanvasBubbleSta
         exchange = { modifier -> DockedReplyCard(dockedReplyParams(frame), modifier) },
         composer = { DockComposer(frame, ChatSurfaceMode.Docked, collapsed = true) },
         recents = recents?.let { frame.bubbleRecents(state, it) },
-        onStop = if (busy) frame.port.actions::stopRun else null,
+        onStop = if (busy) frame.session.port.actions::stopRun else null,
     )
 }
 
@@ -77,7 +77,7 @@ internal class BubbleRecents(
 private fun ChatSurfaceFrame.bubbleRecents(state: CanvasBubbleState, recents: ChatRecentInteractions): BubbleRecents =
     BubbleRecents(
         state = state,
-        content = RecentInteractionsContent(uiState.agentId, uiState.agentName, recents.conversations),
+        content = RecentInteractionsContent(session.uiState.agentId, session.uiState.agentName, recents.conversations),
         hop = recentsHop(this, recents, state::closeRecents),
     )
 
@@ -88,7 +88,7 @@ private fun ChatSurfaceFrame.bubbleRecents(state: CanvasBubbleState, recents: Ch
  */
 internal fun recentsHop(frame: ChatSurfaceFrame, recents: ChatRecentInteractions, closeList: () -> Unit): RecentInteractionsActions {
     val current = frame.conversationId()
-    val draft = frame.composer.text
+    val draft = frame.session.composer.text
     val leave: () -> Unit = {
         if (current != null && draft.isNotBlank()) PendingComposerDrafts.shared.put(current, draft)
         CanvasBubbleArrival.mark()
@@ -111,4 +111,4 @@ internal fun recentsHop(frame: ChatSurfaceFrame, recents: ChatRecentInteractions
 }
 
 /** The conversation on the page, once it is known. */
-internal fun ChatSurfaceFrame.conversationId(): String? = (uiState.conversationState as? ConversationState.Ready)?.conversationId
+internal fun ChatSurfaceFrame.conversationId(): String? = (session.uiState.conversationState as? ConversationState.Ready)?.conversationId

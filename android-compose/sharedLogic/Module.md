@@ -145,7 +145,13 @@ Node identity, client/server contracts and relay configuration. These abstractio
 
 # Package com.letta.mobile.data.controller.node.iroh
 
-JVM/Android Iroh controller hosting: authentication, pairing, viewer fanout and explicit admin-RPC handlers. Native App Server commands and read-only local storage are separate ownership tiers; sensitive workspace/plugin operations use dedicated handlers. Keep product UI and direct backend-file mutation outside protocol handling; add routes through [AdminRpcRoutes](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh/-admin-rpc-routes/index.html) and inject trust/storage policy through [IrohAuthPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh/-iroh-auth-policy/index.html) and [PairedPeerStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh/-paired-peer-store/index.html).
+JVM/Android Iroh controller hosting: authentication, pairing, viewer fanout and explicit admin-RPC handlers. Native App Server commands and read-only local storage are separate ownership tiers; sensitive workspace/plugin operations use dedicated handlers. Keep product UI and direct backend-file mutation outside protocol handling; add routes through [AdminRpcRoutes](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh/-admin-rpc-routes/index.html) and inject trust/storage policy through [IrohAuthPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh.auth/-iroh-auth-policy/index.html) and [PairedPeerStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh/-paired-peer-store/index.html).
+
+Host construction separates endpoint network/identity binding (`IrohEndpointBinding`) from per-peer authentication (`IrohConnectionAuthentication`). Admin routes receive native sources, change notifications and pairing dependencies via `AdminRpcNativeSources`, `AdminRpcNotifications` and `AdminRpcPairing`, alongside host bindings in `AdminRpcHostServices`; omitted optional sources continue to fail closed.
+
+# Package com.letta.mobile.data.controller.node.iroh.auth
+
+JVM/Android authentication policy values and operator-configuration resolution for Iroh hosts. The sealed `IrohAuthPolicy` contract distinguishes bearer credentials, a vetted peer allowlist, pairing-only access and explicit anonymous test mode; `IrohAuthPolicy.resolve(...)` returns a secure policy, a warned test-only selection or a refusal. This leaf package owns configuration validation and pre-authentication decisions; it must not depend on endpoint lifecycle, verifier state, pairing persistence or RPC handlers. Hosts provide the policy to their connection/authentication boundaries, which own verification, rate limits and revocation.
 
 # Package com.letta.mobile.data.controller.reconnect
 
@@ -182,6 +188,8 @@ Server health probing, state and repository contracts. Service availability is r
 # Package com.letta.mobile.data.home
 
 Renderer-independent Home/fleet projections and page controller. Injected sources, pins, recent navigation and agent activity combine into state for the shared Home page. Keep host widgets and duplicate fleet calculations outside home state; bind resources through [HomePageSource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.home/-home-page-source/index.html), pins through [HomePinStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.home/-home-pin-store/index.html) and actions through [HomePageActions](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.home/-home-page-actions/index.html).
+
+The session source reloads backend figures on graph changes and transport reconnection. Page-entry and error Retry requests share an in-flight load; hosts must not add their own refresh timers or reconnect handlers for these figures.
 
 # Package com.letta.mobile.data.lens
 
@@ -355,6 +363,8 @@ Named production JSON configurations for wire and persistence layers. Central co
 
 Backend connection keys, session graph contracts and backend-scoped cache coordination. Session changes define repository/cache lifetime boundaries instead of leaving global state attached to obsolete backends. Keep stale process-global backend state outside resource graphs; construct graphs through [SessionRepositoryGraphFactory](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.session/-session-repository-graph-factory/index.html) and scope caches with [BackendConnectionKey](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.session/-backend-connection-key/index.html).
 
+The internal session-readiness projection lets page data sources follow connection changes through the session boundary without importing transport state types or adding their own platform observers.
+
 # Package com.letta.mobile.data.session.graph
 
 Shared host repository graph construction and session-client adapters. Explicit unserved repositories preserve unsupported-route behavior when a host cannot provide a backend capability. Keep unsupported sources explicit instead of fabricating host capabilities; bind clients through [HostAppServerClients](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.session.graph/-host-app-server-clients/index.html) and repository implementations through [HostRepositoryAdapters](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.session.graph/-host-repository-adapters/index.html).
@@ -401,7 +411,7 @@ Timeline reducers, synchronization and bounded canonical storage/presentation. G
 
 # Package com.letta.mobile.data.timeline.api
 
-The narrow external-transport timeline writer contract. Send/transport code performs optimistic append, delivery changes and ingest through this boundary rather than directly mutating presentation rows. Keep UI code from bypassing canonical commit policy; external transports submit through [TimelineExternalTransportWriter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.timeline.api/-timeline-external-transport-writer/index.html).
+The narrow external-transport timeline writer contract and internal outbound stream lifecycle/scoped-persistence dependency contracts. Send/transport code performs optimistic append, delivery changes and ingest through this boundary rather than directly mutating presentation rows. Keep UI code from bypassing canonical commit policy; external transports submit through [TimelineExternalTransportWriter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.timeline.api/-timeline-external-transport-writer/index.html).
 
 # Package com.letta.mobile.data.timeline.headless
 

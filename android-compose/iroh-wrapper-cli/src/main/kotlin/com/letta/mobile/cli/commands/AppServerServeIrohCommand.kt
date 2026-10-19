@@ -29,7 +29,7 @@ import com.letta.mobile.data.runtime.host.ownedLocalAppServerHost
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.HostSkillsEnumerator
-import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.PairingQrConfig
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
@@ -65,6 +65,8 @@ import kotlinx.coroutines.withContext
 import kotlin.system.exitProcess
 
 import kotlin.time.Duration.Companion.seconds
+import com.letta.mobile.data.controller.node.iroh.IrohEndpointBinding
+
 /**
  * CLI command to serve the Letta App Server over Iroh transport.
  * 
@@ -358,8 +360,10 @@ class AppServerServeIrohCommand : CliktCommand(
             // Create the Iroh endpoint
             val endpoint = IrohNodeEndpoint(
                 scope = scope,
-                bindAddr = "0.0.0.0:${irohPort}",
-                secretKeyPath = irohSecretKeyPath,
+                binding = IrohEndpointBinding(
+                    bindAddr = "0.0.0.0:${irohPort}",
+                    secretKeyPath = irohSecretKeyPath,
+                ),
                 authPolicy = authPolicy,
                 pairingService = pairingService,
                 canvasRelay = canvasRelay,

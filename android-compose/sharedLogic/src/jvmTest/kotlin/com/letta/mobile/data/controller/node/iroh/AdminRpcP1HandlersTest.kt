@@ -45,7 +45,11 @@ class AdminRpcP1HandlersTest {
      */
     @Test
     fun `block tool passage and context methods never dial an admin rest proxy`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test", vibesyncBaseUrl = "http://admin.test")
+        val router = AdminRpcRegistry.buildRouter(
+            services = AdminRpcHostServices(
+                vibesyncBaseUrl = "http://admin.test",
+            ),
+        )
 
         val denied = listOf(
             "block.attach" to params("agent_id" to "agent-1", "block_id" to "block-1"),
@@ -88,7 +92,11 @@ class AdminRpcP1HandlersTest {
     /** The controller-owned constant catalogs answer without any datastore. */
     @Test
     fun `tool catalog reads are served from the controller without a proxy`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test", vibesyncBaseUrl = "http://admin.test")
+        val router = AdminRpcRegistry.buildRouter(
+            services = AdminRpcHostServices(
+                vibesyncBaseUrl = "http://admin.test",
+            ),
+        )
 
         val list = router.dispatchResult("tool.list", params()).jsonArray
         assertTrue(list.isNotEmpty(), "the builtin tool catalog must not be empty")
@@ -101,7 +109,11 @@ class AdminRpcP1HandlersTest {
 
     @Test
     fun `project handlers address a project by identifier`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test", vibesyncBaseUrl = "http://admin.test")
+        val router = AdminRpcRegistry.buildRouter(
+            services = AdminRpcHostServices(
+                vibesyncBaseUrl = "http://admin.test",
+            ),
+        )
 
         router.dispatchResult("project.get", params("identifier" to "proj"))
         router.dispatchResult(
@@ -125,7 +137,11 @@ class AdminRpcP1HandlersTest {
 
     @Test
     fun `project handlers proxy existing api project endpoints`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test", vibesyncBaseUrl = "http://admin.test")
+        val router = AdminRpcRegistry.buildRouter(
+            services = AdminRpcHostServices(
+                vibesyncBaseUrl = "http://admin.test",
+            ),
+        )
 
         router.dispatchResult("project.list", params("limit" to "1"))
         router.dispatchResult("project.get", params("identifier" to "vibesync"))

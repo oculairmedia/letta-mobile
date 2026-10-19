@@ -1,10 +1,10 @@
 # Release Gate Ledger
 
-Historical REST/SSE orchestrator ledger. The auto-policy mirrors `gates.yaml` and
-`scripts/release/verify-release.sh`, including their obsolete ambiguous app task names;
-it is not the current required CI gate list. The recorded runs are April 2026
-evidence. See [RELEASE.md](RELEASE.md) and `.github/workflows/android.yml` for
-current release validation.
+**Status:** Historical April 2026 REST/SSE run ledger. Its orchestrator,
+`gates.yaml` and root REST CLI were removed on 2026-10-19 after verifying they
+had no workflow callers. Policy and run tables below are frozen evidence, not
+an active generator contract or the current required CI gate list. See
+[RELEASE.md](RELEASE.md) for current validation and workflow links.
 
 ## Gate Policy
 
@@ -31,4 +31,4 @@ current release validation.
 | 2026-04-23T06-37-48Z | http://192.168.50.90:8289 | 1 | 2 | 2 | reports/verify-release-2026-04-23T06-37-48Z.md |
 <!-- END AUTO-RUNS -->
 
-Promotion and demotion decisions should reference concrete report paths plus the owning bead before changing a gate classification.
+The recorded classifications apply to those historical runs only; current gates are maintained in the CI workflows.

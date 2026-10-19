@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.timeline.api.TimelineOutboundPendingPersistence
+import com.letta.mobile.data.timeline.api.TimelineOutboundStreamCallbacks
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
@@ -80,6 +82,26 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
         assertEquals(1, turnStartedCalls.size)
         assertEquals(listOf(false), turnEndedCalls)
     }
+
+    @Test
+    fun `send completion releases ingest suppression before ending clean and failed turns`() =
+        runTest(UnconfinedTestDispatcher()) {
+            for (fail in listOf(false, true)) {
+                val callbacks = mutableListOf<String>()
+                val harness = newProcessor(
+                    transport = SingleToolCallSendTransport(fail = fail),
+                    scope = backgroundScope,
+                    onTurnStarted = { callbacks += "started" },
+                    onSendStreamEnded = { callbacks += "stream-ended" },
+                    onTurnEnded = { clean -> callbacks += "turn-ended:$clean" },
+                )
+
+                harness.processor.send("hello")
+                runCurrent()
+
+                assertEquals(listOf("started", "stream-ended", "turn-ended:${!fail}"), callbacks)
+            }
+        }
 
     @Test
     fun `cancellation during turn start still completes end transition before propagating`() = runTest(UnconfinedTestDispatcher()) {
@@ -191,6 +213,7 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
         ),
         onTurnStarted: suspend () -> Unit,
         onTurnEnded: suspend (Boolean) -> Unit,
+        onSendStreamEnded: suspend () -> Unit = {},
     ): ProcessorHarness {
         val eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
         lateinit var processor: TimelineOutboundSendProcessor
@@ -226,16 +249,21 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
             eventQueue = eventQueue,
             state = timelineProcessor.timeline,
             events = MutableSharedFlow(replay = 1, extraBufferCapacity = 64),
-            pendingLocalStore = NoOpPendingLocalStore,
+            pendingPersistence = TimelineOutboundPendingPersistence(
+                store = NoOpPendingLocalStore,
+                scope = PendingLocalScope(backendId = null, conversationId = "conv-send-dangle"),
+            ),
             logTag = "TestSend",
             scope = scope,
-            ingestStreamEvent = { message ->
-                val acknowledgement = timelineProcessor.submit(TimelineMutation.StreamFrame(message))
-                assertTrue(acknowledgement is TimelineProcessorAck.Applied)
-            },
-            onSendStreamEnded = {},
-            onTurnStarted = onTurnStarted,
-            onTurnEnded = onTurnEnded,
+            streamCallbacks = TimelineOutboundStreamCallbacks(
+                ingestStreamEvent = { message ->
+                    val acknowledgement = timelineProcessor.submit(TimelineMutation.StreamFrame(message))
+                    assertTrue(acknowledgement is TimelineProcessorAck.Applied)
+                },
+                onSendStreamEnded = onSendStreamEnded,
+                onTurnStarted = onTurnStarted,
+                onTurnEnded = onTurnEnded,
+            ),
         )
         return ProcessorHarness(processor)
     }

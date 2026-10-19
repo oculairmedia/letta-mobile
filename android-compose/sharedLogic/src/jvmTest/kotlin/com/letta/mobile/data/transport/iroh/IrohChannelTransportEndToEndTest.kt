@@ -12,7 +12,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
-import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import computer.iroh.Connection
@@ -51,6 +51,7 @@ import org.junit.Assume.assumeTrue
 
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+
 /**
  * FULL-STACK on-host harness for the mobile Iroh chat path (g3cva.8 automation).
  *
@@ -157,7 +158,10 @@ class IrohChannelTransportEndToEndTest {
 
     @Test
     fun deviceSendOverIrohRoundTripsAssistantResponse() = runBlocking {
-        val server = IrohNodeEndpoint(scope = CoroutineScope(SupervisorJob() + Dispatchers.IO), authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly)
+        val server = IrohNodeEndpoint(
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+        )
         server.create()
         server.start(EchoAssistantController(reply = ASSISTANT_REPLY))
         val ticket = server.ticketString()
@@ -262,7 +266,10 @@ class IrohChannelTransportEndToEndTest {
 
     @Test
     fun multipleTurnsOverOneIrohConnectionEachGetResponse() = runBlocking {
-        val server = IrohNodeEndpoint(scope = CoroutineScope(SupervisorJob() + Dispatchers.IO), authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly)
+        val server = IrohNodeEndpoint(
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+        )
         server.create()
         // Reply echoes the turn index so we can assert each turn got ITS own response.
         server.start(PerTurnEchoController())
@@ -415,7 +422,10 @@ class IrohChannelTransportEndToEndTest {
     fun consecutiveMultiTurnWithLatencyPasses() = runBlocking {
         // Simulates real-world timing: first turn takes 500ms (LLM latency),
         // second turn should still work after it completes (c0qm0 regression guard).
-        val server = IrohNodeEndpoint(scope = CoroutineScope(SupervisorJob() + Dispatchers.IO), authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly)
+        val server = IrohNodeEndpoint(
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+        )
         server.create()
         server.start(LatentEchoController(delayMs = 500))
         val ticket = server.ticketString()
@@ -522,7 +532,10 @@ class IrohChannelTransportEndToEndTest {
 
     @Test
     fun largeFrameDoesNotCauseOom() = runBlocking {
-        val server = IrohNodeEndpoint(scope = CoroutineScope(SupervisorJob() + Dispatchers.IO), authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly)
+        val server = IrohNodeEndpoint(
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
+        )
         server.create(); server.start(BigFrameController())
         val transport = IrohChannelTransport(scope = clientScope, onConnect = {}, forcedIrohUrl = "iroh://${server.ticketString()}")
         try {

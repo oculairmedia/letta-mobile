@@ -42,6 +42,8 @@ import com.letta.mobile.data.repository.iroh.FakeIrohAdminTransport
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.ChannelTransportState
+import kotlinx.coroutines.CompletableDeferred
 import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.BackendId
@@ -68,6 +70,67 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionHomePageSourceTest {
+
+    @Test
+    fun reconnectReloadsStatsAndCloseStopsObserving() = runTest {
+        val tools = FakeTools(Result.success(4))
+        val connection = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
+        val transport = object : com.letta.mobile.data.transport.api.NoOpChannelTransport() {
+            override val state: StateFlow<ChannelTransportState> = connection
+        }
+        val graph = HomeGraph(tools = tools, channelTransport = transport)
+        val source = SessionHomePageSource(FixedGraphProvider(graph), backgroundScope)
+        source.start()
+        runCurrent()
+        assertEquals(1, tools.countCalls)
+        tools.count = Result.success(7)
+        connection.value = ChannelTransportState.Connected("server", "first", "device")
+        runCurrent()
+        assertEquals(7, source.stats.value.toolCount)
+        assertEquals(2, tools.countCalls)
+        connection.value = ChannelTransportState.Connected("server", "first", "device", a2uiEnabled = true)
+        runCurrent()
+        assertEquals(2, tools.countCalls, "metadata changes while connected do not reload")
+        connection.value = ChannelTransportState.Connecting(reconnecting = true)
+        runCurrent()
+        tools.count = Result.success(9)
+        connection.value = ChannelTransportState.Connected("server", "second", "device")
+        runCurrent()
+        assertEquals(9, source.stats.value.toolCount)
+        assertEquals(3, tools.countCalls)
+        source.close()
+        runCurrent()
+        connection.value = ChannelTransportState.Idle
+        runCurrent()
+        connection.value = ChannelTransportState.Connected("server", "third", "device")
+        runCurrent()
+        assertEquals(3, tools.countCalls)
+    }
+
+    @Test
+    fun entrySharesAnActiveRequestAndRetryRecoversAFailure() = runTest {
+        val pending = CompletableDeferred<Unit>()
+        val tools = FakeTools(Result.failure(IrohGuardException()), beforeCount = { pending.await() })
+        val source = SessionHomePageSource(
+            FixedGraphProvider(HomeGraph(tools = tools, runs = FakeRuns(IrohGuardException()))),
+            backgroundScope,
+        )
+        source.start()
+        runCurrent()
+        source.refresh()
+        runCurrent()
+        assertEquals(1, tools.countCalls, "entry must not restart an in-flight initial request")
+        pending.complete(Unit)
+        runCurrent()
+        assertNotNull(source.stats.value.error)
+        tools.count = Result.success(8)
+        source.refresh()
+        runCurrent()
+        assertEquals(8, source.stats.value.toolCount)
+        assertNull(source.stats.value.error)
+        assertEquals(2, tools.countCalls)
+        source.close()
+    }
 
     @Test
     fun aFigureWithNoAdminRpcPathDropsItsTileWithoutTheBanner() = runTest {
@@ -156,6 +219,7 @@ class SessionHomePageSourceTest {
     private class HomeGraph(
         tools: IToolRepository = FakeTools(),
         runs: IRunRepository = FakeRuns(),
+        override val channelTransport: IChannelTransport = FakeIrohAdminTransport(),
         /** Every route by default (an Iroh session); letta-mobile-by4vm.13 tests narrow it. */
         override val capabilities: SessionCapabilities = SessionCapabilities(SessionRoute.entries.toSet()),
     ) : SessionRepositoryGraph {
@@ -177,7 +241,6 @@ class SessionHomePageSourceTest {
                 supportsAgentFileExport = false,
             ),
         )
-        override val channelTransport: IChannelTransport = FakeIrohAdminTransport()
         override val agentRepository: IAgentRepository = FakeAgents()
         override val conversationRepository: IConversationRepository get() = unused()
         override val cronRepository: ICronRepository get() = unused()
@@ -198,11 +261,19 @@ class SessionHomePageSourceTest {
         private fun unused(): Nothing = error("Home does not read this repository")
     }
 
-    private class FakeTools(private val count: Result<Int> = Result.success(0)) : IToolRepository {
+    private class FakeTools(
+        var count: Result<Int> = Result.success(0),
+        private val beforeCount: suspend () -> Unit = {},
+    ) : IToolRepository {
+        var countCalls = 0
         private val tools = MutableStateFlow<List<Tool>>(emptyList())
         override fun getTools(): StateFlow<List<Tool>> = tools
         override fun getAgentTools(agentId: AgentId): Flow<List<Tool>> = flowOf(emptyList())
-        override suspend fun countTools(): Int = count.getOrThrow()
+        override suspend fun countTools(): Int {
+            countCalls += 1
+            beforeCount()
+            return count.getOrThrow()
+        }
         override suspend fun refreshTools() = Unit
         override suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean = false
         override suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> = emptyList()

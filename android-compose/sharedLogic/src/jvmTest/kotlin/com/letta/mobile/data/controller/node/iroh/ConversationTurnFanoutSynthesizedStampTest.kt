@@ -50,7 +50,9 @@ class ConversationTurnFanoutSynthesizedStampTest {
         return ConversationTurnFanout(
             conversationId = "conv-C",
             runtime = runtime,
-            viewersFor = { emptySet() },
+            delivery = TurnFanoutDelivery(
+                viewersFor = { emptySet() },
+            ),
             initiatorViewer = viewer,
             turnId = "cm-1",
         )

@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 
 class IrohBearerAuthVerifierTest {
     private val token = "0123456789abcdef0123456789abcdef"

@@ -55,7 +55,9 @@ class NodeTurnHostTest {
         val fanout = ConversationTurnFanout(
             conversationId = runtime.conversationId,
             runtime = runtime,
-            viewersFor = { viewers() },
+            delivery = TurnFanoutDelivery(
+                viewersFor = { viewers() },
+            ),
             initiatorViewer = initiator,
             trackInitiatorFrame = { tracker.track(it) },
         )

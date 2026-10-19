@@ -208,6 +208,8 @@ Conversation library presentation and its UI model. [ConversationsPageState](htt
 
 Home dashboard and compact/expanded content sections. [HomePage](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.pages.home/-home-page.html) inputs and callbacks bind dashboard sections; fleet collection, backend connection effects and pin persistence remain outside the layout.
 
+The shared page requests fresh backend figures when entered, without repeating on ordinary recomposition. It offers Retry in its error banner and pull-to-refresh on touch hosts; there is no permanent header refresh button. Reconnection refresh belongs to the shared session source.
+
 # Package com.letta.mobile.ui.shell.pages.memfs
 
 MemFS file browser, editor and history/diff views. Supply MemFS editor/list/history state and actions; file I/O and conflict resolution authority stay in the shared controller/backend layer.

@@ -8,7 +8,7 @@ package com.letta.mobile.data.pairing
  * meridian://pair?qr=letta-qr-v1.<base64url>&dial=<percent-encoded dial address>
  * ```
  *
- * - `qr` is the canonical `letta-qr-v1` envelope (reference/qr-pairing-protocol.md
+ * - `qr` is the canonical `letta-qr-v1` envelope (docs/reference/qr-pairing-protocol.md
  *   §5/§7), unchanged: node id + one-time secret + expiry + signature.
  * - `dial` is a non-secret reachability hint — the host's Iroh ticket or
  *   `<node-id>@host:port` — because the v1 envelope deliberately carries no

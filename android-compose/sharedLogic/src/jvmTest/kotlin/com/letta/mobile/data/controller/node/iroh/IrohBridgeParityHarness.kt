@@ -127,9 +127,11 @@ internal class FakePhoneLink(
     val fanout = ConversationTurnFanout(
         conversationId = runtime.conversationId,
         runtime = runtime,
-        viewersFor = { emptySet() },
+        delivery = TurnFanoutDelivery(
+            viewersFor = { emptySet() },
+            observerWrites = ObserverWriteQueue(writeScope),
+        ),
         initiatorViewer = viewer,
-        observerWrites = ObserverWriteQueue(writeScope),
     )
     val protocol = IrohRelayedTurnProtocol(
         runtime = runtime,

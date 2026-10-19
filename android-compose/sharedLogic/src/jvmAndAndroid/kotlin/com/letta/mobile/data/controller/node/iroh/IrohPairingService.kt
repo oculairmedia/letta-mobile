@@ -230,7 +230,7 @@ class IrohPairingService(
     }
 
     companion object {
-        /** Protocol default (reference/qr-pairing-protocol.md §6.2): five minutes. */
+        /** Protocol default (docs/reference/qr-pairing-protocol.md §6.2): five minutes. */
         const val DEFAULT_TTL_MS = 5 * 60 * 1000L
 
         /** Ceiling on a requested lifetime; an invite is a short-lived enrollment secret. */

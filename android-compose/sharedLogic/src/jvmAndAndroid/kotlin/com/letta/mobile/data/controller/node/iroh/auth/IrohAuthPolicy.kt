@@ -1,10 +1,10 @@
-package com.letta.mobile.data.controller.node.iroh
+package com.letta.mobile.data.controller.node.iroh.auth
 
 /**
- * Explicit authentication policy for an Iroh server endpoint
- *.
+ * Explicit authentication policy for an Iroh server endpoint.
  *
- * Production constructors ([IrohNodeEndpoint], [IrohNodeConnection]) REQUIRE a
+ * Production constructors ([com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint],
+ * [com.letta.mobile.data.controller.node.iroh.IrohNodeConnection]) REQUIRE a
  * policy — there is no default. Anonymous/open operation is only reachable
  * through the loudly named [InsecureAnonymousForTestOnly] value, so a caller
  * can never fail open by forgetting a parameter.
@@ -32,6 +32,7 @@ sealed interface IrohAuthPolicy {
      * rotated credentials are expected to be >= 256-bit random values.
      */
     data class BearerToken(
+        /** Secret bootstrap credential required in the peer's auth frame; never include it in logs. */
         val token: String,
         override val allowedPeerIds: Set<String> = emptySet(),
     ) : IrohAuthPolicy {
@@ -94,7 +95,9 @@ sealed interface IrohAuthPolicy {
         override fun preAuthenticates(remoteId: String): Boolean = true
     }
 
+    /** Validates operator configuration and selects an explicit endpoint authentication policy. */
     companion object {
+        /** Minimum accepted bearer credential length, measured in characters. */
         const val MIN_TOKEN_LENGTH = 16
 
         /**
@@ -144,12 +147,23 @@ sealed interface IrohAuthPolicy {
 
 /** Outcome of resolving operator configuration into an [IrohAuthPolicy]. */
 sealed interface IrohAuthPolicyResolution {
+    /**
+     * Configuration resolved to bearer, allowlist or pairing-only access without anonymous opt-in.
+     * @property policy The policy hosts must enforce on every accepted App Server connection.
+     */
     data class Secure(val policy: IrohAuthPolicy) : IrohAuthPolicyResolution
 
+    /** Explicit anonymous test mode; hosts must show [warning] before starting the endpoint. */
     data class InsecureAccepted(
+        /** Anonymous policy selected only through the operator's insecure opt-in. */
         val policy: IrohAuthPolicy,
+        /** Startup warning explaining that this endpoint grants unauthenticated access. */
         val warning: String,
     ) : IrohAuthPolicyResolution
 
+    /**
+     * Unsafe or invalid configuration for which the host must refuse to start an endpoint.
+     * @property error Operator-facing explanation of the missing or invalid authentication settings.
+     */
     data class Refused(val error: String) : IrohAuthPolicyResolution
 }

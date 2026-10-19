@@ -1,8 +1,13 @@
-# Phase 6a — runnable entry points (docs + aliases deferred)
+# Runnable entry points and host layout
 
-**Status:** Current entrypoint map; audited 2026-10-18 against included projects and application/build declarations. Physical `apps/*` moves remain a proposal.
+**Status:** Current entrypoint map and layout decision, checked 2026-10-19 against included projects and application/build declarations. The historical `apps/*` proposal is not the target layout.
 
-Physical `apps/*` moves (Option B) stay deferred so CI paths (`:app`, `:desktop`, `:web`) stay stable; the current settings retain the original project paths.
+Retain `app/`, `desktop/`, and `web/` under the `android-compose/` Gradle root.
+The existing settings, CI paths and packaging consume these locations; physical
+host grouping provides no shared-code boundary that the modules do not already
+enforce. Revisit only with a concrete tooling or build requirement, including its
+path migration cost. This settles the earlier grouping proposal without moving
+modules or changing project identities.
 
 ## One entry per platform
 
@@ -20,9 +25,9 @@ All commands run from `android-compose/` with `JAVA_HOME` set per `CONTRIBUTING.
 
 See root [README.md](../../README.md) and [kmp-module-map.md](kmp-module-map.md). Shared domain stays in `:sharedLogic`; shared Compose UI in `:sharedUI`.
 
-## Option B (later)
+## Historical Option B (not adopted)
 
-When Phase 5 is further along, consider:
+The migration plan proposed:
 
 ```text
 app/      → apps/android/
@@ -30,4 +35,6 @@ desktop/  → apps/desktop/
 web/      → apps/web/
 ```
 
-plus CI / jpackage / README path updates. Do **not** dual-include the same `projectDir` under two Gradle names — that breaks the project model.
+That option would also require CI / jpackage / README path updates. It is not
+pending implementation. Do **not** dual-include the same `projectDir` under two
+Gradle names — that breaks the project model.

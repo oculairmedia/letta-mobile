@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,7 +37,7 @@ import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * The Home page shared by desktop and Android: the mobile dashboard
+ * The Home page shared by Android, desktop and web: the mobile dashboard
  * (global search, a drag-to-reorder grid of pinned shortcuts and agents, backend stat widgets and a
  * quick-chat composer) merged with the desktop fleet view (recent conversations across every agent
  * and the sortable agent table).
@@ -50,6 +51,7 @@ import com.letta.mobile.ui.theme.LettaDimens
  *
  * [HomePageOptions.document] is the Letta Code mod seam: a recognised A2UI document replaces the
  * native page.
+ * Entering this page requests a refresh once per composition lifetime; Retry is shown for a backend error.
  */
 @Composable
 fun HomePage(
@@ -58,6 +60,8 @@ fun HomePage(
     modifier: Modifier = Modifier,
     options: HomePageOptions = HomePageOptions(),
 ) {
+    // Re-entering this shared page refreshes every host; ordinary recomposition does not.
+    LaunchedEffect(callbacks.actions) { callbacks.actions.refresh() }
     val documentSurface = remember(options.document) { options.document?.toA2uiSurfaceStateOrNull() }
     val base = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).testTag(HomePageTags.PAGE)
     if (documentSurface != null) {
@@ -107,7 +111,7 @@ data class HomePageNavigation(
  * Host presentation choices: [showTitle] false when the host already titles the screen;
  * [showSearch] false when the host's own app bar carries the search; [touch] grows the controls to
  * touch-target size; [orbIndexByAgentId] colours the agent orbs; [headerActions] are the host's own
- * header controls (a backend chip, a refresh button); [document] replaces the page with a mod's
+ * header controls (such as a backend chip); [document] replaces the page with a mod's
  * A2UI document when it is one the renderer recognises.
  */
 @Immutable
@@ -147,12 +151,11 @@ internal class HomePageScope(
 }
 
 /**
- * The page reloads through [LettaRefreshable]: a pull on touch, the header's
- * refresh on a pointer host. The controller reports no refresh in progress, so the pull springs back.
+ * Touch hosts also support an explicit pull. Page entry and reconnection refresh automatically.
  */
 @Composable
 private fun HomeRefreshable(page: HomePageScope, modifier: Modifier, content: @Composable () -> Unit) {
-    LettaRefreshable(refreshing = false, onRefresh = page.actions::refresh, modifier = modifier) { content() }
+    LettaRefreshable(refreshing = page.state.stats.loading, onRefresh = page.actions::refresh, modifier = modifier) { content() }
 }
 
 @Composable

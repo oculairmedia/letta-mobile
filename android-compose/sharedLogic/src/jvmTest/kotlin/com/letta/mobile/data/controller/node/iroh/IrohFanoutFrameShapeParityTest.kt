@@ -108,10 +108,12 @@ class IrohFanoutFrameShapeParityTest {
         ConversationTurnFanout(
             conversationId = conversationId,
             runtime = runtime,
-            viewersFor = { conv -> registry.viewersFor(conv) },
+            delivery = TurnFanoutDelivery(
+                viewersFor = { conv -> registry.viewersFor(conv) },
+                unregisterViewer = { conv, v -> registry.unregister(conv, v) },
+            ),
             initiatorViewer = initiator,
             trackInitiatorFrame = {},
-            unregisterViewer = { conv, v -> registry.unregister(conv, v) },
         )
 
     // ---- fixture loading ------------------------------------------------

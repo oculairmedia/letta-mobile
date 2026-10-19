@@ -6,6 +6,8 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicyResolution
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 
 class IrohAuthPolicyTest {
     private val strongToken = "0123456789abcdef0123456789abcdef"

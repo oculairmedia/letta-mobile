@@ -25,12 +25,19 @@ import kotlin.test.assertTrue
 
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+
 class AdminRpcStreamServerTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
     fun cancelledAdminStreamDoesNotCancelAcceptLoopOrSiblingStreams() = runTest {
-        val server = AdminRpcStreamServer(router = router(), authenticated = AtomicBoolean(true), firstFrameTimeoutMs = 1_000)
+        val server = AdminRpcStreamServer(
+            router = router(),
+            authenticated = AtomicBoolean(true),
+            limits = AdminRpcStreamLimits(
+                firstFrameTimeoutMs = 1_000,
+            ),
+        )
         val accepted = Channel<AdminRpcBiStream?>(Channel.UNLIMITED)
         val cancelled = FakeBiStream(FailingRecvStream(CancellationException("reset")))
         val healthy = FakeBiStream()
@@ -66,7 +73,9 @@ class AdminRpcStreamServerTest {
         val server = AdminRpcStreamServer(
             router = gatedRouter,
             authenticated = AtomicBoolean(true),
-            firstFrameTimeoutMs = 1_000,
+            limits = AdminRpcStreamLimits(
+                firstFrameTimeoutMs = 1_000,
+            ),
             capabilityGate = { method -> if (method == "agent.delete") "admin.full" else null },
         )
         val stream = FakeBiStream()
@@ -88,8 +97,10 @@ class AdminRpcStreamServerTest {
         val server = AdminRpcStreamServer(
             router = router(),
             authenticated = AtomicBoolean(true),
-            firstFrameTimeoutMs = 1_000,
-            capabilityGate = { null }, // allow
+            limits = AdminRpcStreamLimits(
+                firstFrameTimeoutMs = 1_000,
+            ),
+            capabilityGate = { null },
         )
         val stream = FakeBiStream()
         val job = launchTracked(server, stream)
@@ -102,7 +113,13 @@ class AdminRpcStreamServerTest {
 
     @Test
     fun idleAdminStreamWithoutFirstFrameTimesOutAndReleasesHandlerResources() = runTest {
-        val server = AdminRpcStreamServer(router = router(), authenticated = AtomicBoolean(true), firstFrameTimeoutMs = 10)
+        val server = AdminRpcStreamServer(
+            router = router(),
+            authenticated = AtomicBoolean(true),
+            limits = AdminRpcStreamLimits(
+                firstFrameTimeoutMs = 10,
+            ),
+        )
         val idle = FakeBiStream()
 
         val job = launchTracked(server, idle)
@@ -120,8 +137,10 @@ class AdminRpcStreamServerTest {
         val server = AdminRpcStreamServer(
             router = router(),
             authenticated = AtomicBoolean(true),
-            maxActiveHandlers = 2,
-            firstFrameTimeoutMs = 5_000,
+            limits = AdminRpcStreamLimits(
+                maxActiveHandlers = 2,
+                firstFrameTimeoutMs = 5_000,
+            ),
         )
         val streams = List(6) { FakeBiStream() }
         val jobs = streams.map { launchTracked(server, it) }
@@ -150,7 +169,9 @@ class AdminRpcStreamServerTest {
         val server = AdminRpcStreamServer(
             router = router,
             authenticated = authenticated,
-            firstFrameTimeoutMs = 1_000,
+            limits = AdminRpcStreamLimits(
+                firstFrameTimeoutMs = 1_000,
+            ),
         )
 
         val before = FakeBiStream()
@@ -179,7 +200,9 @@ class AdminRpcStreamServerTest {
         val server = AdminRpcStreamServer(
             router = router(),
             authenticated = AtomicBoolean(false),
-            firstFrameTimeoutMs = 1_000,
+            limits = AdminRpcStreamLimits(
+                firstFrameTimeoutMs = 1_000,
+            ),
         )
         val stream = FakeBiStream()
 
@@ -198,7 +221,13 @@ class AdminRpcStreamServerTest {
 
     @Test
     fun failedErrorResponseWriteDoesNotCloseUnrelatedStreams() = runTest {
-        val server = AdminRpcStreamServer(router = router(), authenticated = AtomicBoolean(true), firstFrameTimeoutMs = 1_000)
+        val server = AdminRpcStreamServer(
+            router = router(),
+            authenticated = AtomicBoolean(true),
+            limits = AdminRpcStreamLimits(
+                firstFrameTimeoutMs = 1_000,
+            ),
+        )
         val accepted = Channel<AdminRpcBiStream?>(Channel.UNLIMITED)
         val failingErrorStream = FakeBiStream(send = FakeSendStream(failWrites = true))
         val healthy = FakeBiStream()
@@ -227,8 +256,10 @@ class AdminRpcStreamServerTest {
         val server = AdminRpcStreamServer(
             router = router,
             authenticated = AtomicBoolean(true),
-            firstFrameTimeoutMs = 1_000,
-            maxFrameBytes = 256,
+            limits = AdminRpcStreamLimits(
+                firstFrameTimeoutMs = 1_000,
+                maxFrameBytes = 256,
+            ),
             peerSupportsFrameParts = { true },
         )
         val stream = FakeBiStream()
@@ -255,9 +286,11 @@ class AdminRpcStreamServerTest {
         val server = AdminRpcStreamServer(
             router = router,
             authenticated = AtomicBoolean(true),
-            firstFrameTimeoutMs = 1_000,
-            maxFrameBytes = 256,
-            // peerSupportsFrameParts defaults to false (capability-off peer)
+            limits = AdminRpcStreamLimits(
+                firstFrameTimeoutMs = 1_000,
+                maxFrameBytes = 256,
+            ),
+            // peerSupportsFrameParts defaults to false (capability-off peer),
         )
         val stream = FakeBiStream()
 
@@ -284,8 +317,10 @@ class AdminRpcStreamServerTest {
         val server = AdminRpcStreamServer(
             router = router(),
             authenticated = AtomicBoolean(false),
-            firstFrameTimeoutMs = 1_000,
-            maxFrameBytes = 256,
+            limits = AdminRpcStreamLimits(
+                firstFrameTimeoutMs = 1_000,
+                maxFrameBytes = 256,
+            ),
         )
         val stream = FakeBiStream()
 
@@ -306,8 +341,10 @@ class AdminRpcStreamServerTest {
         val server = AdminRpcStreamServer(
             router = router(),
             authenticated = AtomicBoolean(true),
-            firstFrameTimeoutMs = 1_000,
-            maxFrameBytes = 256,
+            limits = AdminRpcStreamLimits(
+                firstFrameTimeoutMs = 1_000,
+                maxFrameBytes = 256,
+            ),
             peerSupportsFrameParts = { true },
         )
         val stream = FakeBiStream()
@@ -335,10 +372,12 @@ class AdminRpcStreamServerTest {
         val server = AdminRpcStreamServer(
             router = router,
             authenticated = AtomicBoolean(true),
-            firstFrameTimeoutMs = 1_000,
-            maxFrameBytes = 256,
+            limits = AdminRpcStreamLimits(
+                firstFrameTimeoutMs = 1_000,
+                maxFrameBytes = 256,
+                maxReassembledBytes = 512,
+            ),
             peerSupportsFrameParts = { true },
-            maxReassembledBytes = 512,
         )
         val stream = FakeBiStream()
 

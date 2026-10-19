@@ -15,7 +15,7 @@ package com.letta.mobile.data.repository
  * cannot spin forever. They return early when a short page arrives so the
  * common case (one or two pages of real data) finishes quickly.
  *
- * See `docs/data-efficiency-audit.artifact.md` section 2.2 (Q3) for context.
+ * See `docs/performance/data-efficiency-audit.artifact.md` section 2.2 (Q3) for context.
  */
 object PaginationConstants {
     /** Default page size when the underlying API does not impose one. */

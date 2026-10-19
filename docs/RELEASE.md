@@ -1,22 +1,32 @@
 # Release checklist
 
-The older REST/SSE verification tooling below is retained for its original backend.
-It is not sufficient to certify the current App Server/Iroh release: its build tasks
-are ambiguous with today's app flavors, and its sync/stream gates exercise the
-legacy HTTP subscriber rather than the canonical Iroh chat ledger. For the current
-source gates use `:app:compileRootDebugKotlin`, `:app:testRootDebugUnitTest`, and
-`:sharedLogic:allTests :desktop:test` when shared logic changes; run the
-[Iroh two-client probe](iroh-two-client-live-sync-probe.md) and the
-[device protocol](testing/lgns8-e2e-device-protocol.md) for transport evidence.
+Use the required checks in [AGENTS.md](../AGENTS.md#ci-map-what-runs-where)
+and [.github/workflows/android.yml](../.github/workflows/android.yml) for the
+current merge gates. From `android-compose/`, focused Android checks are
+`:app:compileRootDebugKotlin` and `:app:testRootDebugUnitTest`; shared changes
+also need the affected shared/module tests and multiplatform compilation in CI.
 
-The historical entrypoint is
-`make verify-release`, which runs the currently wired gates in prereq order,
-skips gates whose prerequisites are unavailable, and writes a local report to
-`reports/verify-release-<timestamp>.md`.
+For transport acceptance, use the [Iroh two-client probe](iroh-two-client-live-sync-probe.md)
+and [device protocol](testing/lgns8-e2e-device-protocol.md). Record the backend,
+commit, build variant and observed results rather than interpreting an old
+REST/SSE subscriber result as current App Server/Iroh evidence.
 
-Owner: whoever is cutting the release.
+Release packaging is defined by [release.yml](../.github/workflows/release.yml).
+The retained packaging notes below describe its full/lite Android outputs;
+verify the actual workflow run and attached assets for each release.
 
----
+## Historical REST/SSE checklist (retained record)
+
+**Status:** Historical April-era release procedure. The standalone root `cli/`,
+`make verify-sync`, `make verify-stream`, `make verify-all`, `make verify-release`,
+`gates.yaml` and `scripts/release/verify-release.sh` were removed on 2026-10-19.
+They had no workflow callers and exercised retired REST/SSE endpoints. Commands,
+telemetry names, task names, issue states and dashboard recommendations in the
+original record below are not current instructions. The [April run ledger](RELEASE-GATE-LEDGER.md)
+is preserved as evidence. Debug device bootstrap remains available separately
+through `make verify-device-ready` and [its procedure](RELEASE-AUTOMATION.md).
+
+## Original record
 
 ## 1. Verify sync health on a real device (advisory until `letta-mobile-r6j3` closes)
 

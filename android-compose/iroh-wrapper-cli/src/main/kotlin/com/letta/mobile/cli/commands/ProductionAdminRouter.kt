@@ -13,6 +13,10 @@ import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
+import com.letta.mobile.data.controller.node.iroh.AdminRpcNativeSources
+import com.letta.mobile.data.controller.node.iroh.AdminRpcNotifications
+import com.letta.mobile.data.controller.node.iroh.AdminRpcPairing
+import com.letta.mobile.data.controller.node.iroh.AdminRpcHostServices
 
 fun buildProductionAdminRouter(
     controller: DefaultAppServerController,
@@ -107,21 +111,29 @@ fun buildProductionAdminRouter(
         slashCommands?.start(eventScope, nativeClient.events)
     }
     return AdminRpcRegistry.buildRouter(
-        controller = controller,
-        subagentRegistrySource = subagentSource,
-        pairingService = pairingService,
-        nativeClient = nativeClient,
-        vibesyncBaseUrl = vibesyncBaseUrl,
-        localBackendDir = localBackendDir,
-        skillsListing = skillsCatalog.asListingSource(),
-        slashCommands = slashCommands,
-        agentChanges = agentChanges,
-        conversationChanges = conversationChanges,
-        modelExposureFile = modelExposureFile,
-        turnIdentity = turnIdentity,
-        pairingQr = pairingQr,
-        permissionModes = permissionModes,
-        pluginRoutes = pluginRoutes,
+        services = AdminRpcHostServices(
+            controller = controller,
+            subagentRegistrySource = subagentSource,
+            vibesyncBaseUrl = vibesyncBaseUrl,
+            pluginRoutes = pluginRoutes,
+        ),
+        pairing = AdminRpcPairing(
+            pairingService = pairingService,
+            pairingQr = pairingQr,
+        ),
+        native = AdminRpcNativeSources(
+            nativeClient = nativeClient,
+            localBackendDir = localBackendDir,
+            skillsListing = skillsCatalog.asListingSource(),
+            slashCommands = slashCommands,
+            modelExposureFile = modelExposureFile,
+        ),
+        notifications = AdminRpcNotifications(
+            agentChanges = agentChanges,
+            conversationChanges = conversationChanges,
+            turnIdentity = turnIdentity,
+            permissionModes = permissionModes,
+        ),
     ).also { router ->
         if (nativeSource?.changeListener != null) router.featureCapabilities += ControllerSubagentRegistrySource.PUSH_CAPABILITY
     }

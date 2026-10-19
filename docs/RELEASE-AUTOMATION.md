@@ -133,15 +133,10 @@ Timeline ready conv=<conversation-id> count=<n>
 strings are part of the automation interface. If they change, update the script,
 tests, and this document together.
 
-`make verify-release` builds on this gate. When the full device bootstrap
-prerequisites are present, the orchestrator runs `verify-device-ready` before
-the conversation-dependent release gates and includes the result in
-`reports/verify-release-<timestamp>.md`.
-
-Current caveat: the bootstrap handoff reaches "timeline ready" before the
-first guaranteed `ChannelHeartbeatSync` processed cursor is persisted. Until
-`letta-mobile-r6j3.1` lands, `verify-sync` remains advisory in the
-orchestrator even though the standalone gate still enforces 6/6 HEALTHY.
+The old `make verify-release` REST/SSE orchestrator was removed on 2026-10-19;
+this device bootstrap remains callable through `make verify-device-ready`.
+A successful bootstrap is not transport acceptance: follow the current
+[release checklist](RELEASE.md) for App Server/Iroh validation.
 
 ## Safety model
 

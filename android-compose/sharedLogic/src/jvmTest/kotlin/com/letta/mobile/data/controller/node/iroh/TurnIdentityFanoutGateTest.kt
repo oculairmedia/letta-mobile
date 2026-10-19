@@ -45,7 +45,9 @@ class TurnIdentityFanoutGateTest {
         val fanout = ConversationTurnFanout(
             conversationId = "conv-1",
             runtime = AppServerRuntimeScope("agent-1", "conv-1"),
-            viewersFor = { emptySet() },
+            delivery = TurnFanoutDelivery(
+                viewersFor = { emptySet() },
+            ),
             initiatorViewer = null,
             identity = TurnIdentityBinding(ledger, "conv-1", "cmid-1"),
         )

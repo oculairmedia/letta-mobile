@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.timeline.api.TimelineOutboundPendingPersistence
+import com.letta.mobile.data.timeline.api.TimelineOutboundStreamCallbacks
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.LettaMessage
@@ -23,6 +25,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+
 /**
  * Handles serializing, sending, streaming, and post-send reconciliation of outbound messages.
  */
@@ -32,40 +35,10 @@ internal class TimelineOutboundSendProcessor(
     private val eventQueue: Channel<TimelineGatewayEvent>,
     private val state: StateFlow<Timeline>,
     private val events: MutableSharedFlow<TimelineSyncEvent>,
-    private val pendingLocalStore: PendingLocalStore,
-    private val pendingScope: PendingLocalScope = PendingLocalScope(backendId = null, conversationId = conversationId),
+    private val pendingPersistence: TimelineOutboundPendingPersistence,
     private val logTag: String,
     scope: CoroutineScope,
-    private val ingestStreamEvent: suspend (LettaMessage) -> Unit,
-    /**
-     * Invoked when an outbound send's response stream ends
-     * (terminal or error). Each [ingestStreamEvent] call latches the loop's
-     * external-transport flag (dual-ingest suppression: while OUR turn streams
-     * through the send flow, the persistent stream subscriber must not ingest
-     * the same frames twice). That latch must be RELEASED when the turn ends —
-     * otherwise every later subscriber-delivered frame (e.g. another client's
-     * fanned-out turn observed over Iroh) is dropped as `skippedDualIngest`
-     * forever, and the desktop renders the prompt but never the reply.
-     * Mirrors mobile's ChatSendCoordinator, which clears the latch at turn end.
-     */
-    private val onSendStreamEnded: suspend () -> Unit = {},
-    /**
-     * The REST/timeline-
-     * transport send path (this class) previously never signaled the
-     * dangling-tool-call resolver's turn lifecycle — only the WS/iroh
-     * ChatSendCoordinator path did, via TimelineRepository.turnStarted /
-     * turnEnded. That left a tool_call streamed through THIS path with no
-     * eventual return spinning forever, since no sweep was ever scheduled.
-     * Called when the outbound send stream begins; mirrors
-     * [TimelineSyncLoop.turnStarted].
-     */
-    private val onTurnStarted: suspend () -> Unit = {},
-    /**
-     * Called when the outbound send stream ends, with [clean] reflecting
-     * whether it completed without throwing. Mirrors
-     * [TimelineSyncLoop.turnEnded].
-     */
-    private val onTurnEnded: suspend (clean: Boolean) -> Unit = {},
+    private val streamCallbacks: TimelineOutboundStreamCallbacks,
 ) {
     val sendQueue = Channel<PendingSend>(SEND_QUEUE_CAPACITY)
 
@@ -118,15 +91,15 @@ internal class TimelineOutboundSendProcessor(
         }
         if (attachments.isNotEmpty()) {
             runCatching {
-                pendingLocalStore.save(
+                pendingPersistence.store.save(
                     PendingLocalRecord(
                         otid = otid,
                         conversationId = conversationId,
                         content = content,
                         attachments = attachments,
                         sentAt = sentAt,
-                        backendId = pendingScope.backendId,
-                        agentId = pendingScope.agentId,
+                        backendId = pendingPersistence.scope.backendId,
+                        agentId = pendingPersistence.scope.agentId,
                     )
                 )
             }.onFailure { t ->
@@ -167,7 +140,7 @@ internal class TimelineOutboundSendProcessor(
                 val ack = CompletableDeferred<Unit>()
                 eventQueue.send(TimelineGatewayEvent.MarkFailed(pending.otid, ack))
                 ack.await()
-                if (pending.attachments.isNotEmpty()) pendingLocalStore.markFailed(pending.otid)
+                if (pending.attachments.isNotEmpty()) pendingPersistence.store.markFailed(pending.otid)
                 events.emit(TimelineSyncEvent.StreamError("send", t.message ?: "unknown"))
             }
         }
@@ -212,14 +185,14 @@ internal class TimelineOutboundSendProcessor(
         // sweep scheduled instead of spinning forever.
         var streamCompletedCleanly = false
         try {
-            onTurnStarted()
+            streamCallbacks.onTurnStarted()
             stream.collect { message ->
                 eventCount++
                 if (!firstEventLogged) {
                     firstEventLogged = true
                     firstEventTimer.stop("otid" to otid)
                 }
-                ingestStreamEvent(message)
+                streamCallbacks.ingestStreamEvent(message)
                 events.emit(TimelineSyncEvent.ServerEvent(message))
             }
             streamCompletedCleanly = true
@@ -228,8 +201,8 @@ internal class TimelineOutboundSendProcessor(
             // the persistent stream subscriber so externally-initiated turns
             // (fanned-out observer frames) are ingested again.
             withContext(NonCancellable) {
-                onSendStreamEnded()
-                onTurnEnded(streamCompletedCleanly)
+                streamCallbacks.onSendStreamEnded()
+                streamCallbacks.onTurnEnded(streamCompletedCleanly)
             }
         }
 
@@ -291,12 +264,7 @@ internal class TimelineOutboundSendProcessor(
         var lastError: Throwable? = null
         for (attempt in 0 until RECONCILE_RETRY_ATTEMPTS) {
             try {
-                return messageApi.listConversationMessages(
-                    conversationId = ConversationId(conversationId),
-                    limit = if (afterCursor != null) 50 else RECONCILE_LIMIT,
-                    after = afterCursor,
-                    order = if (afterCursor != null) "asc" else "desc",
-                )
+                return listMessagesFromCursor(afterCursor)
             } catch (t: Throwable) {
                 if (!isRetryableReconcileError(t) || attempt == RECONCILE_RETRY_ATTEMPTS - 1) {
                     throw t
@@ -312,6 +280,14 @@ internal class TimelineOutboundSendProcessor(
         }
         throw lastError ?: IllegalStateException("listMessagesWithRetry exhausted without error")
     }
+
+    private suspend fun listMessagesFromCursor(afterCursor: String?): List<LettaMessage> =
+        messageApi.listConversationMessages(
+            conversationId = ConversationId(conversationId),
+            limit = if (afterCursor != null) 50 else RECONCILE_LIMIT,
+            after = afterCursor,
+            order = if (afterCursor != null) "asc" else "desc",
+        )
 
     companion object {
         private const val SEND_QUEUE_CAPACITY = 64

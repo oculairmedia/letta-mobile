@@ -1,6 +1,6 @@
 # Epic: KMP project structure migration
 
-**Status:** Historical migration sequence; implemented portions and remaining proposals must be read against the source map.
+**Status:** Historical migration sequence; implemented portions must be read against the source map. The physical `apps/*` proposal is not adopted; see the [entrypoint layout decision](kmp-phase-6-entrypoints.md).
 
 ## Code audit — 2026-10-18
 

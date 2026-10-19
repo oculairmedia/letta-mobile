@@ -61,6 +61,38 @@ internal class ObserverWriteQueue(
 }
 
 /**
+ * Viewer discovery, fault isolation and ordered write queues for a turn. Initiator writes default to the
+ * observer queue but are never subject to its timeout.
+ */
+internal class TurnFanoutDelivery(
+    /** Snapshot source of every viewer of the requested conversation, including its initiator. */
+    val viewersFor: suspend (conversationId: String) -> Set<ViewerHandle>,
+    /**
+     * Fault isolation: de-register a failed/wedged OBSERVER viewer from
+     * the SAME registry the fanout reads from ([viewersFor]) so the broadcaster
+     * stops writing to a dead peer on subsequent deltas. Never invoked for the
+     * initiator (which follows the parking path, not de-registration). No-op when
+     * there is no registry (legacy/test construction).
+     */
+    val unregisterViewer: suspend (conversationId: String, viewer: ViewerHandle) -> Unit = { _, _ -> },
+    /**
+     * Non-blocking fanout: bounded per-OBSERVER write timeout. A wedged
+     * QUIC observer stream that does not complete a write within this window is
+     * treated as failed, de-registered, and skipped on later deltas — so one dead
+     * peer cannot serially stall the fanout. The INITIATOR viewer is NEVER subject
+     * to this timeout (it must receive every frame). Injectable for tests.
+     */
+    val observerWriteTimeoutMs: Long = 5_000L,
+    val observerWrites: ObserverWriteQueue? = null,
+    /**
+     * Queue for the INITIATOR's writes. The initiator's connection owns
+     * it, while [observerWrites] may be node-owned so a turn that outlives its initiator still
+     * reaches the other viewers. Defaults to [observerWrites] (one shared queue).
+     */
+    val initiatorWrites: ObserverWriteQueue? = observerWrites,
+)
+
+/**
  * The fanout core. Owns a single turn's per-connection frame-shaping
  * state (open-tool_call tracking + terminal-dedup)
  * and fans EACH already-stamped wire DELTA BODY out to EVERY viewer of
@@ -106,8 +138,7 @@ internal class ObserverWriteQueue(
 internal class ConversationTurnFanout(
     private val conversationId: String,
     private val runtime: AppServerRuntimeScope,
-    /** Snapshot source of every viewer of [conversationId] (incl. the initiator). */
-    private val viewersFor: suspend (conversationId: String) -> Set<ViewerHandle>,
+    delivery: TurnFanoutDelivery,
     /**
      * The initiator's own viewer handle. Used as the sole fanout target when
      * there is no registry (legacy path), and — importantly — the identity whose
@@ -121,29 +152,6 @@ internal class ConversationTurnFanout(
      */
     private val trackInitiatorFrame: (deltaJson: String) -> Unit = {},
     /**
-     * Fault isolation: de-register a failed/wedged OBSERVER viewer from
-     * the SAME registry the fanout reads from ([viewersFor]) so the broadcaster
-     * stops writing to a dead peer on subsequent deltas. Never invoked for the
-     * initiator (which follows the parking path, not de-registration). No-op when
-     * there is no registry (legacy/test construction).
-     */
-    private val unregisterViewer: suspend (conversationId: String, viewer: ViewerHandle) -> Unit = { _, _ -> },
-    /**
-     * Non-blocking fanout: bounded per-OBSERVER write timeout. A wedged
-     * QUIC observer stream that does not complete a write within this window is
-     * treated as failed, de-registered, and skipped on later deltas — so one dead
-     * peer cannot serially stall the fanout. The INITIATOR viewer is NEVER subject
-     * to this timeout (it must receive every frame). Injectable for tests.
-     */
-    private val observerWriteTimeoutMs: Long = OBSERVER_WRITE_TIMEOUT_MS,
-    private val observerWrites: ObserverWriteQueue? = null,
-    /**
-     * Queue for the INITIATOR's writes. The initiator's connection owns
-     * it, while [observerWrites] may be node-owned so a turn that outlives its initiator still
-     * reaches the other viewers. Defaults to [observerWrites] (one shared queue).
-     */
-    private val initiatorWrites: ObserverWriteQueue? = observerWrites,
-    /**
      * The turn's prompt client message id, the turn id stamped on the deltas
      * the host synthesizes itself (tool projection, user echo, dangling-call settlement).
      */
@@ -151,6 +159,12 @@ internal class ConversationTurnFanout(
     /** Joins this turn's stamped messages to their stored rows at the end. */
     private val identity: TurnIdentityBinding? = null,
 ) {
+    private val viewersFor = delivery.viewersFor
+    private val unregisterViewer = delivery.unregisterViewer
+    private val observerWriteTimeoutMs = delivery.observerWriteTimeoutMs
+    private val observerWrites = delivery.observerWrites
+    private val initiatorWrites = delivery.initiatorWrites
+
     private val synthesizedIdentity = turnStreamIdentityFor(turnId)
     private val openToolCalls = OpenToolCallTracker()
     private val toolProjection = RelayedToolProjection()
@@ -648,6 +662,5 @@ internal class ConversationTurnFanout(
         // the fanout. Generous enough for a healthy remote peer's writeAll to
         // complete; a peer that exceeds it is treated as dead and de-registered.
         // The INITIATOR is never subject to this — it must get every frame.
-        const val OBSERVER_WRITE_TIMEOUT_MS = 5_000L
     }
 }

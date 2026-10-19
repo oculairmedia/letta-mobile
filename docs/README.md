@@ -8,9 +8,8 @@ is a usage reference with retained historical values, not a competing policy spe
 ## Generated API reference
 
 Use the [Dokka API reference](https://oculairmedia.github.io/letta-mobile/api/)
-for shared Kotlin declarations, signatures and KDoc. Its publication is introduced
-by [PR #2119](https://github.com/oculairmedia/letta-mobile/pull/2119); the hosted links
-become available after that PR merges and its main deployment succeeds.
+for shared Kotlin declarations, signatures and KDoc. It is generated from the
+module overviews and source comments by the documentation CI build.
 Keep design intent, behavioral contracts, procedures and dated evidence here.
 Registry-generated wire tables remain useful: a Kotlin `JsonObject` declaration
 does not document the evaluated JSON schema or the supported widget catalog.
@@ -27,6 +26,26 @@ Use `evidence/` for captured observations, `testing/` for validation procedures,
 `handoff/` for dated session handoffs, and `architecture/` for designs/contracts.
 [plan/](../plan/) holds historical planning; [poc/](../poc/) holds experimental code,
 not production modules. Existing historical filenames are retained unless misleading.
+
+The product Gradle root is [android-compose/](../android-compose/): open that
+folder in Android Studio/IDEA and run Gradle there. Hosts keep their declared
+`app/`, `desktop/`, and `web/` project paths; see the
+[entrypoint layout decision](architecture/kmp-phase-6-entrypoints.md).
+
+Other repository directories:
+
+| Directory | Contents and boundary |
+| --- | --- |
+| [scripts/](../scripts/) | Repository operations and CI entrypoints (build, release, deployment, policy checks); regression tests for these scripts belong in `scripts/tests/`. |
+| [tools/](../tools/) | Self-contained analysis/capture tools and optional development services; keep their implementation, usage notes, fixtures and tests together under each tool. |
+| [tests/](../tests/) | Existing cross-directory deployment-script tests (`tests/scripts/test_seed_agent_address_book.py`); app/module tests belong in their Gradle source sets. |
+| [plugins/](../plugins/) | Packaged plugin examples; [chart](../plugins/chart/README.md) includes its manifest, server, page and protocol tests. |
+| [third_party/](../third_party/README.md) | Retained external source trees and their integration/provenance notes. Production DrawBox is separately vendored as a Gradle module with [VENDORED.md](../android-compose/drawbox/VENDORED.md). |
+| [reports/](../reports/) | Ignored local report output; maintained evidence belongs under `docs/`. |
+
+Maintain prose documents under this `docs/` tree, or colocate module/tool usage
+next to its sources. Do not create hidden handoff folders or another general
+`docs/` root inside the Gradle build.
 
 ## Source audit
 
@@ -85,7 +104,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [KMP Best-Practices Migration Plan](architecture/kmp-best-practices-migration-plan.md)
 - [KMP Extraction Snapshot — 2026-06-06](architecture/kmp-extraction-snapshot-2026-06-06.md)
 - [KMP module map](architecture/kmp-module-map.md)
-- [Phase 6a — runnable entry points \(docs + aliases deferred\)](architecture/kmp-phase-6-entrypoints.md)
+- [Runnable entry points and host layout](architecture/kmp-phase-6-entrypoints.md)
 - [Epic: KMP project structure migration](architecture/kmp-structure-migration-epic.md)
 - [Letta API Behavior Empirical Findings](architecture/letta-api-behaviors.md)
 - [Letta Code file/shell tools on Android access layers](architecture/letta-code-android-file-shell-tool-map.md)
@@ -145,6 +164,8 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Handoff: PR-2 stream integrity and live status \(F06–F10\)](handoff/letta-desktop-parity-pr2-stream.md)
 - [Handoff: PR-5 Conversations and models \(F15-F18\)](handoff/letta-desktop-parity-pr5-conversations.md)
 - [Handoff: Letta Desktop parity PR-6 — memory browser, secrets vault, file mentions \(F24–F26\)](handoff/letta-desktop-parity-pr6-memory-workspace.md)
+- [Handoff: Merge Multi-Run Responses Into Single Virtual Run](handoff/merge-runs-2026-05-07.md)
+- [Handoff — letta-mobile-mmnn \(Claude Code session, 2026-05-07\)](handoff/mmnn.md)
 
 ### observability
 
@@ -158,6 +179,8 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Chat timeline perf baseline — post-Rive-mobile snapshot \(closing measurement\)](performance/chat-perf-baseline-post-rive-mobile-2026-09-14.md)
 - [Chat timeline perf baseline — pre-Rive-mobile snapshot](performance/chat-perf-baseline-pre-rive-mobile-2026-09-13.md)
 - [Chat pinch-to-zoom performance note](performance/chat-pinch-zoom.md)
+- [Data-Efficiency Audit — LettaMobile Android](performance/data-efficiency-audit.artifact.md)
+- [Iroh image replay investigation](performance/iroh-image-replay-inefficiency.md)
 - [Production JankStats Sampling](performance/jankstats-production-sampling.md)
 - [Android perf regression gate](performance/perf-gate.md)
 - [Mobile Chat Render / Streaming Hot-Path Audit](performance/PERF_AUDIT_mobile_render.md)
@@ -173,6 +196,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Looking up Letta documentation](reference/letta-docs.md)
 - [Plugin trust model](reference/plugin-trust-model.md)
 - [Plugin view bridge \`lcp-view/1\` — for plugin page authors](reference/plugin-view-bridge-v1.md)
+- [QR Pairing Protocol](reference/qr-pairing-protocol.md)
 
 ### testing
 

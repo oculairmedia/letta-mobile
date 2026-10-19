@@ -91,8 +91,8 @@ class PluginDriverHost(
 
     private companion object {
         /**
-         * The manifest's setting defaults. TODO: a host settings and
-         * secrets store; until then a plugin runs on its defaults with no secrets.
+         * The manifest's setting defaults. The host currently supplies no settings overrides
+         * or secrets; persisted settings and secret injection belong at this launch boundary.
          */
         fun defaultSettings(manifest: PluginManifest): JsonObject =
             JsonObject(manifest.settings.mapNotNull { (name, field) -> field.default?.let { name to it } }.toMap())

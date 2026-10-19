@@ -1,6 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
-import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
 import com.letta.mobile.util.Telemetry

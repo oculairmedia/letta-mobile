@@ -112,10 +112,17 @@ class ControllerSubagentRegistrySourceTest {
 
     @Test
     fun capabilityAdvertisedOnlyWhenSubagentRoutesRegistered() {
-        val withoutSource = AdminRpcRegistry.buildRouter(controller = null, subagentRegistrySource = null)
+        val withoutSource = AdminRpcRegistry.buildRouter(
+            services = AdminRpcHostServices(
+                controller = null,
+                subagentRegistrySource = null,
+            ),
+        )
         val withSource = AdminRpcRegistry.buildRouter(
-            controller = null,
-            subagentRegistrySource = ControllerSubagentRegistrySource(),
+            services = AdminRpcHostServices(
+                controller = null,
+                subagentRegistrySource = ControllerSubagentRegistrySource(),
+            ),
         )
         assertFalse(ControllerSubagentRegistrySource.CAPABILITY in IrohNodeConnection.advertisedCapabilities(withoutSource))
         assertTrue(ControllerSubagentRegistrySource.CAPABILITY in IrohNodeConnection.advertisedCapabilities(withSource))

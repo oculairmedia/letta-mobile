@@ -153,17 +153,12 @@ fun ChatSurface(
     // The page's one composer-companion seat; the composers only say where it should stand.
     val companionAnchors = remember { CompanionSeatAnchors() }
     val frame = ChatSurfaceFrame(
-        port = port,
-        listState = listState,
-        uiState = uiState,
-        composer = composer,
-        capabilities = capabilities,
+        session = ChatSurfaceSession(port, uiState, composer, capabilities, pagedTimeline, listState),
         presentation = presentation,
         onIntent = stableOnIntent,
         host = effectiveHost,
         appearance = appearance,
         platform = stablePlatform,
-        pagedTimeline = pagedTimeline,
         companionAnchors = companionAnchors,
         dock = dock.takeIf { dockReady },
         recents = recents,
@@ -249,20 +244,27 @@ internal object ChatSurfaceTags {
     const val CANVAS_OVERLAY = "chat_surface_canvas_overlay"
 }
 
-/** One composition's worth of what every part of the page reads. */
+/** The session inputs collected for this composition, shared by every presentation of the page. */
 @Immutable
-internal class ChatSurfaceFrame(
+internal class ChatSurfaceSession(
     val port: ChatSessionPort,
-    val listState: LazyListState,
     val uiState: ChatUiState,
     val composer: ChatComposerUiState,
     val capabilities: ChatSurfaceCapabilities,
+    val pagedTimeline: CanonicalTimelinePresentation?,
+    /** One scroll position per conversation/paged timeline, preserved across presentation changes. */
+    val listState: LazyListState,
+)
+
+/** One composition's session inputs and the page's host-owned presentation and geometry. */
+@Immutable
+internal class ChatSurfaceFrame(
+    val session: ChatSurfaceSession,
     val presentation: ChatSurfacePresentation,
     val onIntent: (ChatSurfaceIntent) -> Unit,
     val host: ChatSurfaceHost,
     val appearance: ChatSurfaceAppearance,
     val platform: ChatSurfacePlatform,
-    val pagedTimeline: CanonicalTimelinePresentation?,
     /** The page's one composer-companion seat. */
     val companionAnchors: CompanionSeatAnchors,
     /** Null until the host knows where the person put the dock (or, on Touch, the head). */
@@ -427,7 +429,9 @@ private fun TouchDock(frame: ChatSurfaceFrame, morph: SurfaceMorph, parts: Touch
         bar = parts.bar,
         morph = morph,
         topChromeInset = frame.platform.topChromeInset,
-        head = frame.dock?.let { touchHeadContent(frame, it, TouchHeadInputs(touchInputPending(frame, turn.pendingApproval), bubble)) { turn } },
+        head = frame.dock?.let {
+            frame.touchHeadContent(it, touchInputPending(frame, turn.pendingApproval), bubble) { turn }
+        },
         slots = touchDockSlots(frame, turn.pendingApproval, bubble),
     )
 }
@@ -449,20 +453,21 @@ private fun touchDockSlots(frame: ChatSurfaceFrame, approval: UiApprovalRequest?
 /** The pending question (with its approve, reject and answer controls) and the A2UI forms, if any. */
 @Composable
 private fun TouchCanvasInput(frame: ChatSurfaceFrame, approval: UiApprovalRequest?) {
-    val surfaces = frame.uiState.a2uiSurfaces
+    val surfaces = frame.session.uiState.a2uiSurfaces
     if (!touchInputPending(frame, approval)) return
     TouchInputTray {
         if (approval != null) {
-            val owner = remember(frame.uiState.activeApprovalRequestId, frame.capabilities.approvals, frame.port.actions) {
-                ApprovalOwner.of(frame.uiState.activeApprovalRequestId, frame.capabilities.approvals, frame.port.actions)
+            val session = frame.session
+            val owner = remember(session.uiState.activeApprovalRequestId, session.capabilities.approvals, session.port.actions) {
+                ApprovalOwner.of(session.uiState.activeApprovalRequestId, session.capabilities.approvals, session.port.actions)
             }
             val decider = rememberApprovalDecider(approval, owner)
             ApprovalRequestCard(approval, decider)
         }
         A2uiSurfaceStack(
             surfaces = surfaces,
-            resolvedActionCounters = frame.uiState.a2uiResolvedActionCounters,
-            actions = frame.port.actions,
+            resolvedActionCounters = frame.session.uiState.a2uiResolvedActionCounters,
+            actions = frame.session.port.actions,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -491,30 +496,26 @@ private fun rememberTouchCanvasChrome(host: ChatSurfaceHost): CanvasHostChrome {
 
 /** The Touch canvas's input tray is up: a question, or a generated form, waits on the person. */
 private fun touchInputPending(frame: ChatSurfaceFrame, approval: UiApprovalRequest?): Boolean =
-    approval != null || frame.uiState.a2uiSurfaces.isNotEmpty()
-
-/** What the chat head needs besides the frame: whether an answer waits on the person, and the bubble. */
-private class TouchHeadInputs(val inputPending: Boolean, val bubble: TouchBubble?)
+    approval != null || frame.session.uiState.a2uiSurfaces.isNotEmpty()
 
 /**
  * What the chat head shows and does, from the page's frame. In the canvas bubble its reply opens
  * the bubble's card rather than the full chat (the card's own chevron goes on to the full chat).
  */
-private fun touchHeadContent(
-    frame: ChatSurfaceFrame,
+private fun ChatSurfaceFrame.touchHeadContent(
     dock: ChatDockState,
-    inputs: TouchHeadInputs,
+    inputPending: Boolean,
+    bubble: TouchBubble?,
     turn: @Composable () -> CollapsedTurn,
 ): TouchHeadContent {
-    val bubble = inputs.bubble
     return TouchHeadContent(
         dock = dock,
-        agentId = frame.uiState.agentId,
-        agentName = frame.uiState.agentName,
-        openChat = bubble?.state?.let { it::expand } ?: { frame.onIntent(ChatSurfaceIntent.Expand) },
-        openAgent = frame.host.openAgentPane,
+        agentId = session.uiState.agentId,
+        agentName = session.uiState.agentName,
+        openChat = bubble?.state?.let { it::expand } ?: { onIntent(ChatSurfaceIntent.Expand) },
+        openAgent = host.openAgentPane,
         turn = turn,
-        inputPending = inputs.inputPending,
+        inputPending = inputPending,
         bubble = bubble,
     )
 }
@@ -532,7 +533,7 @@ private fun CompanionSeat(
 ) {
     CompanionSeatOverlay(
         anchors = frame.companionAnchors,
-        agentId = frame.uiState.agentId,
+        agentId = frame.session.uiState.agentId,
         pageWeight = pageWeight,
         // Over the Touch chat head the character is the head's: its own gestures (drag, tap, long press) win.
         onClick = frame.host.openAgentPane.takeIf { interactive },
@@ -560,7 +561,7 @@ private fun DockedOverlay(frame: ChatSurfaceFrame, dock: ChatDockState, morph: S
     // While it grows into the page it keeps its own docked composer.
     val composerMode = if (frame.mode == ChatSurfaceMode.FullScreen) ChatSurfaceMode.Docked else frame.mode
     // The canvas chat window's thinking cue is the ambient glow, so its rows keep still.
-    val ambient = rememberChatAmbient(frame.uiState)
+    val ambient = rememberChatAmbient(frame.session.uiState)
     // letta-mobile-y5q9z: the header's "+" hops between the agent's conversations.
     val recents = rememberDockedRecents(frame)
     CompositionLocalProvider(
@@ -584,8 +585,8 @@ private fun dockedPanelContent(
         conversation = { conversationModifier -> DockedReplyCard(dockedReplyParams(frame), conversationModifier) },
         composer = { collapsed -> DockComposer(frame, composerMode, collapsed) },
         collapsed = CollapsedDockContent(
-            agentId = frame.uiState.agentId,
-            agentName = frame.uiState.agentName,
+            agentId = frame.session.uiState.agentId,
+            agentName = frame.session.uiState.agentName,
             openAgent = frame.host.openAgentPane,
             editAgent = frame.host.editAgent,
             turn = { rememberCollapsedTurn(dockedReplyParams(frame)) },
@@ -597,10 +598,10 @@ private fun dockedPanelContent(
 
 internal fun dockedReplyParams(frame: ChatSurfaceFrame): DockedReplyParams {
     return DockedReplyParams(
-        state = frame.uiState,
-        pagedTimeline = frame.pagedTimeline,
-        actions = frame.port.actions,
-        capabilities = frame.capabilities,
+        state = frame.session.uiState,
+        pagedTimeline = frame.session.pagedTimeline,
+        actions = frame.session.port.actions,
+        capabilities = frame.session.capabilities,
         host = frame.host,
         appearance = frame.appearance,
         onIntent = frame.onIntent,
@@ -658,14 +659,14 @@ private fun Modifier.reportComposerHeight(frame: ChatSurfaceFrame, composerMode:
 private fun TimelineWithOverlay(frame: ChatSurfaceFrame, modifier: Modifier) {
     Box(modifier) {
         ChatTimeline(
-            state = frame.uiState,
-            pagedTimeline = frame.pagedTimeline,
-            actions = frame.port.actions,
-            capabilities = frame.capabilities,
+            state = frame.session.uiState,
+            pagedTimeline = frame.session.pagedTimeline,
+            actions = frame.session.port.actions,
+            capabilities = frame.session.capabilities,
             host = frame.host,
             appearance = frame.appearance,
             modifier = Modifier.fillMaxSize(),
-            listState = frame.listState,
+            listState = frame.session.listState,
             topInset = frame.platform.topChromeInset,
         )
         frame.platform.timelineOverlay?.let { overlay ->
@@ -699,17 +700,17 @@ private fun Composer(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifier: M
  */
 @Composable
 private fun LiveRunStatus(frame: ChatSurfaceFrame) {
-    val status by frame.port.liveStatus.collectForChatSurface()
-    RunStatusLine(status, companionShowing = companionIndicatorShowing(frame.uiState))
+    val status by frame.session.port.liveStatus.collectForChatSurface()
+    RunStatusLine(status, companionShowing = companionIndicatorShowing(frame.session.uiState))
 }
 
 /** The A2UI surfaces above the docked composer, where no timeline shows them. */
 @Composable
 private fun DockedA2uiStack(frame: ChatSurfaceFrame) {
     A2uiSurfaceStack(
-        surfaces = frame.uiState.a2uiSurfaces,
-        resolvedActionCounters = frame.uiState.a2uiResolvedActionCounters,
-        actions = frame.port.actions,
+        surfaces = frame.session.uiState.a2uiSurfaces,
+        resolvedActionCounters = frame.session.uiState.a2uiResolvedActionCounters,
+        actions = frame.session.port.actions,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
@@ -721,10 +722,12 @@ private fun ComposerPanel(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifi
     ChatComposerPanel(
         inputs = ComposerInputs(
             // letta-mobile-zxk2n.5: "Token usage" off hides the composer's context meter.
-            composer = if (frame.appearance.displayOptions.showTokenUsage) frame.composer else frame.composer.copy(contextUsage = null),
-            uiState = frame.uiState,
-            actions = rememberSendFlightActions(frame.port.actions, frame.composer.text),
-            capabilities = frame.capabilities,
+            composer = frame.session.composer.let {
+                if (frame.appearance.displayOptions.showTokenUsage) it else it.copy(contextUsage = null)
+            },
+            uiState = frame.session.uiState,
+            actions = rememberSendFlightActions(frame.session.port.actions, frame.session.composer.text),
+            capabilities = frame.session.capabilities,
             host = frame.host,
             platform = frame.platform,
             mode = mode,

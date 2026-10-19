@@ -10,7 +10,11 @@ class AdminRpcContractTest {
         // The contract test builds the full registry router, gets its registered method set,
         // and asserts it EXACTLY equals a hardcoded CANONICAL expected set.
         // Adding a new admin method must update both handler + this expected set.
-        val router = AdminRpcRegistry.buildRouter("http://localhost:8080", null)
+        val router = AdminRpcRegistry.buildRouter(
+            services = AdminRpcHostServices(
+                controller = null,
+            ),
+        )
         assertEquals(
             (expectedRegisteredMethods() + "conversation.update").sorted(),
             router.registeredMethods.sorted(),
@@ -20,7 +24,11 @@ class AdminRpcContractTest {
 
     @Test
     fun subagentMethodsRequireUsableSource() {
-        val router = AdminRpcRegistry.buildRouter("http://localhost:8080", subagentRegistrySource = EmptySource)
+        val router = AdminRpcRegistry.buildRouter(
+            services = AdminRpcHostServices(
+                subagentRegistrySource = EmptySource,
+            ),
+        )
 
         assertEquals(AdminRpcRegistry.subagentMethods, router.registeredMethods.intersect(AdminRpcRegistry.subagentMethods))
     }

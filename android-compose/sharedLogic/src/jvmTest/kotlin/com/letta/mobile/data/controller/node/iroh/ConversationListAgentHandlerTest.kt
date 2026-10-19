@@ -56,7 +56,11 @@ class ConversationListAgentHandlerTest {
     fun returnsEmptyArrayWhenAgentMissing() = runTest {
         val root = createTempDirectory("i9h61-list-agent-missing").toFile()
         LocalBackendFixtureStore.create(root)
-        val router = AdminRpcRegistry.buildRouter(localBackendDir = root.absolutePath)
+        val router = AdminRpcRegistry.buildRouter(
+            native = AdminRpcNativeSources(
+                localBackendDir = root.absolutePath,
+            ),
+        )
         val resp = invoke(
             router,
             "conversation.list_agent",
@@ -95,7 +99,11 @@ class ConversationListAgentHandlerTest {
             )
         }
 
-        val router = AdminRpcRegistry.buildRouter(localBackendDir = root.absolutePath)
+        val router = AdminRpcRegistry.buildRouter(
+            native = AdminRpcNativeSources(
+                localBackendDir = root.absolutePath,
+            ),
+        )
         val resp = invoke(
             router,
             "conversation.list_agent",
@@ -133,7 +141,11 @@ class ConversationListAgentHandlerTest {
             """{"id":"conv-hidden","agent_id":"$agentId","hidden":true}""",
         )
 
-        val router = AdminRpcRegistry.buildRouter(localBackendDir = root.absolutePath)
+        val router = AdminRpcRegistry.buildRouter(
+            native = AdminRpcNativeSources(
+                localBackendDir = root.absolutePath,
+            ),
+        )
         val resp = invoke(router, "conversation.list_agent", buildJsonObject { put("agent_id", agentId) })
 
         val ids = extractConversationsArray(resp).map { it["id"]?.jsonPrimitive?.contentOrNull }

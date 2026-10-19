@@ -1,18 +1,15 @@
 package com.letta.mobile.data.chat.projection
 
-import com.letta.mobile.data.chat.projection.meridian.MeridianCommandCall
 import com.letta.mobile.data.messaging.AgentMessageProvenanceProjection
-import com.letta.mobile.data.model.UiApprovalRequest
-import com.letta.mobile.data.model.UiApprovalResponse
-import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.model.UiApprovalRequest
+import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.model.UiSubagentDispatch
-import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.data.model.ToolCall
+import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolResultTruncation
 import com.letta.mobile.data.timeline.DeliveryState
-import com.letta.mobile.data.timeline.Role
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineMessageType
 import com.letta.mobile.data.timeline.stripEnvelopeReminders
@@ -107,246 +104,203 @@ fun timelineEventToUiMessage(
     /** This event's compose receipts, from [CanvasArtifactReceipts.attach]. */
     artifacts: List<CanvasArtifactReceipt> = emptyList(),
 ): UiMessage? {
+    val context = TimelineMessageProjectionContext(ownAgentId, artifacts)
     return when (ev) {
-        is TimelineEvent.Local -> {
-            // letta-mobile-5s1n: Locals can now represent in-flight assistant
-            // streaming (Client Mode harness path) in addition to the legacy
-            // optimistic USER bubble. Standalone TOOL_RETURN Locals are
-            // suppressed to mirror the Confirmed branch contract — tool
-            // returns are folded into the invoking TOOL_CALL Local instead.
-            if (ev.messageType == TimelineMessageType.TOOL_RETURN) return null
-            if (ev.messageType == TimelineMessageType.OTHER) return null
-            if (ev.messageType == TimelineMessageType.SYSTEM) return null
-            val role = when (ev.messageType) {
-                TimelineMessageType.USER -> "user"
-                TimelineMessageType.ASSISTANT -> "assistant"
-                TimelineMessageType.REASONING -> "assistant"
-                TimelineMessageType.TOOL_CALL -> "assistant"
-                TimelineMessageType.SYSTEM, TimelineMessageType.COMPACTION -> return null
-                // Locals never originate as ERROR (server-only frame), but
-                // make the `when` exhaustive so adding the type elsewhere
-                // doesn't compile-warn here. letta-mobile-5s1n.
-                TimelineMessageType.ERROR -> "system"
-                TimelineMessageType.TOOL_RETURN, TimelineMessageType.OTHER ->
-                    when (ev.role) {
-                        Role.USER -> "user"
-                        Role.ASSISTANT -> "assistant"
-                        Role.SYSTEM -> "system"
-                    }
-            }
-            // Mirror the Confirmed branch: tool-call Locals carry structured
-            // tool calls + result/return body + approval state. Pending state
-            // means SENDING; in-flight assistant streaming Locals use SENT so
-            // the UI doesn't spin (the gateway is the delivery authority).
-            val uiToolCalls: List<UiToolCall>? =
-                if (ev.toolCalls.isNotEmpty()) {
-                    val chip: UiToolApprovalDecision? = implicitApprovalChip(
-                        decided = ev.approvalDecided,
-                        approvalRequestId = ev.approvalRequestId,
-                        anyToolReturnError = ev.toolReturnIsError || ev.toolReturnIsErrorByCallId.values.any { it },
-                    )
-                    ev.toolCalls.mapIndexed { index, tc ->
-                        val callId = tc.effectiveId.takeIf { it.isNotBlank() }
-                        val result = callId?.let { ev.toolReturnContentByCallId[it] }
-                            ?: if (index == 0) ev.toolReturnContent else null
-                        val isError = callId?.let { ev.toolReturnIsErrorByCallId[it] }
-                            ?: ev.toolReturnIsError
-                        val executionTimeMs = if (result != null && callId != null) {
-                            ev.toolStartedAtByCallId[callId]
-                                ?.let { startedAt ->
-                                    val completedAt = ev.toolCompletedAtByCallId[callId] ?: ev.sentAt
-                                    timelineInstantDurationMillis(startedAt, completedAt).coerceAtLeast(0L)
-                                }
-                        } else null
-                        tc.toUiToolCall(
-                            ToolCallRenderData(
-                                result = result,
-                                isError = isError,
-                                generatedImageAttachments = tc.generatedImageAttachments(ev.attachments),
-                                executionTimeMs = executionTimeMs,
-                                approvalDecision = chip,
-                                sourceAgentId = ownAgentId,
-                            ),
-                        )
-                    }
-                } else null
-            val uiApproval = pendingApprovalRequest(ev.approvalDecided, ev.approvalRequestId, ev.toolCalls)
+        is TimelineEvent.Local -> ev.toLocalUiMessage(context)
+        // System rows must bypass even structured-notification recognition.
+        is TimelineEvent.Confirmed ->
+            if (ev.messageType == TimelineMessageType.SYSTEM) null else ev.toConfirmedUiMessage(context)
+    }
+}
 
-            if (ev.messageType == TimelineMessageType.TOOL_CALL && uiToolCalls == null && ev.content.isBlank()) {
-                return null
-            }
+private class TimelineMessageProjectionContext(
+    val ownAgentId: String?,
+    val artifacts: List<CanvasArtifactReceipt>,
+)
 
-            // For REASONING locals, prefer reasoningContent if present (allows
-            // the streaming path to set content="" and pipe partial reasoning
-            // through reasoningContent for cleaner separation), falling back
-            // to the standard content field for backward compatibility.
-            val displayContent = when (ev.messageType) {
-                TimelineMessageType.REASONING ->
-                    ev.reasoningContent?.takeIf { it.isNotEmpty() } ?: ev.content
-                TimelineMessageType.TOOL_CALL ->
-                    if (uiToolCalls != null) "" else ev.content
-                else -> ev.content
-            }.stripEnvelopeReminders()
-            UiMessage(
-                id = ev.otid,
-                role = role,
-                content = displayContent,
-                timestamp = ev.sentAt.toString(),
-                clientMessageId = ev.otid,
-                isPending = ev.deliveryState == DeliveryState.SENDING,
-                isReasoning = ev.messageType == TimelineMessageType.REASONING,
-                // letta-mobile-jt4wq: a FAILED delivery is not a server error
-                // frame. Folding it into isError made the user's own prompt
-                // render as a destructive "Error" bubble quoting their own
-                // words back at them — see UiMessage.isSendFailed. The
-                // confirmed-event branch below has always drawn this line
-                // correctly; only the optimistic/local branch conflated them.
-                isError = ev.messageType == TimelineMessageType.ERROR,
-                isSendFailed = ev.deliveryState == DeliveryState.FAILED,
-                toolCalls = uiToolCalls,
-                approvalRequest = uiApproval,
-                approvalResponse = null,
-                attachments = if (uiToolCalls.orEmpty().any { it.name == "generate_image" }) {
-                    emptyList()
-                } else {
-                    ev.attachments.map {
-                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize)
-                    }
-                },
-                // letta-mobile-slqfp: Local events have no owning agentId yet,
-                // so inbound provenance projects against a null recipient —
-                // still correct because the decoded envelope carries its own
-                // toAgentId as a fallback (see projectInbound).
-                agentMessageProvenance = if (role == "user") {
-                    AgentMessageProvenanceProjection.projectInbound(
-                        clientMessageId = ev.otid,
-                        ownAgentId = ownAgentId,
-                    )
-                } else {
-                    null
-                },
-                artifacts = artifacts,
-            )
+private class ProjectedToolReturn(val callId: String?, val content: String?)
+
+private class ToolCallPosition(val toolCall: ToolCall, val index: Int)
+
+private fun TimelineMessageType.chatRole(): String? {
+    return when (this) {
+        TimelineMessageType.USER -> "user"
+        TimelineMessageType.ASSISTANT, TimelineMessageType.REASONING, TimelineMessageType.TOOL_CALL -> "assistant"
+        TimelineMessageType.ERROR -> "system"
+        TimelineMessageType.SYSTEM, TimelineMessageType.COMPACTION,
+        TimelineMessageType.TOOL_RETURN, TimelineMessageType.OTHER -> null
+    }
+}
+
+private fun TimelineEvent.Local.toLocalUiMessage(
+    context: TimelineMessageProjectionContext,
+): UiMessage? {
+    // Standalone returns are merged into their invoking tool call, never their own row.
+    val role = messageType.chatRole() ?: return null
+    val uiToolCalls = localUiToolCalls(context)
+    if (isEmptyToolCall(uiToolCalls)) return null
+    return UiMessage(
+        id = otid,
+        role = role,
+        content = localDisplayContent(uiToolCalls),
+        timestamp = sentAt.toString(),
+        clientMessageId = otid,
+        isPending = deliveryState == DeliveryState.SENDING,
+        isReasoning = messageType == TimelineMessageType.REASONING,
+        // Failed delivery marks the user's send failed, not a server error bubble.
+        isError = messageType == TimelineMessageType.ERROR,
+        isSendFailed = deliveryState == DeliveryState.FAILED,
+        toolCalls = uiToolCalls,
+        approvalRequest = pendingApprovalRequest(approvalDecided, approvalRequestId, toolCalls),
+        approvalResponse = null,
+        attachments = messageAttachments(attachments, uiToolCalls),
+        // Locals have no owning agent yet; the decoded envelope provides the recipient fallback.
+        agentMessageProvenance = if (role == "user") {
+            AgentMessageProvenanceProjection.projectInbound(clientMessageId = otid, ownAgentId = context.ownAgentId)
+        } else {
+            null
+        },
+        artifacts = context.artifacts,
+    )
+}
+
+private fun TimelineEvent.Local.isEmptyToolCall(uiToolCalls: List<UiToolCall>?): Boolean {
+    if (messageType != TimelineMessageType.TOOL_CALL) return false
+    return uiToolCalls == null && content.isBlank()
+}
+
+private fun TimelineEvent.Local.localDisplayContent(uiToolCalls: List<UiToolCall>?): String {
+    val displayContent = when (messageType) {
+        // Streaming reasoning can arrive separately from the ordinary content field.
+        TimelineMessageType.REASONING -> reasoningContent?.takeIf { it.isNotEmpty() } ?: content
+        TimelineMessageType.TOOL_CALL -> if (uiToolCalls != null) "" else content
+        else -> content
+    }
+    return displayContent.stripEnvelopeReminders()
+}
+
+private fun TimelineEvent.Local.localUiToolCalls(context: TimelineMessageProjectionContext): List<UiToolCall>? {
+    if (toolCalls.isEmpty()) return null
+    val chip = implicitApprovalChip(
+        decided = approvalDecided,
+        approvalRequestId = approvalRequestId,
+        anyToolReturnError = toolReturnIsError || toolReturnIsErrorByCallId.values.any { it },
+    )
+    return toolCalls.mapIndexed { index, tc -> localUiToolCall(ToolCallPosition(tc, index), chip, context) }
+}
+
+private fun TimelineEvent.Local.localUiToolCall(
+    position: ToolCallPosition,
+    chip: UiToolApprovalDecision?,
+    context: TimelineMessageProjectionContext,
+): UiToolCall {
+    val tc = position.toolCall
+    val callId = tc.effectiveId.takeIf { it.isNotBlank() }
+    val result = callId?.let { toolReturnContentByCallId[it] }
+        ?: if (position.index == 0) toolReturnContent else null
+    val isError = callId?.let { toolReturnIsErrorByCallId[it] } ?: toolReturnIsError
+    return tc.toUiToolCall(
+        ToolCallRenderData(
+            result = result,
+            isError = isError,
+            generatedImageAttachments = tc.generatedImageAttachments(attachments),
+            executionTimeMs = localExecutionTimeMs(ProjectedToolReturn(callId, result)),
+            approvalDecision = chip,
+            sourceAgentId = context.ownAgentId,
+        ),
+    )
+}
+
+private fun TimelineEvent.Local.localExecutionTimeMs(result: ProjectedToolReturn): Long? {
+    val callId = result.callId
+    if (result.content == null || callId == null) return null
+    return toolStartedAtByCallId[callId]?.let { startedAt ->
+        val completedAt = toolCompletedAtByCallId[callId] ?: sentAt
+        timelineInstantDurationMillis(startedAt, completedAt).coerceAtLeast(0L)
+    }
+}
+
+private fun TimelineEvent.Confirmed.toConfirmedUiMessage(context: TimelineMessageProjectionContext): UiMessage? {
+    confirmedStructuredRow(this)?.let { return it }
+    val role = messageType.chatRole() ?: return null
+    val uiToolCalls = confirmedUiToolCalls()
+    val confirmedContent = confirmedDisplayContent(uiToolCalls) ?: return null
+    return UiMessage(
+        // Server reasoning and assistant events may share a server id; preserve both row identities.
+        id = if (messageType == TimelineMessageType.REASONING) "$serverId:${messageType.name}" else serverId,
+        role = role,
+        content = confirmedContent,
+        timestamp = date.toString(),
+        runId = runId,
+        agentId = agentId,
+        stepId = stepId,
+        clientMessageId = otid.takeIf { it.isNotBlank() },
+        isPending = false,
+        isReasoning = messageType == TimelineMessageType.REASONING,
+        isError = messageType == TimelineMessageType.ERROR,
+        toolCalls = uiToolCalls,
+        approvalRequest = pendingApprovalRequest(approvalDecided, approvalRequestId, toolCalls),
+        // A standalone approval response would hide the rich tool body. Its chip carries the decision.
+        approvalResponse = null,
+        attachments = messageAttachments(attachments, uiToolCalls),
+        agentMessageProvenance = if (role == "user") {
+            AgentMessageProvenanceProjection.projectInbound(clientMessageId = otid, ownAgentId = agentId)
+        } else {
+            null
+        },
+        artifacts = context.artifacts,
+    )
+}
+
+private fun TimelineEvent.Confirmed.confirmedDisplayContent(uiToolCalls: List<UiToolCall>?): String? {
+    return when {
+        messageType == TimelineMessageType.TOOL_CALL && uiToolCalls != null -> ""
+        messageType == TimelineMessageType.USER -> {
+            // History reads bypass the upstream envelope scrub; envelope-only bubbles must disappear.
+            val stripped = scrubUserEnvelope(content)
+            stripped.takeUnless { it.isEmpty() && content.isNotEmpty() }
         }
-        is TimelineEvent.Confirmed -> {
-            if (ev.messageType == TimelineMessageType.SYSTEM) return null
-            confirmedStructuredRow(ev)?.let { return it }
+        else -> content
+    }
+}
 
-            val role = when (ev.messageType) {
-                TimelineMessageType.USER -> "user"
-                TimelineMessageType.ASSISTANT -> "assistant"
-                TimelineMessageType.REASONING -> "assistant"
-                TimelineMessageType.SYSTEM -> return null
-                // letta-mobile-5s1n: ERROR frames render as a system bubble
-                // with the destructive accent applied via UiMessage.isError.
-                TimelineMessageType.ERROR -> "system"
-                TimelineMessageType.TOOL_CALL -> "assistant"
-                TimelineMessageType.TOOL_RETURN -> return null
-                TimelineMessageType.OTHER, TimelineMessageType.COMPACTION -> return null
-            }
-            // letta-mobile-23h5 (regression fix 2026-04-19): when an approval
-            // has been decided we MUST NOT synthesize a `UiApprovalResponse`
-            // alongside the tool calls on the same UiMessage — the renderer
-            // (ChatMessageBubble) short-circuits to `ApprovalResponseCard` as
-            // soon as `approvalResponse != null` and never paints the rich
-            // tool card. Convey the approved state via the per-tool-call
-            // `approvalDecision` chip (which `ToolCallCard` already renders),
-            // and only emit `UiApprovalRequest` while still pending.
-            val uiToolCalls: List<UiToolCall>? =
-                if (ev.toolCalls.isNotEmpty()) {
-                    val chip: UiToolApprovalDecision? = ev.approvalChip()
-                    ev.toolCalls.mapIndexed { index, tc ->
-                        val callId = tc.effectiveId.takeIf { it.isNotBlank() }
-                        val result = callId?.let { ev.toolReturnContentByCallId[it] }
-                            ?: if (index == 0) ev.toolReturnContent else null
-                        val isError = callId?.let { ev.toolReturnIsErrorByCallId[it] }
-                            ?: ev.toolReturnIsError
-                        // letta-mobile-fe51r: surface the pointer-diet marker
-                        // so the card can lazily fetch the full body on expand.
-                        val truncation = callId?.let { ev.toolReturnTruncationByCallId[it] }
-                        tc.toUiToolCall(
-                            ToolCallRenderData(
-                                result = result,
-                                isError = isError,
-                                generatedImageAttachments = tc.generatedImageAttachments(ev.attachments),
-                                approvalDecision = chip,
-                                resultTruncation = truncation?.let {
-                                    UiToolResultTruncation(messageId = it.messageId, byteLen = it.byteLen)
-                                },
-                                sourceAgentId = ev.agentId,
-                            ),
-                        )
-                    }
-                } else null
-            val uiApproval = pendingApprovalRequest(ev.approvalDecided, ev.approvalRequestId, ev.toolCalls)
-            // Intentionally never synthesize a standalone approvalResponse
-            // here — see comment above. The chip on the tool card carries
-            // the "Approved" indicator without hiding the tool body.
-            val uiApprovalResponse: UiApprovalResponse? = null
-            // lettabot-y4j: defensive strip of leaked envelope blocks on
-            // USER bubbles. Confirmed events come from `GET /v1/conversations/
-            // :id/messages` which goes directly to the Letta server (the
-            // lettabot REST scrub doesn't run here), so we MUST strip on
-            // render. Drop the bubble entirely if the content was envelope-only.
-            val confirmedContent = when {
-                ev.messageType == TimelineMessageType.TOOL_CALL && uiToolCalls != null -> ""
-                role == "user" -> {
-                    val stripped = scrubUserEnvelope(ev.content)
-                    if (stripped.isEmpty() && ev.content.isNotEmpty()) return null
-                    stripped
-                }
-                else -> ev.content
-            }
-            UiMessage(
-                // Letta can use the same message id for multiple event shapes
-                // in a single step (observed Client Mode replay: reasoning_message
-                // and assistant_message both arrived with message-05b...). The
-                // ViewModel and render model dedupe by UiMessage.id to protect
-                // LazyColumn keys, so using bare serverId can drop reasoning or
-                // the final assistant bubble whenever both shapes share one
-                // server id. Scope the render-key suffix to Client Mode
-                // harness-collapsed events, plus REASONING events from server
-                // history/live streams, so notification-reply thinking bubbles
-                // survive same-id assistant responses while legacy assistant
-                // message IDs remain stable.
-                id = if (
-                    ev.messageType == TimelineMessageType.REASONING
-                ) {
-                    "${ev.serverId}:${ev.messageType.name}"
-                } else {
-                    ev.serverId
-                },
-                role = role,
-                content = confirmedContent,
-                timestamp = ev.date.toString(),
-                runId = ev.runId,
-                agentId = ev.agentId,
-                stepId = ev.stepId,
-                clientMessageId = ev.otid.takeIf { it.isNotBlank() },
-                isPending = false,
-                isReasoning = ev.messageType == TimelineMessageType.REASONING,
-                isError = ev.messageType == TimelineMessageType.ERROR,
-                toolCalls = uiToolCalls,
-                approvalRequest = uiApproval,
-                approvalResponse = uiApprovalResponse,
-                attachments = if (uiToolCalls.orEmpty().any { it.name == "generate_image" }) {
-                    emptyList()
-                } else {
-                    ev.attachments.map {
-                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize)
-                    }
-                },
-                agentMessageProvenance = if (role == "user") {
-                    AgentMessageProvenanceProjection.projectInbound(
-                        clientMessageId = ev.otid,
-                        ownAgentId = ev.agentId,
-                    )
-                } else {
-                    null
-                },
-                artifacts = artifacts,
-            )
-        }
+private fun TimelineEvent.Confirmed.confirmedUiToolCalls(): List<UiToolCall>? {
+    if (toolCalls.isEmpty()) return null
+    val chip = approvalChip()
+    return toolCalls.mapIndexed { index, tc -> confirmedUiToolCall(ToolCallPosition(tc, index), chip) }
+}
+
+private fun TimelineEvent.Confirmed.confirmedUiToolCall(
+    position: ToolCallPosition,
+    chip: UiToolApprovalDecision?,
+): UiToolCall {
+    val tc = position.toolCall
+    val callId = tc.effectiveId.takeIf { it.isNotBlank() }
+    val result = callId?.let { toolReturnContentByCallId[it] }
+        ?: if (position.index == 0) toolReturnContent else null
+    val isError = callId?.let { toolReturnIsErrorByCallId[it] } ?: toolReturnIsError
+    val truncation = callId?.let { toolReturnTruncationByCallId[it] }
+    return tc.toUiToolCall(
+        ToolCallRenderData(
+            result = result,
+            isError = isError,
+            generatedImageAttachments = tc.generatedImageAttachments(attachments),
+            approvalDecision = chip,
+            // Preserve the pointer marker so expanding the card can fetch the complete result body.
+            resultTruncation = truncation?.let { UiToolResultTruncation(messageId = it.messageId, byteLen = it.byteLen) },
+            sourceAgentId = agentId,
+        ),
+    )
+}
+
+private fun messageAttachments(
+    attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
+    uiToolCalls: List<UiToolCall>?,
+): List<UiImageAttachment> {
+    return if (uiToolCalls.orEmpty().any { it.name == "generate_image" }) {
+        emptyList()
+    } else {
+        attachments.map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize) }
     }
 }
 
@@ -367,116 +321,6 @@ private fun pendingApprovalRequest(
                 arguments = tc.arguments ?: "",
             )
         },
-    )
-}
-
-private fun com.letta.mobile.data.model.ToolCall.toSubagentDispatch(result: String?): UiSubagentDispatch? =
-    if (name == "Agent") {
-        extractSubagentDispatch(
-            toolCallId = effectiveId.takeIf { it.isNotBlank() },
-            arguments = arguments.orEmpty(),
-            returnContent = result,
-        )
-    } else {
-        null
-    }
-
-/**
- * Normalize a skill-invocation tool call for display.
- *
- * When a tool call's arguments contain a `skill` field (possibly wrapped in
- * up to two JSON-string layers), replace the tool name with "Skill" and the
- * remaining arguments as normalized JSON. Unknown or malformed payloads fall
- * back to the original name/arguments so the tool call stays visible.
- */
-private data class NormalizedToolCall(
-    val name: String,
-    val arguments: String,
-    val displayTarget: String? = null,
-)
-
-private fun normalizeSkillToolCall(name: String, arguments: String): NormalizedToolCall {
-    val normalized = com.letta.mobile.data.model.SkillArgumentNormalizer.normalize(arguments)
-    return if (normalized != null) {
-        // Keep invocation details on the ordinary tool-card path rather than
-        // projecting the injected skill document as a second timeline item.
-        NormalizedToolCall(
-            name = "Skill",
-            arguments = normalized.normalizedArguments,
-            displayTarget = normalized.skillName,
-        )
-    } else {
-        NormalizedToolCall(name = name, arguments = arguments)
-    }
-}
-
-private data class ToolCallRenderData(
-    val result: String?,
-    val isError: Boolean,
-    val generatedImageAttachments: List<UiImageAttachment>,
-    val executionTimeMs: Long? = null,
-    val approvalDecision: UiToolApprovalDecision? = null,
-    val resultTruncation: UiToolResultTruncation? = null,
-    val sourceAgentId: String? = null,
-)
-
-/**
- * A `meridian canvas …` call (Bash or the meta-tool) renders as the native
- * canvas tool it runs, its result read off stdout, so its row matches the native call's row.
- */
-private fun ToolCallRenderData.forMeridianStdout(): ToolCallRenderData =
-    copy(result = MeridianCommandCall.toolResult(result), isError = isError || MeridianCommandCall.isErrorResult(result))
-
-private fun com.letta.mobile.data.model.ToolCall.toUiToolCall(data: ToolCallRenderData): UiToolCall {
-    MeridianCommandCall.parse(this)?.let { meridian -> return meridian.applyTo(this).toNativeUiToolCall(data.forMeridianStdout()) }
-    return toNativeUiToolCall(data)
-}
-
-private fun com.letta.mobile.data.model.ToolCall.toNativeUiToolCall(data: ToolCallRenderData): UiToolCall {
-    val normalized = normalizeSkillToolCall(name ?: "tool", arguments ?: "")
-    return UiToolCall(
-        name = normalized.name,
-        arguments = normalized.arguments,
-        result = data.result,
-        displayTarget = normalized.displayTarget,
-        status = data.result?.let { if (data.isError) "error" else "success" },
-        generatedImageAttachments = data.generatedImageAttachments,
-        executionTimeMs = data.executionTimeMs,
-        toolCallId = effectiveId.takeIf { it.isNotBlank() },
-        approvalDecision = data.approvalDecision,
-        subagentDispatch = toSubagentDispatch(data.result),
-        resultTruncation = data.resultTruncation,
-        agentMessageProvenance = AgentMessageProvenanceProjection.projectOutbound(
-            toolName = name,
-            argumentsJson = arguments,
-            resultJson = data.result,
-            isError = data.isError,
-            fromAgentId = data.sourceAgentId,
-        ),
-    )
-}
-
-private fun com.letta.mobile.data.model.ToolCall.generatedImageAttachments(
-    attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
-): List<UiImageAttachment> = if (name == "generate_image") {
-    attachments.map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType, storedByteSize = it.storedByteSize) }
-} else {
-    emptyList()
-}
-
-/**
- * Approval chip for a TOOL_CALL event. An explicit
- * decision (ApprovalDecision) always wins; REJECTED projects to Rejected so
- * a rejected call no longer renders as Approved. A decided event with no
- * explicit outcome falls to [implicitApprovalChip].
- */
-private fun TimelineEvent.Confirmed.approvalChip(): UiToolApprovalDecision? = when (approvalDecision) {
-    com.letta.mobile.data.timeline.ApprovalDecision.REJECTED -> UiToolApprovalDecision.Rejected
-    com.letta.mobile.data.timeline.ApprovalDecision.APPROVED -> UiToolApprovalDecision.Approved
-    null -> implicitApprovalChip(
-        decided = approvalDecided,
-        approvalRequestId = approvalRequestId,
-        anyToolReturnError = toolReturnIsError || toolReturnIsErrorByCallId.values.any { it },
     )
 }
 
