@@ -583,7 +583,7 @@ jobs:
   required-test:
     name: test
     runs-on: ubuntu-latest
-    needs: [test, api-docs]
+    needs: [test, api-docs, api-contract-windows]
     if: always()
     permissions:
       contents: read
@@ -592,9 +592,11 @@ jobs:
         env:
           TEST_RESULT: ${{ needs.test.result }}
           DOCS_RESULT: ${{ needs.api-docs.result }}
+          WINDOWS_API_RESULT: ${{ needs.api-contract-windows.result }}
         run: |
           test "$TEST_RESULT" = success
           test "$DOCS_RESULT" = success
+          test "$WINDOWS_API_RESULT" = success
 
   api-docs:
     runs-on: ubuntu-latest

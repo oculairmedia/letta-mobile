@@ -57,18 +57,21 @@ required_test_job="$(
        active { print }' "$android_workflow"
 )"
 assert_contains "$required_test_job" 'name: test'
-assert_contains "$required_test_job" 'needs: [test, api-docs]'
+assert_contains "$required_test_job" 'needs: [test, api-docs, api-contract-windows]'
 assert_contains "$required_test_job" 'if: always()'
 assert_contains "$required_test_job" 'TEST_RESULT: ${{ needs.test.result }}'
 assert_contains "$required_test_job" 'DOCS_RESULT: ${{ needs.api-docs.result }}'
+assert_contains "$required_test_job" 'WINDOWS_API_RESULT: ${{ needs.api-contract-windows.result }}'
 required_test_script="$(sed -n '/run: |/,$p' <<<"$required_test_job" | tail -n +2)"
 for test_result in success failure cancelled skipped; do
   for docs_result in success failure cancelled skipped; do
-    if TEST_RESULT="$test_result" DOCS_RESULT="$docs_result" bash -e -c "$required_test_script"; then
-      [[ "$test_result/$docs_result" == success/success ]] || fail "required test accepted $test_result/$docs_result"
+    for windows_api_result in success failure cancelled skipped; do
+    if TEST_RESULT="$test_result" DOCS_RESULT="$docs_result" WINDOWS_API_RESULT="$windows_api_result" bash -e -c "$required_test_script"; then
+      [[ "$test_result/$docs_result/$windows_api_result" == success/success/success ]] || fail "required test accepted $test_result/$docs_result/$windows_api_result"
     else
-      [[ "$test_result/$docs_result" != success/success ]] || fail "required test rejected successful jobs"
+      [[ "$test_result/$docs_result/$windows_api_result" != success/success/success ]] || fail "required test rejected successful jobs"
     fi
+    done
   done
 done
 assert_contains "$test_job" ':app:compileSideloadDebugKotlin'
