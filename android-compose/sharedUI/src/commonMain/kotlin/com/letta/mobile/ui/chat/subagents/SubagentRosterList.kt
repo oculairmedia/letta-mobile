@@ -56,7 +56,7 @@ import kotlin.time.Clock
 typealias OpenSubagentConversation = (SubagentRosterItem) -> Unit
 
 /**
- * letta-mobile-ulcg6 (PR4), on the shared RosterList since letta-mobile-ckmub.3.17: the one
+ *  (PR4), on the shared RosterList since the one
  * subagent surface. The Background tasks pane and the subagent sheet both render this, from the
  * same [SubagentRoster] projection, so a subagent reads the same on every client: Running (cards
  * with their latest activity), Finished (with Clear), and reflection / dream runs tucked under a

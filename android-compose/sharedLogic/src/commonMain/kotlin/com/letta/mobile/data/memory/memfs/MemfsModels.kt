@@ -7,7 +7,7 @@ import com.letta.mobile.data.diff.DiffLine
 enum class MemfsFileKind { Markdown, Image }
 
 /**
- * One file in an agent's MemFS (letta-mobile-bzvro.24). [isSystem] files live under `system/`
+ * One file in an agent's MemFS. [isSystem] files live under `system/`
  * and are compiled into the agent's context; the rest are external memory it reads on demand.
  * [body] is the markdown without its frontmatter, as the listing carries it (empty for images).
  */

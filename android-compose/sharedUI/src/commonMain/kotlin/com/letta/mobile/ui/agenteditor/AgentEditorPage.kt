@@ -96,7 +96,7 @@ class AgentEditorPageOptions(
 internal enum class AgentEditorPane { Mascot, Model, Tools, Dreaming, Secrets }
 
 /**
- * letta-mobile-ckmub.3.24 (hard cut S15): the one agent editor of every client, for an existing agent
+ *  (hard cut S15): the one agent editor of every client, for an existing agent
  * and for a new one, drawn through ShellPage's AgentEditor destination. Sections are the Settings
  * page's rows (SettingsModelSection over [AgentEditorSections]); the model and tool pickers are the
  * shared LettaPicker, the mascot the shared MascotPicker, all in LettaPanes. The page owns its insets
@@ -225,7 +225,7 @@ private fun AgentEditorBodyInputs.openers(
 )
 
 /**
- * letta-mobile-k5nbq.9: an existing agent's saved default cwd, from the host's one
+ * An existing agent's saved default cwd, from the host's one
  * [LocalAgentDefaults] (the store its turn engine reads). A host that binds none shows no row.
  */
 @Composable

@@ -52,8 +52,8 @@ object MemoryWorkspaceTags {
 }
 
 /**
- * letta-mobile-ckmub.3.4: the Memory destination - the memory graph, or the agent's MemFS files
- * with their history (letta-mobile-bzvro.24/.37) - behind one Blocks | Files switch. Replaces the
+ * The Memory destination - the memory graph, or the agent's MemFS files
+ * with their history - behind one Blocks | Files switch. Replaces the
  * desktop's DesktopMemoryDestination and the switch inside Android's MemoryOverviewScreen. The view
  * is hoisted so a host's back handling can close an open file first.
  */

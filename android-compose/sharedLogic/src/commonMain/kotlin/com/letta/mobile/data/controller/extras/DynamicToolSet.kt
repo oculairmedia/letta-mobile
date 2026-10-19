@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonObject
 
 /**
- * The live half of [ExternalToolRegistry] (letta-mobile-s416w.27): the [ToolSource]s added at
+ * The live half of [ExternalToolRegistry]: the [ToolSource]s added at
  * runtime, merged into one list on every read.
  *
  * Lock-free: both pieces of state are immutable values swapped atomically through

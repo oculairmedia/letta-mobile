@@ -44,7 +44,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Whether a live mascot answers touch and pointer - hover, poke, pet, double-click tricks
- * (te3n1.4) - or leaves every touch to what is under it (over the Touch chat head).
+ *  - or leaves every touch to what is under it (over the Touch chat head).
  */
 enum class MascotTouch {
     ANSWERS,
@@ -257,7 +257,7 @@ private const val RUN_DONE_IMPACT = 0.6f
 private const val WAKE_IMPACT = 0.35f
 
 /**
- * A transported character's body answering its director's reactions (te3n1.4 over te3n1.3's
+ * A transported character's body answering its director's reactions ( over 's
  * springs): each reaction the director fires squashes the body by [bodyImpactOf] and restarts its
  * frame driver. Nothing under reduced motion, nor when the rig animates the body itself.
  */

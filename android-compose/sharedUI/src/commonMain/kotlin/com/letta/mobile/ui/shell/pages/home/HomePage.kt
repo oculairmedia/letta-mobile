@@ -36,7 +36,7 @@ import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * The Home page shared by desktop and Android (letta-mobile-c3np7.3.11): the mobile dashboard
+ * The Home page shared by desktop and Android: the mobile dashboard
  * (global search, a drag-to-reorder grid of pinned shortcuts and agents, backend stat widgets and a
  * quick-chat composer) merged with the desktop fleet view (recent conversations across every agent
  * and the sortable agent table).
@@ -46,7 +46,7 @@ import com.letta.mobile.ui.theme.LettaDimens
  * [options]. At or above [LettaDimens.Pane.wideBreakpoint] the page is one scrolling column with the
  * composer up top and the full fleet table; below it the composer docks at the bottom like a phone
  * chat bar and the page leads with running work and recent conversations, then an agent avatar row
- * and a one-line stats strip ([homeCompactDashboard], letta-mobile-zxk2n.34).
+ * and a one-line stats strip ([homeCompactDashboard],).
  *
  * [HomePageOptions.document] is the Letta Code mod seam: a recognised A2UI document replaces the
  * native page.
@@ -147,7 +147,7 @@ internal class HomePageScope(
 }
 
 /**
- * The page reloads through [LettaRefreshable] (letta-mobile-ckmub.3.22): a pull on touch, the header's
+ * The page reloads through [LettaRefreshable]: a pull on touch, the header's
  * refresh on a pointer host. The controller reports no refresh in progress, so the pull springs back.
  */
 @Composable

@@ -18,7 +18,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * letta-mobile-bzvro.6 (F06): when to send `sync` for the runtimes a client is watching.
+ *  (F06): when to send `sync` for the runtimes a client is watching.
  *
  * - A recovery request ([SyncReason.Gap] from the event-sequence gap detector, or
  *   [SyncReason.Foreground] when the app comes back) syncs every watched runtime, with
@@ -28,7 +28,7 @@ import kotlin.time.Duration.Companion.seconds
  *   [Policy.busyInterval] while the loop is working, every [Policy.idleInterval] while it waits
  *   on input. A periodic sync only refreshes the snapshots (device status, loop status, queue);
  *   it never asks for approval replays.
- * - letta-mobile-by4vm.50: a periodic sync goes out only when [budget] allows it (phones: unmetered
+ * - a periodic sync goes out only when [budget] allows it (phones: unmetered
  *   network and charging or screen on). A suppressed one stays due until the budget allows it.
  *   Recovery syncs never ask the budget.
  *

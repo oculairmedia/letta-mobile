@@ -11,7 +11,7 @@ import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CoroutineScope
 
 /**
- * letta-mobile-by4vm.24: the one place a [SessionRepositoryGraph] generation's platform-neutral
+ * The one place a [SessionRepositoryGraph] generation's platform-neutral
  * repositories are built. Android (`SessionGraph` via Hilt's assembler) and desktop
  * (`HostRepositoryAdapters`, desktop and web) both call it instead of wiring these by hand, so a repository
  * added here reaches every host at once.

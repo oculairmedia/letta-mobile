@@ -9,7 +9,7 @@ import java.nio.file.Path
 
 /**
  * Where [PluginAssetQuota] keeps each plugin's asset charges of the current window
- * (letta-mobile-cdgpr.15): `<pluginsDir>/asset-quota.json`, beside the registry, replaced
+ * `<pluginsDir>/asset-quota.json`, beside the registry, replaced
  * atomically on every write ([AtomicJsonFile]). A file that does not read or decode is reported
  * ([PluginHostEvent.QUOTA_STORE_FAILED]) and treated as empty; a write that fails is reported and the
  * in-memory window keeps counting, so storage trouble never fails an upload.

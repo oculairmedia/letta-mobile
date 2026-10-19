@@ -6,7 +6,7 @@ import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
 /**
- * letta-mobile-ztuog: who a [WsTimelineEvent] belongs to, as far as the wire lets us tell.
+ * Who a [WsTimelineEvent] belongs to, as far as the wire lets us tell.
  */
 internal sealed interface EventOwner {
     /** The frame belongs to exactly this agent; no other agent's chat may see it. */
@@ -38,7 +38,7 @@ internal enum class OwnershipKind {
 internal data class OwnershipKey(val kind: OwnershipKind, val id: String)
 
 /**
- * letta-mobile-ztuog: turns a frame into its owning agent.
+ * Turns a frame into its owning agent.
  *
  * Only some frames name their agent (turn_started, message frames, agent_updated,
  * user_action_outcome); the rest (stop_reason, usage, turn_done, subscribe_done, error) name only

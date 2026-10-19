@@ -27,13 +27,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * letta-mobile-73o2h.3: single source of truth for the active-subagent
+ * Single source of truth for the active-subagent
  * registry, driven by the shim's mobile WS subagent protocol
  * (`IChannelTransport.sendSubagentList`).
  *
  * Platform-neutral: it depends only on the common [IChannelTransport] surface,
  * so the same registry logic backs both the mobile WS transport and (once it
- * exists) a desktop WS transport (letta-mobile-0yf7o).
+ * exists) a desktop WS transport.
  * An injected [CoroutineScope] remains caller-owned; otherwise the repository
  * owns a fresh [SupervisorJob] on [Dispatchers.Default] and cancels it in
  * [close].
@@ -44,13 +44,13 @@ import kotlin.time.Duration.Companion.milliseconds
  *
  * Lifecycle:
  *  - The first collection of each parent scope triggers one scoped
- *    `subagent_list` round-trip (letta-mobile-fxoew.5); later collections of
+ *    `subagent_list` round-trip; later collections of
  *    that scope share the cached [kotlinx.coroutines.flow.StateFlow] so no
  *    duplicate fetches fire. A failed fetch is retried by the next collection.
  *  - A `subagents_updated` push folds its `subagents_active` snapshot into the
  *    cache without dropping previously running entries that are merely omitted;
  *    explicit terminal states remove entries. A push only touches the parent
- *    scope it describes (letta-mobile-ulcg6 RC2), and an ended entry never
+ *    scope it describes ( RC2), and an ended entry never
  *    returns to running (RC3).
  *  - A RUNNING entry nobody has mentioned for [STREAM_TIMEOUT_MS] is verified
  *    with the host, never failed for being quiet (RC1).
@@ -58,7 +58,7 @@ import kotlin.time.Duration.Companion.milliseconds
  *    collected is re-fetched so the UI doesn't keep showing a stale list after
  *    a dropped socket.
  *
- * letta-mobile-sqdqe: INCREMENTAL push snapshots can be transiently
+ * INCREMENTAL push snapshots can be transiently
  * incomplete, so replacement is conservative: running entries survive omission
  * until the shim sends an explicit terminal state or absence exceeds a bound.
  * AUTHORITATIVE refresh snapshots are still bounded: the mobile request is
@@ -143,7 +143,7 @@ open class SubagentRepository(
             .onCompletion { scopeFetches.collectionStopped(scope) }
 
     /**
-     * letta-mobile-fxoew.5: fetch [scope] the first time it is collected. A
+     * Fetch [scope] the first time it is collected. A
      * failed fetch releases the mark so the next collection (or a reconnect)
      * retries; nothing polls.
      */
@@ -223,7 +223,7 @@ open class SubagentRepository(
      * only describes that parent conversation (a scoped `subagent.list`), so
      * cached entries of every other scope are carried over untouched.
      *
-     * letta-mobile-fxoew.1: this is the ONE place that stamps liveness. Every
+     * this is the ONE place that stamps liveness. Every
      * RUNNING entry a snapshot mentions (pushed or listed) gets
      * `lastSeenAtMs = now`, so the stream-timeout watchdog never fails an
      * entry the host just reported as running.
@@ -276,7 +276,7 @@ open class SubagentRepository(
     }
 
     /**
-     * letta-mobile-ulcg6 (RC3): a subagent that has ended stays ended. The host
+     *  (RC3): a subagent that has ended stays ended. The host
      * registry forbids terminal -> running (DurableSubagentRegistry
      * canAdvanceTo); the cache mirrors that, so a late or replayed RUNNING
      * snapshot can no longer flap a finished chip back to running.
@@ -401,7 +401,7 @@ open class SubagentRepository(
     }
 
     /**
-     * letta-mobile-ulcg6 (RC1): liveness check for quiet RUNNING entries.
+     *  (RC1): liveness check for quiet RUNNING entries.
      *
      * Silence is not failure. letta-code emits `update_subagent_state` only
      * when a subagent's store entry changes and the host re-publishes only on
@@ -471,7 +471,7 @@ open class SubagentRepository(
     }
 
     /**
-     * letta-mobile-ulcg6 (RC2): the parent scope a push describes. The host
+     *  (RC2): the parent scope a push describes. The host
      * names it on the frame; an older host does not, so a push whose entries
      * all share one parent scope is read as that scope. Anything else (an
      * empty or mixed push from an unscoped producer) keeps the legacy

@@ -46,7 +46,7 @@ data class ProjectEditor(
 }
 
 /**
- * letta-mobile-ckmub.2.5 (hard cut S17): what the shared Projects page shows. Projects reach the
+ *  (hard cut S17): what the shared Projects page shows. Projects reach the
  * client only over an Iroh host's `project.*` relay; [error] is a list that could not load at all,
  * [notice] the outcome of the last action (created, archived, a failed sync).
  */

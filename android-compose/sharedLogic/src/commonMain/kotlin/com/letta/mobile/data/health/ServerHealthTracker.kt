@@ -22,12 +22,12 @@ fun interface ServerHealthListener {
 }
 
 /**
- * letta-mobile-qmxn / letta-mobile-ckmub.11: the saved backends' online dots, shared by every host.
+ * The saved backends' online dots, shared by every host.
  *
  * Probes each of [configs] with [probe] and exposes the result per config id. Re-probing fires (a)
  * whenever the set of configured ids changes (a rename alone does not burn a round trip) and (b) on
  * demand through [refreshAll] from a picker opening. There is no periodic background poll (the user
- * opted out of that on letta-mobile-qmxn). While a probe runs its row reads [ServerHealthState.PROBING],
+ * opted out of that). While a probe runs its row reads [ServerHealthState.PROBING],
  * so the dot never flips straight from a stale answer.
  *
  * The config observer runs in [scope] on [context] for the tracker's whole life.
@@ -57,7 +57,7 @@ class ServerHealthTracker(
     }
 
     /**
-     * letta-mobile-by4vm.39: every write, the clear of an emptied list included, happens under
+     * Every write, the clear of an emptied list included, happens under
      * [refreshMutex], so a refresh for a smaller set can never be undone by a probe still in flight.
      */
     private suspend fun refresh(current: List<LettaConfig>) {

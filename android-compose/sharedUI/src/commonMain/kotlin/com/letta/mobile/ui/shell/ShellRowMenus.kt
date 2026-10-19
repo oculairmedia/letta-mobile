@@ -33,7 +33,7 @@ import com.letta.mobile.ui.shell.rail.ShellRailEntry
  */
 object ShellRowMenus {
     /**
-     * A conversation: rename and pin or unpin when the host offers them (letta-mobile-bzvro.17),
+     * A conversation: rename and pin or unpin when the host offers them,
      * archive or restore, and delete (the row asks before it deletes). Where delete only moves a
      * chat to Archived, an archived chat has nothing left to delete, so it offers no Delete.
      */
@@ -78,14 +78,14 @@ data class ShellConversationMenuActions(
 )
 
 /**
- * A conversation row's manage entries: rename and pin (letta-mobile-bzvro.17), settle / move to
- * active and the marker (letta-mobile-zxk2n.5). A null action is one the host does not offer.
+ * A conversation row's manage entries: rename and pin, settle / move to
+ * active and the marker. A null action is one the host does not offer.
  */
 data class ShellConversationManageMenu(
     val pinned: Boolean = false,
     val onRenameRequest: (() -> Unit)? = null,
     val onPinToggle: (() -> Unit)? = null,
-    /** letta-mobile-7mys7 (G37): fork the chat, asking for the fork's name first. */
+    /**  (G37): fork the chat, asking for the fork's name first. */
     val onForkRequest: (() -> Unit)? = null,
     val settled: Boolean = false,
     val onSettleToggle: (() -> Unit)? = null,

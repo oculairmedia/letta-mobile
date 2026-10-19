@@ -6,7 +6,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Where [ShellLayoutState] is kept between launches (letta-mobile-o5m90): the person's explicit
+ * Where [ShellLayoutState] is kept between launches: the person's explicit
  * sidebar choice and width, nothing derived from the window. The host gives it a [key] per backend
  * config, so switching backends never restores another backend's sidebar.
  */

@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Platform-neutral controller behind the shared MemFS page (letta-mobile-bzvro.24): lists an
+ * Platform-neutral controller behind the shared MemFS page: lists an
  * agent's memory files, edits one with an unsaved-changes guard, follows `memory_updated` pushes,
  * and shows commit history with diffs. Hosts bind a [MemfsSource] and choose the agent.
  */

@@ -15,7 +15,7 @@ fun interface PermissionModePushTarget {
 }
 
 /**
- * letta-mobile-a4tm7: tells every viewer of a conversation that its runtime's permission mode changed
+ * Tells every viewer of a conversation that its runtime's permission mode changed
  * on this host, as a `permission_mode` frame ([PermissionModeRpc.FRAME_TYPE]).
  *
  * `permission_mode.set` used to pin the mode and tell no one: a second client (desktop over `iroh://`,

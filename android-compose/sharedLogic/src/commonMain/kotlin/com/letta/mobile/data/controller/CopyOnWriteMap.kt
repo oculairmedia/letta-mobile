@@ -4,7 +4,7 @@ import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 
 /**
- * letta-mobile-by4vm.8: a map whose reads are lock-free and always see one whole snapshot. Writes
+ * A map whose reads are lock-free and always see one whole snapshot. Writes
  * replace the immutable backing map atomically, so a reader on another thread (the turn engine's
  * non-suspending permission-mode provider, called from parallel per-key leases) never observes a
  * half-applied mutation the way it could with a plain `mutableMapOf` under a rehash.

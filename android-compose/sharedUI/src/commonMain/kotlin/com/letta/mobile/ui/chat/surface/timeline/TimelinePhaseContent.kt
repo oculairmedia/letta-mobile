@@ -53,7 +53,7 @@ import org.jetbrains.compose.resources.stringResource
 /** Skeleton row pattern: user, agent, user, agent, agent, user, agent (Android MessageSkeletonList). */
 private val SkeletonPattern = listOf(true, false, true, false, false, true, false)
 
-/** letta-mobile-bglj6.1: first-load placeholder (Android MessageSkeletonList). */
+/** First-load placeholder (Android MessageSkeletonList). */
 @Composable
 internal fun TimelineLoadingSkeleton(modifier: Modifier = Modifier) {
     Column(
@@ -110,7 +110,7 @@ private fun SkeletonLine(fraction: Float) {
 }
 
 /**
- * letta-mobile-bglj6.1: a failed conversation or connection, with a retry (Android
+ * A failed conversation or connection, with a retry (Android
  * ChatScreenErrorContent; desktop ChatStatePanel's failure headline).
  */
 @Composable
@@ -156,7 +156,7 @@ private val StarterPrompts = listOf(
 )
 
 /**
- * letta-mobile-bglj6.1: the empty conversation (desktop NewConversationWelcome greeting, Android
+ * The empty conversation (desktop NewConversationWelcome greeting, Android
  * StarterPrompts). A prompt is SENT, not drafted: Android's behaviour, and the one-tap first move.
  */
 @Composable

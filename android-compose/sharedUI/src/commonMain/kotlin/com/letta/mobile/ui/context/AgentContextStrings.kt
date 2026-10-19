@@ -6,7 +6,7 @@ import com.letta.mobile.data.context.ModelChangeScope
 import com.letta.mobile.data.context.formatContextTokens
 
 /**
- * letta-mobile-3io8k: the drawer context card's and sheet's text, in Kotlin like
+ * The drawer context card's and sheet's text, in Kotlin like
  * [com.letta.mobile.ui.modelcontrol.ModelControlStrings], so the move to `Res.string` is one file.
  */
 object AgentContextStrings {

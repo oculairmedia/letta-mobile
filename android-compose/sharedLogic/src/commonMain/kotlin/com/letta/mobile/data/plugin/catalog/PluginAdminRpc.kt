@@ -12,14 +12,14 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 /**
- * letta-mobile-cdgpr.7: the host's `plugins.*` admin RPCs, as clients call them and the host's
+ * The host's `plugins.*` admin RPCs, as clients call them and the host's
  * handlers read them. Management (list, inspect, install, consent, enable, disable, remove,
  * disableAll) is admin-only; `plugins.page.read` and `plugins.view.action` are what a live view on
  * the canvas needs. A host with a plugin runtime advertises [CAPABILITY]; a client never sends
  * these to a host that does not.
  *
  * Both ends encode and decode these bodies with [com.letta.mobile.data.serialization.LettaJson.wire]
- * (letta-mobile-by4vm.102): defaults and nulls are left out, unknown keys are ignored, and plugin
+ * defaults and nulls are left out, unknown keys are ignored, and plugin
  * states, health and runtimes say which they are with `"kind"` (declared on those types).
  */
 object PluginAdminRpc {
@@ -57,7 +57,7 @@ data class PluginSummaryWire(
     val health: PluginHealth = PluginHealth.Unknown,
     val consented: Boolean = false,
     @SerialName("last_fault") val lastFault: String? = null,
-    /** The installed version's manifest, so a client knows its element kinds and pages (letta-mobile-cdgpr.8). */
+    /** The installed version's manifest, so a client knows its element kinds and pages. */
     val manifest: PluginManifest? = null,
 ) {
     fun toSummary(): PluginSummary = PluginSummary(PluginId(id), name, version, state, health, lastFault, manifest)

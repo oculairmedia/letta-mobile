@@ -76,7 +76,7 @@ data class ShortcutBinding(
 )
 
 /**
- * One entry in the shared keymap (letta-mobile-k5nbq.4). [ShortcutBinding.webAlternate] replaces
+ * One entry in the shared keymap. [ShortcutBinding.webAlternate] replaces
  * the primary chord on [ShortcutPlatform.Web] when the browser already owns it (N, L, P).
  */
 data class ShellShortcut(

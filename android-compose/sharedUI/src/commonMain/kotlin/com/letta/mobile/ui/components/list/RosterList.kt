@@ -50,7 +50,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 
 /**
- * letta-mobile-ckmub.3.10 (hard cut S7, primitive P4): the one sectioned, selectable list. Every
+ *  (hard cut S7, primitive P4): the one sectioned, selectable list. Every
  * roster in the shell (the agent panel's chats and canvases, the rail's agent library, the archived
  * chats, the schedules rail, memory files, channel cards, the background tasks) is this list with
  * its own [row]s; a plain row is [RosterListRow].

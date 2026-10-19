@@ -6,7 +6,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * One-time pairing invitations that bind a persistent NodeId
- * (letta-mobile-d6e8g.5, scoped + persisted by letta-mobile-dpv7m.1).
+ * (scoped and persisted).
  *
  * The server mints a high-entropy single-use invite (nonce + expiry) that also
  * carries the grant the redeemer receives: a capability set (default
@@ -170,7 +170,7 @@ class IrohPairingService(
     }
 
     /**
-     * Rename an already-paired peer (d6e8g.7 inventory UX). Returns the updated
+     * Rename an already-paired peer ( inventory UX). Returns the updated
      * record, or null when the NodeId is not paired. The NodeId binding and
      * capabilities are untouched.
      */
@@ -183,7 +183,7 @@ class IrohPairingService(
     }
 
     /**
-     * Replace an already-paired peer's capability grants (d6e8g.7). Returns the
+     * Replace an already-paired peer's capability grants. Returns the
      * updated record, or null when the NodeId is not paired. Capability names
      * are validated by the caller (handler) against [IrohPeerCapabilities.ALL];
      * this preserves the NodeId binding and paired-at time. Takes effect on the
@@ -208,7 +208,7 @@ class IrohPairingService(
 
     /**
      * Remove the binding and notify listeners so live sessions of that NodeId
-     * are closed (dpv7m.1) — revocation must not wait for the peer to redial.
+     * are closed — revocation must not wait for the peer to redial.
      */
     fun revoke(nodeId: String): Boolean {
         val removed = store.remove(nodeId)

@@ -46,7 +46,7 @@ import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-zxk2n.37: a run's summary as ONE line, the way ChatGPT ("Thought for 8s ›"),
+ * A run's summary as ONE line, the way ChatGPT ("Thought for 8s ›"),
  * Perplexity ("1 step completed ›") and v0 (glyph + "Explored project structure ›") draw an agent's
  * work: a small status glyph, one muted label ("Worked · 10.8s · 1 tool", "Working…", "Failed · 1 of 3",
  * "Waiting for your approval") and, when the run folds, a single trailing chevron. The whole line is
@@ -164,7 +164,7 @@ private fun runSummaryColor(tone: RunSummaryTone): Color = when (tone) {
 }
 
 /**
- * letta-mobile-bglj6.1.19: "Working…" cross-fades to "Worked · 2s" as the run settles (legacy
+ * "Working…" cross-fades to "Worked · 2s" as the run settles (legacy
  * RunBlockMotion RunHeaderLabel: the terminal swap) instead of swapping the text in one frame.
  * Keyed on the copy, so only a change of words plays it.
  */

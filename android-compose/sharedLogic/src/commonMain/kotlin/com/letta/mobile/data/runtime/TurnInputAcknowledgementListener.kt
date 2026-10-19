@@ -5,7 +5,7 @@ import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
 /**
- * letta-mobile-qygvv.12: what the engine concluded about one turn's input, in App Server
+ * What the engine concluded about one turn's input, in App Server
  * `input_accepted` terms. [disposition] is `started` or `queued` when [accepted]; [error] is the
  * failure text when it is not.
  */
@@ -26,7 +26,7 @@ data class TurnInputAcknowledgement(
 }
 
 /**
- * letta-mobile-qygvv.12: observes the engine's input acceptance for the turn collected in this
+ * Observes the engine's input acceptance for the turn collected in this
  * coroutine context. The Iroh node runs its clients' turns itself, so it has no upstream
  * `input_accepted` to forward; it installs this element around `runTurn(...).collect` and answers
  * its client from what the engine learned. Absent (every other caller) it is a no-op.

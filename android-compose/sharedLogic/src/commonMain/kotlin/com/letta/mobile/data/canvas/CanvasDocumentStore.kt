@@ -10,7 +10,7 @@ import com.letta.mobile.data.model.ConversationId
  * compare-and-set by revision, library listing) plus the canvas's conversation lookups.
  *
  * Implemented over the Automerge notebook repository ([NotebookCanvasDocumentStore]), the one owner
- * of every canvas document on Android and desktop (letta-mobile-by4vm.22); the op log beside it is
+ * of every canvas document on Android and desktop; the op log beside it is
  * its write-ahead journal ([CanvasOpLog.unsettled]). [InMemoryCanvasDocumentStore] serves tests.
  */
 data class CanvasDeletedElement(val elementId: String, val elementJson: String)

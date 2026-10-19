@@ -37,7 +37,7 @@ private enum class QueueEvent(val wireName: String) {
 }
 
 /**
- * letta-mobile-1n5py: runs the [ChatSendQueue] against the live transport.
+ * Runs the [ChatSendQueue] against the live transport.
  *
  * A message sent while its conversation is busy is queued here instead of failing. The head runs
  * once the running turn is over: after its terminal ([onTurnFinishedLocked]), on [resume], or right
@@ -80,7 +80,7 @@ internal class QueuedSendDriver(
     }
 
     /**
-     * letta-mobile-1n5py.1: [item] bounced off another client's turn in its conversation (caller
+     * [item] bounced off another client's turn in its conversation (caller
      * holds the turn lock). It waits at the head for that turn's end, never failing.
      */
     fun holdForOtherClientLocked(item: QueuedChatSend) {

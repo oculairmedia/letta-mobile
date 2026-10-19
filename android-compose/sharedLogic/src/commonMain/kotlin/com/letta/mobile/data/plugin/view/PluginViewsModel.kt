@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 /**
- * letta-mobile-cdgpr.8: what a shell needs to show plugin elements live, and what its Plugins page
+ * What a shell needs to show plugin elements live, and what its Plugins page
  * runs over. It is the same on Android and desktop. The shells only bind it.
  *
  * - [supported]: the host advertises `plugins_v1` (as of the last [refresh]). The Plugins page and

@@ -20,7 +20,7 @@ interface AppServerTransport {
     val isConnected: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
 
     /**
-     * Every inbound frame. letta-mobile-by4vm.5: a transport that reads ONE ordered byte
+     * Every inbound frame. a transport that reads ONE ordered byte
      * stream (the Ktor `/ws` socket) overrides this with the frames in arrival order, so a
      * `turn_finished` is never delivered before the `stream_delta`s the server sent ahead of
      * it, and `event_seq` reaches the gap detector in order. See [AppServerInboundDelivery].
@@ -28,7 +28,7 @@ interface AppServerTransport {
      * The default merges the two lanes and keeps no order between them, but keeps the order
      * within each lane. It exists for transports whose lanes really are separate streams
      * (Iroh's two QUIC streams, test fakes), where the transport has no cross-lane order to
-     * preserve. On Iroh that is enough (letta-mobile-by4vm.48): the node writes every
+     * preserve. On Iroh that is enough: the node writes every
      * `event_seq` frame of a turn, `turn_finished` included, on the stream QUIC stream, and only
      * request answers and `input_accepted` on the control stream.
      */

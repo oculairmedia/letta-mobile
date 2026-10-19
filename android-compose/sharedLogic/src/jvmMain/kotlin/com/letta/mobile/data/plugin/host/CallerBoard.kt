@@ -20,7 +20,7 @@ value class PluginCallId(val value: String) {
 }
 
 /**
- * The boards a plugin's emits land on (letta-mobile-cdgpr.16): each agent call into the plugin is
+ * The boards a plugin's emits land on: each agent call into the plugin is
  * registered with [begin] under a fresh [PluginCallId], which the plugin gets as `context.callId`
  * and echoes on `host.emit`. An emit is placed on the conversation canvas of the call it names (or
  * the canvas it names, when that call's caller may open it), so a plugin serving two conversations

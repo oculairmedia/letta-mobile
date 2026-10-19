@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.offset
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 
 /**
- * letta-mobile-ckmub.1 (hard cut S4): the chat page's window insets, owned once by the page's
+ *  (hard cut S4): the chat page's window insets, owned once by the page's
  * [LettaPageScaffold] (the P2 contract) instead of each layer padding for the keyboard itself.
  *
  * What the chat page takes from the window, and why only that:
@@ -28,7 +28,7 @@ import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
  * - not the status bar: the host's floating header and the status bar above it are
  *   [ChatSurfacePlatform.topChromeInset], under which the timeline scrolls edge to edge;
  * - not the navigation bar: the Touch composer bar runs flush to the screen's bottom edge, its
- *   opaque surface under the navigation bar (letta-mobile-bglj6.1.9), and the canvas draws behind it.
+ *   opaque surface under the navigation bar, and the canvas draws behind it.
  */
 internal object ChatSurfaceInsets {
     /** The window insets the page's scaffold pads for besides the keyboard: none (see above). */

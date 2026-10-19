@@ -12,7 +12,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 
 /**
- * letta-mobile-3kble: compaction over a direct App Server client.
+ * Compaction over a direct App Server client.
  *
  * [supportedCommands] is the server's `device_status.supported_commands` for the conversation, or
  * null when no status has arrived yet (then `/compact` is simply tried). letta-code 0.26.1 (the

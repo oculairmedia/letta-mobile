@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 /**
- * letta-mobile-by4vm.98.2: a chat host's send-queue extension point, read by a session port for
+ * A chat host's send-queue extension point, read by a session port for
  * the queued-sends panel and the composer. Where [canQueueWhileStreaming] is true a send during a
  * run goes to the host, which queues it behind the run, instead of waiting for the run to end.
  */
@@ -32,7 +32,7 @@ interface ChatSendQueueSource {
     fun resume()
 }
 
-/** One conversation's queue on the send coordinator serving it (letta-mobile-1n5py). */
+/** One conversation's queue on the send coordinator serving it. */
 data class ChatSendQueueTarget(
     val controls: ChatSendQueueControls,
     val conversationId: QueueConversationId,

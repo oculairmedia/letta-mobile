@@ -11,7 +11,7 @@ import com.letta.mobile.data.model.StepMetrics
 import kotlin.jvm.JvmInline
 
 /**
- * Step queries a non-App-Server backend would serve. letta-mobile-ckmub.4: this is the seam for
+ * Step queries a non-App-Server backend would serve. this is the seam for
  * one; there is no production implementation since the Letta REST backend was removed.
  * Every call fails unless overridden.
  */

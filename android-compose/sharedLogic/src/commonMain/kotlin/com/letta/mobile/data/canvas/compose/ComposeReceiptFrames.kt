@@ -4,7 +4,7 @@ import kotlin.math.floor
 
 /**
  * Keeps a [ComposeReceipt] within [CanvasComposeContract.MAX_RECEIPT_BYTES] once items carry frames
- * (letta-mobile-i9yps.2). Frames come from the placement slot; this only decides which of them fit
+ *. Frames come from the placement slot; this only decides which of them fit
  * in the receipt. Children lose their frames first, then top-level frames from the end, so an item
  * that kept its frame still has one. A dropped frame is never silent: [ComposeReceipt.framesOmitted]
  * and [HINT] say to call canvas_get_layout.

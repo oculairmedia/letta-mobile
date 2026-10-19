@@ -7,7 +7,7 @@ import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 
 /**
- * letta-mobile-7mys7: a right-click (the secondary mouse button) runs [onClick], so a pointer user
+ * A right-click (the secondary mouse button) runs [onClick], so a pointer user
  * opens a message's actions the way a desktop app does; touch keeps its long-press. The press is
  * consumed so it does not also reach the text selection underneath. Null [onClick] adds nothing.
  */

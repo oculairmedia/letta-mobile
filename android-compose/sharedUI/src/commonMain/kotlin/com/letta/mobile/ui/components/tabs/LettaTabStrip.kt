@@ -80,7 +80,7 @@ object LettaTabStripTags {
 }
 
 /**
- * letta-mobile-ckmub.3.25 (formerly desktop's conversation tab strip): a horizontal, browser-style
+ *  (formerly desktop's conversation tab strip): a horizontal, browser-style
  * strip of closable tabs that reorder by dragging, then an optional "+". The active tab is painted
  * in the page background so it reads as the front edge of the content below; inactive tabs recede
  * and lift on hover.

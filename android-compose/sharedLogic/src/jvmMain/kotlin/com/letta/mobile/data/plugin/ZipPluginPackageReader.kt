@@ -8,7 +8,7 @@ import java.util.zip.ZipException
 import java.util.zip.ZipInputStream
 
 /**
- * The host's [PluginPackageReader] (letta-mobile-s416w.24): unpacks a `.lcp` zip in memory within
+ * The host's [PluginPackageReader]: unpacks a `.lcp` zip in memory within
  * [PluginPackageLimits], refusing an unsafe entry name (a path traversal, an absolute path) before
  * reading it, and hashes the package so it is pinned by sha256 (R3). The layout and the manifest
  * are then held by [PluginPackages.assemble].

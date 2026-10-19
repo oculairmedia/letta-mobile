@@ -19,7 +19,7 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * letta-mobile-jvctq: one authenticated connection to the host, as the swarm messenger needs it:
+ * One authenticated connection to the host, as the swarm messenger needs it:
  * the shared App Server turn engine and `admin_rpc` reads. Built over the shared client stack
  * ([AppServerSwarmSession]); fakes implement it directly.
  */

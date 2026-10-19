@@ -19,7 +19,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.launch
 
-/** letta-mobile-joigh: what one conversation's limit slider is about. */
+/** What one conversation's limit slider is about. */
 internal data class LimitTarget(
     val agentId: AgentId,
     val conversationId: ConversationId?,
@@ -48,7 +48,7 @@ internal data class LimitTarget(
 }
 
 /**
- * letta-mobile-joigh: the sheet's context-limit control for [target]: nothing without a
+ * The sheet's context-limit control for [target]: nothing without a
  * controller or with nothing to choose between, the reason once the backend said it cannot change
  * the limit, else the slider. A change applies through the controller (letta-code's
  * `/context-limit`), then [onApplied] re-reads the host record; letta-code's refusal stays under

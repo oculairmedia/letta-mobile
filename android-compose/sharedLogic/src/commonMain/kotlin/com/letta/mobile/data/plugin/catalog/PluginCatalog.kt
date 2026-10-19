@@ -10,8 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * letta-mobile-cdgpr.9: what the Plugins page reads and asks of the host's plugin registry. The
- * real one (C7, letta-mobile-cdgpr.7) rides admin_rpc `plugins.*`; until it lands every client binds
+ * What the Plugins page reads and asks of the host's plugin registry. The
+ * real one (C7,) rides admin_rpc `plugins.*`; until it lands every client binds
  * [UnavailablePluginCatalog].
  *
  * Installing is two steps, so the owner sees what a package asks for before anything runs:
@@ -65,7 +65,7 @@ data class PluginSummary(
     val health: PluginHealth = PluginHealth.Unknown,
     /** The last fault the host recorded (a failed update, a crash), shown even after the plugin recovered. */
     val lastFault: String? = null,
-    /** The installed version's manifest, when the host sent it (letta-mobile-cdgpr.8): its element kinds and pages. */
+    /** The installed version's manifest, when the host sent it: its element kinds and pages. */
     val manifest: PluginManifest? = null,
 ) {
     /** Whether the plugin is switched on (its tools advertised). */

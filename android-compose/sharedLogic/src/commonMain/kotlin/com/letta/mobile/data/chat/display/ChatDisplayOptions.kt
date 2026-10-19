@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.updateAndGet
 import kotlin.math.abs
 
 /**
- * letta-mobile-zxk2n.5 (G91): what the chat timeline shows besides the conversation itself. The
+ *  (G91): what the chat timeline shows besides the conversation itself. The
  * options are one global preference (every chat reads the same), kept on the client: the server
  * has no field for them.
  *

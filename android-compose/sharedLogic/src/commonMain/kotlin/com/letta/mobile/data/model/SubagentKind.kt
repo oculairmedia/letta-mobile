@@ -1,7 +1,7 @@
 package com.letta.mobile.data.model
 
 /**
- * letta-mobile-fxoew.4: the ONE classifier for a subagent's wire
+ * The ONE classifier for a subagent's wire
  * `subagentType`.
  *
  * The host registry passes the App Server's display labels through verbatim:
@@ -11,7 +11,7 @@ package com.letta.mobile.data.model
  * Android chip bar, rings and linger tick, the desktop Background tasks panel)
  * must ask this classifier instead of comparing strings.
  *
- * letta-mobile-iczm7: letta-code's memory upkeep workers (git-conflict repair, invalid-memory
+ * letta-code's memory upkeep workers (git-conflict repair, invalid-memory
  * repair) run as subagentType `memory` (wire label "Memory"), always silent. Like reflection
  * (dreaming) they are background work, shown only on the Dreaming surface.
  */
@@ -19,7 +19,7 @@ enum class SubagentKind {
     Reflection,
 
     /**
-     * letta-mobile-ulcg6: letta-code's memory upkeep worker (memory git-conflict
+     * Letta-code's memory upkeep worker (memory git-conflict
      * and invalid-memory repair; wire label "Memory", always silent).
      */
     Memory,
@@ -39,7 +39,7 @@ enum class SubagentKind {
     val isBackground: Boolean
         get() = this == Reflection || this == Memory || this == Dream
 
-    /** letta-mobile-iczm7: a dream (sleep-time reflection) run, as opposed to memory upkeep. */
+    /** A dream (sleep-time reflection) run, as opposed to memory upkeep. */
     val isDream: Boolean
         get() = this == Reflection || this == Dream
 

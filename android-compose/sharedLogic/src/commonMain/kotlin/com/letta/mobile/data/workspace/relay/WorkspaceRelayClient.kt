@@ -29,7 +29,7 @@ fun interface WorkspaceRelayCall {
 }
 
 /**
- * letta-mobile-bzvro.37: the agent-workspace request path of [AppServerClient] over an Iroh host's
+ * The agent-workspace request path of [AppServerClient] over an Iroh host's
  * relay (see [WorkspaceRelay]). The MemFS, secrets and workspace-file sources keep calling
  * [workspaceRequest] / [writeMemoryFile] exactly as they do on a direct App Server session; this
  * client carries those two calls, and only those, as admin_rpc to the host.

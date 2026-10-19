@@ -28,7 +28,7 @@ internal data class ApprovalAutoAllowRequest(
 /**
  * The one auto-allow policy, for leased and unleased approvals alike: a user-input tool
  * (AskUserQuestion, ExitPlanMode) always waits for the person; under Unrestricted everything else
- * is allowed; in every other mode only an allow-listed `meridian` CLI call is (letta-mobile-jna0o.7:
+ * is allowed; in every other mode only an allow-listed `meridian` CLI call is (
  * the external tools it replaces never asked, so their CLI form must not either).
  */
 internal fun autoAllowPermitted(mode: AppServerPermissionMode, toolName: String?, argumentsJson: String?): Boolean = when {
@@ -44,8 +44,8 @@ private const val SOURCE_CONTROL_REQUEST = "control_request"
 private const val SOURCE_STREAM_DELTA = "approval_request_message"
 
 /**
- * letta-mobile-qygvv.13: an `approval_request_message` delta under Unrestricted is
- * informational (and so is an allow-listed `meridian` call's under any mode, jna0o.7: letta-code
+ * An `approval_request_message` delta under Unrestricted is
+ * informational (and so is an allow-listed `meridian` call's under any mode, letta-code
  * either ran it under its own rule or asks with a real control request, which is answered). letta-code (0.32.17, `handleApprovalStop`) classifies every approval
  * with `checkModeOverride` -> `unrestricted` => allow and executes it without waiting;
  * only approvals that still need a human (alwaysAsk rules, mod tools, interactive tools)

@@ -4,10 +4,10 @@ import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecisi
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 
 /**
- * letta-mobile-qygvv.5: one approval decision to send as an `approval_response` input, answering
+ * One approval decision to send as an `approval_response` input, answering
  * the pending `control_request` [approvalRequestId] on [runtime]. [source] tags telemetry.
  *
- * letta-mobile-qygvv.13: [answersStreamDelta] is true when the decision answers an
+ * [answersStreamDelta] is true when the decision answers an
  * `approval_request_message` stream delta (informational) rather than a real
  * `control_request`; the server's "no longer pending" reply to such a decision means
  * the server already resolved the approval itself, not that the decision was refused.
@@ -23,7 +23,7 @@ data class ApprovalSubmission(
 )
 
 /**
- * letta-mobile-qygvv.5: what the App Server said about one `approval_response` input.
+ * What the App Server said about one `approval_response` input.
  *
  * Approval responses carry a `request_id` and wait for `input_accepted`, so a
  * decision that missed its gate ("Approval request is no longer pending") is

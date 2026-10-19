@@ -33,7 +33,7 @@ import org.jetbrains.compose.resources.getString
  * Gboard paste and cross-app image drop land on the view's rich-content receiver; Ctrl/Cmd+V
  * reads the clipboard. Only the URIs are taken on the main thread: each image is read later on the
  * IO dispatcher, capped at [ImageIngressPolicy.MAX_SOURCE_BYTES], then shares the picker's
- * downscale through [ComposerImageAttacher] (letta-mobile-k5nbq.7, .15). The attacher starts
+ * downscale through [ComposerImageAttacher] (.15). The attacher starts
  * reading as soon as the gesture lands, while the sender's read grant is still held.
  */
 internal actual val platformComposerImageIngress: (@Composable (ComposerImageAttacher) -> Modifier)? =

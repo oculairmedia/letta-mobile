@@ -33,7 +33,7 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * letta-mobile-ckmub.17.1: where a host's App Server sessions come from. [clientFor] is the session
+ * Where a host's App Server sessions come from. [clientFor] is the session
  * a backend of that kind is read over (the bundled runtime's, a dialled App Server's), or null where
  * this host cannot reach one (a browser has no bundled runtime).
  */
@@ -48,12 +48,12 @@ class HostSessionBinding(
     val appServerClients: HostAppServerClients,
     val channelTransport: IChannelTransport = NoOpChannelTransport(),
     val irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
-    /** letta-mobile-wdm6i: where the context chip's last readings survive a restart. */
+    /** Where the context chip's last readings survive a restart. */
     val contextReadingSnapshots: ContextReadingSnapshots? = null,
 )
 
 /**
- * letta-mobile-by4vm.86 / ckmub.17.1: the repositories a desktop or browser session binds itself,
+ * The repositories a desktop or browser session binds itself,
  * one copy for both (it was desktop's `DesktopRepositoryAdapters`). An App Server the host dials
  * directly (the bundled runtime or a ws:// host) serves agents and memory; an Iroh host serves the
  * admin set over `admin_rpc`. Everything else is its shared absent-route form.
@@ -69,7 +69,7 @@ class HostRepositoryAdapters(binding: HostSessionBinding) {
     private val servedKind = hostServedKind(binding.config)
 
     /**
-     * letta-mobile-by4vm.13: what this session serves — the host's row of the
+     * What this session serves — the host's row of the
      * [com.letta.mobile.data.backend.SessionRouteMatrix]. The bindings below decide independently;
      * the shared matrix test holds the two together.
      */

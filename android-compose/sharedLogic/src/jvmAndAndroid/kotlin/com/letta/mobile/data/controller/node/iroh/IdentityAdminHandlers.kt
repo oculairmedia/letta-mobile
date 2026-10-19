@@ -1,7 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 /**
- * lgns8.9 disposition for the identity domain.
+ *  Disposition for the identity domain.
  *
  * admin-shim serves `GET /v1/identities` from `stubList` (`json(res, 200, [])`):
  * the letta-code local backend has no identity entity. The list is therefore

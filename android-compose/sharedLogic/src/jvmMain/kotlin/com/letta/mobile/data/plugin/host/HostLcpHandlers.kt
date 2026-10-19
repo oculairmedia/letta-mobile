@@ -37,7 +37,7 @@ fun interface PluginLogSink {
 }
 
 /**
- * What the host does for one plugin's calls (letta-mobile-cdgpr.5), behind the session's
+ * What the host does for one plugin's calls, behind the session's
  * capability and secret guards:
  *  - `host.emit` is rate-limited ([PluginRateLimits.emit], `-32008` over it) and compiled by
  *    [placement] onto the board;

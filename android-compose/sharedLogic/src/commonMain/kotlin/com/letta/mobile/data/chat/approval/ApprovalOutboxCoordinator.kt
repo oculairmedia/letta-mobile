@@ -39,7 +39,7 @@ sealed interface OutboxNotice {
 }
 
 /**
- * letta-mobile-bzvro.14 (F14): routes approval answers through the [outbox]: sent at once while
+ *  (F14): routes approval answers through the [outbox]: sent at once while
  * [isConnected], queued otherwise (or when the send fails on the connection), and flushed after each
  * reconnect once the host has had [settle] to replay what it still holds (its `pending_approvals`
  * snapshot, which [stillPending] reads).

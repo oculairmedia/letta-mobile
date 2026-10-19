@@ -3,7 +3,7 @@ package com.letta.mobile.data.transport.iroh
 import java.util.concurrent.ConcurrentLinkedDeque
 
 /**
- * letta-mobile-qygvv.22: what the admin_rpc lane says about the path at the moment a
+ * What the admin_rpc lane says about the path at the moment a
  * liveness probe timed out.
  *
  * @param youngInFlight admin_rpcs still open and younger than the congestion grace.
@@ -34,7 +34,7 @@ internal data class AdminRpcPathEvidence(
  * only thing the probe loop acts on; the name goes to telemetry.
  */
 internal enum class ProbeTimeoutVerdict(val congested: Boolean) {
-    /** Nothing else in flight: the probe timeout is the only signal (pre-qygvv.22 rule). */
+    /** Nothing else in flight: the probe timeout is the only signal (pre- rule). */
     NO_IN_FLIGHT(congested = false),
 
     /** Something completed inside the window — the path is alive, just slow (parg0). */
@@ -51,7 +51,7 @@ internal enum class ProbeTimeoutVerdict(val congested: Boolean) {
 }
 
 /**
- * letta-mobile-qygvv.22: classifies a timed-out liveness probe.
+ * Classifies a timed-out liveness probe.
  *
  * INCIDENT (2026-09-25): a Tailscale path flap black-holed the phone's Iroh connection
  * for ~40 s. Six admin_rpcs were in flight, so the parg0 rule ("young in-flight work ⇒
@@ -81,7 +81,7 @@ internal fun classifyProbeTimeout(
 internal const val DEAD_PATH_RPC_TIMEOUTS = 2
 
 /**
- * letta-mobile-qygvv.22: back-to-back `admin_rpc.request_isolated` failures on one
+ * Back-to-back `admin_rpc.request_isolated` failures on one
  * connection generation. Any proof of life resets it, so only an unbroken run of
  * failures — no answer of any kind in between — counts as dead-path evidence.
  */

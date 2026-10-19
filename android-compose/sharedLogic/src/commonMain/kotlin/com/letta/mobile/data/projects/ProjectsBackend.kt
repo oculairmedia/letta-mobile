@@ -102,7 +102,7 @@ class SettingsProjectPinStore(private val settings: ISettingsRepository) : Proje
 }
 
 /**
- * Project pins in a [SecureSettingsStore] under [storageKey] (letta-mobile-ckmub.2.6): the desktop,
+ * Project pins in a [SecureSettingsStore] under [storageKey]: the desktop,
  * which has no Android settings repository, keeps them beside its other preferences.
  */
 class SettingsStoreProjectPinStore(

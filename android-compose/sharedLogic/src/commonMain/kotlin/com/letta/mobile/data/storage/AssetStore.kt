@@ -20,7 +20,7 @@ data class AssetRef(
 
 /**
  * Content-addressed storage for assets of any media type, shared by every surface that keeps large
- * payloads out of its documents (letta-mobile-w3nb2). The generic form of the chat's
+ * payloads out of its documents. The generic form of the chat's
  * [ImageBlobStore]: nothing here knows or cares that most assets today are images.
  *
  * Writes are idempotent (the same bytes give the same ref) and a read returns only bytes that

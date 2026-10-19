@@ -33,7 +33,7 @@ data class CanvasArtifactError(
 )
 
 /**
- * letta-mobile-bglj6.13 (canvas_compose C8): the chat-side part of one compose call, shown as a
+ *  (canvas_compose C8): the chat-side part of one compose call, shown as a
  * card on the message that narrates it. Derived, never persisted: it is read off the compose tool
  * return already stored on the TOOL_CALL timeline event (docs/design/canvas-compose-plan.md, D4).
  *
@@ -57,7 +57,7 @@ data class CanvasArtifactReceipt(
     /**
      * The board ids of the artifact's pieces, group children included, in receipt order: what the
      * receipt names, else derived as `cmp-<artifactId>-<key>` (receipts no longer carry them,
-     * letta-mobile-bglj6.14). Empty while pending, refused or unreadable.
+     *). Empty while pending, refused or unreadable.
      */
     val pieceIds: List<String> = emptyList(),
 ) {
@@ -114,7 +114,7 @@ object CanvasArtifactReceipts {
     }
 
     /**
-     * Whether [call] is a compose call: the native tool, or (letta-mobile-jna0o.6) a
+     * Whether [call] is a compose call: the native tool, or a
      * `meridian canvas compose` run through Bash or the `meridian` meta-tool.
      */
     fun isComposeCall(call: ToolCall): Boolean =

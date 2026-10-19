@@ -76,7 +76,7 @@ data class ShellConversationTabs(
 )
 
 /**
- * What the workspace header draws (letta-mobile-ckmub.17.4, lifted from the desktop title bar): the
+ * What the workspace header draws (lifted from the desktop title bar): the
  * sidebar control, the tab strip, else the now-active identity, else [title]; the search; and the
  * run controls. The desktop draws it in its title bar, the browser at the top of the page.
  */

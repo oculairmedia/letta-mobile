@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.updateAndGet
 
 /**
  * Coordinates the atomic lifecycle of one App Server connection generation
- * (letta-mobile-lgns8.21.1: one bidirectional WebSocket session).
+ * (one bidirectional WebSocket session).
  *
  * Letta Code ≥ 0.29.7 exposes a single `/ws` session (no `?channel=`). Readiness
  * begins [AppServerConnectionState.Disconnected] and becomes

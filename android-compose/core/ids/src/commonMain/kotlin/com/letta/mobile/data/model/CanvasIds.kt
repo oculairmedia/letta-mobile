@@ -6,7 +6,7 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * The id of a canvas board (letta-mobile-by4vm.99).
+ * The id of a canvas board.
  *
  * Unlike the value classes in `DomainIds.kt`, this is a data class and serializes as an object,
  * `{"value":"canvas-…"}`. That is the shape already persisted in every stored canvas's metadata
@@ -42,7 +42,7 @@ data class CanvasId(val value: String) {
 }
 
 /**
- * Who wrote a canvas op (letta-mobile-by4vm.99): an agent's id, the local user
+ * Who wrote a canvas op: an agent's id, the local user
  * (`CanvasSession.LOCAL_USER_ACTOR_ID`), or a system writer such as `system`. Ops carry it on the
  * wire and in the op log as a bare string ([value]); the canvas session and the op-stamping
  * helpers take it typed. Not blank-checked: an op built only to be validated or rebound names no
@@ -55,7 +55,7 @@ value class CanvasActorId(val value: String) {
 }
 
 /**
- * The id of one canvas op (letta-mobile-by4vm.99.1): what the op log, the journal and the
+ * The id of one canvas op: what the op log, the journal and the
  * delivery queue key ops by. Ops carry it on the wire, in Room and in the persisted delivery
  * record as a bare string ([value]); the op-log and delivery-store APIs take it typed.
  */
@@ -66,7 +66,7 @@ value class CanvasOpId(val value: String) {
 }
 
 /**
- * The id of a composed canvas artifact (letta-mobile-by4vm.99.3): the `artifact_id` an agent sends
+ * The id of a composed canvas artifact: the `artifact_id` an agent sends
  * to `canvas_compose`, or the one derived from its tool call. Receipts and compose provenance carry
  * it as a bare string ([value]); the compose compiler and the board-id helpers take it typed.
  */
@@ -77,7 +77,7 @@ value class CanvasArtifactId(val value: String) {
 }
 
 /**
- * The id of one element drawn on a canvas board (letta-mobile-by4vm.99.2): a DrawBox shape,
+ * The id of one element drawn on a canvas board: a DrawBox shape,
  * connector or stroke, or a plugin element (`ext:` kind). A shape a label belongs to is named by
  * its element id too. Ops and the projected scene carry it as a bare string ([value]); the canvas
  * session's element writes take it typed.
@@ -89,7 +89,7 @@ value class CanvasElementId(val value: String) {
 }
 
 /**
- * The id of one block document on a canvas board (letta-mobile-by4vm.99.2): a note, text box or
+ * The id of one block document on a canvas board: a note, text box or
  * shape label written in Cascade JSON. Not `data.document.DocumentId` (a standalone document) and
  * not a [CanvasElementId] (a drawn element). Ops and the projected scene carry it as a bare string
  * ([value]); the canvas session's document writes take it typed.
@@ -101,7 +101,7 @@ value class CanvasNoteId(val value: String) {
 }
 
 /**
- * The id of a canvas checkpoint (letta-mobile-by4vm.99.2), a point the board can be restored to.
+ * The id of a canvas checkpoint, a point the board can be restored to.
  * A value class, so a serialized checkpoint keeps its bare-string `checkpointId`.
  */
 @JvmInline

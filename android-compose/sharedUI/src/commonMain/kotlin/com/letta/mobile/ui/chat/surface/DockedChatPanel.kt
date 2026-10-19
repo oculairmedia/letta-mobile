@@ -164,7 +164,7 @@ internal class ChatDockState(initial: ChatDockGeometry) {
     /** The last laid-out frame; gestures resolve against it. */
     internal var frame: ChatDockFrame? = null
 
-    /** letta-mobile-zxk2n.29: the minimised bar's own width (CanvasBubbleLayout), null: the panel's. */
+    /** The minimised bar's own width (CanvasBubbleLayout), null: the panel's. */
     internal var collapsedWidthDp: Float? = null
 
     /** An edge of the minimised bar is being dragged: its width follows the pointer without gliding. */
@@ -244,7 +244,7 @@ internal class ChatDockState(initial: ChatDockGeometry) {
     }
 
     /**
-     * letta-mobile-bglj6.1.9: where the Touch chat head rests. It reuses the dock's anchors: [side]
+     * Where the Touch chat head rests. It reuses the dock's anchors: [side]
      * 0 is the left edge and 1 the right, [lane] 0..1 is its height in the free band.
      */
     fun placeHead(side: Float, lane: Float) {
@@ -300,7 +300,7 @@ internal class DockedPanelContent(
     val composer: @Composable (collapsed: Boolean) -> Unit,
     /** What the dock shows above the bar minimised: the agent's mascot, see [CollapsedDock]. */
     val collapsed: CollapsedDockContent,
-    /** letta-mobile-y5q9z: the header's "+" and the recent interactions it opens; null hides the "+". */
+    /** The header's "+" and the recent interactions it opens; null hides the "+". */
     val recents: BubbleRecents? = null,
 )
 
@@ -682,7 +682,7 @@ private fun PanelTop(state: ChatDockState, content: DockedPanelContent, modifier
 }
 
 /**
- * The conversation, or (letta-mobile-y5q9z) the agent's recent interactions while the header's "+"
+ * The conversation, or the agent's recent interactions while the header's "+"
  * has them open: a crossfade in the panel's own frame, so the panel keeps its size.
  */
 @Composable

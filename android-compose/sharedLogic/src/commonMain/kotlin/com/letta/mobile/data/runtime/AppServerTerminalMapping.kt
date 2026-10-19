@@ -100,5 +100,5 @@ internal fun TurnCommand.turnDraft(
 
 private fun JsonObject.isNonTerminalError(): Boolean = wireString("is_terminal") == "false"
 
-/** Fail-soft scalar read (letta-mobile-fkpd4): never throws on a non-scalar wire value. */
+/** Fail-soft scalar read: never throws on a non-scalar wire value. */
 private fun JsonObject.wireString(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull

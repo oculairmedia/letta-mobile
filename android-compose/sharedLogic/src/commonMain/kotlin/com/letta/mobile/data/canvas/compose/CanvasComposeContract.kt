@@ -11,7 +11,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * canvas_compose v1 (letta-mobile-bglj6.6, docs/design/canvas-compose-plan.md): an agent says WHAT
+ * Canvas_compose v1 (docs/design/canvas-compose-plan.md): an agent says WHAT
  * goes on the board (notes, checklists, cards, text, groups) and never WHERE; the compose layer
  * places it and compiles it into the one canvas op log. This is the wire contract only: the
  * request, the receipt and the refusal, with the caps and vocabularies both hosts hold an agent to.
@@ -24,7 +24,7 @@ object CanvasComposeContract {
 
     /**
      * The wire version. Changes inside v1 are additive and both ways compatible:
-     * - letta-mobile-bglj6.14: receipt items no longer carry `id` (derivable as
+     * - receipt items no longer carry `id` (derivable as
      *   `cmp-<artifact_id>-<key>`); a reader still takes one when present, as in receipts already
      *   stored in conversations.
      */
@@ -327,7 +327,7 @@ data class ComposeBounds(val x: Float, val y: Float, val width: Float, val heigh
  * One produced item: its [key] and [kind], [count] the entries of a CHECKLIST.
  *
  * Its board id is derived, `cmp-<artifact_id>-<key>` ([boardId]), so the receipt does not carry
- * it (letta-mobile-bglj6.14): with it, the largest receipt the caps allow was over the 4 KiB above
+ * it: with it, the largest receipt the caps allow was over the 4 KiB above
  * which `message.list` ships a tool return as a 2 KiB preview, and lost its bounds on reload.
  * [id] is still read when present, as in receipts written before the slimming; nothing writes it.
  */

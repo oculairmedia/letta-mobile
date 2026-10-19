@@ -81,7 +81,7 @@ import com.letta.mobile.ui.chat.surface.timeline.rows.rememberApprovalDecider
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-bglj6.1: the ONE chat page, shared by Android and desktop.
+ * The ONE chat page, shared by Android and desktop.
  *
  * It renders [port] in the presentation's [ChatSurfaceMode]: a panel docked over the canvas
  * (the default view), the full-screen page, or (reserved) a floating panel. Every mode binds
@@ -107,7 +107,7 @@ import org.jetbrains.compose.resources.stringResource
  *   resets it. A host that does not hoist it gets a panel that still moves for the session.
  *   Null while the host is still reading the person's saved placement: the dock is not drawn
  *   at all until it is known, so it never appears at the default spot and then jumps.
- * @param recents letta-mobile-y5q9z: this agent's conversations, for the canvas bubble's (phone)
+ * @param recents this agent's conversations, for the canvas bubble's (phone)
  *   and the docked panel's (desktop) "+" to hop between or start a new thread; null hides the "+".
  */
 @Composable
@@ -213,7 +213,7 @@ private fun ChatSurfaceLayers(frame: ChatSurfaceFrame, canvas: (@Composable () -
 /**
  * [host] as the page binds it. With a canvas in hand ([hasCanvas]), "open canvas" is a mode
  * change, not the host's navigation, and "show on canvas" also frames the artifact on this page's
- * own board (letta-mobile-bglj6.13).
+ * own board.
  */
 private fun pageHost(
     host: ChatSurfaceHost,
@@ -267,7 +267,7 @@ internal class ChatSurfaceFrame(
     val companionAnchors: CompanionSeatAnchors,
     /** Null until the host knows where the person put the dock (or, on Touch, the head). */
     val dock: ChatDockState?,
-    /** The agent's conversations for the "+" (letta-mobile-y5q9z); null hides it. */
+    /** The agent's conversations for the "+"; null hides it. */
     val recents: ChatRecentInteractions? = null,
 ) {
     val mode: ChatSurfaceMode get() = presentation.mode
@@ -327,7 +327,7 @@ private fun coveredByPage(frame: ChatSurfaceFrame, modifier: Modifier): Modifier
 }
 
 /**
- * letta-mobile-bglj6.1.9: the Touch page. The canvas fills the area above a flush chat bar pinned
+ * The Touch page. The canvas fills the area above a flush chat bar pinned
  * to the bottom (the same draft and send as the full page); a chat head with the agent's mascot
  * floats over the canvas, snapped to a side, and the reply pops out of it. Swiping the bar up (or
  * its chevron) grows the bar into the full page; Back or swipe up on the page's bar comes back.
@@ -416,7 +416,7 @@ private fun TouchChatLayers(frame: ChatSurfaceFrame, layers: SurfaceMorphLayers,
 /**
  * The Touch canvas's bar, its chat head and, over the canvas above the bar, the input tray: the
  * turn's pending question and the generated forms, answered in place without opening the page
- * (letta-mobile-bglj6.1.22). The turn is read once here for the head and the tray, so the history
+ *. The turn is read once here for the head and the tray, so the history
  * behind it is collected once.
  */
 @Composable
@@ -694,7 +694,7 @@ private fun Composer(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifier: M
 }
 
 /**
- * letta-mobile-bzvro.7: what the agent is doing right now, above the composer. Collected here, not
+ * What the agent is doing right now, above the composer. Collected here, not
  * in the frame, so a status tick recomposes this line alone.
  */
 @Composable

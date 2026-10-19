@@ -13,7 +13,7 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 
 /**
- * letta-mobile-bglj6.1: the tap target of a quiet timeline line (a "Thought" row, a run header, a
+ * The tap target of a quiet timeline line (a "Thought" row, a run header, a
  * "Ran 2 commands" summary). It draws no state layer: a pointer's hover would otherwise paint a
  * filled block over the line, an inset the Android timeline never shows. The line lifts its own
  * label instead while [lifted] (hovered or pressed), and a pointer turns to a hand over it.

@@ -73,7 +73,7 @@ internal class AttentionPublisher(
 internal fun Rect.toGazeRect(): GazeRect = GazeRect(left, top, right, bottom)
 
 /**
- * The composer's caret as an attention point (te3n1.2): the text layout says where the caret is,
+ * The composer's caret as an attention point: the text layout says where the caret is,
  * the inner text's coordinates put it in the window. Published while the field has focus; a square
  * the caret's height centred on it, so the point is the caret itself rather than the whole field.
  */
@@ -144,11 +144,11 @@ internal fun rememberMascotCaret(primary: Boolean, selectionEnd: Int): MascotCar
 
 private val CARET_KEY = AttentionKey("composer-caret")
 
-/** How long the last touch stays where the mascot looks (te3n1.2): a hand that lifted is soon gone. */
+/** How long the last touch stays where the mascot looks: a hand that lifted is soon gone. */
 internal val MASCOT_TOUCH_PRESENCE: Duration = 1_500.milliseconds
 
 /**
- * Android's stand-in for a cursor (te3n1.2): the last touch-down or move writes
+ * Android's stand-in for a cursor: the last touch-down or move writes
  * [MascotIdentityRegistry.cursor], so the eyes follow the finger as a desktop mascot follows the
  * pointer, and [expire] clears it again. Desktop's mouse capture is left alone: a cursor written by
  * anything else since the touch is never cleared here.

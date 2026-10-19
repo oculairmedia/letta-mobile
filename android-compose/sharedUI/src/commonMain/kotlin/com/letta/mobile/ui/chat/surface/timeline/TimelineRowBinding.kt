@@ -17,7 +17,7 @@ import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowCallbacks
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowContext
 
 /**
- * letta-mobile-bglj6.1: the per-row inputs, built once per state change and handed to every row.
+ * The per-row inputs, built once per state change and handed to every row.
  *
  * Rows read only [ChatRowContext]. Every row gets the SAME [base] instance, so a settled row's
  * inputs compare equal across a streaming tick and the row skips. Only the row holding the

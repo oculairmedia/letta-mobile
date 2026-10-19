@@ -8,7 +8,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-joigh: the context limit through the Iroh host's `conversation.context_limit`.
+ * The context limit through the Iroh host's `conversation.context_limit`.
  *
  * A host that predates the relay answers "Unknown method", one without a native App Server client
  * or with a letta-code that has no `/context-limit` answers `capability_unavailable`, and a

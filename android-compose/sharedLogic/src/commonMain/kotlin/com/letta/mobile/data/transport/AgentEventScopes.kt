@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.transformWhile
 
 /**
- * letta-mobile-ztuog: per-agent delivery over one shared [WsChatBridge].
+ * Per-agent delivery over one shared [WsChatBridge].
  *
  * The bridge's raw [WsChatBridge.events] carries every agent's frames. Chat coordinators used to
  * collect it directly and drop foreign frames one by one, so after visiting three agents each
@@ -69,7 +69,7 @@ class AgentEventScopes internal constructor(private val events: Flow<WsTimelineE
 }
 
 /**
- * letta-mobile-ztuog: which chat the user is looking at.
+ * Which chat the user is looking at.
  *
  * Until anyone calls [select] the selection is unmanaged and every chat counts as selected — the
  * behavior hosts that never express a selection (desktop, tests) keep. Once a host selects, only
@@ -109,7 +109,7 @@ internal sealed interface ChatSelectionState {
 }
 
 /**
- * letta-mobile-ztuog: one chat coordinator's subscription lifecycle.
+ * One chat coordinator's subscription lifecycle.
  *
  * Stays attached while its owner is selected or has work in flight ([isBusy]), so switching away
  * mid-turn still lands the turn; detaches once unselected and idle; re-attaches on [select]. The

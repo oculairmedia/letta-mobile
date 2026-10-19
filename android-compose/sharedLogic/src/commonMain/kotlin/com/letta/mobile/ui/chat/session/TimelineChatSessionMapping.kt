@@ -56,7 +56,7 @@ data class TimelineRunState(
     /** A stop was requested and the run has not ended yet. */
     val cancelling: Boolean = false,
     /**
-     * letta-mobile-by4vm.81: Stop gave up on the run's terminal and dropped it locally; the page
+     * Stop gave up on the run's terminal and dropped it locally; the page
      * shows the run idle until the timeline's own run ends or the next send.
      */
     val clearedLocally: Boolean = false,
@@ -66,7 +66,7 @@ data class TimelineRunState(
 
 /**
  * Timeline view state a session port keeps for the page: collapsed runs, expanded reasoning, and the
- * page error already shown. letta-mobile-by4vm.98: desktop's port keeps the same state.
+ * page error already shown. desktop's port keeps the same state.
  */
 data class TimelineLocalState(
     val collapsedRunIds: Set<String> = emptySet(),
@@ -122,7 +122,7 @@ private fun TimelineRunState.conversationState(conversationId: String): Conversa
     else -> ConversationState.Ready(conversationId)
 }
 
-/** letta-mobile-by4vm.79: the approval state a host hands the port through [TimelineChatSessionOptions.approvals]. */
+/** The approval state a host hands the port through [TimelineChatSessionOptions.approvals]. */
 data class TimelineHostApprovals(
     val submitting: Set<String> = emptySet(),
     val queued: Set<String> = emptySet(),
@@ -132,7 +132,7 @@ data class TimelineHostApprovals(
 /**
  * [this] with the host's approval state laid over it: parked details joined onto their rows, queued
  * answers marked, and the row answered by either the host or the port ([portSubmitting]) disabled.
- * Unchanged when the host reports nothing. letta-mobile-by4vm.93: on both clients this derives
+ * Unchanged when the host reports nothing. on both clients this derives
  * [ChatUiState.activeApprovalRequestId]: the bottom-most row (parked rows included) whose request has
  * an answer in flight, null when none has a row; it clears once the request leaves the in-flight set
  * (delivery failed or cancelled, the timeline decided it, or a sibling parallel call was parked).

@@ -8,7 +8,7 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.util.runCatchingCancellable
 
 /**
- * letta-mobile-joigh: the context limit over a direct App Server client — letta-code's own
+ * The context limit over a direct App Server client — letta-code's own
  * `execute_command context-limit <tokens>`, so letta-code validates the value and chooses the
  * scope exactly as its TUI does.
  *
@@ -43,7 +43,7 @@ class AppServerContextLimitRepository(
     }
 }
 
-/** letta-mobile-joigh: one `/context-limit` answer, shared by the client path and the host relay. */
+/** One `/context-limit` answer, shared by the client path and the host relay. */
 fun CommandAnswer.toOutcome(requested: Int): ContextLimitOutcome = when {
     !success && output.orEmpty().startsWith(UNKNOWN_COMMAND) -> ContextLimitOutcome.Unsupported
     // letta-code wraps a thrown error as "Failed: <message>" (its validation text, e.g. the 30,000 floor).

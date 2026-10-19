@@ -3,7 +3,7 @@ package com.letta.mobile.data.timeline
 /**
  * Why a persistence write fell back to full-scan planning.
  *
- * letta-mobile-94bt8.1: the clean-main capture showed all nine durable writes taking the full
+ * the clean-main capture showed all nine durable writes taking the full
  * O(N) path and NONE reporting why. `FullScan(reason)` already carried a string, but nothing
  * ever emitted it, so `delta_empty`, an undeclared reducer delta, a cursor advance, a checkpoint
  * and a genuine ambiguity were indistinguishable in a log. This makes the reason typed and
@@ -22,7 +22,7 @@ enum class SnapshotPlanningFallback {
     /**
      * The timeline CHANGED but the reducer declared no delta.
      *
-     * This is the defect behind 94bt8.1: `TimelineMutationDelta.None` is the default on
+     * This is the defect behind `TimelineMutationDelta.None` is the default on
      * [TimelineReduction], so every reducer that never set it -- local append, delivery-state
      * transitions, post-send reconcile, snapshot enrichment, tool-return repair, dangling
      * settlement, cleanup -- silently produced an empty delta. The write then fell back with

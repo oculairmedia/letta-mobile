@@ -61,7 +61,7 @@ interface JsonSchemaHooks {
 }
 
 /**
- * A strict subset of JSON Schema, lifted from `canvas_compose` (letta-mobile-s416w.2) so every
+ * A strict subset of JSON Schema, lifted from `canvas_compose`  so every
  * contract built from schemas (compose requests, plugin kind props, plugin manifests) refuses with
  * JSON-pointer paths the same way.
  *

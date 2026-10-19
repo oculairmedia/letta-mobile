@@ -10,7 +10,7 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
-/** letta-mobile-cyh28: the four sections a local-backend prompt can be split into from disk. */
+/** The four sections a local-backend prompt can be split into from disk. */
 data class ContextSections(
     val system: Int,
     val memory: Int,
@@ -36,7 +36,7 @@ enum class ContextTotalSource(val wire: String) {
 }
 
 /**
- * letta-mobile-cyh28: an estimated breakdown of one conversation's context.
+ * An estimated breakdown of one conversation's context.
  *
  * With a [totalSource] the rows are matched to that exact total: [tools] is the residual (tool
  * schemas live only inside the running process, never on disk; it also absorbs reasoning tokens

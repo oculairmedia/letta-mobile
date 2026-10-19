@@ -38,7 +38,7 @@ open class CachedAllConversationsRepository(
     private val repositoryScope: CoroutineScope = defaultCachedAllConversationsRepositoryScope(),
     private val irohConversationListSource: IrohAdminRpcConversationListSource? = null,
     /**
-     * letta-mobile-lks7m: when given, the list follows Meridian's `conversation_updated` pushes and
+     * When given, the list follows Meridian's `conversation_updated` pushes and
      * re-reads after a reconnect, so conversations created on another device appear without a
      * restart.
      */

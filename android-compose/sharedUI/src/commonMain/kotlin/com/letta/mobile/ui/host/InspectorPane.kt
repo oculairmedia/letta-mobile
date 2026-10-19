@@ -28,7 +28,7 @@ import com.letta.mobile.ui.components.LettaSidePaneHeader
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * letta-mobile-ckmub.3.15 (hard cut S13, primitive P6): a secondary detail panel — the background
+ *  (hard cut S13, primitive P6): a secondary detail panel — the background
  * tasks roster, a tool run's calls, the agent's model and context — declared where its control is
  * and drawn where the window keeps details: docked on the right of the [InspectorFrame] when the
  * frame is wide, a bottom sheet ([LettaPane]) when it is compact.

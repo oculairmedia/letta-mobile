@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
  * with its command text so the user can add args and send.
  *
  * A direct App Server uses [AppServerSlashCommandApi] (its supported `execute_command` ids);
- * iroh:// hosts use [com.letta.mobile.data.repository.iroh.IrohSlashCommandApi]. letta-mobile-ckmub.4
+ * iroh:// hosts use [com.letta.mobile.data.repository.iroh.IrohSlashCommandApi].
  * removed the Letta REST implementation (`/v1/agents/{id}/slash-commands`).
  */
 interface SlashCommandsApi : AutoCloseable {
@@ -39,7 +39,7 @@ internal data class SlashCommandsResponse(
 )
 
 /**
- * App Server implementation of [SlashCommandsApi] (letta-mobile-bzvro.20).
+ * App Server implementation of [SlashCommandsApi].
  * Populates commands from the server's advertised supported commands.
  */
 class AppServerSlashCommandApi(

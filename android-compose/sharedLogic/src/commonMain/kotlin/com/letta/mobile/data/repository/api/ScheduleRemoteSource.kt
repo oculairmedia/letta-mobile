@@ -7,7 +7,7 @@ import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.model.ScheduledMessage
 
 /**
- * Per-agent scheduled messages a non-App-Server backend would serve. letta-mobile-ckmub.4: this is
+ * Per-agent scheduled messages a non-App-Server backend would serve. this is
  * the seam for one; there is no production implementation since the Letta REST backend was
  * removed. Iroh hosts serve schedules through
  * [com.letta.mobile.data.repository.iroh.IrohScheduleRepository].

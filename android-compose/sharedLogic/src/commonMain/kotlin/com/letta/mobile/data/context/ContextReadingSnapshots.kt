@@ -9,7 +9,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 /**
- * letta-mobile-wdm6i: the latest context reading per conversation, kept across restarts in the
+ * The latest context reading per conversation, kept across restarts in the
  * app's existing key-value [SecureSettingsStore] (the store already holding per-agent UI state
  * such as cached mascot identities) — one JSON value under one key, no schema.
  *

@@ -4,7 +4,7 @@ import com.letta.mobile.data.compaction.wireConversationIdOf
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 
-/** letta-mobile-joigh: set one conversation's (or, on its default conversation, the agent's) context limit. */
+/** Set one conversation's (or, on its default conversation, the agent's) context limit. */
 data class ContextLimitRequest(
     val agentId: AgentId,
     /** Null is the agent's default conversation. */
@@ -26,7 +26,7 @@ sealed interface ContextLimitOutcome {
 }
 
 /**
- * letta-mobile-joigh: the context-limit change, whichever way the session reaches letta-code —
+ * The context-limit change, whichever way the session reaches letta-code —
  * the Iroh host's `conversation.context_limit` ([AdminRpcContextLimitRepository]) or a direct App
  * Server client ([AppServerContextLimitRepository]). Both run letta-code's own `/context-limit`.
  */

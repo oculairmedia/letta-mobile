@@ -27,7 +27,7 @@ internal data class RosterMove(val rowKey: String, val toIndex: Int)
 private class RosterDragStep(val self: LazyListItemInfo, val other: LazyListItemInfo, val row: RosterLine.Row<*>, val direction: Int)
 
 /**
- * A row being dragged to a new place in its section (letta-mobile-ckmub.3.25). The row follows the
+ * A row being dragged to a new place in its section. The row follows the
  * pointer ([offset], drawn as a translation); each time its centre crosses a neighbour's, the list
  * swaps the two in a preview order ([preview]) and its siblings glide aside. On release the host's
  * [RosterReorder] hears the move once; the preview stays drawn until the host's sections change, so

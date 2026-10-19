@@ -11,7 +11,7 @@ import kotlinx.serialization.json.contentOrNull
 /**
  * `dry_run` for an app's own canvas tools ([CanvasExternalTools]), which share the host's contract
  * ([CanvasToolContract]): a call that only asked to check must never write, whichever runtime
- * answers it (letta-mobile-qygvv.30).
+ * answers it.
  */
 internal object CanvasAppDryRun {
     private val json = Json {

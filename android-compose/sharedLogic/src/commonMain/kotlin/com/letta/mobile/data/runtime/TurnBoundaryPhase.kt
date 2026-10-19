@@ -1,7 +1,7 @@
 package com.letta.mobile.data.runtime
 
 /**
- * letta-mobile-by4vm.7: what [TurnBoundaryGate] knows about the current lease's server turn, in place
+ * What [TurnBoundaryGate] knows about the current lease's server turn, in place
  * of its `evidenceSeen`, `abortRequested` and `roundContinues` flags. Driven through a
  * [TurnStateMachine] with [boundaryTransition].
  *
@@ -16,7 +16,7 @@ internal sealed interface BoundaryPhase {
     /** An `abort_message` was sent for this lease. */
     val abortRequested: Boolean
 
-    /** letta-mobile-qygvv.29: the latest stop_reason paused the run for an approval-continuation round. */
+    /** The latest stop_reason paused the run for an approval-continuation round. */
     val roundContinues: Boolean
 
     /** A new lease: no evidence, no abort. */

@@ -27,7 +27,7 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * The shared, searchable, provider-grouped model picker over the owner's
- * [ChatModelUiState.options]: the shared [LettaPicker] (letta-mobile-ckmub.3.6) in a modal pane,
+ * [ChatModelUiState.options]: the shared [LettaPicker]  in a modal pane,
  * a sheet on touch and a dialog on pointer. The agent editor's Model row opens it too.
  */
 @Composable
@@ -63,7 +63,7 @@ internal fun ComposerModelPickerSheet(
 }
 
 /**
- * letta-mobile-by4vm.121.11: a search that matched nothing, a catalog that could not be read (its
+ * A search that matched nothing, a catalog that could not be read (its
  * reason, e.g. the on-device runtime stopped), and a catalog with no models yet read differently.
  */
 @Composable

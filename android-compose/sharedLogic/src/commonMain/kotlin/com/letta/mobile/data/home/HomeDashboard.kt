@@ -10,7 +10,7 @@ import com.letta.mobile.data.model.Tool
 import kotlin.math.roundToInt
 
 /**
- * The mobile dashboard half of the shared Home page (letta-mobile-c3np7.3.11): pinned shortcuts and
+ * The mobile dashboard half of the shared Home page: pinned shortcuts and
  * agents, the per-backend stat widgets and the global search, all platform-neutral.
  */
 

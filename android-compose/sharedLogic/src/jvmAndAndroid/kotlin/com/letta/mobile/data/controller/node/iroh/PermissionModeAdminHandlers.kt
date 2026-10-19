@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 /**
- * letta-mobile-bzvro.40: lets an Iroh client read and change the permission mode of a conversation's
+ * Lets an Iroh client read and change the permission mode of a conversation's
  * runtime on this host ([PermissionModeRpc]). The host runs every relayed turn, so its runtime's mode
  * is the one that decides which tool calls park for the person.
  *
@@ -24,7 +24,7 @@ import kotlinx.serialization.json.JsonObject
 internal object PermissionModeAdminHandlers {
     val methods: Set<String> = PermissionModeRpc.methods
 
-    /** [publisher] (letta-mobile-a4tm7) pushes each confirmed change to the conversation's viewers; null pushes nothing. */
+    /** [publisher]  pushes each confirmed change to the conversation's viewers; null pushes nothing. */
     fun register(router: AdminRpcRouter, controller: AppServerController?, publisher: PermissionModePublisher? = null) {
         if (controller == null) {
             CapabilityUnavailable.register(router, methods, "App Server controller")

@@ -21,7 +21,7 @@ data class ContextReadingDisplay(
 )
 
 /**
- * letta-mobile-r2zo8 / letta-mobile-0ofhc: the [ContextWindowUsagePolicy] rules applied to a
+ * The [ContextWindowUsagePolicy] rules applied to a
  * streamed reading instead of a repository read, so every client shows the same thing:
  *
  *  - another conversation's reading is dropped the moment the focus moves;

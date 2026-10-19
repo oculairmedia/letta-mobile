@@ -1,7 +1,7 @@
 package com.letta.mobile.data.subagents
 
 /**
- * Durable backing for [DurableSubagentRegistry] (letta-mobile-lgns8.22.8).
+ * Durable backing for [DurableSubagentRegistry].
  *
  * Deliberately tiny and whole-snapshot: the registry is bounded
  * ([DurableSubagentRegistry.MAX_ENTRIES]) so rewriting the whole set on each

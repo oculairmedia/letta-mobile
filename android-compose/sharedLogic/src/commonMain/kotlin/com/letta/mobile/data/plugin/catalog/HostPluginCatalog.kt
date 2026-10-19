@@ -1,7 +1,7 @@
 package com.letta.mobile.data.plugin.catalog
 
 /**
- * letta-mobile-cdgpr.8: a [PluginCatalog] on a connected host. It knows whether that host runs
+ * A [PluginCatalog] on a connected host. It knows whether that host runs
  * plugins at all ([supported]) and can reload its list ([refresh]). The admin_rpc catalog is one;
  * [com.letta.mobile.data.plugin.view.PluginViewsModel] reads it.
  */

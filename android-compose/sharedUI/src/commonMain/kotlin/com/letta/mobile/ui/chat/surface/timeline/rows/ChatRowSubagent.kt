@@ -169,7 +169,7 @@ private data class NotificationModel(
     val status: String = notification.status.trim().lowercase()
     val isFailure: Boolean = status in NOTIFICATION_FAILURE_STATUSES
 
-    /** letta-mobile-zxk2n.8 (G40): a report from an external coding agent names it. */
+    /**  (G40): a report from an external coding agent names it. */
     val identity: SubagentIdentity = subagentIdentityOf(null, listOf(notification.subagentAgentId))
 
     // The protocol names `completed` as its successful terminal state; older producers said
@@ -329,7 +329,7 @@ private fun NotificationBody(model: NotificationModel, expanded: Boolean, action
 }
 
 /**
- * letta-mobile-qvkmg: a background command's report is its stdout — preformatted text, never
+ * A background command's report is its stdout — preformatted text, never
  * prose. Fed through markdown, shell like `T=$(grep …); A=$(cat …)` paired its `$`s into TeX
  * math and column-aligned output ran together into one paragraph, so command reports take the
  * tool-output block (monospace, line-preserving, horizontally scrollable). A subagent's report

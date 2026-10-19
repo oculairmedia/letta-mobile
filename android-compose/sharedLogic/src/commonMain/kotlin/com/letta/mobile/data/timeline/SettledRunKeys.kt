@@ -15,7 +15,7 @@ internal val ChatRenderItem.isRunItem: Boolean
 
 /**
  * What the live row showed that its settled copy must keep so the two renders are identical
- * (letta-mobile-qygvv.20, letta-mobile-sibr8): the LazyColumn key, the run id that expansion state
+ * the LazyColumn key, the run id that expansion state
  * is keyed by, and the turn latency the run header's "Thought for Xs" title is derived from.
  *
  * The durable copy of a turn is named by the ledger and the live copy by the stream; on the App
@@ -37,7 +37,7 @@ internal data class LiveRowPresentation(
  * A live row of the same shape wins. Failing that, a settled run takes the place of the live bubble
  * it absorbed (a reply streamed with no run settles inside its prompt's run): a fresh key there
  * would draw the reply twice for a frame and then drop the live row, the flash at the end of a turn
- * (letta-mobile-bglj6.1.12). The other way round never adopts: a live run whose rows settled as
+ *. The other way round never adopts: a live run whose rows settled as
  * separate bubbles keeps its own keys, since several settled rows cannot all take one live key.
  */
 internal fun ChatRenderItem.livePresentationFor(

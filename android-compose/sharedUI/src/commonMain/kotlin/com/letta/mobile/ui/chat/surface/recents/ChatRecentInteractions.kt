@@ -7,7 +7,7 @@ import com.letta.mobile.ui.shell.sidebar.ShellConversationRowModel
 import com.letta.mobile.ui.shell.sidebar.ShellSidebarMapping
 
 /**
- * letta-mobile-y5q9z: the agent's recent interactions, as the canvas bubble's "+" lists them: the
+ * The agent's recent interactions, as the canvas bubble's "+" lists them: the
  * same conversations the agent panel (the drawer, the desktop sidebar) lists, recent and archived
  * alike, so the person can hop between them without leaving the canvas, or start a new thread.
  *

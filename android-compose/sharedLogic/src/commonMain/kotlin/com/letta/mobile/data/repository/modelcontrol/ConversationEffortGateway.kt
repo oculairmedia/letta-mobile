@@ -5,7 +5,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmModel
 
 /**
- * letta-mobile-by4vm.85: one conversation's model switch together with what to do with its
+ * One conversation's model switch together with what to do with its
  * reasoning effort ([ReasoningEffortChoice.Unchanged] leaves the effort alone).
  */
 data class ConversationModelChange(
@@ -15,7 +15,7 @@ data class ConversationModelChange(
 )
 
 /**
- * letta-mobile-by4vm.85: a chat gateway whose per-conversation switch can carry a reasoning
+ * A chat gateway whose per-conversation switch can carry a reasoning
  * effort (the wrapper's `model.update`). Probed by an interface check, like
  * `ConnectionStatusGateway`: a gateway without it (desktop's direct App Server session, which
  * switches through `conversation_update`) can change the model only, so a client hides its
@@ -27,7 +27,7 @@ interface ConversationEffortGateway {
 }
 
 /**
- * letta-mobile-by4vm.85: the reasoning efforts the host catalog [rows] advertise for [model], a
+ * The reasoning efforts the host catalog [rows] advertise for [model], a
  * row of a chat's own model list. Matched on the model's handle, id or selection aliases, since a
  * chat list and the catalog name the same route either way; empty when no row advertises any.
  */

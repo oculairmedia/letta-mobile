@@ -5,7 +5,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageId
 
 /**
- * letta-mobile-jvctq: everything a swarm send reports, in order. A send's flow emits receipts as
+ * Everything a swarm send reports, in order. A send's flow emits receipts as
  * each stage is reached ([DeliveryReceipt]), [Activity] for tool traffic it observed, [Retrying]
  * while the link is re-dialled, and ends with exactly one final event: the receipt of the stage the
  * caller waited for, or a [DeliveryFailure]. Expected failures are values, never exceptions.

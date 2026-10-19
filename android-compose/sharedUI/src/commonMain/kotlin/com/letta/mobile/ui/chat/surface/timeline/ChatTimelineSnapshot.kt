@@ -11,7 +11,7 @@ import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 
 /**
- * letta-mobile-bglj6.1: the shared timeline on its own (no composer, no page frame), drawn from
+ * The shared timeline on its own (no composer, no page frame), drawn from
  * [state] exactly as the page draws it. For screenshot comparisons against the legacy Android
  * timeline and for previews; hosts render the whole page through ChatSurface instead.
  */

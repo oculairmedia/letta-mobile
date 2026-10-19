@@ -30,7 +30,7 @@ fun defaultSelfTodoScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
 /**
- * letta-mobile-gnyf7: tracks the MAIN/foreground agent's own TodoWrite plan
+ * Tracks the MAIN/foreground agent's own TodoWrite plan
  * per conversation by observing the conversation stream
  * ([IChannelTransport.events]) for `tool_call_message` frames whose tool is
  * `TodoWrite`. The latest snapshot per `conversationId` is folded into a

@@ -25,7 +25,7 @@ internal object TimelineMascotTags {
 }
 
 /**
- * letta-mobile-bglj6.1: the first load of a conversation, shown as its agent: the mascot in its
+ * The first load of a conversation, shown as its agent: the mascot in its
  * loading orbit (desktop's canonical status row). Without a mascot for [agentId], the skeleton.
  */
 @Composable

@@ -49,7 +49,7 @@ interface ChatGateway : TimelineTransport {
  * conversation creation, model catalog, per-conversation overrides).
  * Desktop reaches these through an interface check on its gateway, so any
  * transport (HTTP, Iroh admin_rpc) can opt in without the controller
- * depending on a concrete gateway class (letta-mobile-yh92w).
+ * depending on a concrete gateway class.
  */
 interface ChatGatewayExtras {
     suspend fun createConversation(agentId: String, summary: String? = null): Conversation
@@ -60,7 +60,7 @@ interface ChatGatewayExtras {
 }
 
 /**
- * letta-mobile-wxy4s: gateways that can report their underlying transport's
+ * Gateways that can report their underlying transport's
  * connection state, so a UI controller can surface a drop and auto-recover after
  * the redial instead of silently rendering cached data.
  *

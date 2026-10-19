@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * Persistent registry of paired peer NodeIds (letta-mobile-d6e8g.5).
+ * Persistent registry of paired peer NodeIds.
  *
  * A paired peer authenticates by its Iroh NodeId alone — the QUIC handshake
  * already proves possession of the private key — so no reusable bootstrap
@@ -17,18 +17,18 @@ data class PairedPeer(
     val name: String,
     val pairedAtMs: Long,
     /**
-     * Explicit capability grants (d6e8g.6). Records without the field keep the
+     * Explicit capability grants. Records without the field keep the
      * least-privilege desktop role they were paired under; admin.full is never
      * implicit and must be granted deliberately.
      */
     val capabilities: Set<String> = IrohPeerCapabilities.DEFAULT_DESKTOP_ROLE,
     /**
-     * Agents this peer may address (letta-mobile-dpv7m.1). Null = every agent
+     * Agents this peer may address. Null = every agent
      * on the host (records paired before agent scoping keep that meaning); a
      * set confines runtime frames and admin_rpc to those agent ids.
      */
     val agentIds: Set<String>? = null,
-    /** Last successful authentication, for the paired-device inventory (d6e8g.7). */
+    /** Last successful authentication, for the paired-device inventory. */
     val lastSeenAtMs: Long? = null,
 )
 
@@ -69,7 +69,7 @@ class InMemoryPairedPeerStore : PairedPeerStore {
  * instances inside one process, so every read-modify-write runs under
  * [AtomicJsonFile.withProcessLock] (an OS file lock on a `.lock` sibling plus
  * a per-path JVM monitor). Without it a concurrent pair and revoke could drop
- * the new peer or resurrect the revoked one (letta-mobile-by4vm.43). Reads
+ * the new peer or resurrect the revoked one. Reads
  * stay lock-free: the atomic rename means they always see a whole snapshot.
  */
 class FilePairedPeerStore(private val path: Path) : PairedPeerStore {

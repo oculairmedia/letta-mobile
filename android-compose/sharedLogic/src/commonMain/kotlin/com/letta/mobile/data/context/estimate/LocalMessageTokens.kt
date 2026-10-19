@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * letta-mobile-cyh28: letta-code's `estimateLocalMessageTokens` (`local-context-estimate.ts`) over
+ * Letta-code's `estimateLocalMessageTokens` (`local-context-estimate.ts`) over
  * one on-disk local message, so a section counted here is the number the server would count.
  *
  * Text, thinking and tool-call blocks count their characters (a tool call: its name plus its

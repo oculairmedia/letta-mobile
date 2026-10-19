@@ -6,7 +6,7 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 
 /**
- * A [CanvasSession]'s side of the op log's journal ([CanvasOpLog.unsettled], letta-mobile-by4vm.22).
+ * A [CanvasSession]'s side of the op log's journal ([CanvasOpLog.unsettled],).
  *
  * The op log (Room `canvas_ops` on Android, JSONL files on desktop) and the stored document (the
  * Automerge notebook) are two stores with no shared transaction. The session therefore always

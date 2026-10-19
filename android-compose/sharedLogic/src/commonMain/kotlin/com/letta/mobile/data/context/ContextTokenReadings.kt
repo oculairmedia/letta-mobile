@@ -14,7 +14,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.launch
 
 /**
- * letta-mobile-r2zo8: the latest context total per conversation, folded from the
+ * The latest context total per conversation, folded from the
  * App Server's `usage_statistics` frames.
  *
  * Every model call reports `context_tokens` — the whole prompt the call held, cached prefix
@@ -40,7 +40,7 @@ fun reduceContextReadings(
 }
 
 /**
- * letta-mobile-kr39h: whether [frame] leaves its conversation's reading exact (`false`, a provider
+ * Whether [frame] leaves its conversation's reading exact (`false`, a provider
  * total), estimated (`true`, a compaction's re-estimate) or untouched (null).
  */
 fun contextReadingEstimate(frame: ServerFrame, readings: Map<ContextReadingKey, Int>): Pair<ContextReadingKey, Boolean>? =
@@ -57,7 +57,7 @@ private fun ServerFrame.UsageStatistics.exactReading(): Pair<ContextReadingKey, 
 }
 
 /**
- * letta-mobile-kr39h: the reading a finished compaction leaves until the next model call reports
+ * The reading a finished compaction leaves until the next model call reports
  * an exact total. Its `context_tokens_*` stats are chars/4 estimates of the transcript alone (no
  * system prompt, no tools), so the drop they describe is taken off the last exact total rather than
  * replacing it: replacing it would understate the context by everything outside the transcript.
@@ -101,7 +101,7 @@ class ContextTokenReadings(
     private val estimatedKeys = MutableStateFlow(emptySet<ContextReadingKey>())
 
     /**
-     * letta-mobile-kr39h: conversations whose reading is a post-compaction estimate rather than a
+     * Conversations whose reading is a post-compaction estimate rather than a
      * provider total. Cleared per conversation by its next exact reading; not persisted (a restored
      * snapshot is treated as exact, as it always was).
      */
@@ -120,7 +120,7 @@ class ContextTokenReadings(
     }
 
     /**
-     * letta-mobile-3kble: a compaction ran that reported no token estimate (a direct App Server
+     * A compaction ran that reported no token estimate (a direct App Server
      * compaction streams none), so this conversation's total is stale until its next exact
      * reading. The number stays; only its provenance changes. A conversation with no reading is
      * left alone.
@@ -130,7 +130,7 @@ class ContextTokenReadings(
         if (key in state.value) estimatedKeys.value = estimatedKeys.value + key
     }
 
-    /** letta-mobile-kr39h: true while this conversation's reading is a post-compaction estimate. */
+    /** True while this conversation's reading is a post-compaction estimate. */
     fun isEstimated(agentId: String?, conversationId: String?): Boolean =
         contextReadingKeyOf(agentId, conversationId)?.let { it in estimated.value } ?: false
 
@@ -147,7 +147,7 @@ fun CoroutineScope.observeContextReadings(
 /**
  * A holder fed by [transport] for as long as [scope] lives — what a session graph owns. With
  * [snapshots], it starts from the last saved readings and saves every change, so the chip
- * survives a restart (letta-mobile-wdm6i).
+ * survives a restart.
  */
 fun contextTokenReadingsOf(
     transport: IChannelTransport,

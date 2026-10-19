@@ -40,7 +40,7 @@ object AppServerApprovalDecisions {
 }
 
 /**
- * letta-mobile-bzvro.11: this decision with the `permission_suggestions` ids the person chose
+ * This decision with the `permission_suggestions` ids the person chose
  * ("always allow"), sent as `selected_permission_suggestion_ids`. Only an allow carries them; a
  * denial, or no ids, is returned unchanged.
  */

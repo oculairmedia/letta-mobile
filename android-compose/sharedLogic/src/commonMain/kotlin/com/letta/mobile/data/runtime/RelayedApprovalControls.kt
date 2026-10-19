@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 
 /**
- * letta-mobile-bzvro.40: an Iroh client's side of the approval relay: the host's `pending_approvals`
+ * An Iroh client's side of the approval relay: the host's `pending_approvals`
  * snapshots folded into one [RelayedPendingApprovalStore].
  *
  * Nothing is cleared on a disconnect: the cards stay, so a decision can still be made (and queued)
@@ -43,7 +43,7 @@ class ApprovalRelayClient(private val store: RelayedPendingApprovalStore = Relay
 }
 
 /**
- * letta-mobile-bzvro.40: the permission-mode chip for a conversation whose turns run on an Iroh host.
+ * The permission-mode chip for a conversation whose turns run on an Iroh host.
  *
  * [modes] holds what this client chose (persisted per conversation, the stricter-of rule while a
  * change is pending); the host's runtime is changed with `permission_mode.set` and read with
@@ -83,7 +83,7 @@ class RelayedPermissionModes(
     }
 
     /**
-     * letta-mobile-a4tm7: folds the host's `permission_mode` pushes from [frames] (a channel
+     * Folds the host's `permission_mode` pushes from [frames] (a channel
      * transport's `events`) until [scope] ends, so a change another client made moves this chip
      * without reopening the conversation.
      *
@@ -121,7 +121,7 @@ class RelayedPermissionModes(
 }
 
 /**
- * letta-mobile-bzvro.40: the approval relay and the permission-mode chip for a gateway that talks to
+ * The approval relay and the permission-mode chip for a gateway that talks to
  * an Iroh host over [transport] (desktop over `iroh://`). Owns one child job of [scope], ended by
  * [close], that folds the host's `pending_approvals` snapshots.
  */
@@ -130,7 +130,7 @@ class IrohApprovalControls(
     val scope: CoroutineScope,
     private val transport: IChannelTransport,
     registry: PermissionModeRegistry,
-    /** letta-mobile-bzvro.14: where answers made offline wait (durable on a real host). */
+    /** Where answers made offline wait (durable on a real host). */
     val outboxStore: com.letta.mobile.data.chat.approval.ApprovalOutboxStore =
         com.letta.mobile.data.chat.approval.InMemoryApprovalOutboxStore(),
 ) : AutoCloseable {
@@ -142,7 +142,7 @@ class IrohApprovalControls(
     )
     private val job: Job = relay.bind(scope, transport.events)
 
-    /** letta-mobile-a4tm7: another client's mode change on the host moves this chip. */
+    /** Another client's mode change on the host moves this chip. */
     private val modeJob: Job = modes.bind(scope, transport.events)
 
     override fun close() {

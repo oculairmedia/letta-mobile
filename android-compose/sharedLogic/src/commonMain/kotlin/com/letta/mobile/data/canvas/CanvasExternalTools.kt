@@ -178,7 +178,7 @@ private suspend fun executeReplaceScene(
 
 /**
  * [ops] written as the caller's, each stamped after the board's clock as the Iroh host stamps them
- * ([CanvasStampedBatch.separately], letta-mobile-s416w.5): through the live session when the board is
+ * ([CanvasStampedBatch.separately],): through the live session when the board is
  * open, else into the store, conditional on the revision this call read.
  */
 private suspend fun commitOpsUpdate(
@@ -275,7 +275,7 @@ private suspend fun executeListCanvases(
 }
 
 /**
- * `canvas_compose` on an app's own App Server (letta-mobile-bglj6.12), the twin of the Iroh host's
+ * `canvas_compose` on an app's own App Server, the twin of the Iroh host's
  * ([HostCanvasTools]): the canvas named by `canvas_id`, or else the caller's conversation's, held to
  * the same read and write checks as [executeAuthorizedMutation], then [CanvasComposeHosting]
  * compiles, checks with the batch validator and publishes through [publishComposed].
@@ -540,7 +540,7 @@ class CanvasListTool(
 }
 
 /**
- * Tool: canvas_compose (letta-mobile-bglj6.12)
+ * Tool: canvas_compose
  * Puts notes, checklists, cards, text and groups on a canvas by meaning; the board places them.
  */
 class CanvasComposeTool(
@@ -576,7 +576,7 @@ class CanvasComposeTool(
 }
 
 /**
- * Tool: canvas_compose_guide (letta-mobile-bglj6.12)
+ * Tool: canvas_compose_guide
  * The canvas_compose format, caps and examples.
  */
 class CanvasComposeGuideTool(

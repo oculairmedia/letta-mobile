@@ -62,7 +62,7 @@ interface IAgentRepository {
     suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview =
         getContextWindow(AgentId(agentId), conversationId?.let(::ConversationId))
     /**
-     * letta-mobile-cyh28: the context breakdown for the drawer meter. [reportedTotal] is the
+     * The context breakdown for the drawer meter. [reportedTotal] is the
      * client's latest streamed `context_tokens` (null when it has none or knows it is stale after a
      * compaction); a local-backend host matches its estimated sections to it. Defaults to
      * [getContextWindow] for backends with nothing to match.
@@ -76,7 +76,7 @@ interface IAgentRepository {
     suspend fun checkpointAndRestoreConfig(agentId: String, operation: suspend () -> Unit) =
         checkpointAndRestoreConfig(AgentId(agentId), operation)
     /**
-     * letta-mobile-by4vm.45: false when this backend cannot serve [createAgent] (the bundled local
+     * False when this backend cannot serve [createAgent] (the bundled local
      * App Server and an Iroh agent directory have no create route), so pages hide the action instead
      * of offering one that always fails.
      */

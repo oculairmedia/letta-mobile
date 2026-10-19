@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * A set of external tools that can change while the host runs (letta-mobile-s416w.27).
+ * A set of external tools that can change while the host runs.
  *
  * [ExternalToolRegistry] reads [tools] whenever it advertises or dispatches, so a source changes
  * what agents are offered by publishing a new list; the registry's `toolsChanged` signal then makes

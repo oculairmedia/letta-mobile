@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * `"{\"command\":\"ls\"}"` rather than `{"command":"ls"}` - while the approval-shaped frames for
  * the same tools carry it once. Every consumer that treats arguments as an object then falls back
  * to printing the raw string, which is how a tool row ends up titled with escaped JSON instead of
- * a summary (letta-mobile-s5vf9).
+ * a summary.
  *
  * One layer comes off, and only when doing so is unambiguous: the text has to parse as a JSON
  * string whose own value parses as an object or an array. A tool whose argument payload is

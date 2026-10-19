@@ -15,7 +15,7 @@ internal const val BRANCH_HISTORY_WINDOW = 200
 private const val NO_CREATE = "This backend can't start a new conversation, so the first prompt can't be edited."
 
 /**
- * letta-mobile-7mys7: the conversation's newest stored messages (oldest first), the list a branch
+ * The conversation's newest stored messages (oldest first), the list a branch
  * places its fork point on. Any [TimelineTransport] can read it: the desktop gateways, and
  * Android's canonical transport (local runtime, Iroh admin_rpc, or REST).
  */

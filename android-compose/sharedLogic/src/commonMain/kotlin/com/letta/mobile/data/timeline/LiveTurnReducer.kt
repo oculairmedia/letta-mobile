@@ -9,7 +9,7 @@ import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentListOf
 
 /**
- * Folds one streamed frame into a live turn's timeline (letta-mobile-nbha6, plan 1.4).
+ * Folds one streamed frame into a live turn's timeline (plan 1.4).
  *
  * A row is named by the logical id the host stamped on its frames and nothing else: the first frame
  * of an id appends the row, a later text frame REPLACES its text when it carries a higher `text_seq`

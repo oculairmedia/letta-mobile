@@ -3,10 +3,10 @@ package com.letta.mobile.data.workspace
 import androidx.compose.runtime.Immutable
 
 /**
- * The device workspace the agent works in, read-only (letta-mobile-bzvro.26): what `@` mentions
+ * The device workspace the agent works in, read-only: what `@` mentions
  * search and the file viewer reads. [AppServerWorkspaceFileSource] serves it over an App Server
  * connection; tests fake it. The working directory comes from the caller: today the
- * conversation's cwd, later the typed device status (F19, letta-mobile-bzvro.19).
+ * conversation's cwd, later the typed device status (F19,).
  */
 interface WorkspaceFileSource {
     /** Up to [limit] paths containing [query], relative to [cwd] (the server's directory when null). */
@@ -16,7 +16,7 @@ interface WorkspaceFileSource {
     suspend fun read(path: String): WorkspaceFileContent
 
     /**
-     * letta-mobile-bzvro.37: [path] relative to [agentId]'s memory root (a memory tool's
+     * [path] relative to [agentId]'s memory root (a memory tool's
      * `system/human/…`). The server joins it to that agent's MemFS root; it never resolves
      * against the host process's working directory.
      */

@@ -21,7 +21,7 @@ import kotlinx.serialization.json.JsonBuilder
  *
  * This serializer delegates to the SDK's [ListSerializer] for the wire encoding (JsonArray
  * of elements), and converts to/from ImmutableList at the boundary via
- * toPersistentList()/toList().
+ * toPersistentList/toList.
  *
  * Per-field usage:
  * ```
@@ -38,11 +38,11 @@ import kotlinx.serialization.json.JsonBuilder
  * annotation's type. For top-level non-annotated fields, callers should use
  * [immutableListOf] which takes the element serializer explicitly:
  * ```
- * val s = ImmutableListSerializer(String.serializer())
+ * val s = ImmutableListSerializer(String.serializer)
  * ```
  *
  * Closes the kotlinx-serialization-kotlinx-collections-immutable gap that
- * letta-mobile-9e8zn / letta-mobile-91er9.19 (List<T> -> ImmutableList<T> in sharedLogic/data/model)
+ *  (List<T> -> ImmutableList<T> in sharedLogic/data/model)
  * depend on.
  */
 class ImmutableListSerializer<T>(
@@ -65,7 +65,7 @@ class ImmutableListSerializer<T>(
  * - `encodeDefaults = false` (omit default values to keep payloads small)
  * - `isLenient = true` (tolerate trailing commas / unquoted keys in development)
  *
- * Callers may override any default by passing a `JsonBuilder.() -> Unit` block:
+ * Callers may override any default by passing a `JsonBuilder. -> Unit` block:
  *
  *   lettaJson { prettyPrint = true }
  *
@@ -76,7 +76,7 @@ class ImmutableListSerializer<T>(
  * don't bind a runtime serializer).
  *
  * Pairs with the kotlinx-serialization-kotlinx-collections-immutable pre-bead
- * (letta-mobile-9e8zn). For the migration target (letta-mobile-91er9.19), each
+ *. For the migration target, each
  * `List<T>` -> `ImmutableList<T>` field in the model classes adds
  * `@Serializable(with = ImmutableListSerializer::class)` annotation.
  */

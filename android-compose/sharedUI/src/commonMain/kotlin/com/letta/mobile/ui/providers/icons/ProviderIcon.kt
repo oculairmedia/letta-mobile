@@ -35,7 +35,7 @@ data class ProviderIdentity(val id: String, val label: String = id, val aliases:
 private const val LOGO_FRACTION = 0.55f
 
 /**
- * A provider's mark (letta-mobile-zxk2n.35): a circle with its brand logo, or — the documented
+ * A provider's mark: a circle with its brand logo, or — the documented
  * fallback for a provider [ProviderIcons] has no logo for — its initial. Filled with the primary
  * container when [connected], as the initial tile always was.
  */

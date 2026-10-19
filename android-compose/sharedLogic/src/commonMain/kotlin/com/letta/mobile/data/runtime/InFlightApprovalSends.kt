@@ -5,7 +5,7 @@ import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
 /**
- * letta-mobile-qygvv.10: approval decisions whose `input_accepted` is still outstanding.
+ * Approval decisions whose `input_accepted` is still outstanding.
  *
  * The unleased answerer and the router's replay responder both see every `control_request` on
  * `client.events`. The decision is cached BEFORE the send, so when the answerer wins that race the

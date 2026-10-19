@@ -4,7 +4,7 @@ import computer.iroh.EndpointAddr
 import computer.iroh.EndpointId
 
 /**
- * letta-mobile-bn008.1: a published Iroh address for an agent — the dialable
+ * A published Iroh address for an agent — the dialable
  * (node id + relay/direct addrs) coordinates a sender needs to reach it directly.
  *
  * Serialized as the same wire shape IrohAppServerTransportAdapter.parseIrohAddress
@@ -51,7 +51,7 @@ sealed interface AddressResolution {
  * The address book: agentId -> current published [IrohAgentAddress].
  *
  * Swappable behind this interface. Layer-1 default is the host-level
- * [HostEndpointAddressStore] (letta-mobile-xmpqm, Phase 1) — one record per host,
+ * [HostEndpointAddressStore] (Phase 1) — one record per host,
  * reachability gated by backend membership rather than per-agent duplication.
  *
  * The interface stays unchanged so callers (resolver, CLI send command, sender

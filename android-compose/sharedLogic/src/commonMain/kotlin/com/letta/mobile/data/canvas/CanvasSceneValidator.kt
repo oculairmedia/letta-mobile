@@ -42,7 +42,7 @@ sealed interface CanvasOpsCheck {
 
 /**
  * Holds a writer's scenes and elements to [CanvasSceneSchema] before they enter the log
- * (letta-mobile-qygvv.21). An element the apps cannot draw is refused with its id, what is wrong
+ *. An element the apps cannot draw is refused with its id, what is wrong
  * and an example of the type it was probably meant to be; nothing of a refused batch is published.
  *
  * What a writer may leave out is filled in ([CanvasElementSpec.defaults], a missing `bgColor`),

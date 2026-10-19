@@ -8,9 +8,9 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * Native cron scheduling over admin_rpc (lgns8.8). These methods are
+ * Native cron scheduling over admin_rpc. These methods are
  * NATIVE-ONLY: the Iroh transport never had a cron surface (the legacy
- * mobile-WS path retires with the shim in lgns8.11), so there is no proxy
+ * mobile-WS path retires with the shim), so there is no proxy
  * fallback — without a live App Server client they fail with a clear error
  * instead of pretending.
  */

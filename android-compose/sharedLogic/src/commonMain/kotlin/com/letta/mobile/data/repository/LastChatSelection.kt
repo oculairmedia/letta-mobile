@@ -9,7 +9,7 @@ data class LastChatSelection(
 /**
  * Platform-neutral merge policy for the persisted chat selection.
  *
- * letta-mobile-etib9: the chat screen writes the selection on entry using
+ * the chat screen writes the selection on entry using
  * whatever the navigation argument carried, which is blank on a cold start
  * (before the roster resolves a name). Treating that blank as a "clear" erased
  * the stored agent name; the next launch then rebuilt the start destination

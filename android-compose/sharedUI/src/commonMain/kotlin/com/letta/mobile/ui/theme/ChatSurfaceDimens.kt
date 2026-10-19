@@ -4,7 +4,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 
-/** letta-mobile-bglj6.1: the shared chat page's shell tokens (the docked panel over the canvas). */
+/** The shared chat page's shell tokens (the docked panel over the canvas). */
 object ChatSurfaceDimens {
     /** The reply card floats over the canvas, so it lifts off it. */
     val dockedReplyElevation: Dp = 6.dp
@@ -75,7 +75,7 @@ object ChatSurfaceDimens {
 }
 
 /**
- * letta-mobile-bglj6.1.9: the Touch canvas's chat head, a Google-Messages-style bubble with the
+ * The Touch canvas's chat head, a Google-Messages-style bubble with the
  * agent's mascot, snapped to a screen edge over the canvas, and the reply popup it speaks through.
  */
 object ChatHeadDimens {
@@ -138,7 +138,7 @@ object ChatHeadDimens {
     /** The snap to an edge after a drag. */
     const val snapMillis: Int = 240
 
-    /** letta-mobile-y5q9z: the expanded bubble's card, at most this wide (a note over the board). */
+    /** The expanded bubble's card, at most this wide (a note over the board). */
     val cardMaxWidth: Dp = 400.dp
 
     /** The card keeps to this share of the area above the keyboard, so the board stays in view. */

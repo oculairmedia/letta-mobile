@@ -63,10 +63,10 @@ data class AgentTemplatesState(
 )
 
 /**
- * letta-mobile-ckmub.2.5 (hard cut S17): makes an agent from a starter template. The host decides
+ *  (hard cut S17): makes an agent from a starter template. The host decides
  * where a made agent opens ([create]'s callback); one creation runs at a time.
  *
- * letta-mobile-by4vm.13: a null [agentRepository] is a session that serves no agents; it offers no
+ * a null [agentRepository] is a session that serves no agents; it offers no
  * create, with the same reason as a backend that cannot create one.
  */
 class AgentTemplatesController(

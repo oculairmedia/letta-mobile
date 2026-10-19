@@ -8,7 +8,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * letta-mobile-fxoew.9: the App Server's `listLocalConversations` drops rows
+ * The App Server's `listLocalConversations` drops rows
  * whose CONVERSATION is hidden, but not rows whose owning AGENT is hidden, so
  * every subagent / reflection run that kept a non-hidden conversation (62 on
  * the live host) reached the chat list. The client cannot filter them: it

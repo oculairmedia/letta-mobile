@@ -26,7 +26,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.launch
 
 /**
- * What the install-and-pair card needs from its platform container (letta-mobile-dpv7m.3).
+ * What the install-and-pair card needs from its platform container.
  * The platform binds identity, persistence and the QR encoder; the card owns all UI.
  */
 class InstallAndPairBindings(

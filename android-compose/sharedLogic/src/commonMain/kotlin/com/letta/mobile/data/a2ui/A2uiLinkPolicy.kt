@@ -3,7 +3,7 @@ package com.letta.mobile.data.a2ui
 import com.letta.mobile.data.plugin.view.ViewLink
 
 /**
- * letta-mobile-by4vm.3: a URL an A2UI `openUrl` call asked to open. Only `http`, `https` and
+ * A URL an A2UI `openUrl` call asked to open. Only `http`, `https` and
  * `mailto` parse; `javascript:`, `file:`, `intent:`, `content:` and every other scheme never reach
  * the platform URI handler. http(s) reuses the plugin bridge's [ViewLink] shape, so userinfo
  * (`https://bank.com@evil.example`) and whitespace are refused the same way for both.

@@ -13,7 +13,7 @@ import kotlin.uuid.Uuid
 
 /**
  * Who is calling a host canvas tool: the runtime scope the App Server stamped, never the input.
- * [toolCallId] is the call's own id in the run (letta-mobile-bglj6.12), for a tool that must answer
+ * [toolCallId] is the call's own id in the run, for a tool that must answer
  * a retried call the same way.
  */
 data class HostCanvasCaller(val agentId: String, val conversationId: String? = null, val toolCallId: String? = null) {
@@ -32,7 +32,7 @@ sealed interface HostCanvasAccess {
 }
 
 /**
- * The host's side of the `canvas_*` tools (letta-mobile-aknkw.1): canvases read from and written to
+ * The host's side of the `canvas_*` tools: canvases read from and written to
  * the relay's durable op log, so an agent running on the host draws on the same boards the apps
  * share, whether or not any app is connected.
  *
@@ -40,7 +40,7 @@ sealed interface HostCanvasAccess {
  * - An agent's ops enter the log the way an app's do: through a relay connection of its own
  *   (origin `agent:<id>`), so they are stored, acknowledged and fanned out to every app on the
  *   board by the same code.
- * - Who may read and write each canvas is in [directory] (letta-mobile-aknkw.2). An agent may claim
+ * - Who may read and write each canvas is in [directory]. An agent may claim
  *   the canvas of the conversation its runtime is in, and no other: the App Server's runtime scope
  *   is the proof that the conversation is its own.
  * - A plugin element's props are held to [kinds], the plugin kinds this host has installed.
@@ -117,11 +117,11 @@ class HostCanvasBackend(
      * it wins over what the caller read. Returns the log's head once the relay has acknowledged
      * every op.
      *
-     * The batch is all or nothing ([check]): elements the apps cannot draw (letta-mobile-qygvv.21)
-     * and a board state they cannot draw as meant (letta-mobile-qygvv.30) refuse the whole of it
+     * The batch is all or nothing ([check]): elements the apps cannot draw
+     * and a board state they cannot draw as meant refuse the whole of it
      * before anything is sent. Published, a bad op would be acknowledged, logged and fanned out.
      *
-     * [atomic] also makes the write itself all or nothing (letta-mobile-bglj6.12): the ops go to the
+     * [atomic] also makes the write itself all or nothing: the ops go to the
      * relay as one [CanvasOp.BatchOp] ([CanvasStampedBatch]), appended, acknowledged and fanned out
      * as one log entry, so a relay that fails mid-write leaves none of them. Sent op by op, a
      * failure after the first ack leaves the ones before it on the board.

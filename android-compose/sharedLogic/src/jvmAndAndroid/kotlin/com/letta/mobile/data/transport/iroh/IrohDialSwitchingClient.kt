@@ -16,7 +16,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * letta-mobile-by4vm.95: the one [AppServerClient] an [IrohChannelTransport]'s turn engine and
+ * The one [AppServerClient] an [IrohChannelTransport]'s turn engine and
  * event router hold across Iroh dials.
  *
  * Calls go to the bound dial's client. While no dial is bound they fail at once with

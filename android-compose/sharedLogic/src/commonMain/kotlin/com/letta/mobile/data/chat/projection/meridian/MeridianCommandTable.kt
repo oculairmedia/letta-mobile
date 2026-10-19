@@ -5,8 +5,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * The `meridian` command surface as the timeline reads it (letta-mobile-jna0o.6): the same paths,
- * positionals and flag aliases as the host's `MeridianCommandCatalog` (letta-mobile-jna0o.3), so a
+ * The `meridian` command surface as the timeline reads it: the same paths,
+ * positionals and flag aliases as the host's `MeridianCommandCatalog`, so a
  * CLI call names the native tool the router runs. Help, `guide <topic>` and `schema …` run no tool
  * and are not here; they keep their Bash row.
  */

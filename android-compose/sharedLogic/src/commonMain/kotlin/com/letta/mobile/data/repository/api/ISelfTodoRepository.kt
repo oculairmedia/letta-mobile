@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
- * letta-mobile-gnyf7: source of truth for the MAIN/foreground agent's OWN
+ * Source of truth for the MAIN/foreground agent's OWN
  * TodoWrite plan in the active conversation.
  *
  * Unlike [ISubagentRepository] (which tracks DISPATCHED subagents over the

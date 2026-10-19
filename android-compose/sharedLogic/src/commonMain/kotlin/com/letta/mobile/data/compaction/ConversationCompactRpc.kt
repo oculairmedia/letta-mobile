@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * letta-mobile-57cta: the `conversation.compact` admin_rpc contract shared by the Iroh host that
+ * The `conversation.compact` admin_rpc contract shared by the Iroh host that
  * serves it and the clients that call it.
  *
  * Params: `agent_id` (required), `conversation_id` (optional, the agent's `default` when absent),
@@ -39,7 +39,7 @@ enum class CompactionPath(val wire: String) {
 }
 
 /**
- * letta-mobile-57cta: what a manual compaction did.
+ * What a manual compaction did.
  *
  * [contextTokensBefore] / [contextTokensAfter] are the host's chars/4 estimates of the transcript
  * (summary plus messages) on either side, the same meaning as a streamed `compaction_stats`, so a

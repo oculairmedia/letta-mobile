@@ -15,12 +15,12 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * letta-mobile-lgns8.22.5: owns the FULL lifecycle of one
+ * Owns the FULL lifecycle of one
  * `external_tool_call_request` — claim, generation fencing, bounded invocation,
  * result caching and the matched `external_tool_call_response`.
  *
- * Extracted verbatim from `AppServerTurnEngine` (lgns8.17 + lgns8.22.4.1.2 +
- * lgns8.22.4.1.6 + PR #1077); no behaviour change. The engine keeps only the
+ * Extracted verbatim from `AppServerTurnEngine` ( +  +
+ *  + PR #1077); no behaviour change. The engine keeps only the
  * decisions that genuinely need a turn lease — WHICH generation is validated for
  * a frame, and WHETHER a request is unleased — and hands the rest here.
  *
@@ -44,7 +44,7 @@ internal class ExternalToolDispatcher(
     private val inboundControlRegistry: InboundControlRequestRegistry,
     private val connectionGenerationProvider: () -> Long,
     /**
-     * lgns8.22.4.1.6: computed results retained PAST a successful (one-way, hence
+     * Computed results retained PAST a successful (one-way, hence
      * ambiguous) send so a reconnect replay reuses the result instead of
      * re-invoking a non-idempotent tool. Bounded + TTL-expiring.
      *
@@ -55,7 +55,7 @@ internal class ExternalToolDispatcher(
      */
     private val resultCache: ExternalToolResultCache = ExternalToolResultCache(),
     /**
-     * lgns8.17(c): per-invocation deadline for `ExternalTool.invoke`. A
+     * (c): per-invocation deadline for `ExternalTool.invoke`. A
      * protocol-derived constant, not a per-host tuning knob — the value must stay
      * strictly inside the server's own window. Injectable for tests only.
      */
@@ -79,8 +79,8 @@ internal class ExternalToolDispatcher(
      * send is lost, but the App Server re-emits the still-blocking request on
      * reconnect/sync, so the next collect re-answers.
      *
-     * @param validatedGeneration the generation `matches()` VALIDATED for this
-     *   lease, NEVER a fresh read of the live provider (lgns8.22.4.1.2). A
+     * @param validatedGeneration the generation `matches` VALIDATED for this
+     *   lease, NEVER a fresh read of the live provider. A
      *   disconnect racing this handler must not make us register/claim (and
      *   execute) under a successor generation, poisoning its registry entry and
      *   duplicating tool side effects.
@@ -169,7 +169,7 @@ internal class ExternalToolDispatcher(
      * Invoke the wired handler (or synthesize a matched is_error result when none
      * handles the tool) and cache the outcome.
      *
-     * lgns8.22.4.1.6: cached by (request_id, tool_call_id) and NOT by connection
+     * cached by (request_id, tool_call_id) and NOT by connection
      * generation, so a successor-generation replay reuses it and a non-idempotent
      * tool never runs twice for one request identity.
      */
@@ -236,7 +236,7 @@ internal class ExternalToolDispatcher(
     }
 
     /**
-     * lgns8.22.4.1.2 fence. Returns true (and releases the claim) when the live
+     *  Fence. Returns true (and releases the claim) when the live
      * connection generation has moved past the generation this external-tool
      * request was validated/claimed on.
      */
@@ -281,7 +281,7 @@ internal class ExternalToolDispatcher(
         private const val TELEMETRY_SOURCE = "AppServerTurnEngine"
 
         /**
-         * lgns8.17(c): deadline for ONE `ExternalTool.invoke`.
+         * (c): deadline for ONE `ExternalTool.invoke`.
          *
          * Chosen against the server's own bound, not picked for feel: letta-code's
          * app-server parks an external tool call on a pending promise with

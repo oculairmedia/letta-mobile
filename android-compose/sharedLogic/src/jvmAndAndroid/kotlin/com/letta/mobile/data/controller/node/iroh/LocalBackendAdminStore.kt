@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
 
 /**
- * lgns8.9: native admin-query tier that reads the letta-code on-disk backend
+ * Native admin-query tier that reads the letta-code on-disk backend
  * store DIRECTLY, replacing the lettashim HTTP proxy for reads. lettashim is not
  * a proxy — its admin queries are `admin-shim/lib/store.ts` functions reading
  * `<baseDir>/agents/{id}.json` + `<baseDir>/memfs/<agentId>/memory/system/{label}.md`. This
@@ -35,7 +35,7 @@ import java.io.File
  * `open` so tests in the host-endpoint address-book module can supply an
  * in-memory subclass (the [com.letta.mobile.data.transport.iroh.HostEndpointAddressStore]
  * membership gate does not need a real on-disk backend to exercise the
- * resolve() contract — see `HostEndpointAddressStoreBackendMembershipTest`).
+ * resolve contract — see `HostEndpointAddressStoreBackendMembershipTest`).
  */
 open class LocalBackendAdminStore(
     private val baseDir: File,
@@ -58,7 +58,7 @@ open class LocalBackendAdminStore(
     /** See [LocalBackendAgentReader.countAgents]. */
     fun countAgents(): Int? = agentReader.countAgents()
 
-    /** See [LocalBackendAgentReader.hiddenAgentIds] (letta-mobile-fxoew.9). */
+    /** See [LocalBackendAgentReader.hiddenAgentIds]. */
     open fun hiddenAgentIds(): Set<String>? = agentReader.hiddenAgentIds()
 
     /**
@@ -119,7 +119,7 @@ open class LocalBackendAdminStore(
     internal fun listRunsProjected(query: RunQuery): JsonArray? = runReader.listRuns(query)
 
     /**
-     * bn008.6: set of conversationIds with at least one `active=true` run for
+     * Set of conversationIds with at least one `active=true` run for
      * [agentId]. Used by the a2a receiver's `conversationsFor` closure to mark
      * a conversation `busy` so the router queues instead of re-triggering.
      *
@@ -163,7 +163,7 @@ open class LocalBackendAdminStore(
     fun agentContextProjected(agentId: String, conversationId: String?): JsonObject? =
         agentContextProjected(AgentContextQuery(agentId, conversationId))
 
-    /** letta-mobile-cyh28: as above, matched to the client's streamed total when it sends one. */
+    /** As above, matched to the client's streamed total when it sends one. */
     fun agentContextProjected(query: AgentContextQuery): JsonObject? = contextReader.agentContextProjected(query)
 
     /** See [LocalBackendContextReader.transcriptTokens]. */

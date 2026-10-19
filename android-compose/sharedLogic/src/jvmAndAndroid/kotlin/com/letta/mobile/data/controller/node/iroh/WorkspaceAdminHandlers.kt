@@ -15,7 +15,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
 /**
- * letta-mobile-bzvro.37: relays the agent-workspace commands (MemFS browser, secrets vault,
+ * Relays the agent-workspace commands (MemFS browser, secrets vault,
  * workspace files) from an Iroh client to this node's App Server — the same commands, through the
  * same [AppServerClient.workspaceRequest] / [AppServerClient.writeMemoryFile] path, a direct
  * desktop session uses.

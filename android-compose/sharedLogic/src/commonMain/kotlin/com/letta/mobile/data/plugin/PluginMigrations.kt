@@ -42,7 +42,7 @@ sealed interface PluginMigrationResult {
 }
 
 /**
- * Props migrations (plan section 3.1, letta-mobile-s416w.24): a kind's `migrations` map is keyed by
+ * Props migrations (plan section 3.1,): a kind's `migrations` map is keyed by
  * the version a step list migrates FROM, so migrating v1 props to v3 applies the lists at "1" and
  * "2" in order; a version with no list changed nothing the props carry. Pure: the host applies it
  * when an element of an older version is read, and the props validator then holds the result to

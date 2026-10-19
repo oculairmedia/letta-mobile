@@ -64,13 +64,13 @@ class CanvasRelayClient(
     private val assets: AssetStore? = null,
     private val assetFetchTimeoutMs: Long = ASSET_FETCH_TIMEOUT_MS,
     /**
-     * Takes ops for canvases this app has but no board open on (letta-mobile-qygvv.23). Without
+     * Takes ops for canvases this app has but no board open. Without
      * one, such an op is left for the next join to replay rather than skipped.
      */
     private val closedBoard: CanvasClosedBoardApplier? = null,
     /**
      * Rebuilds what the op log no longer holds of a canvas from its stored board (a bounded log,
-     * letta-mobile-ckmub.17.9); the first join to a host uploads it beside the log. Without one, the
+     *); the first join to a host uploads it beside the log. Without one, the
      * first join uploads what the log holds.
      */
     private val snapshotSeed: CanvasSnapshotSeed? = null,
@@ -316,7 +316,7 @@ class CanvasRelayClient(
     }
 
     /**
-     * letta-mobile-cdgpr.8: puts [bytes] in the host's asset store outside any canvas, over the
+     * Puts [bytes] in the host's asset store outside any canvas, over the
      * current connection, and answers their ref once the host has kept them. They are pinned: refused
      * before anything is sent unless they hash to [sha256]. Throws [CanvasRelayUploadException] when
      * there is no connection, or the host rejects them or does not answer in [timeoutMs].
@@ -379,7 +379,7 @@ class CanvasRelayClient(
 
     /**
      * The topics of the canvases this app keeps current with no board open ([closedBoard]): joined
-     * on every connection, so an agent's edits land while the person is elsewhere (qygvv.23).
+     * on every connection, so an agent's edits land while the person is elsewhere.
      */
     private suspend fun knownTopics(): List<String> =
         closedBoard?.known().orEmpty().map { canvas(it).topic }
@@ -395,7 +395,7 @@ class CanvasRelayClient(
 
     /**
      * [join], sent again when [topic] has a gap: an op arrived that nothing here took, so the stored
-     * cursor stopped short of it, and joining from there has the host replay it (qygvv.23).
+     * cursor stopped short of it, and joining from there has the host replay it.
      */
     private suspend fun rejoin(live: Live, topic: String) {
         if (gate.hasGap(CanvasRelayTopic(topic))) lock.withLock { live.joinSent -= topic }

@@ -4,7 +4,7 @@ import com.letta.mobile.data.model.LlmModel
 
 /**
  * Client-side domain for App Server provider management and model exposure
- * (letta-mobile-w4q4p). Decoded from the wrapper's `provider.*` / `model.*`
+ *. Decoded from the wrapper's `provider.*` / `model.*`
  * admin RPC by [ModelControlWire]; platform-neutral.
  */
 

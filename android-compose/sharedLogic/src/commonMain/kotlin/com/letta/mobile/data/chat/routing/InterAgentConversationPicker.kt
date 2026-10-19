@@ -5,7 +5,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.api.IConversationRepository
 
 /**
- * letta-mobile-i9h61.3 — pick "the conversation where an inter-agent
+ *  — pick "the conversation where an inter-agent
  * message lives" on the OTHER agent's side.
  *
  * Each agent owns its own conversation id space, and the sender's
@@ -21,7 +21,7 @@ import com.letta.mobile.data.repository.api.IConversationRepository
  * the router chose — no letta-code change, no tool-result change.
  *
  * Reads via [IConversationRepository.listConversationsForAgent]
- * (letta-mobile-i9h61.3.2), which dispatches to the wrapper's
+ *, which dispatches to the wrapper's
  * conversation.list_agent admin_rpc. The picker and the router share one
  * implementation (IrohAgentMessageRouter.pickMostRecentInteractive) so
  * they can never disagree about "which conversation."
@@ -37,7 +37,7 @@ import com.letta.mobile.data.repository.api.IConversationRepository
  *     null and the caller falls through to appserver-resolved fresh
  *     conversation creation.
  *   - HTTP / appserver gateways without conversation.list_agent return
- *     emptyList() and the picker falls through to the null branch.
+ *     emptyList and the picker falls through to the null branch.
  */
 suspend fun pickOtherAgentConversation(
     repo: IConversationRepository,

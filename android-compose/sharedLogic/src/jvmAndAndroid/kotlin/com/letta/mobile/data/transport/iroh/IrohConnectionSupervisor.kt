@@ -36,7 +36,7 @@ data class IrohConnectionHandle(
     val adminRpcCall: (suspend (method: String, path: String, body: String?) -> AppServerInboundFrame.AdminRpcResponse)? = null,
     val serverCapabilities: Set<String>? = null,
     /**
-     * letta-mobile-r3i1z: the stream-channel frame flow the passive observer
+     * The stream-channel frame flow the passive observer
      * ingestion loop subscribes to. Defaults to the live transport's
      * `streamFrames` (== IrohAppServerTransport.streamFrameFlow, where fanned-out
      * frames arrive off QUIC). Overridable so tests can drive observer ingestion
@@ -94,7 +94,7 @@ sealed interface IrohConnectionState {
 internal const val IROH_CONFIG_CHANGED = "config_changed"
 
 /**
- * letta-mobile-by4vm.96: why entering this state ends the session for good, or null when the
+ * Why entering this state ends the session for good, or null when the
  * supervisor is redialling (a lost connection or a failed dial) and turns wait for it.
  */
 internal fun IrohConnectionState.sessionEndReason(): String? = when (this) {

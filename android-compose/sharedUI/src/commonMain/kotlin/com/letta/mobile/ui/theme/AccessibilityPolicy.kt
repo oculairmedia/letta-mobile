@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * letta-mobile-k5nbq.1: the shared reduced-motion / high-contrast policy. Hosts only emit OS
+ * The shared reduced-motion / high-contrast policy. Hosts only emit OS
  * facts ([rememberOsReducedMotion], [rememberOsHighContrast]); this holder is the one consumers
  * and the theme read.
  */

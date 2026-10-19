@@ -9,7 +9,7 @@ import com.letta.mobile.runtime.ToolCallId
 import kotlin.jvm.JvmInline
 
 /**
- * letta-mobile-zxk2n.8 (G39) / ulcg6.1: the subagent dual view. A subagent's own conversation opens
+ *  (G39) / the subagent dual view. A subagent's own conversation opens
  * beside its parent's (one pane each on a wide window, one at a time on a compact one), read-only:
  * the reader watches the child work and replies in the parent. Several can be open, one is shown.
  *

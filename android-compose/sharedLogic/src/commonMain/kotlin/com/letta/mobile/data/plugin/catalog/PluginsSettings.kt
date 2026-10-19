@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * letta-mobile-cdgpr.9: the Settings page's way into the Plugins page, the same on every client:
+ * The Settings page's way into the Plugins page, the same on every client:
  * a section in the Providers group (beside what agents may reach) whose row opens [onOpen].
  */
 fun pluginsSettingsContribution(onOpen: () -> Unit): SettingsContribution = SettingsContribution(
@@ -27,7 +27,7 @@ fun pluginsSettingsContribution(onOpen: () -> Unit): SettingsContribution = Sett
 )
 
 /**
- * letta-mobile-cdgpr.8: the Plugins entry, or none when [onOpen] is null. A host that does not
+ * The Plugins entry, or none when [onOpen] is null. A host that does not
  * advertise `plugins_v1` gets no entry.
  */
 fun pluginsSettingsContributionOrNull(onOpen: (() -> Unit)?): SettingsContribution? = onOpen?.let(::pluginsSettingsContribution)
@@ -44,7 +44,7 @@ fun inMemoryLiveViewsSetting(initial: Boolean = false): SettingValue<Boolean> {
 }
 
 /**
- * letta-mobile-cdgpr.8: this device's "Live plugin views" switch, persisted in [settings] under
+ * This device's "Live plugin views" switch, persisted in [settings] under
  * [FeatureFlag.LIVE_PLUGIN_VIEWS]. On Android that is a DataStore preference. A write applies at
  * once and is saved on [scope].
  */

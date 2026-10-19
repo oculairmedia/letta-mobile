@@ -19,11 +19,11 @@ import com.letta.mobile.data.canvas.compose.CanvasComposeReserve.SAFETY_FACTOR
 import kotlin.math.ceil
 
 /**
- * The height placement RESERVES for a composed item (letta-mobile-bglj6.9, plan section 3.4, D3).
+ * The height placement RESERVES for a composed item (plan section 3.4, D3).
  *
  * The compose layer cannot measure text: the host has no fonts, and Android and Skiko measure the
  * same words differently. So it books a height that is an overestimate by construction, and the
- * renderer fits the real content WITHIN it (sharedUI `CanvasNoteAutoFit`, letta-mobile-bglj6.11: it
+ * renderer fits the real content WITHIN it (sharedUI `CanvasNoteAutoFit`, it
  * shrinks the card to what it measured; content longer than the booking first gets smaller type,
  * down to a floor, and only then a taller card, visually and never written back). Pure arithmetic
  * over characters, with no font, density or Compose API, done in whole world units so every peer

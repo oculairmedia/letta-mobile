@@ -37,7 +37,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * The Skills page shared by desktop and Android (letta-mobile-zxk2n.32): the agent's skills and,
+ * The Skills page shared by desktop and Android: the agent's skills and,
  * beneath them, the tools it can call - one page, since a tool is a skill's smaller sibling. A
  * single search narrows both sections; the skills carry add / remove, the tools section the host's
  * create action when it has one ([SkillsPageActions.onAddTool]).

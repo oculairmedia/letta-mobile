@@ -3,7 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.ToolReturnMessage
 
 /**
- * letta-mobile-fe51r (P2b pointer diet): marker that a tool-return body held
+ *  (P2b pointer diet): marker that a tool-return body held
  * in the timeline is a server-projected preview, not the full output. The
  * full body can be fetched on demand (iroh admin_rpc `tool_return.get`) via
  * [TimelineSyncLoop.resolveTruncatedToolReturn] using [messageId].
@@ -33,7 +33,7 @@ internal data class ToolReturnFoldResult(
  * attach, and the snapshot reconcile path so all three agree on the rule.
  */
 /**
- * letta-mobile-c4igq.2: default inbound cap on a single tool-return body folded
+ * Default inbound cap on a single tool-return body folded
  * into the timeline. A server that does NOT pre-project (toolReturnTruncated !=
  * true) can still deliver an arbitrarily large body; storing it in full has
  * wedged a turn mid-stream. We bound it at this shared ingest chokepoint,
@@ -71,7 +71,7 @@ private class ToolReturnFold(
     }
 
     /**
-     * letta-mobile-by4vm.46: a return with no func_response (a stderr-only failure) still
+     * A return with no func_response (a stderr-only failure) still
      * completes its call, exactly as the live reducer records it: "" unless a body is held.
      */
     private fun addBodyless(callId: String) {

@@ -111,7 +111,7 @@ fun interface CanvasDocumentRecorder {
 
     /**
      * Records [step], a change already made that worked out its own undo (a plugin element's move
-     * or removal, letta-mobile-s416w.3/.4). A recorder with no history ignores it.
+     * or removal,). A recorder with no history ignores it.
      */
     fun record(step: CanvasHistory.Step.Documents) = Unit
 }

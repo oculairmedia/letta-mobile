@@ -42,7 +42,7 @@ import com.letta.mobile.ui.shell.shellTemplatesPage
 private const val PROJECT_PINS_KEY = "desktop.projects.pinned"
 
 /**
- * letta-mobile-ckmub.2.6 / ckmub.17.5: the shared Runs, Templates and Projects pages (they were desktop's
+ * The shared Runs, Templates and Projects pages (they were desktop's
  * `DesktopAdminPages`), each over its sharedLogic controller, which lives while its page is on screen and
  * is rebuilt with the session graph. Projects ride an Iroh host's relay; elsewhere the page says why.
  */
@@ -130,7 +130,7 @@ private fun rememberProjectPins(settings: SecureSettingsStore): ProjectPinStore 
 private fun ProjectSummary.agentIdOrNull(): AgentId? = lettaAgentId?.value?.takeIf { it.isNotBlank() }?.let(::AgentId)
 
 /**
- * Providers (letta-mobile-w4q4p.6 / .6.1): the shared settings pane over the host's [session], the
+ * Providers ( /.6.1): the shared settings pane over the host's [session], the
  * one its model picker and Models sheet read, so a change here shows there at once.
  */
 fun shellProvidersPage(session: ModelControlSession) = ShellPageContent<ShellDestination.Providers> { _, modifier ->

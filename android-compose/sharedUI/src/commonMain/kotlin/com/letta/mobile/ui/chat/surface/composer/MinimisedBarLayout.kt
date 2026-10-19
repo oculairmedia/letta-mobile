@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 
 /**
- * The minimised dock's own say over its prompt bar (letta-mobile-zxk2n.29), where the host keeps
+ * The minimised dock's own say over its prompt bar, where the host keeps
  * layout prefs: the bar runs as wide as the person dragged it (not capped at the chat column), its
  * field as tall as they dragged its top edge, and [handles] draws the drag strips over the bar's
  * own edges. Null everywhere else: the open panel's bar, the full page and the phone.

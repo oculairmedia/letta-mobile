@@ -13,7 +13,7 @@ import com.letta.mobile.data.transport.api.IChannelTransport
  *
  * Ephemeral letta-code subagents (`agent-local-*` workers) churn in bursts while a run fans out;
  * they are not part of the human agent list, so they get no per-agent fetch and the next bulk
- * refresh reconciles them (letta-mobile-vcmin).
+ * refresh reconciles them.
  */
 suspend fun observeAgentUpdates(
     transport: IChannelTransport,

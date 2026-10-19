@@ -27,7 +27,7 @@ interface AgentEditorBackend {
     val models: StateFlow<List<LlmModel>>
     val tools: StateFlow<List<Tool>>
 
-    /** Why the last model refresh failed (letta-mobile-by4vm.121.11); null when it succeeded or has not run. */
+    /** Why the last model refresh failed; null when it succeeded or has not run. */
     val modelsUnavailable: StateFlow<String?>
 
     /** The agent as the server has it now. */
@@ -55,7 +55,7 @@ fun interface AgentCreator {
  * The session repositories the editor works over. [modelCatalog] replaces [models]' list where the
  * host already holds the models its chat offers (the desktop's chat controller).
  *
- * letta-mobile-by4vm.13: a null repository is a route the session does not serve (the desktop's tools
+ * a null repository is a route the session does not serve (the desktop's tools
  * and models off Iroh): its catalog reads empty and its writes fail with that reason.
  */
 class AgentEditorRepositories(

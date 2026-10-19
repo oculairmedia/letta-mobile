@@ -41,14 +41,14 @@ class MascotIdentityRegistry {
     val timelineBounds = mutableStateOf<GazeRect?>(null)
 
     /**
-     * Every attention point a surface published with [mascotAttention] (te3n1.2): the caret, the
+     * Every attention point a surface published with [mascotAttention]: the caret, the
      * newest message, a waiting approval card, a running tool. Read in a snapshot by [MascotLive].
      */
     val attention = mutableStateMapOf<AttentionKey, AttentionRect>()
 
     /**
      * Edits the primary composer has taken, counted for the life of the registry (letta-mobile-
-     * te3n1.1): the mascot being typed to listens harder the faster this climbs. A plain counter,
+     *): the mascot being typed to listens harder the faster this climbs. A plain counter,
      * not snapshot state, on purpose - it is read once per frame by the live mascot, and typing must
      * not recompose every tile. UI thread only, like the composer that writes it.
      */
@@ -111,7 +111,7 @@ enum class MascotGazeSurface {
  * Publishes this node's window bounds as a [GazeDirector] target. Null when
  * the node leaves composition so OWN / USER / CURSOR still run without a
  * dead look at the origin. Android chat can attach the same modifier later
- * (letta-mobile-jwntc).
+ *.
  */
 @Composable
 fun Modifier.mascotGazeTarget(surface: MascotGazeSurface): Modifier {

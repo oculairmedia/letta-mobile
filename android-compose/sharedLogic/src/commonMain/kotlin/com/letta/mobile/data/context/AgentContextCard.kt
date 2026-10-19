@@ -3,7 +3,7 @@ package com.letta.mobile.data.context
 import com.letta.mobile.data.compaction.CompactionOutcome
 import kotlin.math.roundToInt
 
-/** letta-mobile-3io8k: how full the window is, for the bar's tone (neutral < 70 %, warning, error >= 90 %). */
+/** How full the window is, for the bar's tone (neutral < 70 %, warning, error >= 90 %). */
 enum class ContextMeterLevel {
     Normal,
     Warning,
@@ -51,7 +51,7 @@ data class AgentContextCardInputs(
 )
 
 /**
- * letta-mobile-3io8k: the drawer card's presentation — the model line, the meter, and the
+ * The drawer card's presentation — the model line, the meter, and the
  * sheet's Compact state — derived from [AgentContextCardInputs] alone so both platforms say the
  * same thing.
  */
@@ -98,7 +98,7 @@ data class AgentContextCardModel(
         }
 
         /**
-         * letta-mobile-3io8k: a model whose window is smaller than what the conversation already
+         * A model whose window is smaller than what the conversation already
          * holds overflows on its next turn; the picker warns before the switch.
          */
         fun overflowsWindow(usedTokens: Int?, candidateWindow: Int?): Boolean {

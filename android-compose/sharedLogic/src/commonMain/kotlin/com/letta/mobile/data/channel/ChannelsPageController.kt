@@ -23,7 +23,7 @@ interface ChannelLibrarySource : AutoCloseable {
     fun refresh()
 }
 
-/** What the shared Channels page can ask of its controller (letta-mobile-c3np7.3.6). */
+/** What the shared Channels page can ask of its controller. */
 interface ChannelsPageActions {
     fun refresh()
 

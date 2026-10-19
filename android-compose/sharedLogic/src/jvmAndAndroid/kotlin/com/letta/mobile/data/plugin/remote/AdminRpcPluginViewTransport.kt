@@ -18,8 +18,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlin.io.encoding.Base64
 
 /**
- * letta-mobile-cdgpr.7: a live view's [PluginViewTransport] over the host's admin_rpc connection,
- * in place of the dedicated `meridian/plugin-view/1` ALPN (letta-mobile-s416w.32): admin_rpc already
+ * A live view's [PluginViewTransport] over the host's admin_rpc connection,
+ * in place of the dedicated `meridian/plugin-view/1` ALPN: admin_rpc already
  * carries the peer's authentication and capabilities. Pages come from `plugins.page.read`; actions
  * go to `plugins.view.action`, where the host checks them against the manifest again. On a host
  * without `plugins_v1` nothing is sent: pages are unavailable and actions answer Unavailable.

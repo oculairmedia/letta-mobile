@@ -6,7 +6,7 @@ internal data class ForwardGrowthMergeResult(
 )
 
 /**
- * letta-mobile-lf4hh: widest gap between two streamed fragments of ONE assistant
+ * Widest gap between two streamed fragments of ONE assistant
  * reply. Fragments of a single reply are emitted within the same generation loop
  * (milliseconds apart); anything older at the timeline tail is a settled message.
  */

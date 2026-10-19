@@ -3,7 +3,7 @@ package com.letta.mobile.data.backend
 import com.letta.mobile.data.chat.recompile.IrohConversationRecompileRpc
 
 /**
- * letta-mobile-by4vm.13: every optional route a session graph may or may not serve.
+ * Every optional route a session graph may or may not serve.
  *
  * This is the compile-time-checked list behind [SessionCapabilities] and [AppServerRouteUnavailable]:
  * a route a backend does not serve is named by one of these, never by a free-form string, and every
@@ -47,7 +47,7 @@ class AppServerRouteUnavailable(
 )
 
 /**
- * letta-mobile-by4vm.13: a remote source a session either binds or does not.
+ * A remote source a session either binds or does not.
  *
  * Replaces the reflection proxies that used to stand in for an absent source: an [Absent] route is a
  * value callers can match on, and [source] throws [AppServerRouteUnavailable] only as the backstop.

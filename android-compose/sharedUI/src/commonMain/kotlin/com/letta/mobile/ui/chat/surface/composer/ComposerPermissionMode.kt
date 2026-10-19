@@ -155,7 +155,7 @@ private fun ComposerPermissionModeNote(state: ChatPermissionModeUiState) {
     )
 }
 
-/** letta-mobile-a4tm7: "Host: <node id short>" or "This device's bundled runtime". */
+/** "Host: <node id short>" or "This device's bundled runtime". */
 @Composable
 internal fun permissionModeRuntimeLabel(runtime: PermissionModeRuntime): String = when (runtime) {
     is PermissionModeRuntime.Host -> runtime.shortId

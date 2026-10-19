@@ -8,7 +8,7 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 
 /**
- * letta-mobile-bzvro.13, ckmub.17.2 (moved from desktop's App Server gateway): the
+ *  (moved from desktop's App Server gateway): the
  * [PermissionModeGateway] of a session that runs the App Server turn engine itself. A change goes
  * through [permissionModes] (shown pending, recorded once the server echoes it) and out as the
  * engine's `change_device_state`; desktop's gateway and the web's chat page both bind it.

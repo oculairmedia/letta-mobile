@@ -43,7 +43,7 @@ data class RunSummary(val total: Int = 0, val active: Int = 0, val failed: Int =
 }
 
 /**
- * letta-mobile-ckmub.2.5 (hard cut S17): what the shared Runs page shows. [error] is a list that
+ *  (hard cut S17): what the shared Runs page shows. [error] is a list that
  * could not load at all; [operationError] a detail, cancel or delete that failed over a loaded list.
  */
 @Immutable
@@ -87,10 +87,10 @@ private val ACTIVE_STATUSES = setOf("created", "running")
 private const val ERROR_STATUS = "error"
 
 /**
- * The run monitor shared by every host (letta-mobile-ckmub.2.5): lists the host's runs, filters them
+ * The run monitor shared by every host: lists the host's runs, filters them
  * and opens one. Cancel and delete exist only where [IRunRepository.supportsRunDetail] is true.
  *
- * letta-mobile-by4vm.13: a null [runRepository] is a session that serves no runs; the page shows the
+ * a null [runRepository] is a session that serves no runs; the page shows the
  * host's "not served here" reason instead of calling it.
  */
 class RunMonitorController(

@@ -35,14 +35,14 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Duration.Companion.milliseconds
 /**
  * Platform-neutral SEND orchestration for the frame-channel (Iroh) send
- * path, extracted from Android's `WsChatSendCoordinator` (letta-mobile-9ejia.5)
+ * path, extracted from Android's `WsChatSendCoordinator`
  * so desktop can reuse the exact same logic instead of reimplementing a thinner
  * send path.
  *
  * What lives here (pure orchestration, no Compose / Dagger / Android):
  *   - optimistic user-bubble construction via [TimelineExternalTransportWriter]
  *   - otid generation + reconciliation (mark-sent / mark-failed / reconcile)
- *   - the unbounded busy-send queue (letta-mobile-1n5py, [QueuedSendDriver])
+ *   - the unbounded busy-send queue ([QueuedSendDriver])
  *   - turn-state transitions (active otid/turn id, first-wins stop_reason +
  *     usage guards, buffered-error-until-TurnDone ordering)
  *   - the [WsTimelineEvent] state machine, including the strict
@@ -120,7 +120,7 @@ class ChatSendCoordinator(
         sendOfConversation = { conversationId -> peekState(conversationId)?.inFlightSend },
     )
 
-    /** letta-mobile-1n5py: the send queue a chat screen shows and controls. */
+    /** The send queue a chat screen shows and controls. */
     val sendQueue: ChatSendQueueControls = ChatSendQueueControls(scope, queueDriver, queuedSends.state)
     private val bridgeEventDeduplicator = BridgeEventDeduplicator()
     private val postSendReconciler = PostSendReconciler(
@@ -131,7 +131,7 @@ class ChatSendCoordinator(
     )
     private val runtimeEventBatcher = RuntimeEventBatcher(scope, recordRuntimeEvents)
 
-    /** letta-mobile-ztuog: this chat's agent-keyed subscription; hosts select it when it is on screen. */
+    /** This chat's agent-keyed subscription; hosts select it when it is on screen. */
     val eventSubscription = ChatSendEventSubscription(
         scope = scope,
         attachment = wsChatBridge.agentScopes.attachment(AgentId(agentId)) {
@@ -180,7 +180,7 @@ class ChatSendCoordinator(
         val identity = TurnIdentityLifecycle()
         @Volatile var otid: String? = null
 
-        /** letta-mobile-1n5py.1: the send behind [otid], kept so a busy bounce can wait and retry it. */
+        /** The send behind [otid], kept so a busy bounce can wait and retry it. */
         @Volatile var inFlightSend: QueuedChatSend? = null
         @Volatile var localConversationId: String? = null
         @Volatile var serverConversationId: String? = null
@@ -288,7 +288,7 @@ class ChatSendCoordinator(
         }
 
     /**
-     * letta-mobile-ce2xr: Binds an inbound turn to its originating send by [otid].
+     * Binds an inbound turn to its originating send by [otid].
      *
      * Inbound server frames (e.g. UserMessage echo, AssistantMessage) carry the client's
      * [otid] alongside the server's `conversation_id` and `turn_id`. When the server
@@ -566,7 +566,7 @@ class ChatSendCoordinator(
     }
 
     /**
-     * SENSING (letta-mobile-or40x): a send starting for one conversation while
+     * SENSING: a send starting for one conversation while
      * ANOTHER conversation's identity is still non-terminal is precisely the
      * overlap that used to evict state. Legal now — but recorded.
      */
@@ -584,7 +584,7 @@ class ChatSendCoordinator(
     }
 
     /**
-     * SENSING (letta-mobile-or40x): a frame that matches no tracked conversation
+     * SENSING: a frame that matches no tracked conversation
      * entry. Before keying, these silently landed on whatever the single global
      * happened to hold — i.e. they were misattributed rather than dropped.
      */
@@ -1293,8 +1293,8 @@ class ChatSendCoordinator(
     }
 
     /**
-     * letta-mobile-br5g0: renders a dead turn as a visible ERROR row in the
-     * chat timeline (the same TimelineMessageType.ERROR surface letta-mobile-5s1n
+     * Renders a dead turn as a visible ERROR row in the
+     * chat timeline (the same TimelineMessageType.ERROR surface
      * added for server-emitted error frames) instead of leaving the turn
      * silently empty. The row carries the fixed per-family copy only; the raw
      * provider reason stays on the existing error banner path, which is the
@@ -1352,7 +1352,7 @@ class ChatSendCoordinator(
     }
 
     /**
-     * letta-mobile-br5g0: "did this turn deliver assistant content" is read
+     * "did this turn deliver assistant content" is read
      * from observed turn state (an assistant delta with non-blank text was
      * ingested), never inferred from timing.
      *
@@ -1470,7 +1470,7 @@ class ChatSendCoordinator(
      * upgrade so Failed-after-delivered suppression uses the right signal.
      */
     /**
-     * letta-mobile-br5g0 (codex review P1): a stop_reason from a DIFFERENT
+     *  (codex review P1): a stop_reason from a DIFFERENT
      * turn (fanout/replay) must not count as this turn's main-reply completion
      * evidence — a foreign completed stop would suppress the active turn's
      * failure notice.
@@ -1677,7 +1677,7 @@ class ChatSendCoordinator(
     /**
      * The owned terminal of [owner]'s turn.
      *
-     * letta-mobile-1n5py.1: when another client (a second device) already runs this conversation,
+     * when another client (a second device) already runs this conversation,
      * the wrapper bounces this device's send before it starts. Instead of failing, the send waits
      * at the head of the queue and goes again once that turn ends. Its otid is not settled, so the
      * retry reuses it and the row the user already sees. A terminal that carried no send of this
@@ -1710,7 +1710,7 @@ class ChatSendCoordinator(
     }
 
     /**
-     * letta-mobile-or40x PR2: SCOPED to the conversation whose presence is being
+     *  PR2: SCOPED to the conversation whose presence is being
      * healed. The unscoped `hasAnyActiveChatTurn` read meant conversation B's live
      * turn suppressed conversation A's self-heal, so an evicted or orphaned A
      * presence was never recovered. Only a send with no known target (a brand-new
@@ -1873,12 +1873,12 @@ class ChatSendCoordinator(
         ))
 
     /**
-     * letta-mobile-dangling-tool: an abnormal end (not a clean completion) — this
+     * An abnormal end (not a clean completion) — this
      * turn's OWN calls are already settled synchronously by AppServerTurnEngine on
      * disconnect/cancel/error paths, so they won't show up as unresolved here.
      * Still call turnEnded unconditionally (Codex #902 review finding 3): a
      * DIFFERENT, earlier turn's dangling card may have had its sweep cancelled by
-     * this turn's turnStarted() and needs this call to reschedule it, or it would
+     * this turn's turnStarted and needs this call to reschedule it, or it would
      * spin forever.
      */
     private suspend fun endConversationAbnormally(conversationId: String) {

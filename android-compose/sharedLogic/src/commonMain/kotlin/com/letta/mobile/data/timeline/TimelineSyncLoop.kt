@@ -198,7 +198,7 @@ class TimelineSyncLoop(
     }
 
     /**
-     * letta-mobile-827s9.4, dogfood round 3 item 1: every scheduling source is now TYPED.
+     * Dogfood round 3 item 1: every scheduling source is now TYPED.
      *
      * The previous boolean gated only `Debounced` requests, and 12 of the 13 call sites passed
      * `immediate = true` -- so hydration, reconcile, cursor repair and local-mutation callbacks
@@ -561,7 +561,7 @@ class TimelineSyncLoop(
     )
 
     /**
-     * letta-mobile-827s9.4, dogfood round 2, item 2: a stale writer must STOP, not spin.
+     * Dogfood round 2, item 2: a stale writer must STOP, not spin.
      *
      * The Pixel capture showed repeated `revision=1 actualHighWaterRevision=...` rejections
      * from holders that could never commit. Each rejection still cost a full O(N) plan over a
@@ -574,7 +574,7 @@ class TimelineSyncLoop(
      * timeline, but stops scheduling persists entirely.
      *
      * NOTE this is a bounded mitigation, not the cure. The duplicate holders themselves are
-     * letta-mobile-grrhq: a subagent dispatch acquires a SECOND holder for the parent's
+     * a subagent dispatch acquires a SECOND holder for the parent's
      * conversation under the child agent id. This stops the wasted work; grrhq stops the
      * second holder existing.
      */
@@ -900,7 +900,7 @@ class TimelineSyncLoop(
     }
 
     /**
-     * letta-mobile-a02be: rows restored from a snapshot that kept an image only as its size get
+     * Rows restored from a snapshot that kept an image only as its size get
      * the bytes back from the server, in the background so the timeline never waits on it.
      */
     private fun launchImageRecoveryIfNeeded() {
@@ -940,7 +940,7 @@ class TimelineSyncLoop(
     }
 
     /**
-     * letta-mobile-827s9.4, dogfood round 3 item 2: a real per-turn DEADLINE, not
+     * Dogfood round 3 item 2: a real per-turn DEADLINE, not
      * request-arrival behaviour.
      *
      * The previous safety flush only took effect when some later request happened to arrive
@@ -1036,7 +1036,7 @@ class TimelineSyncLoop(
     }
 
     /**
-     * letta-mobile-mxwtn: pre-minted-otid send entry point that the platform
+     * Pre-minted-otid send entry point that the platform
      * send coordinator uses AFTER it has already inserted the Local event
      * synchronously via [appendOptimisticLocalSync]. The Local append is
      * skipped on this path — see [TimelineOutboundSendProcessor.sendWithOtid]
@@ -1051,7 +1051,7 @@ class TimelineSyncLoop(
     }
 
     /**
-     * letta-mobile-mxwtn: synchronous optimistic Local append. Writes a
+     * Synchronous optimistic Local append. Writes a
      * `TimelineEvent.Local` with the given otid through [TimelineProcessor]
      * and returns `true`. Idempotent: returns
      * `false` if an event with the same otid is already present, so a
@@ -1071,12 +1071,12 @@ class TimelineSyncLoop(
         )
     }
 
-    /** letta-mobile-mxwtn: synchronous SENT transition on a Local event. */
+    /** Synchronous SENT transition on a Local event. */
     suspend fun markOptimisticLocalSentSync(otid: String) {
         stateTransitionHandler.markOptimisticLocalSentSync(otid)
     }
 
-    /** letta-mobile-mxwtn: synchronous FAILED transition on a Local event. */
+    /** Synchronous FAILED transition on a Local event. */
     suspend fun markOptimisticLocalFailedSync(otid: String) {
         stateTransitionHandler.markOptimisticLocalFailedSync(otid)
     }
@@ -1245,7 +1245,7 @@ class TimelineSyncLoop(
     }
 
     /**
-     * letta-mobile-fe51r (P2b pointer diet): fetch the full body of a
+     *  (P2b pointer diet): fetch the full body of a
      * tool-return message that `message.list` projected to a preview, then
      * fold it into the owning TOOL_CALL event (clearing the truncation
      * marker). Returns true when a full body was fetched and applied.

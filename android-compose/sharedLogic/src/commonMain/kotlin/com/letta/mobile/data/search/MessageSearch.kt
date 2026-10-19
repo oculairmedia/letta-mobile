@@ -14,7 +14,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * letta-mobile-ckmub.3.9: one message whose text matched a search - which conversation it is in, who
+ * One message whose text matched a search - which conversation it is in, who
  * it belongs to, and the text itself (the row shows a snippet of it).
  */
 data class MessageSearchHit(

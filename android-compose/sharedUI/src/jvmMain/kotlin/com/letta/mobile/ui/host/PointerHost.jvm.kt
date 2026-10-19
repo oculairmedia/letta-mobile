@@ -41,7 +41,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * The desktop pointer host (letta-mobile-ckmub.3.1): the shared pointer containers plus what only a
+ * The desktop pointer host: the shared pointer containers plus what only a
  * desktop window can do: cursor tooltips and hover cards, right-click row menus, and confirmations
  * that pop out as their own undecorated window. [timeLabel] formats a hover card's raw timestamp.
  */

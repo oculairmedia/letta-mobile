@@ -1,8 +1,8 @@
 package com.letta.mobile.data.chat.approval
 
-/** What became of one approval answer a chat client delivered (letta-mobile-by4vm.78). */
+/** What became of one approval answer a chat client delivered. */
 sealed interface ChatApprovalResult {
-    /** letta-mobile-bzvro.14: the link is down; the answer waits in the outbox and sends on reconnect. */
+    /** The link is down; the answer waits in the outbox and sends on reconnect. */
     data object Queued : ChatApprovalResult
     data object MissingActiveAgent : ChatApprovalResult
     data object MissingActiveConversation : ChatApprovalResult

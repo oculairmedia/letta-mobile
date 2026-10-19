@@ -5,12 +5,12 @@ import com.letta.mobile.data.model.AgentIdNamespace
 import java.io.File
 
 /**
- * letta-mobile-xmpqm: host-level address-book store.
+ * Host-level address-book store.
  *
  * Background (BookStack page 703, Phase 1). Every agent on this host shares the
  * wrapper's single [computer.iroh.Endpoint]; per-agent kv rows duplicated the
  * SAME (nodeId, directAddrs) pair under each agentId. At bind that was
- * `register() = readAll() + writeAll()` of the whole file per agent — O(agents²)
+ * `register = readAll + writeAll` of the whole file per agent — O(agents²)
  * bytes of file I/O (~2.4 GB for the live 1462 agents), and every rebind rewrote
  * all rows. Any missed update was a stale-address blackhole (the live 49357 bug,
  * multiplied by the row count).

@@ -4,7 +4,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * letta-mobile-bglj6.1: the few dimensions the shared chat timeline needs that [LettaDimens]
+ * The few dimensions the shared chat timeline needs that [LettaDimens]
  * does not name. Everything else in `ui/chat/surface/timeline` reads [LettaDimens].
  *
  * Values are lifted from the two timelines this one replaces (desktop's message list and

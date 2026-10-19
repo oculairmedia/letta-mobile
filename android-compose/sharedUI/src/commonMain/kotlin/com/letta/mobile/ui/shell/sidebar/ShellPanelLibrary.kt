@@ -50,7 +50,7 @@ internal fun shellPanelSections(state: ShellAgentPanelState): List<RosterSection
 
 /**
  * The conversations under their Active / Archived / All filter, then the canvases: one
- * [RosterList] (letta-mobile-ckmub.3.10). A pinned or settled chat that moves glides to its place.
+ * [RosterList]. A pinned or settled chat that moves glides to its place.
  */
 @Composable
 internal fun ColumnScope.ShellPanelLibrary(state: ShellAgentPanelState, actions: ShellAgentPanelActions) {

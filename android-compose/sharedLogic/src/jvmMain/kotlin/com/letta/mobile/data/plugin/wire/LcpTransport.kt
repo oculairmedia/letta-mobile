@@ -15,7 +15,7 @@ sealed interface LcpInboundFrame {
  * Moves message texts between two peers; the framing (NDJSON lines, WebSocket text frames, an
  * in-memory pair) is the transport's. [send] suspends while the other side is not reading
  * (backpressure) and throws [LcpCallException] with [LcpErrorCode.CLOSED] once closed; [receive]
- * answers null when the other side is gone. Drivers (letta-mobile-s416w.28) supply the real ones.
+ * answers null when the other side is gone. Drivers supply the real ones.
  */
 interface LcpTransport {
     suspend fun send(text: String)

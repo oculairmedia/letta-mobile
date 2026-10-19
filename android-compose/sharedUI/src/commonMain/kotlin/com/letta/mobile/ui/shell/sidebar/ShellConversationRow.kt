@@ -61,9 +61,9 @@ data class ShellConversationRowActions(
     val onPinToggle: (() -> Unit)? = null,
     /** What [onDelete] really does on this backend; the confirm dialog and the row menu follow it. */
     val deleteBehavior: ConversationDeleteBehavior = ConversationDeleteBehavior.Permanent,
-    /** letta-mobile-zxk2n.5: settle and marker; null leaves both out of the menu. */
+    /** Settle and marker; null leaves both out of the menu. */
     val marks: ShellConversationMarkActions? = null,
-    /** letta-mobile-7mys7 (G37): fork the chat under the given name (null keeps the backend's title); null hides it. */
+    /**  (G37): fork the chat under the given name (null keeps the backend's title); null hides it. */
     val onFork: ((name: String?) -> Unit)? = null,
 )
 

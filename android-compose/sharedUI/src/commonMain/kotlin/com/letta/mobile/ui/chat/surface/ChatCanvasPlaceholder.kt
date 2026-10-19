@@ -15,7 +15,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-bglj6.1: what the docked canvas shows before the chat has a conversation. A
+ * What the docked canvas shows before the chat has a conversation. A
  * board belongs to its conversation, so none is created (and later abandoned) for a new chat;
  * the first send creates the conversation, and the host then opens that conversation's board.
  */

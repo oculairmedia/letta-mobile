@@ -30,7 +30,7 @@ object ShellRenameChatDialogTags {
 }
 
 /**
- * letta-mobile-zxk2n.5 (G92): `/rename` for the open chat, an alert pane with the title selected.
+ *  (G92): `/rename` for the open chat, an alert pane with the title selected.
  * Save (or Enter) keeps a changed, non-blank title; anything else leaves the chat as it was.
  */
 @Composable

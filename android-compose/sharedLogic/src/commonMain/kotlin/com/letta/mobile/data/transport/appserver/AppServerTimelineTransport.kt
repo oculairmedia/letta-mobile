@@ -69,7 +69,7 @@ class AppServerTimelineConnection(
 )
 
 /**
- * letta-mobile-o4ygk.4.5: a [TimelineTransport] over the App Server protocol alone (a turn engine
+ * A [TimelineTransport] over the App Server protocol alone (a turn engine
  * plus `admin_rpc` reads), in commonMain so any client that holds an App Server connection can
  * drive the shared [com.letta.mobile.data.timeline.TimelineSyncLoop] with it. The web client is the
  * first: it has no HTTP admin API, only the App Server socket (WebSocket or Iroh).
@@ -82,7 +82,7 @@ class AppServerTimelineConnection(
  *
  * The [TimelineTransport] overrides only adapt the interface's raw ids; the work is done by the
  * typed members below them. Older-history paging (`listConversationMessagesBefore`) keeps the
- * interface default (no such route) until the web binds the canonical route (letta-mobile-o4ygk.4.7).
+ * interface default (no such route) until the web binds the canonical route.
  */
 class AppServerTimelineTransport(
     private val connection: AppServerTimelineConnection,

@@ -5,7 +5,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * letta-mobile-bglj6.1: where the shared chat page is drawn.
+ * Where the shared chat page is drawn.
  *
  * - [Docked]: a bar at the bottom of the canvas. The canvas is the default view.
  * - [FullScreen]: the traditional chat page; the canvas is hidden behind it.

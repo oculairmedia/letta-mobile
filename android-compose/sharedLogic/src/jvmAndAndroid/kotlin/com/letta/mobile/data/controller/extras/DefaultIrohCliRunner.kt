@@ -15,13 +15,13 @@ import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * letta-mobile-bn008-phase2-custom-tool (1vuec): the JVM/Android [IrohCliRunner]
+ *  (1vuec): the JVM/Android [IrohCliRunner]
  * that actually spawns `meridian agent-message send` as a subprocess.
  *
  * The CLI binary is configurable: the production wrapper distribution
  * `:iroh-wrapper-cli` produces an installable `meridian-iroh-wrapper` binary
  * with the `agent-message send` subcommand wired in (or operators can use the
- * Android `:cli` module's `:cli:run -PcliArgs="agent-message send ..."` headless
+ * Android `:cli` module's `:cli:run -PcliArgs="agent-message send..."` headless
  * path in CI/dev). For the production wrapper process, the binary path is
  * passed in by the controller (see `AppServerServeIrohCommand`).
  *

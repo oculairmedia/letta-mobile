@@ -1,12 +1,12 @@
 package com.letta.mobile.data.runtime
 
 /**
- * letta-mobile-bzvro.9 (F09): what kind of run failure this is, so the person knows whether to
+ *  (F09): what kind of run failure this is, so the person knows whether to
  * wait, top up, switch model or compact.
  *
  * Every kind maps 1:1 onto a sanitized failure family of [terminalReasonKind] /
  * [TurnFailureNotices], so classification never exposes the raw provider reason
- * (letta-mobile-o0atv).
+ *.
  */
 enum class RunErrorKind(val family: String, val action: RunErrorAction) {
     RateLimited("rate_limited", RunErrorAction.Retry),

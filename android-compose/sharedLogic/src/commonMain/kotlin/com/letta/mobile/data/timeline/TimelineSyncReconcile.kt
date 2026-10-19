@@ -259,7 +259,7 @@ private fun Timeline.findRecentAssistantPrefixIndex(incoming: TimelineEvent.Conf
 }
 
 /**
- * letta-mobile-x1xnl (SECOND path). Find a recent assistant row that is the
+ *  (SECOND path). Find a recent assistant row that is the
  * live-streamed draft of the SAME in-flight reply as [incoming] (the reconcile
  * snapshot), so the snapshot can REPLACE it instead of appending a duplicate.
  *
@@ -320,7 +320,7 @@ private fun Timeline.findRecentSameRealRunAssistantIndex(incoming: TimelineEvent
 }
 
 /**
- * letta-mobile-h30cy: content-superset fallback for the reconcile duplicate when
+ * Content-superset fallback for the reconcile duplicate when
  * NO id/otid/run match is possible. The reconciled final (message.list) has a
  * ui-msg-* id/otid and NULL run id, so it cannot be matched by identity; and its
  * text differs slightly from the streamed row (first-word-lag), so the exact
@@ -461,7 +461,7 @@ private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(
  * trimmed content. Bounded to the tail window so long histories stay O(1)-ish
  * per reconcile and legitimately repeated OLD messages are not collapsed.
  *
- * letta-mobile-20tat (P1): enhanced to also check Local user events so the
+ *  (P1): enhanced to also check Local user events so the
  * optimistic send row and its reconciled disk twin collapse even when the
  * server doesn't echo otid (common over Iroh).
  */
@@ -469,7 +469,7 @@ private const val RECONCILE_CONTENT_DEDUPE_TAIL = 30
 
 /**
  * Message types whose streamed row and reconciled superset are the same logical
- * message. REASONING joins ASSISTANT here (letta-mobile-6bw72); the other
+ * message. REASONING joins ASSISTANT here; the other
  * reconcile fallbacks stay assistant-only because their looser matching
  * (bidirectional overlap on a MATCHING real run id) is not justified for
  * thoughts, which legitimately repeat within one run.

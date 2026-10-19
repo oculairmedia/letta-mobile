@@ -5,7 +5,7 @@ import kotlinx.serialization.json.JsonObject
 
 /**
  * The one `meridian canvas <verb> …` command of a script, with the input its stdin carries
- * (letta-mobile-jna0o.6). [find] reads the script; [toCall] names the native canvas tool.
+ *. [find] reads the script; [toCall] names the native canvas tool.
  */
 internal class MeridianInvocation private constructor(
     /** The words after `meridian`. */

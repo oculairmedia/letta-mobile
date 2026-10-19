@@ -15,7 +15,7 @@ import com.letta.mobile.ui.host.OverlayHost
 import com.letta.mobile.ui.host.OverlayPresentation
 
 /**
- * letta-mobile-bglj6.1 / ckmub.3.15 (hard cut S13): the page's transient messages, queued on the
+ *  (hard cut S13): the page's transient messages, queued on the
  * window's [OverlayHost] in every mode. Chat errors and A2UI action results reach the user whether
  * the timeline is on screen or the chat is docked under the canvas; each is queued once and then
  * acknowledged to the owner. The page's [com.letta.mobile.ui.host.OverlaySnackbarSlot] draws the
@@ -31,7 +31,7 @@ internal fun ChatSurfaceOverlays(uiState: ChatUiState, port: ChatSessionPort, ov
 }
 
 /**
- * letta-mobile-zxk2n.5 (G92): `/recompile`'s states. "Recompiling" stays up while the command is
+ *  (G92): `/recompile`'s states. "Recompiling" stays up while the command is
  * queued; the answer replaces it (an error stays longer), and once queued it is acknowledged.
  */
 @Composable

@@ -37,10 +37,10 @@ class PluginActionTool(val definition: PluginToolDefinition, private val invoker
 }
 
 /**
- * Plugin actions as agent tools (plan section 6.3, mapping only; the wiring into the host is .29).
+ * Plugin actions as agent tools (plan section 6.3, mapping only; the wiring into the host is.29).
  * Only actions whose `visibility` holds `agent` become tools, and only for plugins whose tools are
  * advertised (enabled, active, or updating from one of those). The tool source always publishes
- * the FULL set, as every `runtime_start` replaces the runtime's tools (letta-mobile-s416w.27).
+ * the FULL set, as every `runtime_start` replaces the runtime's tools.
  */
 object PluginActionTools {
     /** The id of the one [MutableToolSource] that carries every plugin's tools. */

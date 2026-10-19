@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Tracks the latest [AppServerDeviceStatusSnapshot] per runtime (letta-mobile-bzvro.19).
+ * Tracks the latest [AppServerDeviceStatusSnapshot] per runtime.
  */
 interface DeviceStatusRepository {
     fun status(runtime: AppServerRuntimeScope): StateFlow<AppServerDeviceStatusSnapshot?>

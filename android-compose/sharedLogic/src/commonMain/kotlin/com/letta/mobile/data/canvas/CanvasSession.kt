@@ -52,7 +52,7 @@ class CanvasSession(
 
     /**
      * Every change runs under this lock, after folding in any ops the log holds that the stored
-     * document missed (letta-mobile-by4vm.22): a crash or failed write between the two stores.
+     * document missed: a crash or failed write between the two stores.
      */
     private suspend inline fun <T> locked(block: () -> T): T = mutex.withLock {
         if (settlement.begin()) recoverUnsettled()
@@ -262,7 +262,7 @@ class CanvasSession(
      * An op already in the log may have been applied without this session: straight into the store
      * while no board was open ([CanvasClosedBoardApplier]), just as this one was loading. The store
      * is then ahead of what this session holds, and is taken as it is; carrying on from the older
-     * copy would write the op back out of the scene on the next edit (letta-mobile-qygvv.23).
+     * copy would write the op back out of the scene on the next edit.
      */
     private suspend fun adoptNewerStored() {
         val stored = store.get(canvasId) ?: return
@@ -289,7 +289,7 @@ class CanvasSession(
 
     /**
      * Logs this app's own [ops], then queues them for delivery before the document write that
-     * carries them (letta-mobile-by4vm.68): a crash after that write but before the publish still
+     * carries them: a crash after that write but before the publish still
      * leaves them queued; one before the queueing leaves them unsettled, and [recoverUnsettled]
      * queues them.
      */
@@ -358,7 +358,7 @@ class CanvasSession(
     }
 
     /**
-     * An agent's checked ops (canvas_apply_ops on an app's own App Server, letta-mobile-s416w.5),
+     * An agent's checked ops (canvas_apply_ops on an app's own App Server,),
      * each rebound to [actorId] and stamped after this session's clock as the Iroh host stamps them
      * after its log's ([CanvasStampedBatch.separately]), then committed as one revision and published
      * op by op. An update the agent sends is newer than the board it read, whatever clock it wrote.
@@ -389,7 +389,7 @@ class CanvasSession(
 
     /**
      * Writes a block document (Cascade JSON) as a local op, as [write] says (its frame, owner and
-     * compose provenance among the rest, letta-mobile-bglj6.7); a no-op when nothing would change.
+     * compose provenance among the rest,); a no-op when nothing would change.
      */
     suspend fun writeDocument(write: CanvasDocumentWrite): CanvasDocument? {
         val op = CanvasOp.SetDocumentOp(
@@ -501,7 +501,7 @@ class CanvasSession(
     }
 
     /**
-     * An agent's checked batch applied as one op (letta-mobile-bglj6.12, canvas_compose): stamped
+     * An agent's checked batch applied as one op (canvas_compose): stamped
      * after this session's clock ([CanvasStampedBatch]), held to the ACL as [actorId], logged,
      * committed as a single revision and published to peers as one message, so a peer never holds
      * half of it.

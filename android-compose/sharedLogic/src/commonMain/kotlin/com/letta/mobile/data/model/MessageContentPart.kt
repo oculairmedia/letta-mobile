@@ -30,7 +30,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * is verified against the running Letta API at `/openapi.json`. Sending an
  * OpenAI-style `{type:"image_url", image_url:{url:"data:..."}}` part fails with
  * a `string_type` validation error because the union has no `image_url`
- * discriminator (see bead `letta-mobile-cm9a`).
+ * discriminator .
  *
  * Text-only messages continue to go through the legacy string path to minimize
  * server-side compatibility surface.

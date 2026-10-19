@@ -11,7 +11,7 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 
 /**
- * letta-mobile-ulcg6 (RC5): progress read from letta-code's native
+ *  (RC5): progress read from letta-code's native
  * `update_subagent_state.subagents[].tool_calls` (`[{id, name, args}]`).
  *
  * The tool-call list is the only progress signal letta-code sends for a
@@ -70,7 +70,7 @@ private val MODEL_KEYS = listOf("model")
 private val BACKGROUND_KEYS = listOf("is_background", "isBackground")
 
 /**
- * letta-mobile-ulcg6 (RC5): the native progress fields read leniently (snake or
+ *  (RC5): the native progress fields read leniently (snake or
  * camel case), for snapshots the strict decode could not identify.
  */
 internal fun AppServerSubagentSnapshot.withNativeAliases(

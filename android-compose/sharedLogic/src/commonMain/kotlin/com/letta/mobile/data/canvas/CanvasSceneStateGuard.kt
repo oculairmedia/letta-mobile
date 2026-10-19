@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
 /**
- * What one open board draws, given each scene its session projects (letta-mobile-qygvv.30).
+ * What one open board draws, given each scene its session projects.
  *
  * A scene already in the log can break the rules the host now holds writes to ([CanvasSceneState]):
  * it was logged before the check existed, or came from a peer that does not check. The board must

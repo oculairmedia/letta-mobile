@@ -65,7 +65,7 @@ sealed interface ToolApprovalAdmission {
 }
 
 /**
- * letta-mobile-by4vm.2: the tool approvals this client itself is showing as pending, and the only
+ * The tool approvals this client itself is showing as pending, and the only
  * gate an A2UI `tool_approval_response` passes on its way to becoming a real approval.
  *
  * TRUST MODEL. A2UI surfaces are authored by the agent's side of the wire, so an action's name and

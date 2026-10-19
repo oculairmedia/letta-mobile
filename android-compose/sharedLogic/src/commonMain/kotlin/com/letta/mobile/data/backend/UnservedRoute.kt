@@ -1,7 +1,7 @@
 package com.letta.mobile.data.backend
 
 /**
- * letta-mobile-ckmub.17.1: the stand-in a host session graph binds for a whole repository it does
+ * The stand-in a host session graph binds for a whole repository it does
  * not serve. Every member, a property read included, throws [AppServerRouteUnavailable] for
  * [unservedRoute]; there is no "quietly empty" variant. Callers ask [SessionCapabilities.supports]
  * before touching it, so reaching one is a bug the exception names.

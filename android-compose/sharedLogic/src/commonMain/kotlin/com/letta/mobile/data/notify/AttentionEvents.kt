@@ -3,7 +3,7 @@ package com.letta.mobile.data.notify
 import com.letta.mobile.data.presence.ConversationRunState
 
 /**
- * letta-mobile-bzvro.27 (F27): something an agent did that may deserve an OS notification while the
+ *  (F27): something an agent did that may deserve an OS notification while the
  * person is not looking. Platforms post these; whether one is posted at all is [AttentionGate]'s call.
  */
 sealed interface AttentionEvent {

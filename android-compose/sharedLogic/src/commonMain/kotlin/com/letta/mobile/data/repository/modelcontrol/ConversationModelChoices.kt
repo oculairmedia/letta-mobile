@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 
 /**
- * letta-mobile-dxz5s: what each conversation runs, as pickers, composer labels and context meters
+ * What each conversation runs, as pickers, composer labels and context meters
  * read it, keyed by conversation id. [models] holds the conversation's model where it differs from
  * its agent's (none means it runs the agent's); [windows] and [efforts] are the host's figures for
  * that model, present only while they describe it.
@@ -23,7 +23,7 @@ data class ConversationModelChoices(
 )
 
 /**
- * letta-mobile-dxz5s: seeds these selections from a conversation list (cache plus refreshes) until
+ * Seeds these selections from a conversation list (cache plus refreshes) until
  * cancelled; a failing source stops quietly.
  */
 suspend fun ConversationModelSelections.followHost(conversations: Flow<List<Conversation>>) {
@@ -34,7 +34,7 @@ suspend fun ConversationModelSelections.followHost(conversations: Flow<List<Conv
 
 /**
  * A model picked for one conversation in this session; a null [model] withdraws the pick.
- * [effort] is the reasoning effort sent with it (letta-mobile-by4vm.82): a named effort shows at
+ * [effort] is the reasoning effort sent with it: a named effort shows at
  * once, before the host's record catches up.
  */
 internal data class ConversationPick(

@@ -69,7 +69,7 @@ internal class PagedTimelineParams(
 )
 
 /**
- * letta-mobile-bglj6.1: the canonical paged timeline. Paging owns load hints, retries and page
+ * The canonical paged timeline. Paging owns load hints, retries and page
  * dropping; this never materializes the settled history, so a 28k-message conversation costs the
  * same to open as a 30-message one. Lifted from desktop's DesktopCanonicalMessageList and
  * Android's PagedChatMessageList (live/settled de-duplication through TimelineRowAssembly).
@@ -172,7 +172,7 @@ private fun PagedTimelineBody(
 }
 
 /**
- * The paged list's follow over its rows. letta-mobile-bglj6.1.18: a NEW user prompt at the head
+ * The paged list's follow over its rows. a NEW user prompt at the head
  * is the user's own send: always bring them to it, exactly as the legacy list does
  * (LegacyTimelineList's force-follow).
  */
@@ -296,7 +296,7 @@ private fun LazyListScope.pagedRows(scope: PagedRowsScope) {
  * access registers with Paging and drives prefetch. A not-yet-loaded row still occupies space, or
  * the list would collapse toward the tail while a page loads and drag the reader with it.
  *
- * letta-mobile-by4vm.105: a settled row takes over its live twin's key (TimelineRowAssembly), and
+ * a settled row takes over its live twin's key (TimelineRowAssembly), and
  * it must take over its composition too. Live and settled rows are drawn from the one [PagedRow]
  * call below, so at settle the item recomposes in place; drawn from two call sites, the hand-over
  * switched branches, tore the row's content down and rebuilt it (remembered markdown parse, text

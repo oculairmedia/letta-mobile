@@ -44,7 +44,7 @@ internal data class ComposerInputs(
 )
 
 /**
- * letta-mobile-bglj6.1: the shared composer: queued sends, the prompt card, autocomplete,
+ * The shared composer: queued sends, the prompt card, autocomplete,
  * attachments, model/context/working-directory chrome, send and stop.
  *
  * In [ChatSurfaceMode.Docked] it is the canvas's chat bar (one line, same draft, same send,
@@ -130,7 +130,7 @@ private fun rememberComposerImages(
 }
 
 /**
- * letta-mobile-bglj6.1.9: the Touch composer: what stacks above the prompt (inset from the screen
+ * The Touch composer: what stacks above the prompt (inset from the screen
  * edges), the companion above the bar while the agent works (full page only), then the flush bar
  * across the whole width. On the canvas the bar leads with a chevron back up to the chat.
  */

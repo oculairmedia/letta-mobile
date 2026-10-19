@@ -2,7 +2,7 @@ package com.letta.mobile.data.transport.appserver
 
 /**
  * Retry classification for App Server commands across an ambiguous disconnect
- * (letta-mobile-lgns8.5).
+ *.
  *
  * When a request is in flight and the connection drops, the client cannot know
  * whether the server received and applied it. Blindly re-sending is only safe

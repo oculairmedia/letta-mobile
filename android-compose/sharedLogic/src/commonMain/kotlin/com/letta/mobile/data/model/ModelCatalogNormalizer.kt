@@ -3,7 +3,7 @@ package com.letta.mobile.data.model
 /**
  * Normalizes App Server / LLMux model listings after the native `list_models` path.
  *
- * Problems this closes (letta-mobile-o0atv):
+ * Problems this closes:
  * - Multiple providers (`lmstudio`, `openai`/`lc-openai`, `anthropic`/`lc-anthropic`)
  *   pointing at the same LLMux endpoint produce duplicate handles for one model ID.
  * - LLMux omits context/output limits for some models (Grok, MiniMax) that still need

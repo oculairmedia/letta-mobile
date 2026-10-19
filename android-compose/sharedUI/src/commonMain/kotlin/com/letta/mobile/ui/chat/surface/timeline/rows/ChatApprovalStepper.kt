@@ -39,7 +39,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-bzvro.14 (F14, G47): the page's stepper over the approvals waiting on the person.
+ *  (F14, G47): the page's stepper over the approvals waiting on the person.
  * With more than one, the card is drawn on one request at a time with a "1 of N" header; each
  * decision is held ([ApprovalStepper]) and the batch goes to [ChatActions.submitApproval] once the
  * last one is decided, in the order the requests were made.
@@ -133,7 +133,7 @@ private fun ApprovalStepDecision.toAnswer() = ChatApprovalAnswer(
     suggestionBinding = suggestionBinding,
 )
 
-/** letta-mobile-bzvro.14: the answer was made while the connection was down and waits in the outbox. */
+/** The answer was made while the connection was down and waits in the outbox. */
 @Composable
 internal fun ApprovalQueuedNote() {
     Row(

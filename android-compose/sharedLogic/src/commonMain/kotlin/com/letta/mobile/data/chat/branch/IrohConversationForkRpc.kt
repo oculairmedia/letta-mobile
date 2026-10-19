@@ -5,7 +5,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-bzvro.15: the host's `conversation.fork` admin RPC, as clients call it and the
+ * The host's `conversation.fork` admin RPC, as clients call it and the
  * host's handler reads it. Params: `conversation_id` (also carried by the path), and the
  * optional `agent_id` and `message_id` (fork through it, inclusive).
  */

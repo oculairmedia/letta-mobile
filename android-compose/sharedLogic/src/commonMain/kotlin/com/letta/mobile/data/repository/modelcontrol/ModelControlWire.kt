@@ -13,7 +13,7 @@ import kotlinx.serialization.json.put
 
 /**
  * Decoders and param builders for the wrapper's provider/model admin RPC
- * (letta-mobile-w4q4p). Tolerant: unknown keys are ignored and malformed rows
+ *. Tolerant: unknown keys are ignored and malformed rows
  * are skipped rather than failing the whole listing.
  */
 internal object ModelControlWire {

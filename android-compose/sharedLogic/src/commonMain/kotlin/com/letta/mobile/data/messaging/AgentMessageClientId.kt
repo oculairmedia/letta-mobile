@@ -1,7 +1,7 @@
 package com.letta.mobile.data.messaging
 
 /**
- * letta-mobile-slqfp: structural (non-heuristic) encoding of inbound
+ * Structural (non-heuristic) encoding of inbound
  * inter-agent provenance onto the existing `clientMessageId` wire field.
  *
  * `clientMessageId` already survives Local -> Confirmed reconciliation end to
@@ -12,7 +12,7 @@ package com.letta.mobile.data.messaging
  * schema — the projection layer only ever recognizes this exact prefixed
  * shape; it never inspects message body/content text. If the id doesn't
  * match, [decode] returns null and the message renders as ordinary chat —
- * per the "no content heuristics" acceptance criterion on letta-mobile-slqfp.
+ * per the "no content heuristics" acceptance criterion.
  *
  * Format: `a2a:v1:<msgId>:<fromAgentId>:<toAgentId>`
  *

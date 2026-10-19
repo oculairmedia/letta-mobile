@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.chat.render
 
 /**
- * letta-mobile-bglj6.1.18: the reveal-pulse gate, ported from feature-chat's
+ * The reveal-pulse gate, ported from feature-chat's
  * StreamingDisplayText.shouldPulseForStreamingReveal (the legacy Android chat's per-reveal
  * haptic gate): a reveal step pulses when it crosses a chunk of new characters or lands on a
  * word/sentence boundary. The cue itself is rate-limited by its own floor (StreamingPulse,

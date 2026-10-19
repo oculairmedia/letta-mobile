@@ -49,7 +49,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlin.time.Clock
 
 /**
- * letta-mobile-w8mog + i2f23: CIRCULAR progress rings stacked on the RIGHT
+ *  + i2f23: CIRCULAR progress rings stacked on the RIGHT
  * edge of the chat surface with DETERMINATE fill driven by per-subagent
  * `todo_progress`. REPLACES the ActiveSubagentBar chip presentation.
  *
@@ -78,7 +78,7 @@ import kotlin.time.Clock
  *    allocation in draw
  *  - Sliver pulse (arc-length only, NO rotation) respects reduced-motion
  *  - Render hot-path rules: no per-frame work in composition bodies,
- *    remember() everything computed, react to discrete events O(delta)
+ *    remember everything computed, react to discrete events O(delta)
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -170,7 +170,7 @@ fun ActiveSubagentRings(
 }
 
 /**
- * letta-mobile-i2f23: single circular progress ring with DETERMINATE fill.
+ * Single circular progress ring with DETERMINATE fill.
  *
  * Ring sweep = completedTodos / totalTodos, animated smoothly via
  * [animateFloatAsState] between updates. When no todo_progress has arrived
@@ -294,7 +294,7 @@ private const val TRACK_ALPHA = 0.25f
 private const val TWELVE_O_CLOCK = -90f
 
 /**
- * letta-mobile-w8mog: overflow count badge shown when >3 rings are active.
+ * Overflow count badge shown when >3 rings are active.
  * Shows "+N" in a compact circular badge. NO bot/robot iconography.
  */
 @Composable
@@ -322,7 +322,7 @@ private fun OverflowBadge(
 }
 
 /**
- * letta-mobile-w8mog: map a [RingState] to its design-system tint.
+ * Map a [RingState] to its design-system tint.
  *  - RUNNING -> theme primary (accent token)
  *  - STUCK -> warning yellow
  *  - ERROR -> error red
@@ -355,7 +355,7 @@ object ActiveSubagentRingsTags {
 // ── i2f23 constants ──────────────────────────────────────────────────────
 
 /**
- * letta-mobile-i2f23: how long a COMPLETED ring stays visible so its fill can
+ * How long a COMPLETED ring stays visible so its fill can
  * animate from the reached fraction to 100% (~300ms tween) before the
  * collapse animation. After this window the ring is removed from the visible
  * set and AnimatedVisibility collapses it out.

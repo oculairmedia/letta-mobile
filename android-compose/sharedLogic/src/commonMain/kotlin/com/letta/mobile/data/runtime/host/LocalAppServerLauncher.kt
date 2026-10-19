@@ -3,7 +3,7 @@ package com.letta.mobile.data.runtime.host
 import kotlinx.coroutines.flow.Flow
 
 /**
- * One App Server launch (letta-mobile-by4vm.110.4). The platform gives [LocalAppServerHost] the
+ * One App Server launch. The platform gives [LocalAppServerHost] the
  * letta entry point as [command] and where its data lives; the host hands the launcher a copy with
  * the `server` arguments, the loopback listener, the capability-token flags and the local-backend
  * environment added. The platform never builds those.
@@ -30,7 +30,7 @@ data class LocalAppServerLaunch(
 fun interface LocalAppServerLauncher {
     /**
      * True when the server can start only once per OS process (Android's in-process libnode):
-     * the host then never stops it when idle and never restarts it (letta-mobile-by4vm.110.5).
+     * the host then never stops it when idle and never restarts it.
      */
     val singleLaunch: Boolean get() = false
 

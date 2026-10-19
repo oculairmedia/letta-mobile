@@ -1,7 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 /**
- * Project API parity over Iroh admin_rpc (lgns8.9).
+ * Project API parity over Iroh admin_rpc.
  *
  * These 9 methods are owned by the VibeSync product service, not lettashim.
  * The handler talks to VibeSync DIRECTLY through an injected base URL rather

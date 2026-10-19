@@ -35,7 +35,7 @@ interface AppServerTransportAdapter {
  * to concrete [AppServerTransport] implementations.
  *
  * Prefer constructing a fresh instance in tests. Production code uses
- * [AppServerTransportRegistry.shared] (letta-mobile-l2ew9.4).
+ * [AppServerTransportRegistry.shared].
  */
 class AppServerTransportRegistry {
     private val adapters = mutableMapOf<String, AppServerTransportAdapter>()

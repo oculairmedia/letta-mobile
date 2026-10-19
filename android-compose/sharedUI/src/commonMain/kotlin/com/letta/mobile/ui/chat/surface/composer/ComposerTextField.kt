@@ -55,7 +55,7 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-bglj6.1: false for a prompt field that is on its way out. While the docked panel
+ * False for a prompt field that is on its way out. While the docked panel
  * grows into the page (or back) both layers' fields are briefly composed; only the one the
  * person is arriving at tells the send flight where a prompt takes off and the mascot where to
  * look, so neither is left pointing at the field that is about to go.
@@ -63,7 +63,7 @@ import org.jetbrains.compose.resources.stringResource
 internal val LocalComposerPrimary = compositionLocalOf { true }
 
 /**
- * letta-mobile-bglj6.1: whether the page's prompt has keyboard focus. The docked bar and the full
+ * Whether the page's prompt has keyboard focus. The docked bar and the full
  * card are different fields; when one takes over from the other mid-morph it takes the focus too,
  * so expanding (or collapsing) while typing carries on typing.
  */
@@ -182,7 +182,7 @@ internal fun ComposerTextField(
     )
 }
 
-/** One key at the prompt: Shift+Tab cycles the permission mode (letta-mobile-bzvro.40), Enter sends. */
+/** One key at the prompt: Shift+Tab cycles the permission mode, Enter sends. */
 private fun composerKeyHandled(event: KeyEvent, model: ComposerModel, sendFromKeyboard: () -> Boolean): Boolean {
     if (isModeCycleKey(event.key, event.type, event.isShiftPressed)) {
         val next = nextPermissionMode(model.composer.permissionMode) ?: return false
@@ -204,7 +204,7 @@ private fun composerKeyHandled(event: KeyEvent, model: ComposerModel, sendFromKe
 }
 
 /**
- * Where a prompt takes off and where the mascot glances (letta-mobile-bglj6.1): only the primary
+ * Where a prompt takes off and where the mascot glances: only the primary
  * field reports them.
  */
 @Composable

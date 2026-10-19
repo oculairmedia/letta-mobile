@@ -14,7 +14,7 @@ import androidx.compose.ui.platform.LocalDensity
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 
 /**
- * letta-mobile-bglj6.1: how far from the newest content the reader must be before the
+ * How far from the newest content the reader must be before the
  * scroll-to-latest button shows ([showPx]), and how close they must come back before it hides
  * again ([hidePx]). The gap between the two is the hysteresis that keeps a reader resting near
  * the threshold from flickering it; the floor keeps a nudge of the list from raising it at all.

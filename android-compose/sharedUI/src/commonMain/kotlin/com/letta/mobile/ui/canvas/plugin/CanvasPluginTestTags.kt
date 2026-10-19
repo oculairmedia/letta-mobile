@@ -1,14 +1,14 @@
 package com.letta.mobile.ui.canvas.plugin
 
-/** Test tags of plugin elements on the board, by element id (letta-mobile-s416w.4). */
-object CanvasPluginTestTags {
+/** Test tags of plugin elements on the board, by element id. */
+internal object CanvasPluginTestTags {
     /** The placed box of an element: its frame on the board, scaled by the zoom. */
     fun element(id: String): String = "canvas-plugin-element:$id"
 
     /** The fallback card drawn inside it. */
     fun card(id: String): String = "canvas-plugin-card:$id"
 
-    /** The live page a [PluginViewHost] shows in place of the card (letta-mobile-s416w.13). */
+    /** The live page a [PluginViewHost] shows in place of the card. */
     fun live(id: String): String = "canvas-plugin-live:$id"
 
     /** The handle bar an element is dragged by. */

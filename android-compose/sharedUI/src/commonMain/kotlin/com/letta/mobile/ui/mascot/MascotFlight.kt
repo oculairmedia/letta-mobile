@@ -141,7 +141,7 @@ internal suspend fun MascotTransport.Flight.drive(reducedMotion: Boolean, onLand
 }
 
 /**
- * A squash of [impact] (0..1) from outside the hop - a poke, a drop, a reaction (te3n1.4) - that
+ * A squash of [impact] (0..1) from outside the hop - a poke, a drop, a reaction - that
  * wakes the frame driver so the body springs back. Under reduced motion the driver stands it still.
  */
 internal fun MascotTransport.Flight.impulse(impact: Float) {

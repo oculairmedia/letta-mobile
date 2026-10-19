@@ -6,7 +6,7 @@ import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 
 /**
- * [FileCanvasOpLog]'s journal ([CanvasOpLog.unsettled], letta-mobile-by4vm.22): the settled op ids
+ * [FileCanvasOpLog]'s journal ([CanvasOpLog.unsettled],): the settled op ids
  * of each canvas in a sidecar file, one per line. A log that has no sidecar was written before the
  * journal existed; all of its ops are taken as settled the first time it is read, since the
  * document they were written beside is the only record of which of them it holds.

@@ -16,7 +16,7 @@ import kotlinx.serialization.json.put
  *
  * This registry:
  * - Holds the fixed set of external tools the host was built with (an immutable fast path)
- * - Holds the live [ToolSource]s added at runtime (letta-mobile-s416w.27), whose tools join the
+ * - Holds the live [ToolSource]s added at runtime, whose tools join the
  *   advertised set while the source is present
  * - Filters tools based on advertised RemoteCapabilities
  * - Routes inbound ExternalToolCallRequest to the appropriate tool
@@ -25,13 +25,13 @@ import kotlinx.serialization.json.put
  * USAGE:
  * ```kotlin
  * val registry = ExternalToolRegistry(
- *     tools = listOf(ImageHydrationTool(), GoalsTool(), ...),
+ *     tools = listOf(ImageHydrationTool, GoalsTool,...),
  *     capabilities = RemoteCapabilities(imageHydration = true, goals = true)
- * )
- * registry.addSource(pluginSource)          // advertised from the agent's next turn
+ *)
+ * registry.addSource(pluginSource) // advertised from the agent's next turn
  *
  * // List tools to advertise
- * val advertised = registry.listAdvertisedTools()
+ * val advertised = registry.listAdvertisedTools
  *
  * // Route an inbound call
  * val result = registry.invoke("image_hydration", inputArgs)
@@ -49,7 +49,7 @@ class ExternalToolRegistry(
     private val capabilities: RemoteCapabilities,
 
     /**
-     * Which tools the model is offered (letta-mobile-jna0o.8), built once from this registry so a
+     * Which tools the model is offered, built once from this registry so a
      * meta-tool can route back into it. [ToolOffer.Native] (every tool) unless a host opts in.
      */
     offer: (ExternalToolRegistry) -> ToolOffer = { ToolOffer.Native },
@@ -116,7 +116,7 @@ class ExternalToolRegistry(
 
     /**
      * The tools a call can reach through [invoke]: the fixed tools whose capability is enabled, then
-     * the live sources' tools. The Meridian command surface (letta-mobile-jna0o.3) lists and
+     * the live sources' tools. The Meridian command surface lists and
      * dispatches through this, so its commands reach exactly what a native tool call reaches.
      */
     fun invocableTools(): List<ExternalTool> = listAdvertisedTools()
@@ -129,14 +129,14 @@ class ExternalToolRegistry(
         toolOffer.offered(listAdvertisedTools(), audience)
 
     /**
-     * This registry's fixed tools under [offer] instead (letta-mobile-jna0o.8). Call it while
+     * This registry's fixed tools under [offer] instead. Call it while
      * building the host, before adding any [ToolSource]: live sources are not carried over.
      */
     fun offering(offer: (ExternalToolRegistry) -> ToolOffer): ExternalToolRegistry =
         ExternalToolRegistry(tools, capabilities, offer)
 
     /**
-     * lgns8.17(a): the wire form of [listAdvertisedTools] for the `external_tools`
+     * (a): the wire form of [listAdvertisedTools] for the `external_tools`
      * field of `runtime_start`.
      *
      * THIS IS THE ONLY WAY A REQUEST CAN EVER ARRIVE. letta-code's app-server
@@ -148,7 +148,7 @@ class ExternalToolRegistry(
      * it MUST answer, because the server parks the tool call on a pending promise
      * bounded only by its own `EXTERNAL_TOOL_CALL_TIMEOUT_MS` (5 minutes).
      *
-     * letta-mobile-s416w.27: every `runtime_start` REPLACES the runtime's tools (the server
+     * every `runtime_start` REPLACES the runtime's tools (the server
      * unregisters the previous set for that connection and runtime first), so this must always be
      * the whole current set, never a delta.
      *
@@ -198,7 +198,7 @@ class ExternalToolRegistry(
 
     /**
      * [invoke] on behalf of [caller]: its agent and conversation, and the request's `tool_call_id`
-     * ([ExternalToolCaller.toolCallId], letta-mobile-bglj6.12).
+     * ([ExternalToolCaller.toolCallId],).
      */
     suspend fun invoke(toolName: String, input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
         val tool = toolsByName[toolName] ?: dynamicTools.find(toolName)
@@ -232,7 +232,7 @@ class ExternalToolRegistry(
      * `runtime_start` and therefore re-advertises the tools as a side effect of that
      * single call; there is no separate "re-advertise tools" frame in the protocol.
      *
-     * letta-mobile-s416w.27: a change to the live sources is re-advertised the same way. The
+     * a change to the live sources is re-advertised the same way. The
      * registry raises [toolsChanged] and the controller re-issues `runtime_start` for each active
      * runtime (letta-code 0.29.12 replaces a live runtime's tools on a repeated `runtime_start`;
      * see docs/architecture/live-external-tools.md). This hook has no transport handle, so it
@@ -290,12 +290,12 @@ class ExternalToolRegistry(
         /**
          * Creates a factory-default registry, which advertises NO external tools.
          *
-         * lgns8.17(a): WHY ADVERTISING NOTHING IS THE CORRECT PRODUCTION DEFAULT,
+         * (a): WHY ADVERTISING NOTHING IS THE CORRECT PRODUCTION DEFAULT,
          * not an oversight:
          *
          * 1. `external_tools` is an OPT-IN EXTENSION, not a requirement. letta-code
          *    runs its own native tool loop for its built-in tools (Bash, Read, Edit,
-         *    ...) on the app-server route; `external_tool_call_request` is emitted
+         *...) on the app-server route; `external_tool_call_request` is emitted
          *    ONLY for names the controller itself registered through
          *    `runtime_start.external_tools`. Advertising nothing means the server
          *    can never emit a request, so nothing can go unanswered.

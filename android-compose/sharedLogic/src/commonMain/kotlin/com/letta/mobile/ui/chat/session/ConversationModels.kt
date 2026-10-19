@@ -56,7 +56,7 @@ interface ConversationModelHost {
 }
 
 /**
- * letta-mobile-by4vm.98.1, ckmub.17.2 (moved from desktop's DesktopConversationModels): the chat's
+ *  (moved from desktop's DesktopConversationModels): the chat's
  * models in one place: the backend's model list, each conversation's pick and effort, the
  * per-conversation switch, and the composer chip ([ChatModelSource]) with the reasoning efforts the
  * host catalog advertises. Desktop's chat controller and the web's chat page bind it.
@@ -122,7 +122,7 @@ class ConversationModels(
     }
 
     /**
-     * letta-mobile-by4vm.85: binds the window's host catalog, whose rows say which reasoning efforts
+     * Binds the window's host catalog, whose rows say which reasoning efforts
      * each model takes. The catalog is otherwise read only when the picker opens, so each model-list
      * load (a connect, a host swap) re-reads it where the backend can send an effort, for as long as
      * [follow] (the binder's scope) lives. Null (no admin catalog) leaves the effort chip off.
@@ -140,7 +140,7 @@ class ConversationModels(
     /**
      * Shows [conversation]'s model on the chip: this session's or the host's pick, else
      * [agent]'s model, else "Auto". The pick is read after the agent lookup, so a pick made while
-     * the lookup was in flight is not overwritten by the agent model (letta-mobile-okvyf).
+     * the lookup was in flight is not overwritten by the agent model.
      */
     fun showModelOf(conversation: ConversationId, agent: AgentId?) {
         scope.launch {
@@ -162,7 +162,7 @@ class ConversationModels(
 
     /**
      * Applies a model override to the focused conversation, with [effort] for its reasoning effort
-     * (letta-mobile-by4vm.85). A named effort shows at once and stays until the host confirms it.
+     *. A named effort shows at once and stays until the host confirms it.
      */
     fun select(model: String, effort: ReasoningEffortChoice = ReasoningEffortChoice.Unchanged) {
         if (host.isClosed) return
@@ -174,7 +174,7 @@ class ConversationModels(
         scope.launch { apply(switch) }
     }
 
-    /** Re-reads the chat's model list after the host catalog changed (letta-mobile-w4q4p.6.1). */
+    /** Re-reads the chat's model list after the host catalog changed. */
     suspend fun reload() {
         if (host.isClosed) return
         val backend = host.backend ?: return
@@ -214,7 +214,7 @@ class ConversationModels(
     }
 }
 
-/** One per-conversation switch in flight, with what to restore if the host rejects it (letta-mobile-by4vm.85). */
+/** One per-conversation switch in flight, with what to restore if the host rejects it. */
 private data class ModelSwitch(
     val conversationId: ConversationId,
     /** The selection value picked (what the composer chip matches on). */

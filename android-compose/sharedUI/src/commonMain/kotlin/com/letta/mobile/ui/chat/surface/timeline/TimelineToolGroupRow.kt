@@ -12,7 +12,7 @@ import com.letta.mobile.ui.chat.surface.timeline.rows.ToolRunGroup
 import kotlinx.collections.immutable.toImmutableList
 
 /**
- * letta-mobile-bglj6.1: consecutive tool-only messages of one run, folded into ONE tool summary
+ * Consecutive tool-only messages of one run, folded into ONE tool summary
  * line ("Ran 3 commands", "3 ran - 1 failed"), the same line a run block draws for its calls.
  * Tapping it opens the calls in full.
  */

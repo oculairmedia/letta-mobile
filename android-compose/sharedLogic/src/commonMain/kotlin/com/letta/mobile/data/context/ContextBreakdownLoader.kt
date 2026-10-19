@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** letta-mobile-cyh28: one breakdown request: which conversation, matched to which total. */
+/** One breakdown request: which conversation, matched to which total. */
 data class ContextBreakdownRequest(
     val agentId: AgentId,
     val conversationId: ConversationId?,
@@ -44,7 +44,7 @@ sealed interface ContextBreakdownState {
 }
 
 /**
- * letta-mobile-cyh28: fetches the estimated breakdown on demand, never on a timer.
+ * Fetches the estimated breakdown on demand, never on a timer.
  *
  * Callers [load] when the context sheet opens and again after a turn settles or a compaction
  * finishes; a repeat request for the same conversation and total is served from the last answer.

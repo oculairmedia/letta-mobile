@@ -43,7 +43,7 @@ class SearchSlot(
 /**
  * The header search of a page that filters itself (a block library, a model list, an archive): each
  * keystroke narrows the page ([onQuery]) and nothing opens over it. A phone header becomes the search
- * bar in place, and leaving the bar clears the filter (letta-mobile-ckmub.3.25).
+ * bar in place, and leaving the bar clears the filter.
  */
 fun pageFilterSearchSlot(query: String, onQuery: (String) -> Unit, placeholder: String): SearchSlot =
     SearchSlot(query = query, onQuery = onQuery, config = LettaSearchConfig(placeholder = placeholder, autoFocus = false, showResults = false))
@@ -54,7 +54,7 @@ data class ShellSearchContext(val onHome: Boolean = false, val inChat: Boolean =
 
 /**
  * The unified search's own filters: the scope tab and "Filter to this agent". The filter follows the
- * page until the person sets it (letta-mobile-ckmub.3.9): on inside a chat, where "this agent" is the
+ * page until the person sets it: on inside a chat, where "this agent" is the
  * one being talked to, and off anywhere else, where it would hide every other agent's conversations.
  */
 @Stable
@@ -72,7 +72,7 @@ class ShellSearchFilters {
 
 /**
  * The shell's search slot, the same on every platform (re-hosts desktop's header bridge,
- * letta-mobile-xuhmy). While [ShellSearchContext.onHome] the field searches the Home view in place:
+ *). While [ShellSearchContext.onHome] the field searches the Home view in place:
  * each keystroke is [home]'s query and the pane shows the field alone. Anywhere else it is the
  * unified search over [sources] (titles, names, canvases and, through [UnifiedSearchSources.messageSearch],
  * message text), with scopes and the agent filter, and a picked row goes to [onOpen].

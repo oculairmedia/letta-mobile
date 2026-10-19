@@ -10,7 +10,7 @@ import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
  *    runtime-scoped operation and of every admin WRITE that has a native
  *    command.
  *  - [localBackendStore]: a READ-ONLY reader over the letta-code on-disk
- *    backend (lgns8.9). It is the owner for admin READS the App Server exposes
+ *    backend. It is the owner for admin READS the App Server exposes
  *    no command for and that lettashim itself served by reading this same
  *    store (runs/steps, agent context, memory blocks). Never used for writes:
  *    the epic forbids a second writer against one local-backend root.
@@ -28,7 +28,7 @@ data class NativeReadTiers(
     val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
 )
 
-/** Admin RPC handlers a platform adds to the router: the JVM host's plugin runtime (letta-mobile-cdgpr.7). */
+/** Admin RPC handlers a platform adds to the router: the JVM host's plugin runtime. */
 fun interface AdminRpcRoutes {
     fun register(router: AdminRpcRouter)
 }
@@ -105,7 +105,7 @@ object AdminRpcRegistry {
          */
         vibesyncBaseUrl: String? = null,
         /**
-         * lgns8.9 retired the generic admin REST adapter: every former
+         *  Retired the generic admin REST adapter: every former
          * admin_rest_service method now has an explicit owner (App Server v2
          * command, read-only local-backend store, controller-native catalog, or
          * fail-closed denial). Retained, ignored, so older call sites compile —
@@ -113,7 +113,7 @@ object AdminRpcRegistry {
          */
         @Suppress("UNUSED_PARAMETER") adminRestBaseUrl: String? = null,
         /**
-         * lgns8.9: the letta-code on-disk backend root (`LETTA_LOCAL_BACKEND_DIR`).
+         * The letta-code on-disk backend root (`LETTA_LOCAL_BACKEND_DIR`).
          * When set, admin READS the App Server exposes no command for — run/step
          * history, agent context, memory blocks — are served from it directly,
          * which is what lettashim did with the same directory. When null those
@@ -127,7 +127,7 @@ object AdminRpcRegistry {
          */
         skillsListing: SkillsListingSource? = null,
         /**
-         * letta-mobile-by4vm.84: the App Server's slash commands, observed from
+         * The App Server's slash commands, observed from
          * `update_device_status`. Null falls back to a catalog that answers the built-in list
          * when a [nativeClient] is wired, and `capability_unavailable` when none is.
          */
@@ -137,7 +137,7 @@ object AdminRpcRegistry {
         /** See [NativeReadTiers.conversationChanges]. */
         conversationChanges: ConversationChangeNotifier? = null,
         /**
-         * letta-mobile-w4q4p: JSON file holding the model exposure decisions
+         * JSON file holding the model exposure decisions
          * (`model.exposure.*`, filters `model.list`). Null keeps them in memory
          * for the router's lifetime (tests, stub CLI).
          */
@@ -145,14 +145,14 @@ object AdminRpcRegistry {
         /** See [NativeReadTiers.turnIdentity]. */
         turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
         /**
-         * letta-mobile-dpv7m.1: how `pair.invite.create {qr:true}` signs the QR
+         * How `pair.invite.create {qr:true}` signs the QR
          * and which NodeId/dial address it names. Null = no QR minting.
          */
         pairingQr: PairingQrConfig? = null,
-        /** letta-mobile-a4tm7: pushes confirmed permission-mode changes to viewers; null pushes nothing. */
+        /** Pushes confirmed permission-mode changes to viewers; null pushes nothing. */
         permissionModes: PermissionModePublisher? = null,
         /**
-         * letta-mobile-cdgpr.7: the host's `plugins.*` handlers (`PluginAdminHandlers` on a JVM host
+         * The host's `plugins.*` handlers (`PluginAdminHandlers` on a JVM host
          * running plugins). Null (`--plugins=off`, Android) answers them `capability_unavailable`
          * and advertises no `plugins_v1`.
          */

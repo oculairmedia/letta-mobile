@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.Serializable
 
 /**
- * letta-mobile-k5nbq.9 (G96): per-agent defaults kept on the client, next to attention prefs in
+ *  (G96): per-agent defaults kept on the client, next to attention prefs in
  * the host's [SecureSettingsStore]. [cwd] is the folder a new conversation for the agent opens in.
  */
 @Serializable

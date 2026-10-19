@@ -3,7 +3,7 @@ package com.letta.mobile.data.shell
 import com.letta.mobile.data.backend.AppServerRouteUnavailable
 
 /**
- * letta-mobile-ckmub.17.5: how the shell's pages word a failure, on every client. A route the session
+ * How the shell's pages word a failure, on every client. A route the session
  * does not serve reads as that, never as a platform's repositories being missing.
  */
 object ShellPageErrors {

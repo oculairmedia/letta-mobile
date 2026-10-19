@@ -24,7 +24,7 @@ import kotlin.time.Instant
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * letta-mobile-bglj6.1: day sections, lifted from desktop's DesktopChatDayDividers and rewritten on
+ * Day sections, lifted from desktop's DesktopChatDayDividers and rewritten on
  * kotlinx-datetime so it runs in commonMain.
  *
  * Inserts a [TimelineRow.DayDivider] where the LOCAL day changes, ahead of the new day's first
@@ -33,11 +33,11 @@ import kotlin.time.Duration.Companion.milliseconds
  * stay in the open section, so a malformed timestamp cannot tear a turn in half. Input and output
  * are in chat order (oldest first).
  *
- * letta-mobile-om38i: sections only ever move FORWARD. Chat order is not timestamp order: a
+ * sections only ever move FORWARD. Chat order is not timestamp order: a
  * compaction's summary row can carry an earlier stamp than the rows around it, and a run block's
  * boundary is its NEWEST step, so a run spanning midnight reads as tomorrow while the row after it
  * reads as today. Opening a section on any change re-emitted the same day's divider (yesterday,
- * compaction, today, ..., today) and the duplicate `__day__<date>` key crashed the LazyColumn. A
+ * compaction, today,..., today) and the duplicate `__day__<date>` key crashed the LazyColumn. A
  * row stamped earlier than the open section stays in that section, exactly like an unreadable
  * stamp, so each date opens at most one section and every divider key is unique by construction.
  */

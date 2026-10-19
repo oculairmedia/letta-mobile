@@ -52,7 +52,7 @@ import com.letta.mobile.ui.theme.LettaDimens
  * `io.ak1.drawbox.ui.controls.ControlsBar`: that artifact (`io.ak1:drawbox-ui:0.0.1-alpha01`)
  * publishes an Android AAR with classes but **no** `composeResources`, so its own drawables are
  * absent at runtime and the screen died on open with `MissingResourceException`
- * (letta-mobile-r5f3r). DrawBox's canvas itself is unaffected and still used.
+ *. DrawBox's canvas itself is unaffected and still used.
  *
  * State and intents stay DrawBox's, so [CanvasControlsBridge] and its tests are unchanged. The
  * text and note tools are ours: [onAddText] places a plain block-editor text element and

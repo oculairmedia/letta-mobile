@@ -1,7 +1,7 @@
 package com.letta.mobile.data.model
 
 /**
- * letta-mobile-fxoew.6: the ONE rule for what user-facing agent and
+ * The ONE rule for what user-facing agent and
  * conversation LISTS leave out. Every list source applies it at the point it
  * decodes a list; opening an agent or conversation by id (deep links, a
  * subagent's own chat) never goes through it.

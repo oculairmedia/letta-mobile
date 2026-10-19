@@ -62,7 +62,7 @@ import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * Home below [LettaDimens.Pane.wideBreakpoint] (letta-mobile-zxk2n.34): what is happening and where
+ * Home below [LettaDimens.Pane.wideBreakpoint]: what is happening and where
  * the user left off come first, the counters shrink to one strip. In order: a one-line "running
  * now" strip (only while something runs), the recent conversations, the agents as a row of avatars
  * (pinned first), then the stats strip whose overflow opens the pinned-tile editor. The full fleet

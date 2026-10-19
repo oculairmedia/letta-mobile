@@ -73,7 +73,7 @@ internal class CumulativeStreamText {
      * Upstream Node stream_delta frames often rotate `delta.id` per fragment
      * (cm-stream-a/b/c) and omit `otid` on the streaming path. Falling through
      * to that rotating id made each fragment its own byKey entry → staircase
-     * rows (letta-mobile-64ies). Prefer otid, then run_id, then message_id,
+     * rows. Prefer otid, then run_id, then message_id,
      * and only then the frame id.
      */
     private fun textKey(delta: JsonObject): String {

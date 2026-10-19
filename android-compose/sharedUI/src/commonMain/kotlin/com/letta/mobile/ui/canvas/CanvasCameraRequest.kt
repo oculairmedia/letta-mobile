@@ -27,7 +27,7 @@ class CameraBoard(val canvasId: String?, val size: IntSize, val loaded: Boolean)
 }
 
 /**
- * letta-mobile-bglj6.13: where something outside the board (the chat's "Show on canvas") asks its
+ * Where something outside the board (the chat's "Show on canvas") asks its
  * camera to go. The board frames the [target] once it is loaded and measured, at no more than
  * 100% zoom, and then [consume]s it; a target for another board is dropped unframed.
  */

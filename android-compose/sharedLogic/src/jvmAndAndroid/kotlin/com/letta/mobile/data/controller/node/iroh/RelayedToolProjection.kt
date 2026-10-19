@@ -12,7 +12,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-qygvv.27: how the node turns its engine's structured tool events back into App
+ * How the node turns its engine's structured tool events back into App
  * Server deltas for the phone.
  *
  * The node's engine reports one tool call up to three times: the auto-approved

@@ -60,7 +60,7 @@ data class BranchMessage(
 }
 
 /**
- * letta-mobile-7mys7: the ids a timeline row can carry that the server never stored. letta-code's
+ * The ids a timeline row can carry that the server never stored. letta-code's
  * `conversation_fork` only accepts the id of a projected stored message (letta.js
  * `selectLocalMessagesForFork`); anything else answers "Message not found".
  */
@@ -92,7 +92,7 @@ internal object BranchIds {
 }
 
 /**
- * letta-mobile-bzvro.15 / .16, letta-mobile-7mys7: picks the message a fork goes through, from a
+ *  /.16, picks the message a fork goes through, from a
  * conversation's messages (oldest first): the server's own list when the backend can read it (its
  * ids are the ones a fork accepts), else the timeline the page shows.
  *

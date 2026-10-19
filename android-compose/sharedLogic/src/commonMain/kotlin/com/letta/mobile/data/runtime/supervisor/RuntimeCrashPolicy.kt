@@ -3,7 +3,7 @@ package com.letta.mobile.data.runtime.supervisor
 import kotlin.math.min
 
 /**
- * Restart policy for a supervised local runtime process (letta-mobile-bzvro.3, F03).
+ * Restart policy for a supervised local runtime process (F03).
  *
  * - Unexpected exits restart after [baseDelayMs] doubling per consecutive crash, capped at
  *   [maxDelayMs] (2 s, 4 s, 8 s, 16 s, 30 s).

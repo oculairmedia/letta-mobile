@@ -7,7 +7,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.runtime.ApprovalBinding
 
 /**
- * letta-mobile-bzvro.14 (F14, G47): several approvals waiting on the person at once are answered one
+ *  (F14, G47): several approvals waiting on the person at once are answered one
  * at a time, "1 of N", the way Letta Desktop steps through parallel tool calls, and submitted
  * together once the last is decided.
  *

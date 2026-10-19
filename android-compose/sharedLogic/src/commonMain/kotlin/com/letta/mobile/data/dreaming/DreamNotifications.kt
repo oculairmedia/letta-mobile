@@ -5,7 +5,7 @@ import com.letta.mobile.data.model.SubagentKind
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.storage.SecureSettingsStore
 
-/** letta-mobile-iczm7: one dream that ended, for a "dream finished" notification. */
+/** One dream that ended, for a "dream finished" notification. */
 data class DreamFinished(
     val agentId: String,
     val description: String,
@@ -13,7 +13,7 @@ data class DreamFinished(
 )
 
 /**
- * letta-mobile-iczm7: turns successive subagent registry snapshots into finished dreams. Only an
+ * Turns successive subagent registry snapshots into finished dreams. Only an
  * explicit terminal status counts: a run that merely drops out of a snapshot may still be running
  * (the registry retains and re-verifies those), so it is never announced as finished.
  */
@@ -37,7 +37,7 @@ class DreamFinishTracker {
     }
 }
 
-/** letta-mobile-iczm7: the per-agent "tell me when a dream finishes" opt-in, off by default. */
+/** The per-agent "tell me when a dream finishes" opt-in, off by default. */
 class DreamNotifyPrefs(private val store: SecureSettingsStore) {
     fun isEnabled(agentId: String): Boolean = store.getString(key(agentId)) == ENABLED
 

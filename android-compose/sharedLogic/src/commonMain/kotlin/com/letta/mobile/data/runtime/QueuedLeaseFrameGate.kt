@@ -7,7 +7,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * letta-mobile-qygvv.3 (PR #1661 review): keeps a QUEUED lease from adopting the turn ahead of it.
+ *  (PR #1661 review): keeps a QUEUED lease from adopting the turn ahead of it.
  *
  * While this lease's input waits in the server queue its own run does not exist yet, so every
  * run-bearing frame on the runtime belongs to another turn (another viewer's, or one parked on an
@@ -57,7 +57,7 @@ internal class QueuedLeaseFrameGate(private val queuedInput: QueuedInputTracker)
 }
 
 /**
- * letta-mobile-1n5py.1 (the second qygvv.9 race): opens once this lease's `input_accepted` is
+ *  (the second race): opens once this lease's `input_accepted` is
  * resolved, whatever it said.
  *
  * The collector runs while the send coroutine still awaits the ack. A terminal of the turn ahead

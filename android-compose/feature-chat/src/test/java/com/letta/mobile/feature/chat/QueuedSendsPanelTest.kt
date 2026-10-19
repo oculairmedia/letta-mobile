@@ -14,7 +14,6 @@ import com.letta.mobile.ui.chat.QUEUED_BEHIND_OWN_STOP_LABEL
 import com.letta.mobile.ui.chat.QUEUED_ON_SERVER_LABEL
 import com.letta.mobile.ui.chat.QueuedSendActions
 import com.letta.mobile.ui.chat.QueuedSendsPanel
-import com.letta.mobile.ui.chat.QueuedSendsPanelTestTags
 import com.letta.mobile.ui.theme.LettaTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -61,15 +60,15 @@ class QueuedSendsPanelTest {
         composeRule.onNodeWithText("Queued · 2").assertIsDisplayed()
         composeRule.onNodeWithText("Queued · 3").assertIsDisplayed()
         composeRule.onNodeWithText("second").assertIsDisplayed()
-        composeRule.onNodeWithTag(QueuedSendsPanelTestTags.RESUME).assertDoesNotExist()
+        composeRule.onNodeWithTag("queued_sends_resume").assertDoesNotExist()
     }
 
     @Test
     fun `row controls cancel or push through that message only`() {
         render(ConversationSendQueue(items = listOf(send("a", "first"), send("b", "second"))))
 
-        composeRule.onNodeWithTag(QueuedSendsPanelTestTags.CANCEL + "b").performClick()
-        composeRule.onNodeWithTag(QueuedSendsPanelTestTags.SEND_NOW + "a").performClick()
+        composeRule.onNodeWithTag("queued_send_cancel_" + "b").performClick()
+        composeRule.onNodeWithTag("queued_send_now_" + "a").performClick()
 
         assertEquals(listOf("b"), cancelled)
         assertEquals(listOf("a"), sentNow)
@@ -80,7 +79,7 @@ class QueuedSendsPanelTest {
         render(ConversationSendQueue(items = listOf(send("a", "first")), paused = true))
 
         composeRule.onNodeWithText("Queue paused · 1 message").assertIsDisplayed()
-        composeRule.onNodeWithTag(QueuedSendsPanelTestTags.RESUME).performClick()
+        composeRule.onNodeWithTag("queued_sends_resume").performClick()
 
         assertEquals(1, resumed)
     }
@@ -90,7 +89,7 @@ class QueuedSendsPanelTest {
         render(ConversationSendQueue(queuedOnServer = send("s", "sent from phone")))
 
         composeRule.onNodeWithText("1 message queued").assertIsDisplayed()
-        composeRule.onNodeWithTag(QueuedSendsPanelTestTags.ON_SERVER).assertIsDisplayed()
+        composeRule.onNodeWithTag("queued_send_on_server").assertIsDisplayed()
         composeRule.onNodeWithText(QUEUED_ON_SERVER_LABEL).assertIsDisplayed()
         composeRule.onNodeWithText("sent from phone").assertIsDisplayed()
     }
@@ -121,7 +120,7 @@ class QueuedSendsPanelTest {
     fun `nothing renders when nothing is queued`() {
         render(ConversationSendQueue())
 
-        composeRule.onNodeWithTag(QueuedSendsPanelTestTags.PANEL).assertDoesNotExist()
+        composeRule.onNodeWithTag("queued_sends_panel").assertDoesNotExist()
         assertTrue(cancelled.isEmpty())
     }
 

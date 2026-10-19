@@ -3,7 +3,7 @@ package com.letta.mobile.data.repository.modelcontrol
 import com.letta.mobile.data.model.ModelCatalogNormalizer
 
 /**
- * The management screen's view of the host (letta-mobile-w4q4p): every
+ * The management screen's view of the host: every
  * provider the App Server can connect, joined to the catalog models that route
  * through it. Pure functions over the two repositories' snapshots; the
  * controller recomputes on every change.

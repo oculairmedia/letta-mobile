@@ -37,15 +37,15 @@ import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.stringResource
 
-/** letta-mobile-kr39h: test tags of the compaction divider. */
-object ChatCompactionTestTags {
+/** Test tags of the compaction divider. */
+internal object ChatCompactionTestTags {
     const val ROW = "chat-compaction-row"
     const val TOGGLE = "chat-compaction-toggle"
     const val SUMMARY = "chat-compaction-summary"
 }
 
 /**
- * letta-mobile-kr39h: where the conversation was compacted. A quiet divider titled "Conversation
+ * Where the conversation was compacted. A quiet divider titled "Conversation
  * compacted" whose chevron opens the summary the server kept in place of the older messages. It
  * is never a bubble: nobody said it. The open state is the row's own (a reading aid, not session
  * state), saved across recomposition and configuration change.

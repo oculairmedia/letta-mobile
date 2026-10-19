@@ -66,7 +66,7 @@ class DefaultAppServerController(
     private val clientInfo: AppServerRuntimeStartClientInfo = DEFAULT_CLIENT_INFO,
     private val requestIdFactory: () -> String = defaultRequestId,
     /**
-     * Optional durable registry of desired runtimes (lgns8.5). When provided,
+     * Optional durable registry of desired runtimes. When provided,
      * every successful runtime_start upserts a [RuntimeRecord] so the reconnect
      * flow knows which runtimes to reattach after socket loss or App Server
      * restart. The in-memory [runtimeCache] alone is NOT recovery state — it is
@@ -74,7 +74,7 @@ class DefaultAppServerController(
      */
     private val runtimeRegistry: RuntimeRegistry? = null,
     /**
-     * lgns8.17: controller-owned external tools, forwarded to the turn engine so
+     * Controller-owned external tools, forwarded to the turn engine so
      * every external_tool_call_request the App Server emits gets a matched
      * response (executed when advertised here, otherwise a synthesized is_error)
      * and tool-call turns never hang. Null = no controller tools.
@@ -88,31 +88,31 @@ class DefaultAppServerController(
      */
     private val parentCoroutineContext: CoroutineContext = EmptyCoroutineContext,
     /**
-     * letta-mobile-h5t1g: the mode used whenever a caller passes no explicit mode
+     * The mode used whenever a caller passes no explicit mode
      * and nothing is cached for the runtime key (cold start, reconnect, eviction).
      * Single source of truth for every fallback in this class — an explicit mode
-     * (e.g. from a `runtime_start` frame) always wins. letta-mobile-4mps3 will bind
+     * (e.g. from a `runtime_start` frame) always wins. will bind
      * the settings toggle here instead of the hardcoded default.
      */
     private val defaultPermissionMode: () -> AppServerPermissionMode = {
         RuntimePermissionDefaults.DEFAULT_MODE
     },
     /**
-     * letta-mobile-by4vm.55: when true, a turn in flight across a transport disconnect survives
-     * it, as on the desktop's ws:// path (by4vm.9): its lease is carried into the next generation
+     * When true, a turn in flight across a transport disconnect survives
+     * it, as on the desktop's ws:// path: its lease is carried into the next generation
      * and the router is interrupted instead of the lease being cancelled, so the turn waits out
      * [com.letta.mobile.data.runtime.SESSION_RECONNECT_GRACE_MS] for [markConnected]. Only for a
      * client whose events are one stable pipe across generations (a
      * [com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient]); false keeps the
-     * lgns8.22.4 behaviour of ending every in-flight turn on disconnect.
+     *  behaviour of ending every in-flight turn on disconnect.
      */
     private val turnsSurviveReconnect: Boolean = false,
 ) : AppServerController {
     @Suppress("NoDetachedCoroutineLifecycle") // Controller lifecycle owned; cancelled in close().
     private val controllerScope = CoroutineScope(SupervisorJob() + parentCoroutineContext)
-    /** lgns8.22.4: bumps on every transport disconnect so leases are generation-scoped. */
+    /** Bumps on every transport disconnect so leases are generation-scoped. */
     private val connectionGeneration = atomic(0L)
-    /** letta-mobile-qygvv.5: decisions sent, shared by the router and the turn engine. */
+    /** Decisions sent, shared by the router and the turn engine. */
     private val approvalDecisionCache = ApprovalDecisionCache()
     private val eventRouter = AppServerRuntimeEventRouter(
         connectionGenerationProvider = { connectionGeneration.value },
@@ -127,7 +127,7 @@ class DefaultAppServerController(
     }
 
     /**
-     * letta-mobile-qygvv.6: the engine subscribes through [eventRouter], so it only sees frames
+     * The engine subscribes through [eventRouter], so it only sees frames
      * while a turn holds a lease. Queue snapshots and the post-abort `turn_finished` must be seen
      * between turns too.
      */
@@ -143,7 +143,7 @@ class DefaultAppServerController(
     override val cancelledQueuedInputs: Flow<CancelledQueuedInput>
         get() = turnEngine.cancelledQueuedInputs
 
-    /** letta-mobile-qygvv.28: a passive read of the client's frames, like the queue observer's. */
+    /** A passive read of the client's frames, like the queue observer's. */
     override fun observeRuntimeFrames(runtime: AppServerRuntimeScope): Flow<AppServerReceivedFrame> =
         client.events.filter { received ->
             val scope = received.frame.runtime
@@ -151,13 +151,13 @@ class DefaultAppServerController(
         }
 
     /**
-     * lgns8.17(d): standing answerer for `external_tool_call_request` frames that
+     * (d): standing answerer for `external_tool_call_request` frames that
      * arrive while NO turn holds a lease for their runtime.
      *
      * The turn engine can only answer from inside a turn's collect loop, so a
      * server-initiated or reconnect-replayed request that lands on an idle client
      * had no observer and blocked the App Server for its full 5-minute
-     * `EXTERNAL_TOOL_CALL_TIMEOUT_MS` — the original lgns8.17 hang class, one level
+     * `EXTERNAL_TOOL_CALL_TIMEOUT_MS` — the original hang class, one level
      * up from the in-turn case the guarantor already covers.
      *
      * Collects `client.events` DIRECTLY rather than subscribing to the fanout: the
@@ -168,7 +168,7 @@ class DefaultAppServerController(
      *
      * Each answer is launched so a slow tool cannot stall this collector.
      *
-     * letta-mobile-qygvv.3: unleased `control_request` approvals get the same treatment, with
+     * unleased `control_request` approvals get the same treatment, with
      * the policy the lease would have applied (auto-allow under Unrestricted, interactive
      * user-input tools left pending for a viewer). They used to sit in the fanout's pending
      * buffer while the server turn, and the conversation queue behind it, waited.
@@ -196,7 +196,7 @@ class DefaultAppServerController(
     }
 
     /**
-     * letta-mobile-qygvv.5: a `control_request` for a request this client already
+     * A `control_request` for a request this client already
      * answered is a server replay — the server still considers it pending, so our
      * answer was lost. Re-send the SAME cached decision (awaiting input_accepted)
      * instead of dropping the replay or showing a second approval card.
@@ -217,13 +217,13 @@ class DefaultAppServerController(
     private val runtimeCache = mutableMapOf<RuntimeKey, CanonicalRuntime>()
 
     /**
-     * letta-mobile-by4vm.8: written under [runtimeMutex] but read lock-free by the turn engine's
+     * Written under [runtimeMutex] but read lock-free by the turn engine's
      * permission-mode provider, which runs concurrently across per-key leases.
      */
     private val runtimePermissionModes = CopyOnWriteMap<RuntimeKey, AppServerPermissionMode>()
 
     /**
-     * letta-mobile-bzvro.40: modes a relayed client chose with [changePermissionMode]. A later start
+     * Modes a relayed client chose with [changePermissionMode]. A later start
      * (a client's `runtime_start` naming its own default, a reconnect, an eviction) never runs the
      * runtime looser than this; only another [changePermissionMode] can relax it.
      */
@@ -231,7 +231,7 @@ class DefaultAppServerController(
     private val runtimeMutex = Mutex()
 
     /**
-     * letta-mobile-s416w.27: when the registry's live tool sources change, every runtime in
+     * When the registry's live tool sources change, every runtime in
      * [runtimeCache] (controller- and engine-started alike) is sent a fresh `runtime_start` carrying
      * the new set. Null without a registry.
      */
@@ -257,7 +257,7 @@ class DefaultAppServerController(
         toolReadvertiser?.attach(controllerScope)
     }
 
-    /** letta-mobile-qygvv.7: in-place mode changes over the controller-owned router. */
+    /** In-place mode changes over the controller-owned router. */
     private val deviceState = DeviceStateChanger(client, TurnInboundSource(client, eventRouter))
 
     /** Turn engine instance. Created lazily and reused for all turns. */
@@ -356,13 +356,13 @@ class DefaultAppServerController(
         }
     }
 
-    /** letta-mobile-bzvro.40: [mode], never looser than a pinned choice; the pin when nothing was asked for. */
+    /** [mode], never looser than a pinned choice; the pin when nothing was asked for. */
     private fun pinnedMode(key: RuntimeKey, mode: AppServerPermissionMode?): AppServerPermissionMode? {
         val pinned = pinnedPermissionModes[key] ?: return mode
         return mode?.let { stricter(pinned, it) } ?: pinned
     }
 
-    /** letta-mobile-qygvv.7: what the cache holds for [key] under the requested [mode]. */
+    /** What the cache holds for [key] under the requested [mode]. */
     private fun lookupCachedRuntime(key: RuntimeKey, mode: AppServerPermissionMode?): CachedRuntimeLookup? {
         val cached = runtimeCache[key] ?: return null
         val effectiveMode = mode ?: runtimePermissionModes[key] ?: defaultPermissionMode()
@@ -371,7 +371,7 @@ class DefaultAppServerController(
     }
 
     /**
-     * letta-mobile-qygvv.7: changes the cached runtime's mode with `change_device_state`. Returns
+     * Changes the cached runtime's mode with `change_device_state`. Returns
      * the runtime when the server confirmed it; otherwise evicts it (unless a reconnect or another
      * start already replaced it) and returns null so the caller cold-starts.
      */
@@ -730,7 +730,7 @@ class DefaultAppServerController(
      */
     private data class RuntimeKey(val agentId: String, val conversationId: String)
 
-    /** letta-mobile-qygvv.7: a cached runtime that already matches, or one whose mode must change. */
+    /** A cached runtime that already matches, or one whose mode must change. */
     private sealed interface CachedRuntimeLookup {
         data class Current(val runtime: CanonicalRuntime) : CachedRuntimeLookup
 

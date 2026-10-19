@@ -8,7 +8,7 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 
 /**
- * letta-mobile-1n5py / qygvv.9: forwards a client's queue controls (`remove_queue_item`,
+ * Forwards a client's queue controls (`remove_queue_item`,
  * `resume_queue`) to the App Server behind this node.
  *
  * The node already relays `input_accepted{queued}` and `update_queue` to the client, so the

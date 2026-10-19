@@ -30,7 +30,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-zxk2n.8: a subagent's conversation in the dual view - the same shared [ChatSurface]
+ * A subagent's conversation in the dual view - the same shared [ChatSurface]
  * every chat page draws, as its full-screen page, over a [ReadOnlySubagentSessionPort]: the composer
  * takes no input and says to reply in the parent. The child's session lives as long as its view is
  * shown and stops when the reader moves to another view or closes it.

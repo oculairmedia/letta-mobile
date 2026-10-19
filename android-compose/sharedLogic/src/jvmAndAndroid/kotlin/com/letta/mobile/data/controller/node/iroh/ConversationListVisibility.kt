@@ -5,7 +5,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 
 /**
- * letta-mobile-fxoew.6: a wire conversation row the store marked `"hidden": true`
+ * A wire conversation row the store marked `"hidden": true`
  * (subagent and background conversations). Only a strict JSON boolean counts,
  * the same reading the App Server's `include_hidden` filter applies.
  */

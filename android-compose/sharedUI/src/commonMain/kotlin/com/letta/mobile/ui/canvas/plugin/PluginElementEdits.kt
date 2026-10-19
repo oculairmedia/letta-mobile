@@ -11,7 +11,7 @@ import com.letta.mobile.data.model.CanvasElementId
 
 /**
  * What a person does to a plugin element on the board, through the session's own plugin element
- * writes (letta-mobile-s416w.3, plan section 4): a move or resize writes ONLY the frame register,
+ * writes (plan section 4): a move or resize writes ONLY the frame register,
  * owned by USER, so it never overwrites what the plugin writes to the element's state; a removal
  * removes it. Each returns its undo step for the board's history, or null when nothing changed.
  */

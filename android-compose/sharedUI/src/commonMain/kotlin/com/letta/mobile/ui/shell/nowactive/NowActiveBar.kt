@@ -37,7 +37,7 @@ import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * letta-mobile-ckmub.3.14: the now-active identity — the conversation the user last prompted
+ * The now-active identity — the conversation the user last prompted
  * (sticky across browsing, like now-playing), its agent and its live [status], plus the agent
  * working in another conversation, if any. Platforms derive it from their activity state.
  */

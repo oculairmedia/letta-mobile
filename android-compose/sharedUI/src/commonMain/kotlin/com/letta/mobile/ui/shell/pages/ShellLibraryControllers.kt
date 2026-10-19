@@ -42,7 +42,7 @@ class ShellLibrarySources(
 )
 
 /**
- * letta-mobile-ckmub.17.5: the controllers behind the shell's library pages (they were desktop's
+ * The controllers behind the shell's library pages (they were desktop's
  * `DesktopLibraryControllers`). The per-session ones are rebuilt with each session graph; Home and
  * MemFS follow the provider's current graph themselves.
  */
@@ -61,7 +61,7 @@ object ShellLibraryFactory {
     fun memory(provider: ShellGraphProvider, scope: CoroutineScope): MemoryPageController =
         MemoryPageController.forSession(provider, scope, ShellPageErrors::memory)
 
-    /** Only an Iroh host relays schedules; the session's capabilities say so up front (letta-mobile-by4vm.13). */
+    /** Only an Iroh host relays schedules; the session's capabilities say so up front. */
     fun schedules(graph: SharedSessionRepositoryGraph, scope: CoroutineScope): ScheduleLibraryController =
         ScheduleLibraryController(
             agentRepository = graph.agentRepository,

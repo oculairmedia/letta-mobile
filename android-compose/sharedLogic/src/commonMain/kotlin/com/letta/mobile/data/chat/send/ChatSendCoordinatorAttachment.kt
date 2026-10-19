@@ -8,7 +8,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
- * letta-mobile-ztuog: a [ChatSendCoordinator]'s agent-keyed transport subscription.
+ * A [ChatSendCoordinator]'s agent-keyed transport subscription.
  *
  * Only frames the bridge attributes to the coordinator's agent arrive. The subscription detaches
  * once another chat is selected and the coordinator has nothing in flight, and re-attaches with
@@ -32,7 +32,7 @@ class ChatSendEventSubscription internal constructor(
 }
 
 /**
- * letta-mobile-sfex6 / letta-mobile-ztuog: the defensive foreign-agent gate.
+ * The defensive foreign-agent gate.
  *
  * Delivery is agent-keyed, so a frame naming another agent should never reach a coordinator;
  * one that does means routing leaked, and is dropped here (with a WARN) before it can open a turn

@@ -57,7 +57,7 @@ class SharedChatSessionResolver(
     ): String? = resolveMostRecentConversationWithProvenance(agentId, maxAgeMs).conversationId
 
     /**
-     * letta-mobile-grrhq: the SAME selection as [resolveMostRecentConversation],
+     * The SAME selection as [resolveMostRecentConversation],
      * additionally returning a bounded, redacted attribution capture of the
      * candidates considered.
      *

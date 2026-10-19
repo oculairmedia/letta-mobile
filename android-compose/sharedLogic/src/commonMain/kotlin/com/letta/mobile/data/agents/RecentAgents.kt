@@ -52,7 +52,7 @@ data class RecentAgentsCut(
 
 /**
  * The agent rail is a recents strip, not the whole roster: one rule for the desktop rail and the
- * phone's navigation drawer (letta-mobile-c3np7.5.8).
+ * phone's navigation drawer.
  *
  * - Pinned agents come first, in directory order, and are always kept.
  * - Then the agents active inside [RecentAgentsPolicy.window], newest first, capped at

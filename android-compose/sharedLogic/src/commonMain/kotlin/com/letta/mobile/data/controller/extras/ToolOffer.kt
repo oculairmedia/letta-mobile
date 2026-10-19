@@ -11,7 +11,7 @@ data class ToolAudience(val agentId: String? = null) {
 }
 
 /**
- * Which of a registry's tools the model is offered (letta-mobile-jna0o.8): advertised in
+ * Which of a registry's tools the model is offered: advertised in
  * `runtime_start.external_tools`, so paid for on every LLM step. Every tool stays invocable either
  * way; an offer only decides what is listed. [Native] lists them all, as hosts always have. The
  * Meridian offer lists one `meridian` meta-tool in their place, which reaches the same tools

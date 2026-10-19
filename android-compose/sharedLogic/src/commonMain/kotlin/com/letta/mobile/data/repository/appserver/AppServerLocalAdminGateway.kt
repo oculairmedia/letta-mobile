@@ -171,12 +171,12 @@ class AppServerLocalAdminGateway(
     suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation =
         updateConversation(conversationId, buildJsonObject { put("archived", archived) })
 
-    /** letta-mobile-bzvro.17: the conversation's title is its `summary`. */
+    /** The conversation's title is its `summary`. */
     suspend fun renameConversation(update: ConversationSummaryUpdate): Conversation =
         updateConversation(update.conversationId.value, buildJsonObject { put("summary", update.summary.value) })
 
     /**
-     * letta-mobile-bzvro.17: the App Server has no `conversation_delete`, so a delete archives the
+     * The App Server has no `conversation_delete`, so a delete archives the
      * conversation AND hides it: hidden conversations never reach a list (`include_hidden` is off),
      * and `removed = false` brings it back for an undo.
      */
@@ -203,7 +203,7 @@ class AppServerLocalAdminGateway(
         )
 
     /**
-     * letta-mobile-bzvro.15: `conversation_fork`, then a read of the fork (upstream answers with
+     * `conversation_fork`, then a read of the fork (upstream answers with
      * its id only). The options go in the body: without it the whole conversation is copied.
      */
     suspend fun forkConversation(request: ConversationForkRequest): Conversation {
@@ -222,7 +222,7 @@ class AppServerLocalAdminGateway(
         return getConversation(forkedId)
     }
 
-    /** letta-mobile-zxk2n.5: `conversation_recompile`; throws with the server's reason when it refuses. */
+    /** `conversation_recompile`; throws with the server's reason when it refuses. */
     suspend fun recompileConversation(request: ConversationRecompileRequest) {
         val response = client.conversationRecompile(
             AppServerConversationRecompile(

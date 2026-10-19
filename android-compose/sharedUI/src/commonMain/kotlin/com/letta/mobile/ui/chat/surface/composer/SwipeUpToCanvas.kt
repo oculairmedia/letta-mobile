@@ -19,14 +19,14 @@ import com.letta.mobile.ui.theme.ChatComposerDimens
 import kotlin.math.abs
 
 /**
- * letta-mobile-bglj6.1: swipe up on the full-screen prompt card to open the canvas, re-owned
- * from Android's SwipeUpToCanvasModifier (letta-mobile-swup) so both platforms share it.
+ * Swipe up on the full-screen prompt card to open the canvas, re-owned
+ * from Android's SwipeUpToCanvasModifier so both platforms share it.
  *
  * The card is the gesture surface: touch anywhere on it, drag up, release. The gesture commits
  * when EITHER the drag passes [ChatComposerDimens.swipeDistanceThreshold] OR the upward velocity
  * at release passes [ChatComposerDimens.swipeVelocityThresholdPerSecond]; short of both it is
  * swallowed and the card stays put. Horizontal drags are not consumed. A cancelled stream (a
- * release Compose already consumed) never commits (letta-mobile-erx7m).
+ * release Compose already consumed) never commits.
  *
  * The caller decides when it is offered: [enabled] is false while the keyboard is open (so the
  * gesture does not fight the IME) and while a run streams (so a swipe mid-turn does not abandon

@@ -8,15 +8,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 
-/** letta-mobile-1n5py: a queued message's identity — the otid it is sent with once it runs. */
+/** A queued message's identity — the otid it is sent with once it runs. */
 @JvmInline
 value class QueuedSendId(val value: String)
 
-/** letta-mobile-1n5py: the conversation a queue belongs to. */
+/** The conversation a queue belongs to. */
 @JvmInline
 value class QueueConversationId(val value: String)
 
-/** letta-mobile-1n5py: one message the user sent while its conversation had a turn running. */
+/** One message the user sent while its conversation had a turn running. */
 data class QueuedChatSend(
     val id: QueuedSendId,
     val conversationId: QueueConversationId,
@@ -25,7 +25,7 @@ data class QueuedChatSend(
 )
 
 /**
- * letta-mobile-1n5py: the messages waiting for one conversation, in the order they will run.
+ * The messages waiting for one conversation, in the order they will run.
  *
  * [paused] mirrors the App Server's own queue after an `abort_message`: a Stop holds what is
  * queued instead of running it, until the user resumes, sends again, or pushes one item through.
@@ -34,16 +34,16 @@ data class ConversationSendQueue(
     val items: List<QueuedChatSend> = emptyList(),
     val paused: Boolean = false,
     /**
-     * letta-mobile-1n5py.1: another client (a second device) runs this conversation's turn, and
+     * Another client (a second device) runs this conversation's turn, and
      * the head bounced off it. The queue waits for that turn to end instead of failing.
      */
     val heldByOtherClient: Boolean = false,
     /**
-     * letta-mobile-1n5py.1: this device's send already went out, and the App Server parked it in
+     * This device's send already went out, and the App Server parked it in
      * its own queue behind another client's turn. Shown, not run: it leaves once it starts.
      */
     val queuedOnServer: QueuedChatSend? = null,
-    /** What [queuedOnServer] waits behind (letta-mobile-by4vm.121). */
+    /** What [queuedOnServer] waits behind. */
     val queuedOnServerBehind: ServerQueueBlocker = ServerQueueBlocker.OtherClient,
 ) {
     val isEmpty: Boolean get() = items.isEmpty() && queuedOnServer == null
@@ -64,7 +64,7 @@ data class ConversationSendQueue(
 typealias SendQueues = Map<QueueConversationId, ConversationSendQueue>
 
 /**
- * letta-mobile-1n5py: the client-held send queue, per conversation, unbounded.
+ * The client-held send queue, per conversation, unbounded.
  *
  * Only the queue's shape lives here; WHEN to run the head is the coordinator's decision (it knows
  * whether the transport still owns a turn). Every mutation is one atomic [MutableStateFlow.update],
@@ -135,7 +135,7 @@ class ChatSendQueue {
 
     fun isPaused(conversationId: QueueConversationId): Boolean = queueFor(conversationId).paused
 
-    /** letta-mobile-1n5py.1: [item] bounced off another client's turn; it waits at the head. */
+    /** [item] bounced off another client's turn; it waits at the head. */
     fun holdForOtherClient(item: QueuedChatSend) {
         updateQueue(item.conversationId) { queue ->
             val items = if (queue.positionOf(item.id) != null) queue.items else listOf(item) + queue.items
@@ -154,7 +154,7 @@ class ChatSendQueue {
     fun heldConversations(): List<QueueConversationId> =
         _state.value.filterValues { it.heldByOtherClient }.keys.toList()
 
-    /** letta-mobile-1n5py.1: [item] was sent and now waits in the App Server's queue. */
+    /** [item] was sent and now waits in the App Server's queue. */
     fun markQueuedOnServer(item: QueuedChatSend, behind: ServerQueueBlocker = ServerQueueBlocker.OtherClient) {
         updateQueue(item.conversationId) { it.copy(queuedOnServer = item, queuedOnServerBehind = behind) }
     }
@@ -186,7 +186,7 @@ class ChatSendQueue {
 }
 
 /**
- * letta-mobile-by4vm.121: what a send parked in the App Server's queue waits behind. The server
+ * What a send parked in the App Server's queue waits behind. The server
  * says only that the input is queued; this device knows when it just stopped a turn of its own
  * there, whose run can take a while to wind down (an on-device model finishing its generation).
  */

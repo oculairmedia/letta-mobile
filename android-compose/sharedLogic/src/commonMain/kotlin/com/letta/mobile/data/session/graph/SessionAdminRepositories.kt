@@ -38,8 +38,8 @@ import com.letta.mobile.data.repository.api.ToolRemoteSource
 import com.letta.mobile.data.transport.api.IChannelTransport
 
 /**
- * letta-mobile-by4vm.87: the admin repositories (MCP servers, models, archival passages, projects,
- * providers, runs; letta-mobile-by4vm.103: tools and memory blocks) a session graph serves over an Iroh host's `admin_rpc`, built the same way for
+ * The admin repositories (MCP servers, models, archival passages, projects,
+ * providers, runs; tools and memory blocks) a session graph serves over an Iroh host's `admin_rpc`, built the same way for
  * Android and desktop. Each one asks its Iroh source first and falls back to its [AdminRemoteRoutes]
  * entry, which production leaves absent (the call then fails as an unsupported route).
  */

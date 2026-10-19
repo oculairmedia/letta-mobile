@@ -5,7 +5,7 @@ import io.ktor.http.parseQueryString
 
 /**
  * What the user pasted after approving an authorization-code sign-in
- * (letta-mobile-zxk2n.3): the whole address the browser ended on, a
+ * the whole address the browser ended on, a
  * `code=…&state=…` query, `code#state`, or the bare code.
  */
 internal data class PastedCode(val code: String, val state: String?) {

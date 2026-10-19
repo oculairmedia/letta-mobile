@@ -19,7 +19,7 @@ interface AppServerLocalRepositoryTransport {
     suspend fun listAgents(): JsonArray
     suspend fun getContext(agentId: String, conversationId: String?): JsonObject?
 
-    /** letta-mobile-cyh28: `agent.context` with the client's streamed total to match. */
+    /** `agent.context` with the client's streamed total to match. */
     suspend fun getContextBreakdown(request: ContextBreakdownRequest): JsonObject? =
         getContext(request.agentId.value, request.conversationId?.value)
     suspend fun listAgentBlocks(agentId: String): JsonArray

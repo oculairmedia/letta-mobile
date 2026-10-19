@@ -112,7 +112,7 @@ private fun promptBubbleStyle(interAgent: Boolean, grouping: PromptGrouping): Pr
 }
 
 /**
- * letta-mobile-bglj6.1.23: where a prompt sits in a run of the user's own bubbles (the legacy
+ * Where a prompt sits in a run of the user's own bubbles (the legacy
  * MessageBubbleShape groupPosition): one that the next bubble continues tightens its bottom-end
  * corner; only the first (or a lone one) carries the role label.
  */
@@ -128,7 +128,7 @@ internal data class PromptGrouping(val leads: Boolean, val continues: Boolean) {
 }
 
 /**
- * letta-mobile-bglj6.1: the user's prompt as the Android timeline draws it (feature-chat
+ * The user's prompt as the Android timeline draws it (feature-chat
  * ChatMessageItem + MessageBubbleSurface): an end-aligned primaryContainer bubble, at most 88%
  * of the column and sized to its text, with a tight top-end corner and a "You" label. Another
  * agent's message reads "Inter-agent" in the tertiary tint, its provenance (sender -> recipient,

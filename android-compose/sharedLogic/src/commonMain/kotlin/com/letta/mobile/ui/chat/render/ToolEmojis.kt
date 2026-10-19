@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.chat.render
 
 /**
- * The emoji each tool reads as in the chat (letta-mobile-bglj6.1.23). One table, platform-neutral,
+ * The emoji each tool reads as in the chat. One table, platform-neutral,
  * shared by the legacy Android cards (through [ToolDisplayRegistry]) and the shared KMP rows.
  */
 object ToolEmojis {

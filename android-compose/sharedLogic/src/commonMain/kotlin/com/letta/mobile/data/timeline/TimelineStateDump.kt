@@ -4,7 +4,7 @@ import com.letta.mobile.util.Telemetry
 
 /**
  * Diagnostic dump for the hydration-duplication bug family
- * (letta-mobile-1ar3u / 3j6 / 16li).
+ * ( / 3j6 / 16li).
  *
  * Emits one Telemetry event per [TimelineEvent] in [timeline], tagged with
  * [phase] and [conversationId] so a captured ring buffer can be diffed

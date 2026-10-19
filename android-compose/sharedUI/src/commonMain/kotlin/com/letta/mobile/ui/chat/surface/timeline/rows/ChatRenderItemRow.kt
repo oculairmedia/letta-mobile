@@ -15,7 +15,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 
 /**
- * letta-mobile-bglj6.1: renders one timeline item (a single message or a run block) with
+ * Renders one timeline item (a single message or a run block) with
  * every row type: user prompt, assistant text, reasoning, tool summaries, approvals, A2UI,
  * images and provenance. The look is the Android timeline's (feature-chat ChatMessageList).
  *
@@ -77,10 +77,10 @@ internal fun ChatImageViewer(
 
 /** Test tags shared with the desktop row tests (the tool ones keep desktop's names). */
 internal object ChatRowTestTags {
-    /** letta-mobile-bzvro.9: the contextual action under a run error. */
+    /** The contextual action under a run error. */
     const val ERROR_ACTION = "run-error-action"
 
-    /** letta-mobile-7mys7: "Fork from here" beside a reply's Copy. */
+    /** "Fork from here" beside a reply's Copy. */
     const val FORK_REPLY = "fork-reply"
     const val TOOL_CARD_TOGGLE = "tool-card-toggle"
     const val TOOL_CARD_BODY = "tool-card-body"

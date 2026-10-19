@@ -1,7 +1,7 @@
 package com.letta.mobile.data.controller.extras
 
 /**
- * letta-mobile-bn008-phase2-custom-tool (1vuec): platform-resolved default
+ *  (1vuec): platform-resolved default
  * [IrohCliRunner] for the agent-message tool. The common tool resolves this
  * lazily at invoke time so tests that inject an explicit runner never hit
  * the platform-specific path.
@@ -22,9 +22,9 @@ package com.letta.mobile.data.controller.extras
 expect fun defaultIrohCliRunnerOrNull(): IrohCliRunner?
 
 /**
- * letta-mobile-bn008-phase2-custom-tool (1vuec).
+ *  (1vuec).
  *
- * The wrapper that drives `meridian agent-message send --from ... --to ...
+ * The wrapper that drives `meridian agent-message send --from... --to...
  * --body-file -` as a subprocess. Kept behind an interface so unit tests can
  * stub it without spawning a process; the production default implementation
  * uses [ProcessBuilder] and pipes the body through stdin (the safest channel
@@ -45,7 +45,7 @@ expect fun defaultIrohCliRunnerOrNull(): IrohCliRunner?
  * already implements (do not duplicate the send path; reuse the existing CLI).
  */
 /**
- * letta-mobile-bn008-phase2-custom-tool (1vuec): the pair of optional Iroh
+ *  (1vuec): the pair of optional Iroh
  * filesystem paths a CLI invocation may override.
  *
  * Grouped into a single value class so the runner's `send` signature stays

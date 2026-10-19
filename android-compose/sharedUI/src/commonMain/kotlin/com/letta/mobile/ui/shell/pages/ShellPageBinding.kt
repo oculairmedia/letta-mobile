@@ -50,7 +50,7 @@ class ShellHostPages(
 )
 
 /**
- * letta-mobile-ckmub.17.5: everything the shell's pages take from a host besides the session graph
+ * Everything the shell's pages take from a host besides the session graph
  * and the library controllers: its navigation, its focus, its own pages, Home's presentation, the
  * editor's extras, the provider session its model picker shares, and the device's settings store.
  */
@@ -65,7 +65,7 @@ class ShellPageHost(
 )
 
 /**
- * letta-mobile-ckmub.17.5 (W5): the one set of shell pages every client binds - Home, Chat (and its
+ *  (W5): the one set of shell pages every client binds - Home, Chat (and its
  * board), Memory with MemFS, Schedules, Channels, Skills/Tools, Settings, the agent editor, Providers,
  * Runs, Templates, Projects and Plugins - over [graph], [controllers] and [host]. The page on screen
  * follows the focused agent.
@@ -140,7 +140,7 @@ private fun schedulesPage(
 
 /**
  * The Schedules page's actions over the shared schedule library. The controller deletes under its
- * selected agent, so a delete for any other agent's row is dropped (letta-mobile-by4vm.42); a new
+ * selected agent, so a delete for any other agent's row is dropped; a new
  * schedule is for the request's agent, else the focused one.
  */
 internal fun shellScheduleActions(
@@ -163,7 +163,7 @@ private fun channelsPage(controllers: ShellLibraryControllers, slots: ChannelsPa
         shellChannelsPage(state, controllers.channels, ChannelsPageOptions(slots = slots)).Content(destination, modifier)
     }
 
-/** letta-mobile-zxk2n.32: the shared Skills page (skills, then the agent's tools). */
+/** The shared Skills page (skills, then the agent's tools). */
 private fun skillsPage(controllers: ShellLibraryControllers, host: ShellPageHost) =
     ShellPageContent<ShellDestination.Skills> { destination, modifier ->
         val catalog by controllers.skills.state.collectAsState()

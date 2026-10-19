@@ -31,7 +31,7 @@ data class AdminRpcRequestContext(
     val authenticated: Boolean,
     val authorizedConversationIds: Set<String>? = null,
     /**
-     * letta-mobile-dpv7m.1: agents a paired peer may address; null = every
+     * Agents a paired peer may address; null = every
      * agent. Enforced by [AdminRpcRouter.dispatch] for every method via
      * [AgentScopeGuard], so no handler can forget it.
      */
@@ -89,7 +89,7 @@ class AdminRpcRouter(
     }
 
     /**
-     * letta-mobile-fxoew.2: capabilities a host feature behind this router
+     * Capabilities a host feature behind this router
      * enables beyond its methods (for example the subagent registry push),
      * advertised to clients on auth.
      */

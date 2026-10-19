@@ -20,7 +20,7 @@ data class ConversationsPageGroup(
 )
 
 /**
- * letta-mobile-ckmub.2.4 (hard cut S16): everything the fleet conversations page draws. Rows are the
+ *  (hard cut S16): everything the fleet conversations page draws. Rows are the
  * agent panel's conversation rows ([ShellConversationRowModel]); the pinned ones lead under "Pinned",
  * the rest are grouped by agent, most recently active agent first.
  */

@@ -8,7 +8,7 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 
 /**
- * letta-mobile-cyh28: the part of a local-backend transcript (`messages.jsonl`) that is in the
+ * The part of a local-backend transcript (`messages.jsonl`) that is in the
  * model's context right now, read the way letta-code reloads it.
  *
  * Two on-disk shapes exist:

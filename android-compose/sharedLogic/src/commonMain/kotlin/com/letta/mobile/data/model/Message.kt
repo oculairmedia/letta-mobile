@@ -41,8 +41,8 @@ sealed interface LettaMessage {
     val seqId: Int?
 
     /**
-     * The one identity of this row, minted once by the App Server stream stamper (letta-mobile-jdcoj)
-     * and copied here untouched (letta-mobile-ys9it). Null for rows the stamper never saw (stored history
+     * The one identity of this row, minted once by the App Server stream stamper
+     * and copied here untouched. Null for rows the stamper never saw (stored history
      * from before the feature, non-row frames); readers then use `"<id>:<type>"`.
      */
     val logicalMessageId: String? get() = null
@@ -225,9 +225,7 @@ private fun extractContentPartResponse(raw: JsonElement?): String? {
  * Two shapes are accepted:
  *   1. **Flat** `{ "type":"image", "data":"…", "mimeType":"…" }` — live wire
  *      and persisted rows occasionally emit this without a `source` wrapper;
- *      the pre-utw4u parser required `source` and dropped those parts on
- *      the floor (mobile → desktop image fanout silently missing). See
- *      bead letta-mobile-utw4u.
+ *      accepting the flat form preserves images forwarded between clients.
  *   2. **Wrapped** `{ "type":"image", "source": { "type":"base64"|"url"|"letta", … } }`
  *      — the canonical letta wire shape.
  *
@@ -432,7 +430,7 @@ data class ToolReturnMessage(
  */
 /**
  * The text of a stringified tool return [raw] that is the answer itself: plain text ([parsed] null),
- * an Agent dispatch result, or (letta-mobile-bglj6.12) a JSON object a tool answered with
+ * an Agent dispatch result, or a JSON object a tool answered with
  * (canvas_compose's receipt or refusal, apply_ops' result) that holds no content part to read text
  * out of: read down to nothing, the chat lost the receipt the TOOL_CALL event is meant to carry.
  */
@@ -519,7 +517,7 @@ data class EventMessage(
 ) : LettaMessage
 
 /**
- * letta-mobile-kr39h: a conversation compaction's summary row. letta-code's local backend lists it
+ * A conversation compaction's summary row. letta-code's local backend lists it
  * in history (`projectLocalMessageToStoredMessages`) in place of the user-role row that carries
  * `metadata.compaction`; [compactionStats] holds its `compaction_stats` when present.
  *
@@ -592,7 +590,7 @@ data class ApprovalSubmission(
  * tool execution failed, model returned a structured error, rate-limit,
  * etc. Previously fell through to [UnknownMessage] and was silently
  * dropped by [ingestStreamEvent], so users saw a thinking spinner that
- * cleared with no visible feedback (letta-mobile-5s1n diagnosis).
+ * cleared with no visible feedback ( diagnosis).
  *
  * The exact payload shape varies across server versions; we keep it
  * permissive: prefer `content`, fall back to `message` or `error`. The
@@ -835,7 +833,7 @@ object LettaMessageSerializer : JsonContentPolymorphicSerializer<LettaMessage>(L
  * and as an array in terminal envelopes. Without this, every streaming
  * delta fails to deserialize (`Expected JsonArray, but had JsonObject`)
  * which produced the "choppy / discontinuous" updates pattern —
- * letta-mobile-mge5 (diagnosed 2026-04-18).
+ *  (diagnosed 2026-04-18).
  */
 object ToolCallListSerializer : KSerializer<List<ToolCall>?> {
     private val listDelegate = ListSerializer(ToolCall.serializer()).nullable

@@ -8,7 +8,7 @@ import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * letta-mobile-ckmub.3.3 (S3c): how wide the window a pane opens over is. It is the window's width,
+ *  (S3c): how wide the window a pane opens over is. It is the window's width,
  * not the page's: a container (sheet, dialog) covers the whole window, so a list pane in a wide
  * tablet window still opens its modal as a dialog. [Wide] starts at the shell's own breakpoint
  * ([LettaDimens.Pane.wideBreakpoint]), where pages dock a side panel.

@@ -45,7 +45,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 
 /**
- * The "New schedule" form (letta-mobile-ckmub.3.16): name, prompt and the cron builder with a live
+ * The "New schedule" form: name, prompt and the cron builder with a live
  * preview of the next runs. A [LettaPaneKind.Modal]: a sheet on a phone, a dialog on a pointer.
  * [onSubmit] receives a complete draft only.
  */

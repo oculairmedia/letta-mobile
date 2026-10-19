@@ -70,7 +70,7 @@ object ModelsEditTags {
 private const val HIDDEN_ALPHA = 0.6f
 
 /**
- * "Models" (letta-mobile-w4q4p.6.1): every model the host serves, under its
+ * "Models": every model the host serves, under its
  * provider, with a switch that shows or hides it in the picker
  * (`model.exposure.set`). Opened from the picker's "Edit Models…"; a compact
  * card on desktop, a bottom sheet on Android ([com.letta.mobile.ui.host.LettaPane] (LettaPaneKind.Modal)).

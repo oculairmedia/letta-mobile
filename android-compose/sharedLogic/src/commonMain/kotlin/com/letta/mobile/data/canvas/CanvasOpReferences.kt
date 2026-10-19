@@ -3,7 +3,7 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementSchema
 
 /**
- * What one op of a batch names that is not there (letta-mobile-qygvv.30). The projector upserts
+ * What one op of a batch names that is not there. The projector upserts
  * and tombstones whatever it is given, so an update of a missing element quietly creates a
  * half-written one and a remove of a missing one leaves a tombstone: both have to be caught
  * before the op is logged.

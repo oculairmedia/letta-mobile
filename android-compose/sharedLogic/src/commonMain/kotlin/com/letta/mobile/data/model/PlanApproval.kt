@@ -18,7 +18,7 @@ data class PlanPreview(val content: String, val filePath: String?) {
 }
 
 /**
- * letta-mobile-8fq4j: the plan a parked approval proposes, and the answer that accepts it. One
+ * The plan a parked approval proposes, and the answer that accepts it. One
  * reading for every host (desktop, Android, web) and both transports.
  *
  * Two calls carry a plan, mirroring the official Letta desktop app (0.34.10):

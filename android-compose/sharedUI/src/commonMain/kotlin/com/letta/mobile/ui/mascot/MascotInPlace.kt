@@ -15,7 +15,7 @@ import com.letta.mobile.avatar.core.MascotIdentity
  * [agentId]'s mascot drawn where it is, by the one live-or-still rule: the live scene while [live]
  * (see [mascotAtWork]), otherwise the identity's still - the same picture every list, chip and
  * header shows. [MascotAvatar] and a [MascotSeat] with no transport layer both draw through here,
- * so a seat cannot picture an idle agent differently from its avatar (letta-mobile-c3np7.5.8).
+ * so a seat cannot picture an idle agent differently from its avatar.
  */
 @Composable
 internal fun MascotInPlace(

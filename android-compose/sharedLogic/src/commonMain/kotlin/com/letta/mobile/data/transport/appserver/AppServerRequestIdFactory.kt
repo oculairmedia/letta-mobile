@@ -4,7 +4,7 @@ import kotlin.random.Random
 import kotlinx.atomicfu.atomic
 
 /**
- * letta-mobile-by4vm.6: thread-safe App Server request-id source.
+ * Thread-safe App Server request-id source.
  *
  * Ids are `<prefix>-<nonce>-<counter>`. The counter is atomic, so parallel turns on
  * `Dispatchers.Default` never mint the same id (which [AppServerRequestRegistry]

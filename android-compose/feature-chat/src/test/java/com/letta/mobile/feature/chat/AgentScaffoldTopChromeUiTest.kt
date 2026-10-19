@@ -14,7 +14,6 @@ import androidx.compose.ui.test.performClick
 import com.letta.mobile.feature.chat.screen.AgentScaffoldTestTags
 import com.letta.mobile.feature.chat.screen.AgentScaffoldTopChromeLayout
 import com.letta.mobile.ui.chat.AgentIdentity
-import com.letta.mobile.ui.chat.AgentIdentityPillTestTags
 import com.letta.mobile.ui.test.setLettaTestContent
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -58,10 +57,10 @@ class AgentScaffoldTopChromeUiTest {
             )
         }
 
-        val pill = hasTestTag(AgentIdentityPillTestTags.PILL)
+        val pill = hasTestTag("agent_identity_pill")
         composeRule.onAllNodes(pill and hasAnyAncestor(hasTestTag(AgentScaffoldTestTags.HEADER))).assertCountEquals(1)
         composeRule.onAllNodesWithTag(AgentScaffoldTestTags.CANVAS_IDENTITY_PILL).assertCountEquals(0)
-        val headerBounds = composeRule.onNodeWithTag(AgentIdentityPillTestTags.PILL).getUnclippedBoundsInRoot()
+        val headerBounds = composeRule.onNodeWithTag("agent_identity_pill").getUnclippedBoundsInRoot()
 
         headerHidden = true
         composeRule.waitForIdle()
@@ -70,7 +69,7 @@ class AgentScaffoldTopChromeUiTest {
         composeRule.onAllNodesWithTag(AgentScaffoldTestTags.MENU_BUTTON).assertCountEquals(0)
         composeRule.onAllNodes(pill and hasAnyAncestor(hasTestTag(AgentScaffoldTestTags.CANVAS_IDENTITY_PILL)))
             .assertCountEquals(1)
-        val canvasBounds = composeRule.onNodeWithTag(AgentIdentityPillTestTags.PILL).getUnclippedBoundsInRoot()
+        val canvasBounds = composeRule.onNodeWithTag("agent_identity_pill").getUnclippedBoundsInRoot()
         // One element: the same size, and where the header drew it, so switching modes keeps it still.
         assertEquals(headerBounds, canvasBounds)
 

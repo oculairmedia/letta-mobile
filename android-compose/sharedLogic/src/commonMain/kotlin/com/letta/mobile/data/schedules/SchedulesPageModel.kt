@@ -12,7 +12,7 @@ import kotlinx.datetime.plus
 import kotlin.time.Instant
 
 /**
- * letta-mobile-ckmub.3.16 (hard cut S14): the logic behind the shared Schedules page, pure so desktop,
+ *  (hard cut S14): the logic behind the shared Schedules page, pure so desktop,
  * Android and web project schedules the same way.
  */
 

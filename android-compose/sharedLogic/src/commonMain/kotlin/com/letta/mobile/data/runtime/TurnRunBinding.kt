@@ -6,7 +6,7 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
-/** How one frame relates to the active lease's own run (letta-mobile-qygvv.8). */
+/** How one frame relates to the active lease's own run. */
 internal enum class RunOwnership {
     /** The frame names a run the server says consumed THIS lease's `client_message_id`. */
     Own,
@@ -19,7 +19,7 @@ internal enum class RunOwnership {
 }
 
 /**
- * letta-mobile-qygvv.8: binds each turn lease on ONE runtime key to its server run.
+ * Binds each turn lease on ONE runtime key to its server run.
  *
  * App Server 0.32.17 reports `loop_status.client_message_ids_by_run_id` on `update_loop_status`:
  * the exact `client_message_id`s each recently observed run consumed. Frames used to be matched to
@@ -100,7 +100,7 @@ internal fun AppServerReceivedFrame.boundRunIdOrNull(): String? = when (val f = 
 }
 
 /**
- * letta-mobile-qygvv.8: the engine's per-frame binding step for this slot's lease [leaseToken].
+ * The engine's per-frame binding step for this slot's lease [leaseToken].
  * Promotes a run the server just bound to this lease's `client_message_id` (`turn.run_bound`) and
  * classifies [received]'s run. A [RunOwnership.Foreign] frame belongs to a different
  * `client_message_id` (`frame.foreign_run_dropped`): it must neither mutate nor complete this

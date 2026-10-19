@@ -18,7 +18,7 @@ enum class DreamCommitKind {
 }
 
 /**
- * letta-mobile-iczm7: one dream in the agent's memory history. letta-code has no dream log of its
+ * One dream in the agent's memory history. letta-code has no dream log of its
  * own: every dream that changed memory left a commit in the MemFS repository, and that commit is
  * the record (what it was about, when, and through its diff which files it touched).
  */
@@ -76,7 +76,7 @@ object DreamCommits {
 }
 
 /**
- * letta-mobile-iczm7: reads dream history from the agent's MemFS log ([MemfsSource], which works
+ * Reads dream history from the agent's MemFS log ([MemfsSource], which works
  * over a direct App Server and over the Iroh workspace relay alike).
  */
 class DreamHistorySource(private val memfs: MemfsSource) {

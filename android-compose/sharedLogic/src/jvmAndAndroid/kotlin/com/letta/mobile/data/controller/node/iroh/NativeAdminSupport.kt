@@ -25,7 +25,7 @@ internal object NativeAdmin {
     /**
      * Longer budget for mutations that may already have been accepted server-side.
      * Timing out the wait after send and inviting a retry risks duplicate creates
-     * or conflicting updates. letta-mobile-by4vm.110.6: 90 s, since the on-device runtime's
+     * or conflicting updates. 90 s, since the on-device runtime's
      * agent_create runs memfs git on a phone (~30–40 s on a Pixel 9 Pro).
      */
     private const val NATIVE_MUTATION_TIMEOUT_MS = 90_000L

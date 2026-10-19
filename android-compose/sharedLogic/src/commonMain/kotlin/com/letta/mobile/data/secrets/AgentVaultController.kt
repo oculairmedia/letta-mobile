@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Platform-neutral controller behind the shared vault page (letta-mobile-bzvro.25): lists an
+ * Platform-neutral controller behind the shared vault page: lists an
  * agent's secrets, reveals one value on request, and adds, replaces or removes secrets with one
  * `secret_apply` each. Values exist only in this controller's memory and on the server.
  */

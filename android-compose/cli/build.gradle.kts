@@ -32,6 +32,7 @@ application {
 
 dependencies {
     implementation(project(":sharedLogic"))
+    implementation(project(":appserver-testkit"))
     // letta-mobile-zsgad: `app-server-serve-iroh` now lives in the pure-JVM
     // :iroh-wrapper-cli module so it can ship as an installable distribution
     // (at the time this was an Android library module). The developer `meridian` CLI keeps

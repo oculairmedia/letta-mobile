@@ -11,7 +11,7 @@ fun interface AppServerReachability {
 }
 
 /**
- * letta-mobile-ckmub.11: the backend picker's online dot, from an App Server probe.
+ * The backend picker's online dot, from an App Server probe.
  *
  * - The on-device runtime ([LettaConfig.Mode.LOCAL]) is always there.
  * - An `iroh://` host is [ServerHealthState.ONLINE]: its QUIC connection is the real signal, and a

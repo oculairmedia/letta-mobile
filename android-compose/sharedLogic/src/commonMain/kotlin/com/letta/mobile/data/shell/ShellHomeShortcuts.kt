@@ -5,7 +5,7 @@ import com.letta.mobile.data.home.HomePinnedItem
 import com.letta.mobile.data.home.HomeShortcut
 
 /**
- * letta-mobile-ckmub.17.5: the shell's Home shortcuts (they were desktop's `DesktopHome`): which ones
+ * The shell's Home shortcuts (they were desktop's `DesktopHome`): which ones
  * a shell offers, the page each opens, and what a first launch pins. Every client's Home binds these.
  */
 object ShellHomeShortcuts {

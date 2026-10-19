@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 
 /**
- * letta-mobile-by4vm.98: a chat host's working-directory extension point, read by a session port
+ * A chat host's working-directory extension point, read by a session port
  * for the composer chip and the `workingDirectory` capability. [current] is null where the
  * host cannot read or change one (no chip, capability off).
  */

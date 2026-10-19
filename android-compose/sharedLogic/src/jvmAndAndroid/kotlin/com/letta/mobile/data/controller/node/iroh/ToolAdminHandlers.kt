@@ -7,7 +7,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * lgns8.9 disposition for the tool-library and memory-block domains.
+ *  Disposition for the tool-library and memory-block domains.
  *
  * ## Tools — controller-native constant catalog
  * admin-shim's `GET /v1/tools` and `/v1/tools/{id}` return
@@ -209,6 +209,6 @@ object ToolAdminHandlers {
      */
     val POST_RETIREMENT_METHODS: Set<String> = AgentBlockWriteHandlers.CREATE_DELETE_METHODS
 
-    /** Methods the retired admin REST adapter used to own (lgns8.9 inventory). */
+    /** Methods the retired admin REST adapter used to own ( inventory). */
     val FORMER_ADMIN_REST_METHODS: Set<String> = METHODS - POST_RETIREMENT_METHODS
 }

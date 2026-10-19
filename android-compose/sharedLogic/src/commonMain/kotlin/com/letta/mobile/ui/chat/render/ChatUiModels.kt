@@ -155,7 +155,7 @@ data class ContextWindowUiState(
  * /shim/v1/mobile WebSocket path. A2UI rendering only fires on the WS
  * path (the splitter lives server-side in the WS host); rendering tests
  * against a REST-bound agent silently produce blank blocks. See
- * letta-mobile-cbjh.
+ *.
  */
 sealed interface ChatTransport {
     @androidx.compose.runtime.Immutable
@@ -269,7 +269,7 @@ data class ChatUiState(
     val totalTokens: Int? = null,
     val activeApprovalRequestId: String? = null,
     /**
-     * letta-mobile-bzvro.14: approval requests answered while the connection was down, waiting in
+     * Approval requests answered while the connection was down, waiting in
      * the outbox; their cards say so and take no second answer.
      */
     val queuedApprovalRequestIds: kotlinx.collections.immutable.ImmutableSet<String> = persistentSetOf(),
@@ -283,7 +283,7 @@ data class ChatUiState(
     val isSearchActive: Boolean = false,
     val isSearching: Boolean = false,
     val searchResults: ImmutableList<ParsedSearchMessage> = persistentListOf(),
-    /** The chat search's mode and role chips (letta-mobile-k5nbq.5). */
+    /** The chat search's mode and role chips. */
     val searchSelection: MessageSearchSelection = MessageSearchSelection(),
     val a2uiSurfaces: ImmutableMap<String, A2uiSurfaceState> = persistentMapOf(),
     val a2uiResolvedActionCounters: ImmutableMap<String, Int> = persistentMapOf(),
@@ -293,7 +293,7 @@ data class ChatUiState(
     val goalStatus: GoalStatusUi? = null,
     val isGoalStatusLoading: Boolean = false,
     /**
-     * letta-mobile-lgns8.19: an abort has been REQUESTED for the in-flight turn
+     * An abort has been REQUESTED for the in-flight turn
      * but the authoritative terminal frame has not landed yet.
      *
      * This flag is deliberately NOT self-clearing: the run resolves to idle only
@@ -305,26 +305,26 @@ data class ChatUiState(
      */
     val isCancelling: Boolean = false,
     /**
-     * letta-mobile-1n5py: messages the user sent during a turn in the visible conversation,
+     * Messages the user sent during a turn in the visible conversation,
      * waiting to run in this order. Empty when nothing is queued.
      */
     val sendQueue: com.letta.mobile.data.chat.send.ConversationSendQueue =
         com.letta.mobile.data.chat.send.ConversationSendQueue(),
     /**
-     * letta-mobile-bglj6.1: the last run failed and nothing has been sent since, whether or not
+     * The last run failed and nothing has been sent since, whether or not
      * the page has shown (and so cleared) [error]. The ambient glow stays "failed" while it holds.
      */
     val runFailed: Boolean = false,
 ) {
     /**
-     * letta-mobile-lgns8.19: true only while a cancel is outstanding AND the
+     * True only while a cancel is outstanding AND the
      * turn is still streaming. The composer stays blocked for the whole window;
      * a second Stop press while this is true force-clears locally.
      */
     val isCancellingRun: Boolean get() = isStreaming && isCancelling
 
     /**
-     * letta-mobile-bglj6.1: a run is in flight, from the send until the turn's terminal, through
+     * A run is in flight, from the send until the turn's terminal, through
      * every tool round, approval wait and gap between steps: the agent is typing (nothing has
      * answered yet) or the run streams (the composer's Stop button is up). Every working cue (the
      * ambient glow on the page and the docked panel, the dock's busy mascot) reads this one fact.

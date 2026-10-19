@@ -11,7 +11,7 @@ import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
 typealias PluginElementRenderer = @Composable (view: PluginElementView, chrome: PluginElementChrome) -> Unit
 
 /**
- * The renderers the board draws plugin elements with, by element type prefix (letta-mobile-s416w.4).
+ * The renderers the board draws plugin elements with, by element type prefix.
  *
  * Core registers none: every element is drawn by the [fallback] card, which needs no plugin code
  * and works offline or with the plugin uninstalled. A shell (a live-view host, later) registers a

@@ -34,7 +34,7 @@ object BackgroundTasksTags {
 }
 
 /**
- * The "Background tasks" panel (letta-mobile-ulcg6, shared in letta-mobile-ckmub.3.14): the shared
+ * The "Background tasks" panel (shared): the shared
  * [SubagentRosterList] over the shared [projectSubagentRoster], so every client lists the same
  * subagents in the same states. No header of its own: the hosting pane draws the title and close.
  */
@@ -62,10 +62,10 @@ fun BackgroundTasksPanel(
 }
 
 /**
- * The panel in the window's inspector (letta-mobile-ckmub.3.15, S13): docked on the right of a
+ * The panel in the window's inspector (S13): docked on the right of a
  * wide window's [com.letta.mobile.ui.host.InspectorFrame], a sheet when compact. The inspector
  * draws the title and close. [onOpenConversation] opens a row's conversation (the chat's subagent
- * dual view, letta-mobile-ulcg6.1); null hides "View conversation".
+ * dual view,); null hides "View conversation".
  */
 @Composable
 fun BackgroundTasksSidePane(subagents: List<SubagentEntry>, onClose: () -> Unit, onOpenConversation: OpenSubagentConversation? = null) {

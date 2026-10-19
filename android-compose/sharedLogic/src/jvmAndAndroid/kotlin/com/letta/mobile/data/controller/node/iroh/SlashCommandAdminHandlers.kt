@@ -7,7 +7,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-by4vm.84: `slash_command.list` / `slash_command.list_agent` from the App Server's own
+ * `slash_command.list` / `slash_command.list_agent` from the App Server's own
  * command list ([NativeSlashCommandCatalog], fed by `update_device_status`), replacing the
  * shim-era `admin_rest` denial that left the phone's composer without server commands.
  *

@@ -1,7 +1,7 @@
 package com.letta.mobile.data.model
 
 /**
- * letta-mobile-lgns8.10.4.1: the single source of truth for "what kind of
+ * The single source of truth for "what kind of
  * backend is this config?".
  *
  * Before this type, four separate copies of an `iroh://`-prefix heuristic
@@ -15,7 +15,7 @@ package com.letta.mobile.data.model
  * Routing decisions must key on this enum, not on URL string sniffing spread
  * across modules.
  *
- * letta-mobile-ckmub.9 — the backend seam. Letta Cloud is not offered for now (no Settings mode,
+ *  — the backend seam. Letta Cloud is not offered for now (no Settings mode,
  * no cloud URL default, no cloud API-key field). There is no single registration point for a
  * backend family: a new one needs a [LettaConfig.Mode] value (the Settings page lists
  * `Mode.entries`), a kind here returned by [backendKind], and then each place that binds a
@@ -26,7 +26,7 @@ package com.letta.mobile.data.model
  *    `DesktopAppServerChatGateways.createDefault`, which chooses on mode and address;
  *  - web: `WasmAppServerSession`, which still chooses on [isIrohBackendUrl] directly.
  *
- * letta-mobile-by4vm.13: the compiler and the matrix tests then say what else to do. Every row of
+ * the compiler and the matrix tests then say what else to do. Every row of
  * [com.letta.mobile.data.backend.SessionRouteMatrix] is an exhaustive `when` over this enum, so a new
  * kind does not build until each platform (Android, desktop, web) decides which
  * [com.letta.mobile.data.backend.SessionRoute]s it serves; each platform's matrix test then fails
@@ -34,7 +34,7 @@ package com.letta.mobile.data.model
  */
 enum class BackendKind {
     /**
-     * The on-device runtime: a loopback App Server this device hosts (letta-mobile-by4vm.110.6).
+     * The on-device runtime: a loopback App Server this device hosts.
      * Android dials it through the same App Server channel as [DIRECT_WS].
      */
     LOCAL_RUNTIME,
@@ -45,8 +45,8 @@ enum class BackendKind {
     /**
      * A remote App Server dialled directly over its WebSocket address (`ws://…` / `wss://…`): a
      * Settings "Remote host" whose address is not an `iroh://` node. Also the kind of a missing
-     * config. letta-mobile-by4vm.26: was `REST`, named for the Letta REST server that
-     * letta-mobile-ckmub.4 removed. The kind is derived from [LettaConfig] on every read and never
+     * config. was `REST`, named for the Letta REST server that
+     *  removed. The kind is derived from [LettaConfig] on every read and never
      * persisted, so the rename needs no settings migration.
      */
     DIRECT_WS,

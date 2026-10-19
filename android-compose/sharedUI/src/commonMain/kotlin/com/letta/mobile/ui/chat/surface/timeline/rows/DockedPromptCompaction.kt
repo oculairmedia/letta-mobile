@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import kotlin.math.roundToInt
 
 /**
- * How far a docked prompt's images shrink (letta-mobile-bglj6.1). The pinned copy of a prompt
+ * How far a docked prompt's images shrink. The pinned copy of a prompt
  * provides one; the prompt's own row in the list never sees one, so it keeps its full size.
  */
 @Stable

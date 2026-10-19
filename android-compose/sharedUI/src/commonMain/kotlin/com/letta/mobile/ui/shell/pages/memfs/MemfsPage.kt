@@ -22,7 +22,7 @@ import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * The MemFS browser shared by desktop and Android (letta-mobile-bzvro.24): an agent's memory
+ * The MemFS browser shared by desktop and Android: an agent's memory
  * files split into system and external, an editor with an unsaved-changes guard and a prompt
  * when the agent rewrites the open file, and the memory repository's history with each
  * commit's diff.

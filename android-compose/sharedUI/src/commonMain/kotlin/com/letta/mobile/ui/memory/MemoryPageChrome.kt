@@ -144,7 +144,7 @@ private fun MemorySummaryStrip(metrics: List<MemorySummaryMetric>) {
     }
 }
 
-/** letta-mobile-ckmub.3.15 (S13): the page's load failure, as every page shows one. */
+/**  (S13): the page's load failure, as every page shows one. */
 @Composable
 private fun MemoryErrorBanner(message: String) {
     LettaInlineError(message = message, title = null)

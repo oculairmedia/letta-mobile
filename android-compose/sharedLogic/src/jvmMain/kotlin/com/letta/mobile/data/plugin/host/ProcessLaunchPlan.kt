@@ -7,7 +7,7 @@ import java.io.IOException
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
-/** The resource caps a `process` plugin runs under (epic letta-mobile-cdgpr trust minimum). */
+/** Resource limits applied when launching a `process` plugin. */
 data class ProcessCaps(
     val memoryMax: String = "256M",
     val cpuQuota: String = "50%",
@@ -36,7 +36,7 @@ fun interface ProcessConfinementSource {
  * Probes `systemd-run --user --scope` once (lazily, on first use) and caches the answer: present
  * on the PATH and able to start a capped scope with only the bus variables in its environment.
  */
-class SystemdScopeProbe(
+internal class SystemdScopeProbe(
     private val hostEnv: Map<String, String>,
     private val caps: ProcessCaps = ProcessCaps(),
 ) : ProcessConfinementSource {

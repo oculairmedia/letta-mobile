@@ -23,7 +23,7 @@ data class A2uiAction(
         actionId?.let { put("actionId", it) }
     },
     /**
-     * letta-mobile-by4vm.2: which client code built this action. Never read from the wire: a
+     * Which client code built this action. Never read from the wire: a
      * server-authored component (a plain Button, say) can choose any [name] and [context], but it
      * cannot choose this, so it is what tells a forged `tool_approval_response` from a real one.
      */

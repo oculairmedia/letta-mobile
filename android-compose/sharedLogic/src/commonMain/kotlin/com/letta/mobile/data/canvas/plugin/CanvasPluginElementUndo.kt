@@ -8,7 +8,7 @@ import com.letta.mobile.data.canvas.CanvasSession
 import kotlinx.serialization.json.JsonObject
 
 /**
- * How to put a plugin element change back (letta-mobile-s416w.3), the plugin-element side of
+ * How to put a plugin element change back, the plugin-element side of
  * [com.letta.mobile.data.canvas.CanvasDocumentUndo].
  *
  * A step is ops both ways, like a document step, and goes on the board's one [CanvasHistory]. It

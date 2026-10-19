@@ -1,7 +1,7 @@
 package com.letta.mobile.runtime
 
 /**
- * letta-code "runtime user-input" tools: tools whose whole purpose is to get an
+ * Letta-code "runtime user-input" tools: tools whose whole purpose is to get an
  * answer from the human, not a yes/no permission decision. Mirrors letta-code's
  * `RUNTIME_USER_INPUT_TOOLS` (interactiveToolPolicy.ts), which is
  * `["AskUserQuestion", "ExitPlanMode"]` through 0.34.x.

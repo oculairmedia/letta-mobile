@@ -17,7 +17,7 @@ import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * The drivers of the enabled plugins (letta-mobile-cdgpr.6), one per plugin id. Each gets a
+ * The drivers of the enabled plugins, one per plugin id. Each gets a
  * [ProcessPluginSpec] from its manifest and the CONSENTED capabilities only, and [HostLcpHandlers]
  * placing through a [PlacementCompiler] on the board of the call each emit names ([CallerBoard]).
  * Every driver state change after start is passed to [onState], which the runtime turns into
@@ -91,7 +91,7 @@ class PluginDriverHost(
 
     private companion object {
         /**
-         * The manifest's setting defaults. TODO(letta-mobile-cdgpr.14): a host settings and
+         * The manifest's setting defaults. TODO: a host settings and
          * secrets store; until then a plugin runs on its defaults with no secrets.
          */
         fun defaultSettings(manifest: PluginManifest): JsonObject =

@@ -59,6 +59,7 @@ while IFS= read -r file; do
     android-compose/desktop/*) TASKS[":desktop:test"]=1 ;;
     android-compose/cli/*) TASKS[":cli:test"]=1 ;;
     android-compose/appserver-cli/*) TASKS[":appserver-cli:test"]=1 ;;
+    android-compose/appserver-testkit/*) TASKS[":cli:test"]=1; TASKS[":appserver-cli:test"]=1; TASKS[":app:compileRootDebugAndroidTestKotlin"]=1 ;;
     android-compose/iroh-wrapper-cli/*) TASKS[":iroh-wrapper-cli:test"]=1 ;;
     # The conformance kit is the SPI's executable contract: an SPI change re-runs it too.
     android-compose/plugin-api/*) TASKS[":plugin-api:jvmTest"]=1; TASKS[":plugin-api-testkit:jvmTest"]=1 ;;
@@ -67,6 +68,7 @@ while IFS= read -r file; do
 done <<<"$DIFF_FILES"
 
 ORDERED=(
+  ":app:compileRootDebugAndroidTestKotlin"
   ":feature-chat:testDebugUnitTest"
   ":designsystem:testDebugUnitTest"
   ":drawbox:jvmTest"

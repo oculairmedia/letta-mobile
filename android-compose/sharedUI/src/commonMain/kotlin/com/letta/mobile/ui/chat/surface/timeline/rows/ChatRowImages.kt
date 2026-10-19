@@ -51,7 +51,7 @@ internal class ImageTap(
 }
 
 /**
- * letta-mobile-bglj6.1: lifted from desktop's DesktopImageAttachmentsGrid, with Android's
+ * Lifted from desktop's DesktopImageAttachmentsGrid, with Android's
  * tap-to-open-viewer (MessageAttachmentsGrid) routed through the page's single viewer.
  */
 @Composable
@@ -86,7 +86,7 @@ internal fun ChatImageAttachmentsGrid(
 }
 
 /**
- * letta-mobile-bglj6.1.9: a prompt's images on a phone, as the legacy Android bubble drew them
+ * A prompt's images on a phone, as the legacy Android bubble drew them
  * (feature-chat MessageAttachmentsGrid): one image across the bubble's width, two side by side,
  * three or more three up, each opening the page's viewer.
  */

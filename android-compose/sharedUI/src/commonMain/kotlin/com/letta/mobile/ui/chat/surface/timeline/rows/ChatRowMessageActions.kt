@@ -16,7 +16,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-7mys7: the hover "Fork from here" beside a reply's Copy. Hidden, it keeps its place
+ * The hover "Fork from here" beside a reply's Copy. Hidden, it keeps its place
  * (no layout jump) and takes no clicks, as [CopyIconButton] does.
  */
 @Composable

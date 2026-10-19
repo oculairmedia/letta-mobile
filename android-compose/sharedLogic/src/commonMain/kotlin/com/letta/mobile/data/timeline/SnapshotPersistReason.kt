@@ -1,7 +1,7 @@
 package com.letta.mobile.data.timeline
 
 /**
- * letta-mobile-827s9.4: why a snapshot persist was scheduled.
+ * Why a snapshot persist was scheduled.
  *
  * Replaces an `immediate: Boolean` that gated only stream frames while 12 of 13 call sites
  * passed `immediate = true`, so hydration, reconcile, cursor repair and local-mutation

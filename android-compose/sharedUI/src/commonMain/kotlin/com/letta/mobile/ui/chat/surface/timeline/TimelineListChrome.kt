@@ -48,7 +48,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.stringResource
 
-/** letta-mobile-bglj6.1: test tags for the timeline's chrome. */
+/** Test tags for the timeline's chrome. */
 internal object ChatTimelineTags {
     const val LIST = "chat-timeline-list"
     const val SKELETON = "chat-timeline-skeleton"

@@ -12,7 +12,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * `model.update` params → upstream `update_model` (letta-mobile-w4q4p).
+ * `model.update` params → upstream `update_model`.
  *
  * `{agent_id, conversation_id, model_handle?, model_id?, reasoning_effort?}`.
  * An ABSENT `reasoning_effort` leaves the effort alone; an explicit JSON

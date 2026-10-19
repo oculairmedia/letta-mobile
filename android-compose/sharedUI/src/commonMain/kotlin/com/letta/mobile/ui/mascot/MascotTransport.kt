@@ -188,7 +188,7 @@ class MascotTransport {
     internal var layerMounted by mutableStateOf(false)
 
     /**
-     * One slot's flight (letta-mobile-te3n1.3): the character's [body] - where it is along a hop and
+     * One slot's flight: the character's [body] - where it is along a hop and
      * how it squashes, stretches and leans - how far it has come in on its entrance, and the stage
      * it was last seen standing on. Kept here, not in the drawing composable, so a recomposition or
      * a stage flicker during the sidebar's own animation cannot reset a hop halfway through.
@@ -241,14 +241,14 @@ class MascotTransport {
 
     /**
      * Told when a character lands: at the end of each hop and of its entrance, with the impact
-     * (0..1, how fast it came in). The hook the mascot director (letta-mobile-te3n1.1) calls its
+     * (0..1, how fast it came in). The hook the mascot director calls its
      * landing reaction from; null tells no one.
      */
     var motionListener: MascotMotionListener? = null
 
     /**
      * True once the mascot director writes the body's motion to a rig that animates it itself
-     * (letta-mobile-te3n1.5 inputs: [MascotBody.motionX] -> `moveX`, [MascotBody.motionY] ->
+     * ( inputs: [MascotBody.motionX] -> `moveX`, [MascotBody.motionY] ->
      * `moveY`, each landing's impact -> `impact` then `land`). The layer then still carries the
      * character along its hop, between seat sizes and in on its entrance, but leaves the squash,
      * stretch and lean to the file, so they are not applied twice. False (the default) draws them
@@ -493,9 +493,9 @@ private fun Modifier.seatInput(handlers: SeatHandlers, hover: MutableInteraction
 /**
  * Drags the character for [handlers]. A gesture is taken (its slop consumed) only when the seat's
  * gate is open as it starts; otherwise it is left alone for whatever is under the layer. The
- * pointer's velocity goes to [flight]'s body as host data (letta-mobile-te3n1: the host reads
+ * pointer's velocity goes to [flight]'s body as host data (the host reads
  * gestures, the file animates), so the character leans into the drag and the rig hears it; the
- * director holds DRAGGED from the slop to the release and lands it at the release speed (te3n1.4).
+ * director holds DRAGGED from the slop to the release and lands it at the release speed.
  */
 private fun Modifier.seatDrag(handlers: SeatHandlers, drag: SeatDrag): Modifier {
     return pointerInput(handlers, drag.flight) { seatDragGestures(handlers, drag) }
@@ -563,7 +563,7 @@ private fun MascotEditBadge(onEdit: () -> Unit, modifier: Modifier) {
 
 private val EDIT_BADGE_SIZE = LettaDimens.Space.xl
 
-/** Hears the transport's motion events; the mascot director's hook (letta-mobile-te3n1.1). */
+/** Hears the transport's motion events; the mascot director's hook. */
 fun interface MascotMotionListener {
     /** [agent]'s character landed at a seat, with [impact] 0..1 (how fast it came in). */
     fun onLanded(agent: AgentId, impact: Float)

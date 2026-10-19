@@ -2,7 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 /**
  * Registers admin_rpc methods that return a typed capability-unavailable
- * response instead of dialing a backend (lgns8.9).
+ * response instead of dialing a backend.
  *
  * Used when a bounded adapter service is not injected, or for methods
  * deliberately deprecated over Iroh (e.g. shim stubs that only ever returned
@@ -20,7 +20,7 @@ internal object CapabilityUnavailable {
     }
 
     /**
-     * lgns8.9: a PERMANENT denial — the operation has no owner and is not
+     * A PERMANENT denial — the operation has no owner and is not
      * waiting on injection. [reason] must name the evidence (which upstream
      * surface is missing) so the error tells an operator what would unblock it,
      * and so the shim-retirement ceiling doc can be generated from the code.

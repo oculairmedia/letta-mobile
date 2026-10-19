@@ -2,7 +2,7 @@ package com.letta.mobile.data.storage
 
 /**
  * Content-addressed blob store for image attachments stripped from conversation
- * context (letta-mobile-xybm2).
+ * context.
  *
  * Images are persisted BEFORE the stripper removes their inline base64 from
  * messages.jsonl, allowing timeline rehydration to resolve image_ref pointers

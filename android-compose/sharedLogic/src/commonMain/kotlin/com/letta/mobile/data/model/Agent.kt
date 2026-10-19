@@ -33,7 +33,7 @@ data class ContextWindowOverview(
     @SerialName("num_tokens_functions_definitions") val numTokensFunctionsDefinitions: Int = 0,
     @SerialName("num_tokens_messages") val numTokensMessages: Int = 0,
     /**
-     * letta-mobile-cyh28: `"estimate"` when the local-backend estimator computed this answer;
+     * `"estimate"` when the local-backend estimator computed this answer;
      * null from a host that predates it (whose section numbers were placeholders).
      */
     @SerialName("source") val source: String? = null,

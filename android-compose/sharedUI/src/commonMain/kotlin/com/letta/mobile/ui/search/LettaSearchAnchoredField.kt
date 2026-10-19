@@ -55,7 +55,7 @@ enum class LettaSearchTriggerStyle { Field, Icon }
 /**
  * A request from outside the field to open its pane (Android chat's `/search` command). The host
  * keeps one and calls [request]; the field that shows it takes the request once
- * (letta-mobile-zxk2n.39). A counter the field compared on every composition reopened the pane each
+ *. A counter the field compared on every composition reopened the pane each
  * time the header came back (a field leaving composition forgets what it had seen); a taken request
  * is gone, so returning to the chat leaves the pane closed.
  */
@@ -88,7 +88,7 @@ data class LettaSearchAnchor(
  *
  * The header box is a TRIGGER, not the input. Clicking it opens a
  * [LettaPaneKind.Popover] through the [com.letta.mobile.ui.host.LettaHost]
- * in effect (letta-mobile-ckmub.3.5), and the real field lives in there.
+ * in effect, and the real field lives in there.
  *
  * That indirection is forced by the host, not preference. Nucleus's title bar
  * applies `focusProperties { canFocus = false }` to its whole subtree on
@@ -103,7 +103,7 @@ data class LettaSearchAnchor(
  * trigger's own width): its input sits exactly where the trigger was and the
  * scopes, filter and results hang directly beneath it, so the window shows ONE
  * search input, never the trigger's copy of the query above a second field
- * (letta-mobile-06whj; #1606 had this, S6's move to [LettaPane] lost it). The
+ * (#1606 had this, S6's move to [LettaPane] lost it). The
  * trigger draws nothing while the pane covers it. Escape (the pane's own key
  * handling) or a click outside closes the pane and the trigger shows the live
  * query again.

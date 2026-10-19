@@ -11,7 +11,7 @@ import kotlinx.datetime.daysUntil
 import kotlinx.datetime.toLocalDateTime
 
 /**
- * Pure, renderer-agnostic fleet model behind the shared Home page (letta-mobile-c3np7.3.11).
+ * Pure, renderer-agnostic fleet model behind the shared Home page.
  *
  * Everything the fleet half of Home draws is derived here from state the host already holds (its
  * conversation list, the agent roster and the "who is running" set) - no new repositories and no

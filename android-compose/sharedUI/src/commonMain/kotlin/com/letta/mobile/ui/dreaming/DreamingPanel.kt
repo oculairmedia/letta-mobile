@@ -83,7 +83,7 @@ data class DreamingHostNotes(
 )
 
 /**
- * letta-mobile-iczm7: the one Dreaming surface on phone and desktop for the agent [target] names:
+ * The one Dreaming surface on phone and desktop for the agent [target] names:
  * the platform passes the session's [controller] and its [notes].
  */
 @Composable

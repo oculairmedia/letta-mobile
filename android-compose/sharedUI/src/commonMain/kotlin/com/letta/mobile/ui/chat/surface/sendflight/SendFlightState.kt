@@ -25,7 +25,7 @@ enum class SendFlightPhase {
 }
 
 /**
- * letta-mobile-cc25e: one sent prompt in flight from the composer to its timeline row.
+ * One sent prompt in flight from the composer to its timeline row.
  *
  * Bounds are in the [SendFlightState] layer's coordinates. The animated values are snapshot
  * state written by the choreography ([flySendFlight]) and read in layout/draw only.
@@ -66,7 +66,7 @@ class SendFlight internal constructor(
 }
 
 /**
- * letta-mobile-cc25e: the send-flight coordinator, held by the chat page.
+ * The send-flight coordinator, held by the chat page.
  *
  * The composer's field reports its bounds ([reportSource]); a send [launch]es a flight with
  * the draft; the first user-prompt row composed after the send whose text matches claims it

@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 /**
- * [WorkspaceFileSource] over an App Server connection (letta-mobile-bzvro.26): `search_files` for
+ * [WorkspaceFileSource] over an App Server connection: `search_files` for
  * `@` mentions and strict-UTF-8 `read_file` for the viewer. A file the server cannot decode as
  * UTF-8 is [WorkspaceFileContent.Binary]; one over [maxViewChars] is [WorkspaceFileContent.TooLarge].
  */
@@ -29,7 +29,7 @@ class AppServerWorkspaceFileSource(
     override suspend fun read(path: String): WorkspaceFileContent =
         readVia(AppServerFileCommand.ReadFile(requestId("read-file"), path))
 
-    /** `read_memory_file`: the server joins [path] to [agentId]'s memory root (letta-mobile-bzvro.37). */
+    /** `read_memory_file`: the server joins [path] to [agentId]'s memory root. */
     override suspend fun readMemory(agentId: String, path: String): WorkspaceFileContent =
         readVia(AppServerMemfsCommand.ReadMemoryFile(requestId("read-memory-file"), agentId, path))
 

@@ -6,7 +6,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 
 /**
- * letta-mobile-cc25e: motion of the shared chat page.
+ * Motion of the shared chat page.
  *
  * The send flight lifts the sent text out of the prompt box and coasts it into the new prompt
  * row: the row makes room first ([SendFlight.INSERT_MILLIS]), the text travels on an eased
@@ -40,7 +40,7 @@ object ChatMotionTokens {
     }
 
     /**
-     * letta-mobile-bglj6.1: the docked panel growing into the full-screen page and shrinking
+     * The docked panel growing into the full-screen page and shrinking
      * back. One eased progress drives the panel's rect, corner radius, shadow and the page
      * background; the two layouts cross-fade inside it.
      */
@@ -59,7 +59,7 @@ object ChatMotionTokens {
     }
 
     /**
-     * letta-mobile-bglj6.1: the docked panel folding down onto its bar (the mascot over it), and
+     * The docked panel folding down onto its bar (the mascot over it), and
      * back. The panel's top edge slides while its surface and conversation cross-fade with the
      * mascot and its bubble; the bar itself never moves, and the mascot glides between its spots.
      */
@@ -68,7 +68,7 @@ object ChatMotionTokens {
     }
 
     /**
-     * letta-mobile-bglj6.1: the ambient thinking glow in the docked panel and around the
+     * The ambient thinking glow in the docked panel and around the
      * minimised dock. The same glides as the hosts' page glow (desktop
      * DesktopAmbientChatBackground, Android AmbientShaderAgentBackground), so a status change
      * eases the tint, breath rate and agitation instead of popping.
@@ -88,7 +88,7 @@ object ChatMotionTokens {
     }
 
     /**
-     * letta-mobile-bglj6.1: the scroll-to-latest glide. A tap far up the history snaps to about
+     * The scroll-to-latest glide. A tap far up the history snaps to about
      * [GLIDE_VIEWPORTS] from the newest edge, then one underdamped spring carries the list the
      * rest of the way: it eases into the edge, runs a little past it (a lift of the rows, never a
      * scroll past the end, so the platform's own overscroll is left alone) and settles back.

@@ -27,7 +27,7 @@ import kotlin.uuid.Uuid
 
 /**
  * The boards a plugin may place on. The host runtime binds it to the board of the call [call] names
- * (letta-mobile-cdgpr.16, [CallerBoard]); [requestedCanvas] is what the emit named, if anything.
+ * ([CallerBoard]); [requestedCanvas] is what the emit named, if anything.
  * Null refuses the emit. Being handed a board is the plugin's write grant on it: a board's ACL lists
  * agents and users, never plugins.
  */
@@ -36,7 +36,7 @@ fun interface PluginCanvasAccess {
 }
 
 /**
- * Turns one plugin's `host.emit` into canvas ops (plan: trust minimum, letta-mobile-cdgpr.5).
+ * Turns one plugin's `host.emit` into canvas ops (plan: trust minimum,).
  *
  * Ownership is by element id prefix, not a registry: the host mints every id the plugin places as
  * `p-<pluginId>-<suffix>` (plugin ids have no `-`, so no plugin's prefix is another's), and an

@@ -9,7 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 
 /**
- * letta-mobile-bzvro.6 (F06): keeps a client's view of its runtimes from going stale.
+ *  (F06): keeps a client's view of its runtimes from going stale.
  *
  * Fed every inbound frame by [AppServerRuntimeEventRouter] before fan-out. A lost frame (an
  * `event_seq` gap, see [EventSeqGapDetector]) asks the [RuntimeSyncScheduler] for a recovery
@@ -17,7 +17,7 @@ import kotlinx.coroutines.Job
  * hook for "the app came back to the foreground / the window regained focus".
  *
  * Gap detection needs frames in socket order. The router reads `AppServerClient.events`, which on a
- * direct socket is `AppServerTransport.inboundFrames` in arrival order (letta-mobile-by4vm.5); fed
+ * direct socket is `AppServerTransport.inboundFrames` in arrival order; fed
  * from the old two-lane merge, a `turn_finished` overtaking a delta read as a gap.
  */
 class StreamIntegrityMonitor(
@@ -56,10 +56,10 @@ class StreamIntegrityMonitor(
 
     companion object {
         /**
-         * letta-mobile-by4vm.50: advertised in an Iroh host's `auth_response` when it draws every
+         * Advertised in an Iroh host's `auth_response` when it draws every
          * frame's `event_seq` inside its stream write lock, so the per-connection sequence a client
          * sees is contiguous and a jump is a lost frame. Every current host advertises it; clients
-         * no longer check it (by4vm.111) and always enable gap detection.
+         * no longer check it and always enable gap detection.
          */
         const val EVENT_SEQ_ORDERED_CAPABILITY: String = "event_seq_ordered_v1"
     }

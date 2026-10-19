@@ -73,7 +73,7 @@ object BackendConfigPolicy {
     }
 
     /**
-     * letta-mobile-9v9nu: mode-authoritative migration for configs persisted
+     * Mode-authoritative migration for configs persisted
      * before `Mode.LOCAL` became authoritative over `serverUrl` (see
      * [com.letta.mobile.data.model.BackendKind.LOCAL_RUNTIME]'s KDoc). A
      * config can end up with `mode == LOCAL` and a leftover remote
@@ -102,7 +102,7 @@ object BackendConfigPolicy {
     }
 
     /**
-     * letta-mobile-hhp6r: the inverse of the parking done in
+     * The inverse of the parking done in
      * [migrateStaleLocalServerUrl]. When a config is switching to (or already
      * sitting in) a non-LOCAL [LettaConfig.Mode] with no `serverUrl` typed in,
      * restore the last parked remote backend instead of falling through to

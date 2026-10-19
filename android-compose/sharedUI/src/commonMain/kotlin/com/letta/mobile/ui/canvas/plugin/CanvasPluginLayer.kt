@@ -87,7 +87,7 @@ fun rememberPluginBoard(session: CanvasSession, revision: CanvasDocument?, asset
 }
 
 /**
- * The board's plugin elements (letta-mobile-s416w.4, plan section 4), beside the notes and placed
+ * The board's plugin elements (plan section 4), beside the notes and placed
  * the way they are: in the drawing's world coordinates, moving and scaling with the [viewport].
  *
  * Each element is drawn by the renderer [LocalPluginElementRenderers] has for its type, which in

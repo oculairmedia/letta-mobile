@@ -38,7 +38,7 @@ internal data class StepQuery(
 }
 
 /**
- * lgns8.9: on-disk run/step reader — the native owner for `run.list`,
+ * On-disk run/step reader — the native owner for `run.list`,
  * `run.get`, and `step.list`.
  *
  * Faithful port of admin-shim `lib/runs.ts` (`listRuns`, `getRun`,
@@ -47,8 +47,8 @@ internal data class StepQuery(
  * flat and already carries the wire shape:
  *
  * ```
- * <baseDir>/runs/<runId>/run.json      # the Run object, verbatim
- * <baseDir>/runs/<runId>/steps.jsonl   # one Step object per line
+ * <baseDir>/runs/<runId>/run.json # the Run object, verbatim
+ * <baseDir>/runs/<runId>/steps.jsonl # one Step object per line
  * <baseDir>/runs/_archive/<runId>/…    # retention-aged terminal runs
  * ```
  *

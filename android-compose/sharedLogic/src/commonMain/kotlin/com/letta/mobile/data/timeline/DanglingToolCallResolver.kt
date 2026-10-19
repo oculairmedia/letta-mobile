@@ -12,7 +12,7 @@ import kotlinx.coroutines.sync.withLock
 
 import kotlin.time.Duration.Companion.milliseconds
 /**
- * letta-mobile-dangling-tool: post-turn dangling tool-call resolver.
+ * Post-turn dangling tool-call resolver.
  *
  * PR #900 removed premature "settle dangling tool calls as Failed" behavior
  * from CLEAN turn completions: with async/parallel tools a real return can

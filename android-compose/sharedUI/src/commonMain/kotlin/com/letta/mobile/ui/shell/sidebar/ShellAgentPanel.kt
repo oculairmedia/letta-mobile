@@ -64,9 +64,9 @@ object ShellAgentPanelTags {
     const val AGENT_MENU = "shell-agent-panel-agent-menu"
     /** The focused agent's mascot (or its orb) at the head of the panel. */
     const val HERO = "shell-agent-panel-hero"
-    /** letta-mobile-3io8k: the host's model-and-context card under the agent's name. */
+    /** The host's model-and-context card under the agent's name. */
     const val AGENT_CARD = "shell-agent-panel-agent-card"
-    /** The roster of chats and canvases (letta-mobile-ckmub.3.10). */
+    /** The roster of chats and canvases. */
     const val LIBRARY = "shell-agent-panel-library"
 }
 
@@ -76,7 +76,7 @@ object ShellAgentPanelTags {
  * Active / Archived / All filter, the canvases, and Settings. The desktop shows it as the sidebar
  * beside the agent rail; a phone shows it in the navigation drawer. [modifier] sizes and paints it.
  *
- * [agentCard] (letta-mobile-3io8k) is drawn under the agent's name: the host's model-and-context
+ * [agentCard]  is drawn under the agent's name: the host's model-and-context
  * card. Null draws nothing there; it is never drawn on the Home page.
  */
 @Composable

@@ -5,7 +5,7 @@ package com.letta.mobile.data.model
  * server, plus a single classifier used by every UI surface that needs to know
  * whether a tool call ended in error.
  *
- * Background (bead `letta-mobile-o9ce`): the admin client previously treated
+ * Background: the admin client previously treated
  * "anything not literally `success`" as an error, including `null`,
  * `"completed"`, or anything else the server might emit. That mis-painted
  * healthy Bash/Grep/Read calls with the red Error icon. The empirical CLI

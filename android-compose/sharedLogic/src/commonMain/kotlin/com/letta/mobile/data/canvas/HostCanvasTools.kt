@@ -19,7 +19,7 @@ private val hostCanvasJson = Json {
 }
 
 /**
- * The `canvas_*` tools run by the host (letta-mobile-aknkw.3), for every agent runtime the host
+ * The `canvas_*` tools run by the host, for every agent runtime the host
  * serves: registered through `runtime_start.external_tools` like any tool, answered from the relay's
  * log by [HostCanvasBackend]. Same names, descriptions and inputs as the apps' own
  * [CanvasExternalTools] ([CanvasToolContract]).
@@ -98,7 +98,7 @@ object HostCanvasTools {
 
     /**
      * The canvases [caller] may read, its own conversation's first and marked `current`: an agent
-     * picking the first entry used to draw on another conversation's board (letta-mobile-qygvv.21).
+     * picking the first entry used to draw on another conversation's board.
      */
     private suspend fun list(backend: HostCanvasBackend, caller: HostCanvasCaller, input: JsonObject): ExternalToolResult {
         val conversationId = HostCanvasToolInputs.string(input, "conversation_id")
@@ -115,7 +115,7 @@ object HostCanvasTools {
     private fun HostCanvasEntry.listed(current: Boolean) = CanvasListEntry(canvasId, title, conversationId, current)
 
     /**
-     * `canvas_compose` on the host (letta-mobile-bglj6.12): the canvas resolved as every other tool
+     * `canvas_compose` on the host: the canvas resolved as every other tool
      * resolves it ([withCanvas]'s rules), the caller held to its ACL, then [CanvasComposeHosting]
      * compiles, checks against the log's scene and publishes through [HostCanvasBackend.publish],
      * which checks again, stamps the ops as the caller's and sends them to the relay as ONE batch

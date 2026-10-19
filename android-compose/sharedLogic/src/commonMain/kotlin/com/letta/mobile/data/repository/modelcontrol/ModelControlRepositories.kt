@@ -13,7 +13,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * App Server providers (letta-mobile-w4q4p): list what can be connected,
+ * App Server providers: list what can be connected,
  * connect with an auth method's field values, disconnect. The wrapper answers
  * every mutation with the refreshed catalog, which replaces [providers].
  */
@@ -101,12 +101,12 @@ class ModelCatalogRepository(private val rpc: AdminRpcInvoker) {
 /**
  * Switches one conversation's model (and reasoning effort) through `model.update`.
  * Every successful model switch is recorded in [selections] so pickers show the
- * conversation's model rather than the agent's (letta-mobile-okvyf).
+ * conversation's model rather than the agent's.
  */
 class ConversationModelRepository(
     private val rpc: AdminRpcInvoker,
     val selections: ConversationModelSelections = ConversationModelSelections(),
-    /** letta-mobile-bzvro.18: a switched-to model becomes recent once the host accepts it. */
+    /** A switched-to model becomes recent once the host accepts it. */
     private val recents: RecentModelsStore? = null,
 ) {
     /** The models switched to most recently (handles, newest first) for the picker's "Recent" group. */

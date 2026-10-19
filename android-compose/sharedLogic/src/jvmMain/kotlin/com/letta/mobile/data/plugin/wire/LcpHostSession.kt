@@ -64,7 +64,7 @@ object LcpHandshake {
 /**
  * The host's end of one plugin connection: a [LcpPeer] held by the session state machine, the
  * capability check and the secret guard, serving the plugin's calls from [LcpHostBinding.handlers]
- * and calling the plugin's methods with their deadlines. The driver (letta-mobile-s416w.28) opens
+ * and calling the plugin's methods with their deadlines. The driver opens
  * one per process or service connection.
  */
 class LcpHostSession(transport: LcpTransport, binding: LcpHostBinding, scope: CoroutineScope) {

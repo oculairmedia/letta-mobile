@@ -25,7 +25,7 @@ import com.letta.mobile.runtime.BackendDescriptor
 import kotlinx.atomicfu.atomic
 
 /**
- * letta-mobile-by4vm.86: the repositories a host binds itself for one graph generation — its own
+ * The repositories a host binds itself for one graph generation — its own
  * implementations, or an `unavailable(route)` stand-in where the host serves no such route. The
  * transport-bound ones come from [SharedSessionGraph.transportBound] instead.
  */
@@ -55,7 +55,7 @@ class SessionGraphIdentity(
 )
 
 /**
- * letta-mobile-by4vm.86: the one [SessionRepositoryGraph] implementation every host uses. Every
+ * The one [SessionRepositoryGraph] implementation every host uses. Every
  * member is interface-typed; Android (`SessionGraph`, which adds its platform-bound extras by
  * delegation) and desktop build it from [HostSessionRepositories] plus
  * [SharedSessionGraph.transportBound], so the two can no longer drift field by field.
@@ -92,7 +92,7 @@ class SharedSessionRepositoryGraph(
     override val selfTodoRepository: ISelfTodoRepository = transportBound.selfTodoRepository
     override val subagentRepository: ISubagentRepository = transportBound.subagentRepository
 
-    /** letta-mobile-r2zo8: each conversation's latest context total, fed by [channelTransport]. */
+    /** Each conversation's latest context total, fed by [channelTransport]. */
     val contextTokenReadings: ContextTokenReadings = transportBound.contextTokenReadings
 
     private val closed = atomic(false)

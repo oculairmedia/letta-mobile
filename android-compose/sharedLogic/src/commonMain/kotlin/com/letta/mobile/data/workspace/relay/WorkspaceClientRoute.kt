@@ -3,7 +3,7 @@ package com.letta.mobile.data.workspace.relay
 import com.letta.mobile.data.transport.appserver.AppServerClient
 
 /**
- * letta-mobile-bzvro.37: which client the agent-workspace sources (MemFS, secrets, workspace files)
+ * Which client the agent-workspace sources (MemFS, secrets, workspace files)
  * send their commands through. A direct App Server session wins; otherwise the Iroh host's relay
  * ([WorkspaceRelayClient]); with neither, every request fails with [NO_CONNECTION], which the
  * pages show in place of their content.

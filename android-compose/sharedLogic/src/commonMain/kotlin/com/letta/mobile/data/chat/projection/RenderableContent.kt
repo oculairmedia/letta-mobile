@@ -3,7 +3,7 @@ package com.letta.mobile.data.chat.projection
 import com.letta.mobile.data.model.UiMessage
 
 /**
- * letta-mobile-jqiu3: an assistant text segment that carries nothing a renderer can draw.
+ * An assistant text segment that carries nothing a renderer can draw.
  *
  * A model turn is segmented around its tool calls, and the segments between calls are often
  * whitespace (`"\n\n"`, `" "`). Such a segment has no text, no tool calls, no attachments and no

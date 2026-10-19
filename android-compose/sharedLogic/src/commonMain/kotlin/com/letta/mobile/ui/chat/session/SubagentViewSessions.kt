@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * letta-mobile-zxk2n.8: a subagent's conversation as the dual view shows it - read-only. The child
+ * A subagent's conversation as the dual view shows it - read-only. The child
  * works for its parent, so a reply belongs in the parent: the composer takes no input and says so
  * ([notice]), nothing can be sent, re-run or forked from here, and the conversation's settings stay
  * as the parent's dispatch left them. Reading, scrolling, expanding and stopping the run still work.

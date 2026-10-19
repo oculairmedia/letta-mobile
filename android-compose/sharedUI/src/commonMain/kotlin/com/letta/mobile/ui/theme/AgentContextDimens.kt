@@ -4,7 +4,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * letta-mobile-3io8k: the drawer context card's few layout facts that are not on the [LettaDimens]
+ * The drawer context card's few layout facts that are not on the [LettaDimens]
  * scale; spacing still comes from [LettaDimens.Space].
  */
 object AgentContextDimens {
@@ -15,12 +15,12 @@ object AgentContextDimens {
     val popoverWidth: Dp = 360.dp
     val popoverMaxHeight: Dp = 620.dp
 
-    /** letta-mobile-joigh: room for the limit slider's widest label ("200k of 400k"), so the track never shifts. */
+    /** Room for the limit slider's widest label ("200k of 400k"), so the track never shifts. */
     val limitValueWidth: Dp = 84.dp
 
-    /** letta-mobile-joigh: the limit status row's fixed height: a text button's, so its Compact action never moves the sheet. */
+    /** The limit status row's fixed height: a text button's, so its Compact action never moves the sheet. */
     val limitStatusHeight: Dp = 40.dp
 
-    /** letta-mobile-joigh: the auto-compact tick on the sheet's context bar. */
+    /** The auto-compact tick on the sheet's context bar. */
     val autoCompactMarkerWidth: Dp = 2.dp
 }

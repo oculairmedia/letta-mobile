@@ -3,7 +3,7 @@ package com.letta.mobile.data.memory.memfs
 import kotlinx.coroutines.flow.Flow
 
 /**
- * The port the MemFS browser reads and writes through (letta-mobile-bzvro.24).
+ * The port the MemFS browser reads and writes through.
  * [AppServerMemfsSource] serves it from an App Server connection; tests fake it.
  *
  * Every call throws [MemfsException] when the server refuses or cannot answer it, with a

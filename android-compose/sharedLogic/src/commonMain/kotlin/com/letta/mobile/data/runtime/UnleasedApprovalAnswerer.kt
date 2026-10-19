@@ -35,14 +35,14 @@ internal enum class UnleasedApprovalOutcome {
     AlreadyClaimed,
 
     /**
-     * letta-mobile-qygvv.10: this client already sent a decision for the request (a retry, a
+     * This client already sent a decision for the request (a retry, a
      * second observer, or a server replay). No second frame: a replay is re-answered from the
      * [com.letta.mobile.data.controller.fanout.ApprovalDecisionCache] by the router's responder.
      */
     AlreadyDecided,
 
     /**
-     * letta-mobile-qygvv.10: the App Server's `input_accepted` rejected the auto-allow (e.g.
+     * The App Server's `input_accepted` rejected the auto-allow (e.g.
      * "Approval request is no longer pending"). Recorded as `approval.rejected`, exactly like a
      * leased send, and the claim is handed back.
      */
@@ -58,7 +58,7 @@ internal enum class UnleasedApprovalOutcome {
 }
 
 /**
- * letta-mobile-qygvv.3: the approval twin of `answerUnleasedExternalToolCall`.
+ * The approval twin of `answerUnleasedExternalToolCall`.
  *
  * A `control_request` (can_use_tool) that arrives while NO turn holds a lease for its runtime key
  * (the turn's collector ended, a reconnect replayed it, or the server raced the end of a turn)
@@ -72,7 +72,7 @@ internal enum class UnleasedApprovalOutcome {
  * so a turn that subscribes later drops the already-answered request instead of answering twice.
  */
 internal class UnleasedApprovalAnswerer(
-    /** letta-mobile-qygvv.10: the same sender leased approvals use (decision cache + `input_accepted`). */
+    /** The same sender leased approvals use (decision cache + `input_accepted`). */
     private val sender: ApprovalResponseSender,
     private val inboundControlRegistry: InboundControlRequestRegistry,
     private val connectionGenerationProvider: () -> Long,
@@ -82,7 +82,7 @@ internal class UnleasedApprovalAnswerer(
     private val permissionModeFor: (TurnRuntimeKey) -> AppServerPermissionMode,
     private val runtimeScopeFor: (TurnRuntimeKey) -> AppServerRuntimeScope?,
     /**
-     * letta-mobile-bzvro.40: a request left pending for the person is parked like a leased one, so
+     * A request left pending for the person is parked like a leased one, so
      * its card (with rules and diffs) reaches a viewer now (a relaying node pushes it) rather than
      * only when the next turn subscribes.
      */
@@ -140,7 +140,7 @@ internal class UnleasedApprovalAnswerer(
     }
 
     /**
-     * letta-mobile-qygvv.10: sends through [sender] like a leased auto-approve: the decision is
+     * Sends through [sender] like a leased auto-approve: the decision is
      * cached before the send and `input_accepted` is awaited. Marked answered unless rejected
      * (the same rule as `AppServerTurnEngine.submitApprovalResponse`); a rejection or a send
      * failure hands the claim back so a later turn or replay can still answer it.

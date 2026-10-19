@@ -18,9 +18,9 @@ internal data class RuntimeStartExtras(
 )
 
 /**
- * lgns8.17(a): advertise the same external tools the controller would; an omitted field
+ * (a): advertise the same external tools the controller would; an omitted field
  * means the server can never emit `external_tool_call_request`.
- * letta-mobile-k5nbq.9: [RuntimeStartExtras.cwd] is the agent's saved default directory.
+ * [RuntimeStartExtras.cwd] is the agent's saved default directory.
  */
 internal fun TurnCommand.runtimeStart(
     extras: RuntimeStartExtras,
@@ -38,7 +38,7 @@ internal fun TurnCommand.runtimeStart(
 )
 
 /**
- * letta-mobile-k5nbq.12: the `runtime_start.cwd` for [command] — its agent's saved default, only
+ * The `runtime_start.cwd` for [command] — its agent's saved default, only
  * while the runtime keeps no working directory for the conversation. letta-code switches a
  * conversation to any cwd `runtime_start` carries, and persists every chosen one in its cwd map
  * (`get_cwd_map`; a conversation left in the boot directory has no entry). So a conversation whose

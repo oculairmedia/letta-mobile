@@ -25,7 +25,7 @@ import kotlinx.serialization.json.Json
  * Persists ops for each canvas into `{rootDirectory}/ops/{canvasId_sha256}.jsonl`
  * while keeping an in-memory index of seen op IDs for O(1) deduplication.
  *
- * The journal ([CanvasOpLog.unsettled], letta-mobile-by4vm.22) is a sidecar of settled op ids,
+ * The journal ([CanvasOpLog.unsettled],) is a sidecar of settled op ids,
  * `{canvasId_sha256}.settled`, one per line. A log written before the journal existed has no
  * sidecar; its ops are all taken as settled when it is first read, since the document they were
  * written beside is the only record of which of them it holds.

@@ -75,7 +75,7 @@ object ProviderSignInTags {
 }
 
 /**
- * The in-app subscription sign-in (letta-mobile-zxk2n.3), shared by phone and
+ * The in-app subscription sign-in, shared by phone and
  * desktop. Device-code providers show the code to enter and wait for the
  * approval; the others open the sign-in page and take back the code. The
  * browser and the clipboard come from Compose's platform locals, so neither

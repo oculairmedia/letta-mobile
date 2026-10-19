@@ -15,7 +15,7 @@ import kotlinx.collections.immutable.toImmutableList
  * tools) are applied by [com.letta.mobile.data.transport.appserver.CompactProfileRuntimePolicy] for
  * every agent carrying [TAG].
  *
- * letta-mobile-by4vm.121.16: compact means a SMALL toolset, not none. Tools are agent policy, so
+ * compact means a SMALL toolset, not none. Tools are agent policy, so
  * the set lives here, the same on every platform: a name the host does not offer (device_action
  * off the phone) simply matches nothing.
  */

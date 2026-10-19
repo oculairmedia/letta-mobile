@@ -82,7 +82,7 @@ interface TimelineExternalTransportWriter {
     ): RecentMessagesReconcileOutcome
 
     /**
-     * letta-mobile-dangling-tool: signals that a turn started on
+     * Signals that a turn started on
      * [conversationId] so the timeline's post-turn dangling-tool-call sweep
      * (see DanglingToolCallResolver) can supersede whatever the previous
      * turn's sweep left pending. Default no-op so existing fakes compile
@@ -91,7 +91,7 @@ interface TimelineExternalTransportWriter {
     suspend fun turnStarted(agentId: String?, conversationId: String, runId: String? = null, turnId: String? = null) {}
 
     /**
-     * letta-mobile-dangling-tool: signals that a turn ended on
+     * Signals that a turn ended on
      * [conversationId]. Whenever unresolved tool-call cards remain, the
      * timeline schedules a bounded canonical-record-driven resolve sweep —
      * on EVERY completion, clean or abnormal (Codex #902 review finding 3).
@@ -99,7 +99,7 @@ interface TimelineExternalTransportWriter {
      * scheduled, since a non-clean turn's OWN calls are already settled
      * synchronously elsewhere and never show up as unresolved; what this
      * unconditional scheduling protects is an EARLIER turn's still-dangling
-     * card whose sweep this turn's `turnStarted()` superseded. Default
+     * card whose sweep this turn's `turnStarted` superseded. Default
      * no-op so existing fakes compile unchanged.
      */
     suspend fun turnEnded(agentId: String?, conversationId: String, clean: Boolean) {}

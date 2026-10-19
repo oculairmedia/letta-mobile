@@ -4,7 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** Shared parsing for the provider token endpoints (letta-mobile-zxk2n.3). Error text never includes a token or code. */
+/** Shared parsing for the provider token endpoints. Error text never includes a token or code. */
 internal object OAuthWire {
     const val API_KEY_FIELD = "apiKey"
     const val DEVICE_CODE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"

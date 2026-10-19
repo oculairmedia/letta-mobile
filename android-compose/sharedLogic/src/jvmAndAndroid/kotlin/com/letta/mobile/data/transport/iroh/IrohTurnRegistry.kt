@@ -27,7 +27,7 @@ class IrohActiveTurn(request: IrohTurnRequest) {
 
     /**
      * Whether a redial must announce this turn for recovery: it has no terminal and no running
-     * send job. letta-mobile-by4vm.96: a running send job is the engine's turn, which survives the
+     * send job. a running send job is the engine's turn, which survives the
      * redial on its own (it waits out the reconnect grace), so it is not announced as well.
      */
     val needsRedialRecovery: Boolean get() = !hasTerminal && job?.isActive != true
@@ -51,7 +51,7 @@ class IrohActiveTurn(request: IrohTurnRequest) {
     private val sessionLost = atomic(false)
 
     /**
-     * letta-mobile-qygvv.16: the session this turn ran on is gone. Its run may still be going on
+     * The session this turn ran on is gone. Its run may still be going on
      * the server, so once retired the run stays open to the observer instead of being fenced.
      */
     val cutOffBySessionLoss: Boolean get() = sessionLost.value

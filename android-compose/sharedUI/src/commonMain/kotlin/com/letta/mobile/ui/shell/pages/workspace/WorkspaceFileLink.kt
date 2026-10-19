@@ -18,7 +18,7 @@ import com.letta.mobile.data.workspace.WorkspaceFileOpener
 import com.letta.mobile.data.workspace.WorkspacePaths
 
 /**
- * How a host opens workspace files from inside the timeline (letta-mobile-bzvro.26). Null, the
+ * How a host opens workspace files from inside the timeline. Null, the
  * default, means the host cannot read files, and tool cards show no file link.
  */
 val LocalWorkspaceFileOpener = staticCompositionLocalOf<WorkspaceFileOpener?> { null }

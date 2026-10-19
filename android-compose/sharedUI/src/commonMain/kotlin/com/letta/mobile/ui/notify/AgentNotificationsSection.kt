@@ -25,7 +25,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 
-/** letta-mobile-bzvro.27: test tags of the per-agent notification section. */
+/** Test tags of the per-agent notification section. */
 object AgentNotificationsTags {
     const val SECTION = "agent-notifications-section"
     const val SWITCH = "agent-notifications-switch"
@@ -34,7 +34,7 @@ object AgentNotificationsTags {
 }
 
 /**
- * letta-mobile-bzvro.27: the app's [AttentionPrefsRepository], for surfaces the host does not wire
+ * The app's [AttentionPrefsRepository], for surfaces the host does not wire
  * by hand (Android's drawer card, desktop settings). Null where the host posts no notifications.
  */
 val LocalAttentionPrefs = staticCompositionLocalOf<AttentionPrefsRepository?> { null }
@@ -50,7 +50,7 @@ object AgentNotificationsStrings {
 }
 
 /**
- * letta-mobile-bzvro.27 (F27): one switch that mutes or unmutes [agentId]'s notifications, read and
+ *  (F27): one switch that mutes or unmutes [agentId]'s notifications, read and
  * written through the shared [AttentionPrefsRepository]. The caption says what the setting means
  * now; its height change animates unless the person prefers reduced motion.
  */

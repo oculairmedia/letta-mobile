@@ -7,13 +7,13 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
 
-/** Git context associated with the device's current working directory (letta-mobile-bzvro.19). */
+/** Git context associated with the device's current working directory. */
 data class AppServerGitContext(
     val branch: String?,
     val recentBranches: List<String> = emptyList(),
 )
 
-/** An available toolset advertised by the App Server (letta-mobile-bzvro.19, .22). */
+/** An available toolset advertised by the App Server (.22). */
 data class AppServerToolset(
     val id: String,
     val displayName: String? = null,
@@ -22,7 +22,7 @@ data class AppServerToolset(
     val isFeatured: Boolean = false,
 )
 
-/** A background process tracked on the device (letta-mobile-bzvro.19, .21). */
+/** A background process tracked on the device (.21). */
 data class AppServerBackgroundProcess(
     val id: String,
     val type: String? = null,
@@ -57,7 +57,7 @@ data class AppServerWorkflowPhase(
     val counts: AppServerWorkflowProgressCounts,
 )
 
-/** An experiment flag reported by the App Server (letta-mobile-bzvro.19). */
+/** An experiment flag reported by the App Server. */
 data class AppServerExperiment(
     val id: String,
     val label: String? = null,
@@ -67,7 +67,7 @@ data class AppServerExperiment(
     val source: String? = null,
 )
 
-/** A pending control request reported in device status (letta-mobile-bzvro.19). */
+/** A pending control request reported in device status. */
 data class AppServerPendingControlRequest(
     val requestId: String,
     val request: JsonObject = JsonObject(emptyMap()),
@@ -76,7 +76,7 @@ data class AppServerPendingControlRequest(
 )
 
 /**
- * letta-mobile-bzvro.19: the typed subset of an `update_device_status` snapshot
+ * The typed subset of an `update_device_status` snapshot
  * (protocol_v2 `DeviceStatus`) that the client acts on. The frame keeps the full
  * [AppServerInboundFrame.UpdateDeviceStatus.deviceStatus] object, so unknown and
  * future fields stay tolerated; a missing or malformed field reads as null.

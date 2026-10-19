@@ -13,7 +13,7 @@ interface RecentModelsPersistence {
 }
 
 /**
- * letta-mobile-bzvro.18 (F18): the models the user switched to most recently, newest first, so the
+ *  (F18): the models the user switched to most recently, newest first, so the
  * picker can offer them before the full catalogue. [record] runs on a successful `update_model`.
  *
  * The persisted list keeps up to [STORED_LIMIT] entries (the letta-code TUI's own cap, since desktop

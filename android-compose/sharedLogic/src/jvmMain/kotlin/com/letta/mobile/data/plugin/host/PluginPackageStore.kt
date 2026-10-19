@@ -13,7 +13,7 @@ import java.nio.file.StandardCopyOption
 import java.util.UUID
 
 /**
- * Where a host keeps its plugins on disk (letta-mobile-cdgpr.6): the registry at
+ * Where a host keeps its plugins on disk: the registry at
  * `<root>/plugins.json`, written atomically, and each installed version unpacked at
  * `<root>/<id>/<version>/`. A version is unpacked into a staging sibling and moved into place
  * whole, so a crash mid-unpack never leaves a half-written package where the driver would run it.

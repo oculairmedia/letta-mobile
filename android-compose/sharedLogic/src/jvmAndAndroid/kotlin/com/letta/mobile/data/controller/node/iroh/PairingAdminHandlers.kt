@@ -15,21 +15,21 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
- * Admin RPC surface for one-time pairing invitations (d6e8g.5). Registered
+ * Admin RPC surface for one-time pairing invitations. Registered
  * only when a pairing service is configured; all methods run behind the
  * connection's authentication gate and require admin.full
  * ([IrohPeerCapabilities.forAdminMethod]), so only an administrator can mint
  * invites or manage pairings. Invite secrets appear ONLY in the response to
  * the caller who minted them — never in telemetry or errors.
  *
- * letta-mobile-gw0h1 (sixv8.2): when the caller sets `qr: true`, the response
+ *  (sixv8.2): when the caller sets `qr: true`, the response
  * carries an additive `qr_invite` field (the `letta-qr-v1.<base64url>` wire
  * format from `reference/qr-pairing-protocol.md` §5.1 + §7.1) and, since
- * letta-mobile-dpv7m.1, a scannable `pair_link` that adds the host's dial
+ * a scannable `pair_link` that adds the host's dial
  * address. Existing fields (`invite`, `deep_link`, `expires_at_ms`,
  * `suggested_name`) are unchanged.
  *
- * dpv7m.1 invite scope: `role` (chat|desktop|vibesync|admin) or explicit
+ *  invite scope: `role` (chat|desktop|vibesync|admin) or explicit
  * `capabilities` choose the grant (default chat — never admin unless asked),
  * `agent_ids` confines the redeeming device to those agents, and `ttl_ms` is
  * capped at [IrohPairingService.MAX_TTL_MS].

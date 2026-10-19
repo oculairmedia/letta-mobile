@@ -27,14 +27,14 @@ import com.letta.mobile.data.pairing.access
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * Settings > Paired devices (letta-mobile-dpv7m.5): THIS DEVICE / OTHER DEVICES
+ * Settings > Paired devices: THIS DEVICE / OTHER DEVICES
  * with access + agent-scope chips and last activity, per-device revoke with an
  * inline confirmation ("Revoking…" until the host confirms), "Revoke all other
  * devices", and pending invites with Cancel.
  *
  * The agent chip says "Lists N agents" on purpose: today the host filters an
  * agent-limited device's listings but does not yet block opening a
- * conversation by id (letta-mobile-dpv7m.4), and the footnote says so.
+ * conversation by id, and the footnote says so.
  */
 @Composable
 fun PairedDevicesList(

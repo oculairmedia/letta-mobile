@@ -40,7 +40,7 @@ data class AppServerChannelSummary(
  * One channel account as reported by `channel_accounts_list` (upstream
  * `mapChannelAccount`).
  *
- * SECURITY (lgns8.23 landmine 2): [config] is the plugin's account config
+ * SECURITY ( landmine 2): [config] is the plugin's account config
  * VERBATIM — for the Matrix plugin that includes `accessToken` and
  * `syncAccessToken` in cleartext. [toString] is overridden so an accidental
  * string interpolation of this object (or of any frame containing it) can never
@@ -72,7 +72,7 @@ data class AppServerChannelAccount(
 
 /**
  * Server capabilities and version info returned by `app_server_info_response`
- * (lgns8.24). Used for capability discovery before using protocol features.
+ *. Used for capability discovery before using protocol features.
  *
  * @param lettaCodeVersion The Letta Code version string (e.g. "0.29.12")
  * @param protocolVersion Numeric protocol version for feature detection

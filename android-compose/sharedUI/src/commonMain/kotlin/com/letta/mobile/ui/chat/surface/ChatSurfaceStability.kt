@@ -9,7 +9,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 
 /**
- * letta-mobile-bglj6.1: identity-stable versions of the page's host inputs.
+ * Identity-stable versions of the page's host inputs.
  *
  * Hosts naturally build `onIntent`, [ChatSurfaceHost] and [ChatSurfacePlatform] from fresh
  * lambdas on every recomposition (a keystroke on Android, a stream token on desktop). Those
@@ -87,7 +87,7 @@ private inline fun <T : Any> forwardIfSet(member: T?, forwarder: () -> T): T? {
     return if (member == null) null else forwarder()
 }
 
-/** The host's "Show on canvas" (letta-mobile-bglj6.13), calling whatever the host passed last; null when it passes none. */
+/** The host's "Show on canvas", calling whatever the host passed last; null when it passes none. */
 private fun forwardedShowOnCanvas(current: State<ChatSurfaceHost>): ((CanvasArtifactReceipt) -> Unit)? {
     return forwardIfSet<(CanvasArtifactReceipt) -> Unit>(current.value.showOnCanvas) { { receipt -> current.value.showOnCanvas?.invoke(receipt) } }
 }

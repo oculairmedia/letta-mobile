@@ -9,10 +9,10 @@ import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 
 /**
- * letta-mobile-r2zo8: the focused conversation's context window, from data a client already
+ * The focused conversation's context window, from data a client already
  * holds — no extra call:
  *
- *  0. the conversation's own window as the host records it ([conversationWindow], letta-mobile-dxz5s:
+ *  0. the conversation's own window as the host records it ([conversationWindow],
  *     `context_window_limit` on the conversation record), which describes the model it runs;
  *  1. a per-conversation model switch ([modelOverride]) uses that model's catalog window,
  *     since the agent's own limit describes a different model;
@@ -38,7 +38,7 @@ fun contextWindowTokensOf(
 }
 
 /**
- * letta-mobile-dxz5s: the one resolution Android and desktop share for [conversationId]'s window:
+ * The one resolution Android and desktop share for [conversationId]'s window:
  * the conversation's own host window, else its model's catalog window, else the agent's.
  */
 fun ConversationModelChoices.windowTokensFor(conversationId: String?, agent: Agent?, models: List<LlmModel>): Int? =
@@ -50,7 +50,7 @@ fun ConversationModelChoices.windowTokensFor(conversationId: String?, agent: Age
     )
 
 /**
- * letta-mobile-joigh: the catalog window of model [value] (a picker token, handle, id or alias):
+ * The catalog window of model [value] (a picker token, handle, id or alias):
  * the most that model can be run at, i.e. the context-limit slider's ceiling.
  *
  * An exact picker token wins. Otherwise every row the value names counts, and rows that share one
@@ -67,7 +67,7 @@ fun modelCatalogWindowOf(models: List<LlmModel>, value: String?): Int? {
 }
 
 /**
- * letta-mobile-joigh: the drawer card's windows for one conversation.
+ * The drawer card's windows for one conversation.
  *
  * [pinned] is a limit this session just applied under the same model: no cache re-reads the record
  * after `/context-limit`, so it is the newest truth and beats even the host record ([recordWith]).

@@ -4,7 +4,7 @@ import androidx.compose.runtime.Immutable
 import kotlin.jvm.JvmInline
 
 /**
- * A secret's plaintext, held only in memory (letta-mobile-bzvro.25). Its [toString] never shows
+ * A secret's plaintext, held only in memory. Its [toString] never shows
  * the value, so a secret that reaches a log line, an exception message or a state dump stays
  * hidden; the one way to read it is [reveal], which the vault calls only to draw a value the user
  * explicitly asked to see, or to send it to the server.
@@ -54,7 +54,7 @@ data class AgentSecretChanges(
 class AgentSecretsException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
- * The port the vault reads and writes through (letta-mobile-bzvro.25). Values live on the server
+ * The port the vault reads and writes through. Values live on the server
  * only: implementations must not cache, persist or log them.
  */
 interface AgentSecretsSource {

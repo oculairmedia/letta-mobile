@@ -25,7 +25,7 @@ data class AppServerReceivedFrame(
     val frame: AppServerInboundFrame,
     val raw: JsonObject,
     /**
-     * Connection generation that produced this frame (lgns8.22.4). Stamped when
+     * Connection generation that produced this frame. Stamped when
      * the frame enters a stable reconnect pipe so delayed delivery cannot
      * register under a successor generation. Null for transports that do not
      * stamp (tests / direct clients) — callers fall back to the live provider.
@@ -36,7 +36,7 @@ data class AppServerReceivedFrame(
 /**
  * A runtime's `{agent_id, conversation_id}` scope.
  *
- * letta-mobile-bzvro.10 (F10): letta-code 0.33 widened inbound scopes to
+ *  (F10): letta-code 0.33 widened inbound scopes to
  * `ConversationRuntimeScope`, whose `agent_id` may be `null` for agent-free conversations. Strict
  * decoding turned every such frame (stream deltas, loop status, queue, `turn_finished`) into a
  * `DecodeFailure`. A null or absent `agent_id` now decodes to [AGENT_FREE] (the empty id), so the

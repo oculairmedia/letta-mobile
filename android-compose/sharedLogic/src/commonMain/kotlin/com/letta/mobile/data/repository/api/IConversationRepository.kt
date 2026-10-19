@@ -33,19 +33,19 @@ interface IConversationRepository {
         recompileConversation(ConversationId(id), dryRun, agentId?.let(::AgentId))
 
     /**
-     * letta-mobile-by4vm.12: whether [cancelConversation] has a route on the active backend, so pages
+     * Whether [cancelConversation] has a route on the active backend, so pages
      * offer "Cancel runs" only where it works. False unless a backend says otherwise.
      */
     fun canCancelConversationRuns(): Boolean = false
 
-    /** letta-mobile-by4vm.12: whether [recompileConversation] has a route on the active backend. */
+    /** Whether [recompileConversation] has a route on the active backend. */
     fun canRecompileConversations(): Boolean = false
 
     suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation = error("forkConversation unsupported")
     suspend fun forkConversation(id: String, agentId: String): Conversation = forkConversation(ConversationId(id), AgentId(agentId))
 
     /**
-     * letta-mobile-bzvro.15: fork through [throughMessageId] (inclusive), routed by backend: App
+     * Fork through [throughMessageId] (inclusive), routed by backend: App
      * Server / Iroh through `conversation_fork`, REST through `/fork?message_id=`. A null id copies
      * the whole conversation, as [forkConversation] without it does.
      */

@@ -19,7 +19,7 @@ import kotlinx.serialization.json.JsonObject
  * Subagent registry projected from App Server runtime events
  * (`update_subagent_state`), not LettaShim HTTP.
  *
- * lgns8.22.8: this is now a thin adapter over [DurableSubagentRegistry]. It
+ * this is now a thin adapter over [DurableSubagentRegistry]. It
  * used to hold a process-lifetime `ConcurrentHashMap` and DELETE any chip
  * absent from the latest snapshot, which meant (a) a controller restart lost
  * every chip while its workers kept running and (b) a chip could vanish
@@ -78,14 +78,14 @@ class ControllerSubagentRegistrySource(
     }
 
     /**
-     * letta-mobile-fxoew.2: told after every registry mutation, so the host can
+     * Told after every registry mutation, so the host can
      * push the conversation's snapshot to its viewers. Null pushes nothing.
      */
     @Volatile
     var changeListener: SubagentRegistryChangeListener? = null
 
     /**
-     * letta-mobile-fxoew.3: the parent turn ended. Background subagents
+     * The parent turn ended. Background subagents
      * legitimately outlive the turn that dispatched them (5hihw), so this does
      * NOT end running chips: [DurableSubagentRegistry.markParentTurnEnded] stays
      * a lifecycle no-op. The turn end is only a trigger for the stale-chip TTL,
@@ -103,7 +103,7 @@ class ControllerSubagentRegistrySource(
     }
 
     /**
-     * letta-mobile-fxoew.2: the snapshot pushed to viewers. Live chips plus
+     * The snapshot pushed to viewers. Live chips plus
      * terminal chips that ended within [PUSH_TERMINAL_LINGER_MS], so a
      * completion reaches the ring without replaying the whole terminal history.
      * The key's agent narrows to one parent (conversation id `default` is
@@ -145,7 +145,7 @@ class ControllerSubagentRegistrySource(
         scope.launch { events.collect { ingestReceived(it) } }
 
     /**
-     * letta-mobile-7vs4s: fold a weaker producer's view in. Precedence is
+     * Fold a weaker producer's view in. Precedence is
      * enforced inside the registry — these can create a chip the controller has
      * not seen yet, but can never overwrite a controller-native fact.
      */
@@ -210,7 +210,7 @@ class ControllerSubagentRegistrySource(
         const val CAPABILITY = "subagent_registry_v1"
 
         /**
-         * letta-mobile-fxoew.2: advertised only by hosts that push the registry
+         * Advertised only by hosts that push the registry
          * (`subagents_updated` on every mutation plus a replay on viewer join).
          * Deliberately NOT [CAPABILITY]: hosts already in production advertise
          * that for `subagent.list` alone, and a client that silenced its own
@@ -223,7 +223,7 @@ class ControllerSubagentRegistrySource(
     }
 }
 
-/** letta-mobile-fxoew.2: hears every registry mutation, per parent conversation. */
+/** Hears every registry mutation, per parent conversation. */
 fun interface SubagentRegistryChangeListener {
     fun onConversationChanged(key: SubagentConversationKey)
 }

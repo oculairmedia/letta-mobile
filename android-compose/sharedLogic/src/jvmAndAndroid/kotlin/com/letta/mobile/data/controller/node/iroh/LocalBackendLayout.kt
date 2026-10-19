@@ -9,7 +9,7 @@ import java.io.File
 import java.util.Base64
 
 /**
- * letta-mobile-by4vm.21: the ONE description of the letta-code local-backend on-disk layout
+ * The ONE description of the letta-code local-backend on-disk layout
  * (letta.js `src/backend/local/local-store.ts`), shared by the native admin-query readers and the
  * Android embedded runtime's store. A layout change upstream is fixed here, once.
  *

@@ -7,7 +7,7 @@ import com.letta.mobile.data.model.isBackgroundSubagent
 /**
  * What one conversation's subagent registry entries say about it: how many foreground subagents
  * are running (its tool call is DELEGATING), and whether a background dream (reflection) or
- * memory-upkeep run is in flight (letta-mobile-iczm7).
+ * memory-upkeep run is in flight.
  */
 data class SubagentActivity(val running: Int = 0, val dreaming: Boolean = false) {
     companion object {

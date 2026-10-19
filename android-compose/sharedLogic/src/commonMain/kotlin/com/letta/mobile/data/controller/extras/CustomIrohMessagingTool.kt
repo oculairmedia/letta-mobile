@@ -10,7 +10,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-bn008-phase2-custom-tool (1vuec).
+ *  (1vuec).
  *
  * The agent-visible Iroh agent-to-agent messaging tool, distinct from
  * letta-code's `matrix_agent_message`:
@@ -40,7 +40,7 @@ import kotlinx.serialization.json.put
  * `multiLineBodyRoundTripsViaStdin` exercises the full stdin path with a
  * body containing newlines, quotes, ampersands, and a URL.
  *
- * ## Why this lives in sharedLogic and not :cli
+ * ## Why this lives in sharedLogic and not:cli
  * The existing `AgentMessageSendCommand` in `:cli` is an Android library
  * module — no installable distribution. The wrapper distribution
  * `:iroh-wrapper-cli` IS installable but doesn't yet carry the

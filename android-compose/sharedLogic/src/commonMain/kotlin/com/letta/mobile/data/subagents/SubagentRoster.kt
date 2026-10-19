@@ -6,7 +6,7 @@ import com.letta.mobile.data.model.isBackgroundSubagent
 import kotlin.time.Instant
 
 /**
- * letta-mobile-ulcg6 (PR4): the ONE projection of the subagent registry that
+ *  (PR4): the ONE projection of the subagent registry that
  * every subagent surface renders - the desktop Background tasks pane and the
  * Android roster sheet - so both clients show the same subagents in the same
  * states with the same words.
@@ -20,7 +20,7 @@ data class SubagentRoster(
     val running: List<SubagentRosterItem>,
     /** User-facing work that ended and was not cleared. */
     val finished: List<SubagentRosterItem>,
-    /** Reflection / dream runs: kept out of the way, listed separately (zxk2n.8). */
+    /** Reflection / dream runs: kept out of the way, listed separately. */
     val background: List<SubagentRosterItem>,
 ) {
     val runningCount: Int get() = running.size

@@ -112,7 +112,7 @@ object ApprovalAdminHandlers {
     }
 
     /**
-     * letta-mobile-bzvro.40: the always-allow rule ids, on the message or on its first decision. Only
+     * The always-allow rule ids, on the message or on its first decision. Only
      * an approval carries them; the controller checks them against the request it parked.
      */
     private fun selectedSuggestionIds(approval: JsonObject): List<String> {

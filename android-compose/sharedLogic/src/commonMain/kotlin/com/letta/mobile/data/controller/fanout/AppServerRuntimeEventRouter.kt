@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
- * Controller-owned inbound router (lgns8.22.3).
+ * Controller-owned inbound router.
  *
  * Subscribes to [AppServerClient.events] exactly once per attachment and fans
  * full [AppServerReceivedFrame] values (channel + raw JSON preserved) to
@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
 class AppServerRuntimeEventRouter(
     private val inboundControlRegistry: InboundControlRequestRegistry = InboundControlRequestRegistry(),
     val connectionGenerationProvider: () -> Long = { 0L },
-    /** letta-mobile-qygvv.5: decisions sent by this client, shared with the turn engine. */
+    /** Decisions sent by this client, shared with the turn engine. */
     private val approvalDecisionCache: ApprovalDecisionCache = ApprovalDecisionCache(),
     private val fanout: RuntimeEventFanout = RuntimeEventFanout(
         inboundControlRegistry = inboundControlRegistry,
@@ -43,19 +43,19 @@ class AppServerRuntimeEventRouter(
     }
 
     /**
-     * letta-mobile-bzvro.6: every inbound frame is shown to [monitor] (gap detection, sync cadence)
+     * Every inbound frame is shown to [monitor] (gap detection, sync cadence)
      * before it is fanned out. One monitor per router; binding again replaces it.
      */
     fun bindStreamIntegrity(monitor: StreamIntegrityMonitor) {
         integrity.value = monitor
     }
 
-    /** letta-mobile-by4vm.95: the connection the monitor watched is gone; frames go unobserved until the next bind. */
+    /** The connection the monitor watched is gone; frames go unobserved until the next bind. */
     fun unbindStreamIntegrity() {
         integrity.value = null
     }
 
-    /** letta-mobile-bzvro.6: ask the bound monitor to resync what is on screen; no-op without one. */
+    /** Ask the bound monitor to resync what is on screen; no-op without one. */
     fun requestResync() {
         integrity.value?.requestResync()
     }
@@ -67,7 +67,7 @@ class AppServerRuntimeEventRouter(
 
     fun approvalDecisionCache(): ApprovalDecisionCache = approvalDecisionCache
 
-    /** letta-mobile-qygvv.5: see [RuntimeEventFanout.bindApprovalReplayResponder]. */
+    /** See [RuntimeEventFanout.bindApprovalReplayResponder]. */
     fun bindApprovalReplayResponder(responder: (AppServerInboundFrame.ControlRequest) -> Boolean) {
         fanout.bindApprovalReplayResponder(responder)
     }
@@ -99,11 +99,11 @@ class AppServerRuntimeEventRouter(
 
     private val sessionLinkState = RuntimeSessionLinkState()
 
-    /** letta-mobile-by4vm.9: whether the session behind this router is carrying frames right now. */
+    /** Whether the session behind this router is carrying frames right now. */
     val sessionLink: StateFlow<RuntimeSessionLink> = sessionLinkState.link
 
     /**
-     * letta-mobile-by4vm.9: the socket under a stable inbound pipe dropped and its owner is
+     * The socket under a stable inbound pipe dropped and its owner is
      * redialling. Unlike [detach], nothing is closed: the collector and every subscriber stay, so
      * frames from the successor socket reach the same turns. Turns fail only if the session is not
      * restored within their grace window.
@@ -111,7 +111,7 @@ class AppServerRuntimeEventRouter(
     fun interruptSession(reason: String?) = sessionLinkState.interrupt(reason)
 
     /**
-     * letta-mobile-by4vm.9: the successor socket is attached. Ends an interruption and resyncs the
+     * The successor socket is attached. Ends an interruption and resyncs the
      * watched runtimes so what streamed during the gap is recovered; a no-op while linked.
      */
     fun restoreSession() {
@@ -126,7 +126,7 @@ class AppServerRuntimeEventRouter(
 
     /**
      * Every subscriber's turn ends now, as on [detach], but the collector stays attached for the
-     * next connection behind a stable inbound pipe (letta-mobile-by4vm.95: an Android Iroh dial
+     * next connection behind a stable inbound pipe (an Android Iroh dial
      * ended). Closing subscriber channels unblocks turn collectors waiting on fanout (otherwise
      * they sit until idle watchdog / forever under a user-input gate).
      */

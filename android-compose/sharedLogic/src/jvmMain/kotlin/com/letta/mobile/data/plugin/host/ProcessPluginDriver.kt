@@ -74,7 +74,7 @@ data class ProcessDriverOptions(
 )
 
 /**
- * Runs a manifest's `runtime.process` as a subprocess speaking LCP over stdio (letta-mobile-cdgpr.4).
+ * Runs a manifest's `runtime.process` as a subprocess speaking LCP over stdio.
  *
  * Trust minimum: the environment is `PATH` plus the manifest's resolved `env` substitutions and
  * nothing else of the host's (secrets reach the plugin only that way); the working directory and

@@ -45,7 +45,7 @@ data class PairInviteUiState(
 }
 
 /**
- * Inviter-side state holder (letta-mobile-dpv7m.2, UX pass dpv7m.5): mint a
+ * Inviter-side state holder (UX pass): mint a
  * scoped invite and show it as a QR, notice when a new device appears
  * (accepted), list paired devices and pending invites, revoke either. Shared
  * by Android and desktop; the platform supplies [scope] (its ViewModel /

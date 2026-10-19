@@ -4,13 +4,13 @@ import com.letta.mobile.data.model.MessageContentPart
 
 /**
  * Disk-backed store of optimistic user messages that the server may never
- * echo back (mge5.24).
+ * echo back.
  *
  * Android keeps pending rows in the canonical ledger (CanonicalPendingLocalStore) and no longer
  * implements this; the shared TimelineRepository (desktop, web) still takes one.
  * Tests use an in-memory fake.
  *
- * letta-mobile-by4vm.17: rows are owned by a [PendingLocalScope] — the backend,
+ * rows are owned by a [PendingLocalScope] — the backend,
  * the agent and the conversation — not by the conversation id alone.
  * `conv-default-*` / `default` ids are reused by every agent and every backend,
  * so a conversation-only key let an unsent message resurface in another

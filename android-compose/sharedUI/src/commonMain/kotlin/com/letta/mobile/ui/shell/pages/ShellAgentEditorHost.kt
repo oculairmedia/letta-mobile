@@ -39,7 +39,7 @@ class ShellAgentEditorHost(
 )
 
 /**
- * letta-mobile-ckmub.3.24 / ckmub.17.5: the shared agent editor over the session's repositories (it was
+ * The shared agent editor over the session's repositories (it was
  * desktop's `DesktopAgentEditor` binding). A save or delete closes it into the chat; a rename or delete
  * reloads the host's roster.
  */

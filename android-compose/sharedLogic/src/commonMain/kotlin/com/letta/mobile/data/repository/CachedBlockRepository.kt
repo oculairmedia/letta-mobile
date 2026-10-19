@@ -18,7 +18,7 @@ import com.letta.mobile.data.session.BackendScopedCache
 /**
  * Phase 5e: platform-neutral block repository (HTTP / Iroh routing) over [BlockRemoteSource] and an
  * optional [BlockIrohSource]. No durable local cache — identity attach/detach stay HTTP-only (no
- * Iroh handlers yet). letta-mobile-by4vm.103: the one memory-block repository Android and desktop
+ * Iroh handlers yet). the one memory-block repository Android and desktop
  * Iroh sessions build (through [com.letta.mobile.data.session.graph.adminRepositories]).
  */
 open class CachedBlockRepository(

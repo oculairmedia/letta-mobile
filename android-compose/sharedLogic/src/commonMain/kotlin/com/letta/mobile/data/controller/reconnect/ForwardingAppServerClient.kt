@@ -9,7 +9,7 @@ import com.letta.mobile.data.transport.appserver.AppServerWorkspaceCommand
  * An [AppServerClient] whose every call goes to [target], the client of the connection that is
  * current right now. Facades whose connection changes underneath a stable reference extend it:
  * [ReconnectingAppServerClient] (socket generations) and the Android Iroh transport's dial-switching
- * client (letta-mobile-by4vm.95). [target] throws when no connection may take the call.
+ * client. [target] throws when no connection may take the call.
  */
 abstract class ForwardingAppServerClient : AppServerClient {
     protected abstract fun target(): AppServerClient

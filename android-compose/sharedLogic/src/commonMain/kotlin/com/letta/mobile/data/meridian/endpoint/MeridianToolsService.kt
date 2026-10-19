@@ -10,9 +10,9 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * The transport-agnostic body of the `meridian/tools/1` endpoint (letta-mobile-jna0o.4): one request
+ * The transport-agnostic body of the `meridian/tools/1` endpoint: one request
  * line in, one response line out. The socket server around it only moves lines; a later in-process
- * loopback (jna0o.11) can reuse it as is.
+ * loopback can reuse it as is.
  *
  * Order of checks: the wire shape, then the bearer token when the transport needs one (the loopback
  * TCP fallback; a Unix socket is guarded by its file mode), then either a tool-token issue (the

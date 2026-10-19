@@ -5,7 +5,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-by4vm.84: goals have no App Server owner.
+ * Goals have no App Server owner.
  *
  * letta-code 0.34.14 has no goal surface at all: no `/goal` in `SUPPORTED_REMOTE_COMMANDS`, no goal
  * frame in protocol v2, and no goal state in its local backend. Goal mode belonged to the retired

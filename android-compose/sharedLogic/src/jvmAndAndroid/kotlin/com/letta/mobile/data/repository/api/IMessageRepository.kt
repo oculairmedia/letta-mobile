@@ -43,7 +43,7 @@ interface IMessageRepository : IConversationInspectorMessageRepository {
         fetchOlderMessages(AgentId(agentId), ConversationId(conversationId), beforeMessageId)
 
     /**
-     * letta-mobile-f0ixs: older-page backfill that also reports whether MORE history exists.
+     * Older-page backfill that also reports whether MORE history exists.
      *
      * Callers previously inferred "reached the beginning of the conversation" from a page
      * shorter than the requested size. That inference is wrong whenever MessageListPageGuard
@@ -91,7 +91,7 @@ interface IMessageRepository : IConversationInspectorMessageRepository {
     ) = submitApproval(AgentId(agentId), approvalRequestId, toolCallIds, approve, reason, conversationId)
 
     /**
-     * letta-mobile-bzvro.40: [submitApproval] that may carry always-allow rule ids. A repository that
+     * [submitApproval] that may carry always-allow rule ids. A repository that
      * cannot deliver them refuses rather than approve without the rule.
      */
     suspend fun submitApproval(answer: MessageApprovalAnswer) {
@@ -109,7 +109,7 @@ interface IMessageRepository : IConversationInspectorMessageRepository {
     suspend fun resetMessages(agentId: AgentId)
 }
 
-/** letta-mobile-bzvro.40: one approval answer, with the always-allow rule ids the person chose. */
+/** One approval answer, with the always-allow rule ids the person chose. */
 data class MessageApprovalAnswer(
     val agentId: AgentId,
     val approvalRequestId: String,
@@ -120,7 +120,7 @@ data class MessageApprovalAnswer(
     val selectedSuggestionIds: List<String> = emptyList(),
 )
 
-/** letta-mobile-bzvro.14: an answer the offline outbox replays, as the repository sends it. */
+/** An answer the offline outbox replays, as the repository sends it. */
 fun com.letta.mobile.data.chat.approval.OutboxApproval.toMessageAnswer() = MessageApprovalAnswer(
     agentId = AgentId(agentId),
     approvalRequestId = requestId,

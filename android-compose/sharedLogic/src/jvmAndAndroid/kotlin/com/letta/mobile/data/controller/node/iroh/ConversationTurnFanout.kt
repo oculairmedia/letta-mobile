@@ -138,28 +138,28 @@ internal class ConversationTurnFanout(
     private val observerWriteTimeoutMs: Long = OBSERVER_WRITE_TIMEOUT_MS,
     private val observerWrites: ObserverWriteQueue? = null,
     /**
-     * letta-mobile-qygvv.3: queue for the INITIATOR's writes. The initiator's connection owns
+     * Queue for the INITIATOR's writes. The initiator's connection owns
      * it, while [observerWrites] may be node-owned so a turn that outlives its initiator still
      * reaches the other viewers. Defaults to [observerWrites] (one shared queue).
      */
     private val initiatorWrites: ObserverWriteQueue? = observerWrites,
     /**
-     * letta-mobile-4vtng.1: the turn's prompt client message id, the turn id stamped on the deltas
+     * The turn's prompt client message id, the turn id stamped on the deltas
      * the host synthesizes itself (tool projection, user echo, dangling-call settlement).
      */
     turnId: String? = null,
-    /** letta-mobile-r1xkl: joins this turn's stamped messages to their stored rows at the end. */
+    /** Joins this turn's stamped messages to their stored rows at the end. */
     private val identity: TurnIdentityBinding? = null,
 ) {
     private val synthesizedIdentity = turnStreamIdentityFor(turnId)
     private val openToolCalls = OpenToolCallTracker()
     private val toolProjection = RelayedToolProjection()
 
-    /** letta-mobile-qygvv.28: a delta that ends a run already reached the viewers. */
+    /** A delta that ends a run already reached the viewers. */
     private var terminalDeltaRelayed = false
 
     /**
-     * letta-mobile-qygvv.3: the initiator's connection is gone but the turn keeps running
+     * The initiator's connection is gone but the turn keeps running
      * (see [NodeTurnHost]). Frames still go to every other viewer and are still tracked for
      * the initiator's redial parking; only writes to the dead initiator handle stop.
      */
@@ -222,7 +222,7 @@ internal class ConversationTurnFanout(
     }
 
     /**
-     * letta-mobile-qygvv.28: the terminal delta for an engine lifecycle the App Server's own frames
+     * The terminal delta for an engine lifecycle the App Server's own frames
      * did not deliver. It carries the run id, and a cancel stays a cancel (`stop_reason
      * cancelled`, with the reason as its message) instead of reading as a failure on the phone. A
      * completion whose real `stop_reason` already went out gets no second one.
@@ -236,7 +236,7 @@ internal class ConversationTurnFanout(
     }
 
     /**
-     * letta-mobile-qygvv.28: relay one App Server `stream_delta` [raw] frame the engine consumed
+     * Relay one App Server `stream_delta` [raw] frame the engine consumed
      * (its terminal `error_message`, the `stop_reason` after it), shaped like any relayed delta.
      */
     suspend fun relayServerDelta(raw: JsonObject) {
@@ -353,7 +353,7 @@ internal class ConversationTurnFanout(
     }
 
     /**
-     * letta-mobile-qygvv.12: write one non-delta App Server frame (`update_loop_status`,
+     * Write one non-delta App Server frame (`update_loop_status`,
      * `turn_finished`, `update_queue`) to the INITIATOR only, on the same ordered chain as its
      * deltas, so it lands after every delta already queued. [drain] waits for it to reach the wire.
      * Observers are left alone: their ingest reconciles through message.list.
@@ -456,7 +456,7 @@ internal class ConversationTurnFanout(
      * turn frames — so it must not consume a parking slot.
      *
      * eaczz.6 — NON-BLOCKING FANOUT + FAULT ISOLATION. EVERY viewer's writes,
-     * initiator included (letta-mobile-aggeh), enter the connection-owned
+     * initiator included, enter the connection-owned
      * [ObserverWriteQueue], so a normal delta does not wait on any network write
      * at all. Each viewer has one ordered job chain, preserving frame order and
      * event-sequence monotonicity while a stalled observer is timed out and

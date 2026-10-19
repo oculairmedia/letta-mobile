@@ -3,7 +3,7 @@ package com.letta.mobile.ui.host
 import androidx.compose.runtime.Composable
 
 /**
- * letta-mobile-ztdpf: asks an anchored pane (a popover, a menu) to close when the screen that
+ * Asks an anchored pane (a popover, a menu) to close when the screen that
  * opened it stops: its destination is navigated away from, or the app goes to the background.
  *
  * On Android an anchored pane is its own window ("Pop-Up Window", a sub-panel of the activity).

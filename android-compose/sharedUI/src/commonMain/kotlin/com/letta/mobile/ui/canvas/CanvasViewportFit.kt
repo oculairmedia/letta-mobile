@@ -21,7 +21,7 @@ internal object CanvasViewportFit {
     const val MIN_SCALE = 0.05f
     const val MAX_SCALE = 4f
 
-    /** [extra] is anything else on the board with world bounds: its plugin elements (letta-mobile-s416w.4). */
+    /** [extra] is anything else on the board with world bounds: its plugin elements. */
     fun contentBounds(elements: List<Element>, documents: List<CanvasSceneDocument>, extra: List<Rect> = emptyList()): Rect? {
         val rects = elements.map { it.bounds() } +
             documents.mapNotNull { it.frame?.let { f -> Rect(f.x, f.y, f.x + f.width, f.y + f.height) } } + extra

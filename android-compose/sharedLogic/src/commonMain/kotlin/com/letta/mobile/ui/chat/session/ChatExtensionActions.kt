@@ -19,7 +19,7 @@ class ChatExtensionActionState(
 )
 
 /**
- * letta-mobile-by4vm.98.3: the [ChatActions] a host's extension points ([TimelineChatSessionOptions])
+ * The [ChatActions] a host's extension points ([TimelineChatSessionOptions])
  * and the shared view state answer, the same for every session port. A port implements only what
  * its conversation owner does (the draft, sending, stop, approvals, reload); anything with no
  * extension point bound is a no-op its capabilities hide.

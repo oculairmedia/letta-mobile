@@ -2,9 +2,9 @@ package com.letta.mobile.data.chat.projection
 
 /**
  * The live overlay and the settled pages as the one index space a timeline list renders, built
- * from a single read of both sources (letta-mobile-qygvv.24).
+ * from a single read of both sources.
  *
- * A settled row takes over the key of the live row it replaces (letta-mobile-sibr8), and the live
+ * A settled row takes over the key of the live row it replaces, and the live
  * row only drains once the presentation has seen the settled one resident, so for at least a frame
  * both sources hold the key. Hiding the live copy is what lets the settled row replace it in place.
  * That hiding must read the same settled snapshot the list keys are read from: filtering the live

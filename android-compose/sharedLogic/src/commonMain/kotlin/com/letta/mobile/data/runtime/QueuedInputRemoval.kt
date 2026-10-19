@@ -6,7 +6,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * letta-mobile-qygvv.9: cancelling a lease whose input is still QUEUED on the App Server.
+ * Cancelling a lease whose input is still QUEUED on the App Server.
  *
  * [OrphanedTurnAborter] never aborts a Queued lease: it has no run of its own, and an abort would
  * hit the turn ahead (another viewer's) and pause the queue. But the cancelled lease's

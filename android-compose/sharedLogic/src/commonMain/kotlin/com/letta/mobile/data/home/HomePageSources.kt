@@ -90,7 +90,7 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
         statsJob = null
     }
 
-    /** letta-mobile-by4vm.13: a catalog the session does not serve is empty, never asked for. */
+    /** A catalog the session does not serve is empty, never asked for. */
     private suspend fun followCatalog(graph: Graph) {
         val agents = graph.ifSupported(SessionRoute.AGENTS) { agentRepository }
         val roster = agents?.agents ?: MutableStateFlow(emptyList())

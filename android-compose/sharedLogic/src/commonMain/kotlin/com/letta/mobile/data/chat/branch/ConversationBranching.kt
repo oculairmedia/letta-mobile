@@ -52,7 +52,7 @@ data class BranchBackend(
 data class BranchHistory(val messages: List<BranchMessage>, val complete: Boolean)
 
 /**
- * letta-mobile-bzvro.15 / .16, letta-mobile-7mys7: forks a conversation from a message (optionally
+ *  /.16, forks a conversation from a message (optionally
  * naming the fork), "Edit and resend" (fork before the prompt, then hand the prompt back to the
  * composer), and "Rerun" (the same fork, with the prompt sent again unchanged). Shared by both
  * clients; each binds a [BranchBackend] to its gateway or repository, and

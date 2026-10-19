@@ -7,11 +7,11 @@ data class MessageActionAvailability(
     val canCopy: Boolean,
     val canSelectText: Boolean,
     val canSendAgain: Boolean,
-    /** letta-mobile-bzvro.15: "Fork from here". */
+    /** "Fork from here". */
     val canFork: Boolean = false,
-    /** letta-mobile-bzvro.16: "Edit and resend". */
+    /** "Edit and resend". */
     val canEdit: Boolean = false,
-    /** letta-mobile-7mys7: "Rerun" (fork before the prompt and send it again there). */
+    /** "Rerun" (fork before the prompt and send it again there). */
     val canRerun: Boolean = false,
 ) {
     val hasActions: Boolean
@@ -50,7 +50,7 @@ fun messageActionAvailability(
     )
 }
 
-/** letta-mobile-7mys7: the branch actions [message] allows, given what the owner supports. */
+/** The branch actions [message] allows, given what the owner supports. */
 private fun BranchActionSupport.applyTo(message: UiMessage, base: MessageActionAvailability): MessageActionAvailability =
     base.copy(
         canFork = fork && ConversationBranchPlanner.canFork(message),
@@ -63,7 +63,7 @@ private fun isResendable(message: UiMessage): Boolean =
     message.role == "user" && message.content.isNotBlank() && message.attachments.isEmpty()
 
 /**
- * letta-mobile-7mys7: an edit puts the prompt's images back in the composer with its text, so it
+ * An edit puts the prompt's images back in the composer with its text, so it
  * needs their bytes; an image the timeline only keeps a pointer to would be lost.
  */
 private fun imagesKept(message: UiMessage): Boolean = message.attachments.all { it.base64.isNotEmpty() }

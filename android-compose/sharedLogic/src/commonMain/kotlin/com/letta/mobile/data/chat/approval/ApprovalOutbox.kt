@@ -14,7 +14,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * letta-mobile-bzvro.14 (F14, G47): one approval answer made while the connection was down,
+ *  (F14, G47): one approval answer made while the connection was down,
  * waiting to be sent. Keyed by [key] (the tool call it answers, else the request id), which is what
  * makes a replay idempotent: one answer per tool call, ever.
  */
@@ -122,7 +122,7 @@ class InMemoryApprovalOutboxStore(private var snapshot: ApprovalOutboxSnapshot =
 }
 
 /**
- * letta-mobile-bzvro.14 (F14): answers made while disconnected, persisted in [store] and replayed
+ *  (F14): answers made while disconnected, persisted in [store] and replayed
  * once the connection is back.
  *
  * The rules, each from the acceptance criteria:

@@ -71,7 +71,7 @@ fun CanvasWorkspace(
     chromeTopInset: Dp = 0.dp,
     /**
      * Where something outside the board asks the camera to go (the chat's "Show on canvas",
-     * letta-mobile-bglj6.13); null when nothing outside steers it.
+     *); null when nothing outside steers it.
      */
     cameraRequest: CanvasCameraRequest? = null,
 ) {

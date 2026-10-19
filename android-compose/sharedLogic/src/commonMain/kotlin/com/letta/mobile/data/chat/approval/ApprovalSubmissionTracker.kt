@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.update
 
 /**
  * Which approval requests the user has answered and the app is still waiting on, shared by every
- * chat client (letta-mobile-2dsi5.4). An answer is in flight from the moment it is submitted until
+ * chat client. An answer is in flight from the moment it is submitted until
  * the conversation's timeline no longer shows that request as pending; a failed or cancelled submit
  * clears it at once so the card becomes actionable again.
  *

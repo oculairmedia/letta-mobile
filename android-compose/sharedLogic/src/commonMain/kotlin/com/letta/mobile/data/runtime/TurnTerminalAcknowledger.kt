@@ -40,7 +40,7 @@ private class AckLedger(private val capacity: Int) {
 }
 
 /**
- * letta-mobile-zxk2n.2: answers every `turn_finished` that lists this client's
+ * Answers every `turn_finished` that lists this client's
  * [AppServerTerminalConsumerId] with `turn_finished_ack`, so the server stops replaying it.
  *
  * One ack per delivery: the same frame seen twice on one connection (by the turn that applied it

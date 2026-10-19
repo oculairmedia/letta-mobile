@@ -30,7 +30,7 @@ data class AgentSecretDraft(
     val normalizedKey: String get() = AgentSecretKeys.normalize(key)
 }
 
-/** Everything the shared vault page draws (letta-mobile-bzvro.25). */
+/** Everything the shared vault page draws. */
 @Immutable
 data class AgentVaultState(
     val agentId: String? = null,

@@ -23,7 +23,7 @@ import kotlin.time.Duration.Companion.milliseconds
 internal enum class OwnerLiveness { Dead, Alive, Inconclusive }
 
 /**
- * letta-mobile-qygvv.3: protocol-native liveness for the owner of a busy runtime key.
+ * Protocol-native liveness for the owner of a busy runtime key.
  *
  * Replaces the admin_rpc `run.get` / `run.list` probe, which timed out on the production
  * controller (`reconcileLivenessTimedOut`) and so never freed a wedged lease. Instead this asks

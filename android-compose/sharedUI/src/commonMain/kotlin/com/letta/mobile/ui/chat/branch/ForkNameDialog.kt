@@ -31,7 +31,7 @@ object ForkNameDialogTags {
 }
 
 /**
- * letta-mobile-7mys7 (G37): names a fork as it is made. The name is optional: left blank, the fork
+ *  (G37): names a fork as it is made. The name is optional: left blank, the fork
  * keeps the title the backend gives it. Shared by the chat rows ("Fork from here") and the
  * conversation list's "Fork…".
  */

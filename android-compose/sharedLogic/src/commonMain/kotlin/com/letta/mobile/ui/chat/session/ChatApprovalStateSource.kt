@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 
 /**
- * letta-mobile-by4vm.79: the approval state a chat host owns, read by a session port instead of
+ * The approval state a chat host owns, read by a session port instead of
  * tracking its own: answers in flight, answers waiting in the offline outbox, and what each parked
  * control request offered (by tool call id).
  */
@@ -18,7 +18,7 @@ interface ChatApprovalStateSource {
 }
 
 /**
- * letta-mobile-by4vm.97: [this] source as the overlay [withHostApprovals] lays over a timeline; a
+ * [this] source as the overlay [withHostApprovals] lays over a timeline; a
  * host without one (null) reports nothing. Every session port reads host approvals through here.
  */
 fun ChatApprovalStateSource?.hostApprovals(): Flow<TimelineHostApprovals> {

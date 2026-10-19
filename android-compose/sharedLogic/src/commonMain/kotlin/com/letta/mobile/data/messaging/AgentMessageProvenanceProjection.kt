@@ -8,7 +8,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * letta-mobile-slqfp: pure projection from transport-structural signals to
+ * Pure projection from transport-structural signals to
  * [AgentMessageProvenance]. Two independent structural sources feed this —
  * never message body/content text:
  *
@@ -22,7 +22,7 @@ import kotlinx.serialization.json.contentOrNull
  *    message.
  *
  * Kept in `sharedLogic/commonMain` per the cardinal rule so Android reuses
- * the identical projection once its chat render lands (letta-mobile-wq0c8).
+ * the identical projection once its chat render lands.
  */
 object AgentMessageProvenanceProjection {
 

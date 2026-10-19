@@ -23,7 +23,7 @@ import com.letta.mobile.data.chat.send.ServerQueueBlocker
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
-/** letta-mobile-1n5py: what the queued-sends panel can do; shared by the Android and desktop hosts. */
+/** What the queued-sends panel can do; shared by the Android and desktop hosts. */
 data class QueuedSendActions(
     val onCancel: (QueuedSendId) -> Unit = {},
     val onSendNow: (QueuedSendId) -> Unit = {},
@@ -31,7 +31,7 @@ data class QueuedSendActions(
 )
 
 /** Test tags for [QueuedSendsPanel]; row tags are suffixed with the message's id. */
-object QueuedSendsPanelTestTags {
+internal object QueuedSendsPanelTestTags {
     const val PANEL = "queued_sends_panel"
     const val ROW = "queued_send_row_"
     const val CANCEL = "queued_send_cancel_"
@@ -43,10 +43,10 @@ object QueuedSendsPanelTestTags {
 /** The label on a queued message: where it stands in line. */
 fun queuedSendLabel(position: Int): String = "Queued · $position"
 
-/** letta-mobile-1n5py.1: the label on a sent message the App Server parked behind another client. */
+/** The label on a sent message the App Server parked behind another client. */
 const val QUEUED_ON_SERVER_LABEL = "Queued on server · another client's turn"
 
-/** letta-mobile-by4vm.121: the label when it waits for this device's own stopped turn to wind down. */
+/** The label when it waits for this device's own stopped turn to wind down. */
 const val QUEUED_BEHIND_OWN_STOP_LABEL = "Queued on server · waiting for the previous response to stop"
 
 /** The label on [ConversationSendQueue.queuedOnServer]: what it waits behind. */
@@ -67,7 +67,7 @@ fun queuedSendsHeader(queue: ConversationSendQueue): String {
 }
 
 /**
- * letta-mobile-1n5py: the messages waiting behind the running turn, docked above the composer.
+ * The messages waiting behind the running turn, docked above the composer.
  *
  * Each row can be cancelled, or sent now (the running turn is stopped and this message runs
  * next). A queue held by a Stop offers Resume. Shared by the Android and desktop chat screens.
@@ -109,7 +109,7 @@ private fun QueuedSendsHeader(queue: ConversationSendQueue, onResume: () -> Unit
     }
 }
 
-/** letta-mobile-1n5py.1: already sent; the server runs it once the turn ahead of it ends. */
+/** Already sent; the server runs it once the turn ahead of it ends. */
 @Composable
 private fun QueuedOnServerRow(item: QueuedChatSend, behind: ServerQueueBlocker) {
     Column(modifier = Modifier.fillMaxWidth().testTag(QueuedSendsPanelTestTags.ON_SERVER)) {

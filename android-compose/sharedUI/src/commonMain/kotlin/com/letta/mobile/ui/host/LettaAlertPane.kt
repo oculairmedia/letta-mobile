@@ -54,7 +54,7 @@ class LettaAlertSpec(
 )
 
 /**
- * letta-mobile-ckmub.3.3 (S3c): the one shape of a titled question or short form (rename, fork,
+ *  (S3c): the one shape of a titled question or short form (rename, fork,
  * new folder, sign in, chat options) in the host's container. The body sits on the shared side
  * padding and takes the height left over the action row, which always stays in view.
  */

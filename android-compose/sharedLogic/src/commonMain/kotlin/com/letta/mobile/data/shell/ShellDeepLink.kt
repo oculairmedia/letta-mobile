@@ -8,7 +8,7 @@ sealed interface ShellLink {
     data class Open(val destination: ShellDestination) : ShellLink
 
     /**
-     * A scan-to-pair link (`meridian://pair?…` / `letta://pair?…`, letta-mobile-dpv7m.3). It carries
+     * A scan-to-pair link (`meridian://pair?…` / `letta://pair?…`,). It carries
      * a one-time secret: hosts hand it over in memory and open their pairing surface; it is never
      * a route argument and never printed.
      */
@@ -18,7 +18,7 @@ sealed interface ShellLink {
 }
 
 /**
- * letta-mobile-ckmub.3.4: the one parser for `meridian://` links, shared by every client.
+ * The one parser for `meridian://` links, shared by every client.
  *
  * - `meridian://pair?qr=…` (and the `letta://pair` alias) -> [ShellLink.Pair]
  * - `meridian://conversations` -> the chat page; `meridian://conversation/<id>` -> that conversation

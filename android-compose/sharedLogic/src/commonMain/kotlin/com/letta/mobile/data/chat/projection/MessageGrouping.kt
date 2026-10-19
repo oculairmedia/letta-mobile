@@ -18,7 +18,7 @@ internal fun UiMessage.stableListKey(): String {
 /**
  * A renderable item in the chat list. The chat used to be a flat
  * `List<Pair<UiMessage, GroupPosition>>` rendered one bubble per
- * LazyColumn item. With the run-block refactor (letta-mobile-m772.2), assistant
+ * LazyColumn item. With the run-block refactor, assistant
  * messages that share a server `runId` collapse into a single
  * [RunBlock] item with a timeline gutter — so the LazyColumn now consumes
  * `List<ChatRenderItem>` instead.
@@ -28,9 +28,9 @@ internal fun UiMessage.stableListKey(): String {
  * `groupMessagesForRender` builder accepts a reversed input list and
  * preserves that order in the output, so callers don't need to re-reverse.
  *
- * letta-mobile-m772.2
  *
- * letta-mobile-fqxo2 (F2): marked @Immutable so the Compose compiler can
+ *
+ *  (F2): marked @Immutable so the Compose compiler can
  * skip the per-item composables (MeasuredChatRenderItem / RunBlock /
  * RenderChatMessage) when a render item is unchanged across a recompose.
  * Render items are built once per render-model build and never mutated;
@@ -49,7 +49,7 @@ sealed interface ChatRenderItem {
      * a suffix when two items would otherwise resolve to the same [key], so
      * a future duplicate run id degrades gracefully (a slightly less-stable
      * slot identity) instead of hard-crashing the LazyColumn with a
-     * duplicate-key IllegalArgumentException (letta-mobile-y70m0).
+     * duplicate-key IllegalArgumentException.
      */
     val stableItemDiscriminator: String
 
@@ -69,7 +69,7 @@ sealed interface ChatRenderItem {
      * `run-$runId` key for an assistant Single whose runId is unique in the
      * current snapshot. This keeps the LazyColumn slot identity stable across
      * the Single → RunBlock transition that happens mid-stream when a sibling
-     * message in the same run arrives (letta-mobile-w9l3). Without this,
+     * message in the same run arrives. Without this,
      * Compose unmounts the Single and remounts a RunBlock on the next frame,
      * producing a visible flash.
      *
@@ -89,13 +89,13 @@ sealed interface ChatRenderItem {
          * collapse-state lookups (`runId in collapsedRunIds`) match the
          * [RunBlock] path exactly. We can't recover this from [stableRunKey]
          * via `removePrefix("run-")` because the server id may *itself* start
-         * with `run-` (letta-mobile-lkj4r), which normalisation would strip.
+         * with `run-`, which normalisation would strip.
          */
         val stableRunId: String? = null,
         /**
          * Set by [deduplicateRenderKeys] only when this item's natural key
          * would collide with another render item. Null in the common case,
-         * so normal slot identity is unchanged (letta-mobile-y70m0).
+         * so normal slot identity is unchanged.
          */
         val keyOverride: String? = null,
     ) : ChatRenderItem {
@@ -121,7 +121,7 @@ sealed interface ChatRenderItem {
         /**
          * Set by [deduplicateRenderKeys] only when this item's natural key
          * would collide with another render item. Null in the common case,
-         * so normal slot identity is unchanged (letta-mobile-y70m0).
+         * so normal slot identity is unchanged.
          */
         val keyOverride: String? = null,
     ) : ChatRenderItem {
@@ -171,7 +171,7 @@ sealed interface ChatRenderItem {
  *    (multi-message group). For `RunBlock` we re-reverse the accumulator so
  *    the gutter renders oldest→newest top-down.
  *
- * letta-mobile-m772.2
+ *
  */
 fun groupMessagesForRender(
     reversed: List<Pair<UiMessage, GroupPosition>>,
@@ -286,7 +286,7 @@ fun groupMessagesForRender(
 }
 
 /**
- * letta-mobile-y70m0 (defensive hardening): guarantee that every render
+ *  (defensive hardening): guarantee that every render
  * item's LazyColumn [ChatRenderItem.key] is globally unique, even if two
  * distinct items legitimately (or buggily) resolve to the same run id.
  *
@@ -303,7 +303,7 @@ fun groupMessagesForRender(
  * crash. In a correct snapshot no item is rewritten, so this is a no-op.
  */
 /**
- * letta-mobile-x1xnl: collapse render items that render the SAME underlying
+ * Collapse render items that render the SAME underlying
  * assistant message id twice.
  *
  * The incremental builder concatenates a freshly-built tail with a cached
@@ -417,7 +417,7 @@ private fun buildEchoCompactionIndex(
 }
 
 /**
- * letta-mobile-p0gc (ANR fix): per-build instrumentation for the echo-key
+ *  (ANR fix): per-build instrumentation for the echo-key
  * hot path. [normalizationCount] counts how many times a message's content
  * was whitespace-normalized into a [runPanelEchoKey] during
  * [groupMessagesForRender] builds since the last reset. The linear
@@ -450,7 +450,7 @@ internal object EchoCompactionInstrumentation {
  * is kept; any later duplicate is dropped — as is any candidate whose text
  * already appears in OLDER history (indices ≥ [olderStartIndex]).
  *
- * letta-mobile-p0gc (ANR fix): signature changed to consume the build-scoped
+ *  (ANR fix): signature changed to consume the build-scoped
  * [echoKeys] memo + [lastEchoKeyIndex] map computed ONCE per
  * [groupMessagesForRender] call. `lastEchoKeyIndex[key] >= olderStartIndex`
  * is logically identical to `key in olderPlainAssistantText` from the
@@ -500,10 +500,10 @@ private fun Char.isJvmRegexWhitespace(): Boolean =
     this == ' ' || this == '\t' || this == '\n' || this == '\u000B' || this == '\u000C' || this == '\r'
 
 /**
- * Equivalent to `content.trim().replace(RunPanelWhitespaceRegex, " ")`
+ * Equivalent to `content.trim.replace(RunPanelWhitespaceRegex, " ")`
  * (`\s+` → single space after trimming), but single-pass with NO Regex
  * allocation — this runs once per eligible assistant message per render-model
- * build on the Main thread (letta-mobile-p0gc ANR fix).
+ * build on the Main thread ( ANR fix).
  */
 internal fun String.normalizeRunPanelEchoText(): String {
     val trimmed = trim()
@@ -557,7 +557,7 @@ private fun runBlockKey(
  *   IllegalArgumentException: Key "run-run-<id>" was already used.
  *
  * Normalising here guarantees a single, stable `run-<id>` prefix regardless
- * of whether the server id already had one (letta-mobile-lkj4r).
+ * of whether the server id already had one.
  */
 fun runKey(runId: String): String =
     if (runId.startsWith("run-")) runId else "run-$runId"

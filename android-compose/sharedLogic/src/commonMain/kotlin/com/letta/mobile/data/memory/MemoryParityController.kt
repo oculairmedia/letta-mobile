@@ -200,7 +200,7 @@ class MemoryParitySectionReader(
         }
 
     /**
-     * letta-mobile-by4vm.13: [read] when [capabilities] serve [route]; otherwise the section is
+     * [read] when [capabilities] serve [route]; otherwise the section is
      * unavailable for that reason without calling the session's stand-in for the route.
      */
     suspend fun <T> read(

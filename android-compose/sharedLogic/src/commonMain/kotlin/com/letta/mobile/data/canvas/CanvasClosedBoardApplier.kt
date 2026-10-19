@@ -3,7 +3,7 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.model.CanvasId
 
 /**
- * Applies a relayed op to a canvas no board has open in this app (letta-mobile-qygvv.23).
+ * Applies a relayed op to a canvas no board has open in this app.
  *
  * The relay stays joined to a canvas's topic after its board closes, and the host keeps fanning ops
  * out to it: an agent drawing while the person is back in chat. Handed to no session, those ops

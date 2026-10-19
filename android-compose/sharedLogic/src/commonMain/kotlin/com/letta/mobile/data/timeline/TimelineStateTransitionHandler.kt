@@ -41,14 +41,14 @@ class TimelineStateTransitionHandler(
     }
 
     /**
-     * letta-mobile-mxwtn: synchronous optimistic Local append used by the
+     * Synchronous optimistic Local append used by the
      * platform send coordinator BEFORE the transport call so the user bubble
      * reaches the timeline state in the same frame as the composer clear —
      * no round-trip through [eventQueue] / [loopScope] / coroutine scheduling.
      *
      * Mirrors the body of [applyLocalSendAppend] minus the [sendQueue.send]
      * handoff (the caller is responsible for queueing the actual HTTP send
-     * via the regular `send()` entry point, typically with the same otid) and
+     * via the regular `send` entry point, typically with the same otid) and
      * minus the [events] emission (callers that need [TimelineSyncEvent.LocalAppended]
      * can emit it themselves, or rely on the existing event-queue path's
      * emission for parity).
@@ -84,7 +84,7 @@ class TimelineStateTransitionHandler(
     }
 
     /**
-     * letta-mobile-mxwtn: synchronous FAILED transition. Submits to the
+     * Synchronous FAILED transition. Submits to the
      * processor so the caller's failure handler can observe the serialized
      * delivery-state update without round-tripping through the event queue.
      * A no-op when the processor is closed or no Local event exists.
@@ -101,7 +101,7 @@ class TimelineStateTransitionHandler(
     }
 
     /**
-     * letta-mobile-mxwtn: synchronous SENT transition (delivery acknowledged
+     * Synchronous SENT transition (delivery acknowledged
      * by the transport but no Confirmed echo yet). Submits to the processor
      * for serialized processing and no-ops after normal processor closure.
      */

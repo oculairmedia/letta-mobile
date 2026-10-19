@@ -16,7 +16,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 /**
- * lgns8.9: shared low-level primitives for the on-disk LocalBackend admin-query
+ * Shared low-level primitives for the on-disk LocalBackend admin-query
  * readers. Holds the single [json] instance, the base64url key codec (delegating to
  * [LocalBackendLayout]), timestamp
  * helpers, and the sidecar readers (real-times / string-map / attachment-map)

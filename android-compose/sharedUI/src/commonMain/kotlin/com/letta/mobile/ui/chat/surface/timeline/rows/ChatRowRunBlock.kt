@@ -30,22 +30,22 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 
 /**
- * letta-mobile-bglj6.1: a run of assistant messages sharing a run id, drawn as the Android
+ * A run of assistant messages sharing a run id, drawn as the Android
  * timeline draws it (feature-chat RunBlock): its steps in order: each reasoning as a one-line
  * "Thought" disclosure, every tool call of the run folded into one "Ran 2 commands" summary, and
  * the narration as plain text.
  *
- * letta-mobile-ckmub.1 (hard cut S4): the geometry is the legacy RunBlock's. The run's header sits on
+ *  (hard cut S4): the geometry is the legacy RunBlock's. The run's header sits on
  * its own line; under it the body lifts up into its floor, working and settled alike, so settling only
  * rewrites the label.
  *
- * letta-mobile-zxk2n.37: the header is ONE summary line ([RunSummaryLine]: glyph, "Worked Â· 10.8s Â·
+ * the header is ONE summary line ([RunSummaryLine]: glyph, "Worked Â· 10.8s Â·
  * 1 tool", one chevron), and a run with work to show (its reasoning, its tool line) is folded by
  * default, working or settled alike: only its prose shows under the line. Opening the line lists the
  * work steps indented under it, each with its own disclosure. A request waiting on the person holds
- * the run open (letta-mobile-sieej).
+ * the run open.
  *
- * letta-mobile-ckmub.1.2: one disclosure per level. The run's tool calls list as step rows
+ * one disclosure per level. The run's tool calls list as step rows
  * ([RunToolSteps]: LettaListRow, the summary line's own status glyph, one chevron per step with
  * details) straight under the summary line; there is no intermediate "Ran 2 commands" row.
  */
@@ -109,18 +109,18 @@ internal class RunBlockPlan(
     val activity: RunActivityProjection,
     /** Working, settled on the conversation's newest row, or waiting on the person. */
     val headerPinned: Boolean,
-    /** The run's messages the chat options leave on screen (zxk2n.5: hidden reasoning leaves no gap). */
+    /** The run's messages the chat options leave on screen (hidden reasoning leaves no gap). */
     val visible: List<UiMessage>,
     val runId: String?,
     val messageCount: Int,
     /**
-     * letta-mobile-zxk2n.37: the person flipped this run's fold from its default (the page's
+     * The person flipped this run's fold from its default (the page's
      * collapsedRunIds, a plain toggle set on every owner): a foldable run is folded by default, so a
      * run in the set is the one the person opened.
      */
     val toggledByOwner: Boolean,
     /**
-     * letta-mobile-sieej: a request of the run waits on the person. The run then never folds and its
+     * A request of the run waits on the person. The run then never folds and its
      * header shows ("Waiting for your approval"), so the card under its tool line cannot be missed;
      * only once it is answered does the run fold back into its summary line.
      */
@@ -140,7 +140,7 @@ internal class RunBlockPlan(
 
     /**
      * Lifted whenever the header shows, working or settled: legacy's settled geometry, held from the
-     * run's first frame so settling never moves it (no jump, bglj6.1.12).
+     * run's first frame so settling never moves it (no jump,).
      */
     val body: RunBodyState get() = RunBodyState(visible, collapsed, lifted = headerVisible)
 
@@ -184,8 +184,8 @@ private fun loneRunMessage(visible: List<UiMessage>, messageCount: Int): UiMessa
 }
 
 /**
- * letta-mobile-sieej: what holds a run open whatever its owner's fold says: one of its requests waits
- * on the person's approval. letta-mobile-zxk2n.37: working no longer holds it open; the summary line
+ * What holds a run open whatever its owner's fold says: one of its requests waits
+ * on the person's approval. working no longer holds it open; the summary line
  * says "Workingâ€¦", and a run folded the same way working and settled keeps its shape as it settles.
  */
 @Immutable
@@ -234,7 +234,7 @@ internal data class RunHeaderState(
     val visible: Boolean,
     val tall: Boolean = false,
     val fold: RunFold? = null,
-    /** letta-mobile-sieej: the run waits on the person's approval; the line says so. */
+    /** The run waits on the person's approval; the line says so. */
     val awaitingApproval: Boolean = false,
 )
 
@@ -463,7 +463,7 @@ private fun UiMessage.isPlainAssistantStep(): Boolean {
 
 /**
  * A tool-call-only assistant message: folds entirely into the run's tool summary. One carrying a
- * canvas card (letta-mobile-bglj6.13: a compose call with no narration of its own) folds only its
+ * canvas card (a compose call with no narration of its own) folds only its
  * calls; the card stays a step.
  */
 internal fun UiMessage.isRunToolCallMessage(): Boolean = isPlainAssistantStep() && !hasStepOfItsOwn()

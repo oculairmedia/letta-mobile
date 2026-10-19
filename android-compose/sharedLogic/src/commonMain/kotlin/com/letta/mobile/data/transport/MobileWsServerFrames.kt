@@ -85,7 +85,7 @@ sealed interface ServerFrame {
     ) : ServerFrame
 
     /**
-     * letta-mobile-1n5py.1: this device's input was accepted but parked in the App Server's queue
+     * This device's input was accepted but parked in the App Server's queue
      * behind another client's turn (the engine's `Running` lifecycle with the queued reason). The
      * turn it belongs to has not started; its own frames follow once the server dequeues it.
      */
@@ -137,7 +137,7 @@ sealed interface ServerFrame {
         @SerialName("reasoning_tokens") val reasoningTokens: Long = 0,
         val seq: Long? = null,
         /**
-         * letta-mobile-r2zo8: how many tokens the model call that produced this frame held in
+         * How many tokens the model call that produced this frame held in
          * context — the provider's count when it reports one, the App Server's own estimate
          * otherwise (the wire does not say which). Null when the server sent none. Unlike
          * [promptTokens] this includes the cached prefix, so it is the context total.
@@ -145,7 +145,7 @@ sealed interface ServerFrame {
         @SerialName("context_tokens") val contextTokens: Long? = null,
         /**
          * The runtime the frame came from. Stamped by the Iroh mapper, the only channel transport
-         * still shipped (the legacy shim WebSocket was removed under letta-mobile-g70jb).
+         * still shipped (the legacy shim WebSocket was removed).
          */
         @SerialName("agent_id") val agentId: String? = null,
         @SerialName("conversation_id") val conversationId: String? = null,
@@ -157,7 +157,7 @@ sealed interface ServerFrame {
      * so mobile's `dedupeOptimisticContentTwins` can collapse the
      * stream-vs-disk twins on reconcile.
      *
-     * `contentRaw` (letta-mobile-utw4u) carries the unmolested wire content:
+     * `contentRaw`  carries the unmolested wire content:
      * a bare string for text-only sends OR the verbatim `content_parts`
      * JSON array for multimodal sends (text + base64 image). The legacy
      * [content] String is a derived projection of the text-only view and
@@ -194,14 +194,14 @@ sealed interface ServerFrame {
          * carries no text parts. Callers that need attachments MUST use
          * [contentRaw] — this projection is for human-readable text only.
          *
-         * letta-mobile-utw4u (CodeRabbit review feedback): the pre-fix
-         * implementation did `raw.toString()` on the array branch, which
+         *  (CodeRabbit review feedback): the pre-fix
+         * implementation did `raw.toString` on the array branch, which
          * leaked the entire `content_parts` JSON (including base64 image
          * data) into the legacy `.content` String. Text-only consumers
          * like IrohProbeMetrics and MergeTracer would then report
          * base64 garbage instead of the actual user-typed text. Mirrors
          * the same extraction policy as
-         * `OutboundMessageCreate.firstTextPart()` on the send side so
+         * `OutboundMessageCreate.firstTextPart` on the send side so
          * what the recipient sees as "text" matches what the sender
          * declared as text.
          */
@@ -299,7 +299,7 @@ sealed interface ServerFrame {
     ) : ServerFrame
 
     /**
-     * letta-mobile-2rkdj — Spec §11/§3.4: a single replayed (or
+     *  — Spec §11/§3.4: a single replayed (or
      * live-tailed) entry from a Run's `frames.jsonl`, emitted in
      * response to a `subscribe` request.
      *
@@ -322,7 +322,7 @@ sealed interface ServerFrame {
     ) : ServerFrame
 
     /**
-     * letta-mobile-2rkdj — Spec §11/§3.4: terminal envelope for a
+     *  — Spec §11/§3.4: terminal envelope for a
      * subscription. Emitted once the Run reaches a terminal status
      * AND the live-tail has caught up. Client should drop any
      * persisted cursor for this run.
@@ -470,7 +470,7 @@ sealed interface ServerFrame {
     ) : ServerFrame
 
     /**
-     * letta-mobile-lks7m: Meridian's device-wide push after a conversation write (created, updated,
+     * Meridian's device-wide push after a conversation write (created, updated,
      * archived, restored) from any client, so conversation lists follow other devices without a
      * restart. [agentId] is the owning agent when the host knew it.
      */
@@ -537,7 +537,7 @@ sealed interface ServerFrame {
      * [subagentsActive] snapshot so the bar reduces by replacement, and
      * an informational [reason] (e.g. `started`, `completed`, `failed`).
      *
-     * letta-mobile-ulcg6 (RC2): the host registry pushes one frame per parent
+     *  (RC2): the host registry pushes one frame per parent
      * (agent, conversation). [parentAgentId] / [parentConversationId] name
      * that scope so the client folds the snapshot into that conversation only;
      * without them an empty push for conversation B looked like every chip of
@@ -558,7 +558,7 @@ sealed interface ServerFrame {
     ) : ServerFrame
 
     /**
-     * letta-mobile-bzvro.40: an Iroh host's snapshot of the approvals parked for one conversation
+     * An Iroh host's snapshot of the approvals parked for one conversation
      * (see [com.letta.mobile.data.runtime.ApprovalRelay]). Routing-only: it feeds the client's
      * pending-approval store, never the timeline.
      */
@@ -581,7 +581,7 @@ sealed interface ServerFrame {
     }
 
     /**
-     * letta-mobile-a4tm7: an Iroh host's runtime for one conversation now runs in [mode] (a client
+     * An Iroh host's runtime for one conversation now runs in [mode] (a client
      * changed it with `permission_mode.set`). Routing-only: it feeds the permission-mode chip
      * ([com.letta.mobile.data.runtime.RelayedPermissionModes]), never the timeline.
      */
@@ -620,7 +620,7 @@ sealed interface ServerFrame {
     ) : ServerFrame
 
     /**
-     * letta-mobile-bzvro.7/.8: what the run is doing (loop phase, provider retry, server status
+     * What the run is doing (loop phase, provider retry, server status
      * notice, server-side command progress), carried in-process from an App Server turn engine to
      * the chat coordinator on transports that project runtime events into [ServerFrame]s (the
      * Android Iroh path). Never on the wire and never deserialized: [payload] is one of the

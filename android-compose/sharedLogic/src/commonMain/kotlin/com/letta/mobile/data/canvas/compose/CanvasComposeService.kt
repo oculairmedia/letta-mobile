@@ -44,7 +44,7 @@ data class ComposeTarget(
 class ComposePublishException(val code: ComposeErrorCode, message: String) : Exception(message)
 
 /**
- * The one entry point both hosts call for `canvas_compose` (letta-mobile-bglj6.10, plan section
+ * The one entry point both hosts call for `canvas_compose` (plan section
  * 3.3): compile ([CanvasComposeCompiler]), hold the batch to the board's rules
  * ([CanvasBatchValidator], the only validator, which runs CanvasSceneValidator over every op),
  * then publish through the host's existing path and answer with the receipt.

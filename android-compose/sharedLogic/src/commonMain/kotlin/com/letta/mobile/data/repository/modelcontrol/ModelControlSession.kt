@@ -7,7 +7,7 @@ import kotlinx.coroutines.CoroutineScope
  * surface of a client (picker, Models sheet, Providers settings) so a change in
  * one shows in the others at once. Android gets the same sharing from Hilt
  * singletons; desktop holds one of these per data binding. [oauthHttp] runs
- * in-app subscription sign-ins (letta-mobile-zxk2n.3); null keeps the
+ * in-app subscription sign-ins; null keeps the
  * host-terminal steps.
  */
 class ModelControlSession(

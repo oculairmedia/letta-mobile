@@ -2,7 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 /**
  * Explicit authentication policy for an Iroh server endpoint
- * (letta-mobile-d6e8g.2).
+ *.
  *
  * Production constructors ([IrohNodeEndpoint], [IrohNodeConnection]) REQUIRE a
  * policy — there is no default. Anonymous/open operation is only reachable
@@ -18,7 +18,7 @@ sealed interface IrohAuthPolicy {
 
     /**
      * Whether a connection from [remoteId] is authenticated before it sends an
-     * auth frame (letta-mobile-dpv7m.1). Only the explicit anonymous test mode
+     * auth frame. Only the explicit anonymous test mode
      * and an operator-vetted static allowlist pre-authenticate; a bearer token,
      * pairing, or anything else must be proven in the auth frame. This replaces
      * the old "no token configured => authenticated" shortcut, which became a
@@ -69,7 +69,7 @@ sealed interface IrohAuthPolicy {
     }
 
     /**
-     * Fail-closed pairing-only endpoint (letta-mobile-dpv7m.1): no bootstrap
+     * Fail-closed pairing-only endpoint: no bootstrap
      * credential is accepted at all. A peer authenticates only by a NodeId that
      * is present in the paired-peer store, or by redeeming a one-time invite in
      * its auth frame. Knowing the dial address grants nothing.

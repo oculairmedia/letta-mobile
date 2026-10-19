@@ -83,7 +83,7 @@ internal fun ComposerModelControls(
     }
 }
 
-/** The current model's efforts, None … Max (letta-mobile-bzvro.18: the full upstream set, in order). */
+/** The current model's efforts, None … Max (the full upstream set, in order). */
 private fun currentModelEfforts(model: ChatModelUiState): List<String> =
     ComposerEffort.sorted(model.options.firstOrNull { it.handle == model.currentHandle }?.reasoningEfforts.orEmpty())
 

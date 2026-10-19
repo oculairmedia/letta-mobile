@@ -38,7 +38,7 @@ internal data class CanvasWriter(val lamport: Long, val actorId: String, val opI
 
 /**
  * One entry of a scene-root collection kept as named last-writer-wins registers, so writers that
- * touch different parts of it never overwrite each other (letta-mobile-bglj6.16's per-property LWW;
+ * touch different parts of it never overwrite each other ('s per-property LWW;
  * plugin elements are its first user, and block documents can adopt it).
  *
  * Each register holds some of the entry's fields and the writer that last set them, under

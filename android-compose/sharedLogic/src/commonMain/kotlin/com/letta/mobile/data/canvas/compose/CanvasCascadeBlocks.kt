@@ -10,7 +10,7 @@ import kotlinx.serialization.json.put
 /**
  * Writes compose content as the block document a canvas note stores and renders (the Cascade
  * editor's v2 JSON), without depending on the editor: cascade-editor is a sharedUI dependency and
- * the Iroh host runs sharedLogic without Compose (letta-mobile-bglj6.8).
+ * the Iroh host runs sharedLogic without Compose.
  *
  * Every key and type id below is what cascade-editor 1.9.2 writes and reads
  * (`io.github.linreal.cascade.editor.serialization.DocumentSchema` and `RichTextSchema`, over

@@ -71,7 +71,7 @@ data class DreamRunNowState(
 )
 
 /**
- * letta-mobile-iczm7: everything the Dreaming surface shows for one agent. Pure data; the
+ * Everything the Dreaming surface shows for one agent. Pure data; the
  * [DreamingController] owns the I/O.
  */
 @Immutable

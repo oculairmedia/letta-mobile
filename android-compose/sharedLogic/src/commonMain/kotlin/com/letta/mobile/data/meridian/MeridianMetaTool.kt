@@ -12,7 +12,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * The `meridian` meta-tool (letta-mobile-jna0o.8; design section 4, front door B): one small tool
+ * The `meridian` meta-tool (design section 4, front door B): one small tool
  * in place of every canvas, agent and plugin tool, which reaches them all through
  * [MeridianCommandRouter]. Like `device_action`, `--help` lists the commands and
  * `<command> --help` gives one's input, so the reference text is fetched only when needed.

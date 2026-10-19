@@ -10,7 +10,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-qfa81 (P4, inventory row 13): routes user-critical approval
+ *  (P4, inventory row 13): routes user-critical approval
  * submission over `admin_rpc` while the active backend is `iroh://`.
  *
  * Approvals arrive mid-turn (an `approval_request_message` interrupts a running

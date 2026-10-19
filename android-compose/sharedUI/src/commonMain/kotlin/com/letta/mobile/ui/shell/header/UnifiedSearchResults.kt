@@ -21,7 +21,7 @@ import kotlinx.coroutines.delay
 
 /**
  * The unified search's results for [query] over [sources], the one place the header's search and the
- * command palette get them (letta-mobile-ckmub.3.9): while the query covers message text and the
+ * command palette get them: while the query covers message text and the
  * sources have a [UnifiedSearchSources.messageSearch], it runs (a short pause after the last
  * keystroke) and its hits join the other sections. A search that fails leaves the message section empty.
  */

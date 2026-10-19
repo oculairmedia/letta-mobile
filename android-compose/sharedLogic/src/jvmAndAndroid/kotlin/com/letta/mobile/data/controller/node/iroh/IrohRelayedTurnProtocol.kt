@@ -103,7 +103,7 @@ internal class IrohRelayedTurnProtocol(
     private var idleForwarded = false
 
     /**
-     * letta-mobile-qygvv.28: where the post-turn queue relay runs (the node's turn host), so the
+     * Where the post-turn queue relay runs (the node's turn host), so the
      * initiator's connection is not held for it. Null runs it before [relayTurn] returns (tests).
      */
     var postTurnScope: CoroutineScope? = null
@@ -181,7 +181,7 @@ internal class IrohRelayedTurnProtocol(
         }
     }
 
-    /** The run is bound: tell the client which run consumed its input (qygvv.8 on the phone). */
+    /** The run is bound: tell the client which run consumed its input ( on the phone). */
     private suspend fun announceRunning(boundRunId: String) {
         runId = boundRunId
         if (announcedRunId == boundRunId || finished) return
@@ -244,7 +244,7 @@ internal class IrohRelayedTurnProtocol(
     }
 
     /**
-     * letta-mobile-qygvv.28: pass on one App Server frame of the turn's tail (`update_loop_status`,
+     * Pass on one App Server frame of the turn's tail (`update_loop_status`,
      * `update_queue`) as the server sent it, re-enveloped for the initiator.
      */
     suspend fun forwardServerFrame(frame: TapFrame) {
@@ -256,7 +256,7 @@ internal class IrohRelayedTurnProtocol(
     }
 
     /**
-     * letta-mobile-qygvv.28: end the turn with the App Server's own [turnFinished], after the idle
+     * End the turn with the App Server's own [turnFinished], after the idle
      * loop status (synthesized only when the server's tail did not carry one).
      */
     suspend fun finishWithServerFrame(turnFinished: TapFrame) {
@@ -311,10 +311,10 @@ internal class IrohRelayedTurnProtocol(
  * the App Server frames around them. [onFailure] handles an exception out of the collector, after
  * an input that never got its ack is answered `accepted:false` (busy rejection, input failure).
  *
- * letta-mobile-qygvv.18: the terminal is written only once the engine's flow has ended (see
+ * the terminal is written only once the engine's flow has ended (see
  * [OrderedTurnRelay]), so `turn_finished` is the last frame of the turn itself.
  *
- * letta-mobile-qygvv.28: the App Server's own tail (its terminal delta, idle loop status and
+ * the App Server's own tail (its terminal delta, idle loop status and
  * `turn_finished`) is relayed from a [ServerFrameTap] opened before the input goes out, and after
  * the turn the conversation's queue updates keep reaching the initiator. That post-turn relay runs
  * on the protocol's [IrohRelayedTurnProtocol.postTurnScope] when set (the node's turn host),
@@ -405,7 +405,7 @@ internal suspend fun relayDraft(
 }
 
 /**
- * letta-mobile-qygvv.12: input_accepted / loop status / turn_finished for the initiator.
+ * Input_accepted / loop status / turn_finished for the initiator.
  *
  * eaczz.5: live user-echo fanout. Before the assistant stream, [echo] goes out as a snapshot
  * `user_message` delta so OBSERVERS see the sender's prompt immediately, in order, ahead of

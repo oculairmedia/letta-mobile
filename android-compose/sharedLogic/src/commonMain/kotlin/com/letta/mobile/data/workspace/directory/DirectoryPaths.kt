@@ -103,7 +103,7 @@ data class WorktreeLocation(
 )
 
 /**
- * letta-mobile-zxk2n.6 (G32, 0.34 worktrees): letta-code keeps the worktrees its agent creates in
+ *  (G32, 0.34 worktrees): letta-code keeps the worktrees its agent creates in
  * `<repo>/.letta/worktrees/<name>` (its worktree watcher's `.letta/worktrees` directory) and moves
  * the conversation's cwd into a new one when the agent adds a worktree there. The protocol carries
  * no worktree commands (none through 0.34.10), so the client reads worktrees from the path alone:

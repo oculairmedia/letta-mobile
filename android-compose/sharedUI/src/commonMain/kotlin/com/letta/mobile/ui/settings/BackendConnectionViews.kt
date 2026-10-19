@@ -74,7 +74,7 @@ data class BackendConnectionNoticeActions(
 )
 
 /**
- * letta-mobile-ckmub.8: what a page shows before a conversation opens: the connection, what to do
+ * What a page shows before a conversation opens: the connection, what to do
  * next, the last [error], and the way to the settings or the agent list.
  */
 @Composable

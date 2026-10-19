@@ -15,7 +15,7 @@ data class AgentMentionRef(
 data class MentionableAgent(val id: String, val name: String)
 
 /**
- * letta-mobile-zxk2n.6 (G31): `@agent` mentions.
+ *  (G31): `@agent` mentions.
  *
  * Neither letta-code nor the Letta server has a mention syntax: an agent reaches another agent
  * through its messaging tools (the `messaging-agents` skill, `SendAgentMessage`), which address it

@@ -30,7 +30,7 @@ import kotlin.math.roundToInt
 import kotlin.jvm.JvmInline
 
 /**
- * letta-mobile-bglj6.1: pinch-to-zoom of the timeline's text scale, in common pointer input.
+ * Pinch-to-zoom of the timeline's text scale, in common pointer input.
  *
  * Lifted from Android's ChatMessageListPinch + PinchScalePreviewController without the
  * Choreographer frame-budget sampler (Android-only telemetry). While pinching, rows stay laid out

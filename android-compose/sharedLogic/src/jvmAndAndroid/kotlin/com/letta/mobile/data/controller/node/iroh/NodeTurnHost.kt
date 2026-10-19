@@ -14,7 +14,7 @@ import kotlinx.serialization.json.put
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * letta-mobile-qygvv.3: the node-owned home of every live Iroh turn.
+ * The node-owned home of every live Iroh turn.
  *
  * A turn used to run as a child of its initiator's connection scope, so the phone's Iroh link
  * dropping mid-turn cancelled the `runTurn` collector. The engine then released its lease with

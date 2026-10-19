@@ -38,14 +38,14 @@ import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-bglj6.1.21: what the newest run is doing right now — the same strings the
+ * What the newest run is doing right now — the same strings the
  * timeline thinking row, the Touch companion, and the canvas head popup share
- * ("0:12  Thinking…" / "0:12  Running Bash").
+ * ("0:12 Thinking…" / "0:12 Running Bash").
  */
 internal data class ActiveRunActivity(
     val runningToolName: String?,
     val startedAtEpochMs: Long?,
-    /** letta-mobile-sieej: a request of the run waits on the person: the token says so, not "Thinking…". */
+    /** A request of the run waits on the person: the token says so, not "Thinking…". */
     val awaitingApproval: Boolean = false,
 )
 

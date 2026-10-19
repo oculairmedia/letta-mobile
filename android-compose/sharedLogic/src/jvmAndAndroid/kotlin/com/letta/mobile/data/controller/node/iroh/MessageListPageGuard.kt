@@ -10,7 +10,7 @@ import kotlinx.serialization.json.contentOrNull
 import com.letta.mobile.util.Telemetry
 
 /**
- * letta-mobile-c4igq.9: server-side page-size guard for message.list over Iroh
+ * Server-side page-size guard for message.list over Iroh
  * admin_rpc.
  *
  * A ~60MB conversation transcript serialized into one admin_rpc response is
@@ -92,7 +92,7 @@ object MessageListPageGuard {
     }
 
     /**
-     * letta-mobile-w9k3f: a message.list response that is neither a bare array nor
+     * A message.list response that is neither a bare array nor
      * { messages: [...] } is passed through UNCHANGED by this guard, by
      * MessageListWireProjection.projectMessageList (`else -> response`), and then by
      * the client, which hands it to a ListSerializer and dies with
@@ -175,7 +175,7 @@ object MessageListPageGuard {
     }
 
     /**
-     * letta-mobile-c4igq.9: bound an object response (e.g. agent.context) that is
+     * Bound an object response (e.g. agent.context) that is
      * otherwise small but for a few large string fields. Truncates any string
      * whose UTF-8 length exceeds [maxFieldBytes] to a safe prefix + a marker, so
      * the whole response stays comfortably under the frame cap. Non-string fields

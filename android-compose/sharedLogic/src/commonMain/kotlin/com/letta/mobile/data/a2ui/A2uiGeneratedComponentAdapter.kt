@@ -12,7 +12,7 @@ private const val GENERATED_UI_ROOT_COMPONENT_ID = "root"
  * `DomainToUiMessageMapper.extractGeneratedUi`, wire shape
  * `{"type":"generated_ui","component":"<name>","props":{...},"text":"..."}`)
  * onto a single-node A2UI surface, so a desktop `GeneratedUiCard` or
- * standalone A2UI host (letta-mobile-2don7) can render it through the real
+ * standalone A2UI host can render it through the real
  * Basic-catalog renderer ([A2uiSurfaceRenderer]) instead of printing raw
  * JSON.
  *

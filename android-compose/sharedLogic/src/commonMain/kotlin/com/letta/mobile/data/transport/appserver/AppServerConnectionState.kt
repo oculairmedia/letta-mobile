@@ -2,7 +2,7 @@ package com.letta.mobile.data.transport.appserver
 
 /**
  * Explicit lifecycle of one App Server transport connection generation
- * (letta-mobile-lgns8.21.1).
+ *.
  *
  * A "generation" is one bidirectional WebSocket session: readiness begins
  * [Disconnected] (never optimistically connected), advances to [Ready] once the

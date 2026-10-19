@@ -115,7 +115,7 @@ class TimelineExternalTransportAppender(
     }
 
     /**
-     * letta-mobile-by4vm.17: a failed delete is logged, not swallowed. The row stays on disk and
+     * A failed delete is logged, not swallowed. The row stays on disk and
      * the next hydrate deletes it once it sees the server echo of this otid (idempotent), so a
      * confirmed message is never re-injected as a stale unsent bubble.
      */

@@ -106,7 +106,7 @@ internal class ApprovalDecider(
     val requestId: String,
     val isSubmitting: Boolean,
     val submit: ((toolCallIds: List<String>, approve: Boolean, reason: String?) -> Unit)?,
-    /** Approves and persists the server-offered rule [suggestionId] (letta-mobile-bzvro.11). */
+    /** Approves and persists the server-offered rule [suggestionId]. */
     val submitAlwaysAllow: ((details: PendingApprovalDetails, suggestionId: String) -> Unit)? = null,
 ) {
     val enabled: Boolean get() = !isSubmitting && submit != null
@@ -114,7 +114,7 @@ internal class ApprovalDecider(
 
 /**
  * Who answers approvals and which requests are already answered. [busyRequestIds] holds every
- * request with an answer on its way: in flight, queued while offline (letta-mobile-bzvro.14), or
+ * request with an answer on its way: in flight, queued while offline, or
  * held in a submitted batch; [answer] is where a decision goes (the owner's actions, or the stepper
  * while several requests are stepped through).
  */
@@ -176,7 +176,7 @@ private fun rememberRowApprovalOwner(context: ChatRowContext, callbacks: ChatRow
 }
 
 /**
- * letta-mobile-sieej: whether [this] request still waits on the person: it needs them
+ * Whether [this] request still waits on the person: it needs them
  * ([requiresUserInput]: a runtime question, or a gate parked under a permission mode that asks)
  * and none of the calls it names on [toolCalls] has been decided or has returned. A pending
  * request is never folded away: its run stays open and its card shows inline on every host.
@@ -188,16 +188,16 @@ internal fun UiApprovalRequest.isWaitingOn(toolCalls: List<UiToolCall>): Boolean
     return named.isEmpty() || named.any { it.result == null && it.approvalDecision == null }
 }
 
-/** letta-mobile-sieej: [this] message's request, while it waits on the person; null once answered. */
+/** [this] message's request, while it waits on the person; null once answered. */
 internal fun UiMessage.waitingApproval(): UiApprovalRequest? =
     approvalRequest?.takeIf { approvalResponse == null && it.isWaitingOn(toolCalls.orEmpty()) }
 
-/** letta-mobile-sieej: some message of [this] run has a request waiting on the person. */
+/** Some message of [this] run has a request waiting on the person. */
 internal fun List<UiMessage>.hasWaitingApproval(): Boolean = any { it.waitingApproval() != null }
 
 /**
  * A timeline row's approval card, drawn only while the request waits on the person
- * ([requiresUserInput]). letta-mobile-bglj6.1.25: a request the runtime resolves (Bash under
+ * ([requiresUserInput]). a request the runtime resolves (Bash under
  * approve-all) stays on its message until the tool returns; it draws nothing here, so the row
  * reads as its plain tool line, as the legacy Android ApprovalRequestCard did.
  */
@@ -226,7 +226,7 @@ internal fun ApprovalRequestCard(
 }
 
 /**
- * letta-mobile-bzvro.14: over the card, "Approval 2 of 3" while several requests are stepped
+ * Over the card, "Approval 2 of 3" while several requests are stepped
  * through, and a note when the answer is queued until the connection is back.
  */
 @Composable
@@ -238,10 +238,10 @@ private fun ApprovalStepAndQueue(approval: UiApprovalRequest, context: ChatRowCo
 }
 
 /**
- * letta-mobile-bzvro.40: a message's approval card, growing in and out of the row instead of
+ * A message's approval card, growing in and out of the row instead of
  * snapping it taller: an Iroh host's parked request joins a tool row that is already on screen (UI
  * motion rule: a height change animates, reduced-motion aware). A row composed with its card already
- * there shows it at once, so scrolling never replays the entrance. letta-mobile-bzvro.14: while the
+ * there shows it at once, so scrolling never replays the entrance. while the
  * page steps through several requests, only the current step's card is drawn.
  */
 @Composable

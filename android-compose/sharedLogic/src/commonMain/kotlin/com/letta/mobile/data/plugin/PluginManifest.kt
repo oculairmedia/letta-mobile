@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 /**
- * A plugin's `letta-plugin.json` (plan section 3.1, letta-mobile-s416w.24): the contract between a
+ * A plugin's `letta-plugin.json` (plan section 3.1,): the contract between a
  * package and the host. Only [PluginManifestParser] builds one, after [PluginManifestSchema] and
  * [PluginManifestRules] have held the document, so every instance is valid.
  *
@@ -33,7 +33,7 @@ data class PluginManifest(
     val actions: Map<String, PluginAction> = emptyMap(),
     val pages: Map<String, PluginPage> = emptyMap(),
 ) {
-    /** [id] typed (letta-mobile-by4vm.101): what the registry, its commands and the kind catalog are keyed by. */
+    /** [id] typed: what the registry, its commands and the kind catalog are keyed by. */
     val pluginId: PluginId get() = PluginId(id)
 
     /** The last segment of [id], the prefix of every agent tool the plugin offers: `example` of `letta.example`. */

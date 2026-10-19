@@ -141,7 +141,7 @@ fun MascotLive(
      */
     sceneKey: String = agentId,
     /**
-     * The character answers touch and pointer (hover, poke, pet, double-click tricks; te3n1.4). On
+     * The character answers touch and pointer (hover, poke, pet, double-click tricks;). On
      * by default wherever it is a control; a seat that takes input without a click (a hero with an
      * edit pencil) turns it on too, and one that must leave every touch to what is under it, off.
      */
@@ -242,7 +242,7 @@ internal fun MascotHitArea(size: Dp, onClick: () -> Unit) {
 
 /**
  * The live mascot's body as a control: the same hit area, reading every gesture for [gestures]
- * (te3n1.4). The character answers a hover, a poke, a stroke with motion, and that is the
+ *. The character answers a hover, a poke, a stroke with motion, and that is the
  * affordance; a tap still runs the seat's click at once and is still a click to accessibility.
  */
 @Composable
@@ -282,7 +282,7 @@ private const val BODY_DROP_FRACTION = 0.06f
  * The real mascot for an identity that belongs to no agent - a picker option, a preview - drawn
  * paused: the same Rive scene every live surface draws, with its clock stopped. It is not an
  * approximation of the character and not a separate still asset, so the shape, the body's pose and
- * the identity's rotation are exactly what the agent will look like (letta-mobile-0bvjw).
+ * the identity's rotation are exactly what the agent will look like.
  *
  * Callers check [mascotCandidateAvailable] and draw their own fallback when the renderer is
  * unavailable.

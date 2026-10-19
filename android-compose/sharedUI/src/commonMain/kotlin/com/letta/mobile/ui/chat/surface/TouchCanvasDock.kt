@@ -137,7 +137,7 @@ internal class TouchHeadContent(
     /** The input tray is up (a question or a form waits on the person): the reply's popup steps aside. */
     val inputPending: Boolean = false,
     /**
-     * letta-mobile-y5q9z: the canvas bubble (the phone's canvas mode, which has no bar). The head
+     * The canvas bubble (the phone's canvas mode, which has no bar). The head
      * and its reply open the bubble's card instead of the full chat; null keeps the bar's head.
      */
     val bubble: TouchBubble? = null,
@@ -663,7 +663,7 @@ private fun PopupDismiss(onDismiss: () -> Unit, modifier: Modifier) {
 }
 
 /**
- * letta-mobile-bglj6.1.22: the canvas's input tray. A question the agent waits on (and any
+ * The canvas's input tray. A question the agent waits on (and any
  * generated form) is answered here, at thumb reach above the bar, without opening the full page.
  * It keeps to a share of the band above the bar and scrolls past it, so the board stays in view.
  */

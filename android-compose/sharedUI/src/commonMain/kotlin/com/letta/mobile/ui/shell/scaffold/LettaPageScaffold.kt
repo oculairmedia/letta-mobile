@@ -34,13 +34,13 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 
 /**
- * The one page frame every shared page renders in (hard cut P2, letta-mobile-ckmub.2.1). It owns the
+ * The one page frame every shared page renders in (hard cut P2,). It owns the
  * window's system-bar, display-cutout and keyboard insets exactly once, so the page underneath never
  * pads for them itself (no `statusBarsPadding`/`navigationBarsPadding`/`systemBarsPadding`/
  * `imePadding` in a page; `PageInsetModifierGuardTest` holds that line).
  *
  * The page's [containerColor] draws edge to edge, behind the status and navigation bars (Android runs
- * every Activity with `enableEdgeToEdge()`); the insets are split across the slots:
+ * every Activity with `enableEdgeToEdge`); the insets are split across the slots:
  * - [header] sits below the status bar / cutout (top and sides) at its own height: it is measured
  *   without a height bound, so it never takes the content's space;
  * - [bottomBar] (composer, actions) sits above the navigation bar and, when [imeAware], the keyboard;

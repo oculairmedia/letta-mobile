@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Where a subscription sign-in is (letta-mobile-zxk2n.3). Platform-neutral:
+ * Where a subscription sign-in is. Platform-neutral:
  * the phone and desktop sheets render it, neither re-implements a step.
  * No state carries a token or a device secret; the user code is shown by
  * design.

@@ -17,7 +17,7 @@ interface CanvasSyncTransport {
 
     /**
      * Durably commits to delivering [opIds] - this app's own ops, already in the local op log -
-     * whether or not [publish] for them ever runs (letta-mobile-by4vm.68). A session calls it after
+     * whether or not [publish] for them ever runs. A session calls it after
      * logging a local op and BEFORE writing the document, and again for every op its journal
      * recovery folds in, so no crash point leaves a committed op both written and never sent.
      * Idempotent; an op the far end already holds is acknowledged as a duplicate. A transport with
@@ -46,7 +46,7 @@ interface CanvasSyncTransport {
     /**
      * [deliverTo], with each op the actor the far end vouches for, when it vouches for one: the
      * Iroh host vouches for an agent whose op its own canvas tools published after checking that
-     * agent against the host's ACL (letta-mobile-kuwsf). A transport that cannot vouch passes null.
+     * agent against the host's ACL. A transport that cannot vouch passes null.
      */
     suspend fun deliverVouchedTo(canvasId: CanvasId, apply: suspend (op: CanvasOp, vouchedActor: String?) -> Unit) {
         deliverTo(canvasId) { apply(it, null) }

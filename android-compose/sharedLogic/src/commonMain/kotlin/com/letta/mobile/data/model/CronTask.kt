@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * letta-mobile-d52f.1: wire shape of a scheduled prompt as carried over
+ * Wire shape of a scheduled prompt as carried over
  * the shim's mobile WS cron protocol (sister to lcp-d5g). Mirrors the
  * shim's `lib/types/crons.ts` `CronTask` interface verbatim so the
  * persisted file shape and the wire shape stay in sync.

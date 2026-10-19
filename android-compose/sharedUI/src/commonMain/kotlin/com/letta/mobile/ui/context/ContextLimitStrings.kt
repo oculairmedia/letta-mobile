@@ -5,7 +5,7 @@ import com.letta.mobile.data.context.limit.ContextLimitAdvice
 import com.letta.mobile.data.context.limit.ContextLimitScope
 import com.letta.mobile.data.context.limit.ContextLimitWarning
 
-/** letta-mobile-joigh: the context-limit slider's text, beside [AgentContextStrings]. */
+/** The context-limit slider's text, beside [AgentContextStrings]. */
 object ContextLimitStrings {
     const val LIMIT = "Limit"
     const val COMPACT = "Compact"

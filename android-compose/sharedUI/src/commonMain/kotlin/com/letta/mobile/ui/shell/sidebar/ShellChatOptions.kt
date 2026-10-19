@@ -28,7 +28,7 @@ import com.letta.mobile.ui.host.LettaPaneButtons
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.theme.LettaDimens
 
-/** letta-mobile-zxk2n.5 (G91, G37): what the Chat options dialog shows. */
+/**  (G91, G37): what the Chat options dialog shows. */
 @Immutable
 data class ShellChatOptionsState(
     val display: ChatDisplayOptions = ChatDisplayOptions.Default,
@@ -64,7 +64,7 @@ object ShellChatOptionsTags {
 }
 
 /**
- * letta-mobile-zxk2n.5: the chat's display options (reasoning, compactions, token usage, text
+ * The chat's display options (reasoning, compactions, token usage, text
  * size), the list's auto-pin, and Download transcript. Switches for the on/off choices, a
  * segmented S / M / L for the text size; changes apply at once and the dialog stays open.
  */

@@ -45,21 +45,21 @@ interface AppServerController {
     val state: Flow<AppServerControllerState>
 
     /**
-     * letta-mobile-qygvv.6: the latest App Server queue per runtime (items and whether they are
+     * The latest App Server queue per runtime (items and whether they are
      * parked after an abort). A runtime with an empty queue has no entry.
      */
     val queueSnapshots: StateFlow<Map<TurnRuntimeKey, AppServerQueueSnapshot>>
         get() = EMPTY_QUEUE_SNAPSHOTS
 
     /**
-     * letta-mobile-qygvv.6: this client's queued inputs removed after a user abort, each with the
+     * This client's queued inputs removed after a user abort, each with the
      * Cancelled lifecycle draft for its turn.
      */
     val cancelledQueuedInputs: Flow<CancelledQueuedInput>
         get() = emptyFlow()
 
     /**
-     * letta-mobile-qygvv.28: every App Server frame scoped to [runtime], as it arrives, for a relay
+     * Every App Server frame scoped to [runtime], as it arrives, for a relay
      * that must pass on the server's own terminal and queue frames (the Iroh node). The turn
      * engine consumes those into its lifecycle, so they never appear in [runTurn]. Collecting
      * subscribes; null when this controller cannot observe raw frames.
@@ -138,7 +138,7 @@ interface AppServerController {
 
     /**
      * Sends one approval decision and waits for the App Server's `input_accepted`
-     * (letta-mobile-qygvv.5). [ApprovalSubmitResult.Rejected] carries the server's
+     *. [ApprovalSubmitResult.Rejected] carries the server's
      * reason (e.g. "Approval request is no longer pending") and must be surfaced.
      */
     suspend fun submitApproval(
@@ -160,7 +160,7 @@ interface AppServerController {
     }
 
     /**
-     * letta-mobile-bzvro.40: [submitApproval] with the always-allow rule ids the person chose
+     * [submitApproval] with the always-allow rule ids the person chose
      * ([ControllerApprovalAnswer.selectedSuggestionIds]). A controller that cannot validate them against
      * the request it parked refuses an answer that carries any, rather than drop the rule silently.
      */
@@ -180,24 +180,24 @@ interface AppServerController {
     }
 
     /**
-     * letta-mobile-bzvro.40: what each runtime's parked `can_use_tool` requests offered, for a relaying
+     * What each runtime's parked `can_use_tool` requests offered, for a relaying
      * node to push to its clients. Empty for a controller that parks nothing.
      */
     val pendingApprovals: StateFlow<Map<TurnRuntimeKey, List<PendingApprovalDetails>>>
         get() = EMPTY_PENDING_APPROVALS
 
-    /** letta-mobile-bzvro.40: the mode [runtime] runs in as far as this controller knows; null when unknown. */
+    /** The mode [runtime] runs in as far as this controller knows; null when unknown. */
     suspend fun permissionModeOf(runtime: AppServerRuntimeScope): AppServerPermissionMode? = null
 
     /**
-     * letta-mobile-bzvro.40: puts [runtime] in [mode] (starting it when needed) and keeps it there for
+     * Puts [runtime] in [mode] (starting it when needed) and keeps it there for
      * later starts. True once the server runs it in [mode].
      */
     suspend fun changePermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean =
         throw UnsupportedOperationException("change_device_state is not supported by this controller")
 
     /**
-     * letta-mobile-1n5py / qygvv.9: drops one queued input ([itemId] is the queue item's `id`).
+     * Drops one queued input ([itemId] is the queue item's `id`).
      * Lets a relaying node forward its clients' `remove_queue_item`.
      */
     suspend fun removeQueueItem(
@@ -206,7 +206,7 @@ interface AppServerController {
     ): AppServerInboundFrame.RemoveQueueItemResponse =
         throw UnsupportedOperationException("remove_queue_item is not supported by this controller")
 
-    /** letta-mobile-1n5py: releases queue items parked by an abort (`resume_queue`). */
+    /** Releases queue items parked by an abort (`resume_queue`). */
     suspend fun resumeQueue(runtime: AppServerRuntimeScope): AppServerInboundFrame.ResumeQueueResponse =
         throw UnsupportedOperationException("resume_queue is not supported by this controller")
 
@@ -214,7 +214,7 @@ interface AppServerController {
      * Evict any cached runtime(s) for [agentId] so the next turn issues a fresh
      * runtime_start, reseeding the model from the (freshly-updated) agent record.
      *
-     * letta-mobile-eeu5p: the App Server caches its runtime by
+     * the App Server caches its runtime by
      * (agentId, conversationId) and reuses it; a model switch persists the new
      * model to the agent record but the live runtime keeps serving the model it
      * booted with, so turns silently keep hitting the OLD model until the App
@@ -235,7 +235,7 @@ interface AppServerController {
     }
 
     /**
-     * Signals that the underlying transport generation failed (lgns8.5).
+     * Signals that the underlying transport generation failed.
      * Implementations must drop every cached canonical runtime scope — scopes
      * are generation-local and must be re-fetched via runtime_start on the next
      * generation — and reflect [AppServerControllerState.Disconnected].
@@ -265,7 +265,7 @@ interface AppServerController {
 private val EMPTY_PENDING_APPROVALS: StateFlow<Map<TurnRuntimeKey, List<PendingApprovalDetails>>> =
     MutableStateFlow<Map<TurnRuntimeKey, List<PendingApprovalDetails>>>(emptyMap()).asStateFlow()
 
-/** letta-mobile-bzvro.40: one approval answer as a relaying node receives it. */
+/** One approval answer as a relaying node receives it. */
 data class ControllerApprovalAnswer(
     val agentId: AgentId,
     val conversationId: ConversationId?,

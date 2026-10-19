@@ -43,7 +43,7 @@ import com.letta.mobile.ui.shell.header.ShellHeader
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.ui.theme.LettaDimens
 
-/** Where the scanner's camera stands (letta-mobile-dpv7m.5). */
+/** Where the scanner's camera stands. */
 enum class CameraAccess {
     /** No camera on this platform (desktop, web): the paste field is the scanner. */
     UNAVAILABLE,
@@ -79,7 +79,7 @@ class ScanCamera(
 }
 
 /**
- * "Scan to connect" as a full page (letta-mobile-dpv7m.5): header with back,
+ * "Scan to connect" as a full page: header with back,
  * then [PairingScanContent]. Android hosts it around its CameraX container.
  */
 @Composable

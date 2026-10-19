@@ -3,7 +3,7 @@ package com.letta.mobile.data.shell
 import com.letta.mobile.data.pairing.PairLink
 
 /**
- * The canonical text form of a [ShellDestination] (letta-mobile-ckmub.3.4): `name` or
+ * The canonical text form of a [ShellDestination]: `name` or
  * `name?key=value&key=value`, values percent-encoded. It is the web shell's route model, the path
  * of a `meridian://` deep link ([ShellDeepLink]) and the saved form of a destination.
  *

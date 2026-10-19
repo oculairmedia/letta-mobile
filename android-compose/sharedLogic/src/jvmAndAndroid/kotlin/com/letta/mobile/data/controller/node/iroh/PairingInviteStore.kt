@@ -20,7 +20,7 @@ value class InviteSecretHash(val value: String) {
 }
 
 /**
- * An unredeemed pairing invitation (letta-mobile-dpv7m.1). Holds only the
+ * An unredeemed pairing invitation. Holds only the
  * SHA-256 of the secret, never the secret itself, so the store file (and any
  * backup of it) cannot be replayed into a pairing.
  *

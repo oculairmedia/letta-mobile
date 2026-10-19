@@ -6,7 +6,7 @@ enum class NowActiveStatus { Idle, Thinking, Streaming, Stopping, Error }
 /**
  * Precedence reducer: error > stopping > thinking > streaming > idle.
  *
- * letta-mobile-lgns8.19: [isStopping] outranks thinking/streaming so a run with
+ * [isStopping] outranks thinking/streaming so a run with
  * an unconfirmed abort in flight reads as "stopping…" rather than as ordinary
  * work — the turn is still live server-side until its terminal frame lands.
  */

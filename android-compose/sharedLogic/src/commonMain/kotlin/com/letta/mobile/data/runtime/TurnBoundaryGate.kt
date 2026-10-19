@@ -7,7 +7,7 @@ import com.letta.mobile.runtime.RuntimeRunStatus
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
-/** What the engine does with one inbound frame at the turn boundary (letta-mobile-qygvv.2). */
+/** What the engine does with one inbound frame at the turn boundary. */
 internal sealed interface TurnBoundaryDecision {
     val isAuthoritative: Boolean get() = false
     val allowsRunPromotion: Boolean get() = true
@@ -34,7 +34,7 @@ internal sealed interface TurnBoundaryDecision {
     }
 }
 
-/** One inbound frame plus the lease facts the boundary decision reads (letta-mobile-qygvv.2). */
+/** One inbound frame plus the lease facts the boundary decision reads. */
 internal data class TurnBoundaryInput(
     val received: AppServerReceivedFrame,
     val leaseRunId: String?,
@@ -42,7 +42,7 @@ internal data class TurnBoundaryInput(
 )
 
 /**
- * letta-mobile-qygvv.2: authoritative turn boundaries for ONE runtime key, mirroring the reference
+ * Authoritative turn boundaries for ONE runtime key, mirroring the reference
  * SDK's remote turn coordinator.
  *
  * Precedence, highest first:
@@ -52,7 +52,7 @@ internal data class TurnBoundaryInput(
  *     after this lease has seen evidence (any stream delta), never while an approval is outstanding,
  *     never for WAITING_ON_APPROVAL (that is the approval continuation boundary), and never while
  *     the lease's latest round stopped to continue (`requires_approval`): that idle sits between
- *     approval-continuation rounds, and the next round's run follows it (letta-mobile-qygvv.29).
+ *     approval-continuation rounds, and the next round's run follows it.
  *     After an abort request the idle still ends the turn as Cancelled.
  *  3. The terminal `stop_reason` delta with its settle window, for servers without `turn_finished`.
  *
@@ -65,7 +65,7 @@ internal class TurnBoundaryGate {
     private val settledRunIds = RecentIds<String>(RECENT_CAPACITY)
     private var leaseToken: Long? = null
 
-    /** letta-mobile-by4vm.7: the current lease's boundary facts ([BoundaryPhase]); guarded by [lock]. */
+    /** The current lease's boundary facts ([BoundaryPhase]); guarded by [lock]. */
     private val boundary = TurnStateMachine("boundary_gate", BoundaryPhase.AwaitingEvidence, ::boundaryTransition)
 
     /** The current lease's boundary phase (diagnostics and tests). */
@@ -81,7 +81,7 @@ internal class TurnBoundaryGate {
     /** An `abort_message` was sent for this key: a later idle loop status reads as Cancelled. */
     fun noteAbortRequested(): Unit = synchronized(lock) { boundary.fire(BoundaryEvent.AbortRequested) }
 
-    /** Whether an abort was already requested for the current lease (letta-mobile-qygvv.3). */
+    /** Whether an abort was already requested for the current lease. */
     fun isAbortRequested(): Boolean = synchronized(lock) { boundary.phase.abortRequested }
 
     /** The active lease settled [runId]; later terminals for it belong to no live turn. */
@@ -114,7 +114,7 @@ internal class TurnBoundaryGate {
         return TurnBoundaryDecision.Project
     }
 
-    /** Every own delta is evidence; a stop_reason also says whether the round continues (qygvv.29). */
+    /** Every own delta is evidence; a stop_reason also says whether the round continues. */
     private fun AppServerReceivedFrame.boundaryEvent(): BoundaryEvent = when {
         terminalMessageTypeOrNull() != STOP_REASON -> BoundaryEvent.Delta
         stopReasonOrNull() == AppServerStopReason.REQUIRES_APPROVAL -> BoundaryEvent.RoundStoppedForApproval

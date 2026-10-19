@@ -7,7 +7,7 @@ import kotlinx.atomicfu.locks.synchronized
 data class PendingDraft(val draft: BranchDraft, val sendNow: Boolean = false)
 
 /**
- * letta-mobile-bzvro.16, letta-mobile-7mys7: hands an "Edit and resend" or "Rerun" prompt to the
+ * Hands an "Edit and resend" or "Rerun" prompt to the
  * chat that opens the forked conversation. On Android the fork opens as a new chat route with its
  * own view model, so the prompt crosses the navigation here: the branch [put]s it under the fork's
  * id and that chat [take]s it once when it opens. Desktop sets its composer directly and does not

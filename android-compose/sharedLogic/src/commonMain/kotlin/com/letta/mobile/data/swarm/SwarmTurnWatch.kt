@@ -33,7 +33,7 @@ internal sealed interface DraftSignal {
 }
 
 /**
- * letta-mobile-jvctq: reads the shared engine's drafts for a send. Lifecycle terminals end the
+ * Reads the shared engine's drafts for a send. Lifecycle terminals end the
  * watch; an approval request (control request or streamed `approval_request_message`) means the
  * turn is parked for the person, since this client never answers approvals.
  */

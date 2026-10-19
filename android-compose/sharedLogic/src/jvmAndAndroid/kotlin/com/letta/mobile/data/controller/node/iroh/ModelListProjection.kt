@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * Decorates the adapted `model.list` rows (letta-mobile-w4q4p):
+ * Decorates the adapted `model.list` rows:
  *
  *  - `exposed`: the wrapper exposure decision for the row's handle; hidden rows
  *    are dropped unless the caller asked for `include_hidden`.

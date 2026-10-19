@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * letta-mobile-byqjj.1: atomic persistence for [LastChatSelection].
+ * Atomic persistence for [LastChatSelection].
  *
  * The selection used to be written as THREE independent key/value puts
  * (`last_chat_agent_id`, `last_chat_agent_name`, `last_chat_conversation_id`).

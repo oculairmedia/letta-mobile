@@ -51,7 +51,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 data class AgentChoice(val id: String, val name: String)
 
 /**
- * The inviter's card through every [InvitePhase] (letta-mobile-dpv7m.5):
+ * The inviter's card through every [InvitePhase]:
  * Configuring (least-privilege scope form) -> Showing/Expiring (QR on a white
  * card + "Expires in m:ss", or the full link with Copy/Share) -> Expired /
  * Cancelled ("New code", never an auto-refresh) or Redeemed.
@@ -83,7 +83,7 @@ private enum class AgentScopeOption(val label: String, val tag: String) {
 
 /**
  * The scope form's values and the rules that derive the request from them,
- * kept out of the composable. Least privilege by default (dpv7m.5): named
+ * kept out of the composable. Least privilege by default: named
  * agents (when any are offered), chat only, five minutes.
  */
 private class InviteFormState(var agents: List<AgentChoice>) {

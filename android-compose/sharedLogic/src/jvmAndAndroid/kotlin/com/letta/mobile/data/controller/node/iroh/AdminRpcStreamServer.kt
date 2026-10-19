@@ -54,7 +54,7 @@ internal fun BiStream.asAdminRpcBiStream(): AdminRpcBiStream = object : AdminRpc
  *
  * Extracted from [IrohNodeConnection] so the accept/dispatch lifecycle is
  * testable without a live QUIC connection. Semantics mirror the reviewed
- * inline implementation from the stream-per-request slice (letta-mobile-3wwid):
+ * inline implementation from the stream-per-request slice:
  * exactly one `admin_rpc` request frame per bi-stream, answered with exactly
  * one `admin_rpc_response`, then the stream is finished. Authentication
  * happens on the control channel; this server only observes the shared

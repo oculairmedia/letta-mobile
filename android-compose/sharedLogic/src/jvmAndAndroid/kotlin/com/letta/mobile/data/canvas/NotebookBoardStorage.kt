@@ -92,7 +92,7 @@ internal object NotebookBoardStorage {
      * The board without its element bodies: scene fields as [boardJson] has them, `elements` as
      * ordering stubs (plus id-less legacy elements). All a canvas write needs of the board as it
      * stands; reading every element's every field out of the document, and parsing it, made a
-     * write cost the size of the board (letta-mobile-24zur.3).
+     * write cost the size of the board.
      */
     fun envelope(read: Read): JsonObject {
         val root = Json.parseToJsonElement((read.get(ObjectId.ROOT, BOARD).orElseThrow() as AmValue.Str).value).jsonObject

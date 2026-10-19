@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * letta-mobile-iczm7: the one entry point the Dreaming surface uses, on every platform.
+ * The one entry point the Dreaming surface uses, on every platform.
  *
  *  - [focus] picks the agent (and the conversation whose runtime reads its settings) and loads its
  *    settings and dream log; focusing another agent supersedes every request for the previous one.

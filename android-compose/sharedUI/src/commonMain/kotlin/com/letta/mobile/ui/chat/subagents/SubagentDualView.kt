@@ -55,7 +55,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-zxk2n.8 / ulcg6.1: the subagent dual view of one parent conversation. A host keeps
+ * The subagent dual view of one parent conversation. A host keeps
  * one per parent conversation (a new parent starts closed) and binds every subagent opener to
  * [open]: the roster's "View conversation", a ring's, and the timeline's dispatch and report rows.
  */

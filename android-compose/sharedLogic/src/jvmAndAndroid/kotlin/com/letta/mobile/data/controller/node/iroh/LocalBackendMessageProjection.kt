@@ -12,7 +12,7 @@ import kotlinx.serialization.json.put
 import java.time.Instant
 
 /**
- * Telemetry tag shared by every image send/receive boundary (letta-mobile-iej8j).
+ * Telemetry tag shared by every image send/receive boundary.
  * Kept identical to [com.letta.mobile.runtime.local.LocalImageContextStripper.IMAGE_PIPELINE_TAG]
  * so one logcat/telemetry filter shows the whole pipe: persist → cap → re-read
  * → strip → hydrate.
@@ -28,7 +28,7 @@ internal data class MessageSidecars(
 )
 
 /**
- * lgns8.9 slice 3: the `translate.ts:localMessageToConversationMessages` 1:N
+ *  Slice 3: the `translate.ts:localMessageToConversationMessages` 1:N
  * fan-out. One LocalMessage projects to one or more already-projected wire
  * messages; wire field sets and key order match the TS object literals
  * byte-for-byte. Split out of [LocalBackendMessageReader] as pure code motion —
@@ -311,7 +311,7 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
     }
 
     /**
-     * Dates an assistant part's wire frame in part order (letta-mobile-iyj4s). The settled ledger
+     * Dates an assistant part's wire frame in part order. The settled ledger
      * orders a turn by date, so the per-type offset alone put a reply after the tool calls that
      * followed it in the same message, while the live stream showed it where the model wrote it.
      * Each part gets a [partStrideMs] slot; the type offset only orders the frames one part
@@ -361,10 +361,10 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
     }
 
     /**
-     * assistant_message wire object for a run of grouped text parts.
+     * Assistant_message wire object for a run of grouped text parts.
      *
      * A run that follows another part of the same source message is named by the message id and
-     * its part index, and so is its otid (letta-mobile-iyj4s): sharing the source otid with the
+     * its part index, and so is its otid: sharing the source otid with the
      * reasoning part ahead of it made the canonical writer fold the two onto one row.
      */
     private fun buildAssistantText(ctx: ProjCtx, isFirst: Boolean, startIndex: Int, text: String): JsonObject =

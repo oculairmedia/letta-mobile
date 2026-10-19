@@ -18,8 +18,8 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * letta-mobile-ckmub.3.15 (hard cut S13, P10): the one inline error a page shows where its content
- * failed to load (Memory, Schedules, Skills, ...). It stays in the page's layout — unlike the
+ *  (hard cut S13, P10): the one inline error a page shows where its content
+ * failed to load (Memory, Schedules, Skills,...). It stays in the page's layout — unlike the
  * transient overlays of [com.letta.mobile.ui.host.OverlayHost] — so a failed load reads the same
  * everywhere and offers its retry in place. Replaces desktop's DesktopInlineError and the pages'
  * own error cards.

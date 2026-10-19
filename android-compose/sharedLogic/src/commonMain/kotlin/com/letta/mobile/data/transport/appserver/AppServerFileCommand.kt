@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * letta-mobile-bzvro.26: read-only access to the device workspace the agent works in (letta-code
+ * Read-only access to the device workspace the agent works in (letta-code
  * `search_files`, `read_file`). Both are reads; neither is scoped to an agent.
  */
 @Serializable

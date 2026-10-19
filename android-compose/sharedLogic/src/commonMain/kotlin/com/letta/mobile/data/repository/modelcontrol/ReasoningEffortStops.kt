@@ -1,7 +1,7 @@
 package com.letta.mobile.data.repository.modelcontrol
 
 /**
- * letta-mobile-3io8k: the stops of the reasoning-effort slider for one model, built from the tiers
+ * The stops of the reasoning-effort slider for one model, built from the tiers
  * the host lists for it (`list_models`). The first stop is "Default" (null: the provider's own
  * effort, what `reasoning_effort: null` restores), then the tiers lowest to highest.
  *

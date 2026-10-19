@@ -11,7 +11,7 @@ import com.letta.mobile.data.subagents.SubagentIdentity
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * letta-mobile-zxk2n.8 (G40): names an external coding agent (Claude Code, Codex) wherever its work
+ *  (G40): names an external coding agent (Claude Code, Codex) wherever its work
  * shows - a roster row, a timeline dispatch or its report - so it is never mistaken for a Letta
  * subagent. Draws nothing for a Letta subagent.
  */

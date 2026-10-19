@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonArray
 /**
  * Model-catalog reads over the Iroh admin RPC control channel.
  *
- * Same P4-purity class as [IrohAdminRpcAgentSource] (letta-mobile-71orq): the
+ * Same P4-purity class as [IrohAdminRpcAgentSource]: the
  * LettaApiClient choke-point hard-fails raw HTTP admin calls in `iroh://`
  * mode, so [CachedModelRepository.refreshLlmModels]'s raw `ModelApi` call threw and
  * the model picker dropdown rendered empty. The server side already registers

@@ -5,7 +5,7 @@ import computer.iroh.PathSnapshot
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * letta-mobile-qygvv.22: emits `IrohTransport/path.selected` with the selected path's
+ * Emits `IrohTransport/path.selected` with the selected path's
  * remote socket address (`ip:port`, or the relay URL) and relay flag — once on connect
  * and again whenever the selected path changes. The 2026-09-25 black-hole was only
  * diagnosable from Tailscale's own logs because nothing said WHICH address the QUIC

@@ -34,7 +34,7 @@ internal const val MENTIONS_PER_SECTION = 6
 /**
  * The `@mention` suggestions (Penpot "Composer (@ mentions)") above the prompt: FILES / AGENTS /
  * MEMORY sections of mentionables, already filtered by the shared MentionCatalog, as the shared
- * [LettaPickerContent] (letta-mobile-ckmub.3.8) on a raised card. It is not a pane: the caret stays
+ * [LettaPickerContent]  on a raised card. It is not a pane: the caret stays
  * in the composer while the user types the token, so the card has no search field of its own.
  */
 @Composable

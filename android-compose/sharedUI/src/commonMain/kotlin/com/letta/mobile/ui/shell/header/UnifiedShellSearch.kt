@@ -51,7 +51,7 @@ enum class UnifiedSearchKind(val id: String, val label: String) {
 }
 
 /**
- * Where the unified search is drawn, and so which kinds it covers (letta-mobile-ckmub.3.9): the
+ * Where the unified search is drawn, and so which kinds it covers: the
  * header covers canvases, the command palette (a picker mode of the same search) covers the pages
  * to go to. Both find conversations, the text of their messages, and agents.
  */

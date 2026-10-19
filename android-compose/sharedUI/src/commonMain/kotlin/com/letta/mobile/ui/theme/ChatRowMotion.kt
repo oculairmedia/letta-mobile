@@ -25,7 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.TransformOrigin
 
 /**
- * letta-mobile-bglj6.1.19: the timeline rows' motion vocabulary, ported from the legacy Android
+ * The timeline rows' motion vocabulary, ported from the legacy Android
  * chat (designsystem LettaMotion and ChatMotionPolicy) so the shared page's disclosures, label
  * swaps and fold-aways play the same ramps: enter over [LettaMotionTokens.ENTER_MILLIS] on
  * LinearOutSlowIn, exit over [LettaMotionTokens.EXIT_MILLIS] on FastOutLinearIn, fades on the
@@ -57,7 +57,7 @@ internal class ChatRowMotion(private val reduced: Boolean) {
     }
 
     /**
-     * The tool card unfurl (legacy LettaMotion.unfurlEnter, letta-mobile-vui8q): the body opens
+     * The tool card unfurl (legacy LettaMotion.unfurlEnter,): the body opens
      * from the leading edge and downwards at once, so it reads as the card opening rather than
      * content appearing. Mirrored on collapse.
      */
@@ -152,9 +152,9 @@ internal class ChatRowMotion(private val reduced: Boolean) {
 }
 
 /**
- * letta-mobile-bglj6.1.19: the legacy composer's and action sheet's press and swap springs, the
+ * The legacy composer's and action sheet's press and swap springs, the
  * Material 3 expressive motion scheme's fast specs that the Android app theme installs
- * (designsystem Theme: `MotionScheme.expressive()`). Compose Multiplatform's material3 keeps
+ * (designsystem Theme: `MotionScheme.expressive`). Compose Multiplatform's material3 keeps
  * `MaterialTheme.motionScheme` internal, so the shared page carries the token values itself.
  */
 internal object ChatExpressiveMotion {

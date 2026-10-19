@@ -9,13 +9,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-/** letta-mobile-3kble: one conversation, as the in-flight guard keys it. */
+/** One conversation, as the in-flight guard keys it. */
 data class CompactionKey(val agentId: String, val conversationId: String)
 
 val CompactionRequest.key: CompactionKey get() = CompactionKey(agentId.value, wireConversationId)
 
 /**
- * letta-mobile-3kble: the one entry point a UI uses to compact.
+ * The one entry point a UI uses to compact.
  *
  *  - A second tap on a conversation already compacting answers [CompactionOutcome.Busy] without
  *    sending anything; [compacting] says which conversations are busy so the button can disable.

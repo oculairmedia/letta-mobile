@@ -18,7 +18,7 @@ fun interface PendingApprovalsPushTarget {
 }
 
 /**
- * letta-mobile-bzvro.40: pushes what this host's engine has parked on the person to the viewers of
+ * Pushes what this host's engine has parked on the person to the viewers of
  * each conversation, as [ApprovalRelay] `pending_approvals` snapshots.
  *
  * The node answers its App Server's `can_use_tool` control requests itself, so the always-allow rules,

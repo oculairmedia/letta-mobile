@@ -78,7 +78,7 @@ sealed interface TimelineSettledPresentation {
      * compaction marker, or anything a newer protocol writes - or it is an event type the chat
      * surface deliberately does not show, such as a system seed or a standalone tool return.
      * Neither has a renderer or a pager, so the only thing presenting one could produce is a
-     * placeholder where the user expects their own history (letta-mobile-r5v5t).
+     * placeholder where the user expects their own history.
      */
     data object Drop : TimelineSettledPresentation
 

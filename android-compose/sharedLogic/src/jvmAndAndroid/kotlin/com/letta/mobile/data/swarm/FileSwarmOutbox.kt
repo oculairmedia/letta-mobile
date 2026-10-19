@@ -8,7 +8,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * letta-mobile-jvctq: the outbox as one JSON file per message under [directory] (the device
+ * The outbox as one JSON file per message under [directory] (the device
  * profile's `outbox/`), written atomically and readable by the current user only, since entries
  * hold message text. Files are read with a size cap before decoding; an unreadable one is skipped
  * by [list] rather than failing every send.

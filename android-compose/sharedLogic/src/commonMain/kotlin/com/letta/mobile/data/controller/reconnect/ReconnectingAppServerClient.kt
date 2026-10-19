@@ -76,7 +76,7 @@ sealed interface ReconnectingClientState {
 
     /**
      * Terminal: policy/auth failure or the bounded attempt budget is exhausted. [kind] says which,
-     * so a UI can tell "fix your token" from "the server is down" (letta-mobile-bzvro.2, F02).
+     * so a UI can tell "fix your token" from "the server is down" (F02).
      */
     data class GaveUp(val reason: String?, val kind: GiveUpKind = GiveUpKind.Exhausted) : ReconnectingClientState
 
@@ -103,9 +103,9 @@ class AppServerNotConnectedException(message: String) : IllegalStateException(me
 /**
  * [AppServerClient] facade that survives socket loss and App Server process
  * restarts by re-minting transport generations behind a stable reference
- * (lgns8.5). Controllers, turn engines, and admin handlers keep one client;
+ *. Controllers, turn engines, and admin handlers keep one client;
  * underneath, each generation is a fresh dual-socket transport whose pending
- * requests fail promptly on loss (the lgns8.3 registry's failAll) and whose
+ * requests fail promptly on loss (the registry's failAll) and whose
  * recovery runs the caller's reattach/sync flow before the client reports
  * Ready again.
  *
@@ -115,14 +115,14 @@ class AppServerNotConnectedException(message: String) : IllegalStateException(me
  * [com.letta.mobile.data.transport.appserver.AppServerCommandRetryClass];
  * ambiguous writes must reconcile against the committed transcript first:
  * the pinned App Server does not dedupe by `client_message_id`, so resend only
- * when no committed user message has `otid == client_message_id` (lgns8.15
+ * when no committed user message has `otid == client_message_id` (
  * restart/replay evidence).
  *
  * Terminal handshake failures (the transport's `Failed(terminal = true)`:
  * policy violation, auth rejection) stop the supervisor without retries —
  * retrying an unauthorized connection is never correct.
  *
- * [preflight] (letta-mobile-bzvro.2, F02) runs before every dial — typically the HTTP
+ * [preflight] (F02) runs before every dial — typically the HTTP
  * `GET /app-server-info` [com.letta.mobile.data.transport.appserver.AppServerProbe], which never
  * opens a socket. An `Authentication` or `Incompatible` answer stops the loop with that
  * [GiveUpKind], so a revoked token is reported once instead of retried forever; `Unavailable`
@@ -132,11 +132,11 @@ class AppServerNotConnectedException(message: String) : IllegalStateException(me
  * system wakes from sleep. [start] may be called again after a terminal stop (the user pressed
  * Retry or changed settings).
  *
- * letta-mobile-by4vm.9: this is the one owner of App-Server-session reconnect over a direct socket
+ * this is the one owner of App-Server-session reconnect over a direct socket
  * (the wrapper's runtime and admin lanes, the desktop's ws:// gateway). Its [state] projects onto
  * the shared UI model with [toChannelTransportState]. [stampGenerations] stamps every piped frame
  * with its generation for hosts that fence frames by generation (the wrapper's controller, which
- * carries its surviving turns into each new generation, letta-mobile-by4vm.55); a host with no
+ * carries its surviving turns into each new generation,); a host with no
  * generation fence whose turns survive a reconnect (see
  * [com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter.interruptSession]) passes
  * false, which is safe because generations are piped strictly one after another.
@@ -161,7 +161,7 @@ class ReconnectingAppServerClient(
     override val isConnected: Flow<Boolean> = _state.map { it is ReconnectingClientState.Ready }
 
     /**
-     * Discovered server capabilities from the current generation (lgns8.24).
+     * Discovered server capabilities from the current generation.
      *
      * Returns the [AppServerInfoData] from the active generation's client, or
      * null if no generation is ready or discovery hasn't completed yet.
@@ -176,7 +176,7 @@ class ReconnectingAppServerClient(
     @kotlin.concurrent.Volatile
     private var current: AppServerClientGeneration? = null
     /**
-     * lgns8.22.4: mirrors DefaultAppServerController.connectionGeneration.
+     * Mirrors DefaultAppServerController.connectionGeneration.
      * Allocated with getAndIncrement at each pipe start so every connected
      * transport (including failed recovery) gets a unique stamp. Controller
      * failGeneration must run on NeverReady-after-pipe via onDisconnected.

@@ -7,7 +7,7 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * letta-mobile-lgns8.22.5: runtime-key-scoped store of OUTSTANDING user-input
+ * Runtime-key-scoped store of OUTSTANDING user-input
  * approval gates (`tool_call_id -> real approval id`).
  *
  * WHAT THIS OWNS — AND WHAT IT DELIBERATELY DOES NOT
@@ -20,12 +20,12 @@ import kotlinx.coroutines.flow.StateFlow
  *
  * Claim/lease/connection-generation ownership of inbound control requests stays
  * in [com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry]
- * (lgns8.22.4 / PR #1040 + #1061). Duplicating a generation fence here would
+ * ( / PR #1040 + #1061). Duplicating a generation fence here would
  * create a second, divergent source of truth for the same request identity.
  *
  * WHY IT IS KEYED BY RUNTIME
- * letta-mobile-vilsn.6 made the gate set double as the idle-watchdog pause
- * signal, and letta-mobile-8xxzv keyed it per runtime so an unanswered
+ *  made the gate set double as the idle-watchdog pause
+ * signal, and keyed it per runtime so an unanswered
  * AskUserQuestion in conversation A can neither pause conversation B's watchdog
  * nor be cleared by B's terminal. Both properties are preserved verbatim: every
  * mutation a turn performs is scoped to its own [TurnRuntimeKey].
@@ -49,7 +49,7 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
     private val gates = linkedMapOf<TurnRuntimeKey, Map<String, String>>()
 
     /**
-     * letta-mobile-bzvro.11/.12: what each parked `can_use_tool` request offered, for any tool. It
+     * What each parked `can_use_tool` request offered, for any tool. It
      * follows the gates' lifecycle (resolved with the tool call, dropped with the runtime's turn).
      */
     private val parked = PendingApprovalDetailsStore()
@@ -72,7 +72,7 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
      * Record a surfaced [gate] for [key]. Called when a non-auto-approved
      * AskUserQuestion / ExitPlanMode approval reaches the collect body, from
      * either the ControlRequest path or the streamed `approval_request_message`
-     * path (letta-mobile-vilsn.7).
+     * path.
      */
     fun record(key: TurnRuntimeKey, gate: Gate) {
         synchronized(lock) {
@@ -108,7 +108,7 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
 
     /**
      * True while [key] owes the user an answer. This is the idle-watchdog pause
-     * signal (letta-mobile-vilsn.6).
+     * signal.
      */
     fun hasOutstanding(key: TurnRuntimeKey): Boolean =
         synchronized(lock) { gates[key]?.isNotEmpty() == true }

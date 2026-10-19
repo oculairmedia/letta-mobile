@@ -37,7 +37,7 @@ internal object ComposerCompanionTags {
 internal val LocalComposerCompanion = staticCompositionLocalOf { true }
 
 /**
- * letta-mobile-bglj6.1: the agent keeps the user company at the prompt. Its mascot hangs off the
+ * The agent keeps the user company at the prompt. Its mascot hangs off the
  * left edge of [content] (the full card or the docked bar) in a [MascotStage.COMPOSER_COMPANION]
  * seat of the window's mascot transport, so opening the agent pane or the editor flies the
  * character over and closing it flies it back. The slot closes while the character stands

@@ -13,7 +13,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** The read-only file viewer (letta-mobile-bzvro.26): which file is open and what it holds. */
+/** The read-only file viewer: which file is open and what it holds. */
 @Immutable
 data class WorkspaceFileViewerState(
     val path: String? = null,
@@ -66,7 +66,7 @@ class WorkspaceFileViewerController(
     /**
      * Opens [path]; a relative one resolves against [cwd]. With no [cwd], a relative path is
      * [memoryAgentId]'s memory file only when the caller passes it (a memory tool's
-     * `system/human/…`, letta-mobile-bzvro.37); any other relative path cannot be opened, and is
+     * `system/human/…`,); any other relative path cannot be opened, and is
      * never read from the host's own working directory.
      */
     fun open(path: String, cwd: String?, memoryAgentId: String? = null) {

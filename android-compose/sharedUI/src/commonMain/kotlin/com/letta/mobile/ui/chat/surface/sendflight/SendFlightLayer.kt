@@ -39,8 +39,8 @@ import com.letta.mobile.ui.theme.ChatRowType
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
-/** letta-mobile-cc25e: test tags of the send flight. */
-object SendFlightTestTags {
+/** Test tags of the send flight. */
+internal object SendFlightTestTags {
     const val GHOST = "chat-send-flight-ghost"
 }
 
@@ -48,7 +48,7 @@ object SendFlightTestTags {
 fun rememberSendFlightState(): SendFlightState = remember { SendFlightState() }
 
 /**
- * letta-mobile-cc25e: the chat page's send-flight layer. It provides [state] to the composer
+ * The chat page's send-flight layer. It provides [state] to the composer
  * and the timeline rows inside [content] and draws the flying prompt over all of them, so the
  * ghost can travel from the dock or the full composer into the reply card or the timeline.
  *

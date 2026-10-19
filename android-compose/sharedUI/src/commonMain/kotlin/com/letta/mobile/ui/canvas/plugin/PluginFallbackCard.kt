@@ -68,7 +68,7 @@ import com.composables.icons.lucide.Image as LucideImage
 import com.composables.icons.lucide.Link as LucideLink
 
 /**
- * The card every client draws for a plugin element it has no live renderer for (letta-mobile-s416w.4,
+ * The card every client draws for a plugin element it has no live renderer for (
  * plan section 4): no plugin code, so it works offline and with the plugin uninstalled.
  *
  * From the top: a handle bar with the element's icon and title (a drag there moves the element,

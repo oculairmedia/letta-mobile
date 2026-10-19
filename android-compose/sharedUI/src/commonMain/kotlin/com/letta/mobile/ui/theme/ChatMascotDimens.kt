@@ -4,7 +4,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * letta-mobile-bglj6.1: where the agent's mascot stands on the shared chat page, at the sizes
+ * Where the agent's mascot stands on the shared chat page, at the sizes
  * the desktop chat drew it. They are the character's seats, not spacing choices.
  */
 object ChatMascotDimens {

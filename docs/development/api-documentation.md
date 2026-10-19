@@ -28,6 +28,19 @@ syntax fail rather than silently reduce coverage; update discovery alongside
 such build changes. There is no package baseline to regenerate. This checks
 coverage, not the semantic accuracy of ownership claims, which still needs review.
 
+The same jobs reject tracking IDs in production KDoc of published modules:
+
+```bash
+python3 scripts/ci/check-kdoc-hygiene.py
+python3 -m unittest discover -s scripts/tests -p test_kdoc_hygiene.py -v
+```
+
+Describe API intent in KDoc; keep issue references in implementation comments or
+commit history. UI test selectors are internal implementation details. Shared
+smoke-run support lives in `:appserver-testkit`, while CLI-only probe metrics live
+in `:cli`; neither module is part of the product API publication. Health probes
+and bundled canvas examples remain public because production consumers use them.
+
 From `android-compose/`, with the Java/Android SDK setup in CONTRIBUTING.md:
 
 ```bash

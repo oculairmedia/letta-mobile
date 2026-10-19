@@ -7,7 +7,7 @@ import java.io.File
 import java.util.Base64
 
 /**
- * letta-mobile-bn008.1: per-agent persistent Iroh identity.
+ * Per-agent persistent Iroh identity.
  *
  * Each agent gets a stable Ed25519 [SecretKey] (the Iroh identity), persisted
  * locally per agentId — mirroring the real-a2a `load_or_create_identity` pattern
@@ -17,7 +17,7 @@ import java.util.Base64
  *
  * load-or-create is idempotent: the same agentId always yields the same key bytes.
  *
- * letta-mobile-oi147: the agentId is CANONICALIZED ([AgentIdNamespace.normalizeToBareId])
+ * the agentId is CANONICALIZED ([AgentIdNamespace.normalizeToBareId])
  * before it becomes a filename, so `agent-X` and `letta_agent-X` are one identity.
  * Without this, the two spellings derived two different Ed25519 keypairs — the live
  * host carried four keypairs for two agents.

@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * letta-mobile-zxk2n.6 (G32): the working directories the person picked most recently, newest
+ *  (G32): the working directories the person picked most recently, newest
  * first, so the picker offers them before browsing. Kept in the app's own settings store (the
  * platform binds which one), one path per line.
  *

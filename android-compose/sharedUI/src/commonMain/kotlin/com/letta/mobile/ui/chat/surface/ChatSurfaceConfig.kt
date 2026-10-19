@@ -9,7 +9,7 @@ import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.model.UiImageAttachment
 
 /**
- * letta-mobile-bglj6.1: how the shared chat page looks, set by the host from its own
+ * How the shared chat page looks, set by the host from its own
  * preferences (font scale store, haptics setting, debug mode).
  */
 @Immutable
@@ -29,20 +29,20 @@ data class ChatSurfaceAppearance(
     /** Where a run's tool calls open from their "Ran 2 commands" line (Android: a sheet). */
     val toolDetails: ChatToolDetails = ChatToolDetails.Inline,
     /**
-     * The host's input idiom (letta-mobile-bglj6.1.9). Touch draws the phone's chat: the flush
+     * The host's input idiom. Touch draws the phone's chat: the flush
      * full-width composer bar, the "+" action sheet, the canvas's bottom bar with a floating chat
      * head. Pointer keeps the desktop card, the floating panel and the minimised mascot.
      */
     val platformStyle: ChatPlatformStyle = ChatPlatformStyle.Pointer,
     /**
-     * letta-mobile-zxk2n.5 (G91): which rows and readouts the timeline leaves out (reasoning,
+     *  (G91): which rows and readouts the timeline leaves out (reasoning,
      * compaction summaries, token usage). The host reads them from its settings.
      */
     val displayOptions: ChatDisplayOptions = ChatDisplayOptions.Default,
 )
 
 /**
- * letta-mobile-bglj6.1.9: which idiom the page is drawn in. Keyed off the platform, not the
+ * Which idiom the page is drawn in. Keyed off the platform, not the
  * window width: a narrow desktop window is still driven by a pointer, a tablet still by touch.
  */
 enum class ChatPlatformStyle {
@@ -61,7 +61,7 @@ internal val LocalChatPlatformStyle = androidx.compose.runtime.staticComposition
 internal fun touchStyle(): Boolean = LocalChatPlatformStyle.current == ChatPlatformStyle.Touch
 
 /**
- * letta-mobile-bglj6.1: how a tool summary line ("Ran 2 commands") shows its calls.
+ * How a tool summary line ("Ran 2 commands") shows its calls.
  * A bottom sheet is a touch idiom; a pointer host expands them in place.
  */
 enum class ChatToolDetails {
@@ -106,7 +106,7 @@ data class ChatSurfacePlatform(
     /**
      * Drawn over the Touch canvas while it is the view (a box over the board, below
      * [topChromeInset] and above the chat bar): host chrome the canvas mode must keep in sight,
-     * such as Android's active-subagent rings (letta-mobile-bglj6.1.22). Not drawn on the
+     * such as Android's active-subagent rings. Not drawn on the
      * full-screen page, which has [timelineOverlay].
      */
     val canvasOverlay: (@Composable () -> Unit)? = null,
@@ -133,7 +133,7 @@ data class ChatSurfacePlatform(
     }
 }
 
-/** letta-mobile-bglj6.1.23: what the image viewer can do with the image on screen, beyond looking at it. */
+/** What the image viewer can do with the image on screen, beyond looking at it. */
 @Immutable
 class ChatImageActions(
     val save: (UiImageAttachment) -> Unit,

@@ -9,7 +9,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 /**
- * The `meridian/tools/1` wire (letta-mobile-jna0o.4): what the `meridian` shim in an agent's shell
+ * The `meridian/tools/1` wire: what the `meridian` shim in an agent's shell
  * sends the host's local endpoint, and what it gets back. One request per connection, each side one
  * line of UTF-8 JSON terminated by `\n` (JSON escapes every newline inside a string, so a line is
  * always one whole message).

@@ -5,11 +5,11 @@ import com.letta.mobile.data.meridian.MeridianError
 import com.letta.mobile.data.meridian.MeridianErrorCode
 
 /**
- * How the local endpoint decides who a CLI call comes from (letta-mobile-jna0o.4; design
+ * How the local endpoint decides who a CLI call comes from (design
  * "Caller identity"). The shim forwards `LETTA_TOOL_TOKEN` plus `LETTA_AGENT_ID` /
  * `LETTA_CONVERSATION_ID` from the agent's shell env. The ids are the agent's to override, so in
  * [LIVE_CALL] they are never used: only the per-call token says which call, and so which scope, a
- * request belongs to (letta-mobile-by4vm.44).
+ * request belongs to.
  */
 enum class MeridianCallerBindingMode(val wire: String) {
     /**

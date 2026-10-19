@@ -7,7 +7,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * Gives a settled reply the run identity its live projection had (letta-mobile-qygvv.20).
+ * Gives a settled reply the run identity its live projection had.
  *
  * App Server `message.list` rows carry no `run_id`, so the durable copy of a turn is a user row
  * followed by run-less assistant rows. Without a run the settled reply renders as a plain bubble and

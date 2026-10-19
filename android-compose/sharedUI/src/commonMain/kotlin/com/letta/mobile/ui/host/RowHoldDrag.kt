@@ -6,7 +6,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerInputChange
 
 /**
- * What a held row does when the finger then moves on (letta-mobile-ckmub.3.25): a touch row menu
+ * What a held row does when the finger then moves on: a touch row menu
  * opens on a long-press, and a list that reorders (RosterList) lets the same hold become a drag.
  * The touch [LettaHost.rowMenu] reads [LocalRowHoldDrag]: once the held pointer travels past the
  * touch slop it reports the drag here, in pixels along the list.

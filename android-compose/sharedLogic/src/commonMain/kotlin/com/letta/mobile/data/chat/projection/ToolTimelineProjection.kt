@@ -270,7 +270,7 @@ fun projectToolTimelineGroup(
  * This is the message-free half of [projectToolTimelineGroup]: a caller that already
  * holds the calls (plus the identity it wants the group keyed on) does not need to
  * synthesize a [UiMessage] just to reach the projection. Used by the non-run
- * `MessageToolCalls` path (letta-mobile-nfaks) so a tool card rendered outside a
+ * `MessageToolCalls` path so a tool card rendered outside a
  * multi-message run still gets the projected presentation instead of the legacy one.
  *
  * Key derivation, duplicate-key disambiguation, state aggregation and referential

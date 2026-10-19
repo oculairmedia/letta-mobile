@@ -5,7 +5,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * letta-mobile-bglj6.1: where the docked chat panel sits over the canvas, and how big it is.
+ * Where the docked chat panel sits over the canvas, and how big it is.
  *
  * Position is relative so it survives window resizes: [anchorX] / [anchorY] place the panel
  * within the free space of its container (0 = against the left / top margin, 1 = against the
@@ -70,7 +70,7 @@ data class ChatDockFrame(
     val limits: ChatDockLimits,
     val collapsedHeightDp: Float,
     /**
-     * letta-mobile-zxk2n.29: the collapsed bar's own width, as the person set it; null keeps it as
+     * The collapsed bar's own width, as the person set it; null keeps it as
      * wide as the expanded panel. It never leaves the usable area.
      */
     val collapsedWidthDp: Float? = null,

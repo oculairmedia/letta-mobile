@@ -7,7 +7,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
  * Cross-platform haptic vocabulary for A2UI widgets.
  *
  * A2UI moved from the Android-only designsystem module into sharedLogic's
- * jvmAndAndroid source set (letta-mobile-2don7) so desktop can render the
+ * jvmAndAndroid source set so desktop can render the
  * same surfaces. The Android-only `com.letta.mobile.ui.haptics.HapticEffects`
  * (View-based platform haptic constants + Jindong pattern player) stays in
  * designsystem and is NOT reachable from here, so A2UI widgets route through

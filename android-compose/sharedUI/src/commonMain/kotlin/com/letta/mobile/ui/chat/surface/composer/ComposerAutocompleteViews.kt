@@ -170,7 +170,7 @@ private fun CommandOverflow(command: ChatComposerCommand, onUninstall: (ChatComp
 }
 
 /**
- * letta-mobile-bglj6.1.23: the phone's `/` suggestions, a port of the legacy composer's
+ * The phone's `/` suggestions, a port of the legacy composer's
  * SlashCommandSuggestionRow: a horizontal strip of chips above the bar instead of the pointer
  * host's list card. Installed (removable) commands read as tonal chips with a check and uninstall
  * from a long press; the rest are plain chips with a "+".

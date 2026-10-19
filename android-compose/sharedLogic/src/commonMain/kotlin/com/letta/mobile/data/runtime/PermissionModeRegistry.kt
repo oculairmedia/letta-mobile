@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 
 /**
- * letta-mobile-bzvro.13 (F13): the persisted DEFAULT permission mode, used by every runtime that has
+ *  (F13): the persisted DEFAULT permission mode, used by every runtime that has
  * no mode of its own. Replaces reads of [RuntimePermissionDefaults.DEFAULT_MODE] on the seams that take
  * a provider; that constant stays the value of a store that holds nothing, so an install that never
  * touched the setting keeps running Unrestricted.
@@ -78,7 +78,7 @@ data class PermissionModeState(
 }
 
 /**
- * letta-mobile-a4tm7: the runtime a permission-mode chip governs. Two clients' chips only mirror
+ * The runtime a permission-mode chip governs. Two clients' chips only mirror
  * each other when both name the same [Host]; [Local] (this device's bundled App Server) is its own.
  */
 @Immutable
@@ -110,7 +110,7 @@ enum class ModeChangeResult {
 }
 
 /**
- * letta-mobile-bzvro.13 (F13): the permission mode of each `{agent, conversation}` runtime.
+ *  (F13): the permission mode of each `{agent, conversation}` runtime.
  *
  * What it records, and why each rule exists:
  * - The mode a runtime was STARTED with (or the server later reported) is that runtime's own entry
@@ -309,7 +309,7 @@ internal fun AppServerPermissionMode.wireValue(): String = when (this) {
 }
 
 /**
- * bzvro.13: `change_device_state{mode}` confirmed by the echo. A runtime this engine has not started is NOT
+ * `change_device_state{mode}` confirmed by the echo. A runtime this engine has not started is NOT
  * confirmed by anything: nothing is sent, and its `runtime_start` carries the mode the provider returns.
  */
 suspend fun AppServerTurnEngine.setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): ModeChangeResult {

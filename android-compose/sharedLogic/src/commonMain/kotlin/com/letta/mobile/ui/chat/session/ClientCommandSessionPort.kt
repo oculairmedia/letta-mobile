@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
-/** letta-mobile-zxk2n.5 (G92): which client-local commands a host offers, and where each one goes. */
+/**  (G92): which client-local commands a host offers, and where each one goes. */
 class ClientCommandRouting(
     val offered: Set<ClientSlashCommand>,
     val run: (ClientSlashCommand) -> Unit,
@@ -20,7 +20,7 @@ class ClientCommandRouting(
 )
 
 /**
- * letta-mobile-zxk2n.5 (G92): adds the client-local `/` commands to an owner's [ChatSessionPort]
+ *  (G92): adds the client-local `/` commands to an owner's [ChatSessionPort]
  * without changing the owner: the composer lists them before the owner's own commands
  * ([ClientSlashCommands.composerCommands]), choosing one runs the host's route instead of the
  * owner's, and `/recompile`'s status comes from [ClientCommandRouting.recompile].

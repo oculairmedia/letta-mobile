@@ -65,6 +65,7 @@ modules; `app/` provides the Android host rather than owning the whole product.
 | `avatar/core/` `avatar/renderer-rive/` | Avatar models and Rive rendering |
 | `drawbox/` | Vendored canvas editor used by the shared canvas workspace (`drawbox/VENDORED.md`) |
 | `cli/` `appserver-cli/` `iroh-wrapper-cli/` | JVM tooling, App Server contract probes, and the Iroh server wrapper that ships as `meridian-iroh-wrapper` |
+| `appserver-testkit/` | Shared Android/JVM smoke-run scenarios for CLI diagnostics and instrumented tests |
 | `quality/detekt-rules/` `architecture-tests/` | Static-analysis rules and module-boundary tests |
 | `macrobenchmark/` `baselineprofile/` `perf/` `native/` | Performance infrastructure and native libraries |
 | `build-logic/` | Convention plugins: `com.letta.mobile.android.library` for Android library modules, `com.letta.mobile.kmp.library` (`KmpLibraryPlugin.kt`) for the KMP target defaults, plus the architecture-graph, embedded-runtime and JNI 16 KB plugins |

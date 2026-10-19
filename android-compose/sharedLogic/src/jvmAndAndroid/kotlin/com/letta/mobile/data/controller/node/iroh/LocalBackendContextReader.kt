@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.io.File
 
-/** letta-mobile-cyh28: one `agent.context` request. */
+/** One `agent.context` request. */
 data class AgentContextQuery(
     val agentId: String,
     val conversationId: String?,
@@ -19,7 +19,7 @@ data class AgentContextQuery(
 )
 
 /**
- * lgns8.9 / letta-mobile-cyh28: on-disk `agent.context` reader.
+ * On-disk `agent.context` reader.
  *
  * There is no Letta server behind the local backend, and letta-code itself reports only the
  * provider total (`usage_statistics.context_tokens`). This reader estimates the split from the
@@ -61,7 +61,7 @@ internal class LocalBackendContextReader(
         }.getOrNull()
 
     /**
-     * letta-mobile-57cta: the in-context transcript (compaction summary plus messages) in estimated
+     * The in-context transcript (compaction summary plus messages) in estimated
      * tokens, unscaled — what letta-code's `compaction_stats.context_tokens_*` measure. Null when
      * the store cannot be read.
      */
@@ -74,7 +74,7 @@ internal class LocalBackendContextReader(
 
     /**
      * An absent transcript is an empty conversation; one past the byte cap is not estimated at all.
-     * Below the cap, lines go through [BoundedTranscriptReader] (letta-mobile-by4vm.49) so a
+     * Below the cap, lines go through [BoundedTranscriptReader]  so a
      * multi-MB base64 image part becomes a length marker instead of one giant String.
      */
     private fun readTranscript(file: File): LocalTranscriptContext? {

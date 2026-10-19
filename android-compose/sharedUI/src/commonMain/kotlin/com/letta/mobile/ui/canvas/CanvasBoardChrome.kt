@@ -310,7 +310,7 @@ private fun CanvasBoard.checkpointRestored(restored: CanvasHistoryRestorer.Resto
 
 /**
  * The tool rail down the left, clear of the title pill above and the foot row below. Our own:
- * the drawbox-ui one loads drawables its Android artifact never ships (letta-mobile-r5f3r). See
+ * the drawbox-ui one loads drawables its Android artifact never ships. See
  * CanvasControlsBar.
  */
 @Composable

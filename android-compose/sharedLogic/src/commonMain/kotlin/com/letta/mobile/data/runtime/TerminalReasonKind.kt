@@ -1,7 +1,7 @@
 package com.letta.mobile.data.runtime
 
 /**
- * letta-mobile-aktss: sanitized classification of a terminal failure reason.
+ * Sanitized classification of a terminal failure reason.
  * Returns a fixed category token, never any substring of the reason itself,
  * so the o0atv no-secrets guarantee is preserved. Categories mirror the
  * failure families letta-code actually produces (run error details and

@@ -16,7 +16,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * [MemfsSource] over an App Server connection (letta-mobile-bzvro.24): the letta-code MemFS
+ * [MemfsSource] over an App Server connection: the letta-code MemFS
  * commands, plus `write_memory_file` for saves. [events] is the connection's inbound frames, from
  * which the `memory_updated` pushes are read.
  */

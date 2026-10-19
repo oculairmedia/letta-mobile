@@ -10,7 +10,7 @@ import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * letta-mobile-bn008.3: the receive side of direct agent-to-agent messaging.
+ * The receive side of direct agent-to-agent messaging.
  *
  * Serves the a2a ALPN as a protocol of the host's own endpoint: read the [IrohAgentMessage]
  * envelope from an accepted connection, apply the [IrohAgentMessageRouter] policy, hand the
@@ -19,7 +19,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * message is still acked (delivery is at-most-once on OUR side) but not delivered. NO HTTP
  * fallback.
  *
- * letta-mobile-by4vm.112: this used to run its own accept loop on a SECOND endpoint bound with
+ * this used to run its own accept loop on a SECOND endpoint bound with
  * the host's secret key. Both endpoints registered the same node id with the relay, which keeps
  * only the newest, so relay-routed App Server dials (every browser client) reached the a2a-only
  * twin and failed TLS with `no_application_protocol`. As an [IrohNodeProtocolHandler] the

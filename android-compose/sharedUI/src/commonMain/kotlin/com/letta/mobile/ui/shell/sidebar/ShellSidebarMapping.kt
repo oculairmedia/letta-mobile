@@ -15,18 +15,18 @@ data class ShellConversationMarks(
     val selectedId: String? = null,
     val thinkingId: String? = null,
     val deletingIds: Set<String> = emptySet(),
-    /** letta-mobile-bzvro.17: pinned conversations, listed first. */
+    /** Pinned conversations, listed first. */
     val pinnedIds: Set<String> = emptySet(),
-    /** letta-mobile-7mys7 (G37): each fork's source conversation id (ConversationLineage), for "Forked from …". */
+    /**  (G37): each fork's source conversation id (ConversationLineage), for "Forked from …". */
     val parentIds: Map<String, String> = emptyMap(),
-    /** letta-mobile-zxk2n.5: settled conversations, listed after the active ones. */
+    /** Settled conversations, listed after the active ones. */
     val settledIds: Set<String> = emptySet(),
-    /** letta-mobile-zxk2n.5: each marked conversation's emoji. */
+    /** Each marked conversation's emoji. */
     val markers: Map<String, String> = emptyMap(),
 )
 
 /**
- * letta-mobile-ckmub.3.10: what a host knows about its sidebar, in platform-neutral terms. The host
+ * What a host knows about its sidebar, in platform-neutral terms. The host
  * has already scoped [conversations] to the agent and the filter, and [canvases] to the filter;
  * [archivedConversations] are every archived chat (the Archived chats dialog).
  */

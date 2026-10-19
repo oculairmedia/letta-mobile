@@ -48,7 +48,7 @@ data class ProviderManagementActions(
     val form: ProviderFormActions,
     val onConfirmDisconnect: () -> Unit,
     val onDismissDisconnect: () -> Unit,
-    /** In-app subscription sign-in (letta-mobile-zxk2n.3); offered only when [canSignIn]. */
+    /** In-app subscription sign-in; offered only when [canSignIn]. */
     val onSignIn: (ConnectableProvider) -> Unit = {},
     val signIn: ProviderSignInActions = ProviderSignInActions.NONE,
     val canSignIn: Boolean = false,
@@ -79,7 +79,7 @@ data class ProviderManagementActions(
 }
 
 /**
- * Providers & Models (letta-mobile-w4q4p.6): the host's providers as
+ * Providers & Models: the host's providers as
  * expandable cards — connected first — each opening onto the models it
  * serves with a show/hide switch per model and show-all / hide-all for the
  * provider. One search covers providers and models; the filter chips narrow

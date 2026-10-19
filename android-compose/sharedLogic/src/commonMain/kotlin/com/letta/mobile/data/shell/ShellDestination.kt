@@ -3,7 +3,7 @@ package com.letta.mobile.data.shell
 import com.letta.mobile.data.lens.LensDestination
 
 /**
- * letta-mobile-ckmub.3.4 (hard cut S5, primitive P8): the one destination model of the shell.
+ *  (hard cut S5, primitive P8): the one destination model of the shell.
  *
  * Every client has a route model of its own (Android's typed navigation routes, the desktop's
  * `DesktopDestination` plus its selection, the web's canonical [ShellRoute] path) and every one of
@@ -62,7 +62,7 @@ sealed interface ShellDestination {
         override val kind get() = ShellPageKind.Channels
     }
 
-    /** The Skills page, whose Tools section is the [ShellSkillsSection.Tools] anchor (zxk2n.32). */
+    /** The Skills page, whose Tools section is the [ShellSkillsSection.Tools] anchor. */
     data class Skills(
         override val agentId: String? = null,
         val section: ShellSkillsSection = ShellSkillsSection.Skills,
@@ -74,7 +74,7 @@ sealed interface ShellDestination {
         override val kind get() = ShellPageKind.Settings
     }
 
-    /** The agent editor for [agentId]; without one, the new-agent flow (letta-mobile-ckmub.3.24). */
+    /** The agent editor for [agentId]; without one, the new-agent flow. */
     data class AgentEditor(override val agentId: String? = null) : ShellDestination {
         override val kind get() = ShellPageKind.AgentEditor
     }
@@ -89,22 +89,22 @@ sealed interface ShellDestination {
         override val kind get() = ShellPageKind.Overview
     }
 
-    /** The run monitor: every agent's runs, active ones first (letta-mobile-ckmub.2.6). */
+    /** The run monitor: every agent's runs, active ones first. */
     data object Runs : ShellDestination {
         override val kind get() = ShellPageKind.Runs
     }
 
-    /** The starter templates a new agent is made from (letta-mobile-ckmub.2.6). */
+    /** The starter templates a new agent is made from. */
     data object Templates : ShellDestination {
         override val kind get() = ShellPageKind.Templates
     }
 
-    /** The projects catalog; projects ride an Iroh host's `project.*` relay (letta-mobile-ckmub.2.6). */
+    /** The projects catalog; projects ride an Iroh host's `project.*` relay. */
     data object Projects : ShellDestination {
         override val kind get() = ShellPageKind.Projects
     }
 
-    /** The host's plugins: install from a file with consent, enable, disable, remove (letta-mobile-cdgpr.9). */
+    /** The host's plugins: install from a file with consent, enable, disable, remove. */
     data object Plugins : ShellDestination {
         override val kind get() = ShellPageKind.Plugins
     }
@@ -120,7 +120,7 @@ enum class ShellSkillsSection { Skills, Tools }
 
 /**
  * A Settings anchor. A pairing link opened from outside lands on [Pairing]; its secret never rides
- * the route. [About] is the diagnostics section (the desktop's Overview opens it, letta-mobile-ckmub.3.12).
+ * the route. [About] is the diagnostics section (the desktop's Overview opens it,).
  */
 enum class ShellSettingsSection { Pairing, About }
 

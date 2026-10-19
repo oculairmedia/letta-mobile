@@ -6,7 +6,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Roster/name-resolution telemetry (letta-mobile-z5lqt).
+ * Roster/name-resolution telemetry.
  *
  * TELEMETRY ONLY. Nothing here changes resolution behaviour: no function in
  * this file fetches, retries, mutates a roster, or alters what a caller

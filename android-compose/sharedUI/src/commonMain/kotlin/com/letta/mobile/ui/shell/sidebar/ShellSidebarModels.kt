@@ -44,13 +44,13 @@ data class ShellConversationRowModel(
     val thinking: Boolean = false,
     val deleting: Boolean = false,
     val archived: Boolean = false,
-    /** letta-mobile-bzvro.17: pinned rows lead the list and show a pin. */
+    /** Pinned rows lead the list and show a pin. */
     val pinned: Boolean = false,
-    /** letta-mobile-zxk2n.5: settled rows sink below the active ones and read quieter. */
+    /** Settled rows sink below the active ones and read quieter. */
     val settled: Boolean = false,
-    /** letta-mobile-zxk2n.5: the emoji drawn before the title, or null. */
+    /** The emoji drawn before the title, or null. */
     val marker: String? = null,
-    /** letta-mobile-7mys7 (G37): the title of the conversation this one was forked from; its preview line says so. */
+    /**  (G37): the title of the conversation this one was forked from; its preview line says so. */
     val forkedFrom: String? = null,
 ) {
     /** The line under the title: where a fork came from, else the latest message. */
@@ -87,9 +87,9 @@ data class ShellAgentPanelState(
     val archiveFilter: ShellArchiveFilter = ShellArchiveFilter.Active,
     val conversations: List<ShellConversationRowModel> = emptyList(),
     val canvases: List<ShellCanvasRowModel> = emptyList(),
-    /** letta-mobile-zxk2n.5: every archived chat, whatever the filter, for the Archived chats dialog. */
+    /** Every archived chat, whatever the filter, for the Archived chats dialog. */
     val archivedConversations: List<ShellConversationRowModel> = emptyList(),
-    /** letta-mobile-zxk2n.5: the chat options the menu's Chat options dialog shows; null hides it. */
+    /** The chat options the menu's Chat options dialog shows; null hides it. */
     val chatOptions: ShellChatOptionsState? = null,
 )
 
@@ -112,21 +112,21 @@ data class ShellAgentPanelActions(
      * where delete would only move it there.
      */
     val deleteBehavior: ConversationDeleteBehavior = ConversationDeleteBehavior.Permanent,
-    /** letta-mobile-bzvro.17: rename a conversation; null means the host cannot, so rows offer no rename. */
+    /** Rename a conversation; null means the host cannot, so rows offer no rename. */
     val onRenameConversation: ((id: String, title: String) -> Unit)? = null,
-    /** letta-mobile-bzvro.17: pin or unpin a conversation; null means the host keeps no pins. */
+    /** Pin or unpin a conversation; null means the host keeps no pins. */
     val onPinConversation: ((id: String, pinned: Boolean) -> Unit)? = null,
-    /** letta-mobile-7mys7 (G37): fork a conversation, named or not; null means the backend cannot fork. */
+    /**  (G37): fork a conversation, named or not; null means the backend cannot fork. */
     val onForkConversation: ((id: String, name: String?) -> Unit)? = null,
     val onOpenCanvas: (CanvasId) -> Unit = {},
     val onArchiveCanvas: ((id: CanvasId, archived: Boolean) -> Unit)? = null,
-    /** letta-mobile-zxk2n.5: settle and marker; null means the host keeps no such marks. */
+    /** Settle and marker; null means the host keeps no such marks. */
     val conversationMarks: ShellConversationMarkActions? = null,
-    /** letta-mobile-zxk2n.5: what the Chat options dialog changes; read with [ShellAgentPanelState.chatOptions]. */
+    /** What the Chat options dialog changes; read with [ShellAgentPanelState.chatOptions]. */
     val chatOptions: ShellChatOptionsActions = ShellChatOptionsActions(),
 )
 
-/** letta-mobile-zxk2n.5: a conversation's client marks: settle / move to active, and its marker emoji. */
+/** A conversation's client marks: settle / move to active, and its marker emoji. */
 data class ShellConversationMarkActions(
     val onSettle: (id: String, settled: Boolean) -> Unit,
     /** A null marker clears it. */

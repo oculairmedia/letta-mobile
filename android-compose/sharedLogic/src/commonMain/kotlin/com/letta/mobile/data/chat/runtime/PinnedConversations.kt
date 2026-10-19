@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 /**
- * letta-mobile-bzvro.17 (F17): the conversations the user pinned. Pins are a client preference
+ *  (F17): the conversations the user pinned. Pins are a client preference
  * (the reference app keeps them on the client too), stored in the settings store so they survive
  * a restart. A list shows pinned conversations first ([pinnedFirst]); a fork of a pinned
  * conversation is pinned too ([inherit]).

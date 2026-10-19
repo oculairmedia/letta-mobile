@@ -52,12 +52,12 @@ internal class IrohDialer(
     private val bindEndpoint: suspend (ByteArray, List<ByteArray>) -> Endpoint = { secretKey, alpns ->
         Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode(), secretKey = secretKey, alpns = alpns))
     },
-    /** letta-mobile-by4vm.50: when cadence syncs may run on this device; recovery syncs always may. */
+    /** When cadence syncs may run on this device; recovery syncs always may. */
     private val syncBudget: SyncBudgetPolicy = SyncBudgetPolicy.Unlimited,
 ) {
     private val endpointMutex = Mutex()
 
-    /** letta-mobile-by4vm.95: one engine and router for every dial of this transport, built on the first. */
+    /** One engine and router for every dial of this transport, built on the first. */
     private val transportEngine by lazy { IrohTransportEngine(scope, externalToolRegistry, agentDefaults) }
     private var hostEndpoint: Endpoint? = null
     private var hostNotebook: InboundNotebook? = null
@@ -134,7 +134,7 @@ internal class IrohDialer(
 
     /**
      * Binds an authenticated dial's [IrohDialAttachment.client] to the transport's engine and
-     * resumes an interrupted session on it (letta-mobile-by4vm.96). Closing the returned handle
+     * resumes an interrupted session on it. Closing the returned handle
      * interrupts the session again and then releases the dial's resources; turns end only when the
      * transport ends the session ([endSessionTurns]). Tests attach scripted clients here.
      */
@@ -171,7 +171,7 @@ internal class IrohDialer(
     }
 
     /**
-     * letta-mobile-by4vm.110.6: attaches a direct ws:// [dial] as one dial of this engine: admin_rpc
+     * Attaches a direct ws:// [dial] as one dial of this engine: admin_rpc
      * in process, the socket's stream deltas for the observer, and the socket closing reported as the
      * connection loss the QUIC watcher reports for an Iroh dial.
      */
@@ -198,7 +198,7 @@ internal class IrohDialer(
         return handle
     }
 
-    /** letta-mobile-by4vm.96: the session ended for good (config change, disconnect, auth failure). */
+    /** The session ended for good (config change, disconnect, auth failure). */
     fun endSessionTurns() {
         transportEngine.endTurns()
     }
@@ -348,7 +348,7 @@ internal class IrohDialer(
     }
 
     /**
-     * letta-mobile-by4vm.50: gap detection and with it the busy/idle sync cadence, within
+     * Gap detection and with it the busy/idle sync cadence, within
      * [syncBudget]. The host draws `event_seq` in wire order (it always advertises
      * [com.letta.mobile.data.controller.fanout.StreamIntegrityMonitor.EVENT_SEQ_ORDERED_CAPABILITY]),
      * so a jump is a lost frame.

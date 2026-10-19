@@ -11,7 +11,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
-/** letta-mobile-by4vm.51: one `conversation.recompile` request, validated. */
+/** One `conversation.recompile` request, validated. */
 internal data class RecompileParams(val agentId: String, val conversationId: String, val dryRun: Boolean) {
     companion object {
         fun from(params: JsonObject?): RecompileParams = RecompileParams(
@@ -24,7 +24,7 @@ internal data class RecompileParams(val agentId: String, val conversationId: Str
 }
 
 /**
- * letta-mobile-by4vm.51: relays a system-prompt recompile from an Iroh client to this node's App
+ * Relays a system-prompt recompile from an Iroh client to this node's App
  * Server as `conversation_recompile` (letta-code `protocol_v2` `ConversationRecompileCommand`),
  * carrying `agent_id` and `dry_run` in its body. The answer is the compiled prompt
  * ([IrohConversationRecompileRpc.result]); a dry run compiles without saving.

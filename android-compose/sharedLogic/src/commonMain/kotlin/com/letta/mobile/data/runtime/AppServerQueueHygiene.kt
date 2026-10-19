@@ -27,7 +27,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * letta-mobile-qygvv.6: the last `update_queue` snapshot seen for one runtime.
+ * The last `update_queue` snapshot seen for one runtime.
  * [paused] is true while the server holds items parked by an `abort_message`.
  */
 data class AppServerQueueSnapshot(
@@ -36,7 +36,7 @@ data class AppServerQueueSnapshot(
 )
 
 /**
- * letta-mobile-qygvv.6: a queued input this client sent, removed from the server queue after a
+ * A queued input this client sent, removed from the server queue after a
  * user abort. [draft] is the Cancelled lifecycle for that input's turn, so a host can stop showing
  * [clientMessageId] as pending. A lease that is still waiting on the item also settles Cancelled
  * through its own flow, from the `update_queue` removal the server emits.
@@ -51,7 +51,7 @@ data class CancelledQueuedInput(
 internal const val QUEUED_INPUT_REMOVED_AFTER_ABORT_REASON = "Queued input removed after abort"
 
 /**
- * letta-mobile-qygvv.6: queue hygiene after a user abort.
+ * Queue hygiene after a user abort.
  *
  * `abort_message` pauses the conversation queue on the App Server (0.32.3): queued user items stay
  * parked (`paused: true`) until the next `input` or a `resume_queue`. Once the abort settles
@@ -176,7 +176,7 @@ internal class AppServerQueueHygiene(
     }
 
     /**
-     * letta-mobile-qygvv.9: a lease whose input is still waiting in the server queue was
+     * A lease whose input is still waiting in the server queue was
      * cancelled. Take that input off the queue, or the server runs it later with nobody
      * observing. False when the item is not in the last snapshot or the removal failed.
      */

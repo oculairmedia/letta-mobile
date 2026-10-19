@@ -36,7 +36,7 @@ interface ViewerHandle {
     fun receivesConversationEvents(): Boolean = false
 }
 
-/** letta-mobile-fxoew.2: told when a connection starts viewing a conversation. */
+/** Told when a connection starts viewing a conversation. */
 fun interface ViewerJoinedListener {
     suspend fun onViewerJoined(conversationId: String, viewer: ViewerHandle)
 }
@@ -89,7 +89,7 @@ class ConnectionRegistry {
     /**
      * Register [registration] only while it remains the endpoint's current generation.
      *
-     * letta-mobile-fxoew.2: when this makes the connection a NEW viewer of
+     * when this makes the connection a NEW viewer of
      * [conversationId] (not a re-registration from paging), every
      * [ViewerJoinedListener] hears it after the lock is released.
      */
@@ -106,7 +106,7 @@ class ConnectionRegistry {
 
     private val joinListeners = java.util.concurrent.CopyOnWriteArrayList<ViewerJoinedListener>()
 
-    /** letta-mobile-fxoew.2: hear each connection that starts viewing a conversation. */
+    /** Hear each connection that starts viewing a conversation. */
     fun addViewerJoinedListener(listener: ViewerJoinedListener) {
         joinListeners += listener
     }

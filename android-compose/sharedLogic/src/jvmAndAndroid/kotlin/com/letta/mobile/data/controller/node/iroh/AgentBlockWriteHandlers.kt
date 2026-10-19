@@ -10,7 +10,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
- * Agent-scoped memory-block writes (lgns8.9 update, bfooy.5 create/delete).
+ * Agent-scoped memory-block writes ( update, bfooy.5 create/delete).
  *
  * A core-memory block IS the MemFS file `memory/system/<label>.md`, so every
  * write here is addressed by `agent_id` + `label` and maps onto a native App
@@ -29,7 +29,7 @@ internal object AgentBlockWriteHandlers {
     const val CREATE = "block.create_agent"
     const val DELETE = "block.delete_agent"
 
-    /** bfooy.5 additions; [UPDATE] predates them (lgns8.9). */
+    /** Bfooy.5 additions; [UPDATE] predates them. */
     val CREATE_DELETE_METHODS: Set<String> = setOf(CREATE, DELETE)
 
     val METHODS: Set<String> = CREATE_DELETE_METHODS + UPDATE

@@ -10,7 +10,7 @@ import java.util.UUID
 import kotlinx.serialization.json.Json
 
 /**
- * letta-mobile-lgns8.22.8: JSON-file-backed [SubagentRegistryStore].
+ * JSON-file-backed [SubagentRegistryStore].
  *
  * Deliberately the same shape as `FilePairedPeerStore` — the existing
  * controller durable-state precedent — rather than a new database: fsync'd

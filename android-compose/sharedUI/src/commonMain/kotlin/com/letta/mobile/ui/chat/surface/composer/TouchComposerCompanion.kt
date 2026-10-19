@@ -40,7 +40,7 @@ import com.letta.mobile.ui.theme.TouchComposerDimens
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-bglj6.1.9 / .21: the agent's mascot above the Touch bar, at its left edge, only
+ *  /.21: the agent's mascot above the Touch bar, at its left edge, only
  * while the agent works (legacy ChatComposerCompanion). The row opens as a run starts, the
  * character rises out of the bar with elapsed time and the running tool beside it, and both go
  * when the run is done. The seat stays declared throughout (the page's one companion seat stands

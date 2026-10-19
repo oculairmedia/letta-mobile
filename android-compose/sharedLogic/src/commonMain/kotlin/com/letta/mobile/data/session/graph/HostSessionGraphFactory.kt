@@ -12,7 +12,7 @@ import com.letta.mobile.runtime.BackendDescriptor
 import kotlinx.atomicfu.atomic
 
 /**
- * letta-mobile-ckmub.17.1: the session graph factory desktop and the browser share. Each [create]
+ * The session graph factory desktop and the browser share. Each [create]
  * asks [bindingProvider] for the generation's backend and channel, binds [HostRepositoryAdapters]
  * over it and wraps them in the one [SharedSessionRepositoryGraph].
  */

@@ -56,9 +56,9 @@ import kotlinx.collections.immutable.toImmutableList
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-bglj6.1: one tool call, lifted from desktop's ToolCard.
+ * One tool call, lifted from desktop's ToolCard.
  *
- * letta-mobile-ckmub.1.2: one step row on every host, built from the shared primitives
+ * one step row on every host, built from the shared primitives
  * ([RunStepListRow]: a [com.letta.mobile.ui.components.LettaListRow] led by the run's
  * [RunStatusGlyph], the tool's name, a one-line preview of its command, and the shared
  * [com.letta.mobile.ui.components.DisclosureChevron] only when it has details). Success, failure and

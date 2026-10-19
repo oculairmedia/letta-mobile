@@ -43,7 +43,7 @@ typealias CanvasDocumentOptions = SharedDocumentOptions<CanvasId, CanvasOp, Canv
  * none.
  *
  * The open board's [CanvasSession] still writes through those stores directly; folding its write
- * path into the primitive is the follow-up letta-mobile-ckmub.6.2.
+ * path into the primitive is the follow-up.
  */
 suspend fun openCanvasDocument(
     seed: CanvasDocument,

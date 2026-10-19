@@ -47,7 +47,7 @@ import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * An agent's secrets vault, shared by desktop and Android (letta-mobile-bzvro.25): the keys its
+ * An agent's secrets vault, shared by desktop and Android: the keys its
  * tools can read, each value masked until the user reveals it, with add, replace and delete.
  * Values are kept by the App Server only; the page never stores them, and it masks everything
  * again when it leaves the screen.

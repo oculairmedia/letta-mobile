@@ -10,7 +10,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * letta-mobile-cc25e: runs one flight on the frame clock (so a test's clock drives it).
+ * Runs one flight on the frame clock (so a test's clock drives it).
  *
  * 1. Hold at the prompt until the row claims the flight, at most
  *    [ChatMotionTokens.SendFlight.TARGET_WAIT_MILLIS]; otherwise fade out where it stands.

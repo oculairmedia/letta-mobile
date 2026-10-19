@@ -5,13 +5,13 @@ import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 
 /**
- * letta-mobile-by4vm.13: the one stand-in for a contract a session does not serve. Every call, a
+ * The one stand-in for a contract a session does not serve. Every call, a
  * property read included, throws [AppServerRouteUnavailable] for [route]; there is no "quietly empty"
  * variant. Callers ask [SessionCapabilities.supports] before touching it, so reaching this is a bug
  * the exception names.
  *
  * Production code binds it only for a whole repository a desktop session graph leaves unbound (the
- * graph's interface has no nullable slot for it until letta-mobile-by4vm.24). Android's remote
+ * graph's interface has no nullable slot for it until). Android's remote
  * sources are [RemoteRoute.Absent] instead, so no reflection proxy is created in an Android release.
  */
 inline fun <reified T : Any> unavailable(route: SessionRoute): T = unavailable(T::class.java, route)

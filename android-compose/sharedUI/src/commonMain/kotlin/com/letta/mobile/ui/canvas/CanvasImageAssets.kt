@@ -5,7 +5,7 @@ import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.PayLoad
 
 /**
- * A board's images kept in an [AssetStore] rather than only inside the drawing (letta-mobile-w3nb2.2).
+ * A board's images kept in an [AssetStore] rather than only inside the drawing.
  *
  * - [adopt]: an image that has bytes but no asset gets one — its bytes stored under their hash, a
  *   ref, its media type and a small preview. That is how newly placed images and the images of

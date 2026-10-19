@@ -5,7 +5,7 @@ import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.update
 
 /**
- * letta-mobile-fxoew.5: which parent scopes the [SubagentRepository] has
+ * Which parent scopes the [SubagentRepository] has
  * already fetched, and which ones are being collected right now.
  *
  * The host's `subagent.list` is conversation-scoped, so one fetch per

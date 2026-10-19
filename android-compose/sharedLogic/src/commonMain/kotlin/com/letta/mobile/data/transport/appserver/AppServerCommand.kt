@@ -21,7 +21,7 @@ sealed interface AppServerCommand {
          * must never emit capability-gated encodings to such peers.
          */
         val capabilities: List<String>? = null,
-        /** letta-mobile-dpv7m.2: label the host records when this auth redeems a pairing invite. */
+        /** Label the host records when this auth redeems a pairing invite. */
         @SerialName("peer_name") val peerName: String? = null,
     ) : AppServerCommand {
         /** The token may be a bearer or a one-time invite secret: never print it. */
@@ -123,7 +123,7 @@ sealed interface AppServerCommand {
     ) : AppServerCommand
 
     /**
-     * letta-mobile-qygvv.6: releases queue items parked by an `abort_message` (upstream 0.32+,
+     * Releases queue items parked by an `abort_message` (upstream 0.32+,
      * `queue-update-protocol.d.ts`). The server answers with `resume_queue_response` only when
      * [requestId] is set.
      */
@@ -135,7 +135,7 @@ sealed interface AppServerCommand {
     ) : AppServerCommand
 
     /**
-     * letta-mobile-qygvv.6: drops one queued input without stopping the active turn (upstream
+     * Drops one queued input without stopping the active turn (upstream
      * 0.32+, `task-control-protocol.d.ts`). [itemId] is the queue item's `id`, not its
      * `client_message_id`; the server then emits an `update_queue` removal `cancelled`.
      */
@@ -322,7 +322,7 @@ sealed interface AppServerCommand {
     // path, which retires with the shim in lgns8.11.
 
     /**
-     * lgns8.9: the native owner of an agent memory-block write. Core-memory
+     * The native owner of an agent memory-block write. Core-memory
      * blocks are MemFS files (`memory/system/<label>.md`), and this command is
      * how the App Server — the local backend's single writer — commits one.
      */
@@ -515,7 +515,7 @@ sealed interface AppServerCommand {
     ) : AppServerCommand
 
     /**
-     * Executes a device slash command (letta-mobile-bzvro.20).
+     * Executes a device slash command.
      */
     @Serializable
     @SerialName("execute_command")
@@ -527,7 +527,7 @@ sealed interface AppServerCommand {
     ) : AppServerCommand
 
     /**
-     * Stops a background process or monitor (letta-mobile-bzvro.21).
+     * Stops a background process or monitor.
      */
     @Serializable
     @SerialName("monitor_stop")
@@ -538,7 +538,7 @@ sealed interface AppServerCommand {
     ) : AppServerCommand
 
     /**
-     * Updates the active toolset preference (letta-mobile-bzvro.22).
+     * Updates the active toolset preference.
      */
     @Serializable
     @SerialName("update_toolset")
@@ -549,7 +549,7 @@ sealed interface AppServerCommand {
     ) : AppServerCommand
 
     /**
-     * Pauses a scheduled cron task (letta-mobile-bzvro.23).
+     * Pauses a scheduled cron task.
      */
     @Serializable
     @SerialName("cron_pause")
@@ -559,7 +559,7 @@ sealed interface AppServerCommand {
     ) : AppServerCommand
 
     /**
-     * Resumes a paused cron task (letta-mobile-bzvro.23).
+     * Resumes a paused cron task.
      */
     @Serializable
     @SerialName("cron_resume")
@@ -570,7 +570,7 @@ sealed interface AppServerCommand {
     ) : AppServerCommand
 
     /**
-     * Capability discovery request (lgns8.24).
+     * Capability discovery request.
      *
      * Sent over the WebSocket after connect to discover server capabilities
      * before using protocol features. The response [AppServerInfoResponse]

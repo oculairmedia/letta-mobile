@@ -4,7 +4,7 @@ import kotlin.math.min
 import kotlin.random.Random
 
 /**
- * Bounded full-jitter backoff for App Server reconnect (letta-mobile-lgns8.5).
+ * Bounded full-jitter backoff for App Server reconnect.
  *
  * Computes the delay before reconnect attempt N using the AWS "full jitter"
  * strategy: an exponentially growing ceiling capped at [maxDelayMs], with the

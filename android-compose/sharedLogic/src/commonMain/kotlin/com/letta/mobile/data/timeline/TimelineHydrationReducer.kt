@@ -149,7 +149,7 @@ object TimelineHydrationReducer {
      * [serverEvent] with every fact [localEvent] knows that the server copy does not: an approval
      * decision, an attachment set, and each tool call's return.
      *
-     * A return the server copy says nothing about stays exactly as stored (letta-mobile-bglj6.1.12):
+     * A return the server copy says nothing about stays exactly as stored:
      * the recent page lists a tool call and its return as two messages, so merging the bare call
      * used to drop the stored return (its text, truncation and error flag) and the page's return
      * put it straight back. The row was rewritten on every reconcile of an unchanged page, each
@@ -228,7 +228,7 @@ object TimelineHydrationReducer {
     }
 
     /**
-     * letta-mobile-hw2l1: second line of defence for the reconcile-final row.
+     * Second line of defence for the reconcile-final row.
      *
      * A reconcile final is the same logical message as the streamed row it
      * supersedes, but it carries a NULL (or reconcile-synthetic) run id and a
@@ -335,7 +335,7 @@ object TimelineHydrationReducer {
     }
 
     /**
-     * letta-mobile-x13xi.13.1.1: true when [server] is a Confirmed USER row
+     * True when [server] is a Confirmed USER row
      * that semantically represents the same user message as this pending
      * Local. Matches regardless of the server's otid, because hydration
      * snapshots are written by the server under its own otid even when the

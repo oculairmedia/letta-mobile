@@ -10,7 +10,7 @@ enum class SessionPlatform {
 }
 
 /**
- * letta-mobile-by4vm.13: what one session serves, decided once when its graph is built.
+ * What one session serves, decided once when its graph is built.
  *
  * Callers ask [supports] before reaching for an optional route, and render "not available" (the
  * existing reason text) instead of calling it. [AppServerRouteUnavailable] is only the backstop for
@@ -49,7 +49,7 @@ class SessionCapabilities(
 }
 
 /**
- * letta-mobile-by4vm.13: the (platform x backend kind x route) contract. This replaces the
+ * The (platform x backend kind x route) contract. This replaces the
  * "adding a backend means editing three factories" note: a new [BackendKind] or [SessionRoute] does
  * not compile until every row below decides it, and each platform's matrix test fails until its
  * factory binds exactly its row. Where the platforms disagree, [DIVERGENCES] must say why.
@@ -78,7 +78,7 @@ object SessionRouteMatrix {
 
     /**
      * Android: every backend is an App Server reached through the session's channel (an Iroh host, a
-     * ws:// address, or the on-device runtime's loopback server, letta-mobile-by4vm.110.6), whose
+     * ws:// address, or the on-device runtime's loopback server,), whose
      * admin_rpc is the Iroh host's router or the same router run in process.
      */
     private fun android(kind: BackendKind?): Set<SessionRoute> = when (kind) {
@@ -95,7 +95,7 @@ object SessionRouteMatrix {
     }
 
     /**
-     * Web: desktop's row (letta-mobile-ckmub.17.1: the browser builds desktop's session graph over its
+     * Web: desktop's row (the browser builds desktop's session graph over its
      * one App Server session), except that a browser has no embedded runtime.
      */
     private fun web(kind: BackendKind?): Set<SessionRoute> = when (kind) {

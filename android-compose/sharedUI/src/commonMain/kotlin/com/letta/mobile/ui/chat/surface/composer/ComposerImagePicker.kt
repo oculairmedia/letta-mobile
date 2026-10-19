@@ -41,7 +41,7 @@ internal class ComposerImagePickerTarget(
 internal typealias ComposerImageSource = suspend () -> ByteArray
 
 /**
- * letta-mobile-bglj6.1: reads and encodes picked images in a scope owned by the page, not by one
+ * Reads and encodes picked images in a scope owned by the page, not by one
  * composer panel. Docking and expanding compose a different panel instance; an encode running in
  * the old panel's scope would be cancelled with it and the image silently lost.
  *

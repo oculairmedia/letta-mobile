@@ -301,6 +301,13 @@ git -C "$repo" commit -qm "delete appserver-cli file"
 actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" "$base2")"
 assert_eq "$actual" ":appserver-cli:test"
 
+# A testkit change must compile its Android instrumentation consumer as well as JVM callers.
+mkdir -p "$repo/android-compose/appserver-testkit/src"
+touch "$repo/android-compose/appserver-testkit/src/Smoke.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm "add appserver testkit"
+actual="$(cd "$repo" && bash scripts/ci/changed-gradle-modules.sh HEAD~1)"
+assert_eq "$actual" ":app:compileRootDebugAndroidTestKotlin :cli:test :appserver-cli:test"
+
 # Additive appserver-cli test: adding a file should also schedule the module
 git -C "$repo" checkout "$base2" -q
 mkdir -p "$repo/android-compose/appserver-cli/src"

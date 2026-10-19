@@ -35,7 +35,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.io.encoding.Base64
 
 /**
- * letta-mobile-cdgpr.7: the host's `plugins.*` admin RPCs over its [PluginHostRuntime]. A package
+ * The host's `plugins.*` admin RPCs over its [PluginHostRuntime]. A package
  * to install arrives as an asset already uploaded to this host's [assets] (the canvas relay's
  * store) and is pinned by the sha256 the client computed; every management write answers with the
  * registry after it, so a client's list stays current without a second call. Live views read pages

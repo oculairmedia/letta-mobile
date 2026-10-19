@@ -40,7 +40,7 @@ sealed interface PluginViewActionOutcome {
 
 /**
  * How a client reaches the host for a live view (plan section 7.2): the page's HTML and the view's
- * actions. The `meridian/plugin-view/1` ALPN implements it (letta-mobile-s416w.32), and so can a
+ * actions. The `meridian/plugin-view/1` ALPN implements it, and so can a
  * loopback in desktop direct mode; [Unavailable] is the offline transport.
  */
 interface PluginViewTransport {
