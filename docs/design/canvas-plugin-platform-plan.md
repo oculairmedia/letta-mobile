@@ -1,6 +1,26 @@
 # Canvas Plugin Platform: Architecture Plan (revision 2)
 
-> Source audit, 2026-10-18: Parts of this plan are implemented: process-plugin hosting, the LCP wire layer, trust checks, and the shared view bridge. The plan also describes future jar/service runtimes and settings/secrets flows; `PluginDriverHost` currently accepts process runtimes only and creates empty `PluginSecrets`. Use [wire reference](../reference/canvas-plugin-wire-v1.md), [view bridge](../reference/plugin-view-bridge-v1.md), and [trust model](../reference/plugin-trust-model.md) for implemented guarantees. Bead progress below is the original planning snapshot.
+> Source audit, 2026-10-19, main `74feb94a1`: This is the retained 2026-10-02 design, with proposed mechanisms and original bead progress. The current-support table below distinguishes implemented behavior from proposals; later sections are the original plan, not a current runtime inventory. Use [wire reference](../reference/canvas-plugin-wire-v1.md), [view bridge](../reference/plugin-view-bridge-v1.md), and [trust model](../reference/plugin-trust-model.md) for implemented guarantees.
+
+## Current implementation boundaries — 2026-10-19
+
+| Area | Implemented behavior / remaining proposal |
+|---|---|
+| Hosting | The wrapper constructs the process-plugin host. JVM JAR loading, service execution and a desktop direct-mode host remain proposed; a manifest or SPI declaration does not supply those executors. |
+| Registry and tools | `ExternalToolRegistry.addSource` and `toolsChanged` support live re-advertisement. The immutable-registry baseline in section 2 is historical. |
+| Settings and secrets | The launcher supplies manifest defaults and empty secrets. Settings/secret management endpoints and production secret injection remain proposed. Driver/handler scrubber tests do not establish an end-to-end credential flow. |
+| Placements | Writes use the plugin actor and per-plugin emit limits, rather than the agent actor and per-element limits proposed below. See [v1 host limits](../reference/canvas-plugin-wire-v1.md#host-limits-v1) for supported entries and refusals. |
+| Restart | The process driver uses full-jitter backoff and a windowed crash budget. Fixed restart intervals and idle shutdown below are proposals. |
+| View transport | The Iroh view adapter uses `plugins.page.read` and `plugins.view.action` over admin RPC; the separate view ALPN proposed below is not its implemented transport. |
+
+Source evidence: [wrapper assembly](../../android-compose/iroh-wrapper-cli/src/main/kotlin/com/letta/mobile/cli/commands/PluginHostWiring.kt),
+[runtime launch](../../android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/host/PluginDriverHost.kt),
+[host handlers and placement policy](../../android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/host/),
+[live registry](../../android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/controller/extras/ExternalToolRegistry.kt),
+and [view adapter](../../android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/plugin/remote/AdminRpcPluginViewTransport.kt).
+
+The application-wide optional/replacement interface plan is tracked in `letta-mobile-i5jdm`.
+It is subsequent design work, not functionality supplied by this canvas-specific platform.
 
 Epic: letta-mobile-s416w. Date: 2026-10-02. Status: **plan, validated against origin/main f1c96bb0e; revised after Emmanuel's decisions of 2026-10-02 (recorded on the epic). Group A (beads .1–.5) is unchanged from revision 1 and is in progress.**
 
@@ -46,9 +66,10 @@ The core modules gain only generic mechanisms (an element collection, a renderer
 
 ---
 
-## 2. What exists today and what it dictates
+## 2. Original baseline — 2026-10-02
 
-Unchanged from revision 1 (the table there is still accurate). The rows that matter most for this revision:
+Retained from revision 1; the current-support table above supersedes these implementation claims.
+The rows that informed the original design were:
 
 - `ExternalToolRegistry` is immutable after construction and advertised on `runtime_start`; `reRegisterAll` is a no-op seam kept for a future protocol; the reconnect coordinator re-issues `runtime_start` per active runtime. Hot-loading needs a live registry and a re-advertisement path (section 6.3, decision R2).
 - The Iroh App Server connection already carries a generic `admin_rpc` (method, path, body) on the control stream, routed by `AdminRpcRouter`/`AdminRpcRegistry` on the host, gated by `IrohAuthPolicy` (token, allowed peers, pairing). The management API rides on it.

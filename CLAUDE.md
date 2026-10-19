@@ -20,7 +20,7 @@ The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The W
 - Hilt (Android DI), Room (Android persistence), Ktor (HTTP + WebSocket transports)
 - Iroh QUIC (`computer.iroh:iroh:1.1.0`, pinned in `gradle/libs.versions.toml`) for P2P transport
 - Material 3 + Lucide icons + A2UI renderer
-- Gradle 9.6.1 (wrapper), JDK 17/21/26 (CI uses JDK 26; detekt requires JDK 21)
+- Gradle 9.6.1 (wrapper); daemon JDK 21 is pinned in `gradle/gradle-daemon-jvm.properties`. CI launcher JDKs vary by job; several use 26.
 
 ---
 
@@ -29,7 +29,7 @@ The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The W
 ```bash
 cd android-compose
 cp -f local.properties.example local.properties
-export JAVA_HOME="/usr/lib/jvm/jdk-26"      # CI parity
+export JAVA_HOME="/usr/lib/jvm/jdk-26"      # launcher; configured daemon uses JDK 21
 ./gradlew :app:assembleRootDebug                # Android APK
 ./gradlew :desktop:run                      # Compose Desktop (needs a display; on a headless VM use DISPLAY=:1 and SOFTWARE rendering)
 ```
@@ -107,7 +107,7 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt -Parch
 
 **CI at a glance** (full table: "CI map" in `AGENTS.md`):
 - **Required** (branch protection): `test`, `build-apk-pass` (play-release builds on main pushes only), `shared-multiplatform`, `detekt`.
-- `test` aggregates the parallel `test-workload` and `api-docs` jobs; both must explicitly succeed. Missing linked API declarations and documentation generation failures therefore block merging alongside test failures.
+- `test` aggregates the parallel `test-workload`, `api-docs` and `api-contract-windows` jobs; all three must explicitly succeed. The workload runs Linux `apiCheck`; missing linked API declarations, documentation failures and API signature drift on either host therefore block merging alongside test failures.
 - **Nightly + main, not a PR gate:** `perf-gate` (emulator startup macrobenchmark, one measurement; on a breach the job summary shows the last 5 main runs as a control and a human decides whether to rerun — no automatic retry; a red nightly/main run opens or updates the `perf-gate regression` issue). PRs run only the cheap `perf-scripts` self-test unless they edit the perf gate or use `[perf:rebaseline]`.
 - **Not required, but honest** (red = a new problem in your diff): `Platform UI gate` (`--enforce`: a new platform `@Composable` file fails), `main module tests` (main pushes only: `:sharedUI:jvmTest :desktop:test`), `embedded-runtime-node18` (a letta-code pin bump or staging change must boot the staged tree on Node 18.20.4 headless and as an App Server, within the 28 MiB gzip budget).
 - **Advisory** (never fail): `Advisory AGENTS.md policy`, `row goldens (advisory)`, `Export architecture graph`; CodeScene is external and still expected green.

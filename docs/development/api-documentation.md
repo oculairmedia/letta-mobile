@@ -58,8 +58,8 @@ run, extract it, and open `index.html`. The artifact is retained for 30 days.
 On main pushes, `assemble-web-pages` combines the WASM site with the generated
 reference under `api/`, then `deploy-web-pages` publishes the single Pages artifact.
 The app remains at the site root; the API reference is served at
-[letta-mobile/api/](https://oculairmedia.github.io/letta-mobile/api/) after merge
-and a successful main deployment. PRs generate downloadable docs without deploying.
+[letta-mobile/api/](https://oculairmedia.github.io/letta-mobile/api/) by that deployment.
+PRs generate downloadable docs without deploying.
 Both builds must succeed before the combined site can deploy.
 
 CI pins source links to the checked-out commit using `-PdokkaSourceRef=<sha>`.
@@ -175,18 +175,19 @@ replacement actually contains the information.
 
 | Reference | Existing authority | Further automation |
 |---|---|---|
-| Protocol and admin ownership | Pinned [protocol inventory](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json), [ownership matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json), registry parity tests | Render current commands, counts, hashes and ownership directly from these fixtures, with source commit/version shown. |
+| Protocol and admin ownership | Pinned [protocol inventory](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/installed-protocol-v2-inventory.json), [ownership matrix](../../android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json), registry parity tests | Already rendered into the [current protocol reference](../reference/current-app-server-protocol.md); the generator and verifier reject stale output. |
 | Tool schemas, wire tables and widget catalogs | Runtime registries; [LCP table test](../../android-compose/sharedLogic/src/jvmTest/kotlin/com/letta/mobile/data/plugin/wire/LcpWireDocTest.kt) and [Canvas Compose guide test](../../android-compose/sharedLogic/src/jvmTest/kotlin/com/letta/mobile/data/canvas/compose/CanvasComposeGuideDocTest.kt) already generate marked content | Publish evaluated schemas/catalogs and existing generated outputs directly; remove manual copy/paste updates while retaining parity checks. |
 | Modules, targets and dependencies | [Architecture exporter](../../android-compose/build-logic/src/main/kotlin/com/letta/mobile/architecture/ArchitectureGraphPlugin.kt) already emits configured Gradle/KMP records | Render inventories and dependency maps from its JSONL; retain human ownership/rationale beside them. |
 | Deployment and performance evidence | Dated captures with version, commit and scope | Validate metadata and links; require fresh captures to claim a new observation. Source pins cannot establish deployed state. |
 
-Protocol/ownership generation has the highest immediate value: the existing
-`scripts/appserver/verify-v2-audit-doc.mjs` searches the historical v2 audit for
-current pinned values, so it fails after a pin moves even when the old evidence
-is honestly dated. Generate a separate current reference rather than rewriting
-history to satisfy that assertion. Each generator should have deterministic
-fixture tests and reject stale output; schema/widget changes must alter its
-reference without requiring a live host.
+The protocol/ownership generator is implemented in
+[`generate-protocol-reference.mjs`](../../scripts/appserver/generate-protocol-reference.mjs).
+Run it with `--write` after changing its pinned inputs; required CI checks its
+output and fixture tests. `verify-v2-audit-doc.mjs` checks that current reference
+and the historical documents' durable safeguards and reference link, preserving
+the original captures' pins. See [generated documentation commands](../../CONTRIBUTING.md#generated-documentation)
+for this generator and the existing LCP/Canvas guide writers. Extending generation
+to evaluated schemas or catalogs still needs deterministic fixtures and stale-output checks.
 
 KDoc also needs review: generated pages repeat stale comments faithfully.
 Generation and link gates prove the publication is buildable and navigable;
@@ -277,8 +278,7 @@ root (`api/linux_x64`, `api/mingw_x64`, or host-independent `api`), and its
 the resulting diff, then require both checks to pass. A failed capture publishes
 no artifact; resolve its compilation failure rather than accepting partial data.
 
-Before this workflow reaches the default branch (GitHub's prerequisite for
-manual dispatch), or for an explicit capture from a local commit, push that
+For a capture triggered directly by a pushed commit, push that
 commit to a temporary `codex/api-capture/<name>` branch. The narrow push trigger
 runs the same capture jobs. Verify artifact provenance, then delete the temporary
 remote branch after retrieving the outputs. This does not bypass PR checks or

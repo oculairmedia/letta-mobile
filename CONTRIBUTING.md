@@ -48,9 +48,15 @@ The repo admin runs this once to apply / re-apply branch protection on the remot
 ## Local Android setup
 
 1. Create `android-compose/local.properties` with your Android SDK path.
-2. Point `JAVA_HOME` at a full JDK 26 for parity with CI. Gradle 9.6.1 can still
-   run on JDK 17-26, so Android Studio's bundled JBR remains acceptable for
-   local builds when it falls in that supported range.
+2. Point `JAVA_HOME` at a supported full JDK; the examples use JDK 26, as several
+   CI launchers do. The build daemon is selected separately:
+   [`gradle-daemon-jvm.properties`](android-compose/gradle/gradle-daemon-jvm.properties)
+   pins JDK 21. Gradle's [daemon JVM criteria](https://docs.gradle.org/current/userguide/gradle_daemon.html#sec:daemon_jvm_criteria)
+   take precedence over `JAVA_HOME`; setting it to 26 does not change that pin.
+   Android Studio's bundled JBR can launch Gradle when compatible, but the build
+   still needs the configured daemon toolchain. Use `./gradlew --version` from
+   `android-compose/` to inspect the launcher and daemon JVMs. The desktop app's
+   downloaded JBR is another runtime, configured in `desktop/build.gradle.kts`.
 
 Example on Linux:
 

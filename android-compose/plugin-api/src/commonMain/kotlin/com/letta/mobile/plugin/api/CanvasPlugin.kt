@@ -3,22 +3,22 @@ package com.letta.mobile.plugin.api
 import kotlinx.serialization.json.JsonObject
 
 /**
- * What a jvm-runtime plugin implements (plan section 3.2). The manifest's `runtime.entry` names a
- * public class with a public no-argument constructor that implements this interface; the host
- * loads it in its own child-first class loader (R1: consented code, isolated by the loader, a
- * bounded dispatcher and deadlines, never sandboxed).
+ * Kotlin SPI for a JVM-runtime plugin. The manifest's `runtime.entry` identifies a public class
+ * with a public no-argument constructor implementing this interface. This declaration defines
+ * the contract; the production host currently executes process plugins over LCP and does not
+ * provide an in-process JAR loader.
  *
- * Every member maps one-to-one to an LCP wire method ([LcpMethod]), so a jar plugin and a process
- * or service plugin behave alike. The host calls them in this order, one at a time:
+ * Members map to LCP wire methods through [LcpMethod]. Lifecycle ordering is:
  *
  * 1. [initialize] once, with the [PluginHost] the plugin keeps (wire `plugin.initialize`);
  * 2. [activate] once (wire `plugin.activate`);
  * 3. any number of [invoke], [onElementEvent], [onSettingsChanged] and [health];
- * 4. [deactivate], after which the host cancels [PluginHost.scope] and drops the class loader.
+ * 4. [deactivate], after which an SPI executor must cancel [PluginHost.scope] and release resources.
  *
- * A call that throws is a fault: the host marks the plugin `Faulted` and answers the caller with an
- * error. A call that outlives its deadline ([LcpMethod.deadlineMillis]) is cancelled and counted as
- * a fault too, so long work belongs in [PluginHost.scope], not in a call.
+ * Active calls may overlap; the wire implementation bounds concurrent requests rather than
+ * serializing every call. Request errors and deadlines do not by themselves mean the driver
+ * becomes Faulted: the executor owns its lifecycle and restart policy. Keep background work in
+ * [PluginHost.scope] and honor call cancellation and [LcpMethod.deadlineMillis].
  */
 public interface CanvasPlugin {
     /**

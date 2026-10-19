@@ -23,7 +23,7 @@ Historical planning and experiments live in [plan/](plan/) and [poc/](poc/).
 - **Memory administration** — core memory blocks, memory files and the pan/zoom memory graph on the shared memory workspace (`sharedUI`); on Android the `MemoryOverviewScreen` entry point in `app/` hosts that shared workspace
 - **Admin tooling** — providers, tools, skills, templates, projects, channels, schedules, runs, telemetry, system access, pairing and config
 - **Canvas and notes** — a shared canvas workspace with the vendored DrawBox editor, peer-owned documents synced across collaborators, plus Dreaming reflection settings; agents draw with `canvas_apply_ops` and lay out notes, checklists and cards by meaning with `canvas_compose`
-- **Canvas plugins** — new canvas element kinds and agent tools from plugins under a versioned contract: the `plugin-api` Kotlin SPI for JVM plugins, the LCP wire protocol for process/service plugins in any language, and live re-advertisement of plugin tools to the agent
+- **Canvas plugins** — new canvas element kinds and agent tools from process plugins over LCP, with live tool re-advertisement. The Kotlin JVM SPI and service framing are declared contracts; JVM JAR and service executors remain proposed. See the [implemented host subset](docs/reference/plugin-trust-model.md).
 - **Live sync** — multi-client conversation sync between mobile, desktop and browser, paired-device authz, agent-to-agent messaging
 - **Shell** — one adaptive shell across clients: unified search, connection state, a live dock mascot, and pull-to-refresh on list surfaces
 
@@ -97,7 +97,7 @@ sync and presence use separate Iroh ALPNs. See the generated
 | Compose Desktop | `./gradlew :desktop:run` |
 | Phone UI on desktop | `./gradlew :desktop:runPhone` (live backend) / `:desktop:runPhonePlayground` (fixtures); `…Hot` variants add hot reload — see [`phone-preview.md`](docs/development/phone-preview.md) |
 | Browser WASM | `./gradlew :web:wasmJsBrowserDevelopmentRun`; CI runs `:web:wasmJsBrowserDistribution` and `:web:wasmJsBrowserTest` (job `web-wasm`) |
-| Iroh wrapper (the deployed server) | `./gradlew :iroh-wrapper-cli:installDist` → `build/install/meridian-iroh-wrapper/bin/meridian-iroh-wrapper app-server-serve-iroh …` |
+| Iroh wrapper (the deployed server) | `./gradlew :iroh-wrapper-cli:installDist` → `iroh-wrapper-cli/build/install/meridian-iroh-wrapper/bin/meridian-iroh-wrapper app-server-serve-iroh …` |
 | CLI / probes | `./gradlew :cli:run -PcliArgs="…"`; App Server contract probes via `:appserver-cli` (see [`kmp-phase-6-entrypoints.md`](docs/architecture/kmp-phase-6-entrypoints.md)) |
 
 `:cli` is a plain Kotlin/JVM `application` module (the developer `meridian` CLI): `:cli:run`

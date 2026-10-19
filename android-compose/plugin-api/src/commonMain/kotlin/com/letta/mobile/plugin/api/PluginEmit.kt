@@ -7,10 +7,12 @@ import kotlinx.serialization.json.JsonObject
 /**
  * What a plugin puts on the board (wire `host.emit` parameters, and [ActionResult.Ok.emit]). The
  * host compiles it into one atomic batch of canvas ops through the same validator as an agent's
- * `canvas_apply_ops`; whatever it refuses comes back in the [EmitReceipt], never as a failure.
+ * `canvas_apply_ops`. Unsupported entries are reported in [EmitReceipt]; ownership, board-access
+ * or batch-validation failures can refuse the whole call without writing anything.
  *
  * Only the plugin's own kinds can be placed or updated (`ext:<pluginId>/<kind>`), and removals name
- * the plugin's own elements. An emit made for a call carries that call's [callId]. [placeImages] places core images that outlive the plugin.
+ * the plugin's own elements. An emit made for a call carries that call's [callId]. The production
+ * v1 host refuses [placeImages] entries and inline snapshot bytes; upload assets and use their refs.
  */
 @Serializable
 public data class PluginEmit(
@@ -62,8 +64,8 @@ public data class UpdateElement(
 )
 
 /**
- * A core image element placed from the plugin's output (needs `assets:write`): it keeps the
- * plugin as provenance and stays on the board without the plugin.
+ * Declared core-image placement shape. The production v1 host refuses these entries with
+ * `place_images_unsupported`; the declaration does not imply image-placement support.
  */
 @Serializable
 public data class PlaceImage(
@@ -73,7 +75,7 @@ public data class PlaceImage(
     public val canvasId: String? = null,
 )
 
-/** Where a picture comes from: an asset already stored, or bytes the host stores (needs `assets:write`). */
+/** Snapshot carrier: the production v1 host accepts stored asset refs and refuses inline bytes. */
 @Serializable
 public sealed interface SnapshotSource {
     /** An asset the host already has, by its `sha256:<hex>` [ref] (from [PluginHost.putAsset]). */
@@ -82,9 +84,9 @@ public sealed interface SnapshotSource {
     public data class Asset(public val ref: String) : SnapshotSource
 
     /**
-     * Raw [bytes] of [mediaType] (base64 on the wire), stored by the host on emit. A carrier, not
-     * a value: two instances are equal only when they are the same instance (compare [bytes] with
-     * `contentEquals`).
+     * Raw [bytes] of [mediaType] (base64 on the wire). The production v1 host refuses this carrier
+     * on emit with `inline_bytes_unsupported`; use [PluginHost.putAsset] and [Asset] instead.
+     * Two instances are equal only by identity (compare [bytes] with `contentEquals`).
      */
     @Serializable
     @SerialName("bytes")
