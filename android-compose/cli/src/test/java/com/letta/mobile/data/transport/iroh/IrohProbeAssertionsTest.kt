@@ -27,7 +27,7 @@ class IrohProbeAssertionsTest {
         val summary = IrohProbeAssertions.summarize(listOf(metrics))
 
         assertTrue(summary.ok)
-        assertEquals(emptyList(), summary.violations)
+        assertEquals(emptyList<String>(), summary.violations)
         assertEquals(2, metrics.assistantDeltaCount)
         assertEquals(listOf("assistant-1"), metrics.assistantMessageIds)
         assertEquals(1, metrics.reasoningRowEstimate)
@@ -133,7 +133,7 @@ class IrohProbeAssertionsTest {
         val summary = IrohProbeAssertions.summarize(listOf(skipped))
 
         assertTrue(summary.ok)
-        assertEquals(emptyList(), summary.violations)
+        assertEquals(emptyList<String>(), summary.violations)
         assertTrue(summary.turns.single().skipped)
         assertEquals(listOf("restart-send skipped: --wrapper-restart-cmd not provided"), summary.turns.single().notes)
     }

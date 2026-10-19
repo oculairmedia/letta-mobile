@@ -10,8 +10,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
- *
- *
  * The agent-visible Iroh agent-to-agent messaging tool, distinct from
  * letta-code's `matrix_agent_message`:
  *
@@ -40,16 +38,11 @@ import kotlinx.serialization.json.put
  * `multiLineBodyRoundTripsViaStdin` exercises the full stdin path with a
  * body containing newlines, quotes, ampersands, and a URL.
  *
- * ## Why this lives in sharedLogic and not:cli
- * The existing `AgentMessageSendCommand` in `:cli` is an Android library
- * module — no installable distribution. The wrapper distribution
- * `:iroh-wrapper-cli` IS installable but doesn't yet carry the
- * `agent-message send` subcommand. The cleanest path is: keep the
- * `AgentMessageSendCommand` unchanged (the bead says "do not modify the
- * CLI"), invoke the SAME CLI from a controller-owned tool wrapper, and let
- * the controller's binary-path config point at whatever `meridian` binary
- * the operator has deployed. This keeps the wire path
- * (`a2a.create_and_deliver`) identical to the operator flow.
+ * ## Host integration
+ * Shared controller code validates arguments and dispatches through [IrohCliRunner].
+ * The host supplies the deployed `meridian` binary path and the runner's platform
+ * implementation. Message bodies travel through stdin, preserving the same
+ * `a2a.create_and_deliver` wire path as an operator invocation of the CLI.
  *
  * ## Code health
  * The validation chain and the runner dispatch are extracted into private

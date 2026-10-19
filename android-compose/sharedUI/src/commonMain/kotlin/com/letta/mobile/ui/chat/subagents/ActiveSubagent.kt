@@ -266,7 +266,7 @@ data class ActiveSubagent(
          * ([lastUpdateAt]) before its ring flips to the YELLOW "stuck" state.
          *  (RC4): progress is now a new tool call, and a
          * model routinely thinks for well over a minute between tool calls,
-         * so the old 35s (dvobc, todo-change semantics) flagged healthy work.
+         * so the old 35s (todo-change semantics) flagged healthy work.
          * Five minutes is the stuck-suspected soft threshold.
          */
         const val STUCK_THRESHOLD_MS: Long = 5 * 60_000L
