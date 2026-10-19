@@ -17,7 +17,7 @@ on:
   pull_request:
     # Required contexts (test / build-apk-pass / shared-multiplatform) must report
     # on stacked letta/**, feat/**, cursor/** and codex/** PRs as well as main.
-    # pull_request.branches filters the PR *base*, not the head â€” Cloud Agent
+    # pull_request.branches filters the PR *base*, not the head — Cloud Agent
     # reviews targeting feat/* or cursor/* otherwise never get Android APK CI.
     # Do not infer those results from the base branch.
     branches:
@@ -212,7 +212,7 @@ jobs:
 
       # Additive module tests: when a PR only (or also) touches feature/designsystem/
       # desktop/cli trees, run those unit tests in addition to the base set.
-      # Never used to skip :sharedLogic:allTests â€” that stays in shared-multiplatform.
+      # Never used to skip :sharedLogic:allTests — that stays in shared-multiplatform.
       # Diff against the GitHub PR base, not origin/main. Stacked PRs otherwise
       # re-run every additive module from lower layers (e.g. designsystem on a
       # conversations-only PR) and let unrelated flakes fail required `test`.
@@ -974,7 +974,7 @@ jobs:
 
   # Stable status check for branch protection that the iroh-wrapper artifact
   # was built and uploaded. Required so the merge-train can't land a PR whose
-  # wrapper was never produced â€” otherwise we'd rediscover the protocol-
+  # wrapper was never produced — otherwise we'd rediscover the protocol-
   # mismatch at device runtime instead of at merge time.
   build-iroh-wrapper-pass:
     runs-on: ubuntu-latest
