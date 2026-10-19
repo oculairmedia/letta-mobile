@@ -15,7 +15,7 @@ class AppServerServeSpecException(message: String) : IllegalArgumentException(me
  * Declarative description of a host `letta app-server` invocation. Shared by the
  * `:cli` (`meridian app-server-serve`) and `:appserver-cli`
  * (`meridian-app-server app-server-serve`) entry points so the arg-building and
- * validation logic lives in exactly one place (audit P1.6 / gn7kr.12).
+ * validation logic lives in exactly one place.
  */
 data class AppServerServeSpec(
     val listen: String = DEFAULT_APP_SERVER_LISTEN,

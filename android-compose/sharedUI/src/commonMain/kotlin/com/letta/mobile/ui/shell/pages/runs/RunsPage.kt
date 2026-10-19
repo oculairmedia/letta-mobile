@@ -78,7 +78,7 @@ data class RunsPageActions(
 )
 
 /**
- * The page's actions over the shared [RunMonitorController] (letta-mobile-ckmub.2.6): every host binds
+ * The page's actions over the shared [RunMonitorController]: every host binds
  * the monitor the same way and only says where a run's conversation opens.
  */
 fun RunMonitorController.runsPageActions(
@@ -96,7 +96,7 @@ fun RunMonitorController.runsPageActions(
 )
 
 /**
- * letta-mobile-ckmub.2.5 (hard cut S17): the run monitor shared by every host. A search and the
+ *  (hard cut S17): the run monitor shared by every host. A search and the
  * All / Active filter over one [RosterList] of runs (pulled down on touch to reload, a refresh
  * button on a pointer); a run opens its detail in an inspector. [modifier] carries the host frame's
  * insets; [slots] are the host's search field and refresh control.

@@ -7,7 +7,7 @@ import com.letta.mobile.data.timeline.TimelineMessageType
 
 /**
  * A confirmed event that renders as its own structured row rather than a message: a compaction
- * divider (letta-mobile-kr39h) or a subagent's report carried in a user/assistant message.
+ * divider or a subagent's report carried in a user/assistant message.
  */
 internal fun confirmedStructuredRow(ev: TimelineEvent.Confirmed): UiMessage? = when (ev.messageType) {
     TimelineMessageType.COMPACTION -> compactionUiMessage(ev)
@@ -29,7 +29,7 @@ private fun subagentNotificationUiMessage(ev: TimelineEvent.Confirmed, notificat
         subagentNotification = notification,
     )
 
-/** letta-mobile-kr39h: a compaction summary row; a blank summary still marks where it happened. */
+/** A compaction summary row; a blank summary still marks where it happened. */
 private fun compactionUiMessage(ev: TimelineEvent.Confirmed): UiMessage = UiMessage(
     id = ev.serverId,
     role = "system",

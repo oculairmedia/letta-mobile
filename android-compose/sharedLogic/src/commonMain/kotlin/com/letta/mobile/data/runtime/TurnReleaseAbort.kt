@@ -7,7 +7,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * letta-mobile-qygvv.3: a cancellation that ends a turn lease WITHOUT the server turn needing an
+ * A cancellation that ends a turn lease WITHOUT the server turn needing an
  * `abort_message`, because the server turn is already over, unreachable, or owned elsewhere.
  *
  * Any other cancellation of a lease that saw no server terminal (a user cancel, a host scope
@@ -54,7 +54,7 @@ internal data class LeaseReleaseFacts(
 )
 
 /**
- * letta-mobile-qygvv.3: never leave a server turn running with nobody observing it.
+ * Never leave a server turn running with nobody observing it.
  *
  * When a lease ends without a server terminal (idle watchdog, stream error, or a cancellation
  * that is not a handover), the server may still be running the turn. Its approvals then block
@@ -77,7 +77,7 @@ internal class OrphanedTurnAborter(
     }
 
     /**
-     * Review of PR #1661: `abort_message` without a run id aborts WHATEVER run is active on the
+     * `abort_message` without a run id aborts WHATEVER run is active on the
      * runtime, which may be another viewer's turn, and it also pauses the server queue.
      *
      *  - A lease still [TurnLeasePhase.Queued] has no run of its own: the active run belongs to

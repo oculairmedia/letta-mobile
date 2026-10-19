@@ -138,7 +138,7 @@ class ChatTimelineProjector {
      * `isPending=true` message is currently in `live`. Without this flag the
      * projection collapses to the same boolean as
      * [TimelineProjection.anyLettaServerLocalPending] and the Thinking chip
-     * drops mid-turn between tools. See bead letta-mobile-dir4k.1.
+     * drops mid-turn between tools.
      */
     fun project(
         timeline: Timeline,
@@ -272,7 +272,7 @@ class ChatTimelineProjector {
     }
 
     /**
-     * g87l6 scope guard: full-path no-change suppression exists for
+     * Scope guard: full-path no-change suppression exists for
      * high-frequency streaming churn whose rendered output is identical to the
      * previous snapshot. Empty timelines (open/close heartbeats) are rare,
      * carry lifecycle meaning (loading-clear), and stay contractual FULL
@@ -654,7 +654,7 @@ data class TimelineProjection(
     val tailIsAssistant: Boolean,
     val anyLettaServerLocalPending: Boolean,
     /**
-     * letta-mobile-dir4k: true iff any run in the projection still has an
+     * True iff any run in the projection still has an
      * active `projectRunActivity` (i.e. an unresolved run). Computed by
      * grouping the just-projected `live` messages by `runId` and asking the
      * projection layer (`RunActivityProjection.projectRunActivity`) whether
@@ -674,7 +674,7 @@ data class TimelineProjection(
     val fastPath: Boolean,
     val messageListChange: ChatMessageListChange,
     /**
-     * letta-mobile-yflpp: true when this projection is byte-identical to the
+     * True when this projection is byte-identical to the
      * previously applied one (a no-op streaming tick). The collector skips the
      * uiState write and emits suppressed telemetry instead of a full
      * uiProjection.snapshot.
@@ -685,7 +685,7 @@ data class TimelineProjection(
 /** This list with [tail] appended, or in place of its last entry. */
 private fun <T> List<T>.withTail(tail: T, append: Boolean): List<T> = if (append) this + tail else dropLast(1) + tail
 
-/** What a projection reads besides the timeline: whose chat it is, and the compose receipts (letta-mobile-bglj6.13). */
+/** What a projection reads besides the timeline: whose chat it is, and the compose receipts. */
 private class ProjectionScope(val ownAgentId: String?, val receipts: Map<String, List<CanvasArtifactReceipt>>)
 
 private data class CachedTimelineProjectionSnapshot(
@@ -710,7 +710,7 @@ private data class CachedTimelineProjectionSnapshot(
     // per streaming tick.
     val pendingCount: Int = 0,
     val confirmedCount: Int = 0,
-    /** letta-mobile-bglj6.13: the receipts applied to [liveMessages], to tell when they move. */
+    /** The receipts applied to [liveMessages], to tell when they move. */
     val receipts: Map<String, List<CanvasArtifactReceipt>> = emptyMap(),
 )
 
@@ -730,7 +730,7 @@ private data class CachedTimelineProjectionEvent(
     val isConfirmedVisible: Boolean,
 ) {
     /**
-     * letta-mobile-yflpp: true when this record renders identically to [other] —
+     * True when this record renders identically to [other] —
      * same projected UiMessage, same extracted a2ui messages, and same
      * projection-relevant flags. Deliberately ignores the raw [TimelineEvent]
      * (and thus non-rendered fields like seqId/liveCursor) so a streaming tick

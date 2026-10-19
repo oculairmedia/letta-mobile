@@ -3,7 +3,7 @@ package com.letta.mobile.data.runtime
 import kotlinx.atomicfu.atomic
 
 /**
- * letta-mobile-by4vm.7: how a turn's frame collection ended, returned by the collector instead of
+ * How a turn's frame collection ended, returned by the collector instead of
  * thrown out of it.
  *
  * It replaces the `TurnCompleted` / `TurnIdleTimedOut` singleton Throwables. Those crossed coroutine

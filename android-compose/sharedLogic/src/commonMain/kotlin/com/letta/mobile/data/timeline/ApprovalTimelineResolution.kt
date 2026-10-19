@@ -42,7 +42,7 @@ internal fun TimelineEvent.Confirmed.hasExplicitApprovalResponse(evidence: Appro
 }
 
 /**
- * letta-mobile-c49of: the explicit decision carried by this response echo,
+ * The explicit decision carried by this response echo,
  * or null when it resolves nothing (approve=null auto-approval echo). When
  * both the top-level flag and per-call results are present, REJECTED wins —
  * a mixed echo must never render as "Approved".
@@ -128,7 +128,7 @@ internal fun TimelineEvent.Confirmed.willCompleteWith(returnedCallIds: Set<Strin
     }
 
 /**
- * letta-mobile-hga00: deliberately NOT gated on [hasExplicitDecision] — the
+ * Deliberately NOT gated on [hasExplicitDecision] — the
  * Letta server sends an `approve=null` response echo for auto-approved
  * (bypassPermissions) tool calls (see [hasAnyApprovalResponse]), and that
  * echo is the ONLY signal the LIVE stream reducer ([matchingApprovalEvent],

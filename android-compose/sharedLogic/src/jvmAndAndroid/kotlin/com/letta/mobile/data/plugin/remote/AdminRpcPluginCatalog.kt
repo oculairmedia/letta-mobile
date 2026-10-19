@@ -25,7 +25,7 @@ import kotlinx.serialization.json.put
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * letta-mobile-cdgpr.7: the Plugins page's [PluginCatalog] over the host's `plugins.*` admin RPCs.
+ * The Plugins page's [PluginCatalog] over the host's `plugins.*` admin RPCs.
  * Every management call answers with the host's registry, which becomes [plugins]. Installing
  * uploads the package to the host's asset store ([uploader]) and asks the host to install it from
  * there, pinned by the sha256 the page showed; the host's answer is what the manifest asks for.

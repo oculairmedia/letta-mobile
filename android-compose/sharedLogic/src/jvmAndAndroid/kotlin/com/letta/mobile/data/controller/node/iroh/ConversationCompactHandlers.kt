@@ -20,7 +20,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 
-/** letta-mobile-57cta: one `conversation.compact` request, validated. */
+/** One `conversation.compact` request, validated. */
 internal data class CompactRequest(val agentId: String, val conversationId: String, val mode: CompactionMode?) {
     val query: AgentContextQuery get() = AgentContextQuery(agentId, conversationId)
 
@@ -37,7 +37,7 @@ internal data class CompactRequest(val agentId: String, val conversationId: Stri
 }
 
 /**
- * letta-mobile-57cta: relays a manual compaction from an Iroh client to this node's App Server.
+ * Relays a manual compaction from an Iroh client to this node's App Server.
  *
  * `execute_command compact` first — letta-code's `/compact`, which runs the pre-compact hooks and
  * the compaction-event reflection a compaction run from any other client gets — then

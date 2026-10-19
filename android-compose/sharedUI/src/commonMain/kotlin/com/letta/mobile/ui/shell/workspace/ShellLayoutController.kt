@@ -12,8 +12,8 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.storage.SecureSettingsStore
 
 /**
- * The shell's sidebar layout as Compose state (letta-mobile-o5m90, moved from :desktop by
- * letta-mobile-ckmub.17.4): the shared [ShellLayoutReducer]'s rules over the shared [ShellLayoutStore],
+ * The shell's sidebar layout as Compose state (moved from:desktop by
+ *): the shared [ShellLayoutReducer]'s rules over the shared [ShellLayoutStore],
  * so the desktop window and the browser keep the same sidebar the same way.
  */
 class ShellLayoutController(private val store: ShellLayoutStore) {

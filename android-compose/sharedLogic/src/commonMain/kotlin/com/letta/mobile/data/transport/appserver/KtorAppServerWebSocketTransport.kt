@@ -24,7 +24,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Ktor-backed App Server transport (letta-mobile-lgns8.21.1: one bidirectional
+ * Ktor-backed App Server transport (one bidirectional
  * WebSocket session with truthful readiness).
  *
  * Letta Code ≥ 0.29.7 rejects legacy `?channel=control|stream` upgrades with
@@ -38,7 +38,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * - Inbound frames are decoded once and delivered by [AppServerInboundDelivery]:
  *   [inboundFrames] carries every frame in socket arrival order (the router reads
  *   this), while [controlFrames] / [streamFrames] are per-type views of the same
- *   sequence for request correlation and stream observers (letta-mobile-by4vm.5).
+ *   sequence for request correlation and stream observers.
  *
  * `bearerToken` is intentionally optional: loopback App Server runs omit WS auth,
  * while non-loopback/headless hosts should launch `letta app-server` / `letta
@@ -225,7 +225,7 @@ internal fun Throwable.isTerminalHandshakeFailure(): Boolean {
 }
 
 /**
- * letta-mobile-by4vm.117: the HTTP client cannot run this socket at all, e.g. Ktor's OkHttp engine
+ * The HTTP client cannot run this socket at all, e.g. Ktor's OkHttp engine
  * rejecting the App Server frame ceiling ("Max frame size switch is not supported in OkHttp
  * engine") or an engine without WebSocket support. Retrying the same client never helps.
  */

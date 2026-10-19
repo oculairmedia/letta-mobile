@@ -75,7 +75,7 @@ internal fun TurnCommand.draftFor(
 )
 
 /**
- * letta-mobile-oqfbj: extract tool_call_id from a RemoteStreamFrame body.
+ * Extract tool_call_id from a RemoteStreamFrame body.
  * Handles tool_call_message, approval_request_message, and tool_return_message frames.
  */
 internal fun extractToolCallId(body: String): String? = runCatching {

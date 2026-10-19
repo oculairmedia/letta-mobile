@@ -4,7 +4,7 @@ import java.security.MessageDigest
 
 /**
  * Hardened bootstrap bearer verification for Iroh connections
- * (letta-mobile-d6e8g.3): constant-time token comparison, per-NodeId failure
+ * constant-time token comparison, per-NodeId failure
  * rate limiting with a lockout window, and outcomes that never carry the
  * provided or expected secret.
  *
@@ -69,7 +69,7 @@ class IrohBearerAuthVerifier(
 
     /**
      * Count a failed credential attempt that did not go through [verify] — an
-     * invalid/expired invite redemption (dpv7m.1) — against the same per-NodeId
+     * invalid/expired invite redemption — against the same per-NodeId
      * budget, so invite guessing is rate limited exactly like bearer guessing.
      */
     fun deny(remoteEndpointId: String, reason: String): Outcome {

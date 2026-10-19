@@ -21,7 +21,7 @@ fun chatModelOptions(availableModels: List<LlmModel>): List<Pair<String, String>
     }
 
 /**
- * letta-mobile-by4vm.85: the reasoning efforts the composer offers. [byValue] holds each option's
+ * The reasoning efforts the composer offers. [byValue] holds each option's
  * efforts by selection value (empty where the backend cannot send an effort, so no effort chip
  * shows); [current] is the selected conversation's effort, this session's pick else the host's.
  */
@@ -41,7 +41,7 @@ data class ChatModelEffortInputs(
     val supported: Boolean,
 )
 
-/** letta-mobile-by4vm.85: each option's efforts (by selection value) and the conversation's effort. */
+/** Each option's efforts (by selection value) and the conversation's effort. */
 fun chatModelEfforts(inputs: ChatModelEffortInputs): ChatModelEfforts {
     if (!inputs.supported) return ChatModelEfforts()
     val byValue = inputs.models.mapNotNull { model ->

@@ -70,7 +70,7 @@ internal data class CopyAction(
 )
 
 /**
- * letta-mobile-bglj6.1: lifted from desktop's CopyIconButton. Click copies to the clipboard
+ * Lifted from desktop's CopyIconButton. Click copies to the clipboard
  * and the glyph flips to a success check for a moment. Once the button itself is hovered,
  * focused or mid-"copied" it stays visible regardless of [CopyAction.visible].
  */

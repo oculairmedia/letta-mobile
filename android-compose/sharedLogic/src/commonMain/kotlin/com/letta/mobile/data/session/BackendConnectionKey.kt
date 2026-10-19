@@ -6,7 +6,7 @@ import com.letta.mobile.data.model.LettaConfig
  * Stable key for "did the backend connection change?" session rebuilds.
  *
  * Includes local-model fields so selecting an embedded model on the same
- * config id still triggers a rebuild (letta-mobile-mlyhq).
+ * config id still triggers a rebuild.
  */
 data class BackendConnectionKey(
     val mode: LettaConfig.Mode,

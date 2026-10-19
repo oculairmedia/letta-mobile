@@ -15,7 +15,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 
 /**
- * What `canvas_get_layout` answers (letta-mobile-i9yps.3): one row per thing on the board, geometry
+ * What `canvas_get_layout` answers: one row per thing on the board, geometry
  * and identity only, so a large board fits in an agent's context. The same answer on the Iroh host
  * and on an app's own runtime.
  *

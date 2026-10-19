@@ -6,10 +6,10 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 
 class IrohProbeAssertionsTest {
     @Test
@@ -27,7 +27,7 @@ class IrohProbeAssertionsTest {
         val summary = IrohProbeAssertions.summarize(listOf(metrics))
 
         assertTrue(summary.ok)
-        assertEquals(emptyList(), summary.violations)
+        assertEquals(emptyList<String>(), summary.violations)
         assertEquals(2, metrics.assistantDeltaCount)
         assertEquals(listOf("assistant-1"), metrics.assistantMessageIds)
         assertEquals(1, metrics.reasoningRowEstimate)
@@ -133,7 +133,7 @@ class IrohProbeAssertionsTest {
         val summary = IrohProbeAssertions.summarize(listOf(skipped))
 
         assertTrue(summary.ok)
-        assertEquals(emptyList(), summary.violations)
+        assertEquals(emptyList<String>(), summary.violations)
         assertTrue(summary.turns.single().skipped)
         assertEquals(listOf("restart-send skipped: --wrapper-restart-cmd not provided"), summary.turns.single().notes)
     }
@@ -443,7 +443,7 @@ class IrohProbeAssertionsTest {
     @Test
     fun `hydrate heavy classifier checks completeness and budget`() {
         assertEquals(
-            emptyList(),
+            emptyList<String>(),
             IrohProbeAssertions.classifyHydrateHeavy(seededCount = 24, listedCount = 24, wallMs = 900, budgetMs = 10_000),
         )
         assertEquals(

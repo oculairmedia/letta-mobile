@@ -10,8 +10,8 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
 /**
- * letta-mobile-gw0h1: the QR issuance seam for the `pair.invite.create` extension
- * defined by `reference/qr-pairing-protocol.md` (doctrine 11, gate bead 7b9on).
+ * The QR issuance seam for the `pair.invite.create` extension
+ * defined by `reference/qr-pairing-protocol.md`.
  *
  * The wire format is `letta-qr-v1.<base64url-json>` whose body is
  * `{ version, node_id, signed_secret, expires_at_ms, signature }`. The signature
@@ -22,12 +22,12 @@ import javax.crypto.spec.SecretKeySpec
  *
  * `PairQrSigner` is the seam between the pairing handler and the minting
  * identity. The default implementation is a DETERMINISTIC HMAC-SHA256 keyed
- * by `IrohSecretKeyStore.loadOrCreate()` (the same 32-byte SecRandom key that
+ * by `IrohSecretKeyStore.loadOrCreate` (the same 32-byte SecRandom key that
  * backs the endpoint). v1 acceptance criteria treat this as a private signing
  * surface: the QR is only useful to a phone/desktop that already knows the
  * minting identity through the QR itself (`node_id` is the public-key
  * reference), so the real Ed25519 verification is a follow-on bead
- * (letta-mobile-nonza / letta-mobile-g2d2i). The wire format is identical
+ *. The wire format is identical
  * either way: a base64url-encoded signature blob over the canonical message.
  *
  * seealso: `reference/qr-pairing-protocol.md` §5, §7, §10.
@@ -118,7 +118,7 @@ class HmacPairQrSigner(private val secretKeyStore: IrohSecretKeyStore) : PairQrS
 }
 
 /**
- * letta-mobile-gw0h1: encode the versioned QR payload per protocol §5.1 +
+ * Encode the versioned QR payload per protocol §5.1 +
  * §7.1. Pure function — exposed to the CLI renderer and to the tests.
  *
  * `version` is hard-coded to `1`; bumping it is a protocol version bump and
@@ -187,7 +187,7 @@ object PairQrEnvelope {
      * structural violation (missing prefix, bad base64url, non-JSON body,
      * wrong version, missing required fields).
      *
-     * Exposed for symmetry: the cross-platform scanner (letta-mobile-g2d2i)
+     * Exposed for symmetry: the cross-platform scanner
      * will reuse this decoder. Tests for both, in `jvmTest`.
      */
     fun decode(encoded: String): Decoded? {
@@ -232,7 +232,7 @@ object PairQrEnvelope {
 }
 
 /**
- * letta-mobile-gw0h1: tiny fingerprint helper for operators / log lines that
+ * Tiny fingerprint helper for operators / log lines that
  * want to confirm a QR payload matches a known node id without decoding the
  * full envelope. NOT a substitute for the protocol's signature verification.
  */

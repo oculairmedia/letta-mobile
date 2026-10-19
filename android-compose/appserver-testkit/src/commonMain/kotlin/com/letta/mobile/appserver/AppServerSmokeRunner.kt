@@ -28,9 +28,9 @@ import kotlinx.coroutines.withTimeout
  * reach ([url]/[token]), the target ([agentId]/[conversationId]), the [message]
  * text, and the [timeoutMs] budget. These cohesive request parameters travel as
  * one value so the runner and its two CLI call sites thread an identical turn
- * shape (audit P1.6 / gn7kr.12 — CodeScene #1012 arg-count cleanup).
+ * shape (audit P1.6 / gn7kr.12 —  arg-count cleanup).
  * [images] ride along as the content array the app sends for a photo, so a smoke
- * can prove the runtime's image preparation (letta-mobile-by4vm.121.12).
+ * can prove the runtime's image preparation.
  */
 data class AppServerSmokeSpec(
     val url: String,
@@ -122,7 +122,7 @@ suspend fun runAppServerSmokeTurn(
 }
 
 /**
- * letta-mobile-8xxzv: E2E probe for the KEYED turn lease.
+ * E2E probe for the KEYED turn lease.
  *
  * Drives TWO turns through ONE [AppServerTurnEngine] on ONE `/ws` connection,
  * on two different `{agent_id, conversation_id}` runtimes, CONCURRENTLY. Before

@@ -285,7 +285,7 @@ fun partitionStreamingMarkdown(text: String): StreamingMarkdownPartition {
  *    a. A paragraph break (`\n\n`), or
  *    b. A GFM table that has just structurally ended (the line after
  *       the last `|`-bearing row contains no pipes — see
- *       [letta-mobile-c8of.6]).
+ *       []).
  * 2. The number of unescaped triple-backtick fences in `text[0..pos]`
  *    is even (no unclosed code fence — an unclosed fence would absorb
  *    subsequent content into a code block on the next chunk).
@@ -728,7 +728,7 @@ fun splitMarkdownBlocks(prefix: String): List<MarkdownBlock> {
 }
 
 /**
- * letta-mobile-flk.3: returns true if [tail] contains an UNCLOSED
+ * Returns true if [tail] contains an UNCLOSED
  * triple-backtick or `$$` block fence.
  *
  * The streaming tail (everything past the last safe paragraph boundary)

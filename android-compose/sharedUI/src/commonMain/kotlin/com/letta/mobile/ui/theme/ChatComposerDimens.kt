@@ -5,7 +5,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * letta-mobile-bglj6.1: the few sizes the shared chat composer needs that are not on the
+ * The few sizes the shared chat composer needs that are not on the
  * [LettaDimens] scale. Each is a layout fact of the composer (a breakpoint, a popover width,
  * a gesture threshold), not a spacing choice; spacing still comes from [LettaDimens.Space].
  */
@@ -58,7 +58,7 @@ object ChatComposerDimens {
 }
 
 /**
- * letta-mobile-bglj6.1.9: the Touch composer bar, lifted from the legacy Android composer
+ * The Touch composer bar, lifted from the legacy Android composer
  * (feature-chat ChatComposer + designsystem LettaInputBar) so the shared page draws the same bar.
  */
 object TouchComposerDimens {

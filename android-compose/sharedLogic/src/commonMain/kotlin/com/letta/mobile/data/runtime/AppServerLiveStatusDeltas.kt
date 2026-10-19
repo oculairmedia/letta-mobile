@@ -11,16 +11,16 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 
 /**
- * letta-mobile-bzvro.7 / .8 / .10: the typed reading of the `stream_delta` message types that
+ * Typed reading of the `stream_delta` message types that
  * describe the run rather than carry its content: `retry`, `status`, the command lifecycle pairs
  * and 0.33's `approval_classification_end`.
  *
  * Shapes follow letta-code `loop-status-protocol.ts`, `protocol_v2.ts` and
  * `approval-classification-protocol.ts` (0.29.12 through 0.33.6). The compaction pair
  * (`event_message` with `event_type: "compaction"`, then `summary_message`) follows the local
- * backend's `emitCompactionChunks` (letta-mobile-kr39h). Every read is fail-soft: a
+ * backend's `emitCompactionChunks`. Every read is fail-soft: a
  * missing or mistyped field degrades to its default and never throws, because this runs inside the
- * turn collect loop (see the mapper's FAIL-SOFT note, letta-mobile-fkpd4).
+ * turn collect loop (see the mapper's FAIL-SOFT note).
  */
 internal object AppServerLiveStatusDeltas {
     /** The typed payload for a run-describing [messageType]; null for every other type. */

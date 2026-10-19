@@ -16,7 +16,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
-/** letta-mobile-joigh: one `conversation.context_limit` request, validated. */
+/** One `conversation.context_limit` request, validated. */
 internal data class ContextLimitParams(val agentId: String, val conversationId: String, val tokens: Int) {
     companion object {
         fun from(params: JsonObject?): ContextLimitParams {
@@ -31,7 +31,7 @@ internal data class ContextLimitParams(val agentId: String, val conversationId: 
 }
 
 /**
- * letta-mobile-joigh: relays a context-limit change from an Iroh client to this node's App Server
+ * Relays a context-limit change from an Iroh client to this node's App Server
  * as letta-code's own `/context-limit <tokens>` (`execute_command context-limit`): letta-code
  * validates the value (its 30,000-token floor, the model's catalog window) and chooses the scope —
  * the agent on its `default` conversation, else that conversation's own limit — exactly as its

@@ -295,7 +295,7 @@ open class CachedAgentRepository(
 
     /**
      * Fetch a single agent from the active backend. Routes over the Iroh admin
-     * RPC control channel when the backend is iroh:// (letta-mobile-71orq),
+     * RPC control channel when the backend is iroh://,
      * falling back to the raw HTTP AgentApi otherwise.
      */
     private suspend fun fetchAgentRemote(id: AgentId): Agent =

@@ -34,7 +34,7 @@ fun interface InviteAuthenticator {
 }
 
 /**
- * Presents a scanned invite to its host over Iroh (letta-mobile-dpv7m.2).
+ * Presents a scanned invite to its host over Iroh.
  *
  * The device dials with its PERSISTENT identity ([secretKeyStore] — the same
  * key the chat session uses), so the NodeId the host binds is the one that

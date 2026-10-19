@@ -135,7 +135,7 @@ internal class IrohObserverIngestor(
      * messages, so they decode as [AppServerInboundFrame.Unknown]) are republished as
      * [ServerFrame.AgentUpdated] / [ServerFrame.ConversationUpdated], the frames the agent and
      * conversation repositories react to. The host registry's `subagents_updated`
-     * (letta-mobile-fxoew.2) takes the same path to `SubagentRepository`.
+     *  takes the same path to `SubagentRepository`.
      * Returns true when [received] was one of them.
      */
     private suspend fun republishDevicePush(received: AppServerReceivedFrame): Boolean {
@@ -187,7 +187,7 @@ internal class IrohObserverIngestor(
     }
 
     /**
-     * letta-mobile-p0gc (causal slice C): the ONLY thing the observer does with
+     *  (causal slice C): the ONLY thing the observer does with
      * an engine-owned delta is look for the local turn's [ServerFrame.TurnDone]
      * terminal fallback. Full mapping is therefore worth running ONLY for delta
      * shapes that can ever produce a TurnDone through
@@ -381,7 +381,7 @@ internal class IrohObserverIngestor(
 
     /**
      * Tracks `Agent` dispatches and returns so [sanitizeAgentReturn] can recognise a subagent's
-     * return. The host's `subagents_updated` push (letta-mobile-fxoew.2) is the only registry
+     * return. The host's `subagents_updated` push is the only registry
      * writer; the client correlator emits nothing.
      */
     private fun correlateAgentFrame(streamDelta: AppServerInboundFrame.StreamDelta) {
@@ -499,7 +499,7 @@ internal class IrohObserverIngestor(
         /** Meridian's device-wide conversation change push; see ConversationChangeNotifier on the host. */
         private const val CONVERSATION_UPDATED_TYPE = "conversation_updated"
 
-        /** letta-mobile-fxoew.2: the host registry's push; see SubagentRegistryPublisher on the host. */
+        /** The host registry's push; see SubagentRegistryPublisher on the host. */
         private const val SUBAGENTS_UPDATED_TYPE = "subagents_updated"
 
         private val HOST_PUSH_TYPES = setOf(

@@ -1,7 +1,8 @@
 package com.letta.mobile.ui.canvas
 
 /**
- * Embedded official DrawBox sample diagrams for P0 import and export verification.
+ * Bundled DrawBox diagrams offered by the canvas import menu.
+ * Hosts and render tests reuse these same user-visible examples.
  * Source: akshay2211/DrawBox (samples/DrawBox-build-cycle.json, samples/DrawBox-daily-loop.json)
  */
 object CanvasSamples {

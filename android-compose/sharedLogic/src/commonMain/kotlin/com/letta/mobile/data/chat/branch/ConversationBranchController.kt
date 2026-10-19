@@ -48,7 +48,7 @@ sealed interface BranchState {
 }
 
 /**
- * letta-mobile-7mys7: the one fork / edit-and-resend / rerun controller every surface drives. It
+ * The one fork / edit-and-resend / rerun controller every surface drives. It
  * runs one branch at a time on [scope], records the fork's parent in [lineage], hands the result
  * to [opener], and reports progress and failures through [state] (and [onError], for pages that
  * show errors in their own banner).

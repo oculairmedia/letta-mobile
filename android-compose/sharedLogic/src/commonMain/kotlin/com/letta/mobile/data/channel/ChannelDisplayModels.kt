@@ -41,7 +41,7 @@ enum class ChannelDisplayStatus(val label: String) {
     Connected("Connected"),
     Connecting("Connecting"),
     /**
-     * letta-mobile-wxy4s: the connection dropped and the supervisor is redialing.
+     * The connection dropped and the supervisor is redialing.
      * Distinct from [Disconnected] on purpose — "reconnecting" must read
      * differently from "dead", and BOTH must read differently from "connected".
      * The 2026-07-31 incident was invisible precisely because dead connections

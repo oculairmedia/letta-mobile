@@ -13,7 +13,7 @@ import kotlinx.serialization.json.put
 enum class WorkspaceRelayAccess { MemoryRead, MemoryWrite, Files, Secrets }
 
 /**
- * letta-mobile-bzvro.37: the admin_rpc methods an Iroh host relays to its App Server for the
+ * The admin_rpc methods an Iroh host relays to its App Server for the
  * agent-workspace features (MemFS browser, secrets vault, workspace files). One method per
  * App Server command, and nothing else: the method fixes the command type, so a client cannot
  * smuggle a different command through a method it is allowed to call.
@@ -57,7 +57,7 @@ enum class WorkspaceRelayMethod(
 class WorkspaceRelayException(message: String) : IllegalArgumentException(message)
 
 /**
- * letta-mobile-bzvro.37: the wire contract between an Iroh client and the host relaying its
+ * The wire contract between an Iroh client and the host relaying its
  * agent-workspace commands. Shared by both ends so they cannot drift.
  *
  * - Request: admin_rpc `method` = [WorkspaceRelayMethod.method]; `params` = the App Server

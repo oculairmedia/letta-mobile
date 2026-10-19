@@ -9,7 +9,7 @@ import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
 
 /**
- * letta-mobile-qygvv.11: the ONE exact-event key shared by the transport ingest
+ * The ONE exact-event key shared by the transport ingest
  * seam ([IngestFrameDeduplicator]) and the coordinator safety net
  * (`BridgeEventDeduplicator`). Keeping a single definition is what lets the
  * coordinator's drop counter read zero once ingest has already collapsed the

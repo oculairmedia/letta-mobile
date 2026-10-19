@@ -3,7 +3,7 @@ package com.letta.mobile.data.runtime
 import com.letta.mobile.runtime.RuntimeRunStatus
 
 /**
- * letta-mobile-kyqdt: TELEMETRY-ONLY. The last-seen terminal the engine records on the
+ * TELEMETRY-ONLY. The last-seen terminal the engine records on the
  * active-turn owner and its lease. A null [source], [seq] or [scopeMatched] keeps the value
  * already recorded.
  *

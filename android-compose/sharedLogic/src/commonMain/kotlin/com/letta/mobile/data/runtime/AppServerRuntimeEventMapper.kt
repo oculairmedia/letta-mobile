@@ -22,7 +22,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * letta-mobile-gdvbf: `open` so the injected-mapper seam that
+ * `open` so the injected-mapper seam that
  * [AppServerTurnEngine] already exposes is actually usable — the engine takes
  * a mapper as a constructor parameter for testing, but the type being final
  * made that impossible to exercise.
@@ -119,7 +119,7 @@ open class AppServerRuntimeEventMapper {
         }
 
     /**
-     * letta-mobile-gdvbf: a `stream_delta` whose `delta` is not a JSON object.
+     * A `stream_delta` whose `delta` is not a JSON object.
      *
      * Because this shape is now HANDLED rather than thrown, it would otherwise
      * be invisible — no exception means no `frame.projection_failed` event, so
@@ -221,7 +221,7 @@ open class AppServerRuntimeEventMapper {
     }
 
     /**
-     * letta-mobile-bzvro.7/.8/.10: the typed reading of a run-describing delta (`retry`, `status`,
+     * The typed reading of a run-describing delta (`retry`, `status`,
      * command lifecycle, `approval_classification_end`), emitted ALONGSIDE the raw remote stream
      * frame those deltas always produced, so every existing consumer of that frame (relay fanout,
      * Iroh projection) is unchanged.
@@ -296,7 +296,7 @@ open class AppServerRuntimeEventMapper {
         )
 
     /**
-     * letta-mobile-fkpd4: FAIL-SOFT wire read — see the sibling accessor in
+     * FAIL-SOFT wire read — see the sibling accessor in
      * [com.letta.mobile.data.subagents.SubagentParentProjection]. `.jsonPrimitive`
      * THROWS on a JsonArray/JsonObject, and this mapper runs inside
      * [AppServerTurnEngine]'s turn collect loop over RAW App Server deltas,

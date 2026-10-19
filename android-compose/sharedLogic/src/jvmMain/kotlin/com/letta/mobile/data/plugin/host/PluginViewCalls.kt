@@ -30,7 +30,7 @@ class PluginPageDocument(
 class PluginViewRefusal(message: String) : Exception(message)
 
 /**
- * The host end of a live view (letta-mobile-cdgpr.7): the page a view loads and the actions it
+ * The host end of a live view: the page a view loads and the actions it
  * calls, held to the same rules [com.letta.mobile.data.plugin.view.ViewCallHandler] holds a page to
  * on the client, since a client is not trusted to have checked. Only an enabled plugin serves
  * pages; only an action whose manifest visibility includes `view` runs, with input that holds to

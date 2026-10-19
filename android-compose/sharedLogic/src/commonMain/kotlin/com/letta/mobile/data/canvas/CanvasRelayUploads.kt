@@ -12,7 +12,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 class CanvasRelayUploadException(message: String) : Exception(message)
 
 /**
- * letta-mobile-cdgpr.8: assets put in the host's store outside any canvas (a plugin package before
+ * Assets put in the host's store outside any canvas (a plugin package before
  * `plugins.install`), on [CanvasRelayProtocol.UPLOAD_TOPIC]. Each upload waits for the host's
  * `asset_stored` or `asset_rejected`. One upload per ref at a time, and anyone asking for the same
  * ref waits on the first.

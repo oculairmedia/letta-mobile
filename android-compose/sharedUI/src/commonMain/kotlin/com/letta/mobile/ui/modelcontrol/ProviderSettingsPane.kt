@@ -89,7 +89,7 @@ object ProviderSettingsTags {
 }
 
 /**
- * Providers settings (letta-mobile-w4q4p.6.1), modelled on Hermes' Settings ->
+ * Providers settings, modelled on Hermes' Settings ->
  * Providers: a left navigation (Accounts, API keys, Custom Endpoints, Models)
  * on wide windows, tabs on a phone. Everything comes from one
  * [ProviderManagementState]; the desktop destination and the Android screen

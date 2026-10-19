@@ -46,7 +46,7 @@ class LocalAppServerStartException(
 ) : IllegalStateException(message, cause)
 
 /**
- * A single-launch server's one launch is over in this process (letta-mobile-by4vm.121.11): it
+ * A single-launch server's one launch is over in this process: it
  * exited, or never became ready before its node ended. Only a new app process can run it, so the
  * connection supervisor stops redialling ([TerminalConnectionFailure]). [reason] says what ended it.
  */
@@ -60,7 +60,7 @@ class LocalAppServerStoppedException :
 
 /**
  * The one supervisor of a loopback letta-code App Server, shared by every client that hosts its
- * own (letta-mobile-by4vm.110.4; lifted from the desktop runtime manager and supervisor).
+ * own (lifted from the desktop runtime manager and supervisor).
  *
  * Every launch is `<command> server --backend local --listen ws://127.0.0.1:0 --ws-auth
  * capability-token --ws-token-file <backendDir>/ws-token` with a fresh 32-byte token. The host
@@ -68,16 +68,16 @@ class LocalAppServerStoppedException :
  * [LocalAppServerLease]s carrying the URL and the token. The server stops when the last lease
  * closes.
  *
- * Crash supervision (letta-mobile-bzvro.3): an unexpected exit while a lease is held restarts
+ * Crash supervision: an unexpected exit while a lease is held restarts
  * after the [policy] backoff; giving up waits for [forceRestart]. Our own stops and clean exits
  * never restart. [onSuspended]/[onResumed] keep a laptop sleep from counting as crashes.
  *
- * Single launch (letta-mobile-by4vm.110.5, decision D3): a [LocalAppServerLauncher.singleLaunch]
+ * Single launch (decision D3): a [LocalAppServerLauncher.singleLaunch]
  * launcher can run the server once per OS process (Android runs node in-process, and `node::Start` cannot run
  * twice). The host then keeps the server when the last lease closes, leaves a live one alone on
  * [forceRestart], and never restarts it: any exit gives up with [RESTART_THE_APP], since only a
  * new app process can start it again. The one start runs in [scope] and every acquire waits on it
- * (letta-mobile-by4vm.121.11): a caller that is cancelled or times out never abandons the node, and
+ * a caller that is cancelled or times out never abandons the node, and
  * once the launch is over every acquire fails with [LocalAppServerTerminatedException] without
  * launching again.
  *
@@ -270,7 +270,7 @@ class LocalAppServerHost(
     }
 
     /**
-     * Caller holds [lifecycle]. The one start of a single-launch server (letta-mobile-by4vm.121.11):
+     * Caller holds [lifecycle]. The one start of a single-launch server:
      * launched on first use, shared by every acquire while it starts, refused once it is over. The
      * platform's preparation (asset extraction, bridges) runs in the caller and may be retried; the
      * node itself is started at most once.

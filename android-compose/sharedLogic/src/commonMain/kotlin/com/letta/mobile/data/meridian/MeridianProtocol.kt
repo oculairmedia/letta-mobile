@@ -7,7 +7,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * One call on the Meridian command surface (letta-mobile-jna0o.3), whichever front door it came
+ * One call on the Meridian command surface, whichever front door it came
  * through: the `meridian` shim in an agent's shell (argv, stdin and the caller scope the wrapper
  * bound to the call) or the `meridian` meta-tool (its `command` split into [argv], its `input` as
  * [stdin], and the scope the App Server stamped).

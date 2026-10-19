@@ -5,7 +5,7 @@ import com.letta.mobile.data.repository.modelcontrol.ConnectableProvider
 import com.letta.mobile.ui.providers.icons.ProviderIcons
 
 /**
- * Every name a provider row's logo may be found by, most specific first (letta-mobile-zxk2n.35):
+ * Every name a provider row's logo may be found by, most specific first:
  * the row id, its subscription login, its type and name, then the display name.
  */
 internal fun ConnectableProvider.brandIds(): List<String?> =

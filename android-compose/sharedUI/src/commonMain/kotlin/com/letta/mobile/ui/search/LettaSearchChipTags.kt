@@ -16,7 +16,7 @@ import com.letta.mobile.data.search.MessageSearchCapabilities
 import com.letta.mobile.data.search.MessageSearchSelection
 import com.letta.mobile.ui.theme.LettaDimens
 
-/** Test tags for the shared search's mode and role chips (letta-mobile-k5nbq.5). */
+/** Test tags for the shared search's mode and role chips. */
 object LettaSearchChipTags {
     fun chip(id: String): String = "letta-search-chip-$id"
 }

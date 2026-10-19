@@ -6,14 +6,14 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * lgns8.9: run/step history is served from the on-disk local backend store
+ * Run/step history is served from the on-disk local backend store
  * ([LocalBackendRunReader]), not from a REST admin service.
  *
  * admin-shim implemented these routes by reading `<backend>/runs/<id>/run.json`
  * and `steps.jsonl` itself (`lib/runs.ts`), so the store — not the shim — was
  * always the source of truth. With the store injected the wrapper serves them
  * directly; with no store configured they fail closed with a typed capability
- * error and never dial :8291.
+ * error and never dial:8291.
  */
 object RunAdminHandlers {
     internal fun register(router: AdminRpcRouter, store: LocalBackendAdminStore?) {

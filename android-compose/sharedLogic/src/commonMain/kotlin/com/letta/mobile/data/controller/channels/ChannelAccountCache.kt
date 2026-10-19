@@ -4,7 +4,7 @@ import kotlinx.atomicfu.atomic
 
 /**
  * Last-known enabled channel accounts, carried ACROSS App Server generations
- * (letta-mobile-o5bqk).
+ *.
  *
  * [ChannelRestoreCoordinator] is constructed per generation because it binds to
  * that generation's client, so it cannot remember anything itself. This cache is
@@ -18,7 +18,7 @@ import kotlinx.atomicfu.atomic
  * channel event is received, posts a typing indicator, resolves its route and is
  * ENQUEUED — but `scheduleQueuePump` bails on the dead captured socket, so the
  * turn never runs and the room shows a typing indicator followed by silence
- * (measured 2026-08-01, letta-mobile-lgns8.23.1 probe #4). Shortening the window
+ * (measured 2026-08-01,  probe #4). Shortening the window
  * to a single round trip is the client-side half of the mitigation.
  *
  * Contents are identifiers only. **Never** put an [AppServerChannelAccount] or

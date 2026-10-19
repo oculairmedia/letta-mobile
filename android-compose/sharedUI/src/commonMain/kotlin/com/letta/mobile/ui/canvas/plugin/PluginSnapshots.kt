@@ -24,7 +24,7 @@ class PluginSnapshotSources(
 )
 
 /**
- * Hydrates snapshots the way board images are (letta-mobile-w3nb2): read from the asset store off
+ * Hydrates snapshots the way board images are: read from the asset store off
  * the main thread, else fetched; until the bytes are anywhere, asked again on a backoff, so a
  * snapshot that lands in the store later (a relay catch-up, a peer's upload) replaces the skeleton.
  */

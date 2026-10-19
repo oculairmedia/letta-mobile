@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 import kotlin.time.TimeSource
 
 /**
- * letta-mobile-bglj6.1: the paged list's follow mode. Only the READER's scrolling detaches it: the
+ * The paged list's follow mode. Only the READER's scrolling detaches it: the
  * list's own scrolls (the send's glide to the new prompt, the stream's snap-back, the
  * scroll-to-latest glide) run through [ownScroll] and are never mistaken for the reader leaving
  * the newest edge. Before this, the send's own glide detached the follow it had just re-armed: the
@@ -96,7 +96,7 @@ private fun FollowTheNewestEdge(listState: LazyListState, follow: PagedFollow, n
 }
 
 /**
- * letta-mobile-bglj6.1.18: a new user prompt at the head is the user's own send, so the viewport
+ * A new user prompt at the head is the user's own send, so the viewport
  * follows it — the port of LegacyTimelineList's force-follow (the legacy Android chat's
  * shouldForceScrollOnUserSend): re-arm the follow and bring the reader to the newest edge, wherever
  * they were scrolled; a glide, or a jump under reduced motion. The very first composition only

@@ -3,7 +3,7 @@ package com.letta.mobile.data.chat.branch
 import com.letta.mobile.data.model.Conversation
 
 /**
- * letta-mobile-bzvro.15 (F15): what a fork asks the backend for.
+ *  (F15): what a fork asks the backend for.
  *
  * [throughMessageId] is inclusive: the fork keeps every message up to and including it. Null
  * forks the whole conversation. [agentId] names the agent the fork belongs to; backends use it

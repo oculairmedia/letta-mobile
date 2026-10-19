@@ -31,7 +31,7 @@ object CanvasPluginElementSchema {
     val REF = CanvasPluginLimit("/ref", 512)
     val PROPS = CanvasPluginLimit("/props", 4 * 1024)
 
-    /** The most items an array in props may hold; arrays hold scalars only (letta-mobile-cdgpr.12). */
+    /** The most items an array in props may hold; arrays hold scalars only. */
     const val MAX_PROPS_ARRAY_ITEMS: Int = 256
     val META = CanvasPluginLimit("/meta", 1024)
     val TITLE = CanvasPluginLimit("/fallback/title", 120)

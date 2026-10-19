@@ -40,7 +40,7 @@ data class ShellHomePrompt(
 )
 
 /**
- * letta-mobile-ckmub.17.3 (W3): the shell's navigation verbs. Every surface (rail, sidebar, palette,
+ *  (W3): the shell's navigation verbs. Every surface (rail, sidebar, palette,
  * tabs, Home, deep links) on every client opens conversations and agents through here, so "leave the
  * editor, select, show the chat" stays one rule over one [state].
  */

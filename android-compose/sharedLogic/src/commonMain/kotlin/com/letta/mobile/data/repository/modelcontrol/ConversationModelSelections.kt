@@ -4,7 +4,7 @@ import com.letta.mobile.data.model.Conversation
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * letta-mobile-okvyf / letta-mobile-dxz5s: each conversation's model.
+ * Each conversation's model.
  *
  * A per-conversation switch (`model.update` / `update_model` with a conversation id) leaves the
  * agent's own `model` untouched. Two sources say which model a conversation runs:

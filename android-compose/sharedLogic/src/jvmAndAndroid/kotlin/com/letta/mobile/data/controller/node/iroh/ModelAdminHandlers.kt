@@ -19,7 +19,7 @@ import kotlinx.serialization.json.put
  * - `model.update` is native (`update_model`) for one agent + conversation.
  * - `model.exposure.get` / `model.exposure.set` read/write the wrapper-owned
  *   exposure decisions. They never touch the App Server.
- * - `model.list.embedding` stays a controller constant (lgns8.9).
+ * - `model.list.embedding` stays a controller constant.
  *
  * `provider.*` lives in [ProviderAdminHandlers].
  */
@@ -92,7 +92,7 @@ object ModelAdminHandlers {
     /** Controller-owned constant catalog (no datastore, no shim). */
     val CONSTANT_CATALOG_METHODS: Set<String> = setOf("model.list.embedding")
 
-    /** Methods the retired admin REST adapter used to own (lgns8.9 inventory). */
+    /** Methods the retired admin REST adapter used to own ( inventory). */
     val FORMER_ADMIN_REST_METHODS: Set<String> = CONSTANT_CATALOG_METHODS + "provider.list"
 
     /** Wrapper-owned exposure state; never an App Server call. */

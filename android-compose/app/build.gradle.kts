@@ -419,6 +419,7 @@ dependencies {
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
+    androidTestImplementation(project(":appserver-testkit"))
 
     // Compose
     implementation(libs.androidx.compose.material3)

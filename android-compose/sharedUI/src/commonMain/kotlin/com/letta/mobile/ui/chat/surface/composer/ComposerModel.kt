@@ -11,7 +11,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 
 /**
- * letta-mobile-bglj6.1: everything one composer frame reads, bundled so the parts take one
+ * Everything one composer frame reads, bundled so the parts take one
  * parameter instead of nine. Rebuilt per composition of [ChatComposerPanel].
  */
 @Immutable

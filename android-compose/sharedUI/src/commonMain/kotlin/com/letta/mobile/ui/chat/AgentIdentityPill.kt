@@ -25,7 +25,7 @@ import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.mascot.mascotAtWork
 import com.letta.mobile.ui.theme.LettaDimens
 
-object AgentIdentityPillTestTags {
+internal object AgentIdentityPillTestTags {
     /** The pill's surface: one per screen, wherever it is drawn. */
     const val PILL = "agent_identity_pill"
 
@@ -66,7 +66,7 @@ data class AgentIdentity(
 )
 
 /**
- * letta-mobile-bglj6.1.22: the agent at a glance - avatar, name, favourite and pin marks and the
+ * The agent at a glance - avatar, name, favourite and pin marks and the
  * switcher chevron in [AgentPillSurface]. The one element for the chat screen's header and the
  * phone canvas mode, which keeps it alone where the header was; callers only place it.
  */

@@ -24,7 +24,7 @@ sealed class TimelineSyncEvent {
     data class LocalConfirmed(val otid: String, val serverId: String) : TimelineSyncEvent()
     data class ServerEvent(val message: LettaMessage) : TimelineSyncEvent()
     data class StreamError(val type: String, val message: String) : TimelineSyncEvent()
-    /** A LettaMessage was ingested via the resume-stream subscriber (letta-mobile-mge5). */
+    /** A LettaMessage was ingested via the resume-stream subscriber. */
     data class StreamEventIngested(val serverId: String, val messageType: String?) : TimelineSyncEvent()
     data class OrphanAssistantFragmentsCleaned(val runId: String, val turnId: String?, val count: Int, val reason: String) : TimelineSyncEvent()
     /** Stream subscriber successfully opened a stream; resets backoff. */
@@ -99,7 +99,7 @@ fun LettaMessage.toTimelineEvent(position: Double, agentId: String? = null): Tim
     )
 }
 
-/** What names a timeline row, all read from the wire (letta-mobile-ys9it); nothing is derived from run ids. */
+/** What names a timeline row, all read from the wire; nothing is derived from run ids. */
 private data class RowIdentity(val logicalId: String, val otid: String, val turnId: String?, val textSeq: Int)
 
 private fun LettaMessage.rowIdentity(type: TimelineMessageType): RowIdentity {
@@ -123,7 +123,7 @@ private fun legacyUserOtid(id: String, runId: String?): String {
  * Format: "name(args)" on one line per tool call. Args are the JSON-string
  * that the server sends — typically streaming concatenation results. The UI
  * bubble component parses this further for pretty-printing if desired.
- * letta-mobile-mge5: previously only the tool name was preserved, so streaming
+ * previously only the tool name was preserved, so streaming
  * argument deltas were never visible and ApprovalRequestMessages were dropped.
  */
 internal fun renderToolCallContent(calls: List<com.letta.mobile.data.model.ToolCall>): String {
@@ -170,7 +170,7 @@ internal fun compareNullableInts(left: Int?, right: Int?): Int = when {
  * True when [incoming] is a stream frame we have already folded into this
  * event and can safely drop.
  *
- * letta-mobile-k9y5d: the seq id alone is NOT a reliable drop signal on
+ * the seq id alone is NOT a reliable drop signal on
  * replay. When a run's `frames.jsonl` is replayed (or frames arrive
  * out-of-order on resume), the frame carrying the COMPLETE, correct
  * assistant text can land with a seq id that is <= an existing event which
@@ -196,7 +196,7 @@ fun TimelineEvent.Confirmed.hasAlreadyIngestedStreamFrame(
         incoming.content.isContainedSnapshotOf(content)
 
 /**
- * letta-mobile-k9y5d: true when [this] incoming frame text carries no
+ * True when [this] incoming frame text carries no
  * information beyond [existing] — i.e. it is empty, equal, or a pure
  * prefix/suffix of the already-held text. These are exactly the snapshot
  * no-op cases (EMPTY_INCOMING/EQUAL/STALE/SUFFIX_DUPLICATE) where keeping the

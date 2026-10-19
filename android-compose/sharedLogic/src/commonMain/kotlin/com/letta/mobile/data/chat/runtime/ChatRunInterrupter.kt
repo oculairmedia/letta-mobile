@@ -51,7 +51,7 @@ class ChatRunInterruptTelemetry(
 )
 
 /**
- * letta-mobile-lgns8.19, by4vm.14: the Stop button's lifecycle, one implementation for Android's
+ * The Stop button's lifecycle, one implementation for Android's
  * composer and desktop's controller (they used to carry a copy each).
  *
  * Stop does not settle the UI. It enters CANCELLING ([cancelling]) and asks the server to abort;

@@ -10,7 +10,7 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * letta-mobile-jvctq: the idempotency key of one swarm message. Minted once per send, written to the
+ * The idempotency key of one swarm message. Minted once per send, written to the
  * outbox before anything is dialled and sent as the input's `client_message_id`, so a retry or a
  * resume is recognisably the same message. Also a file name in the outbox, hence the charset.
  */

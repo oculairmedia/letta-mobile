@@ -71,34 +71,34 @@ data class TimelineChatRunControls(
 data class TimelineChatSessionOptions(
     val controls: TimelineChatRunControls = TimelineChatRunControls(),
     /**
-     * letta-mobile-by4vm.79: the host's own approval state (answers in flight, queued offline,
+     * The host's own approval state (answers in flight, queued offline,
      * parked details), e.g. the shared [com.letta.mobile.data.chat.approval.ChatApprovalAnswerer]'s.
      * Null keeps the port's own in-flight tracking only, as the web client does.
      */
     val approvals: ChatApprovalStateSource? = null,
-    /** letta-mobile-by4vm.98: the conversation's working directory; null: no chip, capability off. */
+    /** The conversation's working directory; null: no chip, capability off. */
     val workingDirectory: ChatWorkingDirectorySource? = null,
-    /** letta-mobile-by4vm.98: the conversation's permission-mode chip; null shows none. */
+    /** The conversation's permission-mode chip; null shows none. */
     val permissionModes: ChatPermissionModeSource? = null,
-    /** letta-mobile-by4vm.98.1: the conversation's model chip and switch; null: no chip, capability off. */
+    /** The conversation's model chip and switch; null: no chip, capability off. */
     val models: ChatModelSource? = null,
-    /** letta-mobile-by4vm.98.2: the conversation's send queue; null: a send waits for the run to end. */
+    /** The conversation's send queue; null: a send waits for the run to end. */
     val sendQueue: ChatSendQueueSource? = null,
-    /** letta-mobile-by4vm.98.3: the composer's commands, mentionables, context usage and placeholder. */
+    /** The composer's commands, mentionables, context usage and placeholder. */
     val composerHost: StateFlow<ChatComposerHostInputs>? = null,
-    /** letta-mobile-by4vm.98.3: where an A2UI surface's actions go; null drops them. */
+    /** Where an A2UI surface's actions go; null drops them. */
     val onA2uiAction: ((A2uiAction) -> Unit)? = null,
-    /** letta-mobile-by4vm.98.3: fork, edit and resend, and rerun; null: capabilities off. */
+    /** Fork, edit and resend, and rerun; null: capabilities off. */
     val branching: ChatBranchingSource? = null,
-    /** letta-mobile-by4vm.98.3: `/recompile` and its status; null keeps the status idle. */
+    /** `/recompile` and its status; null keeps the status idle. */
     val recompile: ConversationRecompileController? = null,
-    /** letta-mobile-by4vm.98.3: the conversation's live status line; null keeps it hidden. */
+    /** The conversation's live status line; null keeps it hidden. */
     val liveStatus: Flow<RuntimeLiveStatus>? = null,
     val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
 )
 
 /**
- * letta-mobile-o4ygk.4.5: a [ChatSessionPort] owned entirely in commonMain, over one conversation's
+ * A [ChatSessionPort] owned entirely in commonMain, over one conversation's
  * shared timeline loop.
  *
  * The timeline is projected by the same [ChatTimelinePresenter] Android and desktop use (rows, the
@@ -133,7 +133,7 @@ class TimelineChatSessionPort(
     ) { ui, cleared, queue -> ui.withRunClearedLocally(cleared).copy(sendQueue = queue) }
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialUiState())
 
-    /** letta-mobile-by4vm.81: Stop's lifecycle, the same shared state machine Android and desktop run. */
+    /** Stop's lifecycle, the same shared state machine Android and desktop run. */
     private val interrupter = ChatRunInterrupter(
         scope = scope,
         host = TimelineRunStopHost(updateRun = ::updateRun, onClearedLocally = ::watchClearedRunEnd),
@@ -141,7 +141,7 @@ class TimelineChatSessionPort(
     )
     private var clearedRunWatch: Job? = null
 
-    /** letta-mobile-by4vm.98.3: what the host's extension points add, read the way desktop's port reads them. */
+    /** What the host's extension points add, read the way desktop's port reads them. */
     private val extensions = ChatSessionExtensions(options, scope)
 
     override val composer: StateFlow<ChatComposerUiState> = combine(draft, uiState, extensions.chrome) { current, ui, chrome ->
@@ -163,6 +163,7 @@ class TimelineChatSessionPort(
 
     override val recompileStatus: StateFlow<RecompileStatus> get() = extensions.recompileStatus
 
+    /** Stable handlers bound to this session's draft, timeline and configured extension actions. */
     override val actions: ChatActions = TimelineChatActions(
         port = this,
         options = options,

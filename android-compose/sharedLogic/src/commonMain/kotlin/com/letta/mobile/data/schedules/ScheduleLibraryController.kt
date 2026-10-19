@@ -119,7 +119,7 @@ class ScheduleLibraryController(
      */
     private val initialAgentId: String? = null,
     /**
-     * letta-mobile-by4vm.13: false when the session's capabilities say it serves no native schedule
+     * False when the session's capabilities say it serves no native schedule
      * route, so the controller never makes the doomed call and opens on the cron fallback or the
      * "admin unavailable" state straight away.
      */

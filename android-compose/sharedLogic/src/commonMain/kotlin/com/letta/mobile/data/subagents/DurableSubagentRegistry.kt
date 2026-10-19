@@ -6,25 +6,25 @@ import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
 /**
- * letta-mobile-lgns8.22.8 — the durable, keyed subagent-chip registry.
+ * Durable, keyed subagent-chip registry.
  *
  * ## The defect class
- * Same shape as letta-mobile-or40x: durable state that should be KEYED lived
+ * Durable state that should have been keyed previously lived
  * in one process-wide, in-RAM slot. For subagent chips this produced two
  * complementary failures:
  *  - restart the controller and every chip vanishes while its worker keeps
  *    running (a "completed" that never happened), and
  *  - a chip whose worker died has nothing that can ever clear it, so it spins
- *    forever (letta-mobile-7vs4s' production symptom).
+ *    forever.
  *
  * ## What this owns
  *  1. **Durable, keyed state.** Chips are keyed by
  *     ([SubagentChipKey]: conversationId, agentId, toolCallId) and written
  *     through a [SubagentRegistryStore] on every mutation, so a restart
  *     rehydrates rather than starting empty. Two parents never share a slot.
- *  2. **Source precedence** ([SubagentChipSource], letta-mobile-7vs4s): a
+ *  2. **Source precedence** ([SubagentChipSource]): a
  *     weaker producer can never overwrite a stronger one's fact.
- *  3. **Lifecycle enforcement** ([SubagentChipState], letta-mobile-5hihw):
+ *  3. **Lifecycle enforcement** ([SubagentChipState]):
  *     illegal transitions are rejected + telemetered, never applied.
  *  4. **Reconciliation** ([reconcile]): on restart / reconnect, persisted chips
  *     with no live counterpart become [SubagentChipState.ORPHANED] with
@@ -43,7 +43,7 @@ class DurableSubagentRegistry(
     private val store: SubagentRegistryStore = InMemorySubagentRegistryStore(),
     private val maxEntries: Int = MAX_ENTRIES,
     private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
-    /** letta-mobile-fxoew.3: how long a live chip may go unobserved; see [staleRunningChips]. */
+    /** How long a live chip may go unobserved; see [staleRunningChips]. */
     private val staleAfterMs: Long = STALE_RUNNING_AFTER_MS,
 ) {
     private val lock = SynchronizedObject()
@@ -58,7 +58,7 @@ class DurableSubagentRegistry(
     }
 
     /**
-     * letta-mobile-fxoew.3: terminalize every live chip unobserved for longer
+     * Terminalize every live chip unobserved for longer
      * than [staleAfterMs] (see [staleRunningChips]). Returns the chips it
      * ended so the caller can tell their conversations' viewers.
      */
@@ -118,7 +118,7 @@ class DurableSubagentRegistry(
         data class Accepted(val record: SubagentChipRecord) : ObserveResult()
 
         /**
-         * letta-mobile-7vs4s: a lower-precedence source tried to overwrite a
+         * A lower-precedence source tried to overwrite a
          * higher-precedence fact. The existing record is untouched.
          */
         data class RejectedBySource(
@@ -127,7 +127,7 @@ class DurableSubagentRegistry(
         ) : ObserveResult()
 
         /**
-         * letta-mobile-5hihw: the observation asked for an edge the lifecycle
+         * The observation asked for an edge the lifecycle
          * state machine does not have. The existing record is untouched.
          */
         data class IllegalTransition(
@@ -290,7 +290,7 @@ class DurableSubagentRegistry(
     }
 
     /**
-     * letta-mobile-ulcg6 (RC4): a re-delivered identical snapshot is not
+     *  (RC4): a re-delivered identical snapshot is not
      * progress. A new tool call, new activity lines or a lifecycle change is.
      */
     private fun SubagentChipRecord.madeProgress(observation: SubagentChipObservation): Boolean =
@@ -404,7 +404,7 @@ class DurableSubagentRegistry(
     }
 
     /**
-     * letta-mobile-5hihw: the parent assistant turn finished.
+     * The parent assistant turn finished.
      *
      * This is intentionally a NO-OP on chip lifecycle. It exists so the seam is
      * named and testable: the parent turn ending is NOT evidence that a
@@ -447,7 +447,7 @@ class DurableSubagentRegistry(
      * on the same chip set, because a client (or this registry, via [observe])
      * merges by [SubagentChipKey] rather than appending. Terminal chips are
      * included so a chip that finished while the client was disconnected
-     * resurfaces as terminal instead of disappearing (letta-mobile-29h9u
+     * resurfaces as terminal instead of disappearing (
      * lingering terminal chips).
      */
     fun replaySnapshot(conversationId: String): List<SubagentChipRecord> =
@@ -541,7 +541,7 @@ class DurableSubagentRegistry(
         const val MAX_ENTRIES = 512
 
         /**
-         * letta-mobile-fxoew.3: a live chip unobserved for this long is ended as
+         * A live chip unobserved for this long is ended as
          * stale. Six hours is far beyond any subagent run seen in the live
          * registry, so it only catches chips whose worker is gone; the zombies it
          * targets were days to weeks old.

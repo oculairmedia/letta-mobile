@@ -329,7 +329,7 @@ private fun CanvasBoardNotes(board: CanvasBoard) {
 }
 
 /**
- * Plugin elements (letta-mobile-s416w.4), beside the notes and in the same world units. A selected
+ * Plugin elements, beside the notes and in the same world units. A selected
  * one is the board's active item, so a press on the board or on a note lets it go.
  */
 @Composable

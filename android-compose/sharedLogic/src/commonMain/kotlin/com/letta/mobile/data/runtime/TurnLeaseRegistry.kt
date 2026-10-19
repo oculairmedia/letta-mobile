@@ -8,7 +8,7 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlinx.atomicfu.update
 
 /**
- * letta-mobile-8xxzv: the App Server's runtime key — `{agent_id, conversation_id}`.
+ * The App Server's runtime key — `{agent_id, conversation_id}`.
  *
  * letta-code's App Server (0.29.9 / 0.29.12, `src/websocket/listener/runtime.ts`)
  * keeps a `conversationRuntimes` map with a per-conversation TurnLifecycle, queue
@@ -22,13 +22,12 @@ data class TurnRuntimeKey(val agentId: String, val conversationId: String) {
 }
 
 /**
- * letta-mobile-8xxzv: ALL per-turn engine state for ONE runtime key.
+ * ALL per-turn engine state for ONE runtime key.
  *
- * Before this bead every field here was a single process-wide slot on
+ * Previously every field here was a single process-wide slot on
  * [AppServerTurnEngine], so a turn on conversation B was rejected
  * ("iroh_turn_engine_busy") purely because conversation A held the one lease —
- * the last unkeyed slot of the letta-mobile-or40x defect class (the transport
- * was keyed in PR #1055, the coordinator in PR #1056).
+ * the transport and coordinator already kept separate state per conversation.
  *
  * Atomic fields are private and reached through accessors: kotlinx-atomicfu's
  * JVM transformer rejects an atomic field touched from another class.
@@ -44,15 +43,15 @@ internal class TurnLeaseSlot(val key: TurnRuntimeKey) {
      */
     val runIdGate = TurnRunIdGate(leaseRef, ownerRef)
 
-    /** Authoritative turn boundaries for THIS key (letta-mobile-qygvv.2). */
+    /** Authoritative turn boundaries for THIS key. */
     val boundaryGate = TurnBoundaryGate()
 
-    /** Lease -> server run binding for THIS key (letta-mobile-qygvv.8). */
+    /** Lease -> server run binding for THIS key. */
     val runBinding = TurnRunBinding()
 
     /**
      * A new turn lease starts collecting on this key: its run-id gate, boundary gate and run binding
-     * all reset to it. lgns8.22.4: run ids from before a mid-turn reassignment are superseded.
+     * all reset to it. run ids from before a mid-turn reassignment are superseded.
      */
     fun beginLease(token: Long, clientMessageId: String?) {
         runIdGate.beginLease(token)
@@ -102,9 +101,9 @@ internal class TurnLeaseSlot(val key: TurnRuntimeKey) {
 }
 
 /**
- * letta-mobile-8xxzv: bounded, recency-ordered registry of [TurnLeaseSlot]s.
+ * Bounded, recency-ordered registry of [TurnLeaseSlot]s.
  *
- * Mirrors the ChatSendCoordinator reference implementation merged in PR #1056:
+ * Mirrors the ChatSendCoordinator reference implementation:
  * cap [MAX_TRACKED_RUNTIME_KEYS], evict SETTLED entries oldest-first, NEVER drop
  * a tracking entry (the map exceeds the cap instead, telemetered), and re-insert
  * on access so ordering is recency rather than first-seen.
@@ -159,7 +158,7 @@ internal class TurnLeaseRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS
     }
 
     companion object {
-        /** Same cap as ChatSendCoordinator's turn-state map (PR #1056). */
+        /** Same cap as ChatSendCoordinator's turn-state map. */
         const val MAX_TRACKED_RUNTIME_KEYS: Int = 32
     }
 }

@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * letta-mobile-bglj6.1: the chat timeline's type roles, lifted from designsystem's LettaChatTheme
+ * The chat timeline's type roles, lifted from designsystem's LettaChatTheme
  * (ChatTypography) and TypeHierarchy so the shared rows draw the legacy Android timeline's text
  * without depending on the Android-only designsystem module. Every style derives from the host's
  * MaterialTheme typography, so the Letta type scale (Inter on Android) still applies.
@@ -101,7 +101,7 @@ object ChatRowSpacing {
     val runGlyphSize: Dp = LettaDimens.Control.iconSm
 
     /**
-     * letta-mobile-zxk2n.37: an expanded run's work steps (reasoning, the tool line) sit indented
+     * An expanded run's work steps (reasoning, the tool line) sit indented
      * under its summary line, flush with the summary's label (past its inset and glyph).
      */
     val runStepIndent: Dp = runHeaderHorizontal + runGlyphSize + LettaDimens.Space.sm

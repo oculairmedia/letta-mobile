@@ -28,7 +28,7 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
- * letta-mobile-bglj6.1.20: the legacy timeline's elastic bounce (feature-chat
+ * The legacy timeline's elastic bounce (feature-chat
  * TimelineKineticOverscroll), in common Compose. The list keeps every drag and fling it can
  * consume; only velocity a fling leaves at a genuinely exhausted edge rubber-bands the rows, by at
  * most [RUBBER_BAND_RATIO] of the list's height, on one spring that settles exactly back at rest.

@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * What an app hands DrawBox's decoder: a scene with every element the decoder cannot read taken out
- * and reported (letta-mobile-qygvv.21).
+ * and reported.
  *
  * The decoder is all-or-nothing: one element missing `zIndex`, or with a point it cannot parse,
  * fails the whole scene and the board opens empty with nothing said. Already-logged scenes can hold

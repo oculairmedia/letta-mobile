@@ -38,7 +38,7 @@ private val OverflowSections = listOf(
 
 /**
  * The sections that live inside the collapsible sidebar (New chat, Memory, Schedules, Channels,
- * Skills, Settings), reachable without reopening it (o5m90 AC #6). Conversation history is the
+ * Skills, Settings), reachable without reopening it. Conversation history is the
  * command palette's (Ctrl/Cmd+K).
  */
 @Composable

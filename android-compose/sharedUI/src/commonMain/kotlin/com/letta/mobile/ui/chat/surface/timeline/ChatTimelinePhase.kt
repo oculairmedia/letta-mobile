@@ -5,7 +5,7 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 
 /**
- * letta-mobile-bglj6.1: which of the timeline's mutually exclusive bodies is on screen.
+ * Which of the timeline's mutually exclusive bodies is on screen.
  *
  * Lifted from Android's ChatScreenLayout content phases (skeleton, error, no-conversation,
  * content) and desktop's ChatDetailContent (status panel, welcome, list). One pure function

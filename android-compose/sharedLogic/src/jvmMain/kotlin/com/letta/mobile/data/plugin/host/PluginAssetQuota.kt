@@ -7,12 +7,12 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 
 /**
- * How many asset bytes each plugin may store (plan: trust minimum, letta-mobile-cdgpr.5): at most
+ * How many asset bytes each plugin may store: at most
  * [limit] (default [DEFAULT_BYTES_PER_DAY] per trailing 24 hours), counted per plugin over a
  * sliding window. Bytes the store already has cost nothing (assets are content-addressed, so a
  * re-upload writes nothing), and an upload that would cross the limit is refused whole.
  *
- * With a [file] (letta-mobile-cdgpr.15) the window's charges are kept on disk: [load] reads them at
+ * With a [file]  the window's charges are kept on disk: [load] reads them at
  * host start and every charge or refund rewrites the file atomically, so a host restart does not
  * reset the day's budget. Without one the usage lives in memory only.
  */

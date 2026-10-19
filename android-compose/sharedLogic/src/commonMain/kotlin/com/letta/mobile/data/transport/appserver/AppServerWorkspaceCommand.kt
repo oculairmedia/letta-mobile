@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 
 /**
- * The agent-workspace commands (letta-mobile-bzvro.24–.26): MemFS browsing, the agent secrets
+ * The agent-workspace commands: MemFS browsing, the agent secrets
  * vault and device files. They share one request path, [AppServerClient.workspaceRequest], so
  * each feature adds its commands without growing the client interface.
  *

@@ -61,7 +61,7 @@ internal class ObserverWriteQueue(
 }
 
 /**
- * eaczz.4 — the fanout core. Owns a single turn's per-connection frame-shaping
+ * The fanout core. Owns a single turn's per-connection frame-shaping
  * state (open-tool_call tracking + terminal-dedup)
  * and fans EACH already-stamped wire DELTA BODY out to EVERY viewer of
  * the turn's conversation — not just the initiator.
@@ -77,14 +77,14 @@ internal class ObserverWriteQueue(
  *    per-viewer ordering + seq monotonicity + frame-part capability gating stay
  *    intact and shape parity holds.
  *  - Fanout is best-effort per viewer: a slow/dead observer that fails its write
- *    never breaks the loop or the initiator's turn (eaczz.6).
+ *    never breaks the loop or the initiator's turn.
  *
  * CRITICAL ISOLATION: mid-turn redial PARKING is INITIATOR-scoped. Only the
  * initiator's frames are tracked for parking (via [trackInitiatorFrame]); a
  * failing observer is never parked. Observers reconcile via message.list on
- * reconnect (eaczz.6), so they get no parking here.
+ * reconnect, so they get no parking here.
  *
- * eaczz.6 — OBSERVER LIFECYCLE / CONVERGENCE:
+ * OBSERVER LIFECYCLE / CONVERGENCE:
  *  - JOIN MID-TURN: an observer that subscribes (via its own message.list
  *    hydrate) AFTER the turn started may miss the earliest deltas, but it always
  *    reconciles-to-final. Because [snapshotViewers] re-reads the registry on
@@ -94,7 +94,7 @@ internal class ObserverWriteQueue(
  *    terminal + the joiner's own message.list hydrate close the rest. It never
  *    gets initiator parking (parking is initiator-only).
  *  - DISCONNECT MID-TURN: the connection's disconnect path unregisters it
- *    (eaczz.1 unregisterAll); the next [snapshotViewers] no longer contains it,
+ *    ([ConnectionRegistry.release]); the next [snapshotViewers] no longer contains it,
  *    so the broadcaster stops writing to it — the initiator is unaffected.
  *  - RECONNECT: on redial the observer re-subscribes (message.list) and
  *    reconciles to the same final timeline; it gets NO parking replay.
@@ -117,11 +117,11 @@ internal class ConversationTurnFanout(
     /**
      * Initiator-only parking hook: records a delta body JSON so a mid-turn
      * redial can replay it. MUST NOT run per-observer (parking is initiator
-     * scoped — q71yi). No-op when the turn is not parkable (no client_message_id).
+     * scoped). No-op when the turn is not parkable (no client_message_id).
      */
     private val trackInitiatorFrame: (deltaJson: String) -> Unit = {},
     /**
-     * eaczz.6 fault isolation: de-register a failed/wedged OBSERVER viewer from
+     * Fault isolation: de-register a failed/wedged OBSERVER viewer from
      * the SAME registry the fanout reads from ([viewersFor]) so the broadcaster
      * stops writing to a dead peer on subsequent deltas. Never invoked for the
      * initiator (which follows the parking path, not de-registration). No-op when
@@ -129,7 +129,7 @@ internal class ConversationTurnFanout(
      */
     private val unregisterViewer: suspend (conversationId: String, viewer: ViewerHandle) -> Unit = { _, _ -> },
     /**
-     * eaczz.6 non-blocking fanout: bounded per-OBSERVER write timeout. A wedged
+     * Non-blocking fanout: bounded per-OBSERVER write timeout. A wedged
      * QUIC observer stream that does not complete a write within this window is
      * treated as failed, de-registered, and skipped on later deltas — so one dead
      * peer cannot serially stall the fanout. The INITIATOR viewer is NEVER subject
@@ -138,28 +138,28 @@ internal class ConversationTurnFanout(
     private val observerWriteTimeoutMs: Long = OBSERVER_WRITE_TIMEOUT_MS,
     private val observerWrites: ObserverWriteQueue? = null,
     /**
-     * letta-mobile-qygvv.3: queue for the INITIATOR's writes. The initiator's connection owns
+     * Queue for the INITIATOR's writes. The initiator's connection owns
      * it, while [observerWrites] may be node-owned so a turn that outlives its initiator still
      * reaches the other viewers. Defaults to [observerWrites] (one shared queue).
      */
     private val initiatorWrites: ObserverWriteQueue? = observerWrites,
     /**
-     * letta-mobile-4vtng.1: the turn's prompt client message id, the turn id stamped on the deltas
+     * The turn's prompt client message id, the turn id stamped on the deltas
      * the host synthesizes itself (tool projection, user echo, dangling-call settlement).
      */
     turnId: String? = null,
-    /** letta-mobile-r1xkl: joins this turn's stamped messages to their stored rows at the end. */
+    /** Joins this turn's stamped messages to their stored rows at the end. */
     private val identity: TurnIdentityBinding? = null,
 ) {
     private val synthesizedIdentity = turnStreamIdentityFor(turnId)
     private val openToolCalls = OpenToolCallTracker()
     private val toolProjection = RelayedToolProjection()
 
-    /** letta-mobile-qygvv.28: a delta that ends a run already reached the viewers. */
+    /** A delta that ends a run already reached the viewers. */
     private var terminalDeltaRelayed = false
 
     /**
-     * letta-mobile-qygvv.3: the initiator's connection is gone but the turn keeps running
+     * The initiator's connection is gone but the turn keeps running
      * (see [NodeTurnHost]). Frames still go to every other viewer and are still tracked for
      * the initiator's redial parking; only writes to the dead initiator handle stop.
      */
@@ -222,7 +222,7 @@ internal class ConversationTurnFanout(
     }
 
     /**
-     * letta-mobile-qygvv.28: the terminal delta for an engine lifecycle the App Server's own frames
+     * The terminal delta for an engine lifecycle the App Server's own frames
      * did not deliver. It carries the run id, and a cancel stays a cancel (`stop_reason
      * cancelled`, with the reason as its message) instead of reading as a failure on the phone. A
      * completion whose real `stop_reason` already went out gets no second one.
@@ -236,7 +236,7 @@ internal class ConversationTurnFanout(
     }
 
     /**
-     * letta-mobile-qygvv.28: relay one App Server `stream_delta` [raw] frame the engine consumed
+     * Relay one App Server `stream_delta` [raw] frame the engine consumed
      * (its terminal `error_message`, the `stop_reason` after it), shaped like any relayed delta.
      */
     suspend fun relayServerDelta(raw: JsonObject) {
@@ -306,7 +306,7 @@ internal class ConversationTurnFanout(
         }
     }
 
-    /** Flush a synthetic cancelled tool_return for every still-open tool_call (8s45p), fanned out. */
+    /** Flush a synthetic cancelled tool_return for every still-open tool_call, fanned out. */
     suspend fun flushOpenToolCalls() {
         val openIds = openToolCalls.openIds()
         if (openIds.isEmpty()) return
@@ -353,7 +353,7 @@ internal class ConversationTurnFanout(
     }
 
     /**
-     * letta-mobile-qygvv.12: write one non-delta App Server frame (`update_loop_status`,
+     * Write one non-delta App Server frame (`update_loop_status`,
      * `turn_finished`, `update_queue`) to the INITIATOR only, on the same ordered chain as its
      * deltas, so it lands after every delta already queued. [drain] waits for it to reach the wire.
      * Observers are left alone: their ingest reconciles through message.list.
@@ -379,7 +379,7 @@ internal class ConversationTurnFanout(
     }
 
     /**
-     * eaczz.5 — live user-echo fanout. Synthesize a `user_message` wire delta for
+     * Live user-echo fanout. Synthesize a `user_message` wire delta for
      * the sender's prompt and fan it out to EVERY viewer at turn start, BEFORE
      * any assistant stream. Observers render it as a fresh user row so the prompt
      * appears before the reply; the initiator collapses it against its own
@@ -403,7 +403,7 @@ internal class ConversationTurnFanout(
      * Content parts (images) are carried verbatim: when [contentParts] is a JSON
      * array we forward it as `content`; otherwise the plain [text] string.
      *
-     * NOT parked: parking (q71yi) replays the INITIATOR's own live turn tail on
+     * NOT parked: parking replays the INITIATOR's own live turn tail on
      * redial; the user echo is derived deterministically from the resent input
      * and the reconnecting initiator re-owns its optimistic row, so echoing it is
      * pure fanout — it must NOT count toward initiator parking (which stays
@@ -455,8 +455,8 @@ internal class ConversationTurnFanout(
      * deterministically from the (redial-resent) input rather than from live
      * turn frames — so it must not consume a parking slot.
      *
-     * eaczz.6 — NON-BLOCKING FANOUT + FAULT ISOLATION. EVERY viewer's writes,
-     * initiator included (letta-mobile-aggeh), enter the connection-owned
+     * NON-BLOCKING FANOUT + FAULT ISOLATION. EVERY viewer's writes,
+     * initiator included, enter the connection-owned
      * [ObserverWriteQueue], so a normal delta does not wait on any network write
      * at all. Each viewer has one ordered job chain, preserving frame order and
      * event-sequence monotonicity while a stalled observer is timed out and
@@ -536,7 +536,7 @@ internal class ConversationTurnFanout(
     }
 
     /**
-     * tg7b8: partition a viewer snapshot into the initiator (0 or 1 entry)
+     * Partition a viewer snapshot into the initiator (0 or 1 entry)
      * and the observers (the rest). Centralized here so the call site
      * doesn't need to repeat the `===` / `connectionId` identity dance
      * — the same identity check [broadcastDeltaBodyNoPark] used inline.

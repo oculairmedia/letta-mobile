@@ -14,7 +14,7 @@ internal data class CanvasRelayTopic(val name: String)
 internal class CanvasRelayTarget(val canvasId: CanvasId, val appliers: List<CanvasRelayApplier>)
 
 /**
- * Where a relayed op goes in this app (letta-mobile-qygvv.23): to the sessions open on its canvas,
+ * Where a relayed op goes in this app: to the sessions open on its canvas,
  * or, with none open, straight into the stored canvas ([CanvasClosedBoardApplier]). An op nothing
  * took leaves a gap on its topic, and the relay client must not move its cursor past a gap: the
  * next join asks the host for everything after the last op this app really has.

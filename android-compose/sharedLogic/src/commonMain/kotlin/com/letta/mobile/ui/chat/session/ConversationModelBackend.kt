@@ -10,7 +10,7 @@ import com.letta.mobile.data.repository.modelcontrol.ConversationModelChange
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 
 /**
- * letta-mobile-ckmub.17.2: where a chat's model list comes from and where a per-conversation
+ * Where a chat's model list comes from and where a per-conversation
  * switch goes, for [ConversationModels]. Desktop builds it from its chat gateway ([of]); a host that
  * holds only an App Server session builds it from that session's admin reads ([of] with an
  * [AppServerLocalAdminGateway]), so both run the same switch.

@@ -1,7 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 /**
- * lgns8.9 disposition for the MCP-catalog and passage-read domains.
+ *  Disposition for the MCP-catalog and passage-read domains.
  *
  *  - `mcp.list`: admin-shim has no `/v1/mcp/servers` route at all (it stubs
  *    `/v1/mcp-servers` with `json(res, 200, [])`), so the proxy call this

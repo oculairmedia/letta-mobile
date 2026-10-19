@@ -50,7 +50,7 @@ internal class CanvasHostMenuEntry(val icon: ImageVector, val label: String, val
 /**
  * How the page around the board wants the board's chrome laid out.
  *
- * The phone's shared chat page keeps the top of the board clear (letta-mobile-bglj6.1): with
+ * The phone's shared chat page keeps the top of the board clear: with
  * [actionsInFoot] a compact board draws no actions pill; undo, redo and the overflow menu join the
  * tool bar at its foot, sharing and the sync status move into that menu, and [menu] carries what
  * the page's own header would have offered over the board (the agent switcher and menu). A wide

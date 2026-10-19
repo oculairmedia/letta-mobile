@@ -86,7 +86,7 @@ object SettingsSectionTags {
 data class SettingsHeader(val key: String, val title: String, val supporting: String? = null, val showTitle: Boolean = true)
 
 /**
- * letta-mobile-ckmub.3.12 (hard cut S10, primitive P9) / ckmub.3.12.1: one rounded settings card.
+ *  (hard cut S10, primitive P9) / one rounded settings card.
  * Every Settings row on every platform is drawn by the [SettingsScope] rows inside one of these, from
  * the row models in com.letta.mobile.data.settings; a platform describes its own sections as data.
  */

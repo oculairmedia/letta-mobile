@@ -6,7 +6,7 @@ import com.letta.mobile.ui.notify.AgentNotificationsStrings
 data class SettingsLabel(val key: String, val title: String, val helper: String? = null)
 
 /**
- * letta-mobile-ckmub.3.12.1: the words of the Settings page's standard rows, in one place so the rows
+ * The words of the Settings page's standard rows, in one place so the rows
  * and the page search read the same text. Nouns for settings, verbs for actions, no Enable/Disable.
  */
 object SettingsCopy {

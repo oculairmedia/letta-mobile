@@ -16,7 +16,7 @@ import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.icons.LettaIcons
 
 /**
- * The one way a shared page lets the user reload a list (letta-mobile-ckmub.3.21): pull-to-refresh
+ * The one way a shared page lets the user reload a list: pull-to-refresh
  * on a touch host, a refresh icon on a pointer host - never both, and never a refresh button on a
  * phone.
  *

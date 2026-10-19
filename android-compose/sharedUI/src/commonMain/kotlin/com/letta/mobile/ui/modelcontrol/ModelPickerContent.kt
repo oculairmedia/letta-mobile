@@ -62,7 +62,7 @@ data class ModelPickerActions(
     val currentToolset: String? = null,
     val onSelectToolset: ((String) -> Unit)? = null,
     /**
-     * letta-mobile-pt1ze.5: set when the picker is the second level of a pane (the agent settings
+     * Set when the picker is the second level of a pane (the agent settings
      * sheet); it then heads the list with a back arrow, and Escape goes back.
      */
     val onBack: (() -> Unit)? = null,
@@ -114,10 +114,10 @@ private val ModelPickerPickerTags = PickerTags(
 )
 
 /**
- * The model picker (letta-mobile-w4q4p.6.1): "Search models", the exposed
+ * The model picker: "Search models", the exposed
  * models under collapsible provider headers, the current one marked, and a
  * footer with "Refresh Models" and "Edit Models…". It composes the shared
- * [LettaPickerContent] (letta-mobile-ckmub.3.6): the search stays pinned and the list owns the
+ * [LettaPickerContent]: the search stays pinned and the list owns the
  * only scroll. Hosts put it in a [com.letta.mobile.ui.host.LettaPane] (LettaPaneKind.Modal), or
  * show it as the second level of a pane they own (the agent settings sheet, [ModelPickerActions.onBack]).
  */
@@ -257,7 +257,7 @@ private fun PickerRow(entry: ModelPickerEntry, row: PickerRowState, actions: Mod
 }
 
 /**
- * letta-mobile-3io8k: what the conversation already holds, in tokens, when the picker is opened from
+ * What the conversation already holds, in tokens, when the picker is opened from
  * the context sheet; rows then show their window and warn when it is smaller than that.
  */
 val LocalModelPickerContextTokens = staticCompositionLocalOf<Int?> { null }

@@ -9,14 +9,14 @@ import kotlinx.serialization.json.put
 import java.util.Base64
 
 /**
- * lgns8.9: controller-owned constant catalogs for admin domains whose
+ * Controller-owned constant catalogs for admin domains whose
  * admin-shim implementation was itself a CONSTANT, not a datastore read.
  *
  * Evidence (admin-shim `server.ts`, `@letta-ai/letta-code` 0.29.12 host):
  *  - `GET /v1/tools` / `/v1/tools/{id}` -> `BUILTIN_TOOL_DEFINITIONS.map(vanillaTool)`,
  *    a hard-coded 14-entry list of client-side letta-code tools. No store read.
  *  - `GET /v1/providers` -> formerly a constant here; now live `list_connect_providers`
- *    ([ProviderAdminHandlers], letta-mobile-w4q4p).
+ *    ([ProviderAdminHandlers]).
  *  - `GET /v1/models/embedding` -> a single hard-coded embedding descriptor.
  *  - `GET /v1/folders|/v1/groups|/v1/identities|/v1/jobs|/v1/archives|/v1/mcp-servers`
  *    -> `stubList` — literally `json(res, 200, [])`. The letta-code local backend
@@ -25,7 +25,7 @@ import java.util.Base64
  *    for no gain).
  *
  * Serving these from the controller is therefore exact parity with the shim AND
- * removes the last read-only reason for the wrapper to dial :8291. These are
+ * removes the last read-only reason for the wrapper to dial:8291. These are
  * `controller_native` in the ownership matrix: no Letta storage is touched.
  *
  * EMPTY-BY-CONTRACT is not the same as capability-unavailable: the domain is

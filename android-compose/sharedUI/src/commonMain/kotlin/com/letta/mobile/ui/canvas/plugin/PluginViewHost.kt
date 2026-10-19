@@ -25,7 +25,7 @@ import com.letta.mobile.data.plugin.view.ViewBridge
 
 /**
  * Shows a plugin page live inside its element on the board (plan section 7.3,
- * letta-mobile-s416w.13): the Android WebView, desktop JCEF (s416w.14), later a wasm iframe. A
+ *): the Android WebView, desktop JCEF, later a wasm iframe. A
  * shell provides one through [LocalPluginViewHost]; with none, every element is drawn by the
  * fallback card ([PluginViewSlot]).
  *

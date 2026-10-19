@@ -31,7 +31,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * letta-mobile-ckmub.3.12.1: the Settings page's three form factors. [Phone]: one scrolling list with
+ * The Settings page's three form factors. [Phone]: one scrolling list with
  * the search under the title. [Medium]: the same list under a sticky row of section chips. [Wide]: a
  * section rail (search on top, scroll-spy selection) beside a content column capped at a readable width.
  */

@@ -9,7 +9,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Brings back the bytes of images this device kept only as size pointers (letta-mobile-a02be).
+ * Brings back the bytes of images this device kept only as size pointers.
  *
  * Before image bodies were persisted, a snapshot stored an image over the inline thumbnail budget
  * as its size alone. The server still holds the message with its image content, so each such row

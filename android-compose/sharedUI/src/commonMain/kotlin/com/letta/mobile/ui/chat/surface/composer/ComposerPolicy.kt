@@ -18,7 +18,7 @@ import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
 
 /**
- * letta-mobile-bglj6.1: the composer's pure decisions (what the action button does, when
+ * The composer's pure decisions (what the action button does, when
  * Enter sends, what the autocomplete offers), kept out of composables so they are tested
  * without a UI and read the same on Android and desktop.
  */
@@ -164,7 +164,7 @@ internal fun reconcileComposerFieldValue(current: TextFieldValue, externalText: 
 }
 
 /**
- * letta-mobile-bzvro.40 (G48): the mode Shift+Tab moves to, the next of the chip's options after the
+ *  (G48): the mode Shift+Tab moves to, the next of the chip's options after the
  * one shown; null while the chip cannot change (locked, or a change still pending).
  */
 internal fun nextPermissionMode(state: ChatPermissionModeUiState?): AppServerPermissionMode? {

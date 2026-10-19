@@ -3,7 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.util.Telemetry
 
 /**
- * letta-mobile-9lgfu (P0 data-integrity): terminal settlement fence.
+ *  (P0 data-integrity): terminal settlement fence.
  *
  * Acceptance criterion 2 of the bead: "Terminal events cannot finalize or
  * persist an accumulator whose sequence is older than an already-received
@@ -136,7 +136,7 @@ internal fun settleTerminalEvent(
  * Deliberately byte-strict (no letters/digits normalization): anything the
  * strict check rejects falls into the conservative fold path, which still
  * never loses accumulated text — so a mangled-vs-clean mismatch degrades to
- * keep-longer (the letta-mobile-k9y5d tradeoff), never to truncation.
+ * keep-longer (the tradeoff), never to truncation.
  */
 private fun isContentSuperset(candidate: String, accumulated: String): Boolean {
     if (accumulated.isEmpty()) return true

@@ -18,7 +18,7 @@ import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * letta-mobile-ckmub.3.10 (hard cut S7, primitive P4): one titled group of a [RosterList]. A null
+ *  (hard cut S7, primitive P4): one titled group of a [RosterList]. A null
  * [title] draws no header; [emptyHint] is the quiet line an empty section shows (null: nothing).
  * [headerEnd] is drawn at the header's end (a count, a live dot).
  */

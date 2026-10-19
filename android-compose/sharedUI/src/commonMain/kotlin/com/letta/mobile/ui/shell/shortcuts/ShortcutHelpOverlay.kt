@@ -19,7 +19,7 @@ import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * Help overlay generated from [ShortcutRegistry] (letta-mobile-k5nbq.4): only the entries the
+ * Help overlay generated from [ShortcutRegistry]: only the entries the
  * window's [ShellShortcutBinding] covers, with the chords of its platform (the web's alternates in
  * the browser).
  */

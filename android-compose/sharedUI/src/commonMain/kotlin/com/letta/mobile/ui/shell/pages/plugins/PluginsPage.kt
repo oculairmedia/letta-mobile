@@ -75,7 +75,7 @@ data class PluginsPageOptions(
 )
 
 /**
- * letta-mobile-cdgpr.9: the Plugins page shared by every client. The installed plugins with their
+ * The Plugins page shared by every client. The installed plugins with their
  * state, health and fault; install from a picked file (its sha256 shown before upload) through a
  * consent sheet that lists every capability, origin and page with an explicit Allow or Deny; enable,
  * disable and remove per plugin; "Disable all plugins" behind a confirmation; and this device's
@@ -147,7 +147,7 @@ fun shellPluginsPage(binding: PluginsPageBinding, onBack: (() -> Unit)? = null) 
     }
 
 /**
- * letta-mobile-cdgpr.8: the Plugins page over [model]. It shows the host's catalog while the host
+ * The Plugins page over [model]. It shows the host's catalog while the host
  * runs plugins, and the unavailable one otherwise. It refreshes when it opens, and its live-views
  * switch is the persisted one.
  */
@@ -159,7 +159,7 @@ fun shellPluginsPage(model: PluginViewsModel, pickPackage: (suspend () -> Plugin
         shellPluginsPage(binding, onBack).Content(destination, modifier)
     }
 
-/** letta-mobile-cdgpr.8: [onOpen] while the host runs plugins, else null, so the Settings entry is hidden. */
+/** [onOpen] while the host runs plugins, else null, so the Settings entry is hidden. */
 @Composable
 fun rememberPluginsEntry(model: PluginViewsModel, onOpen: () -> Unit): (() -> Unit)? {
     LaunchedEffect(model) { model.refresh() }

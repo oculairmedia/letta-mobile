@@ -18,7 +18,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * The `@` file suggestions for the composer's draft (letta-mobile-bzvro.26). [query] is the text
+ * The `@` file suggestions for the composer's draft. [query] is the text
  * after the active `@`, or null when the cursor is not in a mention; [results] are the matching
  * workspace files as [Mentionable]s, ready to merge into the composer's mention list.
  */

@@ -33,7 +33,7 @@ import com.letta.mobile.ui.components.list.RosterSpec
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * The Channels page shared by desktop and Android (letta-mobile-c3np7.3.6): every live channel the
+ * The Channels page shared by desktop and Android: every live channel the
  * active backend exposes, grouped by status, with a search and status filter, and - when
  * [ChannelsPageOptions.showDetails] - a channel's full transport detail on tap.
  *

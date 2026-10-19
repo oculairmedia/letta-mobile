@@ -42,7 +42,7 @@ fun interface ProjectFailureWords {
 }
 
 /**
- * letta-mobile-ckmub.2.5 (hard cut S17): the projects catalog shared by every host, over an Iroh
+ *  (hard cut S17): the projects catalog shared by every host, over an Iroh
  * host's `project.*` relay - list, search, pin, sync, Beads remote, archive, delete, and the
  * create / edit form ([editor]). Project work items (issues) have no App Server route and are not
  * offered.

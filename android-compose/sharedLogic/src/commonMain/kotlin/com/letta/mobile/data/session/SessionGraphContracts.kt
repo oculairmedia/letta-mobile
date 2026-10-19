@@ -61,7 +61,7 @@ interface SessionRepositoryGraph {
     val vibesyncEventStreamRepository: IVibesyncEventStreamRepository
 
     /**
-     * letta-mobile-by4vm.13: which optional routes this graph serves. A repository for a route it
+     * Which optional routes this graph serves. A repository for a route it
      * does not serve throws [com.letta.mobile.data.backend.AppServerRouteUnavailable] on every call,
      * so ask here (or use [ifSupported]) before touching one.
      */

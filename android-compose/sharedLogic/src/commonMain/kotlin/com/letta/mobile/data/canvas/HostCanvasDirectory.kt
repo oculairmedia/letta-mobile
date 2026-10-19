@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
 /**
  * A canvas as the host knows it: which relay topic holds its ops, what it is called, and who may
  * read and write it. The ops themselves stay in the relay's log, the one truth for the scene; this
- * is only what the log does not say (letta-mobile-aknkw.2).
+ * is only what the log does not say.
  */
 @Serializable
 data class HostCanvasEntry(

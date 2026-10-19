@@ -10,7 +10,7 @@ const val A2UI_TOOL_APPROVAL_RESPONSE_ACTION = "tool_approval_response"
 /**
  * An approval answer parsed from an A2UI `tool_approval_response` action. Parsing alone grants
  * nothing: every field is server-influenced, so only [PendingToolApprovalRegistry.admit] may turn
- * one into a submitted approval (letta-mobile-by4vm.2).
+ * one into a submitted approval.
  */
 data class A2uiToolApprovalSubmission(
     val ref: ToolApprovalRef,

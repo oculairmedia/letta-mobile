@@ -5,7 +5,7 @@ import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
 /**
- * letta-mobile-qygvv.11: exact-frame deduplication at the transport's single
+ * Exact-frame deduplication at the transport's single
  * emit seam, BEFORE fan-out.
  *
  * Every subscriber of the frame stream (the chat coordinator, the goal and A2UI
@@ -14,7 +14,7 @@ import kotlinx.atomicfu.locks.synchronized
  * duplicate is recognised once, from the [TransportFrameEvent.timelineEvent]
  * projection the subscribers would share anyway, and never published.
  *
- * Frames with no timeline projection (A2UI, cron, subagent snapshots, ...)
+ * Frames with no timeline projection (A2UI, cron, subagent snapshots,...)
  * are never deduplicated: they have no key.
  *
  * Owned by one transport instance; the window is bounded like the coordinator's.

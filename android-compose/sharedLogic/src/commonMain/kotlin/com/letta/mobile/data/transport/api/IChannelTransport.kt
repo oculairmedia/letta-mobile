@@ -20,7 +20,7 @@ interface IChannelTransport {
     val frameEvents: SharedFlow<TransportFrameEvent>
 
     /**
-     * letta-mobile-or40x: True only while this transport owns a live,
+     * True only while this transport owns a live,
      * non-terminal chat turn FOR [conversationId].
      *
      * Turn ownership is per conversation: two conversations can stream
@@ -32,7 +32,7 @@ interface IChannelTransport {
     fun hasActiveChatTurn(conversationId: String): Boolean = false
 
     /**
-     * letta-mobile-or40x: True while this transport owns ANY live, non-terminal
+     * True while this transport owns ANY live, non-terminal
      * chat turn, on any conversation. Deliberately named so it can never be
      * mistaken for the conversation-scoped [hasActiveChatTurn]. Only correct for
      * transport-wide questions ("is this connection doing anything at all"),
@@ -66,13 +66,13 @@ interface IChannelTransport {
     fun subscribe(runId: String, cursor: Long = 0L): Boolean
 
     /**
-     * letta-mobile-bzvro.40: the feature capabilities the connected host advertised (Iroh `auth_response`),
+     * The feature capabilities the connected host advertised (Iroh `auth_response`),
      * empty while disconnected or for a transport without such a handshake.
      */
     val hostCapabilities: Set<String> get() = emptySet()
 
     /**
-     * letta-mobile-a4tm7: the node id (hex) of the Iroh host this transport is connected to, null while
+     * The node id (hex) of the Iroh host this transport is connected to, null while
      * disconnected or for a transport that has no host node.
      */
     val hostNodeId: String? get() = null
@@ -152,7 +152,7 @@ data class FrameCollectorOverflowIncident(
 )
 
 /**
- * letta-mobile-wxy4s: transports that run an application-level liveness probe and
+ * Transports that run an application-level liveness probe and
  * can be asked to run one RIGHT NOW.
  *
  * QUIC state cannot be trusted to notice a peer that vanished without a

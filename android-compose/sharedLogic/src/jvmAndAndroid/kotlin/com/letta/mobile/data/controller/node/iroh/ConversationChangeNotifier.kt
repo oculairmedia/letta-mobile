@@ -27,7 +27,7 @@ fun interface ConversationChangeTarget {
 
 /**
  * Tells every connected client that a conversation changed, so conversation lists refresh without a
- * restart (letta-mobile-lks7m).
+ * restart.
  *
  * The App Server has no conversation-change event and the node's live-turn fan-out reaches only the
  * connections VIEWING a conversation, so a chat started on one device was invisible to the others.

@@ -5,7 +5,7 @@ import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
 /**
- * Correlates server→client control frames (lgns8.22.4).
+ * Correlates server→client control frames.
  *
  * Distinct from the transport [com.letta.mobile.data.transport.appserver.AppServerRequestRegistry],
  * which tracks client→server RPC responses. This registry owns inbound
@@ -14,20 +14,20 @@ import kotlinx.atomicfu.locks.synchronized
  * - disconnect can supersede every pending entry for that generation
  * - a turn lease can claim exclusive handling before answering
  *
- * IDENTITY (lgns8.22.4.1.3): the App Server v2 contract declares
+ * IDENTITY: the App Server v2 contract declares
  * `external_tool_call_request` idempotency as `request_id_and_tool_call_id`, so
  * external-tool entries are keyed by (request_id, tool_call_id, generation).
  * Approvals carry no tool_call_id at this layer and stay request-id keyed
  * (tool_call_id null).
  *
- * MEMORY (lgns8.22.4.1.5): [entries] holds ONLY live work (Pending / Dispatched /
+ * MEMORY: [entries] holds ONLY live work (Pending / Dispatched /
  * Claimed); it is naturally bounded by the number of in-flight requests. Answered
  * and superseded identities move into [completed], a bounded LRU dedup window,
  * so a long-lived tool-heavy connection cannot grow the registry without bound
  * and [failGeneration] never walks unbounded history.
  *
  * Full approval/tool execution ledgers (retry, sync recover, controller API)
- * remain in lgns8.22.5.
+ * remain.
  */
 class InboundControlRequestRegistry {
     private val lock = SynchronizedObject()
@@ -50,7 +50,7 @@ class InboundControlRequestRegistry {
     enum class State { Pending, Dispatched, Claimed, Answered, Superseded }
 
     /**
-     * Identity of one inbound control request (lgns8.22.4.1.3).
+     * Identity of one inbound control request.
      *
      * External tools are identified by (request_id, tool_call_id) — the App Server
      * v2 `request_id_and_tool_call_id` idempotency key. Approvals carry no
@@ -76,7 +76,7 @@ class InboundControlRequestRegistry {
         val state: State = State.Pending,
         val leaseToken: Long? = null,
         /**
-         * lgns8.17(c) / PR #1077 review (P1): the claim is held by an invocation
+         * The claim is held by an invocation
          * that deliberately OUTLIVES its turn lease (external tools run on a
          * detached job so a slow tool cannot stall frame ingestion). A detached
          * claim must survive [releaseClaimsForLease] — otherwise the turn's
@@ -217,7 +217,7 @@ class InboundControlRequestRegistry {
     /**
      * Retire the identity as answered.
      *
-     * lgns8.22.4.1.4: [connectionGeneration] MUST be the generation the request
+     * [connectionGeneration] MUST be the generation the request
      * was claimed/sent on, never the live generation read after the send — a
      * recovery replay already registered under a successor generation must not be
      * marked answered by an old-connection response the server may never have seen.
@@ -367,7 +367,7 @@ class InboundControlRequestRegistry {
 
     companion object {
         /**
-         * Bound on the answered/superseded dedup window (lgns8.22.4.1.5). Sized
+         * Bound on the answered/superseded dedup window. Sized
          * well above any plausible in-flight replay horizon for one connection:
          * an eviction means a request answered >[MAX_COMPLETED_HISTORY] requests
          * ago was replayed, which is why eviction is recorded at WARN.

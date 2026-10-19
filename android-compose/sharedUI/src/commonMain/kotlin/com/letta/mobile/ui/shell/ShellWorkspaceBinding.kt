@@ -19,7 +19,7 @@ import com.letta.mobile.ui.shell.sidebar.ShellPanelAgent
 import kotlin.time.Instant
 
 /**
- * letta-mobile-ckmub.17.3: the shell's one [ShellWorkspaceState], kept across a saved-state round
+ * The shell's one [ShellWorkspaceState], kept across a saved-state round
  * trip as its page's canonical route and the rail's width (never the pairing secret or the tabs).
  */
 @Composable

@@ -6,7 +6,7 @@ import com.letta.mobile.data.controller.extras.ToolAudience
 import com.letta.mobile.data.controller.extras.ToolOffer
 
 /**
- * The [ToolOffer] behind `agent-tools-mode` (letta-mobile-jna0o.8/.9), per agent:
+ * The [ToolOffer] behind `agent-tools-mode`, per agent:
  * - [AgentToolsMode.NATIVE]: every tool, byte-identical to [ToolOffer.Native];
  * - [AgentToolsMode.CLI]: nothing, since every tool is reached through the `meridian` CLI;
  * - [AgentToolsMode.META]: the `meridian` meta-tool in their place.

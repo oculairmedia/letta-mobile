@@ -187,7 +187,7 @@ internal class CanvasBoardUi {
 internal class CanvasSessionBoardState(
     /**
      * What the board draws of each projected scene: a scene that breaks the board's rules keeps
-     * the last one that drew, and is reported, rather than crashing or blanking it (qygvv.30).
+     * the last one that drew, and is reported, rather than crashing or blanking it.
      */
     val sceneGuard: CanvasSceneStateGuard,
 ) {

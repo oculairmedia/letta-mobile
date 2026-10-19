@@ -14,7 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * letta-mobile-qygvv.5: the one send path for `approval_response` inputs (user
+ * The one send path for `approval_response` inputs (user
  * submit, auto-approve, `TurnInput.ToolApprovalResponse`, cached replay re-answer).
  *
  * Every response carries a `request_id` and waits for `input_accepted`, so a
@@ -47,7 +47,7 @@ internal class ApprovalResponseSender(
     }
 
     /**
-     * letta-mobile-qygvv.13: under Unrestricted the App Server approves the tool itself and
+     * Under Unrestricted the App Server approves the tool itself and
      * still streams an `approval_request_message`; a reply to that delta is acked with
      * "Approval request is no longer pending". That is the server having resolved it, so it
      * is handled exactly like an accepted reply. A real `control_request` keeps the rejection.
@@ -85,7 +85,7 @@ internal class ApprovalResponseSender(
         return result
     }
 
-    /** letta-mobile-qygvv.10: the same decision is awaiting its ack; its own result settles it. */
+    /** The same decision is awaiting its ack; its own result settles it. */
     private fun coalescedWithInFlight(cached: ApprovalDecisionCache.CachedDecision): ApprovalSubmitResult {
         Telemetry.event(
             TELEMETRY_TAG, "approval.replay_in_flight",
@@ -167,7 +167,7 @@ internal class ApprovalResponseSender(
 }
 
 /**
- * letta-mobile-qygvv.5: when [frame] is a `control_request` this client already
+ * When [frame] is a `control_request` this client already
  * answered (a server replay: the answer was lost), re-sends the cached decision on
  * [launchScope] and returns true so the caller drops the frame instead of
  * surfacing a second approval card. A replay scoped to another runtime is left
@@ -189,13 +189,13 @@ internal fun ApprovalResponseSender.reanswerCachedReplay(
     return true
 }
 
-/** letta-mobile-qygvv.5: the decision already sent for a replayed [frame], if this engine answered it. */
+/** The decision already sent for a replayed [frame], if this engine answered it. */
 fun AppServerTurnEngine.cachedApprovalDecisionFor(
     frame: AppServerInboundFrame.ControlRequest,
 ): ApprovalDecisionCache.CachedDecision? = approvalSender.cachedDecisionFor(frame)
 
 /**
- * letta-mobile-qygvv.5: the captured user-input gate id for [toolCallId] is released once its
+ * The captured user-input gate id for [toolCallId] is released once its
  * answer went through; a rejected answer leaves the gate open for a retry.
  */
 fun AppServerTurnEngine.releaseUserInputGateUnlessRejected(
@@ -208,13 +208,13 @@ fun AppServerTurnEngine.releaseUserInputGateUnlessRejected(
     clearUserInputApprovalId(ApprovalBinding(toolCallId, capturedRequestId))
 }
 
-/** letta-mobile-qygvv.5: re-sends [cached] for a server replay of the same request (awaits `input_accepted`). */
+/** Re-sends [cached] for a server replay of the same request (awaits `input_accepted`). */
 suspend fun AppServerTurnEngine.reanswerReplayedApproval(
     cached: ApprovalDecisionCache.CachedDecision,
 ): ApprovalSubmitResult = approvalSender.reanswer(cached)
 
 /**
- * letta-mobile-qygvv.5: hosts that build an engine on their own [router] (desktop,
+ * Hosts that build an engine on their own [router] (desktop,
  * Iroh dialer) call this so a replayed `control_request` for a request this engine
  * already answered is re-answered on [scope] instead of being dropped by the fanout.
  */
@@ -226,7 +226,7 @@ internal fun AppServerTurnEngine.answerApprovalReplaysFrom(router: AppServerRunt
     }
 }
 
-/** letta-mobile-qygvv.5: the approval decision [this] input carries, when it is an `approval_response`. */
+/** The approval decision [this] input carries, when it is an `approval_response`. */
 internal fun AppServerCommand.Input.approvalResponseOrNull(): AppServerInputPayload.ApprovalResponse? =
     (payload as? AppServerInputPayload.ApprovalResponse)?.takeIf { it.decision != null }
 

@@ -1,7 +1,7 @@
 package com.letta.mobile.data.canvas
 
 /**
- * What a relay peer reads beyond the ops protocol v1 started with (letta-mobile-s416w.5).
+ * What a relay peer reads beyond the ops protocol v1 started with.
  *
  * The relay frame is versioned, but a peer built before an op type existed cannot decode that op at
  * all: the frame is malformed to it, and the host refuses the connection, or the app drops it and
@@ -15,7 +15,7 @@ package com.letta.mobile.data.canvas
  *    and go up once the host is redeployed with a build that reads them.
  */
 object CanvasRelayFeatures {
-    /** `set_plugin_element` / `remove_plugin_element` (letta-mobile-s416w.1). */
+    /** `set_plugin_element` / `remove_plugin_element`. */
     const val PLUGIN_ELEMENTS: String = "plugin_elements"
 
     /** Everything this build reads: what it says in every Join and Joined. */

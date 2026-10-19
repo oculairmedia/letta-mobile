@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.emptyFlow
 
 /**
- * letta-mobile-wecy: chat-flavored projection of [IChannelTransport].
+ * Chat-flavored projection of [IChannelTransport].
  *
  * Wraps the wire-level transport into the higher-level events the
  * chat ViewModels actually want to switch on:
@@ -59,7 +59,7 @@ class WsChatBridge(
     fun isConnected(): Boolean = transport.state.value is ChannelTransportState.Connected
 
     /**
-     * letta-mobile-wxy4s: force an immediate connection-liveness probe.
+     * Force an immediate connection-liveness probe.
      *
      * The transport's periodic probe is unreliable while an Android app is
      * backgrounded (doze), so a user returning to a screen would otherwise wait a
@@ -78,7 +78,7 @@ class WsChatBridge(
     /**
      * High-level event stream tailored for chat consumers.
      *
-     * letta-mobile-qygvv.11: every collector gets its own subscription (and so
+     * every collector gets its own subscription (and so
      * one copy of each frame), but the frame -> event projection is memoized on
      * the published [TransportFrameEvent], so it runs once per frame no matter
      * how many coordinators collect.
@@ -102,7 +102,7 @@ class WsChatBridge(
     )
 
     /**
-     * letta-mobile-ztuog: agent-keyed views of [events]. Chat coordinators subscribe here, never
+     * Agent-keyed views of [events]. Chat coordinators subscribe here, never
      * to [events] directly, so a frame reaches only the coordinator of the agent it belongs to.
      */
     val agentScopes: AgentEventScopes = AgentEventScopes(events)
@@ -149,7 +149,7 @@ class WsChatBridge(
 
     /**
      * Authoritative transport ownership FOR [conversationId]; UI presence must
-     * never outlive this. letta-mobile-or40x: keyed — a turn on one conversation
+     * never outlive this. keyed — a turn on one conversation
      * must never light up another conversation's surface.
      */
     fun hasActiveChatTurn(conversationId: String): Boolean = transport.hasActiveChatTurn(conversationId)
@@ -225,7 +225,7 @@ sealed interface WsTimelineEvent {
         val message: LettaMessage,
         val isReplay: Boolean = false,
         /**
-         * letta-mobile-r3i1z: the wire frame's own `conversation_id`, when it
+         * The wire frame's own `conversation_id`, when it
          * carried a non-blank one. Fanned-out observer frames (server-side
          * Iroh fanout writes every turn frame to every registered viewer) are
          * routed by THIS id — a passive observer never sees the turn_started
@@ -235,7 +235,7 @@ sealed interface WsTimelineEvent {
          */
         val conversationId: String? = null,
         /**
-         * letta-mobile-ce2xr: the wire frame's own `turn_id` when present, enabling
+         * The wire frame's own `turn_id` when present, enabling
          * coordinators to route deltas directly to their owning turn even when the
          * server emits an unseen server-assigned conversation id.
          */
@@ -281,7 +281,7 @@ sealed interface WsTimelineEvent {
     ) : WsTimelineEvent
 
     /**
-     * letta-mobile-1n5py.1: this device's send [turnId] waits in the App Server's queue behind
+     * This device's send [turnId] waits in the App Server's queue behind
      * another client's turn. It has not started; its own frames follow the dequeue.
      */
     data class TurnQueued(
@@ -320,7 +320,7 @@ sealed interface WsTimelineEvent {
     ) : WsTimelineEvent
 
     /**
-     * letta-mobile-bzvro.7/.8: an advisory runtime event (loop phase, retry, status notice, command
+     * An advisory runtime event (loop phase, retry, status notice, command
      * progress) for the status line. Folded into the run state only; never a timeline row.
      */
     data class RunActivity(
@@ -497,7 +497,7 @@ private fun ServerFrame.messageDeltaEvent(isReplay: Boolean): WsTimelineEvent.Me
 }
 
 /**
- * letta-mobile-r3i1z: the `conversation_id` the message frame itself carries,
+ * The `conversation_id` the message frame itself carries,
  * normalized to null when absent or blank (ToolReturnMessage defaults it to
  * ""). Used to tag [WsTimelineEvent.MessageDelta] so consumers can route
  * fanned-out observer frames without having witnessed the turn_started.
@@ -522,7 +522,7 @@ private fun ServerFrame.messageFrameAgentId(): String? = when (this) {
 }?.takeIf { it.isNotBlank() }
 
 /**
- * letta-mobile-ce2xr: the `turn_id` the message frame itself carries, normalized to
+ * The `turn_id` the message frame itself carries, normalized to
  * null when absent or blank.
  */
 private fun ServerFrame.messageFrameTurnId(): String? = when (this) {

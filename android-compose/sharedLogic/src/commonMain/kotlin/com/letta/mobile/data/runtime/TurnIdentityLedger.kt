@@ -9,7 +9,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * The authority's stream-to-stored join (letta-mobile-r1xkl, plan 1.4). When a turn ends the host
+ * The authority's stream-to-stored join (plan 1.4). When a turn ends the host
  * lists the conversation's newest stored rows once, matches the turn's logical messages to them
  * exactly ([TurnRowMatcher]), and persists `(durable id, message_type) -> (logical id, turn id)`.
  * Every `message.list` row is then served through [enrich], so a client joins the live stream and

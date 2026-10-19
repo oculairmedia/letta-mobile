@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * letta-mobile-joigh: the `conversation.context_limit` admin_rpc contract shared by the Iroh host
+ * The `conversation.context_limit` admin_rpc contract shared by the Iroh host
  * that serves it and the clients that call it.
  *
  * Params: `agent_id` (required), `conversation_id` (optional, the agent's `default` when absent),

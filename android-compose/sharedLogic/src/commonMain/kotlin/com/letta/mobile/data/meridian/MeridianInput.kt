@@ -96,7 +96,7 @@ private class MeridianArgvReader(private val words: List<String>, private val sc
 }
 
 /**
- * Turns a command's argv words and stdin into the tool's input object (letta-mobile-jna0o.3).
+ * Turns a command's argv words and stdin into the tool's input object.
  *
  * stdin is the JSON object, unchanged. Flags and positionals add scalar properties typed by the
  * tool's own input schema (`--dry-run` is `dry_run: true`, `--limit 5` is `limit: 5`). Arrays and

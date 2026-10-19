@@ -8,7 +8,7 @@ import com.letta.mobile.data.model.UiToolCall
 import kotlinx.datetime.LocalDate
 
 /**
- * letta-mobile-bglj6.1: one row the timeline's LazyColumn holds.
+ * One row the timeline's LazyColumn holds.
  *
  * Lifted from desktop's DesktopChatRow. Tool-call folding and day dividers are presentation
  * choices layered over the shared render items, not part of the shared grouping layer, whose key
@@ -92,14 +92,14 @@ private fun UiMessage.isBareToolCallMessage(): Boolean {
 /**
  * Generated UI, an approval waiting on the person or answered, or media: conversation that keeps
  * its own row. A runtime-resolved request (Bash under approve-all) draws no card, so it folds with
- * its run like any tool call (letta-mobile-bglj6.1.25).
+ * its run like any tool call.
  */
 private fun UiMessage.carriesConversation(): Boolean {
     if (generatedUi != null || approvalRequest?.requiresUserInput() == true) return true
     return approvalResponse != null || carriesMedia()
 }
 
-/** An image attachment or a canvas card (letta-mobile-bglj6.13): content of its own, never folded. */
+/** An image attachment or a canvas card: content of its own, never folded. */
 private fun UiMessage.carriesMedia(): Boolean = attachments.isNotEmpty() || artifacts.isNotEmpty()
 
 /**

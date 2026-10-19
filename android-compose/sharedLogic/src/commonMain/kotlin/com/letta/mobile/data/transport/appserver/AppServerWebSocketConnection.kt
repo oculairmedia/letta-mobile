@@ -53,7 +53,7 @@ class AppServerWebSocketConnection(
 )
 
 /**
- * letta-mobile-by4vm.110.6: THE "open an App Server over `ws://url` + bearer" composition, shared by
+ * THE "open an App Server over `ws://url` + bearer" composition, shared by
  * desktop (every generation of its self-reconnecting session), web and Android (the embedded
  * runtime's loopback server and a Settings "Remote host" ws:// address). Lifted from the ws:// half
  * of the desktop's direct session.

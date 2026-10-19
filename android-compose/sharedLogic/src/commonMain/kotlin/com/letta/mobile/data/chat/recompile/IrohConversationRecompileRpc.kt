@@ -10,7 +10,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-by4vm.51: the host's `conversation.recompile` admin RPC, as clients call it and the
+ * The host's `conversation.recompile` admin RPC, as clients call it and the
  * host's handler reads it. The host relays it to App Server `conversation_recompile`. Params:
  * `agent_id`, `conversation_id`, and the optional `dry_run` (compile without saving). The result
  * carries the compiled system prompt under [PROMPT].
@@ -45,7 +45,7 @@ object IrohConversationRecompileRpc {
 }
 
 /**
- * letta-mobile-by4vm.51: `/recompile` and the conversation inspector's Recompile over an Iroh
+ * `/recompile` and the conversation inspector's Recompile over an Iroh
  * host's `conversation.recompile` relay. [supported] reads the host's advertised capability; a call
  * to a host without it throws [UnsupportedOperationException] (the recompile controller shows its
  * unavailable reason) instead of sending a method the host would refuse.
@@ -77,7 +77,7 @@ class IrohConversationRecompileClient(private val transport: IrohAdminRpcLink) :
 /**
  * The part of an Iroh connection [IrohConversationRecompileClient] uses: one admin RPC, and what the
  * host advertised. It mirrors [IChannelTransport.adminRpc] so this package does not depend on
- * `repository.iroh` (letta-mobile-by4vm.27 layering ratchet: no mutually importing packages).
+ * `repository.iroh` ( layering ratchet: no mutually importing packages).
  */
 interface IrohAdminRpcLink {
     val hostCapabilities: Set<String>

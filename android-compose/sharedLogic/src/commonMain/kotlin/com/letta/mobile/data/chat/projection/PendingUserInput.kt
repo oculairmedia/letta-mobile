@@ -10,7 +10,7 @@ import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.runtime.RuntimeUserInputTools
 
 /**
- * letta-mobile-bglj6.1.22: the approval in [messages] (oldest first) that waits on the person, or
+ * The approval in [messages] (oldest first) that waits on the person, or
  * null: the newest request carrying a runtime user-input tool (AskUserQuestion, ExitPlanMode) that no later
  * response answers. A later response answers it when it names the same request, or names none.
  *
@@ -29,8 +29,8 @@ fun pendingUserInputApproval(messages: List<UiMessage>): UiApprovalRequest? {
 }
 
 /**
- * letta-mobile-bglj6.1.25: whether this request waits on the person: it carries a runtime
- * user-input tool (AskUserQuestion, ExitPlanMode), or (letta-mobile-bzvro.11) the server's `can_use_tool`
+ * Whether this request waits on the person: it carries a runtime
+ * user-input tool (AskUserQuestion, ExitPlanMode), or the server's `can_use_tool`
  * control request for it is parked, which only happens under a permission mode that does not
  * approve everything. Every other request (a Bash call under approve-all, say) is resolved by the
  * runtime, even while the projection still holds it as undecided because its tool has not
@@ -51,7 +51,7 @@ private fun PendingApprovalDetails.sameRequestAs(other: PendingApprovalDetails?)
  * (by tool call id) holds for it. Returns the same list when nothing joins, so an idle
  * conversation keeps its list identity.
  *
- * letta-mobile-bzvro.40: a message that shows the call only as a plain tool row (no approval
+ * a message that shows the call only as a plain tool row (no approval
  * request) gets one built from the parked request when [details] names one of its calls. That is
  * how an Iroh client, whose own engine never sees the host's control requests, draws the card: the
  * host's `pending_approvals` snapshot is the only thing that says the call waits on the person.
@@ -71,7 +71,7 @@ fun withPendingApprovalDetails(
 }
 
 /**
- * letta-mobile-bzvro.40: [state] with its messages joined to [details]; the same state when nothing
+ * [state] with its messages joined to [details]; the same state when nothing
  * joins. A join rewrites rows anywhere in the list, so it is reported as a full change.
  */
 fun ChatUiState.withPendingApprovalDetails(details: Map<String, PendingApprovalDetails>): ChatUiState {
@@ -80,7 +80,7 @@ fun ChatUiState.withPendingApprovalDetails(details: Map<String, PendingApprovalD
     return copy(messages = joined.toImmutableList(), messageListChange = ChatMessageListChange.Full)
 }
 
-/** letta-mobile-bzvro.14: [this] marking [queued] approvals as waiting in the outbox; the same state when unchanged. */
+/** [this] marking [queued] approvals as waiting in the outbox; the same state when unchanged. */
 fun ChatUiState.withQueuedApprovals(queued: Set<String>): ChatUiState =
     if (queued == queuedApprovalRequestIds) this else copy(queuedApprovalRequestIds = queued.toImmutableSet())
 

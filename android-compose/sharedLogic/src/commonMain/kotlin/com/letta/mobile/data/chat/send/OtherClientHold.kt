@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * letta-mobile-1n5py.1: the terminal of a send the wrapper bounced because ANOTHER client (a second
+ * The terminal of a send the wrapper bounced because ANOTHER client (a second
  * device) already runs a turn in the same conversation. The engine's lease is per conversation, so
  * this device's send never started: it gets an initiator-only busy error and a failed terminal.
  * Nothing was delivered, so the send can wait and go again.
@@ -39,7 +39,7 @@ internal fun otherClientBounce(
 private const val OTHER_CLIENT_BUSY_CODE = "iroh_turn_engine_busy"
 
 /**
- * letta-mobile-1n5py.1: when a queue held for another client's turn tries again.
+ * When a queue held for another client's turn tries again.
  *
  * The usual release is a signal: a terminal this device does not own (the other client's turn
  * ending). This timer is the backstop for a turn whose end this device never sees. Each retry that
@@ -94,7 +94,7 @@ internal class OtherClientHold(
 }
 
 /**
- * letta-mobile-1n5py.1: keeps the "queued on server" mark of a sent message. The App Server parks
+ * Keeps the "queued on server" mark of a sent message. The App Server parks
  * this device's input behind another client's turn ([WsTimelineEvent.TurnQueued]); the first live
  * frame of this device's own turn means it started. Its terminal clears the mark with the turn state.
  */
@@ -121,7 +121,7 @@ internal class ServerQueueMarks(
     }
 
     /**
-     * letta-mobile-by4vm.121: the notice for a turn of this device's own that ended cancelled; its
+     * The notice for a turn of this device's own that ended cancelled; its
      * run may still be winding down on the server, so a send queued next waits for it, not for
      * another device ([markQueuedOnServer]).
      */

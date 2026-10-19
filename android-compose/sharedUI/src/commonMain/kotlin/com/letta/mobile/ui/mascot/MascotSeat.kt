@@ -113,14 +113,14 @@ private fun seatPresence(agentId: String?, stage: MascotStage, identity: MascotI
  * draw it, and either there is no transport layer (each seat draws its own) or the layer has it
  * standing at [stage], or at no seat yet. False while another seat holds it (the agent pane's
  * hero) or the host cannot bring up its scene: a place that must never stand empty draws a
- * stand-in then (letta-mobile-8kpk7).
+ * stand-in then.
  */
 @Composable
 fun mascotDrawnAt(agentId: String?, stage: MascotStage): Boolean = seatPresence(agentId, stage).drawn
 
 /**
  * [agentId]'s character, live, at a place that must show it while the transported one stands at
- * another seat (the minimised dock while the desktop sidebar's hero holds it; letta-mobile-ckmub.15).
+ * another seat (the minimised dock while the desktop sidebar's hero holds it).
  * It is the same character the seat draws - the editor's preview first, then the registry's look,
  * fed the same presence - so the two move together; [fallback] draws when the host cannot bring up
  * the agent's scene.

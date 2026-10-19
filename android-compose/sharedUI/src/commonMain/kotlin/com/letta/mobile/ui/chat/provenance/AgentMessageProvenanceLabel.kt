@@ -32,7 +32,7 @@ import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * letta-mobile-bccty: shared (Android + Desktop + Web) VISUAL render for
+ * Shared (Android + Desktop + Web) VISUAL render for
  * structured inter-agent (a2a) provenance. The provenance itself
  * (sender, recipient, delivery state, ids) is built exclusively in
  * `sharedLogic/commonMain` (`AgentMessageProvenanceProjection`) — this

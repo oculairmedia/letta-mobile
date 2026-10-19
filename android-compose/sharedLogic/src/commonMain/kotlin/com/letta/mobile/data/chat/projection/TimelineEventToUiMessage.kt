@@ -81,7 +81,7 @@ fun scrubUserEnvelope(content: String): String {
  * renders. Kept as a top-level function so it can be unit-tested without
  * instantiating a platform view model.
  *
- * Contract (letta-mobile-mge5.23):
+ * Contract:
  * - Standalone TOOL_RETURN events → null (should be merged into TOOL_CALL).
  * - TOOL_CALL events produce a UiMessage with populated `toolCalls` carrying
  *   name, arguments, result (from [TimelineEvent.Confirmed.toolReturnContent])
@@ -95,7 +95,7 @@ fun scrubUserEnvelope(content: String): String {
  *   `GET /v1/conversations/:id/messages` immediately after `POST
  *   /v1/conversations`). Rendering those as bubbles produces the
  *   "miscellaneous message history in a brand-new conversation" bug
- *   `letta-mobile-e75s`. The chat surface is for user-facing conversation
+ *. The chat surface is for user-facing conversation
  *   only; agent-state system messages are not part of the conversational UX.
  *   Other surfaces that legitimately want to see system messages (Debug tab,
  *   tooling) should observe the timeline directly without going through this
@@ -104,7 +104,7 @@ fun scrubUserEnvelope(content: String): String {
 fun timelineEventToUiMessage(
     ev: TimelineEvent,
     ownAgentId: String? = null,
-    /** letta-mobile-bglj6.13: this event's compose receipts, from [CanvasArtifactReceipts.attach]. */
+    /** This event's compose receipts, from [CanvasArtifactReceipts.attach]. */
     artifacts: List<CanvasArtifactReceipt> = emptyList(),
 ): UiMessage? {
     return when (ev) {
@@ -382,7 +382,7 @@ private fun com.letta.mobile.data.model.ToolCall.toSubagentDispatch(result: Stri
     }
 
 /**
- * letta-mobile-45e2k: normalize a skill-invocation tool call for display.
+ * Normalize a skill-invocation tool call for display.
  *
  * When a tool call's arguments contain a `skill` field (possibly wrapped in
  * up to two JSON-string layers), replace the tool name with "Skill" and the
@@ -421,7 +421,7 @@ private data class ToolCallRenderData(
 )
 
 /**
- * letta-mobile-jna0o.6: a `meridian canvas …` call (Bash or the meta-tool) renders as the native
+ * A `meridian canvas …` call (Bash or the meta-tool) renders as the native
  * canvas tool it runs, its result read off stdout, so its row matches the native call's row.
  */
 private fun ToolCallRenderData.forMeridianStdout(): ToolCallRenderData =
@@ -465,7 +465,7 @@ private fun com.letta.mobile.data.model.ToolCall.generatedImageAttachments(
 }
 
 /**
- * letta-mobile-c49of: approval chip for a TOOL_CALL event. An explicit
+ * Approval chip for a TOOL_CALL event. An explicit
  * decision (ApprovalDecision) always wins; REJECTED projects to Rejected so
  * a rejected call no longer renders as Approved. A decided event with no
  * explicit outcome falls to [implicitApprovalChip].
@@ -481,7 +481,7 @@ private fun TimelineEvent.Confirmed.approvalChip(): UiToolApprovalDecision? = wh
 }
 
 /**
- * letta-mobile-soa3i.4: the chip for a request resolved without an explicit decision - the
+ * The chip for a request resolved without an explicit decision - the
  * approve=null auto-approval echo, or a tool return that completed it. It fails closed: a rejected
  * call comes back as an error tool return, so a request whose missing explicit decision is paired
  * with an error return gets no chip at all rather than reading as Approved. Only a clean resolution

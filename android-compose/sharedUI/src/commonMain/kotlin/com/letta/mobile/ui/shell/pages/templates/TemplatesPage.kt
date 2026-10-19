@@ -51,7 +51,7 @@ fun AgentTemplatesController.templatesPageActions(onCreated: (agentId: String) -
 )
 
 /**
- * letta-mobile-ckmub.2.5 (hard cut S17): the starter templates shared by every host, one [RosterList]
+ *  (hard cut S17): the starter templates shared by every host, one [RosterList]
  * row each with its Create button. Creating goes through the App Server's `agent_create`; the host
  * opens the new agent. [modifier] carries the host frame's insets.
  */

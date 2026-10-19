@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * The help tree (letta-mobile-jna0o.3), generated from the tools' own definitions
+ * The help tree, generated from the tools' own definitions
  * ([CanvasToolContract] for canvas, each tool's description and input schema for the rest), so
  * it never drifts from what the tools accept. Every text is deterministic: same tools, same bytes.
  */

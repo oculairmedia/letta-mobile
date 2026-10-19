@@ -46,7 +46,7 @@ import org.jetbrains.compose.resources.stringResource
 internal class TouchSheetItem(val label: String, val icon: ImageVector, val onClick: () -> Unit)
 
 /**
- * letta-mobile-bglj6.1.9: the "+" sheet, "Add to message". A port of the legacy Android composer's
+ * The "+" sheet, "Add to message". A port of the legacy Android composer's
  * ChatComposerActionSheet on designsystem's ActionSheet: the host's sheet pane with a title, a
  * divider and one tonal row per action, each closing the sheet before it acts.
  */
@@ -112,7 +112,7 @@ private fun TouchSheetRow(item: TouchSheetItem, onClick: () -> Unit) {
 internal data class SheetRowLook(val corner: Dp, val elevation: Dp)
 
 /**
- * letta-mobile-bglj6.1.19: the pressed row's morph (legacy designsystem ActionSheetItem): its
+ * The pressed row's morph (legacy designsystem ActionSheetItem): its
  * corners round from 8 to 12 dp and it lifts from 2 to 4 dp of tonal elevation, on the expressive
  * scheme's fast spatial spring. Snaps under reduced motion.
  */

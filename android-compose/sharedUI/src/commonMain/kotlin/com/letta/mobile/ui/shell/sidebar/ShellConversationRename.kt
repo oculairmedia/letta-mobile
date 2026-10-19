@@ -18,7 +18,7 @@ object ShellConversationTags {
 internal const val CHAT_NAME_PLACEHOLDER = "Chat name"
 
 /**
- * letta-mobile-bzvro.17: a conversation's title, editable in place: the roster's rename field
+ * A conversation's title, editable in place: the roster's rename field
  * ([RosterRenameField]) with the chat's placeholder and tag.
  */
 @Composable

@@ -5,7 +5,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.jvm.JvmInline
 
 /**
- * The words after a command's path, read as the host router reads them (letta-mobile-jna0o.6,
+ * The words after a command's path, read as the host router reads them (
  * mirroring `MeridianInputBuilder`): a word starting `--` is a flag (`--name=value`, a bare boolean
  * `--name` when the schema says boolean, else `--name value`); anything else is a positional, which
  * fills [MeridianCommandSpec.positional] in order. `--input-file` names a file, not a field.

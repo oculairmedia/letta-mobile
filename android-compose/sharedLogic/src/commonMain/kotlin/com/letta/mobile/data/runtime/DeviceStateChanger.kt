@@ -21,7 +21,7 @@ import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * letta-mobile-qygvv.7: changes a runtime's working directory or permission mode
+ * Changes a runtime's working directory or permission mode
  * with `change_device_state` — the protocol's own mechanism — instead of
  * re-issuing `runtime_start` (which replays full state and re-registers external
  * tools, racing live turns).

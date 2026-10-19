@@ -36,7 +36,6 @@ import com.letta.mobile.data.model.A2uiSurfaceId
 import com.letta.mobile.ui.a2ui.A2uiAction
 import com.letta.mobile.ui.a2ui.A2uiRenderer
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
-import com.letta.mobile.ui.a2ui.A2uiTestTags
 import com.letta.mobile.ui.test.setLettaTestContent
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -102,7 +101,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.MISSING_COMPONENT).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_missing_component").assertIsDisplayed()
     }
 
     @Test
@@ -126,7 +125,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.MISSING_TEXT).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_missing_text").assertIsDisplayed()
         composeRule.runOnIdle {
             manager.applyMessage(
                 A2uiMessage.UpdateDataModel(
@@ -184,7 +183,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.TEXT_FIELD).performTextInput("not-email")
+        composeRule.onNodeWithTag("a2ui_text_field").performTextInput("not-email")
         composeRule.onNodeWithText("Enter a valid email").assertIsDisplayed()
     }
 
@@ -206,7 +205,7 @@ class A2uiRendererTest {
         }
 
         composeRule.onNodeWithText("Accept terms").assertIsDisplayed()
-        composeRule.onNodeWithTag(A2uiTestTags.CHECKBOX).assertIsOff().performClick()
+        composeRule.onNodeWithTag("a2ui_checkbox").assertIsOff().performClick()
         composeRule.runOnIdle {
             assertEquals("true", manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/accepted")!!.jsonPrimitive.content)
         }
@@ -233,7 +232,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.LIST_VIEW).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_list_view").assertIsDisplayed()
         composeRule.onNodeWithText("First card").assertIsDisplayed()
         composeRule.onNodeWithText("Second card").assertIsDisplayed()
     }
@@ -272,7 +271,7 @@ class A2uiRendererTest {
                 )
             )
         }
-        composeRule.onNodeWithTag(A2uiTestTags.MODAL).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_modal").assertIsDisplayed()
         composeRule.onNodeWithText("Modal body").assertIsDisplayed()
     }
 
@@ -295,9 +294,9 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.VIDEO).assertIsDisplayed()
-        composeRule.onNodeWithTag(A2uiTestTags.AUDIO_PLAYER).assertIsDisplayed()
-        composeRule.onAllNodesWithTag(A2uiTestTags.MEDIA_PLAY_PAUSE).assertCountEquals(2)
+        composeRule.onNodeWithTag("a2ui_video").assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_audio_player").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("a2ui_media_play_pause").assertCountEquals(2)
     }
 
     @Test
@@ -428,7 +427,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.TOOL_APPROVAL_CARD).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_tool_approval_card").assertIsDisplayed()
         composeRule.onNodeWithText("bash").assertIsDisplayed()
         composeRule.onNodeWithText("Run a shell command").assertIsDisplayed()
         composeRule.onNodeWithText("Destructive").assertIsDisplayed()
@@ -452,7 +451,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.TOOL_APPROVAL_SENSITIVE_VALUE).performClick()
+        composeRule.onNodeWithTag("a2ui_tool_approval_sensitive_value").performClick()
         composeRule.onNodeWithText("sk-test-secret").assertIsDisplayed()
     }
 
@@ -514,7 +513,7 @@ class A2uiRendererTest {
                 )
             )
         }
-        composeRule.onNodeWithTag(A2uiTestTags.SURFACE_MISSING).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_surface_missing").assertIsDisplayed()
 
         composeRule.runOnIdle {
             manager.applyToolApprovalSurface()
@@ -643,7 +642,7 @@ class A2uiRendererTest {
         composeRule.onNodeWithText("2").assertIsDisplayed()
         composeRule.onNodeWithText("Reservation time").assertIsDisplayed()
         composeRule.onNodeWithText("2026-05-17T18:30").assertIsDisplayed()
-        composeRule.onNodeWithTag(A2uiTestTags.DIVIDER).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_divider").assertIsDisplayed()
     }
 
     @Test
@@ -659,7 +658,7 @@ class A2uiRendererTest {
             )
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.LIST_VIEW).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_list_view").assertIsDisplayed()
         composeRule.onNodeWithText("Alpha issue").assertIsDisplayed()
         composeRule.onNodeWithText("Needs review").assertIsDisplayed()
         composeRule.onNodeWithText("Beta issue").assertIsDisplayed()
@@ -682,7 +681,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.MISSING_COMPONENT).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_missing_component").assertIsDisplayed()
         composeRule.runOnIdle {
             manager.applyMessage(
                 A2uiMessage.UpdateDataModel(
@@ -725,7 +724,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.TEXT_FIELD).performTextInput("4")
+        composeRule.onNodeWithTag("a2ui_text_field").performTextInput("4")
         composeRule.runOnIdle {
             assertEquals(
                 "4",
@@ -742,7 +741,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.CHECKBOX).assertIsOff().performClick()
+        composeRule.onNodeWithTag("a2ui_checkbox").assertIsOff().performClick()
         composeRule.runOnIdle {
             assertEquals(
                 "true",
@@ -759,8 +758,8 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.SWITCH).assertIsOn().performClick()
-        composeRule.onNodeWithTag(A2uiTestTags.SWITCH).assertIsOff()
+        composeRule.onNodeWithTag("a2ui_switch").assertIsOn().performClick()
+        composeRule.onNodeWithTag("a2ui_switch").assertIsOff()
         composeRule.runOnIdle {
             assertEquals(
                 "false",
@@ -777,7 +776,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.RADIO).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_radio").assertIsDisplayed()
         composeRule.onNodeWithText("Aisle").performClick()
         composeRule.runOnIdle {
             assertEquals(
@@ -813,7 +812,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.CHOICE_PICKER).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_choice_picker").assertIsDisplayed()
         composeRule.onNodeWithText("Bound feel").assertIsDisplayed()
         composeRule.onNodeWithText("Glitchy").performClick()
 
@@ -862,8 +861,8 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onAllNodesWithTag(A2uiTestTags.CHOICE_PICKER_LIST_OPTION).assertCountEquals(4)
-        composeRule.onAllNodesWithTag(A2uiTestTags.CHOICE_PICKER_CHIP_OPTION).assertCountEquals(4)
+        composeRule.onAllNodesWithTag("a2ui_choice_picker_list_option").assertCountEquals(4)
+        composeRule.onAllNodesWithTag("a2ui_choice_picker_chip_option").assertCountEquals(4)
         composeRule.onNodeWithText("OpenAI").performClick()
         composeRule.onNodeWithText("Code").performClick()
         composeRule.onNodeWithText("Direct").performClick()
@@ -921,8 +920,8 @@ class A2uiRendererTest {
         }
 
         composeRule.onNodeWithText("Submit").performClick()
-        composeRule.onNodeWithTag(A2uiTestTags.BUTTON_PROGRESS).assertIsDisplayed()
-        composeRule.onNodeWithTag(A2uiTestTags.CHOICE_PICKER).assertIsNotEnabled()
+        composeRule.onNodeWithTag("a2ui_button_progress").assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_choice_picker").assertIsNotEnabled()
 
         composeRule.runOnIdle {
             assertEquals(null, manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/_inputs/feel-picker"))
@@ -942,9 +941,9 @@ class A2uiRendererTest {
         }
 
         composeRule.onNodeWithText("Submit").performClick()
-        composeRule.onNodeWithTag(A2uiTestTags.BUTTON_PROGRESS).assertIsDisplayed()
-        composeRule.onNodeWithTag(A2uiTestTags.CHECKBOX).assertIsNotEnabled()
-        composeRule.onNodeWithTag(A2uiTestTags.SWITCH).assertIsNotEnabled()
+        composeRule.onNodeWithTag("a2ui_button_progress").assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_checkbox").assertIsNotEnabled()
+        composeRule.onNodeWithTag("a2ui_switch").assertIsNotEnabled()
 
         composeRule.onNodeWithText("Aisle").performClick()
         composeRule.runOnIdle {
@@ -963,8 +962,8 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.SLIDER).assertIsDisplayed()
-        composeRule.onNodeWithTag(A2uiTestTags.SLIDER)
+        composeRule.onNodeWithTag("a2ui_slider").assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_slider")
             .performSemanticsAction(SemanticsActions.SetProgress) { setProgress -> setProgress(8f) }
 
         composeRule.runOnIdle {
@@ -983,8 +982,8 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.SLIDER).assertIsDisplayed()
-        composeRule.onNodeWithTag(A2uiTestTags.SLIDER)
+        composeRule.onNodeWithTag("a2ui_slider").assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_slider")
             .performSemanticsAction(SemanticsActions.SetProgress) { setProgress -> setProgress(1.5f) }
 
         composeRule.runOnIdle {
@@ -1003,8 +1002,8 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onAllNodesWithTag(A2uiTestTags.STEPPER_INCREMENT)[0].performClick()
-        composeRule.onAllNodesWithTag(A2uiTestTags.STEPPER_INCREMENT)[1].performClick()
+        composeRule.onAllNodesWithTag("a2ui_stepper_increment")[0].performClick()
+        composeRule.onAllNodesWithTag("a2ui_stepper_increment")[1].performClick()
 
         composeRule.runOnIdle {
             assertEquals(
@@ -1027,7 +1026,7 @@ class A2uiRendererTest {
         }
 
         composeRule.onNodeWithText("1").assertIsDisplayed()
-        composeRule.onNodeWithTag(A2uiTestTags.STEPPER_INCREMENT).performClick()
+        composeRule.onNodeWithTag("a2ui_stepper_increment").performClick()
         composeRule.onNodeWithText("2").assertIsDisplayed()
         composeRule.runOnIdle {
             assertEquals(
@@ -1046,7 +1045,7 @@ class A2uiRendererTest {
         }
 
         composeRule.onNodeWithText("Downloading model").assertIsDisplayed()
-        composeRule.onNodeWithTag(A2uiTestTags.LINEAR_PROGRESS).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_linear_progress").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Linear progress 25%").assertIsDisplayed()
         composeRule.onNodeWithText("25%").assertIsDisplayed()
 
@@ -1075,7 +1074,7 @@ class A2uiRendererTest {
         }
 
         composeRule.onNodeWithText("Scanning files").assertIsDisplayed()
-        composeRule.onNodeWithTag(A2uiTestTags.CIRCULAR_PROGRESS).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_circular_progress").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Circular progress 40%").assertIsDisplayed()
         composeRule.onNodeWithText("40%").assertIsDisplayed()
 
@@ -1121,9 +1120,9 @@ class A2uiRendererTest {
         }
 
         composeRule.onNodeWithText("Submit").performClick()
-        composeRule.onNodeWithTag(A2uiTestTags.BUTTON_PROGRESS).assertIsDisplayed()
-        composeRule.onNodeWithTag(A2uiTestTags.SLIDER).assertIsNotEnabled()
-        composeRule.onAllNodesWithTag(A2uiTestTags.STEPPER_INCREMENT)[0].assertIsNotEnabled()
+        composeRule.onNodeWithTag("a2ui_button_progress").assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_slider").assertIsNotEnabled()
+        composeRule.onAllNodesWithTag("a2ui_stepper_increment")[0].assertIsNotEnabled()
     }
 
     @Test
@@ -1134,7 +1133,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.DROPDOWN).assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("a2ui_dropdown").assertIsDisplayed().performClick()
         composeRule.onNodeWithText("Aisle").performClick()
         composeRule.runOnIdle {
             assertEquals(
@@ -1152,7 +1151,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.DROPDOWN).assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("a2ui_dropdown").assertIsDisplayed().performClick()
         composeRule.onNodeWithText("Pasta").performClick()
         composeRule.runOnIdle {
             assertEquals(
@@ -1171,7 +1170,7 @@ class A2uiRendererTest {
         }
 
         composeRule.onNodeWithText("Low").assertIsDisplayed()
-        composeRule.onNodeWithTag(A2uiTestTags.DROPDOWN).performClick()
+        composeRule.onNodeWithTag("a2ui_dropdown").performClick()
         composeRule.onNodeWithText("High").performClick()
         composeRule.onNodeWithText("High").assertIsDisplayed()
         composeRule.runOnIdle {
@@ -1195,8 +1194,8 @@ class A2uiRendererTest {
         }
 
         composeRule.onNodeWithText("Submit").performClick()
-        composeRule.onNodeWithTag(A2uiTestTags.BUTTON_PROGRESS).assertIsDisplayed()
-        composeRule.onNodeWithTag(A2uiTestTags.DROPDOWN).assertIsNotEnabled()
+        composeRule.onNodeWithTag("a2ui_button_progress").assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_dropdown").assertIsNotEnabled()
     }
 
     @Test
@@ -1212,7 +1211,7 @@ class A2uiRendererTest {
             )
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.CHIP).assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("a2ui_chip").assertIsDisplayed().performClick()
         composeRule.runOnIdle {
             val action = actions.single()
             assertEquals("filter_tag", action.name)
@@ -1228,7 +1227,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.FILTER_CHIP).assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("a2ui_filter_chip").assertIsDisplayed().performClick()
         composeRule.runOnIdle {
             assertEquals(
                 "true",
@@ -1245,7 +1244,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.BADGE).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_badge").assertIsDisplayed()
         composeRule.onNodeWithText("2").assertIsDisplayed()
         composeRule.runOnIdle {
             manager.applyMessage(
@@ -1270,7 +1269,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.TABS).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_tabs").assertIsDisplayed()
         composeRule.onNodeWithText("Overview body").assertIsDisplayed()
         composeRule.onNodeWithText("Activity").performClick()
         composeRule.onNodeWithText("Activity body").assertIsDisplayed()
@@ -1301,7 +1300,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.ACCORDION).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_accordion").assertIsDisplayed()
         composeRule.onNodeWithText("Summary body").assertIsDisplayed()
         composeRule.onNodeWithText("Details body").assertDoesNotExist()
         composeRule.onNodeWithText("Details").performClick()
@@ -1336,8 +1335,8 @@ class A2uiRendererTest {
             )
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.LIST_VIEW).assertIsDisplayed()
-        composeRule.onAllNodesWithTag(A2uiTestTags.SCHEDULE_CARD).assertCountEquals(5)
+        composeRule.onNodeWithTag("a2ui_list_view").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("a2ui_schedule_card").assertCountEquals(5)
         composeRule.onNodeWithText("Morning check-in").assertIsDisplayed()
         composeRule.onNodeWithText("Weekly summary").assertIsDisplayed()
 
@@ -1406,7 +1405,7 @@ class A2uiRendererTest {
             )
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.SCHEDULE_SELECTOR_INPUT).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_schedule_selector_input").assertIsDisplayed()
         composeRule.onNodeWithText("Runs on cron: 0 8 * * *").assertIsDisplayed()
         composeRule.onNodeWithText("Cron").performClick()
         composeRule.onNodeWithText("Every").performClick()
@@ -1444,7 +1443,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.ICON).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_icon").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Cloud status").assertIsDisplayed()
     }
 
@@ -1456,7 +1455,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.MISSING_ICON).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_missing_icon").assertIsDisplayed()
     }
 
     @Test
@@ -1472,7 +1471,7 @@ class A2uiRendererTest {
             )
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.TEXT_FIELD).performTextInput("4")
+        composeRule.onNodeWithTag("a2ui_text_field").performTextInput("4")
         composeRule.onNodeWithText("Submit").performClick()
 
         composeRule.runOnIdle {
@@ -1523,7 +1522,7 @@ class A2uiRendererTest {
             )
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.TEXT_FIELD).performTextInput("hello")
+        composeRule.onNodeWithTag("a2ui_text_field").performTextInput("hello")
         composeRule.onNodeWithText("Send").performClick()
 
         composeRule.runOnIdle {
@@ -1568,7 +1567,7 @@ class A2uiRendererTest {
             )
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.TEXT_FIELD).performTextInput("hello")
+        composeRule.onNodeWithTag("a2ui_text_field").performTextInput("hello")
         composeRule.onNodeWithText("Send").performClick()
 
         composeRule.runOnIdle {
@@ -1657,7 +1656,7 @@ class A2uiRendererTest {
             )
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.TEXT_FIELD).performTextInput("hello")
+        composeRule.onNodeWithTag("a2ui_text_field").performTextInput("hello")
         composeRule.onNodeWithText("Send").performClick()
 
         composeRule.runOnIdle {
@@ -1704,7 +1703,7 @@ class A2uiRendererTest {
             )
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.TEXT_FIELD).performTextInput("world")
+        composeRule.onNodeWithTag("a2ui_text_field").performTextInput("world")
         composeRule.onNodeWithText("Send").performClick()
 
         composeRule.runOnIdle {
@@ -1735,7 +1734,7 @@ class A2uiRendererTest {
             )
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.TEXT_FIELD).performTextInput("4")
+        composeRule.onNodeWithTag("a2ui_text_field").performTextInput("4")
         composeRule.onNodeWithText("Submit").performClick()
 
         composeRule.runOnIdle {
@@ -1796,7 +1795,7 @@ class A2uiRendererTest {
         }
 
         composeRule.onNodeWithText("Submit").performClick()
-        composeRule.onNodeWithTag(A2uiTestTags.BUTTON_PROGRESS).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_button_progress").assertIsDisplayed()
         composeRule.onNodeWithText("Submit").assertIsNotEnabled()
         composeRule.onNodeWithText("submitting...").assertIsDisplayed()
 
@@ -1817,11 +1816,11 @@ class A2uiRendererTest {
             )
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.TEXT_FIELD).performTextInput("4")
+        composeRule.onNodeWithTag("a2ui_text_field").performTextInput("4")
         composeRule.onNodeWithText("Submit").performClick()
         composeRule.onNodeWithText("submitting...").assertIsDisplayed()
         assertThrows(AssertionError::class.java) {
-            composeRule.onNodeWithTag(A2uiTestTags.TEXT_FIELD).performTextInput("2")
+            composeRule.onNodeWithTag("a2ui_text_field").performTextInput("2")
         }
 
         composeRule.runOnIdle {
@@ -1846,7 +1845,7 @@ class A2uiRendererTest {
             }
 
             composeRule.onNodeWithText("Submit").performClick()
-            composeRule.onNodeWithTag(A2uiTestTags.BUTTON_PROGRESS).assertIsDisplayed()
+            composeRule.onNodeWithTag("a2ui_button_progress").assertIsDisplayed()
             composeRule.onNodeWithText("Submit").assertIsNotEnabled()
 
             composeRule.mainClock.autoAdvance = false
@@ -1855,7 +1854,7 @@ class A2uiRendererTest {
 
             composeRule.onNodeWithText("Submit").assertIsEnabled()
             composeRule.onNodeWithText("submitting...").assertDoesNotExist()
-            composeRule.onNodeWithTag(A2uiTestTags.BUTTON_PROGRESS).assertDoesNotExist()
+            composeRule.onNodeWithTag("a2ui_button_progress").assertDoesNotExist()
         } finally {
             composeRule.mainClock.autoAdvance = true
         }
@@ -1875,7 +1874,7 @@ class A2uiRendererTest {
         }
 
         composeRule.onNodeWithText("Submit").performClick()
-        composeRule.onNodeWithTag(A2uiTestTags.BUTTON_PROGRESS).assertIsDisplayed()
+        composeRule.onNodeWithTag("a2ui_button_progress").assertIsDisplayed()
         composeRule.onNodeWithText("Submit").assertIsNotEnabled()
 
         composeRule.runOnIdle {
@@ -1885,7 +1884,7 @@ class A2uiRendererTest {
 
         composeRule.onNodeWithText("Submit").assertIsEnabled()
         composeRule.onNodeWithText("submitting...").assertDoesNotExist()
-        composeRule.onNodeWithTag(A2uiTestTags.BUTTON_PROGRESS).assertDoesNotExist()
+        composeRule.onNodeWithTag("a2ui_button_progress").assertDoesNotExist()
     }
 
     @Test
@@ -1896,7 +1895,7 @@ class A2uiRendererTest {
             A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.DATE_TIME_INPUT).performClick()
+        composeRule.onNodeWithTag("a2ui_date_time_input").performClick()
         composeRule.onAllNodesWithText("Select date").assertCountEquals(2)
         composeRule.onAllNodesWithText("OK")[0].performClick()
 

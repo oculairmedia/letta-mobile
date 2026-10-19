@@ -9,7 +9,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 
 /**
- * letta-mobile-jna0o.6: a `meridian` CLI call read as the canvas tool it runs
+ * A `meridian` CLI call read as the canvas tool it runs
  * (docs/design/on-demand-tools-via-meridian-cli.md, "Results, receipts and timeline rendering").
  *
  * An agent reaches the canvas either through native `canvas_*` tools, or by running

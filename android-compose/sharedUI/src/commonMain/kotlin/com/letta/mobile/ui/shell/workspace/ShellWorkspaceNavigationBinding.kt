@@ -16,7 +16,7 @@ import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
 import com.letta.mobile.ui.shell.rail.ShellRailFocus
 import kotlin.time.Instant
 /**
- * letta-mobile-ckmub.17.4: the workspace's navigation over the workspace and its roster [agents] as
+ * The workspace's navigation over the workspace and its roster [agents] as
  * (id, name): the whole roster on the rail (its library lists them all), the focused agent's panel.
  */
 fun ShellWorkspaceState.workspaceNavigation(

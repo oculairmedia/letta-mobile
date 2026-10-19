@@ -36,7 +36,7 @@ sealed interface AttentionDecision {
 }
 
 /**
- * letta-mobile-bzvro.27 (F27): the one decision of whether an [AttentionEvent] becomes a notification.
+ *  (F27): the one decision of whether an [AttentionEvent] becomes a notification.
  *
  * Each [AttentionEvent.dedupKey] is decided once, whatever the outcome, so an approval request
  * replayed by a reconnect or rebuilt by a resync posts at most one notification, and one first

@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * letta-mobile-by4vm.112: rate-limited WARN telemetry for a host-side Iroh failure that a peer can
+ * Rate-limited WARN telemetry for a host-side Iroh failure that a peer can
  * repeat at will (a redialling client, a refused handshake).
  *
  * Each distinct error message is counted. Its first [burst] occurrences are logged, then every

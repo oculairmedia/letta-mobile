@@ -6,7 +6,7 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 
 /**
- * letta-mobile-by4vm.9: binds a [ReconnectingAppServerClient] to a router and turn engine that
+ * Binds a [ReconnectingAppServerClient] to a router and turn engine that
  * outlive the socket, so an in-flight turn survives a brief disconnect instead of failing on it.
  *
  *  - [onDisconnected]: the router is marked interrupted. Subscribers stay registered and each turn

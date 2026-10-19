@@ -10,7 +10,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 
 object AppServerProtocol {
-    /** Alias of [LettaJson.wire]; see that instance for the flag rationale (letta-mobile-by4vm.20). */
+    /** Alias of [LettaJson.wire]; see that instance for the flag rationale. */
     val json: Json = LettaJson.wire
 
     /** Placeholder substituted for credential values in redacted diagnostics. */
@@ -24,7 +24,7 @@ object AppServerProtocol {
      * On one-socket transports these are labelled [AppServerChannel.Stream];
      * everything else (including malformed JSON) is [AppServerChannel.Control].
      * The label picks a frame's per-type view only; delivery order is the socket's
-     * (letta-mobile-by4vm.5, see [AppServerInboundDelivery]).
+     * (see [AppServerInboundDelivery]).
      */
     private val STREAM_CHANNEL_MESSAGE_TYPES: Set<String> = setOf(
         "stream_delta",
@@ -112,7 +112,7 @@ object AppServerProtocol {
      * When [channel] is absent, the one-socket transport channel is inferred from
      * the parsed top-level message type without parsing the frame a second time.
      *
-     * Forward-compatibility contract (letta-mobile-lgns8.4):
+     * Forward-compatibility contract:
      * - Unknown top-level `type` values decode to [AppServerInboundFrame.Unknown]
      *   with the raw envelope preserved, so receive loops survive new server frames.
      * - Additive object keys on known frames are ignored ([Json.ignoreUnknownKeys]).

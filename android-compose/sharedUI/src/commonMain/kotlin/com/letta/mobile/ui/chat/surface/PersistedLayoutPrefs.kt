@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.withContext
 
 /**
- * letta-mobile-ckmub.3.14: where a platform keeps one shared layout preference (a properties
+ * Where a platform keeps one shared layout preference (a properties
  * file on desktop). Both calls may block and may throw; the shared hosts below run them on [io]
  * and treat a failure as "nothing stored" / "not written", so a broken file costs a session's
  * layout, never a frame.
@@ -64,7 +64,7 @@ private const val CHAT_DOCK_GEOMETRY_KEY = "chat.dock.geometry"
 const val LAYOUT_PREF_SAVE_DEBOUNCE_MS = 400L
 
 /**
- * letta-mobile-zxk2n.29: provides the minimised-chat layout prefs ([LocalCanvasBubbleLayoutPrefs])
+ * Provides the minimised-chat layout prefs ([LocalCanvasBubbleLayoutPrefs])
  * for [defaults], read once from [storage] and written back off the UI thread, debounced.
  */
 @OptIn(FlowPreview::class)
@@ -86,7 +86,7 @@ fun CanvasBubbleLayoutHost(
 }
 
 /**
- * letta-mobile-bglj6.1: the docked chat panel's placement, read from [storage] off the UI thread
+ * The docked chat panel's placement, read from [storage] off the UI thread
  * (null until it arrives, so the page draws no dock rather than one that jumps) and written back,
  * debounced, whenever it changes. A placement still waiting out the debounce when the caller
  * leaves is written then, so the last move is never lost. One placement for every conversation:

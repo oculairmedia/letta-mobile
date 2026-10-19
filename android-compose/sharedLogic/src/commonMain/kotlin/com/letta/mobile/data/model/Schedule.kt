@@ -71,8 +71,6 @@ private data class ScheduleListResponseSurrogate(
  * (`{ "has_next_page": ..., "scheduled_messages": [...] }`). This serializer accepts
  * both shapes so the mobile Schedules page hydrates (or shows an empty state) instead
  * of throwing a SerializationException and landing in a broken/error state.
- *
- * NOTE: previously added in PR #648 and inadvertently reverted by PR #650; restored here.
  */
 object ScheduleListResponseSerializer : KSerializer<ScheduleListResponse> {
     override val descriptor: SerialDescriptor = ScheduleListResponseSurrogate.serializer().descriptor

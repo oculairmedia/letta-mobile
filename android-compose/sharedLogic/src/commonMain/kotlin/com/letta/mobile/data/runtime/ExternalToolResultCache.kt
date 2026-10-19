@@ -6,7 +6,7 @@ import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
 /**
- * Bounded, expiring cache of computed external-tool results (lgns8.22.4.1.6).
+ * Bounded, expiring cache of computed external-tool results.
  *
  * WHY IT OUTLIVES A SUCCESSFUL SEND
  * `external_tool_call_response` is a ONE-WAY frame: `sendExternalToolResponse`

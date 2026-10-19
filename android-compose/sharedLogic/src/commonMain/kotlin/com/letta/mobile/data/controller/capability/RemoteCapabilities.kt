@@ -59,13 +59,12 @@ data class RemoteCapabilities(
     val scopedPush: Boolean = false,
 
     /**
-     * letta-mobile-bn008-phase2-custom-tool (1vuec): agent-to-agent direct
+     * Agent-to-agent direct
      * messaging via the Iroh CLI binary. When enabled, the
      * [CustomIrohMessagingTool] (`agent_message_send`) is advertised in every
      * agent's runtime_start `external_tools`, so the model can call it
      * directly. Distinct from the upstream `matrix_agent_message` tool which
-     * is the agent↔human surface — see bn008-phase2-handoff §1
-     * "Architecture distinction".
+     * is the agent↔human surface.
      */
     val agentMessaging: Boolean = false,
 ) {
@@ -179,7 +178,7 @@ enum class Capability {
     SlimAgents,
     ScopedPush,
     /**
-     * letta-mobile-bn008-phase2-custom-tool (1vuec): see
+     * See
      * [RemoteCapabilities.agentMessaging] for the agent↔agent Iroh surface
      * this gates.
      */

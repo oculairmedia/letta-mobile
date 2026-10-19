@@ -1,7 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 /**
- * lgns8.9 disposition for the archive/folder/group/passage domains.
+ *  Disposition for the archive/folder/group/passage domains.
  *
  * Evidence from the pinned admin-shim (`server.ts`, 0.29.12 host):
  *  - `GET /v1/archives`, `/v1/folders`, `/v1/groups` are `stubList` routes —
@@ -9,7 +9,7 @@ package com.letta.mobile.data.controller.node.iroh
  *    archive, folder, or group entity at all, so an empty list IS the complete
  *    answer. They are served natively (empty-by-contract) rather than denied,
  *    because denying would regress the admin screens that render them.
- *  - `POST /v1/agents/{id}/archival-memory` and `DELETE .../{pid}` do not exist
+ *  - `POST /v1/agents/{id}/archival-memory` and `DELETE.../{pid}` do not exist
  *    in admin-shim: those paths 404. There is no archival-memory store in the
  *    local backend and no native v2 command for one, so passage WRITES fail
  *    closed. That is parity with today, not a regression.

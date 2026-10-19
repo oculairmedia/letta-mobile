@@ -19,7 +19,7 @@ public data class ActionCall(
  * Where an [ActionCall] comes from: its [origin], the board it concerns ([canvasId], when there is
  * one) and the element it concerns ([elementId], when there is one).
  *
- * [callId] is the host's opaque token for this one call (SPI 1.1, letta-mobile-cdgpr.16). A
+ * [callId] is the host's opaque token for this one call (SPI 1.1). A
  * plugin echoes it as [PluginEmit.callId] on every `host.emit` it makes for the call, so the host
  * places on this call's board even while the plugin serves other conversations at once.
  */

@@ -25,7 +25,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * Native reflection (dreaming) parity over Iroh admin_rpc (lgns8.16, letta-mobile-iczm7).
+ * Native reflection (dreaming) parity over Iroh admin_rpc.
  *
  *  - `reflection.get` / `reflection.set` carry the agent's settings through letta-code's
  *    runtime-scoped `get_reflection_settings` / `set_reflection_settings`: trigger, step_count and,

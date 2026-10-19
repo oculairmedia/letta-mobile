@@ -60,7 +60,7 @@ internal class TimelineHydrator(
     }
 
     /**
-     * letta-mobile-by4vm.17: a failed Room read no longer degrades silently to "no unsent
+     * A failed Room read no longer degrades silently to "no unsent
      * messages". The rows stay on disk (hydration never deletes what it did not load), the
      * failure is logged at ERROR and surfaced on [events] as a [TimelineSyncEvent.StreamError]
      * so the session's existing error state shows it. Cancellation is never swallowed.

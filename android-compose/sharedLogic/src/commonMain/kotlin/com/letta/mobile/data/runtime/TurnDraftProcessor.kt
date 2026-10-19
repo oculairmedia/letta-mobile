@@ -26,7 +26,7 @@ internal data class TurnDraftCallbacks(
     val completedDraft: (RunId?) -> RuntimeEventDraft,
     val recordTerminal: (RuntimeEventDraft, Long?) -> Unit,
     val noteCompleted: (Long?) -> Unit,
-    /** Ends the turn (letta-mobile-by4vm.7: signals its [TurnOutcome.Completed]; it no longer throws). */
+    /** Ends the turn (signals its [TurnOutcome.Completed]; it no longer throws). */
     val complete: () -> Unit,
     val settleDelayMs: Long,
     /** Whether the turn already ended, by this processor or another path (an abrupt local ending). */
@@ -36,14 +36,14 @@ internal data class TurnDraftCallbacks(
 internal class TurnDraftProcessor(
     private val callbacks: TurnDraftCallbacks,
     private val coroutineScope: CoroutineScope,
-    /** letta-mobile-jdcoj: the turn's one identity stamper; every stream-frame draft passes through it. */
+    /** The turn's one identity stamper; every stream-frame draft passes through it. */
     val identity: TurnStreamIdentity = turnStreamIdentityFor(null),
 ) {
     val ledger = TurnToolCallLedger()
     private val tail = TurnTailBuffer()
 
     /**
-     * letta-mobile-by4vm.7: the completion lifecycle ([TurnPhase]), in place of the former
+     * The completion lifecycle ([TurnPhase]), in place of the former
      * `terminalArmed` / `speculativeCompletionArmed` / `terminalEmitted` flags. The settle window is
      * armed exactly when a completion is held, i.e. on leaving [TurnPhase.Streaming] for a pending
      * phase.
@@ -60,7 +60,7 @@ internal class TurnDraftProcessor(
     val phase: TurnPhase get() = lifecycle.phase
 
     /**
-     * letta-mobile-qygvv.16: the transport session carrying this turn is gone, so no server terminal
+     * The transport session carrying this turn is gone, so no server terminal
      * will ever arrive. Ends the turn through the same terminal path a server terminal takes: a
      * completion already waiting out its settle window is published as it stands, otherwise
      * [fallback] is. Never emits a second terminal. Reports what it did, then completes the turn.
@@ -92,7 +92,7 @@ internal class TurnDraftProcessor(
     }
 
     /**
-     * letta-mobile-qygvv.26: a round's tail (usage_statistics, stop_reason) is closed once its
+     * A round's tail (usage_statistics, stop_reason) is closed once its
      * stop_reason arrived. The next non-terminal frame means the turn continues into another round,
      * so that round's tail goes out now, ahead of the frame, instead of being overwritten or held
      * back until the turn's terminal.
@@ -104,7 +104,7 @@ internal class TurnDraftProcessor(
 
     /**
      * [authoritative] marks a draft projected from the server's own end-of-turn signal
-     * (`turn_finished`, or an idle loop status after evidence — letta-mobile-qygvv.2). Its terminal
+     * (`turn_finished`, or an idle loop status after evidence ). Its terminal
      * lifecycle completes the turn immediately, superseding any pending settle window, instead of
      * waiting out the quiet period the `stop_reason` delta fallback needs.
      */
@@ -225,7 +225,7 @@ internal class TurnDraftProcessor(
 }
 
 /**
- * letta-mobile-qygvv.26: the buffered end-of-round frames, kept in arrival order (the App Server
+ * The buffered end-of-round frames, kept in arrival order (the App Server
  * sends usage_statistics, then stop_reason) and every one of them: a multi-round turn reports each
  * round's usage and stop_reason, not the first usage and the last stop_reason.
  */
@@ -249,7 +249,7 @@ private class TurnTailBuffer {
     }
 }
 
-/** letta-mobile-qygvv.16: how [TurnDraftProcessor.cutOff] ended a turn whose session was lost. */
+/** How [TurnDraftProcessor.cutOff] ended a turn whose session was lost. */
 internal enum class TurnCutOffOutcome {
     /** The turn's own terminal was already out; nothing more was emitted. */
     AlreadyTerminal,
@@ -306,7 +306,7 @@ private fun RuntimeEventDraft.isUsageStatisticsFrame(): Boolean = when (val even
 
 /**
  * A frame that carries the turn on past a closed round tail: neither a tail frame nor a terminal,
- * nor an advisory status (letta-mobile-bzvro.7: a loop status or retry notice after a round's
+ * nor an advisory status (a loop status or retry notice after a round's
  * stop_reason says nothing about another round starting).
  */
 private fun RuntimeEventDraft.continuesTurn(): Boolean =

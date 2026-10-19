@@ -9,7 +9,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * letta-mobile-1n5py: what a chat screen can see and do with the send queue. Every host (Android,
+ * What a chat screen can see and do with the send queue. Every host (Android,
  * desktop) binds this one object; the queue logic stays in [QueuedSendDriver].
  */
 class ChatSendQueueControls internal constructor(

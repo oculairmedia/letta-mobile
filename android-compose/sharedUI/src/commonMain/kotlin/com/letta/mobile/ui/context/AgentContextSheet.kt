@@ -66,18 +66,18 @@ data class AgentContextPicker(
     val actions: ModelPickerActions,
     val onEffortApplied: ((ModelPickerEntry, String?) -> Unit)? = null,
     /**
-     * letta-mobile-pt1ze.5: which level the sheet shows, owned by the pane so its dismissal can go
+     * Which level the sheet shows, owned by the pane so its dismissal can go
      * back first; null keeps the levels inside the sheet.
      */
     val levels: PickerDrillIn<AgentSettingsLevel>? = null,
 )
 
-/** The agent settings sheet's levels: its rows, and the model list opened over them (letta-mobile-pt1ze.5). */
+/** The agent settings sheet's levels: its rows, and the model list opened over them. */
 enum class AgentSettingsLevel { Root, Model }
 
 /**
- * letta-mobile-3io8k: the card's sheet. letta-mobile-pt1ze.5 (built on the S8 picker,
- * letta-mobile-ckmub.3.6): two levels. The root is one scroll of rows: the "Model" row under
+ * The card's sheet. (built on the S8 picker,
+ *): two levels. The root is one scroll of rows: the "Model" row under
  * "Applies to this agent/conversation" with the selected model's effort slider, then the context
  * (used / limit, the per-section legend with its provenance, Compact). The "Model" row opens the
  * searchable model list as the second level, with a back arrow, its search pinned and its own
@@ -143,7 +143,7 @@ private fun ModelRow(model: AgentContextCardModel, picker: AgentContextPicker, o
 }
 
 /**
- * letta-mobile-3io8k: one effort slider, for the selected model only (tap a model first to tune
+ * One effort slider, for the selected model only (tap a model first to tune
  * another; the pick applies at once and the slider follows it). Hidden for a model with no tiers
  * or a single one; it unfolds rather than jumping in.
  */
@@ -176,7 +176,7 @@ private class EffortChoice(val entry: ModelPickerEntry, val stops: ReasoningEffo
         }
 
         /**
-         * letta-mobile-by4vm.82: the tier the conversation runs at — its own effort (this session's
+         * The tier the conversation runs at — its own effort (this session's
          * pick, else the host's record) — else the catalog row's. The row's tier is only the
          * catalog's first variant for the handle, so reading it alone snapped the slider back.
          */
@@ -256,7 +256,7 @@ private fun MeterDetail(meter: ContextMeter) {
     }
 }
 
-/** letta-mobile-joigh: the context-limit slider, or why this host has none; nothing when the sheet has no limit to offer. */
+/** The context-limit slider, or why this host has none; nothing when the sheet has no limit to offer. */
 @Composable
 private fun LimitControl(limit: ContextLimitControl?, onCompact: (() -> Unit)?) {
     when (limit) {

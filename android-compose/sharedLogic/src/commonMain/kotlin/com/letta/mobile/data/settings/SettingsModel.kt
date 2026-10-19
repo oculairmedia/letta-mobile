@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.emptyFlow
  */
 
 /**
- * Where a section sits on the Settings page, in page order (letta-mobile-ckmub.3.12.1): the backend
+ * Where a section sits on the Settings page, in page order: the backend
  * first, the danger zone last and on its own.
  */
 enum class SettingsGroup(val title: String) {

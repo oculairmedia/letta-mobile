@@ -29,7 +29,7 @@ data class CanvasElementSpec(
 )
 
 /**
- * The scene format the apps can draw, and the one source of truth for it (letta-mobile-qygvv.21).
+ * The scene format the apps can draw, and the one source of truth for it.
  *
  * Read off DrawBox's own decoder (drawbox `domain/model/Serialization.kt`: `SerializableDrawing`,
  * `SerializableElement`, `ElementDto.toElement`), which is what renders a scene on every app:

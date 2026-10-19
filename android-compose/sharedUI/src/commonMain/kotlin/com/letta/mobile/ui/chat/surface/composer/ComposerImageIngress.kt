@@ -8,7 +8,7 @@ import com.letta.mobile.sharedui.resources.composer_attach_too_large
 import org.jetbrains.compose.resources.getString
 
 /**
- * letta-mobile-k5nbq.7: paste and drop of images onto the composer, where the composer itself has
+ * Paste and drop of images onto the composer, where the composer itself has
  * to receive them: Android's rich-content receiver (Gboard, drag from another app) and Ctrl/Cmd+V,
  * and the browser's paste and drop events. The result goes on the composer panel. Null on desktop,
  * whose window already installs AWT paste and drop.

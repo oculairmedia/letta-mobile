@@ -69,7 +69,7 @@ import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 
 /**
- * letta-mobile-bglj6.1: a run's (or a message's) tool calls as ONE quiet summary line, as the
+ * A run's (or a message's) tool calls as ONE quiet summary line, as the
  * Android timeline draws them (feature-chat ProjectedToolTimelineGroupCard / ToolRunSummaryRow):
  * "Ran 2 commands", "2 ran - 1 failed" in the error tint, "Running Bash - 1 command - 0:12" while
  * one runs. Tapping it shows each call as its step row ([ToolStepList]; command, output): in a bottom
@@ -77,10 +77,10 @@ import kotlin.time.Clock
  * disclosure, on a pointer host ([ChatToolDetails.Inline]). Approvals that wait on the user show
  * their controls under the line.
  *
- * letta-mobile-ckmub.1.2: this line is a lone tool-calling message's (outside a run block). Inside a
+ * this line is a lone tool-calling message's (outside a run block). Inside a
  * run the calls list as step rows straight under the run's summary line ([RunToolSteps]).
  *
- * letta-mobile-sieej: an approval the run waits on (a runtime question, or a permission gate parked
+ * an approval the run waits on (a runtime question, or a permission gate parked
  * under "Ask"/"Strict", relayed or local) is never folded into the line's disclosure: its card,
  * with Approve / Reject (and the always-allow rules), grows in under the line on every host, and
  * the line says "Approval needed". Once it is answered the card folds away and the line reads as
@@ -220,7 +220,7 @@ internal fun List<UiApprovalRequest>.requestFor(call: UiToolCall): UiApprovalReq
     firstOrNull { request -> request.toolCalls.any { it.toolCallId == call.toolCallId } }
 
 /**
- * letta-mobile-sieej: a call a parked permission gate holds reads "awaiting approval", not
+ * A call a parked permission gate holds reads "awaiting approval", not
  * "running": the shared classifier only knows runtime questions, since a gate is only parked while
  * the request carries the host's control request ([isWaitingOn]).
  */
@@ -326,7 +326,7 @@ private const val ELAPSED_TICK_MILLIS = 1_000L
 
 /**
  * The calls in full, one step row ([ToolStepList]) each: in the window's inspector
- * (docked when wide, a sheet when compact; letta-mobile-ckmub.3.15), titled with the run's line.
+ * (docked when wide, a sheet when compact), titled with the run's line.
  */
 @Composable
 private fun ToolRunDetailsSheet(

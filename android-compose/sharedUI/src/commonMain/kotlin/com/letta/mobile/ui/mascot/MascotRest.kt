@@ -46,7 +46,7 @@ internal val MASCOT_REST_DELAY: Duration = 3.seconds
 /**
  * True while [MascotLive]'s scene should advance: while [engaged], and for [MASCOT_REST_DELAY]
  * after it stops being engaged, [identity] changes or [touches] counts another gesture on it (a
- * poke on a resting mascot wakes it to play the reaction; letta-mobile-te3n1.4). False afterwards:
+ * poke on a resting mascot wakes it to play the reaction). False afterwards:
  * the surface keeps its last frame and nothing asks for another.
  */
 @Composable

@@ -50,9 +50,9 @@ object ShellNavDrawerTags {
  * The phone's navigation drawer: the desktop's agent rail and agent panel side by side (rail, panel,
  * separated by tone rather than a line), so the hamburger opens the same navigation the desktop
  * shows. [modifier] sizes it. [agentCard] is the model-and-context card under the agent's name
- * (letta-mobile-3io8k).
+ *.
  *
- * Edge to edge (letta-mobile-by4vm drawer bug): the rail's and the panel's surfaces fill the whole
+ * Edge to edge ( drawer bug): the rail's and the panel's surfaces fill the whole
  * height, under the status bar and the navigation bar, and only their content pads for [insets] — the
  * rail for the top, bottom and start (a landscape cutout), the panel for the top and bottom. A host
  * sheet must therefore not pad for the insets itself (see [ShellNavDrawerSheet]), or the rail's tint

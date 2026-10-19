@@ -172,13 +172,13 @@ object LettaDimens {
         /** A confirmation (LettaPane Alert): narrower than a modal, one message and two actions. */
         val alertWidth: Dp = 420.dp
 
-        /** A pairing QR code (letta-mobile-dpv7m): big enough to scan across a desk, no bigger. */
+        /** A pairing QR code: big enough to scan across a desk, no bigger. */
         val qrCodeMaxWidth: Dp = 320.dp
 
-        /** The smallest a pairing QR is drawn (dpv7m.5): phone cameras lock on reliably from here. */
+        /** The smallest a pairing QR is drawn: phone cameras lock on reliably from here. */
         val qrCodeMinWidth: Dp = 240.dp
 
-        /** The scan viewfinder's square and its corner brackets (dpv7m.5). */
+        /** The scan viewfinder's square and its corner brackets. */
         val scanFrameSize: Dp = 240.dp
         val scanBracketLength: Dp = 28.dp
         val scanBracketStroke: Dp = 4.dp
@@ -200,7 +200,7 @@ object LettaDimens {
         val contentMaxWidth: Dp = 760.dp
 
         /**
-         * The Settings page's form factors (letta-mobile-ckmub.3.12.1): below [settingsMediumBreakpoint]
+         * The Settings page's form factors: below [settingsMediumBreakpoint]
          * one list, up to [settingsWideBreakpoint] one list under a row of section chips, from it a
          * section rail beside a column no wider than [settingsColumnMaxWidth].
          */

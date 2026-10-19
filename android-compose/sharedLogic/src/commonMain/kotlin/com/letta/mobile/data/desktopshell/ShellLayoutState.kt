@@ -5,7 +5,7 @@ package com.letta.mobile.data.desktopshell
  * sidebar (Memory/Schedules/Channels/Skills/New chat/conversation history —
  * NOT the far-left agent rail, which has its own icon/expanded toggle).
  *
- * Platform-neutral by design (letta-mobile-o5m90): the collapse/resize rules
+ * Platform-neutral by design: the collapse/resize rules
  * and the width-breakpoint decision live here so both desktop hosts share one
  * source of truth. Desktop supplies only rendering and a persistence binding.
  *

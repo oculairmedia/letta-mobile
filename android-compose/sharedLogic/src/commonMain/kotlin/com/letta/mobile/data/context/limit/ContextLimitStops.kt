@@ -5,7 +5,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * letta-mobile-joigh: the stops of the context-limit slider for one model.
+ * The stops of the context-limit slider for one model.
  *
  * A ladder of familiar windows from [MIN_TOKENS] up to the model's catalog window ([modelMax]),
  * always including that maximum and the limit in force now ([current]) so the thumb starts on the
@@ -65,7 +65,7 @@ enum class ContextLimitWarning {
 }
 
 /**
- * letta-mobile-joigh: one candidate limit judged against the conversation: where letta-code would
+ * One candidate limit judged against the conversation: where letta-code would
  * auto-compact under it, and what to warn about.
  */
 data class ContextLimitAdvice(val tokens: Int, val autoCompactAtTokens: Int?, val warning: ContextLimitWarning) {

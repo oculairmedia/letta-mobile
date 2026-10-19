@@ -12,10 +12,9 @@ import kotlinx.coroutines.sync.withLock
 
 import kotlin.time.Duration.Companion.milliseconds
 /**
- * letta-mobile-dangling-tool: post-turn dangling tool-call resolver.
+ * Post-turn dangling tool-call resolver.
  *
- * PR #900 removed premature "settle dangling tool calls as Failed" behavior
- * from CLEAN turn completions: with async/parallel tools a real return can
+ * Clean turn completions do not prematurely settle dangling tool calls as failed: with async/parallel tools a real return can
  * legitimately arrive after the turn's terminal frame, so guessing at
  * completion time produced a red->green flicker (or worse, a permanently
  * wrong red card while a real success streamed in later). The tradeoff is

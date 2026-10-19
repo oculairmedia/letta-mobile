@@ -4,7 +4,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * letta-mobile-bglj6.1: the few sizes the shared chat rows need that the [LettaDimens] scale
+ * The few sizes the shared chat rows need that the [LettaDimens] scale
  * does not name. Each one bounds content the transcript must not let grow without limit.
  */
 object ChatRowDimens {
@@ -43,7 +43,7 @@ object ChatRowDimens {
     const val gridMaxImages: Int = 4
     const val stripMaxImages: Int = 6
 
-    /** A phone prompt's images (letta-mobile-bglj6.1.9): three up at most, each cell this tall. */
+    /** A phone prompt's images: three up at most, each cell this tall. */
     const val promptGridMaxImages: Int = 3
     val promptGridCellHeight: Dp = 120.dp
 

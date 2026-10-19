@@ -8,8 +8,8 @@ import java.io.File
 
 /**
  * Host-side skill-root enumerator — the production adapter for
- * [NativeSkillsCatalog.hydrateFromHost] (letta-mobile-7dm1q, closing the
- * lgns8.21.2 gap).
+ * [NativeSkillsCatalog.hydrateFromHost] (closing the
+ *  gap).
  *
  * ## Why this exists
  *

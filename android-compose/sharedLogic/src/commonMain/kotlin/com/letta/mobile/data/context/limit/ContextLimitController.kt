@@ -16,7 +16,7 @@ val ContextLimitRequest.key: CompactionKey get() = CompactionKey(agentId.value, 
 data class AppliedContextLimit(val tokens: Int, val scope: ContextLimitScope?, val modelValue: String?)
 
 /**
- * letta-mobile-joigh: the one entry point a UI uses to change the context limit.
+ * The one entry point a UI uses to change the context limit.
  *
  *  - [applying] says which conversations have a change in flight, so the slider disables; a
  *    second change while one runs is not sent.

@@ -48,10 +48,10 @@ interface BlockIrohSource {
     suspend fun countBlocks(): Int
     suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block
 
-    /** bfooy.5: `block.create_agent` — a committed new memory file under the agent. */
+    /** `block.create_agent` — a committed new memory file under the agent. */
     suspend fun createAgentBlock(target: AgentBlockTarget, value: String): Block
 
-    /** bfooy.5: `block.delete_agent` — a committed memory-file delete under the agent. */
+    /** `block.delete_agent` — a committed memory-file delete under the agent. */
     suspend fun deleteAgentBlock(target: AgentBlockTarget)
     suspend fun updateGlobalBlock(
         blockId: String,

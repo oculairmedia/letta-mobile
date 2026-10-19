@@ -6,7 +6,7 @@ import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelSelections
 
 /**
- * letta-mobile-dxz5s: what the context card and composer show for one conversation, resolved once
+ * What the context card and composer show for one conversation, resolved once
  * for Android and desktop alike.
  *
  * [model] is the conversation's own model (host override or this session's pick), else the

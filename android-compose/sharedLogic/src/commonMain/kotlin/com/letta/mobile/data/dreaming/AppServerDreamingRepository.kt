@@ -9,7 +9,7 @@ import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.serialization.json.JsonObject
 
 /**
- * letta-mobile-iczm7: dreaming over a direct App Server client (the desktop's bundled runtime, an
+ * Dreaming over a direct App Server client (the desktop's bundled runtime, an
  * App Server URL): letta-code's own `get/set_reflection_settings` and `execute_command dream`.
  *
  * [supportedCommands] is the server's `device_status.supported_commands`, or null when no status
@@ -86,7 +86,7 @@ internal fun settingsOutcome(success: Boolean, settings: JsonObject?, error: Str
         ?: DreamOutcome.Failed("letta-code sent no dreaming settings")
 }
 
-/** letta-mobile-iczm7: one `/dream` answer, shared by the client path and the host relay. */
+/** One `/dream` answer, shared by the client path and the host relay. */
 fun CommandAnswer.toDreamOutcome(): DreamOutcome<DreamRunStart> = when {
     !success && output.orEmpty().startsWith(UNKNOWN_COMMAND) -> DreamOutcome.Unsupported(DreamUnsupportedReason.RuntimeTooOld)
     else -> DreamOutcome.Done(DreamRunStart.parse(success, output))

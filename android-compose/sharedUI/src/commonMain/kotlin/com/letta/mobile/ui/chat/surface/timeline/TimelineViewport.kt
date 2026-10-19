@@ -10,7 +10,7 @@ import com.letta.mobile.data.chat.runtime.ChatViewportSnapshot
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
- * letta-mobile-bglj6.1: viewport arithmetic shared by the legacy and paged lists.
+ * Viewport arithmetic shared by the legacy and paged lists.
  *
  * Both lists are laid out in REVERSE (index 0 is the newest row, at the bottom), as Android's lists
  * are: growth at the tail then never re-measures the history above it, and loading older history

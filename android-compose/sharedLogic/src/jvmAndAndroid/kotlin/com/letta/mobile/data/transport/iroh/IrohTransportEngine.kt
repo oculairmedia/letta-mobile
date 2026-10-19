@@ -22,13 +22,13 @@ import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 /**
- * letta-mobile-by4vm.95: the one turn engine and event router of an [IrohChannelTransport]. They
+ * The one turn engine and event router of an [IrohChannelTransport]. They
  * are built once, over an [IrohDialSwitchingClient] whose generations are the transport's dials,
  * and outlive every dial; [IrohDialer] binds each authenticated dial with [startDial] and its
  * handle's close ends it with [endDial].
  *
- * letta-mobile-by4vm.96: ending a dial interrupts the session instead of ending its turns, as the
- * desktop's ws:// and iroh:// gateways and the wrapper do (by4vm.9, by4vm.55). Each held lease is
+ * ending a dial interrupts the session instead of ending its turns, as the
+ * desktop's ws:// and iroh:// gateways and the wrapper do. Each held lease is
  * carried into the next dial's generation and the router is marked interrupted, so a turn keeps
  * its lease and subscription and waits out
  * [com.letta.mobile.data.runtime.SESSION_RECONNECT_GRACE_MS]. The next dial re-attaches every
@@ -38,7 +38,7 @@ import java.util.UUID
 internal class IrohTransportEngine(
     private val scope: CoroutineScope,
     private val externalToolRegistry: ExternalToolRegistry?,
-    /** letta-mobile-k5nbq.12: the saved default cwd a conversation with no working directory yet starts in. */
+    /** The saved default cwd a conversation with no working directory yet starts in. */
     private val agentDefaults: AgentDefaultsRepository? = null,
 ) {
     val client = IrohDialSwitchingClient(scope)

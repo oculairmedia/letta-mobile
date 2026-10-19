@@ -25,7 +25,7 @@ import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.icons.LettaIcons
 import org.jetbrains.compose.resources.stringResource
 
-/** letta-mobile-7mys7: the branch actions the owner supports, as the message-action policy reads them. */
+/** The branch actions the owner supports, as the message-action policy reads them. */
 fun ChatSurfaceCapabilities.branchSupport(): BranchActionSupport =
     BranchActionSupport(fork = fork, edit = editAndResend, rerun = rerunInFork)
 
@@ -59,7 +59,7 @@ fun ChatActions.asMessageMenuActions(): MessageMenuActions {
 }
 
 /**
- * letta-mobile-7mys7: one message's actions (Edit and resend, Rerun in a new branch, Send again,
+ * One message's actions (Edit and resend, Rerun in a new branch, Send again,
  * Fork from here, Copy) and its fork-naming dialog, shared by every chat surface: the shared
  * timeline rows and desktop's own message cards. A surface opens it with [openMenu] (a long
  * press, a right-click) and can start a fork directly with [fork] (a hover button); it draws

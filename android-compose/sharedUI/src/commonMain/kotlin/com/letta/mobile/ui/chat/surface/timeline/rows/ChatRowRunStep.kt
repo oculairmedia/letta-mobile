@@ -145,7 +145,7 @@ internal class RunStepDisclosure(
  * row's title style, a one-line preview under it, and the shared [DisclosureChevron] trailing only
  * when [disclosure] has details to open. Its height never depends on its state: open or closed,
  * working or settled, it is the list row's height. A tool call and a reasoning step both draw
- * through here (letta-mobile-ckmub.1.3), so the run's rows read alike.
+ * through here, so the run's rows read alike.
  */
 @Composable
 internal fun RunStepListRow(spec: RunStepRowSpec, disclosure: RunStepDisclosure?, modifier: Modifier = Modifier) {
@@ -177,7 +177,7 @@ private fun RunStepChevron(disclosure: RunStepDisclosure) {
  * An expanded run's tool calls, listed straight under its summary line: one [ToolCard] step row per
  * call (no group row, no second chevron). Calls of more than one kind get a plain, non-disclosing
  * [LettaSectionLabel] over them ("Ran 3 commands"). A request waiting on the person keeps its
- * approval card under the steps (letta-mobile-sieej), unchanged.
+ * approval card under the steps, unchanged.
  */
 @Composable
 internal fun RunToolSteps(

@@ -23,13 +23,13 @@ object ShellListDetailTags {
 fun isWideShellWidth(width: Dp): Boolean = width >= LettaDimens.Pane.wideBreakpoint
 
 /**
- * letta-mobile-ckmub.2.4 (hard cut S16): the shell's wide layout for a list and the page it opens.
+ *  (hard cut S16): the shell's wide layout for a list and the page it opens.
  * At or above [LettaDimens.Pane.wideBreakpoint] the [list] docks at [LettaDimens.Pane.sidePanelWidth]
  * as a sidebar and [detail] fills the rest (the desktop's sidebar + page); below it only the list
  * shows and the host navigates to the opened page instead. [list] learns which it is.
  *
  * The list sits at the same place in the composition at every width, so its saved state (scroll,
- * filter) survives a rotation across the breakpoint (letta-mobile-v7aln).
+ * filter) survives a rotation across the breakpoint.
  */
 @Composable
 fun ShellListDetail(

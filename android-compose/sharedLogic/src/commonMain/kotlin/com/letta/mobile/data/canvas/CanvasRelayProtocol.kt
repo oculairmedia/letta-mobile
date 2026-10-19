@@ -38,7 +38,7 @@ object CanvasRelayProtocol {
     fun canvasTopic(canvasId: CanvasId): String = "canvas:${canvasId.value}"
 
     /**
-     * letta-mobile-cdgpr.8: the topic an app puts an asset on outside any canvas (a plugin package
+     * The topic an app puts an asset on outside any canvas (a plugin package
      * before `plugins.install`). It is never joined. The host takes `asset_put` on it from any app
      * it serves, which is no more than joining any topic already allowed.
      */

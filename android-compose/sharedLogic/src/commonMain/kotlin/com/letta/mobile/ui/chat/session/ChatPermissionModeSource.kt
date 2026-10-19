@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 
 /**
- * letta-mobile-by4vm.98: a chat host's permission-mode extension point, read by a session port for
+ * A chat host's permission-mode extension point, read by a session port for
  * the composer's mode chip. [permissionMode] emits null where the conversation's runtime cannot read
  * or change its mode (no chip).
  */
@@ -25,7 +25,7 @@ interface ChatPermissionModeSource {
     fun setPermissionMode(mode: AppServerPermissionMode)
 }
 
-/** One conversation's runtime on a gateway that may govern permission modes (letta-mobile-bzvro.13). */
+/** One conversation's runtime on a gateway that may govern permission modes. */
 data class ChatPermissionModeTarget(
     val gateway: PermissionModeGateway,
     val runtime: AppServerRuntimeScope,
@@ -33,8 +33,8 @@ data class ChatPermissionModeTarget(
 
 /**
  * The shared [ChatPermissionModeSource] over a [PermissionModeGateway]: the chip follows whichever
- * conversation [targets] names, re-syncs a relaying host's mode on open (letta-mobile-bzvro.40), and
- * names the runtime it governs (letta-mobile-a4tm7). [current] is the target a mode change goes to.
+ * conversation [targets] names, re-syncs a relaying host's mode on open, and
+ * names the runtime it governs. [current] is the target a mode change goes to.
  */
 class GatewayPermissionModes(
     private val scope: CoroutineScope,

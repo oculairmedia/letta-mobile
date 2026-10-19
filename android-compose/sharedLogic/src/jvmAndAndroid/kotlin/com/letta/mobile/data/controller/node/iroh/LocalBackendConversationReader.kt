@@ -14,7 +14,7 @@ import kotlinx.serialization.json.put
 import java.io.File
 
 /**
- * lgns8.9: on-disk `conversation.list` reader. Faithful port of admin-shim
+ * On-disk `conversation.list` reader. Faithful port of admin-shim
  * `GET /v1/conversations` (handleConversationsList) + `store.ts` scans +
  * `withRealTimes` overlay + `translate.ts:conversationToLetta`. Split out of the
  * former monolithic `LocalBackendAdminStore` as pure code motion — no behavior change.
@@ -25,7 +25,7 @@ internal class LocalBackendConversationReader(private val support: LocalBackendS
      * Port of admin-shim `GET /v1/conversations` (handleConversationsList):
      * read the conversation records (agent-scoped or all), apply the withRealTimes
      * ordering overlay, filter by archive status, sort newest first with the shared
-     * [ConversationRecency] order (letta-mobile-by4vm.72: parsed instants with an
+     * [ConversationRecency] order (parsed instants with an
      * updated_at/created_at fallback and an id tie-break, the order the app's cache uses), page,
      * and project each via conversationToLetta. Returns null on any error so the
      * caller falls back to the shim proxy.

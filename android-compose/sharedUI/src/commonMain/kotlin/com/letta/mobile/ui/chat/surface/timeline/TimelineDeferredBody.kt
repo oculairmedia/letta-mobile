@@ -44,7 +44,7 @@ typealias DeferredBodyRead = suspend (TimelineSemanticField, Long) -> TimelineSe
  *
  * The first read also decides which string is being paged. A tool call keeps its text in one of
  * several places and never in `content`, which for a tool call holds `name(arguments)` - a
- * serialization artifact the normal projection blanks (letta-mobile-jp78k).
+ * serialization artifact the normal projection blanks.
  */
 @Stable
 internal class DeferredPageReader(

@@ -8,7 +8,7 @@ import com.google.zxing.common.BitMatrix
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 
 /**
- * letta-mobile-gw0h1: small Kotlin facade over ZXing that produces a
+ * Small Kotlin facade over ZXing that produces a
  * 2D bit-matrix from a UTF-8 string. The wire format is `letta-qr-v1.<base64url-json>`
  * (≈150-180 bytes today, with headroom for future metadata), so the default
  * configuration — QR Code, byte mode, error-correction level M (15% recovery)
@@ -22,10 +22,10 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
  * Java encoder; it has shipped in the Google Authenticator / Android
  * platform / countless commercial scanners for a decade. We use it here
  * as a renderer only — the wire format (encoder input) is the
- * letta-mobile-owned canonical JSON, NOT the QR-matrix bytes.
+ *  canonical JSON, NOT the QR-matrix bytes.
  *
  * The encoder contract is intentionally narrow: a 2D bool matrix the
- * renderer can paint. Tests live in :sharedLogic jvmTest.
+ * renderer can paint. Tests live in:sharedLogic jvmTest.
  *
  * seealso: `reference/qr-pairing-protocol.md` §7 (transport encoding).
  */

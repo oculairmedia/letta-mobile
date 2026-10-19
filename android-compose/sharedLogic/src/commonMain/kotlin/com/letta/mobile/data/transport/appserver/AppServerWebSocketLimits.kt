@@ -3,7 +3,7 @@ package com.letta.mobile.data.transport.appserver
 import io.ktor.client.plugins.websocket.WebSockets
 
 /**
- * letta-mobile-lgns8.21.7: inbound frame ceiling for every App Server WebSocket
+ * Inbound frame ceiling for every App Server WebSocket
  * client.
  *
  * Ktor's client `WebSockets` plugin defaults `maxFrameSize` to `Int.MAX_VALUE`

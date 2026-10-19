@@ -35,7 +35,7 @@ import com.letta.mobile.ui.shell.shortcuts.shortcutTextInput
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * A phone header in search mode (letta-mobile-06whj): when the page behind the header is itself
+ * A phone header in search mode: when the page behind the header is itself
  * the result surface (Home), the header becomes a full-width search bar in place rather than
  * dropping a floating box over the page. Back (the arrow, the system Back or Escape) leaves search
  * mode and clears the query, so the page's filter never outlives the bar that set it; the clear

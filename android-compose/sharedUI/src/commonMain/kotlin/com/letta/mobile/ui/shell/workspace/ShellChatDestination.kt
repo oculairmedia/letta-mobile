@@ -106,12 +106,12 @@ class ShellChatLook(
     val canvasHeaderTrailing: (@Composable () -> Unit)? = null,
     /** The board on show, so the host can route its own opens of it to this page (desktop's dock); null when it leaves. */
     val onBoardShown: ((CanvasId?) -> Unit)? = null,
-    /** letta-mobile-zxk2n.8: the conversation's subagent dual view; null draws the page alone. */
+    /** The conversation's subagent dual view; null draws the page alone. */
     val subagentViews: SubagentDualViewBinding? = null,
 )
 
 /**
- * letta-mobile-c3np7.4.4 / ckmub.17.4: the one conversation destination desktop and web mount. The
+ * The one conversation destination desktop and web mount. The
  * conversation opens on its own board with the chat docked under it (or full screen); expanding,
  * "Open canvas" and Escape move between the two. A new chat has no board yet, so it shows the
  * placeholder rather than a shared default board. Hosts keep only their port and look.

@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.chat.surface.composer
 
-/** letta-mobile-bglj6.1: test tags of the shared composer. Desktop's tests used the first two. */
-object ComposerTestTags {
+/** Test tags of the shared composer. Desktop's tests used the first two. */
+internal object ComposerTestTags {
     const val INPUT = "composer-input"
     const val SEND = "composer-send"
     const val STOP = "composer-stop"
@@ -33,13 +33,13 @@ object ComposerTestTags {
     const val PERMISSION_MODE_NOTE = "composer-permission-mode-note"
     const val PERMISSION_MODE_RUNTIME = "composer-permission-mode-runtime"
 
-    /** letta-mobile-bglj6.1.9: the Touch bar and its parts. */
+    /** The Touch bar and its parts. */
     const val TOUCH_BAR = "composer-touch-bar"
     const val TOUCH_PLUS = "composer-touch-plus"
     const val TOUCH_VOICE = "composer-touch-voice"
     const val TOUCH_SHEET = "composer-touch-sheet"
     const val TOUCH_SHEET_ROW = "composer-touch-sheet-row"
     const val TOUCH_RESTORE = "composer-touch-restore"
-    /** letta-mobile-bglj6.1.21: elapsed + running-tool readout beside the Touch companion. */
+    /** Elapsed + running-tool readout beside the Touch companion. */
     const val TOUCH_COMPANION_STATUS = "composer-touch-companion-status"
 }

@@ -7,7 +7,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * lgns8.9 disposition for the tool-library and memory-block domains.
+ *  Disposition for the tool-library and memory-block domains.
  *
  * ## Tools — controller-native constant catalog
  * admin-shim's `GET /v1/tools` and `/v1/tools/{id}` return
@@ -30,7 +30,7 @@ import kotlinx.serialization.json.put
  *    onto the native `write_memory_file` command, so the App Server — the
  *    store's single writer — performs the write. The controller never writes the
  *    local-backend root itself (epic constraint: one writer per root).
- *    bfooy.5 adds `block.create_agent` / `block.delete_agent` on the same
+ *    The same native path supports `block.create_agent` / `block.delete_agent` on the same
  *    footing (see [AgentBlockWriteHandlers]);
  *  - `block.create`, `block.update`, `block.delete`, `block.attach` and
  *    `block.detach` address a block by a GLOBAL id that admin-shim synthesises
@@ -204,11 +204,11 @@ object ToolAdminHandlers {
         BLOCK_READ_METHODS + BLOCK_NATIVE_WRITE_METHODS + BLOCK_DENIED_METHODS
 
     /**
-     * bfooy.5: agent-scoped block create/delete were added after the admin REST
+     * Agent-scoped block create/delete were added after the admin REST
      * adapter retired; they were native (App Server v2) from the start.
      */
     val POST_RETIREMENT_METHODS: Set<String> = AgentBlockWriteHandlers.CREATE_DELETE_METHODS
 
-    /** Methods the retired admin REST adapter used to own (lgns8.9 inventory). */
+    /** Methods the retired admin REST adapter used to own ( inventory). */
     val FORMER_ADMIN_REST_METHODS: Set<String> = METHODS - POST_RETIREMENT_METHODS
 }

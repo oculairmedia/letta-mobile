@@ -9,7 +9,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-iczm7: when letta-code starts a dream (a background reflection run) on its own,
+ * When letta-code starts a dream (a background reflection run) on its own,
  * the `trigger` of `set_reflection_settings`. Runs start only after a successful turn; there is no
  * idle trigger.
  */
@@ -65,7 +65,7 @@ enum class DreamSettingsScope(val wire: String) {
 }
 
 /**
- * letta-mobile-iczm7: one agent's dreaming settings as letta-code stores them
+ * One agent's dreaming settings as letta-code stores them
  * (`reflection_settings` {trigger, step_count, merge, merge_instructions}). letta-code has no
  * dream model setting: a local-backend dream uses the agent's own model.
  */

@@ -148,7 +148,7 @@ sealed class TimelineEvent {
 enum class Role { USER, ASSISTANT, SYSTEM }
 
 /**
- * letta-mobile-c49of: explicit outcome of an approval request, observed from
+ * Explicit outcome of an approval request, observed from
  * an ApprovalResponseMessage carrying approve=true/false. Kept separate from
  * [approvalDecided] because a request can be resolved without a decision
  * (tool-return completion, approve=null auto-approval echo) — those stay
@@ -176,11 +176,11 @@ enum class TimelineMessageType {
     /**
      * Server-emitted error frame. Rendered as a system-style bubble with
      * destructive accent so the user sees that the run aborted instead of
-     * a silent dropped spinner. letta-mobile-5s1n.
+     * a silent dropped spinner..
      */
     ERROR,
     /**
-     * letta-mobile-kr39h: a conversation compaction's summary row (`summary_message`), rendered
+     * A conversation compaction's summary row (`summary_message`), rendered
      * as a divider with the summary behind a disclosure. Content is the summary text.
      */
     COMPACTION,
@@ -290,7 +290,7 @@ data class Timeline(
     fun findByOtid(otid: String): TimelineEvent? =
         otidToIndex[AgentMessageClientId.dedupIdentity(otid)]?.let { events[it] }
 
-    /** The confirmed row that carries [id] as its logical id (letta-mobile-nbha6); at most one exists. */
+    /** The confirmed row that carries [id] as its logical id; at most one exists. */
     fun findByLogicalId(id: String): TimelineEvent.Confirmed? =
         logicalIdToIndex[id]?.let { events[it] as? TimelineEvent.Confirmed }
 
@@ -303,7 +303,7 @@ data class Timeline(
     /**
      * Find an event by its server message id. Used by the resume-stream
      * subscriber to dedupe events that may arrive via both the stream and
-     * a concurrent reconcile. See letta-mobile-mge5.
+     * a concurrent reconcile..
      */
     fun findByServerId(
         serverId: String,
@@ -515,7 +515,7 @@ data class Timeline(
      * jitter across deltas. Returns this timeline unchanged if no event with
      * the given serverId exists (caller should append instead).
      *
-     * Added for letta-mobile-mge5.
+     *
      */
     fun replaceByServerId(confirmed: TimelineEvent.Confirmed): Timeline {
         val tailIdx = events.lastIndex

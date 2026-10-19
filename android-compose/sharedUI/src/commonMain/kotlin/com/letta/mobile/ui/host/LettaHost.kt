@@ -11,7 +11,7 @@ import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.shell.ShellLongPressMenu
 
 /**
- * letta-mobile-ckmub.3.1 (hard cut S3, primitive P1): the one container contract.
+ *  (hard cut S3, primitive P1): the one container contract.
  *
  * A surface never picks a platform container (ModalBottomSheet, Popup, DialogWindow,
  * ContextMenuArea). It asks for a [LettaPaneKind] through [LettaPane] and the [LettaHost] in effect

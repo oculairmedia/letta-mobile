@@ -3,7 +3,7 @@ package com.letta.mobile.data.commands
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
 
 /**
- * letta-mobile-zxk2n.5 (G92): the `/` commands the app answers itself instead of sending to the
+ *  (G92): the `/` commands the app answers itself instead of sending to the
  * agent. Each opens a screen or dialog the platform already has, or (for [Recompile]) runs an App
  * Server command, so they appear in the composer's autocomplete next to the server's own commands.
  *

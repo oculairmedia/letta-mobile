@@ -37,7 +37,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 /** The automatic triggers a user picks between; [DreamTrigger.Off] is the switch. */
 private val AutomaticTriggers = listOf(DreamTrigger.CompactionEvent, DreamTrigger.StepCount)
 
-/** letta-mobile-iczm7: the stored settings as controls. Every change saves through letta-code at once. */
+/** The stored settings as controls. Every change saves through letta-code at once. */
 @Composable
 internal fun DreamingSettingsSection(state: DreamSettingsState, onSave: (DreamSettingsChange) -> Unit) {
     val settings = state.settings ?: return

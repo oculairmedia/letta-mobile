@@ -44,7 +44,7 @@ private fun monotonicClock(): () -> Long {
 }
 
 /**
- * One live view's end of `lcp-view/1` (plan section 7.2, letta-mobile-s416w.31). Every message the
+ * One live view's end of `lcp-view/1` (plan section 7.2). Every message the
  * page posts on [port] is validated ([ViewMessageValidator]), rate limited per view, gated by the
  * view's state (nothing but `view.ready` before the handshake, nothing at all after teardown) and
  * audited; the calls that pass go to [ViewCallHandler], which relays actions over the transport.

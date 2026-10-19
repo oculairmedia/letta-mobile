@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * The skills half of the shared Skills page (letta-mobile-zxk2n.32): the server registry, what
+ * The skills half of the shared Skills page: the server registry, what
  * [agentId] has installed, and whether a load is in flight or failed.
  */
 @Immutable

@@ -100,7 +100,7 @@ class LettaShellWorkspaceHost(
 class ShellWorkspaceEvents(
     /** The workspace's measured width in dp, for the host's layout reducer. */
     val onWidthChanged: (Float) -> Unit = {},
-    /** The host's binding of the shared keymap (letta-mobile-k5nbq.4); null leaves every chord to the focused field. */
+    /** The host's binding of the shared keymap; null leaves every chord to the focused field. */
     val shortcuts: ShellShortcutBinding? = null,
 )
 

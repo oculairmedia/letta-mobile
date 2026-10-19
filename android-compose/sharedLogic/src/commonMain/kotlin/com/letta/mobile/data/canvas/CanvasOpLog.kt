@@ -12,7 +12,7 @@ import kotlinx.coroutines.sync.withLock
  * Append-only log of [CanvasOp] operations for a canvas document: the shared-document [OpLog]
  * for canvases.
  *
- * The log is also the write-ahead journal of the stored document (letta-mobile-by4vm.22). The
+ * The log is also the write-ahead journal of the stored document. The
  * document lives in another store (the Automerge notebook) with no transaction shared with the
  * log, so a [CanvasSession] appends an op first, writes the document, and only then [settle]s the
  * op. An op appended but never settled - the process died, or the document write failed, in

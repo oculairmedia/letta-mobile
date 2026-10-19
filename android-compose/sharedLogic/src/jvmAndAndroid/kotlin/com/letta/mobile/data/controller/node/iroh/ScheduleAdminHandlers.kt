@@ -14,7 +14,7 @@ import java.time.Instant
 import java.time.ZoneId
 
 /**
- * lgns8.9: `schedule.*` is served by the NATIVE App Server cron commands.
+ * `schedule.*` is served by the NATIVE App Server cron commands.
  *
  * The product "scheduled message" surface was never a store of its own —
  * admin-shim's `/v1/agents/{id}/schedule` routes are a thin compatibility

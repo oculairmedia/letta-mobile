@@ -69,7 +69,7 @@ class PairDeviceBinding(
 )
 
 /**
- * The inviter side of scan-to-connect (letta-mobile-dpv7m.2/.5), shared by the
+ * The inviter side of scan-to-connect, shared by the
  * phone and desktop: the invite card (scope -> QR + countdown -> expired /
  * redeemed) above the paired-devices list. Stateless: [PairDeviceView.nowMs] is passed in.
  */

@@ -4,7 +4,7 @@ package com.letta.mobile.data.chat.runtime
  * Capability a [ChatGateway] may implement to answer / dismiss a parked runtime
  * approval (e.g. AskUserQuestion) over its own transport.
  *
- * letta-mobile-vilsn: desktop over Iroh uses [com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway],
+ * desktop over Iroh uses [com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway],
  * which had no approval-submit path — so desktop approvals were a silent no-op.
  * This interface lets any gateway expose one; callers detect it via
  * `gateway as? ApprovalSubmittingGateway`.
@@ -25,7 +25,7 @@ interface ApprovalSubmittingGateway {
     )
 
     /**
-     * letta-mobile-bzvro.40: approves the bound call and persists the server-offered rules
+     * Approves the bound call and persists the server-offered rules
      * ("always allow"). A gateway that cannot carry them refuses, rather than approve without the
      * rule the person chose.
      */
@@ -34,7 +34,7 @@ interface ApprovalSubmittingGateway {
 }
 
 /**
- * letta-mobile-bzvro.40: an approval that persists [suggestionIds], bound to the parked request
+ * An approval that persists [suggestionIds], bound to the parked request
  * ([binding]: its tool call and the control request's own id) whose card offered them.
  */
 data class AlwaysAllowAnswer(
@@ -45,7 +45,7 @@ data class AlwaysAllowAnswer(
 )
 
 /**
- * letta-mobile-bzvro.14: a gateway that queues answers made while its connection is down (the
+ * A gateway that queues answers made while its connection is down (the
  * offline outbox) and says which requests are waiting, so their cards show it.
  */
 interface ApprovalQueueSource {
@@ -53,7 +53,7 @@ interface ApprovalQueueSource {
 }
 
 /**
- * letta-mobile-bzvro.11/.12/.40: a gateway that can say what each parked `can_use_tool` request
+ * A gateway that can say what each parked `can_use_tool` request
  * offered (always-allow rules, blocked path, diffs), by tool call id: one that runs the App Server
  * turn engine itself, or an Iroh gateway fed by its host's `pending_approvals` relay.
  */
@@ -62,7 +62,7 @@ interface PendingApprovalSource {
 }
 
 /**
- * letta-mobile-bzvro.13/.40: a gateway that can read and change a conversation's permission mode. One
+ * A gateway that can read and change a conversation's permission mode. One
  * that cannot reports no [permissionModes], and the composer shows no mode chip for it.
  */
 interface PermissionModeGateway {
@@ -79,7 +79,7 @@ interface PermissionModeGateway {
     suspend fun syncPermissionMode(runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope) = Unit
 
     /**
-     * letta-mobile-a4tm7: which runtime the chip governs, named on the chip so a desktop on its own
+     * Which runtime the chip governs, named on the chip so a desktop on its own
      * bundled runtime is not expected to mirror a phone talking to an Iroh host.
      */
     val permissionModeRuntime: com.letta.mobile.data.runtime.PermissionModeRuntime

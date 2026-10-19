@@ -24,7 +24,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * letta-mobile-jvctq: the swarm link over Iroh, as the paired device [profile] describes. Each
+ * The swarm link over Iroh, as the paired device [profile] describes. Each
  * [withSession] binds an endpoint with the device's PERSISTENT key (the NodeId the host paired),
  * dials the stored host the way every Iroh client does ([IrohAppServerTransportAdapter] ->
  * [DefaultAppServerClient]), authenticates with a blank token (a paired device is known by its

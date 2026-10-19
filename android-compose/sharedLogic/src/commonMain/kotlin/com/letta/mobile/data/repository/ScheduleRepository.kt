@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
 /**
- * Per-agent schedules for a backend without the Iroh `schedule.*` relay. letta-mobile-ckmub.4:
+ * Per-agent schedules for a backend without the Iroh `schedule.*` relay.
  * [remote] is the seam for a non-App-Server backend; production binds no route (the Letta REST
  * backend was removed), so these calls fail with a no-route error. Iroh hosts use
  * [com.letta.mobile.data.repository.iroh.IrohScheduleRepository].

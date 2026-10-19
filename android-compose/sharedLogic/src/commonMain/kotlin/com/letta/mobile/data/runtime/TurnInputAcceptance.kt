@@ -32,7 +32,7 @@ import kotlinx.coroutines.selects.select
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * letta-mobile-qygvv.1: what the App Server said about one `create_message` input.
+ * What the App Server said about one `create_message` input.
  *
  * The server acknowledges an `input` with `input_accepted` only when it carried a
  * `request_id`. Without the ack the engine could not tell a queued input (the
@@ -52,7 +52,7 @@ internal sealed interface InputAcceptance {
         val failureReason: String
         val kind: String
 
-        /** The lease's release reason when this failure ends the turn (letta-mobile-by4vm.7). */
+        /** The lease's release reason when this failure ends the turn. */
         val releaseReason: String get() = TurnReleaseReason.INPUT_REJECTED
     }
 
@@ -73,7 +73,7 @@ internal sealed interface InputAcceptance {
     }
 
     /**
-     * letta-mobile-by4vm.7: sending the input threw before any acknowledgement could be read. The
+     * Sending the input threw before any acknowledgement could be read. The
      * input may or may not have reached the server, so the turn fails and the orphan-abort rules
      * for a cancelled lease apply (an abort only when this lease's own run was seen).
      */
@@ -204,7 +204,7 @@ internal enum class QueueRemovalDisposition {
 }
 
 /**
- * letta-mobile-qygvv.1: per-turn view of whether THIS lease's input is waiting in
+ * Per-turn view of whether THIS lease's input is waiting in
  * the server queue.
  *
  * While queued the idle watchdog is paused — silence is expected until the turn
@@ -221,7 +221,7 @@ internal enum class QueueRemovalDisposition {
 internal class QueuedInputTracker(val clientMessageId: String?) {
     private val state = atomic(PENDING)
 
-    /** letta-mobile-1n5py.1 (qygvv.9 second race): released once `input_accepted` is resolved. */
+    /**  ( second race): released once `input_accepted` is resolved. */
     val acknowledgement = InputAcknowledgementLatch()
 
     val isQueued: Boolean get() = state.value == QUEUED
@@ -319,7 +319,7 @@ internal fun recordDequeued(lease: LeaseRef, source: String) {
 }
 
 /**
- * letta-mobile-qygvv.7: while this lease's input is queued, frames on the scope belong to the turn
+ * While this lease's input is queued, frames on the scope belong to the turn
  * ahead; only `update_queue` concerns it.
  */
 internal fun LeaseRef.holdsWhileQueued(received: AppServerReceivedFrame): Boolean =
@@ -330,15 +330,15 @@ internal fun QueueRemovalDisposition?.cancelsLeaseOnceProjected(projected: Boole
     projected && this == QueueRemovalDisposition.Cancelled
 
 /**
- * letta-mobile-qygvv.1: tracks a queued input through `update_queue`. Returns the
+ * Tracks a queued input through `update_queue`. Returns the
  * removal disposition for this lease's input when [received] carries one.
  *
  * Only the `dequeued` removal of THIS input's client message id ends the queued
  * wait. A `stream_delta` is not start evidence: while this input is pending or
- * queued it may belong to the turn ahead (review of PR #1661). Servers that
+ * queued it may belong to the turn ahead. Servers that
  * answer `queued` (0.32+) also send `update_queue.removed`.
  *
- * letta-mobile-1n5py.1 (qygvv.9 race 2): a terminal that beats this input's ack first waits for it.
+ *  ( race 2): a terminal that beats this input's ack first waits for it.
  */
 internal suspend fun observeQueueProgress(
     received: AppServerReceivedFrame,
@@ -358,13 +358,13 @@ internal class TurnInputSender(
     private val requestIdFactory: () -> String,
     private val approvalSender: ApprovalResponseSender,
     private val externalToolRegistry: ExternalToolRegistry? = null,
-    /** letta-mobile-qygvv.6: records a user input before it is sent, so its queue item is recognised. */
+    /** Records a user input before it is sent, so its queue item is recognised. */
     private val noteSentInput: (TurnRuntimeKey, String?, TurnCommand) -> Unit = { _, _, _ -> },
-    /** letta-mobile-zxk2n.2: the 0.34 delivery fields and the re-send of an input a dropped link lost. */
+    /** The 0.34 delivery fields and the re-send of an input a dropped link lost. */
     private val durable: DurableInputSending = DurableInputSending(),
 ) {
     /**
-     * Sends [command]'s input. letta-mobile-1n5py.1: the lease's acknowledgement latch opens only
+     * Sends [command]'s input. the lease's acknowledgement latch opens only
      * once this returns (after [enterQueued]), so a terminal the collector held for the ack sees the
      * Queued state and is recognised as the turn ahead's.
      */
@@ -409,7 +409,7 @@ internal class TurnInputSender(
     }
 
     /**
-     * letta-mobile-zxk2n.2: when the link drops before `input_accepted` and the host keeps input
+     * When the link drops before `input_accepted` and the host keeps input
      * identities ([DurableInputFields.isResumable]), the SAME input (same `client_message_id`) is
      * sent once more on the restored session. The host answers a duplicate with the first copy's
      * disposition instead of running it twice, so the turn resumes instead of failing.
@@ -483,7 +483,7 @@ internal fun ToolPolicy.toWireAllowlist(registry: ExternalToolRegistry?): List<S
 }
 
 /**
- * letta-mobile-qygvv.3: runs [send] (the input send and its `input_accepted` wait), abandoning it
+ * Runs [send] (the input send and its `input_accepted` wait), abandoning it
  * with a null result when [collector] ends first. A turn the collector already settled (terminal,
  * watchdog, superseded generation) must not stay parked on an ack that will never arrive.
  */

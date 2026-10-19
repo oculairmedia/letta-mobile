@@ -18,7 +18,7 @@ data class DirectoryListing(
 )
 
 /**
- * letta-mobile-zxk2n.6 (G32): the folders on the device the agent works in, for the
+ *  (G32): the folders on the device the agent works in, for the
  * working-directory picker. [AppServerWorkspaceDirectorySource] serves it with `list_in_directory`.
  */
 fun interface WorkspaceDirectorySource {

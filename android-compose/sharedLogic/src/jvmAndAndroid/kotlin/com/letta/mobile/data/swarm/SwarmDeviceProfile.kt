@@ -31,7 +31,7 @@ data class PairedHostRecord(
 data class Unpaired(val nodeId: String?, val hostNodeId: String?)
 
 /**
- * letta-mobile-jvctq: one machine's swarm device, all under [directory] (user profile, never the
+ * One machine's swarm device, all under [directory] (user profile, never the
  * repo): its Iroh identity key (`device.key`), the paired host (`host.json`) and the outbox.
  * The directory and every file in it are readable by the current user only (POSIX 0700/0600, or
  * an owner-only ACL on Windows). The key is never printed or logged.

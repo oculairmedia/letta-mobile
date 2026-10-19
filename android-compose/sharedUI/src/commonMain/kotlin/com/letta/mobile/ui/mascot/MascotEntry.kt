@@ -39,7 +39,7 @@ abstract class MascotEntry(
 
     private var morph: Morph? = null
 
-    /** The shared director (letta-mobile-te3n1.1): state, gaze and reactions for this agent, on every platform. */
+    /** The shared director: state, gaze and reactions for this agent, on every platform. */
     val director = MascotDirector(runtime).also { d ->
         d.addStateListener { _, enter -> applyState(enter) }
     }

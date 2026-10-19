@@ -150,7 +150,7 @@ sealed interface PluginsPageEvent {
 internal fun PluginConsentSheet.decide(item: PluginConsentItem, allow: Boolean): PluginConsentSheet =
     if (items.any { it.key == item.key }) copy(decisions = decisions + (item.key to allow)) else this
 
-/** letta-mobile-cdgpr.9: the Plugins page's pure state machine; [PluginsPageController] feeds it. */
+/** The Plugins page's pure state machine; [PluginsPageController] feeds it. */
 object PluginsPageModel {
     fun reduce(state: PluginsPageState, event: PluginsPageEvent): PluginsPageState = event.applyTo(state)
 

@@ -24,7 +24,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonElement
 
 /**
- * letta-mobile-ckmub.3.24 (hard cut S15): the agent editor of every client, for an existing agent
+ *  (hard cut S15): the agent editor of every client, for an existing agent
  * ([AgentEditorMode.Edit]) or a new one ([AgentEditorMode.Create]). It lives as long as [scope] (the
  * Android view model's, the desktop pane's composition) and writes only what changed.
  */

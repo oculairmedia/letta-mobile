@@ -1,7 +1,7 @@
 package com.letta.mobile.data.chat.branch
 
 /**
- * letta-mobile-7mys7: letta-code's conversation-branching slash commands, as the composer types them.
+ * Letta-code's conversation-branching slash commands, as the composer types them.
  *
  * letta-code (0.29.12 through 0.34.8) handles `/fork` and `/btw` in its terminal UI only: neither is
  * in the App Server's `SUPPORTED_REMOTE_COMMANDS`, so `device_status.supported_commands` never lists

@@ -3,7 +3,7 @@ package com.letta.mobile.data.runtime
 import com.letta.mobile.util.Telemetry
 
 /**
- * letta-mobile-by4vm.7: an explicit state machine over one turn-lifecycle dimension. The phase only
+ * An explicit state machine over one turn-lifecycle dimension. The phase only
  * changes through [fire], which looks the (phase, event) pair up in a transition table. A pair the
  * table does not list is an illegal transition: it is rejected (the phase stays) and recorded as
  * `turn.illegal_transition`, never silently ignored.
@@ -108,7 +108,7 @@ private val turnTransitions: Map<Pair<TurnPhase, TurnEvent>, TurnPhase> = buildM
 internal fun turnTransition(phase: TurnPhase, event: TurnEvent): TurnPhase? = turnTransitions[phase to event]
 
 /**
- * letta-mobile-by4vm.7: what this turn has shown towards a speculative completion, replacing
+ * What this turn has shown towards a speculative completion, replacing
  * `sawToolReturn` / `sawAssistantAfterToolReturn`. Every move between these is legal.
  */
 internal enum class SpeculationEvidence {

@@ -7,19 +7,19 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * Per-peer agent scope (letta-mobile-dpv7m.1): a device paired with an invite
+ * Per-peer agent scope: a device paired with an invite
  * that named agents may only address those agents.
  *
  * Enforcement is centralized here so it cannot be forgotten by a handler:
  *  - requests: any admin_rpc params / runtime frame naming an out-of-scope
- *    `agent_id` (top level or under `runtime`; all of them, by4vm.36) are denied before dispatch;
+ *    `agent_id` (top level or under `runtime`; all of them) are denied before dispatch;
  *  - results: listings (`agent.list`, `conversation.list`, …) drop rows that
  *    belong to out-of-scope agents.
  *
  * Residual (tracked as a follow-up): reads addressed ONLY by a conversation
  * id do not resolve the conversation's owning agent here; scoped peers cannot
  * discover such ids through filtered listings, and conversation-content scope
- * (lgns8.12) still applies.
+ *  still applies.
  */
 object AgentScopeGuard {
     const val DENIED = "forbidden: agent not in this device's scope"
@@ -29,7 +29,7 @@ object AgentScopeGuard {
 
     /**
      * Every agent a runtime/admin frame names: the top-level `agent_id` and `runtime.agent_id`,
-     * each in either spelling (letta-mobile-by4vm.36). Admin handlers act on the top-level id; relayed runtime frames
+     * each in either spelling. Admin handlers act on the top-level id; relayed runtime frames
      * (`input`, `abort_message`, queue controls) decode and act on `runtime.agent_id`. Checking
      * only the first one found let an in-scope top-level id smuggle an out-of-scope runtime id.
      */

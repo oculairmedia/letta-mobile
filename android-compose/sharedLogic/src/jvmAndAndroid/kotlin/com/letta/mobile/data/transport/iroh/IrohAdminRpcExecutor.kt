@@ -169,7 +169,7 @@ internal class IrohAdminRpcExecutor(
             lastProofOfLifeMs = System.currentTimeMillis()
             timeoutStreak.reset()
         }
-        /** qygvv.22: a connection-class failure on a nominally alive connection. */
+        /** A connection-class failure on a nominally alive connection. */
         fun recordIsolatedFailure() = timeoutStreak.record()
         fun millisSinceLastStream(): Long = System.currentTimeMillis() - lastProofOfLifeMs
         fun beginAdminRpc(): Long = nextInFlightToken.incrementAndGet().also { inFlightStartByToken[it] = System.currentTimeMillis() }

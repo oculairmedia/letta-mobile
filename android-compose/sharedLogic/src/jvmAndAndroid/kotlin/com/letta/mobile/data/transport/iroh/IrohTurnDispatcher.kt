@@ -36,7 +36,7 @@ internal class IrohTurnDispatcher(
     private val currentGeneration get() = dependencies.currentGeneration
 
     /**
-     * letta-mobile-1n5py: false when [submission]'s conversation already has a turn. That is not a
+     * False when [submission]'s conversation already has a turn. That is not a
      * failure: the send coordinator queues the message behind the running turn, so no error or
      * failed terminal is published for it.
      */

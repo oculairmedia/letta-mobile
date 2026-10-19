@@ -9,7 +9,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * letta-mobile-fe51r (P2b pointer diet): server-side wire projection for
+ *  (P2b pointer diet): server-side wire projection for
  * iroh admin_rpc `message.list` responses.
  *
  * Kitchen testing showed a 50-message page weighing ~1.4MB (avg ~28KB per

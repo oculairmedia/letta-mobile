@@ -27,22 +27,22 @@ data class ConversationRunState(
     /** The user is composing to this conversation. Orthogonal to [phase]. */
     val userTyping: Boolean = false,
     /**
-     * letta-mobile-bzvro.7: the status line's detail (loop phase, retry, server notices and
+     * The status line's detail (loop phase, retry, server notices and
      * commands), reduced from the same events by [com.letta.mobile.data.runtime.RuntimeLiveStatusReducer].
      */
     val live: RuntimeLiveStatus = RuntimeLiveStatus.Idle,
     /**
-     * letta-mobile-bzvro.27: the request id of the approval the turn is parked on (the newest one
+     * The request id of the approval the turn is parked on (the newest one
      * while several wait), so attention notifications can tell a new request from a replay of one
      * already announced. Null whenever [phase] is not [RunPhase.AWAITING_INPUT].
      */
     val awaitingApprovalId: String? = null,
     /**
-     * letta-mobile-iczm7: a background dream (reflection) or memory-upkeep run is in flight under
+     * A background dream (reflection) or memory-upkeep run is in flight under
      * this conversation. Orthogonal to [phase]: a dream is not a turn.
      */
     val dreaming: Boolean = false,
-    /** letta-mobile-te3n1.1: the moments this conversation's runs have been through, as counts. */
+    /** The moments this conversation's runs have been through, as counts. */
     val edges: RunEdges = RunEdges.NONE,
 ) {
     /** How many tool calls are in flight; tools overlap, so this is a count, not a flag. */

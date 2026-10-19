@@ -79,7 +79,7 @@ internal class OutboxEntryHolder(private val outbox: SwarmOutbox, initial: Outbo
 }
 
 /**
- * letta-mobile-jvctq: one dial's worth of a send: resolve the agent and conversation in scope
+ * One dial's worth of a send: resolve the agent and conversation in scope
  * (CONNECTED), then either run the turn through the shared engine (ACCEPTED -> PERSISTED ->
  * PROCESSED) or, when the input may already have left on an earlier dial, resume from the history.
  * Watching stops with [TurnHandoverCancellation], never an abort: the server turn keeps running.

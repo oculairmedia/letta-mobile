@@ -10,7 +10,7 @@ import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 
 /**
- * letta-mobile-bglj6.1: what the shared page hands the host's canvas. The canvas is the
+ * What the shared page hands the host's canvas. The canvas is the
  * conversation's own board, so its "share to chat" and "back" act on this conversation and
  * this page's mode directly: no staging queue, no navigation.
  */
@@ -44,7 +44,7 @@ class ChatCanvasActions internal constructor(
     val camera: CanvasCameraRequest = CanvasCameraRequest()
 
     /**
-     * letta-mobile-bglj6.13: "Show on canvas" on a canvas_compose card. Frames the artifact's
+     * "Show on canvas" on a canvas_compose card. Frames the artifact's
      * bounds on the board (when the receipt has them) and brings the canvas forward with
      * [ChatSurfaceIntent.OpenCanvas], which is a no-op where the canvas already shows.
      */

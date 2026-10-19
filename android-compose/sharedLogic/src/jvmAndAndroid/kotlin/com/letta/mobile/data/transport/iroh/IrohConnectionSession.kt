@@ -40,7 +40,7 @@ internal class IrohConnectionSession(
     @Volatile
     private var readyTicket: String? = null
 
-    /** letta-mobile-a4tm7: the Ready handle's host node id (hex); null when not ready or unparseable. */
+    /** The Ready handle's host node id (hex); null when not ready or unparseable. */
     fun hostNodeId(): String? = readyTicket?.let(::nodeIdOf)
 
     fun onReady(handle: IrohConnectionHandle) {

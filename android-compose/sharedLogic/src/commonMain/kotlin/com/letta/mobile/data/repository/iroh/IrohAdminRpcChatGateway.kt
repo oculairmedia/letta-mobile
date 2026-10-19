@@ -73,13 +73,13 @@ import kotlin.time.Duration.Companion.milliseconds
  * pipeline works unchanged. [streamConversation] is the persistent
  * subscriber view of the same frames, with synthesized heartbeats standing
  * in for SSE pings so the loop's silence timeout doesn't cycle the
- * subscription while the agent is idle (letta-mobile-yh92w).
+ * subscription while the agent is idle.
  */
 class IrohAdminRpcChatGateway(
     private val transport: IChannelTransport,
     deviceLabel: String = "iroh-chat-gateway",
     private val heartbeatIntervalMs: Long = STREAM_HEARTBEAT_INTERVAL_MS,
-    /** letta-mobile-bzvro.40: the host's approval relay and the mode chip; null leaves both off. */
+    /** The host's approval relay and the mode chip; null leaves both off. */
     private val approvalControls: com.letta.mobile.data.runtime.IrohApprovalControls? = null,
 ) : ChatGateway,
     ChatGatewayExtras,
@@ -119,7 +119,7 @@ class IrohAdminRpcChatGateway(
         ),
     )
 
-    /** letta-mobile-bzvro.40: only a host that relays approvals applies the rule ids. */
+    /** Only a host that relays approvals applies the rule ids. */
     override suspend fun submitAlwaysAllow(answer: com.letta.mobile.data.chat.runtime.AlwaysAllowAnswer) {
         if (com.letta.mobile.data.runtime.ApprovalRelay.CAPABILITY !in transport.hostCapabilities) {
             throw UnsupportedOperationException("this host cannot persist always-allow rules")
@@ -128,7 +128,7 @@ class IrohAdminRpcChatGateway(
     }
 
     /**
-     * letta-mobile-bzvro.14: through the offline outbox when there is one (sent now while connected,
+     * Through the offline outbox when there is one (sent now while connected,
      * queued until the reconnect otherwise), else straight to the host.
      */
     private suspend fun deliver(entry: com.letta.mobile.data.chat.approval.OutboxApproval) {
@@ -143,7 +143,7 @@ class IrohAdminRpcChatGateway(
         approvalControls?.relay?.resolve(com.letta.mobile.runtime.ToolCallId(entry.key))
     }
 
-    /** letta-mobile-bzvro.14: answers made while the link is down, replayed after the reconnect. */
+    /** Answers made while the link is down, replayed after the reconnect. */
     private val approvalOutbox: com.letta.mobile.data.chat.approval.ApprovalOutboxCoordinator? = approvalControls?.let { controls ->
         com.letta.mobile.data.chat.approval.ApprovalOutboxChannel(
             transport = transport,
@@ -186,7 +186,7 @@ class IrohAdminRpcChatGateway(
         approvalControls?.modes?.sync(runtime)
     }
 
-    /** letta-mobile-a4tm7: this chip governs the Iroh host's runtime, shared with its other clients. */
+    /** This chip governs the Iroh host's runtime, shared with its other clients. */
     override val permissionModeRuntime: com.letta.mobile.data.runtime.PermissionModeRuntime
         get() = com.letta.mobile.data.runtime.PermissionModeRuntime.Host(transport.hostNodeId)
 
@@ -427,7 +427,7 @@ class IrohAdminRpcChatGateway(
         return json.decodeFromJsonElement(Conversation.serializer(), result)
     }
 
-    /** letta-mobile-bzvro.15: the host's `conversation.fork` (App Server `conversation_fork`). */
+    /** The host's `conversation.fork` (App Server `conversation_fork`). */
     override suspend fun forkConversation(request: ConversationForkRequest): Conversation {
         val result = rpc(
             AdminRpcCall.of(
@@ -440,11 +440,11 @@ class IrohAdminRpcChatGateway(
             .also { agentIdByConversation[it.id] = it.agentId }
     }
 
-    /** letta-mobile-w4q4p: the wrapper's `model.update` (App Server `update_model`) for this conversation. */
+    /** The wrapper's `model.update` (App Server `update_model`) for this conversation. */
     override suspend fun setConversationModel(conversationId: String, model: String): Conversation =
         updateConversationModel(ConversationModelChange(ConversationId(conversationId), ModelHandle(model)))
 
-    /** letta-mobile-by4vm.85: `model.update` with the effort, built by the shared model-control wire. */
+    /** `model.update` with the effort, built by the shared model-control wire. */
     override suspend fun updateConversationModel(change: ConversationModelChange): Conversation {
         val agentId = agentIdFor(change.conversationId)
         val target = ConversationModelTarget(agentId.value, change.conversationId.value)

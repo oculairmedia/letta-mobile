@@ -18,7 +18,7 @@ fun interface SubagentPushTarget {
 }
 
 /**
- * letta-mobile-fxoew.2: pushes the host's authoritative subagent registry to the
+ * Pushes the host's authoritative subagent registry to the
  * viewers of a conversation.
  *
  * Before this, clients only pulled `subagent.list` and built RUNNING-only chips
@@ -92,7 +92,7 @@ class SubagentRegistryPublisher(
     private fun nowMs(): Long = clock().toEpochMilli()
 
     /**
-     * letta-mobile-ulcg6 (RC2): the frame names the (agent, conversation) it
+     *  (RC2): the frame names the (agent, conversation) it
      * describes, so a client folds it into that scope only. A null agent (an
      * unattributed group) leaves the agent unnamed and the client falls back
      * to inferring the scope from the entries.

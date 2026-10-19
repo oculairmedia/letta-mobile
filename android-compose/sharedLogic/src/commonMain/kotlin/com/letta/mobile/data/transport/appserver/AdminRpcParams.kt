@@ -8,7 +8,7 @@ import kotlinx.serialization.json.put
 /**
  * The `admin_rpc` params an App Server reads for a legacy `(method, path, body)` call: the
  * conversation and message ids a `/v1/conversations/{id}/messages/{id}` path names, its query
- * parameters, then the JSON body's fields. letta-mobile-ckmub.17.1: one shape for the JVM Iroh
+ * parameters, then the JSON body's fields. one shape for the JVM Iroh
  * transport and the browser's AppServerClientChannel, so both send the same request.
  */
 fun appServerAdminRpcParams(path: String, body: String?): JsonObject = buildJsonObject {

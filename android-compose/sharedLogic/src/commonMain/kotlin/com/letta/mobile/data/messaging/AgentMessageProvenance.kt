@@ -3,7 +3,7 @@ package com.letta.mobile.data.messaging
 import androidx.compose.runtime.Immutable
 
 /**
- * letta-mobile-slqfp: structured, transport-carried provenance for an
+ * Structured, transport-carried provenance for an
  * inter-agent (a2a) message projected onto the chat render layer.
  *
  * This model is built ONLY from explicit structural signals — the a2a wire
@@ -11,8 +11,7 @@ import androidx.compose.runtime.Immutable
  * call's own arguments/result (via [AgentMessageProvenanceProjection]) —
  * NEVER by pattern-matching message body/content text. If neither structural
  * signal is present, no [AgentMessageProvenance] is produced and the message
- * renders as ordinary chat. See letta-mobile-i9h61 / letta-mobile-bn008 for
- * the transport this projects.
+ * renders as ordinary chat.
  */
 @Immutable
 data class AgentMessageProvenance(
@@ -66,7 +65,7 @@ enum class AgentMessageDirection { INBOUND, OUTBOUND }
  * [com.letta.mobile.data.timeline.DeliveryState] (which tracks the LOCAL
  * optimistic-send lifecycle of any chat message) — this tracks the a2a
  * APPLICATION delivery lifecycle end to end: local transport acceptance is
- * not receiver application confirmation (letta-mobile-i9h61.2).
+ * not receiver application confirmation.
  */
 @Immutable
 enum class AgentMessageDeliveryState { PENDING, SENT, RECEIVER_CONFIRMED, FAILED }

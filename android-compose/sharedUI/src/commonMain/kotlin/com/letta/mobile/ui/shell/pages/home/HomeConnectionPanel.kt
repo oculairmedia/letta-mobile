@@ -40,7 +40,7 @@ data class HomeConnectionState(
 )
 
 /**
- * letta-mobile-ckmub.3.11: the hero the Home page shows until the backend is there (connecting,
+ * The hero the Home page shows until the backend is there (connecting,
  * no backend configured, offline, or a failed connect), with Retry when retrying can help. Moved
  * from desktop's ChatStatePanel when the legacy desktop chat surface was deleted.
  *

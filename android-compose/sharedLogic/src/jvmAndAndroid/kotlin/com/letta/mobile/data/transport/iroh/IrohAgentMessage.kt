@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * letta-mobile-bn008.2: the direct agent-to-agent message envelope carried over
+ * The direct agent-to-agent message envelope carried over
  * an Iroh QUIC BiStream. QUIC is reliable/ordered/lossless, so delivery is acked
  * (no gap-replay). The receiver dedupes on [msgId] for at-most-once processing on
  * redelivery.
@@ -16,7 +16,7 @@ data class IrohAgentMessage(
     val body: String,
     val msgId: String,
     val ts: Long,
-    /** letta-mobile-5m1qy: optional explicit target conversation on the recipient. */
+    /** Optional explicit target conversation on the recipient. */
     val conversationId: String? = null,
 ) {
     fun encode(): String = wireJson.encodeToString(serializer(), this)

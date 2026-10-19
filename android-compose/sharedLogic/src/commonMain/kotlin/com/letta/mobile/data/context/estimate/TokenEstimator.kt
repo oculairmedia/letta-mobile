@@ -1,7 +1,7 @@
 package com.letta.mobile.data.context.estimate
 
 /**
- * letta-mobile-cyh28: how a span of prompt text is counted in tokens when no provider figure
+ * How a span of prompt text is counted in tokens when no provider figure
  * exists for it.
  *
  * letta-code has no tokenizer: every local estimate it makes (`estimateLocalMessageTokens`,

@@ -14,7 +14,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
 /**
- * Server-process-scoped dedupe for client message ids (P3, letta-mobile-3wq5g).
+ * Server-process-scoped dedupe for client message ids.
  *
  * Moving this off a per-[IrohNodeConnection] set means a redial that re-delivers
  * the SAME `client_message_id` on a fresh connection is still recognised as a
@@ -59,7 +59,7 @@ class ProcessScopedClientMessageDedupe(
 
 /**
  * Server-process-scoped store of terminal frames that could NOT be delivered
- * because the control/stream channel died mid-turn (P3, q71yi root cause).
+ * because the control/stream channel died mid-turn.
  *
  * Keyed by `client_message_id` — the one id the client re-presents when it
  * redials and re-sends the same turn. On that re-send the server replays the
@@ -170,7 +170,7 @@ internal class TurnFrameTracker(
 }
 
 /**
- * eaczz.3: per-connection conversation-viewer subscription with the Option A
+ * Per-connection conversation-viewer subscription with the Option A
  * de-scope rule.
  *
  * A single [IrohNodeConnection] owns ONE [ViewerHandle] identity (its
@@ -219,7 +219,7 @@ internal class ConversationViewerSubscription(
 }
 
 /**
- * letta-mobile-by4vm.50: advertised in every auth_response. [IrohViewerHandle] draws each frame's
+ * Advertised in every auth_response. [IrohViewerHandle] draws each frame's
  * [ConnectionEventSeq] value inside the connection's stream write lock, so wire order is seq order
  * and a client may read a jump as a lost frame.
  */
@@ -253,7 +253,7 @@ internal object IrohEventSeqAllocator {
  * Tracks tool_call ids opened by a turn's stream frames and closed by their
  * matching tool_return frames, so on failure/abort the server can synthesize a
  * terminal `tool_return(status=error, "cancelled")` for anything still open
- * (P3, letta-mobile-8s45p) — no tool_call is left dangling without a return.
+ * — no tool_call is left dangling without a return.
  */
 internal class OpenToolCallTracker {
     private val open = LinkedHashSet<String>()
@@ -293,7 +293,7 @@ internal object DanglingToolCallSynthesizer {
     }.getOrNull()
 
     /**
-     * letta-mobile-fkpd4: FAIL-SOFT wire read. `.jsonPrimitive` THROWS on a
+     * FAIL-SOFT wire read. `.jsonPrimitive` THROWS on a
      * JsonArray/JsonObject, and these helpers run over RAW frames on the
      * fanout path where `id`, `status` and `content` can legitimately arrive
      * non-scalar. A throw here does not degrade one field — it escapes the turn
@@ -339,7 +339,7 @@ internal object DanglingToolCallSynthesizer {
 }
 
 /**
- * letta-mobile-h30cy: mirror the shim's tagAsOptimistic / cm-stream tagging on the
+ * Mirror the shim's tagAsOptimistic / cm-stream tagging on the
  * Iroh serve path. The Iroh stream forwards the App Server delta with its raw
  * provider id (letta-msg-*), but message.list later returns the SAME reply with a
  * DIFFERENT id namespace (ui-msg-*, null run) that shares NO identity field with

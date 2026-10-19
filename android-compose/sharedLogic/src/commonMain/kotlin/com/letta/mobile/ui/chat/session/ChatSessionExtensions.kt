@@ -55,7 +55,7 @@ fun ChatSurfaceCapabilities.withExtensions(facts: ChatExtensionFacts): ChatSurfa
 )
 
 /**
- * letta-mobile-by4vm.98.3: a host's extension points ([TimelineChatSessionOptions]) read together,
+ * A host's extension points ([TimelineChatSessionOptions]) read together,
  * so every session port composes the same composer chrome, capabilities and status lines from
  * them: [TimelineChatSessionPort] over its own draft, desktop's port over its controller's.
  */
@@ -87,11 +87,11 @@ class ChatSessionExtensions(
     ) { directory, branches -> ChatExtensionFacts(directory, options.models != null, branches) }
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), currentFacts())
 
-    /** letta-mobile-bzvro.7: the conversation's live status; idle where the host observes none. */
+    /** The conversation's live status; idle where the host observes none. */
     val liveStatus: StateFlow<RuntimeLiveStatus> = (options.liveStatus ?: flowOf(RuntimeLiveStatus.Idle))
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), RuntimeLiveStatus.Idle)
 
-    /** letta-mobile-zxk2n.5: where the last `/recompile` stands; idle where the host has none. */
+    /** Where the last `/recompile` stands; idle where the host has none. */
     val recompileStatus: StateFlow<RecompileStatus> =
         options.recompile?.status ?: MutableStateFlow(RecompileStatus.Idle)
 

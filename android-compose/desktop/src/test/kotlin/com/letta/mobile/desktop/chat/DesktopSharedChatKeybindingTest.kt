@@ -33,7 +33,6 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.ChatSurface
-import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
 import java.lang.reflect.Proxy
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -97,7 +96,7 @@ class DesktopSharedChatKeybindingTest {
     }
 
     private fun ComposeUiTest.press(key: Key, modifier: Key? = null) {
-        onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performKeyInput {
+        onNodeWithTag("composer-input").requestFocus().performKeyInput {
             if (modifier == null) pressKey(key) else withKeyDown(modifier) { pressKey(key) }
         }
         waitForIdle()

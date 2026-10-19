@@ -18,10 +18,10 @@ import kotlinx.serialization.json.put
 /**
  * Agent reads over the Iroh admin RPC control channel.
  *
- * letta-mobile-71orq: after P4 purity (letta-mobile-qfa81) the LettaApiClient
+ * after P4 purity the LettaApiClient
  * choke-point hard-fails any raw HTTP admin call in iroh:// mode instead of
  * silently falling back to a stale HTTP config. [AgentRepository.getAgent]
- * previously always called the raw HTTP `AgentApi` (removed in letta-mobile-ckmub.4),
+ * previously always called the raw HTTP `AgentApi` (removed),
  * so opening a conversation over iroh:// threw
  * `IrohAdminApiUnavailableException` before any
  * stream and the whole chat screen errored out.
@@ -140,7 +140,7 @@ class IrohAdminRpcAgentSource(
      * List ALL agents by paging through `agent.list`. The server returns only a
      * default first page (~50) when no limit is given, so agents beyond it never
      * resolved a name in the conversation list and fell back to `agentId.take(8)`
-     * (letta-mobile-71orq).
+     *.
      */
     override suspend fun listAgents(): List<Agent> {
         val merged = mutableListOf<Agent>()
@@ -230,13 +230,13 @@ class IrohAdminRpcAgentSource(
     }
 
     /**
-     * letta-mobile-ulz2b.1: authoritative roster size via the shared
+     * Authoritative roster size via the shared
      * [IrohAdminRpcAgentDirectory.countAgents] seam. Never silent-0 on failure.
      */
     override suspend fun countAgents(): Int = agentDirectory.countAgents()
 
     /**
-     * letta-mobile-z5lqt: compare the swept roster against the authoritative
+     * Compare the swept roster against the authoritative
      * `agent.count`. Observation only — the swept list is returned unchanged
      * whatever this reports, and a failure to measure is recorded as UNKNOWN
      * rather than being swallowed.

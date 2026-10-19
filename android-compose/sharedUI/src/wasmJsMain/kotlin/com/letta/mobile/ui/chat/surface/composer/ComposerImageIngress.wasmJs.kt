@@ -16,7 +16,7 @@ import org.khronos.webgl.Int8Array
 import org.khronos.webgl.get
 
 /**
- * letta-mobile-k5nbq.15: the browser's image paste and file drop. Pasting takes the clipboard's
+ * The browser's image paste and file drop. Pasting takes the clipboard's
  * image files while the composer has focus (so a paste meant for the canvas stays there); a drop
  * anywhere on the page attaches, as desktop's window drop does. Files past
  * [ImageIngressPolicy.MAX_SOURCE_BYTES] are refused by their reported size, before being read.

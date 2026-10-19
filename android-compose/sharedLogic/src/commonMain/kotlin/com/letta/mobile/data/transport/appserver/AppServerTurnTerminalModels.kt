@@ -80,7 +80,7 @@ value class AppServerTerminalConsumerId(val value: String) {
         fun isValid(value: String): Boolean = value.length in 1..MAX_LENGTH && ALLOWED.matches(value)
 
         /**
-         * letta-mobile-zxk2n.2: the stable id of one client surface ([surface], e.g. the
+         * The stable id of one client surface ([surface], e.g. the
          * runtime_start client name) on one install ([install]). Characters outside the grammar
          * become `-`, and the id is cut to [MAX_LENGTH].
          */

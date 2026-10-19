@@ -12,7 +12,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * The one command surface behind both front doors (letta-mobile-jna0o.3; design
+ * The one command surface behind both front doors (design
  * docs/design/on-demand-tools-via-meridian-cli.md section 4): the `meridian` CLI an agent runs
  * from its shell, and the `meridian` meta-tool. Transport-agnostic: it takes argv, stdin and the
  * caller scope, and answers stdout, stderr and an exit code.

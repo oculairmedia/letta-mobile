@@ -1,7 +1,7 @@
 package com.letta.mobile.data.subagents
 
 /**
- * letta-mobile-fxoew.3: the registry's TTL for live chips nobody reports any
+ * The registry's TTL for live chips nobody reports any
  * more.
  *
  * A chip leaves RUNNING only through an App Server lifecycle event or

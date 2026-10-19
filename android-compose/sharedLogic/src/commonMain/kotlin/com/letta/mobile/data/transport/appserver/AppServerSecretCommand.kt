@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * letta-mobile-bzvro.25: an agent's secrets vault (letta-code `secret_list`, `secret_apply`).
+ * An agent's secrets vault (letta-code `secret_list`, `secret_apply`).
  *
  * Both carry plaintext values on the wire: `secret_list_response` returns every key with its
  * value, and [SecretApply.set] sends new ones. Values are stored only by the server; nothing here

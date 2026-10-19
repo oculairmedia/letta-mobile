@@ -18,7 +18,7 @@ val PairedDevice.displayName: String get() = name.ifBlank { nodeId.take(DEVICE_F
 
 private const val DEVICE_FINGERPRINT_CHARS = 8
 
-/** Copy for the scan-to-pair surfaces (letta-mobile-dpv7m.2, UX pass dpv7m.5), shared by Android and desktop. */
+/** Copy for the scan-to-pair surfaces (UX pass), shared by Android and desktop. */
 object PairingStrings {
     // Scanner (joining device).
     const val SCAN_TITLE = "Scan to connect"
@@ -156,7 +156,7 @@ object PairingStrings {
     fun revokeConfirm(device: PairedDevice) = "${device.displayName} will lose access immediately and any open chat ends."
 
     /**
-     * Honest scope note (dpv7m.4 is open): the host filters agent LISTINGS for an
+     * Honest scope note ( is open): the host filters agent LISTINGS for an
      * agent-limited device, but does not yet block opening a conversation by id.
      */
     const val AGENT_SCOPE_NOTE =

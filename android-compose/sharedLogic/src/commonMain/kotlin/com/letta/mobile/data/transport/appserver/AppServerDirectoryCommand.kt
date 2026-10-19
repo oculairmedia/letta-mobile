@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * letta-mobile-zxk2n.6 (G32): folder browsing on the device the agent works in (letta-code
+ *  (G32): folder browsing on the device the agent works in (letta-code
  * `list_in_directory`). A read; not scoped to an agent.
  *
  * Not one of the Iroh workspace relay's methods ([WorkspaceRelayMethod]): over a relay it fails

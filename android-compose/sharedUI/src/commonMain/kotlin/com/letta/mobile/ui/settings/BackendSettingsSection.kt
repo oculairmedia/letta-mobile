@@ -89,7 +89,7 @@ object BackendSettingsTags {
     const val PROBLEM = SettingsSectionTags.PROBLEM_PREFIX + SERVER_URL
 }
 
-/** The mode's name as the Settings page shows it (letta-mobile-ckmub.9: Local runtime | Remote host). */
+/** The mode's name as the Settings page shows it (Local runtime | Remote host). */
 val LettaConfig.Mode.settingsLabel: String
     get() = when (this) {
         LettaConfig.Mode.LOCAL -> "Local runtime"
@@ -148,7 +148,7 @@ sealed interface ConnectionTest {
 }
 
 /**
- * letta-mobile-ckmub.3.12 / ckmub.9 / ckmub.3.12.1: the Backend section every client's Settings page
+ * The Backend section every client's Settings page
  * shows. A segmented Local runtime | Remote host; for a remote host the connection's status, the
  * address (checked as it is typed, with Paste and Scan to connect), the access token, and Test
  * connection with its latency or the reason it failed; then an explicit Save that waits for a change.
@@ -212,7 +212,7 @@ private fun TestConnectionRow(test: ConnectionTest, enabled: Boolean, onTest: ()
 }
 
 /**
- * letta-mobile-ckmub.3.12.1: the danger zone, last and on its own: removing the saved token and
+ * The danger zone, last and on its own: removing the saved token and
  * resetting this device's identity, each in red and confirmed with its consequence first.
  */
 @Composable

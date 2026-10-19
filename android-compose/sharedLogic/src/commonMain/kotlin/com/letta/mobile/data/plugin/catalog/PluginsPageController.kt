@@ -44,7 +44,7 @@ private const val BYTE_MASK = 0xff
 private const val HEX = 16
 
 /**
- * letta-mobile-cdgpr.9: the Plugins page over a [PluginCatalog]. It follows the catalog's list (and
+ * The Plugins page over a [PluginCatalog]. It follows the catalog's list (and
  * this device's [liveViews] switch) while [scope] lives, runs one catalog call at a time, and never
  * sends a consent that denies anything: a Deny refuses the install here and drops the staged package.
  * [hashing] is where a picked package is hashed (off the UI thread by default).

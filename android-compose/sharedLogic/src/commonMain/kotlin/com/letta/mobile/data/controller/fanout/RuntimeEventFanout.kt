@@ -53,7 +53,7 @@ import kotlinx.coroutines.sync.Mutex
  */
 class RuntimeEventFanout(
     /**
-     * lgns8.22.4: correlates server→client control / external-tool requests so
+     * Correlates server→client control / external-tool requests so
      * the same request_id is not rebroadcast after the first delivery.
      */
     private val inboundControlRegistry: InboundControlRequestRegistry = InboundControlRequestRegistry(),
@@ -66,7 +66,7 @@ class RuntimeEventFanout(
     private val approvalReplayResponder = atomic<((AppServerInboundFrame.ControlRequest) -> Boolean)?>(null)
 
     /**
-     * letta-mobile-qygvv.5: [responder] is offered every `control_request` before
+     * [responder] is offered every `control_request` before
      * registration. It returns true when this client already answered the request
      * (the frame is a server replay, so the answer was lost) and it has re-sent the
      * cached decision; the frame is then consumed instead of being dropped as an
@@ -80,7 +80,7 @@ class RuntimeEventFanout(
     private val subscriberOverflowListener = atomic<SubscriberOverflowListener?>(null)
 
     /**
-     * letta-mobile-by4vm.4: [listener] is told the runtime of every subscriber [route] detaches
+     * [listener] is told the runtime of every subscriber [route] detaches
      * for overflowing (see [RuntimeSubscriberOverflowCancellation]), so the owner can resync what
      * that subscriber missed. Called from [route]; must not block.
      */
@@ -91,11 +91,11 @@ class RuntimeEventFanout(
     /**
      * Per-subscriber channels. Buffering starts at [subscribe], not at collect,
      * so frames cannot be lost in the subscribe→collect handoff window. There is
-     * no shared replay cache (lgns8.22.3): a new subscriber never sees a prior
+     * no shared replay cache: a new subscriber never sees a prior
      * turn's terminal.
      *
      * Capacity is bounded ([SUBSCRIBER_BUFFER_CAPACITY]) for memory safety.
-     * [route] never suspends on a subscriber (letta-mobile-by4vm.4): it offers
+     * [route] never suspends on a subscriber: it offers
      * each frame with `trySend`, and a subscriber whose buffer is full is
      * detached and its channel closed with [RuntimeSubscriberOverflowCancellation]
      * — after the frames it already buffered — so only that subscriber's turn
@@ -104,7 +104,7 @@ class RuntimeEventFanout(
     private val subscribers = mutableMapOf<String, SubscriberSlot>()
 
     /**
-     * lgns8.22.4.1.1: server-initiated control / external-tool frames that arrived
+     * Server-initiated control / external-tool frames that arrived
      * while NO subscriber was attached.
      *
      * The reconnect path (`ReconnectCoordinator.reconnectRuntime` →
@@ -161,7 +161,7 @@ class RuntimeEventFanout(
     }
 
     /**
-     * letta-mobile-qygvv.3: a PASSIVE subscription for probes. It receives the runtime's
+     * A PASSIVE subscription for probes. It receives the runtime's
      * scoped frames like any subscriber but never takes delivery of server-initiated control
      * requests, and no buffered control frames are flushed into it, so a probe can never
      * swallow an approval or external-tool request a real turn must answer.
@@ -182,7 +182,7 @@ class RuntimeEventFanout(
      *
      * Closing the subscriber channel drops its buffer. Per-runtime turn locks are
      * **not** removed here — an active turn/lease must survive viewer churn
-     * (lgns8.22.3). Idle locks are retired from [releaseTurnLock] once no waiters
+     *. Idle locks are retired from [releaseTurnLock] once no waiters
      * remain and no viewers are subscribed.
      */
     fun unsubscribe(subscriberId: String): Boolean = synchronized(stateLock) {
@@ -200,7 +200,7 @@ class RuntimeEventFanout(
      * Unscoped external-tool / control requests register in
      * [inboundControlRegistry] then deliver once (duplicate request_ids drop).
      *
-     * Never suspends on a subscriber (letta-mobile-by4vm.4): the router calls this
+     * Never suspends on a subscriber: the router calls this
      * from ONE sequential loop for the whole connection, so waiting on any one
      * subscriber's full buffer would stall every runtime and, upstream, the
      * transport's bounded delivery queue. A full subscriber is detached instead
@@ -387,7 +387,7 @@ class RuntimeEventFanout(
     }
 
     /**
-     * letta-mobile-by4vm.4: offer [received] to each target without suspending. A
+     * Offer [received] to each target without suspending. A
      * target whose buffer is full is detached on the spot: removed from
      * [subscribers] and its channel closed with [RuntimeSubscriberOverflowCancellation].
      * `close` (not `cancel`) keeps the frames it already buffered, so its collector
@@ -440,8 +440,8 @@ class RuntimeEventFanout(
 
     /**
      * A server-initiated control frame that reached NO subscriber because every
-     * target overflowed is retained exactly like one that arrived with no subscriber
-     * (lgns8.22.4.1.1), so the successor lease (the retried turn) still answers it
+     * target overflowed is retained exactly like one that arrived with no subscriber,
+     * so the successor lease (the retried turn) still answers it
      * instead of the server blocking forever. Then the owner is asked to resync.
      */
     private fun onSubscribersOverflowed(
@@ -557,7 +557,7 @@ class RuntimeEventFanout(
         subscribers.size
     }
 
-    /** letta-mobile-bzvro.6: one scope per runtime with at least one subscriber (passive included). */
+    /** One scope per runtime with at least one subscriber (passive included). */
     fun watchedRuntimes(): List<com.letta.mobile.data.transport.appserver.AppServerRuntimeScope> =
         synchronized(stateLock) {
             subscribers.values.map { it.key }.distinct().map {
@@ -619,13 +619,13 @@ class RuntimeEventFanout(
         /**
          * Per-subscriber buffer. Large enough for bursty stream deltas; when full,
          * [route] detaches that subscriber with [RuntimeSubscriberOverflowCancellation]
-         * rather than waiting for it (letta-mobile-by4vm.4).
+         * rather than waiting for it.
          */
         const val SUBSCRIBER_BUFFER_CAPACITY = 256
 
         /**
          * Bound on control frames retained while no subscriber exists
-         * (lgns8.22.4.1.1). Sized for a full recovery replay burst; eviction is
+         *. Sized for a full recovery replay burst; eviction is
          * recorded at WARN because it means a server request will go unanswered.
          */
         const val MAX_PENDING_CONTROL_FRAMES = 64
@@ -637,11 +637,11 @@ class RuntimeEventFanout(
     }
 }
 
-/** letta-mobile-by4vm.4: told the runtime of a subscriber detached for overflowing. */
+/** Told the runtime of a subscriber detached for overflowing. */
 typealias SubscriberOverflowListener = (AppServerRuntimeScope) -> Unit
 
 /**
- * lgns8.22.4.1.3: external-tool registry identity is (request_id, tool_call_id).
+ * External-tool registry identity is (request_id, tool_call_id).
  * Approvals carry no tool_call_id at this layer.
  */
 private fun AppServerReceivedFrame.controlToolCallId(): String? =

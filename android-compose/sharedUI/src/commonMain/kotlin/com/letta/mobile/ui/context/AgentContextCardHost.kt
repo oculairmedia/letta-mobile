@@ -45,15 +45,15 @@ import com.letta.mobile.ui.theme.AgentContextDimens
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
-/** letta-mobile-3io8k: what a host supplies once per session; any part may be absent. */
+/** What a host supplies once per session; any part may be absent. */
 class AgentContextCardDeps(
     val readings: ContextTokenReadings?,
     val breakdown: ContextBreakdownLoader?,
     val compaction: CompactionController?,
     val pickerSource: ModelPickerSource?,
-    /** letta-mobile-joigh: the context-limit change; null when the host has no route to letta-code's `/context-limit`. */
+    /** The context-limit change; null when the host has no route to letta-code's `/context-limit`. */
     val contextLimit: ContextLimitController? = null,
-    /** letta-mobile-bzvro.27: the agent's notification mute; null when the host posts no notifications. */
+    /** The agent's notification mute; null when the host posts no notifications. */
     val attention: AttentionPrefsRepository? = null,
 )
 
@@ -68,7 +68,7 @@ data class AgentContextFocus(
     val effort: String?,
     /** The model's window from the host's catalog; the breakdown's record window wins when known. */
     val windowTokens: Int?,
-    /** letta-mobile-joigh: the focused model's catalog window (the limit slider's ceiling); the sheet's catalog fills in when null. */
+    /** The focused model's catalog window (the limit slider's ceiling); the sheet's catalog fills in when null. */
     val modelWindowTokens: Int? = null,
     /** A turn is running: no breakdown fetch, no compaction. */
     val turnRunning: Boolean,
@@ -99,7 +99,7 @@ data class AgentContextCardActions(
 /**
  * How a host binds the card: the session pieces and the model picks. Where the detail opens is the
  * window's: the [InspectorPane] docks on the right of a wide window's inspector frame and is a
- * sheet on a compact one (letta-mobile-ckmub.3.15, S13).
+ * sheet on a compact one (S13).
  */
 data class AgentContextCardBinding(
     val deps: AgentContextCardDeps,
@@ -107,7 +107,7 @@ data class AgentContextCardBinding(
 )
 
 /**
- * letta-mobile-3io8k: the drawer card with its sheet, wired to the session. The meter is the
+ * The drawer card with its sheet, wired to the session. The meter is the
  * streamed total; the breakdown loads only while the sheet is open and no turn runs, and again
  * after a compaction; nothing polls.
  */
@@ -180,7 +180,7 @@ private class CardSnapshot(val windows: FocusedContextWindows, val overview: Con
 }
 
 /**
- * letta-mobile-joigh: the conversation's windows: a limit just applied here, else the host's
+ * The conversation's windows: a limit just applied here, else the host's
  * figure, else the sheet catalog's window for the focused model (see [FocusedContextWindows]).
  */
 @Composable

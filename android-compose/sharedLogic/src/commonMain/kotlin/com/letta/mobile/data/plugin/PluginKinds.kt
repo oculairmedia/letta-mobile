@@ -24,7 +24,7 @@ data class PluginKindSummary(
 /**
  * How installed plugins' element kinds reach the props validator (plan sections 4 and 6.1): every
  * installed plugin's kinds, at their current schema version, through the same
- * [InMemoryPluginKindCatalog.specsOf] the manifest fixture is read with (letta-mobile-s416w.2). A
+ * [InMemoryPluginKindCatalog.specsOf] the manifest fixture is read with. A
  * disabled plugin's kinds stay known, so its elements on boards are still held to their schema.
  */
 object PluginKinds {

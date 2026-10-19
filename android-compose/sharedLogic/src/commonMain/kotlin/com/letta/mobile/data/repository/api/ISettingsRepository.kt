@@ -14,14 +14,14 @@ import kotlinx.coroutines.flow.flowOf
  * tests can substitute a hand-written
  * [com.letta.mobile.testutil.FakeSettingsRepository] instead of mocking the
  * stateful concrete class (mockk on a final class with internal StateFlows /
- * EncryptedSharedPreferences leaks across the daemon JVM — see letta-mobile-0dnn).
+ * EncryptedSharedPreferences leaks across the daemon JVM).
  *
  * Covers the reads used by:
  *  - Infra collaborators: ChannelHeartbeatSync.
  *  - VM-facing reads: ConversationsViewModel (pinned-conversation state) and
  *    DashboardViewModel (favorite + pinned agents + shortcuts). Adding new
  *    VM consumers should widen the interface here rather than reaching for
- *    the concrete class — see letta-mobile-9x4 / letta-mobile-utc.
+ *    the concrete class .
  */
 interface ISettingsRepository {
     val configs: StateFlow<List<LettaConfig>>
@@ -87,7 +87,7 @@ interface ISettingsRepository {
     fun getHapticsEnabled(): Flow<Boolean>
 
     /**
-     * letta-mobile-bglj6.1: whether the shared chat page opens a conversation on the canvas
+     * Whether the shared chat page opens a conversation on the canvas
      * (canvas-first) rather than the traditional full-screen chat. Only the initial
      * presentation; the user's later surface mode still wins. Defaults to enabled.
      */
@@ -111,7 +111,7 @@ interface ISettingsRepository {
 /**
  * Backend identity of a [LettaConfig]: the fields that determine which
  * backend the active config points at. Used as the distinctness key for
- * [ISettingsRepository.activeConfigChanges] (letta-mobile-xzoy3).
+ * [ISettingsRepository.activeConfigChanges].
  *
  * Same-id edits that flip [LettaConfig.Mode] (SELF_HOSTED<->LOCAL) or the server
  * URL are real backend switches and MUST be observed by consumers; a

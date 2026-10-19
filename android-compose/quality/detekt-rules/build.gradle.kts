@@ -30,15 +30,12 @@ tasks.test {
 
 val changedKotlinFiles = providers.provider {
     val repositoryRoot = rootProject.projectDir.parentFile
-    fun git(vararg args: String): Set<String> = providers.exec {
-        workingDir(repositoryRoot)
-        commandLine("git", *args)
-        isIgnoreExitValue = true
-    }.standardOutput.asText.get().lineSequence().filter(String::isNotBlank).toSet()
-
     val base = providers.environmentVariable("GITHUB_BASE_REF").orNull?.let { "origin/$it" } ?: "origin/main"
-    val paths = git("diff", "--name-only", "$base...HEAD") +
-        git("diff", "--name-only") + git("ls-files", "--others", "--exclude-standard")
+    val python = if (System.getProperty("os.name").startsWith("Windows")) "python" else "python3"
+    val paths = providers.exec {
+        workingDir(repositoryRoot)
+        commandLine(python, "scripts/ci/changed-kotlin-code.py", "--base", base)
+    }.standardOutput.asText.get().lineSequence().filter(String::isNotBlank).toSet()
     paths.asSequence()
         .filter { it.startsWith("android-compose/") && it.endsWith(".kt") }
         .filterNot { "/build/" in it || "/generated/" in it || "/quality/detekt-rules/" in it }
@@ -50,7 +47,7 @@ val changedKotlinFiles = providers.provider {
 }
 
 tasks.register<io.gitlab.arturbosch.detekt.Detekt>("guardrailDetekt") {
-    description = "Block new high-risk Kotlin policy violations in files changed from origin/main."
+    description = "Block high-risk Kotlin policy violations in files with code changes from the PR base."
     group = "verification"
     dependsOn(tasks.jar)
     setSource(changedKotlinFiles)

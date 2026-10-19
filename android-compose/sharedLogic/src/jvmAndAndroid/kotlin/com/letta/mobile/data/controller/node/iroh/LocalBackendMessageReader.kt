@@ -12,7 +12,7 @@ import java.io.File
 data class MessagePage(val limit: Int?, val before: String?, val after: String?, val order: String?)
 
 /**
- * lgns8.9 slice 3: on-disk `message.list` reader.
+ *  Slice 3: on-disk `message.list` reader.
  *
  * Faithful port of admin-shim `handleConversationMessagesList` (server.ts) +
  * `store.ts:listMessages`/`normalizeMessage`. Handles transcript I/O, sidecar
@@ -73,7 +73,7 @@ internal class LocalBackendMessageReader(
     }.getOrNull()
 
     /**
-     * letta-mobile-cyh28: the directory holding the conversation `agent.context` describes, without
+     * The directory holding the conversation `agent.context` describes, without
      * reading or projecting its transcript. Null when the store cannot be read.
      *
      * admin-shim: `url.searchParams.get("conversation_id") ?? "default"`, and the bare literal
@@ -177,7 +177,7 @@ internal class LocalBackendMessageReader(
         )
 
     /**
-     * lgns8.9: cache the parsed transcript + sidecar maps per conversation, keyed
+     * Cache the parsed transcript + sidecar maps per conversation, keyed
      * on a composite file signature (messages.jsonl + sidecars + runs dir mtime),
      * so repeated polls on a large transcript (the ~87MB main conversation) don't
      * re-parse the whole file every call — mirrors the shim's messagesCache. An

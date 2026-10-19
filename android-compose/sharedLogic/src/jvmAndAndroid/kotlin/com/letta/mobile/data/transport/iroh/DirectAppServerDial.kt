@@ -23,7 +23,7 @@ import java.util.UUID
 import kotlin.time.Duration
 
 /**
- * letta-mobile-by4vm.110.6: one dial of a plain ws:// App Server that [IrohChannelTransport]
+ * One dial of a plain ws:// App Server that [IrohChannelTransport]
  * attaches to its turn engine exactly like an Iroh dial: the device's own loopback server (the
  * embedded runtime) or a Settings "Remote host" ws:// address. So every Android backend runs the
  * same channel, chat and repositories; only the dial differs.
@@ -86,7 +86,7 @@ suspend fun openDirectAppServerDial(
 
 /**
  * The HTTP client for direct App Server sockets on Android and the JVM: CIO, because the shared
- * frame ceiling needs an engine that honours `maxFrameSize` (OkHttp refuses it, letta-mobile-by4vm.117).
+ * frame ceiling needs an engine that honours `maxFrameSize` (OkHttp refuses it).
  */
 fun directAppServerHttpClient(): HttpClient = HttpClient(CIO) {
     install(WebSockets) { applyAppServerFrameLimits() }

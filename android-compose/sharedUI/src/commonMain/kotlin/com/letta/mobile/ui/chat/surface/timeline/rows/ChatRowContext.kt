@@ -16,7 +16,7 @@ import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.persistentMapOf
 
 /**
- * letta-mobile-bglj6.1: the slim, stable per-row inputs. Rows read only this (never the
+ * The slim, stable per-row inputs. Rows read only this (never the
  * whole ChatUiState) so a streaming tick on the newest row doesn't recompose settled rows.
  */
 @Immutable
@@ -37,7 +37,7 @@ internal data class ChatRowContext(
     val newestMessageId: String? = null,
     /** Where a tool summary line shows its calls: in place (desktop) or in a sheet (Android). */
     val toolDetails: ChatToolDetails = ChatToolDetails.Inline,
-    /** letta-mobile-zxk2n.5: rows these options hide draw nothing (reasoning, compactions, usage). */
+    /** Rows these options hide draw nothing (reasoning, compactions, usage). */
     val displayOptions: ChatDisplayOptions = ChatDisplayOptions.Default,
 ) {
     /** True on the row holding the conversation's newest message. */
@@ -77,7 +77,7 @@ internal class ChatRowCallbacks(
      * dispatch identity instead. Null hides the affordance.
      */
     val openSubagent: ((ChatSubagentTarget) -> Unit)? = null,
-    /** letta-mobile-bzvro.9: the newest user prompt, for an error card's Retry. */
+    /** The newest user prompt, for an error card's Retry. */
     val lastPrompt: () -> UiMessage? = { null },
 ) {
     /** These callbacks, with [prompt] as the source of the newest user prompt. */

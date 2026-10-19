@@ -6,7 +6,7 @@ import com.letta.mobile.data.transport.appserver.WorkspaceRelayMethod
 
 /**
  * Server-side per-peer authorization after authentication
- * (letta-mobile-d6e8g.6). Endpoint authentication alone does not imply
+ *. Endpoint authentication alone does not imply
  * unrestricted admin: every protected command and admin_rpc method maps to a
  * capability, unknown methods deny by default, and paired peers carry an
  * explicit persisted capability set. `admin.full` is never implicit.
@@ -50,7 +50,7 @@ object IrohPeerCapabilities {
     )
 
     /**
-     * Default grant of a scanned pairing invite (letta-mobile-dpv7m.1): read
+     * Default grant of a scanned pairing invite: read
      * and send chat, and manage the conversations of the agents in scope —
      * nothing else (no memory writes, tools, skills, schedules, projects, and
      * never admin). Wider roles are requested explicitly by the inviter.
@@ -68,7 +68,7 @@ object IrohPeerCapabilities {
     }
 
     /**
-     * Vibesync consumer role (letta-mobile-qjncd): a paired desktop that may
+     * Vibesync consumer role: a paired desktop that may
      * additionally spawn subagents (agent.create + conversation.create,
      * without the rest of admin.full) and read/write the workactivity stream.
      * Lighter than ADMIN_FULL, broader than DEFAULT_DESKTOP_ROLE on the two
@@ -96,7 +96,7 @@ object IrohPeerCapabilities {
     /**
      * Capability required for an admin_rpc method. Unknown/unmapped methods
      * require [ADMIN_FULL] — deny-by-default for anything new until it is
-     * classified here (and in the lgns8.13 ownership matrix).
+     * classified here (and in the ownership matrix).
      */
     fun forAdminMethod(method: String): String = when {
         method in CHAT_READ_METHODS -> CHAT_READ
@@ -165,7 +165,7 @@ object IrohPeerCapabilities {
     }
 
     /**
-     * letta-mobile-bzvro.37: MemFS reads and writes ride the memory tier like blocks. Workspace files
+     * MemFS reads and writes ride the memory tier like blocks. Workspace files
      * take an absolute host path (`read_file`) or any host directory (`search_files` cwd) and the App
      * Server reads whatever its process can, so they are admin.full, like secrets (plaintext
      * credentials): neither is scoped to the agent's workspace.
@@ -181,7 +181,7 @@ object IrohPeerCapabilities {
         ADMIN_FULL in capabilities || required in capabilities
 
     /**
-     * Agent scope check (letta-mobile-dpv7m.1): null scope = every agent; a
+     * Agent scope check: null scope = every agent; a
      * request that names no agent is not agent-addressed and passes here
      * (its conversation/capability gates still apply).
      */
@@ -189,7 +189,7 @@ object IrohPeerCapabilities {
         agentScope == null || agentId == null || agentId in agentScope
 
     /**
-     * Conversation-content scope for admin_rpc reads (lgns8.12): peers that
+     * Conversation-content scope for admin_rpc reads: peers that
      * may manage conversations read any conversation (null = unrestricted);
      * lesser peers are bounded to the conversation they are actively viewing
      * (empty set when none) — cross-conversation content access is rejected

@@ -59,7 +59,7 @@ interface TimelineTransport {
     ): List<LettaMessage>
 
     /**
-     * letta-mobile-fe51r (P2b pointer diet): fetch the full body of a single
+     *  (P2b pointer diet): fetch the full body of a single
      * tool-return message whose `message.list` representation was projected
      * to a preview. Returns null when the transport never projects list
      * responses (plain HTTP) and therefore has nothing to hydrate.

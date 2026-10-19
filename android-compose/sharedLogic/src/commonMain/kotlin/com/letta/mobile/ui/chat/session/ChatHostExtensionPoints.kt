@@ -51,7 +51,7 @@ data class ChatBranchView(val messages: List<UiMessage>, val hasOlderMessages: B
 data class ChatBranchSupport(val fork: Boolean = false, val nameForks: Boolean = false)
 
 /**
- * A chat host's fork / edit-and-resend / rerun extension point (letta-mobile-bzvro.15/.16, 7mys7).
+ * A chat host's fork / edit-and-resend / rerun extension point.
  * Each action branches the conversation from a message of [ChatBranchView] and opens the branch.
  */
 interface ChatBranchingSource {
@@ -65,7 +65,7 @@ interface ChatBranchingSource {
 }
 
 /**
- * letta-mobile-bzvro.7: the live status of the conversation [key] names, from a window's run
+ * The live status of the conversation [key] names, from a window's run
  * registry; idle when nothing is selected or the conversation has no run.
  */
 fun runLiveStatus(

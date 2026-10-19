@@ -179,10 +179,10 @@ object ScheduleProjection {
      * Adapt a native schedule-admin [ScheduledMessage] (the
      * `/v1/agents/{id}/schedule` shape) into a [ScheduleDef]. Backends that
      * serve the native route but no `/v1/crons` expose schedules only here, so
-     * a surface that projects from crons alone hides them (Codex review #5).
+     * a surface that projects from crons alone hides them.
      * For one-shots the fire instant comes from `scheduled_at` (Unix epoch
      * seconds) or, when absent, the `next_scheduled_time` ISO timestamp
-     * fallback (Codex review #6) — otherwise a one-time schedule would carry
+     * fallback — otherwise a one-time schedule would carry
      * neither cron nor oneShotAt and never materialize. The wire shape carries
      * no per-schedule time zone, so the viewer's zone is used.
      */
@@ -314,7 +314,7 @@ object ScheduleProjection {
      * lanes line up with the column headers; [now] still drives run
      * classification (Done/Running/Next). Without an explicit [startDate] the
      * lanes were always anchored to today, so navigating weeks left the ticks
-     * mismatched against the headers (Codex/CodeRabbit review #1).
+     * mismatched against the headers.
      */
     fun timeline(
         defs: List<ScheduleDef>,

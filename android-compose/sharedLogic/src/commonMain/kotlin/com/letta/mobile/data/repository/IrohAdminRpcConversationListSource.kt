@@ -104,7 +104,7 @@ class IrohAdminRpcConversationListSource(
         return conversationRpc(ConversationRpcCall("conversation.update", "/v1/conversations/${id.value}", body.toString()))
     }
 
-    /** letta-mobile-bzvro.15: the host's `conversation.fork`, which answers with the full fork. */
+    /** The host's `conversation.fork`, which answers with the full fork. */
     suspend fun forkConversation(request: ConversationForkRequest): Conversation =
         conversationRpc(
             ConversationRpcCall(
@@ -115,7 +115,7 @@ class IrohAdminRpcConversationListSource(
         )
 
     /**
-     * letta-mobile-by4vm.51: the host's `conversation.recompile` relay; [IrohConversationRecompileClient.supported]
+     * The host's `conversation.recompile` relay; [IrohConversationRecompileClient.supported]
      * says whether the connected host advertises it.
      */
     val recompiler = IrohConversationRecompileClient(channelTransport.asAdminRpcLink())

@@ -43,7 +43,7 @@ import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-zxk2n.6 (G31): the agents the draft mentions, one input chip each, above the
+ *  (G31): the agents the draft mentions, one input chip each, above the
  * prompt. The reference itself stays in the text (that is what the agent receives, see
  * [AgentMentions]); removing a chip removes the whole reference from the draft. The row grows and
  * shrinks in place rather than pushing the prompt in one jump, and snaps under reduced motion.

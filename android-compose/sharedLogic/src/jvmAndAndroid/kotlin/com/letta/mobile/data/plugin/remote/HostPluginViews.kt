@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
- * letta-mobile-cdgpr.8: [PluginPackageUploader] over the canvas relay. The package goes into the
+ * [PluginPackageUploader] over the canvas relay. The package goes into the
  * host's asset store outside any canvas, pinned by the sha256 the Plugins page showed, and
  * `plugins.install` then installs it from there.
  */

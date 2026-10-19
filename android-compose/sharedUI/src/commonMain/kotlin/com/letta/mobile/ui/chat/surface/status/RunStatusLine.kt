@@ -59,8 +59,8 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 
-/** letta-mobile-bzvro.7/.8: test tags of the live status line. */
-object RunStatusTestTags {
+/** Test tags of the live status line. */
+internal object RunStatusTestTags {
     const val LINE = "run-status-line"
     const val PHASE = "run-status-phase"
     const val NOTICE = "run-status-notice"
@@ -71,7 +71,7 @@ object RunStatusTestTags {
 }
 
 /**
- * letta-mobile-bzvro.7 (F07) / .8 (F08): one line above the composer saying what the agent is
+ * One line above the composer saying what the agent is
  * doing right now ("Waiting for the model…", "Retrying (2/5) in 4 s"), the server's latest status
  * message, and a card per server-side command (running, then its output until dismissed).
  *
@@ -190,7 +190,7 @@ private fun retryText(retry: LiveRetry, now: () -> Long): String {
     return counted + " " + stringResource(Res.string.run_status_retry_provider, provider)
 }
 
-/** letta-mobile-kr39h: "Compacting the conversation…", then what it came to. */
+/** "Compacting the conversation…", then what it came to. */
 @Composable
 private fun CompactionRow(compaction: LiveCompaction) {
     Row(

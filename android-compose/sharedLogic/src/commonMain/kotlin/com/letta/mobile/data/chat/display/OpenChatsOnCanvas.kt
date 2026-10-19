@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 
 /**
- * letta-mobile-bglj6.1: "Open conversations on the canvas" (default on). The chat page reads it
+ * "Open conversations on the canvas" (default on). The chat page reads it
  * once for a conversation's first presentation; the full-screen chat is the alternative, and the
  * person's later mode changes still win. Not namespaced by backend.
  */

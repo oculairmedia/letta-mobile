@@ -3,9 +3,9 @@ package com.letta.mobile.data.swarm
 import kotlin.jvm.JvmInline
 
 /**
- * letta-mobile-jvctq: a short, display-only label naming who sent a swarm message ("orchestrator").
+ * A short, display-only label naming who sent a swarm message ("orchestrator").
  * It is NOT an identity: anyone holding a paired device can write any label, so the agent must not
- * trust it. The authoritative sender is the device NodeId the host stamps (letta-mobile-vqyr2).
+ * trust it. The authoritative sender is the device NodeId the host stamps.
  * Control characters and line breaks are dropped so a label can never forge further lines.
  */
 @JvmInline

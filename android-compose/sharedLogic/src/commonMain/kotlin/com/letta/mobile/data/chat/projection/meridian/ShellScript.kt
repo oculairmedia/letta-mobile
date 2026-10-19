@@ -15,7 +15,7 @@ internal data class ShellCommand(
 )
 
 /**
- * letta-mobile-jna0o.6: a small, lenient reader of the shell scripts agents pass to their Bash
+ * A small, lenient reader of the shell scripts agents pass to their Bash
  * tool. It knows quotes, escapes, comments, command separators (`;`, `&&`, `||`, `|`, `&`,
  * newlines), redirections and heredocs; it does not expand anything. It is only good enough to
  * find a `meridian …` invocation and its stdin, and it never throws: an unterminated quote yields

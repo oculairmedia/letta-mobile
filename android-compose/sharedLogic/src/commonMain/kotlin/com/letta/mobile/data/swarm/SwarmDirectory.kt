@@ -33,9 +33,9 @@ internal inline fun <T, R> Lookup<T>.then(next: (T) -> Lookup<R>): Lookup<R> = w
 }
 
 /**
- * letta-mobile-jvctq: the `admin_rpc` reads a swarm client makes, all inside the device's scope.
+ * The `admin_rpc` reads a swarm client makes, all inside the device's scope.
  * The host filters agent listings to the device's agent scope; conversation reads by id are NOT
- * scope-checked by the host yet (letta-mobile-dpv7m.4), so [conversationOf] refuses, here, any
+ * scope-checked by the host yet, so [conversationOf] refuses, here, any
  * conversation whose owner is not the agent the caller resolved in scope.
  */
 internal class SwarmDirectory(private val session: SwarmSession) {
@@ -172,7 +172,7 @@ data class SwarmMessage(
     val id: MessageId,
     val type: String,
     val date: String?,
-    /** Sender metadata as the host stamped it on the row, when it carries any (letta-mobile-vqyr2). */
+    /** Sender metadata as the host stamped it on the row, when it carries any. */
     val senderId: String?,
     val clientMessageId: String?,
     val text: String?,

@@ -50,7 +50,7 @@ import com.letta.mobile.ui.theme.LettaDimens
  * The list's header: the filter field first (directly under the host's Blocks | Files mode switch),
  * then the Current | History tabs. The title row shows only when the host does not title the page,
  * and the refresh button only on a pointer host - touch pulls the list instead
- * (letta-mobile-ckmub.3.21).
+ *.
  */
 @Composable
 internal fun MemfsHeader(page: MemfsPageScope) {

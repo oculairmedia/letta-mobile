@@ -12,7 +12,7 @@ interface IConversationInspectorMessageRepository {
      * The heartbeat notifier only needs the most recent notifiable message;
      * scanning the default oldest-first page both pins detection to a
      * conversation's first 200 messages and pulls up to 200 records per
-     * conversation per sync (letta-mobile-e9vca). Remote implementations
+     * conversation per sync. Remote implementations
      * override this with an `order=desc` query so only [limit] records cross
      * the wire.
      *

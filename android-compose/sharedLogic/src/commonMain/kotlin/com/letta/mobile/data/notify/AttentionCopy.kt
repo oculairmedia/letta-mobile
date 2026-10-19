@@ -1,6 +1,6 @@
 package com.letta.mobile.data.notify
 
-/** letta-mobile-bzvro.27: the words of an approval notification, shared so both platforms say the same thing. */
+/** The words of an approval notification, shared so both platforms say the same thing. */
 object AttentionCopy {
     private const val AGENT_FALLBACK = "Your agent"
 

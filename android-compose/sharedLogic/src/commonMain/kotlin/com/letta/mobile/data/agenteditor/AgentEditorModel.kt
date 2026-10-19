@@ -82,7 +82,7 @@ data class AgentEditorState(
     val starter: AgentStarter = AgentStarter.Blank,
     val starters: List<AgentStarter.CopyOf> = emptyList(),
     val models: List<ChatModelOption> = emptyList(),
-    /** Why the models could not be listed (letta-mobile-by4vm.121.11); null when they were, or still may be. */
+    /** Why the models could not be listed; null when they were, or still may be. */
     val modelsUnavailable: String? = null,
     val tools: List<AgentToolOption> = emptyList(),
     /** The listed models (by selection value) small enough that a new agent on them starts compact. */

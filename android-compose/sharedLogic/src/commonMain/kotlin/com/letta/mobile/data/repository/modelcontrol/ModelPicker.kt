@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * The composer's model picker (letta-mobile-w4q4p.6.1), shared by Android and
+ * The composer's model picker, shared by Android and
  * desktop: exposed models only, grouped under the provider that serves them,
  * with a search, collapsible groups, and a refresh that re-queries the host.
  */
@@ -51,7 +51,7 @@ data class ModelPickerEntry(
     /** Reasoning variants the host advertises for the handle; empty when none. */
     val efforts: List<String>,
     val selected: Boolean,
-    /** letta-mobile-3io8k: the model's context window in tokens, when the catalog says. */
+    /** The model's context window in tokens, when the catalog says. */
     val contextWindow: Int? = null,
 )
 
@@ -88,7 +88,7 @@ object ModelPickerCatalog {
     const val RECENTS_GROUP_TITLE = "Recent"
 
     /**
-     * letta-mobile-bzvro.18: [groups] headed by a "Recent" group of the [recent] models (newest
+     * [groups] headed by a "Recent" group of the [recent] models (newest
      * first) that the catalog still offers. A recent entry is a handle or a picker value; one the
      * catalog no longer lists is skipped. No recents, no group.
      */
@@ -147,7 +147,7 @@ interface ModelPickerSource {
     /** True while exposure can be edited from the picker ("Edit Models…"). */
     val canEditModels: Flow<Boolean>
 
-    /** letta-mobile-bzvro.18: recently used models (handles), newest first; they head the list. */
+    /** Recently used models (handles), newest first; they head the list. */
     val recents: Flow<List<String>> get() = flowOf(emptyList())
 
     suspend fun load(mode: ModelLoad)

@@ -1,7 +1,7 @@
 package com.letta.mobile.data.model
 
 /**
- * letta-mobile-ckmub.8: an `iroh://` backend address, read without dialing, so every client (and the
+ * An `iroh://` backend address, read without dialing, so every client (and the
  * settings form) can say what is wrong with one before a transport sees it.
  *
  * The App Server prints two dialable forms (`appserver-serve-iroh`): a `Ticket:` line (an endpoint

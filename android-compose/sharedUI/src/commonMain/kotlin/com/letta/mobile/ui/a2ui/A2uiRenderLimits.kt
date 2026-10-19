@@ -28,7 +28,7 @@ import com.letta.mobile.data.a2ui.A2uiRenderClaim
 import com.letta.mobile.data.a2ui.A2uiSurfaceLimits
 import com.letta.mobile.data.model.A2uiComponentId
 
-/** letta-mobile-by4vm.3: the render budget of the surface pass being composed; null outside a surface. */
+/** The render budget of the surface pass being composed; null outside a surface. */
 internal val LocalA2uiRenderBudget = compositionLocalOf<A2uiRenderBudget?> { null }
 
 /** How `openUrl` buttons treat a parsed link; hosts may provide a policy, the default asks every time. */

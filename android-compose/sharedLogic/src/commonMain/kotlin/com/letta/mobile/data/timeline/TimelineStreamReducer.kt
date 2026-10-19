@@ -554,7 +554,7 @@ private fun TimelineEvent.Confirmed.hasIrohSyntheticRunId(): Boolean =
     runId?.takeIf { it.isNotBlank() }?.isIrohSyntheticRunId() == true
 
 /**
- * letta-mobile-j98r5.1: the single canonical predicate for "is this a
+ * The single canonical predicate for "is this a
  * client-synthesized Iroh run-id placeholder" shared by BOTH the stream reducer
  * and the reconcile seam ([TimelineSyncReconcile]) so their classification can
  * never drift. The Iroh transport stamps throwaway placeholders under TWO
@@ -567,7 +567,7 @@ private fun TimelineEvent.Confirmed.hasIrohSyntheticRunId(): Boolean =
  * ids and never changes how or when they are stamped. The transport's own
  * abort/promote predicate (IrohChannelTransport.kt, jvmAndAndroid) is
  * intentionally kept separate: it only ever evaluates an `ActiveTurn` run id
- * (always born `iroh-run-*` in `send()`), and observer ids can never reach it.
+ * (always born `iroh-run-*` in `send`), and observer ids can never reach it.
  */
 internal val IROH_SYNTHETIC_RUN_ID_PREFIXES = listOf("iroh-run-", ObserverStreamPromotionPolicy.OBSERVER_RUN_ID_PREFIX)
 
@@ -632,7 +632,7 @@ private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
 }
 
 /**
- * letta-mobile-x13xi.13.1.2: when a cursor re-emit or hydration backfill
+ * When a cursor re-emit or hydration backfill
  * replaces `oldCalls` with `newCalls` (the arg-score-wins branch used by
  * the incoming chat frame), preserve any `oldCalls` entry whose
  * `effectiveId` already has an entry in `existing.toolReturnContentByCallId`.

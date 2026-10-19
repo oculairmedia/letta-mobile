@@ -6,7 +6,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 
-/** Lenient readers for the provider token endpoints' JSON (letta-mobile-zxk2n.3). */
+/** Lenient readers for the provider token endpoints' JSON. */
 
 /** A non-blank string field. */
 internal fun JsonObject.text(key: String): String? =

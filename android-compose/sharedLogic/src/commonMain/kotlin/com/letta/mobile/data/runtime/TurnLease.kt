@@ -2,7 +2,7 @@ package com.letta.mobile.data.runtime
 import kotlinx.coroutines.Job
 
 /**
- * Owner-token turn lease (letta-mobile-lgns8.22.2).
+ * Owner-token turn lease.
  *
  * Replaces tokenless [Mutex] force-unlock. Only the structured scope that
  * holds [token] may release the lease, or a coordinator that first cancels and
@@ -47,7 +47,7 @@ enum class TurnLeasePhase {
     Preparing,
     Starting,
     /**
-     * letta-mobile-qygvv.1: `input_accepted{disposition: queued}` — the input waits
+     * `input_accepted{disposition: queued}` — the input waits
      * behind an active turn or pending approval. The idle watchdog is paused until
      * the first stream frame (or `update_queue` dequeue) shows the turn started.
      */
@@ -89,7 +89,7 @@ internal fun AppServerTurnEngine.ActiveTurnOwner.isFor(lease: TurnLease): Boolea
         acquiredAtMs == lease.acquiredAtMs
 
 /**
- * letta-mobile-by4vm.55: a lease is superseded once the live connection generation has moved past
+ * A lease is superseded once the live connection generation has moved past
  * it. A lease carried ahead into the next generation (see [carryActiveLeasesInto]) is not behind
  * while the provider catches up, so a frame processed in that window cannot end its turn.
  */

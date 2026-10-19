@@ -12,7 +12,7 @@ import kotlinx.serialization.json.put
 import java.io.File
 
 /**
- * lgns8.9: on-disk `agent.list` reader. Faithful port of admin-shim
+ * On-disk `agent.list` reader. Faithful port of admin-shim
  * `GET /v1/agents` (non-slim) + `translate.ts:agentToLettaState` /
  * `store.ts:readBlocksForAgent`. Split out of the former monolithic
  * `LocalBackendAdminStore` as pure code motion — no behavior change.
@@ -28,13 +28,13 @@ internal class LocalBackendAgentReader(
      * The LIST endpoint never hydrates transcripts (message_ids -> []). Returns null
      * on any error so the caller fails closed.
      *
-     * letta-mobile-ulz2b.1: [countAgents] returns the authoritative roster size
+     * [countAgents] returns the authoritative roster size
      * from the same on-disk records without projecting full objects. Completeness
      * is proven by the directory listing itself (no page / offset).
      */
     fun countAgents(): Int? = runCatching { readAgentRecords().size }.getOrNull()
 
-    /** letta-mobile-fxoew.9: ids of hidden (subagent) agents; null when the store cannot be read. */
+    /** Ids of hidden (subagent) agents; null when the store cannot be read. */
     fun hiddenAgentIds(): Set<String>? = runCatching {
         readAgentRecords().filter { it.obj.isHiddenAgentRecord() }.mapTo(HashSet()) { it.id }
     }.getOrNull()

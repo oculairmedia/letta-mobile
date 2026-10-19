@@ -4,7 +4,7 @@ import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 
 /**
- * letta-mobile-by4vm.9: projects the reconnect owner's lifecycle onto [ChannelTransportState], the
+ * Projects the reconnect owner's lifecycle onto [ChannelTransportState], the
  * one session-status model every UI reads (Android's Iroh supervisor projects onto it too, in
  * `IrohChannelTransport`). Replaces the parallel `AppServerSessionStatus` banner model, which
  * nothing consumed.

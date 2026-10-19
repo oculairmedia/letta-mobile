@@ -90,7 +90,7 @@ fun A2uiSurfaceRenderer(
     }
 }
 
-object A2uiTestTags {
+internal object A2uiTestTags {
     const val SURFACE_MISSING = "a2ui_surface_missing"
     const val SURFACE_PENDING = "a2ui_surface_pending"
     const val MISSING_COMPONENT = "a2ui_missing_component"

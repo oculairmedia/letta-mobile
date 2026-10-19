@@ -22,13 +22,13 @@ data class ChatStreamingPresence(
  * @property replyStreaming true while a streaming reply is producing tokens.
  * @property a2uiThinkingActive true while an A2UI thinking surface is open.
  * @property duplicateInitialMessageInFlight true while a duplicate-initial follow is showing.
- * @property turnInFlight letta-mobile-c4igq.7: true while a chat turn is in flight
+ * @property turnInFlight true while a chat turn is in flight
  *   on the transport (from turn start until the real terminal), spanning ALL tool
  *   rounds. Without it, a multi-step agentic turn drops presence in the
  *   inter-round gap (replyStreaming briefly false, tail is the post-tool
  *   assistant text), flickering the thinking indicator / send button and
  *   making the turn look finished between rounds.
- * @property projectionRunActive letta-mobile-dir4k: true iff the projection still
+ * @property projectionRunActive true iff the projection still
  *   says a server run is pending for this conversation. The transport-side
  *   `turnInFlight` can stay stale for one observer cycle after the projection
  *   has folded the run — when the projection says "done" we must NOT honor a
@@ -60,7 +60,7 @@ data class ChatStreamInputs(
  *  - failing those, a still-sending local message means working — and typing is
  *    suppressed once the tail is a confirmed assistant message (the reply has
  *    started landing, so it's "streaming" rather than "typing").
- *  - letta-mobile-dir4k: `turnInFlight` is masked by `projectionRunActive`.
+ *  - `turnInFlight` is masked by `projectionRunActive`.
  *    The transport-side `turnInFlight` can stay stale for one observer cycle
  *    after the projection has folded the run (the projection settles before
  *    the transport's `ActiveTurn` entry is removed, e.g. when an emitTurnFrame

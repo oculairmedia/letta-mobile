@@ -17,7 +17,7 @@ import kotlinx.serialization.json.Json
 
 /**
  * The second [SharedDocument] kind, proving the primitive is not the canvas in disguise: one
- * Markdown text with a title, for the Agent Tray's agent-scoped persistent panel (zxk2n.30).
+ * Markdown text with a title, for the Agent Tray's agent-scoped persistent panel.
  */
 @Serializable
 data class MarkdownDocId(val value: String) {

@@ -3,18 +3,18 @@ package com.letta.mobile.data.serialization
 import kotlinx.serialization.json.Json
 
 /**
- * The canonical [Json] configurations for Letta Mobile (letta-mobile-by4vm.20).
+ * The canonical [Json] configurations for Letta Mobile.
  *
- * Every production `Json { ... }` outside this file is known debt, frozen in
+ * Every production `Json {... }` outside this file is known debt, frozen in
  * `android-compose/architecture-tests/json-instances-baseline.txt` and flagged on changed files
  * by the `NoAdHocJsonInstance` detekt guardrail. New code picks one of these instances by what
  * the bytes are, never by what happens to decode today:
  *
- * | Instance     | Bytes it handles                                   | Unknown keys | Lenient / coerce | Defaults | Nulls    |
+ * | Instance | Bytes it handles | Unknown keys | Lenient / coerce | Defaults | Nulls |
  * |--------------|----------------------------------------------------|--------------|------------------|----------|----------|
- * | [wire]       | App Server `/ws`, Iroh turn frames, `plugins.*`    | ignored      | no / no          | omitted  | omitted  |
- * | [adminRpc]   | Letta REST bodies relayed over Iroh `admin_rpc`    | ignored      | yes / yes        | omitted  | omitted  |
- * | [persisted]  | Files and rows this app writes and reads back      | ignored      | no / no          | written  | written  |
+ * | [wire]       | App Server `/ws`, Iroh turn frames, `plugins.*`    | ignored | no / no | omitted | omitted |
+ * | [adminRpc]   | Letta REST bodies relayed over Iroh `admin_rpc`    | ignored | yes / yes | omitted | omitted |
+ * | [persisted]  | Files and rows this app writes and reads back | ignored | no / no | written | written |
  *
  * There is deliberately no lenient test instance: tests decode with the instance the production
  * path uses, so a test cannot pass on input production would reject.
@@ -50,7 +50,7 @@ object LettaJson {
      * Letta REST-shaped payloads carried over Iroh `admin_rpc` and the send-path decoder (the
      * former `lettaWireJson`). These bodies come from the Letta server's REST models, which write
      * unset optional fields as explicit `null` (for example `"metadata": null`) where the Kotlin
-     * model has a non-null default (letta-mobile-71orq). `coerceInputValues = true` with
+     * model has a non-null default. `coerceInputValues = true` with
      * `explicitNulls = false` maps those to the property default instead of failing the whole
      * response; `isLenient = true` is kept because it was already shipped on every one of these
      * paths.

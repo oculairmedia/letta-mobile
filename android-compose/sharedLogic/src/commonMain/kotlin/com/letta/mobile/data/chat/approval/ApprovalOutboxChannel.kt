@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 /**
- * letta-mobile-bzvro.14 (F14): the offline outbox over an Iroh channel [transport], shared by the
+ *  (F14): the offline outbox over an Iroh channel [transport], shared by the
  * Android chat and the desktop Iroh gateway.
  *
  * - Connected is the transport's own state.

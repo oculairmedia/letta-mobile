@@ -60,7 +60,7 @@ data class ShellLibraryRailState(
 )
 
 /**
- * letta-mobile-ckmub.3.10 (hard cut S7): the agent rail a pointer host shows, collapsed to orbs or
+ *  (hard cut S7): the agent rail a pointer host shows, collapsed to orbs or
  * expanded to [ShellAgentLibrary]. Each orb keeps its agent's mascot (or gradient orb).
  */
 @Composable

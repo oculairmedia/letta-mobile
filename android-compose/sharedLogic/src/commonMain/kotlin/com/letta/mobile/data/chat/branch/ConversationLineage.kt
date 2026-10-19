@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.update
 data class ConversationParent(val conversationId: String, val kind: BranchKind = BranchKind.Fork)
 
 /**
- * letta-mobile-7mys7 (G37): which conversation each fork came from, so the drawer can show
+ *  (G37): which conversation each fork came from, so the drawer can show
  * "Forked from …" under it. letta-code's `conversation_fork` keeps no link to the source (its
  * answer is the new id only), so the link is a client record, kept in the settings store like
  * [com.letta.mobile.data.chat.runtime.PinnedConversations] so it survives a restart.

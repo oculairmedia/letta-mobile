@@ -8,7 +8,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
-import com.letta.mobile.ui.chat.AgentIdentityPillTestTags
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -36,10 +35,10 @@ class PhoneAgentPillTest {
         }
         mainClock.advanceTimeBy(500)
         onNodeWithTag(PhoneShellTags.CHAT_HEADER).assertExists()
-        onNodeWithTag(AgentIdentityPillTestTags.PILL, useUnmergedTree = true).assertExists()
+        onNodeWithTag("agent_identity_pill", useUnmergedTree = true).assertExists()
         onNodeWithText("Meridian", useUnmergedTree = true).assertExists()
 
-        onNodeWithTag(AgentIdentityPillTestTags.TRIGGER, useUnmergedTree = true).performClick()
+        onNodeWithTag("agent_identity_pill_trigger", useUnmergedTree = true).performClick()
         assertEquals(1, switched, "tapping the pill opens the agents panel, the phone's switcher")
         assertEquals(0, canvas)
     }
@@ -56,8 +55,8 @@ class PhoneAgentPillTest {
         mainClock.advanceTimeBy(500)
         onNodeWithTag(PhoneShellTags.CANVAS_IDENTITY_PILL).assertExists()
         onNodeWithTag(PhoneShellTags.CHAT_HEADER).assertDoesNotExist()
-        onNodeWithTag(AgentIdentityPillTestTags.PILL, useUnmergedTree = true).assertExists()
-        onNodeWithTag(AgentIdentityPillTestTags.TRIGGER, useUnmergedTree = true).performClick()
+        onNodeWithTag("agent_identity_pill", useUnmergedTree = true).assertExists()
+        onNodeWithTag("agent_identity_pill_trigger", useUnmergedTree = true).performClick()
         assertEquals(1, switched)
     }
 
@@ -70,7 +69,7 @@ class PhoneAgentPillTest {
             }
         }
         mainClock.advanceTimeBy(500)
-        val right = onNodeWithTag(AgentIdentityPillTestTags.PILL, useUnmergedTree = true).getBoundsInRoot().right
+        val right = onNodeWithTag("agent_identity_pill", useUnmergedTree = true).getBoundsInRoot().right
         assertTrue(right.value <= 400 * CANVAS_PILL_MAX_WIDTH_FRACTION, "the pill ends at $right")
     }
 

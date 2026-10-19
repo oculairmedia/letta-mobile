@@ -63,7 +63,7 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
 }
 
 /**
- * letta-mobile-2rkdj: hand-written deserializer for the `subscribe_frame`
+ * Hand-written deserializer for the `subscribe_frame`
  * envelope (§11). The wrapper carries `run_id` + `seq` + an opaque `frame`
  * object whose shape is whatever BridgeFrame the shim recorded. We keep
  * the inner `frame` as a raw [JsonObject] so the caller can re-decode it

@@ -96,7 +96,7 @@ internal class TurnIdentityLifecycle {
      * True when [turnId] is a turn this lifecycle has already identified — it is
      * still fenced after [clear], because the fence is what makes a delayed
      * terminal recognizable as history rather than as a frame for whatever send
-     * happens to be waiting now (letta-mobile-or40x PR2 review).
+     * happens to be waiting now ( PR2 review).
      */
     fun isFenced(turnId: String): Boolean = synchronized(lock) {
         turnId.isNotBlank() && turnId in terminalFenceTurnIds

@@ -245,7 +245,7 @@ private suspend fun CanvasBoard.autosave() {
 
 /**
  * The image itself is given its ref (and a preview) only once drawings stop carrying image bytes
- * (DrawingSerializer.inlineImageBytes off, w3nb2.3c), when every app reads refs. Before then,
+ * (DrawingSerializer.inlineImageBytes off), when every app reads refs. Before then,
  * rewriting it fought any older app on the board: that app's drawing drops fields it does not
  * know, so its next save sent every image back without them, this board adopted them again, and
  * the two traded the same images forever. So until then the store is only filled, which needs

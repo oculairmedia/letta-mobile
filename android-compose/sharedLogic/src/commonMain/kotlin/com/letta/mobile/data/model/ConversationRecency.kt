@@ -3,7 +3,7 @@ package com.letta.mobile.data.model
 import kotlin.time.Instant
 
 /**
- * letta-mobile-by4vm.72: the one authoritative "newest conversation first" order.
+ * The one authoritative "newest conversation first" order.
  *
  * A conversation's recency is the first PARSEABLE of `last_message_at`, `updated_at`,
  * `created_at` as epoch millis (0 when none parse, so it sorts last); `id` ascending breaks
@@ -12,7 +12,7 @@ import kotlin.time.Instant
  * (`COALESCE(lastMessageAtEpochMs, updatedAtEpochMs, createdAtEpochMs, 0) DESC, id`) is the
  * SQL form of [sortKeyMillis]; the iroh host's on-disk `conversation.list` reader sorts with
  * [comparator]. The upstream App Server's own local list applies the same field fallback but
- * compares ISO strings; its own records are `toISOString()` (always `Z`, millisecond fraction),
+ * compares ISO strings; its own records are `toISOString` (always `Z`, millisecond fraction),
  * for which string and instant order coincide.
  *
  * Timestamps arrive with `Z` or `+00:00`/`+02:00` offsets, any fraction precision, and

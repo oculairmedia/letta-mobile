@@ -16,7 +16,7 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-bzvro.9 (F09): the one thing to do about a failed run, under its error bubble:
+ *  (F09): the one thing to do about a failed run, under its error bubble:
  * Retry (rate limit, network, timeout, a provider hiccup), Switch model (out of credit, model not
  * supported, refused) or Compact (context window exceeded). An error that is none of these, or an
  * action this page cannot take, shows no button: the bubble reads as it always did.

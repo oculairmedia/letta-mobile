@@ -53,7 +53,7 @@ object ChatSessionReducer {
         )
 
     /**
-     * letta-mobile-rgn9u: the generation is the timeline observer's identity for its
+     * The generation is the timeline observer's identity for its
      * selection, so bumping it retires the live presentation and rebuilds the whole list.
      * Re-publishing the conversation the user is already reading — which every hydration,
      * remote-load completion and post-send resolve does — must therefore leave the
@@ -98,7 +98,7 @@ object ChatSessionReducer {
     }
 
     /**
-     * letta-mobile-lks7m: a background re-read of the roster after a `conversation_updated` push
+     * A background re-read of the roster after a `conversation_updated` push
      * (another client created or changed a conversation). Unlike [conversationsLoaded], this is NOT
      * a (re)load of the session: it swaps the list and nothing else. Selection, selection generation, hydrated messages, composer draft,
      * send/loading flags and status all stay exactly where they are, so a pushed refresh can never

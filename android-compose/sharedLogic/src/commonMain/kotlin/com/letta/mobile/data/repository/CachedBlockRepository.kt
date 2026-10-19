@@ -18,7 +18,7 @@ import com.letta.mobile.data.session.BackendScopedCache
 /**
  * Phase 5e: platform-neutral block repository (HTTP / Iroh routing) over [BlockRemoteSource] and an
  * optional [BlockIrohSource]. No durable local cache — identity attach/detach stay HTTP-only (no
- * Iroh handlers yet). letta-mobile-by4vm.103: the one memory-block repository Android and desktop
+ * Iroh handlers yet). the one memory-block repository Android and desktop
  * Iroh sessions build (through [com.letta.mobile.data.session.graph.adminRepositories]).
  */
 open class CachedBlockRepository(
@@ -61,7 +61,7 @@ open class CachedBlockRepository(
         updateAgentBlock(target.agentId, target.label, params)
 
     /**
-     * bfooy.5: Iroh uses the committed agent-scoped route; plain HTTP Letta has
+     * Iroh uses the committed agent-scoped route; plain HTTP Letta has
      * global blocks, so it creates one and attaches it to the agent.
      */
     override suspend fun createAgentBlock(target: AgentBlockTarget, value: String): Block =

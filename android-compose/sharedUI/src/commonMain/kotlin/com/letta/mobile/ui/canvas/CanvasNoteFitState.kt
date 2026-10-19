@@ -13,7 +13,7 @@ internal fun MutableMap<String, Float>.putOrRemove(id: String, height: Float?) {
 }
 
 /**
- * One card's auto-fit (letta-mobile-bglj6.11), remembered per document by [CanvasNotesLayer]. The
+ * One card's auto-fit, remembered per document by [CanvasNotesLayer]. The
  * stored frame of an AUTO note is a booking; what the card is shown at is [measured] by
  * [NoteFitMeasurer] and never written back. A person's move or resize of a fitted card takes it
  * over at the size and type it was SHOWN at; until that op lands, the card stays at what the person

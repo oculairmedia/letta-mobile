@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * letta-mobile-bzvro.24: MemFS browsing commands (letta-code `list_memory`, `read_memory_file`,
+ * MemFS browsing commands (letta-code `list_memory`, `read_memory_file`,
  * `memory_history`, `memory_commit_diff`, `memory_file_at_ref`, `enable_memfs`). Writes and
  * deletes keep their dedicated [AppServerCommand.WriteMemoryFile] / [AppServerCommand.DeleteMemoryFile].
  * Paths are relative to the agent's memory root; upstream rejects any that escape it.

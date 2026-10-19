@@ -6,7 +6,7 @@ import com.letta.mobile.data.context.estimate.ESTIMATE_SOURCE
 import com.letta.mobile.data.model.ContextWindowOverview
 
 /**
- * letta-mobile-cyh28: how far a context reading can be trusted.
+ * How far a context reading can be trusted.
  *
  * Only the total is ever exact (the provider's `context_tokens`); every per-section figure is an
  * estimate, because letta-code has no tokenizer and no server keeps sections.

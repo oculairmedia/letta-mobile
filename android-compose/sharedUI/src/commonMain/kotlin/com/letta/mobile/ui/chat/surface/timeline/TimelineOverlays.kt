@@ -65,7 +65,7 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.layout.widthIn
 
 /**
- * letta-mobile-bglj6.1: the A2UI surfaces stacked at the bottom of the timeline (Android
+ * The A2UI surfaces stacked at the bottom of the timeline (Android
  * ChatScreenContent A2uiSurfaceStack), ordered by surface id so the stack is stable.
  */
 @Composable
@@ -167,7 +167,7 @@ internal class GoalCardActions(
     }
 }
 
-/** letta-mobile-bglj6.1: the active goal (Android GoalStatusCard). */
+/** The active goal (Android GoalStatusCard). */
 @Composable
 internal fun GoalStatusCard(goal: GoalStatusUi, loading: Boolean, actions: GoalCardActions, modifier: Modifier = Modifier) {
     Surface(

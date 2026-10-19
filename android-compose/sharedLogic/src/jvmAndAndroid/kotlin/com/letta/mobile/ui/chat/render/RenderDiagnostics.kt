@@ -6,7 +6,7 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
 
 /**
- * letta-mobile-x1xnl: flag-gated per-frame chat RENDER diagnostics.
+ * Flag-gated per-frame chat RENDER diagnostics.
  *
  * The stranded-duplicate assistant row was proven NOT to be a data/reducer/
  * projection bug (server has 1 message, uiProjection.snapshot shows
@@ -20,7 +20,7 @@ import kotlinx.atomicfu.atomic
  *    identity hash, size, path (fast/full), and the ordered keys. Two DIFFERENT
  *    list instances presented to the LazyColumn within one streaming frame is
  *    the suspected trigger; the identity hash + key sequence expose it.
- *  - [onLazyItemComposed]: each LazyColumn item() composition logs its key and a
+ *  - [onLazyItemComposed]: each LazyColumn item composition logs its key and a
  *    per-render-generation seen-set. If the SAME key is composed twice within
  *    one generation, that is the phantom double-draw — logged as a WARN so it is
  *    greppable even when the rest is at DEBUG.
@@ -38,7 +38,7 @@ object RenderDiagnostics {
     private val lock = Any()
 
     /**
-     * letta-mobile-mxwtn: deterministic sample gate for the heavy
+     * Deterministic sample gate for the heavy
      * `contentDupes` scan in [onRenderItemsBuilt]. The scan walks every item
      * and builds a ~30KB Telemetry string; on a 1,280-item streaming list it
      * ran every render-delta on the main thread and was the dominant cost of
@@ -154,7 +154,7 @@ object RenderDiagnostics {
     }
 
     /**
-     * letta-mobile-c4igq.5: greppable render-SCOPE projection. Tags each visible
+     * Greppable render-SCOPE projection. Tags each visible
      * timeline item with its (agentId, conversationId) + kind (message/run/
      * subagent) so a headless probe can assert every rendered item is scoped to
      * the active agent — flagging a FOREIGN item (agentId != active) without a
@@ -195,7 +195,7 @@ object RenderDiagnostics {
      * the current render generation, that is the phantom double-draw.
      */
     /**
-     * letta-mobile-h30cy: capture the ACTUAL displayed text of an assistant row at
+     * Capture the ACTUAL displayed text of an assistant row at
      * a render site (streamed StreamingMarkdownText vs final MarkdownText), so the
      * stream-vs-final punctuation mangle is observable ON DEVICE without a human
      * eyeballing the screen. Flag-gated (LettaRenderDiag VERBOSE); zero-cost off.
@@ -228,7 +228,7 @@ object RenderDiagnostics {
     }
 
     /**
-     * letta-mobile-8kdjm.13: Real-time tool timeline projection probes.
+     * Real-time tool timeline projection probes.
      * Logs projection duration and entity counts. Zero-cost when off.
      */
     fun onProjectionCompleted(

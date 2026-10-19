@@ -11,7 +11,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 
 /**
- * What a renderer is handed for one plugin element on the board (letta-mobile-s416w.4): the element
+ * What a renderer is handed for one plugin element on the board: the element
  * as the board holds it, what this client knows about its plugin, its snapshot as far as it has
  * arrived, and the generic status the card may show.
  *

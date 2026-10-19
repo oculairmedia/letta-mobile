@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonElement
 
 /**
  * Which shell tool calls are `meridian` CLI calls safe to approve without asking
- * (letta-mobile-jna0o.7). An external tool never raised an approval card; its CLI form must not
+ *. An external tool never raised an approval card; its CLI form must not
  * either, in any permission mode, or moving the tools behind the CLI would put a card on every
  * canvas edit under Standard and Strict.
  *
@@ -21,7 +21,7 @@ import kotlinx.serialization.json.JsonElement
  *   shell expands nothing in the body, closed by its delimiter line with nothing after it;
  * - the command is one of the router's groups: `canvas`, `plugin`, `tool`, `guide`, `schema`,
  *   `help`, `agents find`, `agent-message send`, or help flags. Nothing that the developer CLI
- *   also answers (`rest`, `profile`, `peer`, ...) is allowed.
+ *   also answers (`rest`, `profile`, `peer`,...) is allowed.
  *
  * The same rule ships to letta-code as a PermissionRequest hook
  * (scripts/deploy/meridian-permission-hook.cjs); both are checked against

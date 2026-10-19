@@ -7,7 +7,7 @@ import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
 /**
- * letta-mobile-qygvv.5: the decisions this client sent, keyed by
+ * The decisions this client sent, keyed by
  * (agent_id, conversation_id, request_id) and independent of connection generation.
  *
  * A `control_request` the server replays (sync `recover_approvals`, or an approval

@@ -9,7 +9,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-/** The machine went to sleep or woke up (letta-mobile-bzvro.4, F04). */
+/** The machine went to sleep or woke up (F04). */
 sealed interface SuspendEvent {
     data object Suspended : SuspendEvent
 

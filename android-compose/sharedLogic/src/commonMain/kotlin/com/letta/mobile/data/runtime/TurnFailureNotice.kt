@@ -6,11 +6,11 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * letta-mobile-br5g0: user-facing description of a terminal turn failure.
+ * User-facing description of a terminal turn failure.
  *
  * [kind] is the sanitized failure family produced by [terminalReasonKind]
- * (letta-mobile-aktss) — never a substring of the raw provider reason, so the
- * letta-mobile-o0atv "raw reason never leaves the redaction boundary" rule
+ *  — never a substring of the raw provider reason, so the
+ *  "raw reason never leaves the redaction boundary" rule
  * still holds for anything derived from it. [message] is fixed per-family copy.
  */
 data class TurnFailureNotice(
@@ -19,7 +19,7 @@ data class TurnFailureNotice(
 )
 
 /**
- * letta-mobile-br5g0: decides what (if anything) the chat timeline should show
+ * Decides what (if anything) the chat timeline should show
  * when a run terminates Failed.
  *
  * Two distinct shapes were observed on 2026-07-29 and MUST NOT render alike:
@@ -110,7 +110,7 @@ object TurnFailureNotices {
     }
 
     /**
-     * letta-mobile-bzvro.9: the family whose fixed copy [text] is, or null. A failure row carries
+     * The family whose fixed copy [text] is, or null. A failure row carries
      * only that copy (never the raw reason), so this is how a renderer recovers its family.
      */
     fun kindForMessage(text: String?): String? {
@@ -171,7 +171,7 @@ object TurnFailureNotices {
 
     const val CANCELLED_KIND: String = "cancelled"
 
-    /** letta-mobile-qygvv.16: the transport session carrying the turn was lost mid-turn. */
+    /** The transport session carrying the turn was lost mid-turn. */
     const val CONNECTION_LOST_KIND: String = "connection_lost"
     private const val OTHER_KIND = "other"
 

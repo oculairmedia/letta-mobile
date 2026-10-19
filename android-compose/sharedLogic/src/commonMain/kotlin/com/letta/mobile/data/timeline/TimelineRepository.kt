@@ -48,7 +48,7 @@ open class TimelineRepository(
     private val repositoryScope: CoroutineScope,
     private val startLoopStreamSubscribers: Boolean = true,
     /**
-     * letta-mobile-grrhq: injection seam so tests assert exact provenance
+     * Injection seam so tests assert exact provenance
      * correlation chains instead of pattern-matching random tokens.
      * Diagnostic only — never influences holder identity or aliasing.
      */
@@ -71,7 +71,7 @@ open class TimelineRepository(
     private var maxCachedLoops = DEFAULT_MAX_CACHED_LOOPS
 
     /**
-     * letta-mobile-grrhq: mint an acquisition id for a creator path that has no
+     * Mint an acquisition id for a creator path that has no
      * caller-supplied provenance. Diagnostic only.
      */
     fun nextAcquisitionId(): String = acquisitionIdGenerator.next()
@@ -174,7 +174,7 @@ open class TimelineRepository(
             requested.agentId == null
 
     /**
-     * letta-mobile-grrhq: this early return is load-bearing EVIDENCE, not just a
+     * This early return is load-bearing EVIDENCE, not just a
      * guard. Because the refusal is suppressed whenever either side is unscoped,
      * a logged `loop.aliasRefused` PROVES both competing cache keys carried
      * non-null, differing agent ids — which eliminates every unscoped
@@ -202,10 +202,10 @@ open class TimelineRepository(
     }
 
     /**
-     * Listener the :app module can install to receive inbound-message events
+     * Listener the:app module can install to receive inbound-message events
      * from every TimelineSyncLoop we manage. Used to post system notifications
      * when messages arrive while the relevant chat isn't foregrounded.
-     * See letta-mobile-mge5. Set once at application startup.
+     *. Set once at application startup.
      */
     @Volatile
     var ingestedListener: IngestedMessageListener? = null
@@ -265,7 +265,7 @@ open class TimelineRepository(
     }
 
     /**
-     * letta-mobile-oznnh: single-flight hydrate per conversation.
+     * Single-flight hydrate per conversation.
      *
      * The first caller for a conversation claims the flight and runs
      * [TimelineSyncLoop.hydrate]; concurrent callers for the SAME conversation
@@ -382,7 +382,7 @@ open class TimelineRepository(
     }
 
     /**
-     * letta-mobile-grrhq: the SECOND creator path. Reached from
+     * The SECOND creator path. Reached from
      * [repairExpiredConversationCursorScoped] and [warmConversations] without
      * passing through [getOrCreate], so instrumenting only getOrCreate would
      * leave two blind spots.
@@ -574,7 +574,7 @@ open class TimelineRepository(
     suspend fun observe(agentId: String?, conversationId: String): StateFlow<Timeline> =
         getOrCreate(agentId, conversationId).state
 
-    /** letta-mobile-grrhq: provenance-carrying observe. Diagnostic only. */
+    /** Provenance-carrying observe. Diagnostic only. */
     suspend fun observe(
         agentId: String?,
         conversationId: String,
@@ -606,7 +606,7 @@ open class TimelineRepository(
     ): String = getOrCreate(agentId, conversationId).send(content, attachments)
 
     /**
-     * letta-mobile-mxwtn: send with a pre-minted otid and NO Local append.
+     * Send with a pre-minted otid and NO Local append.
      * Pair with [appendOptimisticLocal] which the platform send coordinator
      * MUST call BEFORE this so the user bubble reaches the timeline state
      * synchronously. The transport call still runs and the MarkSent /
@@ -623,7 +623,7 @@ open class TimelineRepository(
     }
 
     /**
-     * letta-mobile-mxwtn: synchronously insert an optimistic Local user
+     * Synchronously insert an optimistic Local user
      * bubble into the timeline state. Returns `true` if the bubble was
      * appended, `false` if an event with that otid was already present
      * (idempotent — the existing one is kept so duplicate callers don't fork
@@ -641,7 +641,7 @@ open class TimelineRepository(
         attachments = attachments,
     )
 
-    /** letta-mobile-mxwtn: synchronous SENT transition on a Local bubble. */
+    /** Synchronous SENT transition on a Local bubble. */
     suspend fun markOptimisticLocalSent(
         agentId: String?,
         conversationId: String,
@@ -650,7 +650,7 @@ open class TimelineRepository(
         getOrCreate(agentId, conversationId).markOptimisticLocalSentSync(otid)
     }
 
-    /** letta-mobile-mxwtn: synchronous FAILED transition on a Local bubble. */
+    /** Synchronous FAILED transition on a Local bubble. */
     suspend fun markOptimisticLocalFailed(
         agentId: String?,
         conversationId: String,
@@ -726,7 +726,7 @@ open class TimelineRepository(
     }
 
     /**
-     * letta-mobile-fe51r (P2b pointer diet): resolve a projected tool-return
+     *  (P2b pointer diet): resolve a projected tool-return
      * preview to its full body via the transport's on-demand fetch. Called
      * when the user expands a truncated tool card.
      */
@@ -781,7 +781,7 @@ open class TimelineRepository(
     }
 
     /**
-     * letta-mobile-9hcg: flip the external-transport user-bubble Local
+     * Flip the external-transport user-bubble Local
      * to SENT. Called from WsChatSendCoordinator on every TurnDone so
      * the Local appended via [appendExternalTransportLocal] doesn't sit
      * in SENDING state past the turn — which would otherwise keep

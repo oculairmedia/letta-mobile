@@ -8,17 +8,17 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * letta-mobile-m6oa1.1: the Kotlin App Server's own Agent-tool_call
- * correlation reducer — the first migration step of epic m6oa1
+ * The Kotlin App Server's own Agent-tool_call
+ * correlation reducer
  * (lettashim → Kotlin App Server). This is the Kotlin analogue of the
  * shim's `ingestParentFrame`, but STRICTLY scoped to dispatch + return
  * correlation:
  *
  *  - Identity-from-return-body parsing (taskId / subagentAgentId /
- *    parentRunId scraped from the dispatch's return body) is m6oa1.3 —
+ *    parentRunId scraped from the dispatch's return body) is —
  *    NOT here. This reducer never scrapes identity from a body.
  *  - Terminal / lifecycle / log / PID detection (the reaper-style
- *    `cancelled` nuance, failure classification) is m6oa1.4 — NOT here.
+ *    `cancelled` nuance, failure classification) is — NOT here.
  *    A return only acknowledges dispatch; child lifecycle is authoritative
  *    through `update_subagent_state`.
  *

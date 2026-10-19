@@ -1,7 +1,7 @@
 package com.letta.mobile.data.model
 
 /**
- * The one place that knows the string shapes of Letta ids (letta-mobile-by4vm.23).
+ * The one place that knows the string shapes of Letta ids.
  *
  * Code that needs to recognise or build a special id goes through here instead of repeating a
  * literal such as `"conv-default-"` or `"cm-"`. The architecture-tests id-literal ratchet

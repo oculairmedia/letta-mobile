@@ -5,7 +5,7 @@ import com.letta.mobile.data.model.A2uiSurfaceId
 import com.letta.mobile.util.Telemetry
 
 /**
- * letta-mobile-by4vm.3: budgets that keep one server frame from freezing or exhausting the UI thread.
+ * Budgets that keep one server frame from freezing or exhausting the UI thread.
  *
  * A surface is untrusted agent output. Without caps a 10k-child column, or a diamond DAG
  * (`children: [b, b]` at every level) that expands to 2^depth rendered instances, composes on the

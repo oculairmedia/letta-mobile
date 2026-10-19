@@ -2,7 +2,7 @@ package com.letta.mobile.data.canvas
 
 /**
  * A rule a canvas scene must keep for every app to draw it as its writers meant
- * (letta-mobile-qygvv.30). [wire] is how a refusal names it to a model and a WARN names it in the
+ *. [wire] is how a refusal names it to a model and a WARN names it in the
  * logs; [breaksRender] marks the ones that stop an app drawing the board at all, as opposed to a
  * reference the renderer quietly ignores (DrawBox drops a binding to a shape that is gone).
  */

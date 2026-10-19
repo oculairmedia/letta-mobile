@@ -3,7 +3,7 @@ package com.letta.mobile.ui.providers.icons
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
- * A provider brand the app carries a logo for (letta-mobile-zxk2n.35). [tokens] are the names a
+ * A provider brand the app carries a logo for. [tokens] are the names a
  * provider id, type or display name is matched on; entries are checked in order, so a more specific
  * brand (Azure OpenAI, Vertex) sits before the one its name also contains (OpenAI, Google).
  *

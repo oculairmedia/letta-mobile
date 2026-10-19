@@ -4,7 +4,7 @@ import com.letta.mobile.data.repository.modelcontrol.ReasoningTier
 
 /**
  * User-facing text of the picker, the Models sheet and the Providers settings
- * pages (letta-mobile-w4q4p.6.1), in one place. sharedUI publishes no
+ * pages, in one place. sharedUI publishes no
  * composeResources (its Android AAR carries none), so commonMain text lives in
  * Kotlin like the rest of this package; keeping it here makes the move to
  * `Res.string` a one-file change.

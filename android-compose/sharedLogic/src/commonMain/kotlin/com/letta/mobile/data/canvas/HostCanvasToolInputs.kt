@@ -9,7 +9,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 
 /**
- * A model's canvas tool input read the way it is usually written (letta-mobile-qygvv.21): a scene or
+ * A model's canvas tool input read the way it is usually written: a scene or
  * element given as a JSON object rather than a string of one is taken as its string, and an op's
  * `opId`, `actorId` and `lamport` may be left out, since the host replaces all three anyway.
  */
@@ -24,7 +24,7 @@ internal object HostCanvasToolInputs {
 
     /**
      * The object fields of ops that a model may send as JSON strings, as it sends elementJson
-     * (letta-mobile-s416w.5): set_plugin_element's and set_document's.
+     * set_plugin_element's and set_document's.
      */
     private val embeddedObjects = setOf("frame", "style", "props", "snapshot", "fallback", "meta")
 

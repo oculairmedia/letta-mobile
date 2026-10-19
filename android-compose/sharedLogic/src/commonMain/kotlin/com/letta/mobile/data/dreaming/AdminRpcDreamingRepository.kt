@@ -12,7 +12,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-iczm7: dreaming through the Iroh host's `reflection.get/set/run` ([DreamingRpc]).
+ * Dreaming through the Iroh host's `reflection.get/set/run` ([DreamingRpc]).
  *
  * A host that predates a method answers "Unknown method" ([DreamUnsupportedReason.HostNeedsUpdate]:
  * `reflection.run` and the merge fields are newer than `reflection.get/set`). One without a native

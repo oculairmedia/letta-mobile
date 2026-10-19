@@ -33,6 +33,7 @@ application {
 
 dependencies {
     implementation(project(":sharedLogic"))
+    implementation(project(":appserver-testkit"))
 
     implementation(libs.clikt)
     implementation(libs.kotlinx.coroutines.core)

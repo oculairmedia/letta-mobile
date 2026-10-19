@@ -5,7 +5,7 @@ import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
 
 /**
- * letta-mobile-bzvro.7 / .8 (F07, F08): what the shared chat page's status line says about the
+ * What the shared chat page's status line says about the
  * running turn, beyond "a run is in flight": the loop's phase, a provider retry in progress, the
  * server's latest status message, and the server-side commands it is running or just ran.
  *
@@ -21,7 +21,7 @@ data class RuntimeLiveStatus(
     val notice: LiveNotice? = null,
     /** Server-side commands, newest last, at most [RuntimeLiveStatusReducer.MAX_COMMANDS]. */
     val commands: List<CommandActivity> = emptyList(),
-    /** letta-mobile-kr39h: a compaction in progress, or the one that just finished. */
+    /** A compaction in progress, or the one that just finished. */
     val compaction: LiveCompaction? = null,
 ) {
     /** Nothing to show. */
@@ -82,7 +82,7 @@ data class CommandActivity(
 enum class CommandState { Running, Succeeded, Failed }
 
 /**
- * letta-mobile-kr39h: a conversation compaction as the stream described it. [stats] is null while
+ * A conversation compaction as the stream described it. [stats] is null while
  * it runs and on servers that do not report `compaction_stats`.
  */
 data class LiveCompaction(

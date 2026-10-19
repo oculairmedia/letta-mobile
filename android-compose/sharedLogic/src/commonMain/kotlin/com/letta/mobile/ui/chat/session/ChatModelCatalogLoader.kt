@@ -26,7 +26,7 @@ class ChatModelCatalogSources(
 )
 
 /**
- * letta-mobile-ckmub.17.2 (moved from desktop): loads a chat's model list asynchronously, keeps
+ *  (moved from desktop): loads a chat's model list asynchronously, keeps
  * the one load in flight, and resolves a create's model against it (routing included).
  */
 class ChatModelCatalogLoader(

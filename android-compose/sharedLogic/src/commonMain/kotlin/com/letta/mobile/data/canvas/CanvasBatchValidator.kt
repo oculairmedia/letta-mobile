@@ -21,7 +21,7 @@ sealed interface CanvasBatchCheck {
 
 /**
  * Holds a whole batch to the state the board is left in, not just to the shape of each element
- * in it (letta-mobile-qygvv.30). A batch of well-formed ops can still break a board: an update of
+ * in it. A batch of well-formed ops can still break a board: an update of
  * an element that is not there, a remove of a shape a label still belongs to, an arrow bound to
  * a note that is gone. The batch is applied to a scratch copy of the current scene with the
  * real projector and the result checked ([CanvasSceneState]); one broken rule refuses all of it.

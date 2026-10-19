@@ -694,7 +694,7 @@ internal object CanvasWorkspaceSupport {
 
     /**
      * Where a request for a caret lands: an existing text element, else the shape under it that
-     * holds text (its own text, native to the shape since letta-mobile-8cik1).
+     * holds text (its own text, native to the shape since).
      */
     fun handleRequestTextEdit(params: RequestTextEditParams) {
         val text = CanvasTextElements.at(params.elements, params.offset, params.tolerance)

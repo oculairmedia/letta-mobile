@@ -1,7 +1,7 @@
 package com.letta.mobile.data.pairing
 
 /**
- * What a paired device may do, as the host records it (letta-mobile-dpv7m.5),
+ * What a paired device may do, as the host records it,
  * reduced to the three levels the device list shows as a chip.
  */
 enum class DeviceAccess {
@@ -36,7 +36,7 @@ enum class DeviceAccess {
 val PairedDevice.access: DeviceAccess get() = DeviceAccess.of(capabilities)
 
 /**
- * The paired-device list split for display (dpv7m.5): this device first, then
+ * The paired-device list split for display: this device first, then
  * the others, most recently active first.
  */
 data class PairedDeviceGroups(val thisDevice: PairedDevice?, val others: List<PairedDevice>) {

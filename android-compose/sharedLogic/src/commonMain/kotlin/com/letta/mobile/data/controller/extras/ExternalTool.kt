@@ -75,7 +75,7 @@ interface ExternalTool {
  * model cannot choose. [agentId] and [conversationId] are null when the frame carried no scope.
  *
  * [toolCallId] is the request's `tool_call_id`: the id the model's tool call has in the run, the
- * same one the timeline's TOOL_CALL event and its return are keyed on (letta-mobile-bglj6.12). A
+ * same one the timeline's TOOL_CALL event and its return are keyed. A
  * tool that must answer a retried call the same way (canvas_compose derives its artifact id from
  * it) reads it; null when the call came some other way.
  */

@@ -45,7 +45,7 @@ internal data class PinnedOwner(
 )
 
 /**
- * The prompt pinned over the list (desktop rememberPinnedPrompt), letta-mobile-bglj6.1.
+ * The prompt pinned over the list (desktop rememberPinnedPrompt),.
  *
  * With no chrome over the list ([stickLinePx] 0, the desktop) it pins once its row has left the
  * screen, while no prompt is on screen. Under floating chrome (the phone's status bar and header,
@@ -61,7 +61,7 @@ internal class PinnedPrompt(
     private val owner: State<PinnedOwner?>,
     /** The list's visible top, in px from its top edge. */
     val stickLinePx: Int,
-    /** How the copy's images shrink as it docks (letta-mobile-bglj6.1.26). */
+    /** How the copy's images shrink as it docks. */
     val compaction: DockedCopyCompaction,
 ) {
     val item: ChatRenderItem? get() = owner.value?.item
@@ -192,7 +192,7 @@ internal fun Modifier.hiddenUnderStickyCopy(pinned: PinnedPrompt?, key: String):
 }
 
 /**
- * The header shading for the sticky copy (letta-mobile-bglj6.1.26). The copy is drawn over the list,
+ * The header shading for the sticky copy. The copy is drawn over the list,
  * outside the list's own top fade, so when the next prompt pushes it up past the visible top it
  * would run hard under the status bar and the header's controls. Instead whatever of it has crossed
  * the line dissolves over [ChatTimelineDimens.stickyPromptExitFadeLength] and is gone above that, so

@@ -9,7 +9,7 @@ import kotlinx.serialization.json.jsonObject
 
 /**
  * What `canvas_get_scene` answers, on the Iroh host and on an app's own App Server alike
- * (letta-mobile-s416w.5).
+ *.
  *
  * The board's plugin elements are not in `scene_json`: the scene root's `_pluginElements` holds them
  * with per-register provenance an agent has no use for. They are listed once, compact, in

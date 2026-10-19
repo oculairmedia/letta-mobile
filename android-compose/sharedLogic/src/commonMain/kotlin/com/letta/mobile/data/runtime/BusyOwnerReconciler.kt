@@ -5,7 +5,7 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.Job
 
 /**
- * letta-mobile-c4igq.3 / lgns8.22.2 / qygvv.3: busy-path recovery for ONE runtime key. Clears a
+ * Busy-path recovery for ONE runtime key. Clears a
  * dead owner ONLY on the server's own evidence ([TurnOwnerLivenessProbe]), and only by cancelling
  * and joining that owner's job, never by force-unlocking. Preparing/Starting/Queued leases are
  * locally alive and are never probed.
@@ -42,7 +42,7 @@ internal class BusyOwnerReconciler(
     }
 
     /**
-     * SENSING (c, letta-mobile-8xxzv): the LEGITIMATE busy, a second turn for the SAME
+     * SENSING: the LEGITIMATE busy, a second turn for the SAME
      * {agent, conversation} runtime. letta-code permits at most one active turn per runtime, so
      * this rejection of [rejected] preserves the server contract rather than serializing the app.
      */

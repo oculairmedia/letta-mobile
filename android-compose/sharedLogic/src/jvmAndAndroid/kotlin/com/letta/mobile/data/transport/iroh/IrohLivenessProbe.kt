@@ -14,11 +14,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * letta-mobile-wxy4s: APPLICATION-LEVEL CONNECTION LIVENESS.
+ * APPLICATION-LEVEL CONNECTION LIVENESS.
  *
  * ROOT CAUSE it exists for (production incident 2026-07-31): the peer can vanish
  * without ever sending a CONNECTION_CLOSE (host reboot / NAT rebind / black-hole).
- * Neither of [IrohAppServerTransport]'s loss reporters — the `connection.closed()`
+ * Neither of [IrohAppServerTransport]'s loss reporters — the `connection.closed`
  * watcher and reader-loop exit — can fire then. Worse, its 15s UNACKED keepalive
  * datagram makes it actively harmful: `sendDatagram` succeeds locally regardless of
  * peer liveness and keeps resetting the local QUIC idle timer (RFC 9000 §10.1
@@ -28,7 +28,7 @@ import kotlin.time.Duration.Companion.milliseconds
  *
  * MECHANISM: issue `health.check` through the connection HANDLE's `adminRpc`, which
  * lands on `IrohAppServerTransport.adminRpcOverStream` whose first act is
- * `connection.openBi()`. Opening a fresh QUIC bidi stream is precisely the
+ * `connection.openBi`. Opening a fresh QUIC bidi stream is precisely the
  * operation that fails on a black-holed path and that an unacked datagram can never
  * test. It deliberately does NOT go through `IrohChannelTransport.adminRpc`, which
  * would run the retry/escalate ladder and pollute its viewed-conversation
@@ -37,7 +37,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * It is a LIVENESS test, not a health test: any answer from the peer counts as
  * alive (see [classifyProbeError]).
  *
- * letta-mobile-parg0: CONGESTION ≠ DEATH. Under heavy concurrent admin_rpc
+ * CONGESTION ≠ DEATH. Under heavy concurrent admin_rpc
  * (model.list / message.list hydrate), a fresh health.check can miss its probe
  * budget while the path is still alive. Recent proof-of-life (stream frames OR
  * successful admin_rpc) skips the probe; a timed-out probe while other young
@@ -45,7 +45,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * Congested outcomes do not reset the failure streak; an absolute
  * [MAX_DETECTION_MS] deadline bounds deferral so detection stays ≤120s.
  *
- * letta-mobile-qygvv.22: IN-FLIGHT WORK IS NOT PROOF OF LIFE. A black-holed path also
+ * IN-FLIGHT WORK IS NOT PROOF OF LIFE. A black-holed path also
  * has "young in-flight" admin_rpcs — they are the requests that are hanging. A probe
  * timeout is only soft-failed when the path has actually answered something inside
  * the probe window, or the in-flight work is too young to judge; see
@@ -63,7 +63,7 @@ import kotlin.time.Duration.Companion.milliseconds
  *   test scheduler in unit tests).
  * @param reportConnectionLost the supervisor's loss entry point. Attribution is
  *   MANDATORY: an unattributed report landing after a redial destroys the healthy
- *   NEW handle (the r3i1z regression), so the dying handle is always passed along.
+ *   NEW handle, so the dying handle is always passed along.
  */
 internal class IrohLivenessProbe(
     private val intervalMs: Long,
@@ -263,7 +263,7 @@ internal class IrohLivenessProbe(
      * falls back to the control channel with its own 30s timeout (worst case ~60s
      * per call). The probe MUST bound the call itself rather than inherit that.
      *
-     * letta-mobile-parg0 / qygvv.22: a timeout while other admin_rpcs are in flight is
+     * a timeout while other admin_rpcs are in flight is
      * congestion only when the path has otherwise proved alive — see
      * [classifyProbeTimeout] — so a live-but-busy path is not torn down while a
      * black-holed one still is.
@@ -343,7 +343,7 @@ internal class IrohLivenessProbe(
          * (the probe is the real liveness signal; the keepalive only masks death).
          * One tiny bidi stream per interval => few RPCs/min steady state.
          *
-         * letta-mobile-parg0: timeout 10s / 2 failures. Congestion soft-fails must not
+         * timeout 10s / 2 failures. Congestion soft-fails must not
          * erase the failure streak or unbounded-defer detection: worst case including
          * [CONGESTION_GRACE_MS] deferral stays ≤ [MAX_DETECTION_MS] (wiring gate).
          * Budget: GRACE + FAILURES*(INTERVAL+TIMEOUT) = 45s + 2*30s = 105s ≤ 120s.
@@ -372,7 +372,7 @@ internal class IrohLivenessProbe(
 }
 
 /**
- * k7yyc: true when [this] (or any cause in its chain) is a frame codec decode/size
+ * True when [this] (or any cause in its chain) is a frame codec decode/size
  * rejection — a per-request payload fault that must fail only the request, never
  * trigger a transport reconnect.
  */

@@ -97,7 +97,7 @@ data class ProjectsPageActions(
 )
 
 /**
- * The page's actions over the shared [ProjectsPageController] (letta-mobile-ckmub.2.6): every host binds
+ * The page's actions over the shared [ProjectsPageController]: every host binds
  * the catalog the same way and only says where a project's chat opens ([onOpenChat]; null hides it).
  */
 fun ProjectsPageController.projectsPageActions(onOpenChat: ((ProjectSummary, ProjectChatIntent) -> Unit)?) = ProjectsPageActions(
@@ -130,7 +130,7 @@ fun ProjectsPageController.projectsPageActions(onOpenChat: ((ProjectSummary, Pro
 )
 
 /**
- * letta-mobile-ckmub.2.5 (hard cut S17): the projects catalog shared by every host (Iroh hosts
+ *  (hard cut S17): the projects catalog shared by every host (Iroh hosts
  * only: projects ride the `project.*` relay). A search and one [RosterList], pinned first; a
  * project opens its detail in an inspector, and New project / Edit open the form in a pane.
  * [modifier] carries the host frame's insets; [slots] are the host's search field and refresh.
@@ -229,7 +229,7 @@ private fun ProjectsNotice(message: String, onDismiss: () -> Unit) {
 }
 
 /**
- * letta-mobile-ckmub.2.6: the Projects destination on a backend that has no projects. Projects ride
+ * The Projects destination on a backend that has no projects. Projects ride
  * an Iroh host's `project.*` relay; a direct App Server has none, so the page says so instead of an
  * empty list or a failed load. [onOpenSettings] offers the way to another backend, when the host has one.
  */

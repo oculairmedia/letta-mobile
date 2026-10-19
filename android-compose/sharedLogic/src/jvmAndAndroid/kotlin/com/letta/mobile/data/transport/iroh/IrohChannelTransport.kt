@@ -152,7 +152,7 @@ class IrohChannelTransport(
 
     /** Emit to canonical frame publisher so both direct consumers and
      *  WsChatBridge (via frameEvents) see each frame exactly once without split histories.
-     *  letta-mobile-qygvv.11: this is the single ingest point — the publisher drops exact
+     *  this is the single ingest point — the publisher drops exact
      *  duplicates here, before fan-out, so no subscriber pays for them. */
     private suspend fun emitBoth(frame: ServerFrame) {
         // letta-mobile-34xoj: record stream activity to prevent premature reconnect
@@ -170,7 +170,7 @@ class IrohChannelTransport(
     }
 
     /**
-     * letta-mobile-or40x: send jobs KEYED BY conversationId.
+     * Send jobs KEYED BY conversationId.
      *
      * Previously a single process-wide slot. Starting a turn on conversation B
      * overwrote the only reference to conversation A's job, so a later
@@ -254,7 +254,7 @@ class IrohChannelTransport(
             .distinctUntilChanged { a, b -> a === b }
 
     /**
-     * letta-mobile-qygvv.16 / by4vm.96: the session ended for good, so every turn it carried must
+     * The session ended for good, so every turn it carried must
      * still end. The engine's turns end through the router, and the cut-off lets each publish its
      * own terminal before its job is cancelled, standing in with a synthetic one when none arrives
      * in time. A redial is not an end: the engine carries its turns across it.
@@ -336,7 +336,7 @@ class IrohChannelTransport(
     )
 
     /**
-     * letta-mobile-wxy4s: application-level connection liveness. QUIC state alone
+     * Application-level connection liveness. QUIC state alone
      * cannot detect a black-holed peer — the transport's unacked keepalive datagram
      * keeps resetting the idle timer — so [IrohLivenessProbe] periodically opens a
      * fresh bidi stream instead. See that class for the full root cause.
@@ -411,10 +411,10 @@ class IrohChannelTransport(
     )
 
     /**
-     * letta-mobile-or40x: recovery is announced PER CONVERSATION. Every
+     * Recovery is announced PER CONVERSATION. Every
      * interrupted conversation, plus every still-nonterminal live turn that has
      * no interrupted snapshot, gets its own [RedialWhileTurnActive]. The
-     * pre-or40x version could only ever announce ONE conversation because it
+     * previous version could only ever announce ONE conversation because it
      * read single global slots.
      */
     private fun notifyRedialIfTurnActive() {
@@ -453,13 +453,13 @@ class IrohChannelTransport(
     }
 
     /**
-     * Test seam (letta-mobile-by4vm.96): attaches a scripted, already-authenticated [client] as a
+     * Test seam: attaches a scripted, already-authenticated [client] as a
      * dial of this transport's one engine, for a [testDialer] that exercises redial survival.
      */
     internal suspend fun attachTestDial(config: IrohConnectConfig, client: AppServerClient): IrohConnectionHandle =
         irohDialer.attachDial(IrohDialAttachment(config, ticket = config.baseShimUrl, client = client, serverCapabilities = null))
 
-    /** Test seam (letta-mobile-by4vm.96): [handle]'s connection died, as the QUIC loss watcher reports it. */
+    /** Test seam: [handle]'s connection died, as the QUIC loss watcher reports it. */
     internal fun reportConnectionLostForTest(reason: String, handle: IrohConnectionHandle) =
         supervisor.onConnectionLostAsync(reason, handle)
 
@@ -623,7 +623,7 @@ class IrohChannelTransport(
      * to the initiator — the ONLY difference between the two paths is who supplies
      * the (agentId, conversationId, turnId, runId) context, and for
      * [RuntimeEventPayload.RemoteStreamFrame] even those are read from the wire
-     * envelope first (context is only a fallback). This is the letta-mobile-r3i1z
+     * envelope first (context is only a fallback). This is the
      * "identical shape" contract: same mapper, same defaults, same output.
      */
     private fun payloadToServerFrames(
@@ -643,8 +643,8 @@ class IrohChannelTransport(
     )
 
     /**
-     * letta-mobile-or40x: cancel HONORS ITS ARGUMENT. Only [conversationId]'s own
-     * turn and send job are touched. The pre-or40x implementation was keyed in
+     * Cancel HONORS ITS ARGUMENT. Only [conversationId]'s own
+     * turn and send job are touched. The previous implementation was keyed in
      * name only — it read the single global `activeTurn`/`activeSendJob` and so
      * aborted and cancelled whichever conversation happened to occupy the slot.
      * That is the reported "cancelling one conversation froze the other".
@@ -773,7 +773,7 @@ class IrohChannelTransport(
     }
 
     /**
-     * letta-mobile-by4vm.10: terminal teardown. [disconnect] keeps the instance reusable (a
+     * Terminal teardown. [disconnect] keeps the instance reusable (a
      * later [connect] redials); [close] also cancels [transportJob] so every coroutine this
      * transport launched (cancel terminal waits, observers, liveness) ends with it. The
      * caller's scope, if any, stays active. The instance must not be reused after close.
@@ -930,7 +930,7 @@ class IrohChannelTransport(
     override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse =
         invokeSubagentRpc(subagentListCall(all), currentSubagentScope(), timeoutMs)
 
-    /** letta-mobile-fxoew.5: target the caller's conversation, not the viewed one. */
+    /** Target the caller's conversation, not the viewed one. */
     override suspend fun sendSubagentListForScope(
         scope: SubagentParentScope,
         all: Boolean,
@@ -1122,7 +1122,7 @@ class IrohChannelTransport(
         /**
          * Handles bare `iroh://`, `https://iroh://` (corrupted saved config), etc.
          *
-         * letta-mobile-lgns8.10.4.1: delegates to the commonMain
+         * delegates to the commonMain
          * [com.letta.mobile.data.model.isIrohBackendUrl] so there is exactly ONE
          * implementation of this classification. Four independent copies used to
          * exist (here, ShimBackendDetector, ChatSendCoordinator,
@@ -1153,8 +1153,8 @@ class IrohChannelTransport(
  * reconcile/stream-reduction classifier ([isIrohSyntheticRunId] in
  * TimelineStreamReducer.kt).
  *
- * letta-mobile-j98r5.1: it is only ever evaluated against an [ActiveTurn] run
- * id, which is always born `iroh-run-${UUID}` in `send()` and only ever
+ * it is only ever evaluated against an [ActiveTurn] run
+ * id, which is always born `iroh-run-${UUID}` in `send` and only ever
  * promoted to a REAL server run id — never to an observer id. The observer
  * placeholder `iroh-observer-run-*` is stamped solely in the passive projection
  * path (`IrohObserverIngestor.ingestObserverFrame`, which is skipped while a turn is engine-owned)

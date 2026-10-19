@@ -19,10 +19,10 @@ data class MeridianLiveCall(
 )
 
 /**
- * The shell calls running `meridian` in the runtimes this host relays (letta-mobile-jna0o.4).
+ * The shell calls running `meridian` in the runtimes this host relays.
  *
  * Fed with every frame the wrapper receives from the App Server ([observe]). Each call gets one
- * capability token (letta-mobile-by4vm.44): letta-code's PreToolUse hook asks for it by the call's id
+ * capability token: letta-code's PreToolUse hook asks for it by the call's id
  * ([issueToken], once per call) and hands it to the shell as `LETTA_TOOL_TOKEN`. A CLI request is
  * bound by that token alone ([claim]); the `LETTA_AGENT_ID` / `LETTA_CONVERSATION_ID` the shell sends
  * play no part, so overriding them cannot reach another conversation's call.

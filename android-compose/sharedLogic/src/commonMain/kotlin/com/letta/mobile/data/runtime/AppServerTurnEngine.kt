@@ -71,9 +71,9 @@ class AppServerTurnEngine(
     // letta-mobile-h5t1g: same default source as the controller — an engine built
     // without an explicit mode approves tool calls instead of parking the turn.
     private val permissionMode: AppServerPermissionMode = RuntimePermissionDefaults.DEFAULT_MODE,
-    /** The mode in force for the runtime, read at runtime_start and again for every approval (bzvro.13). */
+    /** The mode in force for the runtime, read at runtime_start and again for every approval. */
     private val permissionModeProvider: (TurnCommand) -> AppServerPermissionMode = { permissionMode },
-    /** bzvro.13: told a runtime's mode (runtime_start's, or a device status); answers the mode still wanted, if it differs. */
+    /** Told a runtime's mode (runtime_start's, or a device status); answers the mode still wanted, if it differs. */
     private val onPermissionModeInForce: (AppServerRuntimeScope, AppServerPermissionMode) -> AppServerPermissionMode? = { _, _ -> null },
     private val requestIdFactory: () -> String = defaultRequestId,
     /**
@@ -82,14 +82,14 @@ class AppServerTurnEngine(
      * the engine's single-turn lock is released and subsequent sends are not
      * permanently jammed. This is progress-based (reset on every matching frame),
      * NOT a total-duration cap — a long but actively-streaming turn is fine.
-     * Guards the c0qm0 jam: a real App Server that never emits a terminal
+     * Guards a stuck turn: a real App Server that never emits a terminal
      * stop_reason would otherwise block client.events.collect forever, leaving
      * activeTurn locked so every later send() silently no-ops ("Thinking..." hang).
      */
     private val turnIdleTimeoutMs: Long = DEFAULT_TURN_IDLE_TIMEOUT_MS,
     private val terminalSettleQuietMs: Long = DEFAULT_TERMINAL_SETTLE_QUIET_MS,
     /**
-     * lgns8.17: controller-owned external tools. letta-code's App-Server (WS)
+     * Controller-owned external tools. letta-code's App-Server (WS)
      * route does NOT self-execute tool calls — it emits external_tool_call_request
      * and BLOCKS the turn until it receives a matched external_tool_call_response
      * (matched by request_id; content irrelevant). If a request goes unanswered
@@ -101,23 +101,23 @@ class AppServerTurnEngine(
      */
     private val externalToolRegistry: ExternalToolRegistry? = null,
     /**
-     * lgns8.22.3: when set, turn collection subscribes to the controller-owned
+     * When set, turn collection subscribes to the controller-owned
      * inbound router instead of collecting [AppServerClient.events] directly.
      */
     private val eventRouter: AppServerRuntimeEventRouter? = null,
     /**
-     * lgns8 / qhlo0: when the controller has already started a runtime, reuse its
+     * When the controller has already started a runtime, reuse its
      * canonical scope instead of issuing a duplicate runtime_start from the engine.
      */
     private val runtimeScopeResolver: suspend (TurnCommand) -> AppServerRuntimeScope? = { null },
     /**
-     * lgns8.22.4: connection generation stamped onto each lease. Incremented by
+     * Connection generation stamped onto each lease. Incremented by
      * the controller on transport disconnect so old-generation frames cannot
      * mutate a successor lease.
      */
     private val connectionGenerationProvider: () -> Long = { 0L },
     /**
-     * lgns8.22.4: server→client control / external-tool correlation. Shared with
+     * Server→client control / external-tool correlation. Shared with
      * the controller router when present; otherwise a local registry for direct
      * [AppServerClient.events] collection (unit tests / hosts without fanout).
      */
@@ -140,7 +140,7 @@ class AppServerTurnEngine(
         Long,
     ) -> Unit = { _, _, _ -> },
     /**
-     * letta-mobile-465hq / pr3wf / 1rekc: injectable millisecond time source.
+     *  Injectable millisecond time source.
      *
      * EVERY wall-clock read in this engine (idle-watchdog deadlines, lease
      * `acquiredAtMs` / held-duration telemetry, terminal timestamps) goes through
@@ -148,35 +148,35 @@ class AppServerTurnEngine(
      * byte-for-byte unchanged.
      *
      * Tests pass `{ testScheduler.currentTime }` so the watchdog measures the SAME
-     * virtual timeline that `delay()` advances under `runTest`. Without this the
+     * virtual timeline that `delay` advances under `runTest`. Without this the
      * watchdog compared wall time against virtually-advanced delays, which is why
      * the timing tests had to escape to `Dispatchers.Default` and race real
      * elapsed time — the documented flake source.
      */
     private val nowMs: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
     /**
-     * letta-mobile-qygvv.6: runs post-abort queue hygiene triggered by a cancelled
+     * Runs post-abort queue hygiene triggered by a cancelled
      * `turn_finished`. Null keeps only the abort-response trigger.
      */
     private val queueHygieneScope: CoroutineScope? = null,
     /**
-     * letta-mobile-qygvv.5: approval decisions this client sent, keyed by
+     * Approval decisions this client sent, keyed by
      * (agent, conversation, request_id). Shared with the controller router when
      * present so a replayed `control_request` is re-answered, not dropped.
      */
     private val approvalDecisionCache: ApprovalDecisionCache =
         eventRouter?.approvalDecisionCache() ?: ApprovalDecisionCache(),
-    /** letta-mobile-jvctq: false never answers an approval for the person; every one waits for them. */
+    /** False never answers an approval for the person; every one waits for them. */
     private val autoAllowApprovals: Boolean = true,
-    /** letta-mobile-zxk2n.2: 0.34 delivery for this host (durable terminals, client preferences); off by default. */
+    /** 0.34 delivery for this host (durable terminals, client preferences); off by default. */
     private val durableDelivery: DurableTurnDelivery = DurableTurnDelivery.OFF,
-    /** letta-mobile-k5nbq.9: the saved default cwd a conversation with no working directory yet starts in. */
+    /** The saved default cwd a conversation with no working directory yet starts in. */
     private val agentDefaults: AgentDefaultsRepository? = null,
 ) : TurnEngine {
     internal val approvalSender = ApprovalResponseSender(client, approvalDecisionCache, requestIdFactory)
 
     /**
-     * letta-mobile-8xxzv: owner-token leases KEYED BY {agentId, conversationId}.
+     * Owner-token leases KEYED BY {agentId, conversationId}.
      *
      * Formerly ONE process-wide `activeLeaseRef` slot, which made every send into
      * a second conversation fast-fail "iroh_turn_engine_busy" even though the
@@ -190,7 +190,7 @@ class AppServerTurnEngine(
     internal val deviceState = DeviceStateChanger(client, inboundSource)
 
     /**
-     * lgns8.22.5: the FULL external-tool invocation lifecycle — claim, generation
+     * The FULL external-tool invocation lifecycle — claim, generation
      * fencing, bounded invocation, result caching and the matched
      * `external_tool_call_response`. The engine keeps only the two decisions that
      * genuinely need a turn lease (which generation a frame validated on, and
@@ -204,7 +204,7 @@ class AppServerTurnEngine(
     )
 
     /**
-     * lgns8.22.5: outstanding user-input approval gates, scoped per runtime key.
+     * Outstanding user-input approval gates, scoped per runtime key.
      * Owns what `TurnLeaseSlot.approvalIds` used to hold; see [ApprovalRegistry]
      * for why claim/generation ownership stays in [InboundControlRequestRegistry].
      */
@@ -224,14 +224,14 @@ class AppServerTurnEngine(
         durable = DurableInputSending(durableDelivery, InputResumption(inboundSource.sessionLink)),
     )
 
-    /** letta-mobile-zxk2n.2: `turn_finished_ack` for every durable terminal kept for this client. */
+    /** `turn_finished_ack` for every durable terminal kept for this client. */
     private val terminalAcks = TurnTerminalAcknowledger(client, durableDelivery.consumerId, connectionGenerationProvider)
 
     /** Whether this engine names itself a durable terminal consumer (a host must then feed [acknowledgeTerminalOutsideTurns]). */
     internal val keepsDurableTerminals: Boolean get() = durableDelivery.consumerId != null
 
     /**
-     * letta-mobile-zxk2n.2: acks a durable `turn_finished` that no turn lease is collecting: a
+     * Acks a durable `turn_finished` that no turn lease is collecting: a
      * replay after a reconnect or restart, or a terminal that outlived the turn watching it. A
      * held lease acks the frames it applies itself, so this no-ops for its runtime.
      */
@@ -241,20 +241,20 @@ class AppServerTurnEngine(
         terminalAcks.acknowledge(received)
     }
 
-    /** letta-mobile-qygvv.6: latest `update_queue` snapshot per runtime (items + paused). */
+    /** Latest `update_queue` snapshot per runtime (items + paused). */
     val queueSnapshots: StateFlow<Map<TurnRuntimeKey, AppServerQueueSnapshot>> get() = queueHygiene.snapshots
 
-    /** letta-mobile-qygvv.6: this client's queued inputs removed after a user abort. */
+    /** This client's queued inputs removed after a user abort. */
     val cancelledQueuedInputs: SharedFlow<CancelledQueuedInput> get() = queueHygiene.cancelledInputs
 
     /**
-     * letta-mobile-qygvv.6: feeds a frame seen outside any turn. A host that routes frames through
+     * Feeds a frame seen outside any turn. A host that routes frames through
      * [eventRouter] must call this for every inbound frame; without a router the engine feeds the
      * frames its turns collect itself.
      */
     fun observeQueueFrame(frame: AppServerInboundFrame) = queueHygiene.observe(frame)
 
-    /** letta-mobile-qygvv.3: busy-path owner liveness from the App Server's own loop state. */
+    /** Busy-path owner liveness from the App Server's own loop state. */
     private val busyOwnerReconciler = BusyOwnerReconciler(
         probe = TurnOwnerLivenessProbe(client, eventRouter, requestIdFactory),
         otherBusyKeys = { key -> busyRuntimeKeys().filter { it != key } },
@@ -275,13 +275,13 @@ class AppServerTurnEngine(
         },
     )
 
-    /** letta-mobile-qygvv.3: a lease released without a server terminal aborts its server turn. */
+    /** A lease released without a server terminal aborts its server turn. */
     private val orphanAborter = OrphanedTurnAborter(
         abort = { agentId, conversationId, runId -> abort(agentId, conversationId, runId) },
         noteSettled = { key, runId -> leases.peek(key)?.boundaryGate?.noteSettled(runId) },
     )
 
-    /** letta-mobile-qygvv.9: a cancelled Queued lease takes its input off the server queue. */
+    /** A cancelled Queued lease takes its input off the server queue. */
     private val queuedInputRemoval = QueuedInputRemoval(queueHygiene::removeQueuedInput)
 
     /** Without an [eventRouter] the engine feeds [queueHygiene] the frames its turns collect. */
@@ -289,11 +289,11 @@ class AppServerTurnEngine(
         leases.slotFor(TurnRuntimeKey(command.agentId.value, command.conversationId.value))
 
     /**
-     * lgns8.22.4: cancel the active turn immediately when its connection generation
+     * Cancel the active turn immediately when its connection generation
      * is superseded. Must not wait for another inbound frame — a turn parked at a
      * user-input gate pauses the idle watchdog and would otherwise hang forever.
      *
-     * letta-mobile-8xxzv: applies to EVERY keyed lease — a generation rollover is
+     * applies to EVERY keyed lease — a generation rollover is
      * connection-wide, so all concurrent runtimes are superseded together.
      */
     fun cancelActiveLeaseForGeneration(failedGeneration: Long, reason: String = "connection generation superseded") {
@@ -309,7 +309,7 @@ class AppServerTurnEngine(
 
     /**
      * Drops the cached runtime scopes so the next turn re-issues runtime_start.
-     * Called on transport disconnect/generation rollover (lgns8.5): a scope
+     * Called on transport disconnect/generation rollover: a scope
      * minted by a dead generation must never be reused against the next one.
      * Connection-wide, so every keyed scope is dropped.
      *
@@ -325,7 +325,7 @@ class AppServerTurnEngine(
     /**
      * Answer [received] when it is an external_tool_call_request.
      *
-     * lgns8.22.4.1.2: hands the VALIDATED lease generation to the handler so a
+     * hands the VALIDATED lease generation to the handler so a
      * disconnect racing this frame cannot make it execute/claim under the
      * successor generation.
      */
@@ -382,7 +382,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     * lgns8.17(d): answer an `external_tool_call_request` that NO turn lease owns.
+     * (d): answer an `external_tool_call_request` that NO turn lease owns.
      *
      * The original hang class. Every answer path in this engine hangs off a turn's
      * collect loop, which only exists while a lease is held. A request that arrives
@@ -429,7 +429,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile-qygvv.3: apply the lease's approval policy to a `control_request` that NO
+     * Apply the lease's approval policy to a `control_request` that NO
      * turn lease owns, instead of leaving it in the fanout's pending buffer while the server turn
      * (and the conversation queue behind it) waits. See [UnleasedApprovalAnswerer].
      */
@@ -439,10 +439,10 @@ class AppServerTurnEngine(
     ): UnleasedApprovalOutcome = unleasedApprovals.answer(request, connectionGeneration)
 
     /**
-     * The connection generation matches() validated for [lease], or null when that
+     * The connection generation matches validated for [lease], or null when that
      * lease is gone / superseded. Read-only over the lease.
      *
-     * letta-mobile-8xxzv: SCOPED to the runtime key that owns this turn. lgns8.22.4.1.2
+     * SCOPED to the runtime key that owns this turn.
      * read the one process-wide activeLeaseRef; with concurrent turns that would
      * validate an external-tool request belonging to conversation A against
      * whichever runtime happened to hold "the" lease. [LeaseRef.current] resolves
@@ -459,7 +459,7 @@ class AppServerTurnEngine(
      * READ the recorded real approval id for [toolCallId] without removing it, or
      * null if none was recorded (non-interactive tool, or already consumed).
      *
-     * letta-mobile-vilsn: this is the can_use_tool control-request request_id
+     * this is the can_use_tool control-request request_id
      * (e.g. `perm-call_…`) captured when the approval was surfaced, so the
      * ApprovalResponse targets the gate letta-code actually parked on — it is NOT
      * derivable from the tool_call_id (`call_…` vs `toolu_…`).
@@ -471,7 +471,7 @@ class AppServerTurnEngine(
      * permanently unanswerable. [clearUserInputApprovalId] removes it only after
      * the response is actually sent.
      *
-     * lgns8.22.5: storage lives in [ApprovalRegistry]; this stays the stable
+     * storage lives in [ApprovalRegistry]; this stays the stable
      * host-facing entry point (DefaultAppServerController, desktop gateway).
      */
     fun userInputApprovalId(toolCallId: String): String? =
@@ -484,7 +484,7 @@ class AppServerTurnEngine(
     /**
      * Mark an inbound control/approval request answered after a successful send.
      *
-     * lgns8.22.4.1.4: [claimGeneration] MUST be captured BEFORE the send, not read
+     * [claimGeneration] MUST be captured BEFORE the send, not read
      * afterwards. If a disconnect advanced the generation mid-send, the recovery
      * replay is already registered under the successor generation and marking THAT
      * entry answered would silently drop a decision the server may never have
@@ -502,7 +502,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile-qygvv.5: send one approval decision with a `request_id` and wait
+     * Send one approval decision with a `request_id` and wait
      * for `input_accepted`. The inbound control request is marked answered unless
      * the server REJECTED the decision (e.g. "Approval request is no longer
      * pending"), which the caller must surface. [claimGeneration] follows the same
@@ -523,7 +523,7 @@ class AppServerTurnEngine(
     fun currentConnectionGeneration(): Long = connectionGenerationProvider()
 
     /**
-     * letta-mobile-8xxzv: owner metadata for ONE runtime key (telemetry only).
+     * Owner metadata for ONE runtime key (telemetry only).
      * This is what a busy rejection must report — the owner of the lease the
      * INCOMING send collides with, not "whoever happens to hold a lease".
      */
@@ -544,13 +544,13 @@ class AppServerTurnEngine(
     fun isBusy(agentId: String, conversationId: String): Boolean =
         leases.peek(TurnRuntimeKey(agentId, conversationId))?.isBusy == true
 
-    /** letta-mobile-qygvv.9: [key]'s input waits in the server queue, so a cancel must not abort. */
+    /** [key]'s input waits in the server queue, so a cancel must not abort. */
     fun isQueued(key: TurnRuntimeKey): Boolean = leases.peek(key)?.lease?.phase == TurnLeasePhase.Queued
 
     /**
-     * true when ANY runtime key holds a lease. Aggregate — use [isBusy] for a
+     * True when ANY runtime key holds a lease. Aggregate — use [isBusy] for a
      * send/routing decision; this exists for whole-engine liveness assertions
-     * (mirrors hasAnyActiveChatTurn vs hasActiveChatTurn from letta-mobile-or40x).
+     * (mirrors hasAnyActiveChatTurn vs hasActiveChatTurn from).
      */
     val isAnyBusy: Boolean get() = leases.busySlots().isNotEmpty()
 
@@ -558,7 +558,7 @@ class AppServerTurnEngine(
     fun busyRuntimeKeys(): List<TurnRuntimeKey> = leases.busySlots().map { it.key }
 
     /**
-     * SENSING (a, letta-mobile-8xxzv): two or more leases are active at once.
+     * SENSING: two or more leases are active at once.
      * Impossible before this bead (one global slot) and the whole point of it —
      * so the concurrency must be observable, with the exact key set, rather than
      * inferred from the absence of busy errors.
@@ -582,7 +582,7 @@ class AppServerTurnEngine(
      * canonical (promoted) run id of the turn being cancelled; a null run id asks
      * the server to abort whatever run is currently active for the runtime.
      *
-     * letta-mobile-8xxzv: KEYED. Aborting conversation A must never be sent
+     * KEYED. Aborting conversation A must never be sent
      * against conversation B's runtime scope, which is exactly what the single
      * cached scope would have done once turns run concurrently.
      */
@@ -598,7 +598,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     * Aborts [runtime] with an explicit scope. letta-mobile-qygvv.6: once the server confirms
+     * Aborts [runtime] with an explicit scope. once the server confirms
      * the abort, this client's queued items for the runtime are removed and the queue resumed
      * (see [AppServerQueueHygiene]) before this returns.
      */
@@ -633,7 +633,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile folder-settings #2: reads the working directory the
+     * Reads the working directory the
      * runtime currently uses for [agentId]/[conversationId] via `get_cwd_map`
      * — the full per-conversation map plus the process boot directory as the
      * fallback for scopes that were never customized. Returns null only on a
@@ -647,7 +647,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile folder-settings #2 / letta-mobile-qygvv.7: changes the working
+     * Changes the working
      * directory for [agentId]/[conversationId] with `change_device_state{cwd}` and
      * confirms it from the matching `update_device_status` (bounded wait, see
      * [DeviceStateChanger]). Never re-issues `runtime_start`: that replays full
@@ -831,7 +831,7 @@ class AppServerTurnEngine(
         )
     }
 
-    /** letta-mobile-by4vm.7: records how the collector ended; an idle timeout also publishes its Failed terminal. */
+    /** Records how the collector ended; an idle timeout also publishes its Failed terminal. */
     private suspend fun finishCollectedTurn(run: TurnRun, outcome: TurnOutcome) {
         when (outcome) {
             TurnOutcome.Completed -> run.release.record(TurnReleaseReason.NORMAL_COMPLETION)
@@ -848,7 +848,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile-by4vm.7: the turn's preflight (permission mode) and `runtime_start`. Returns the
+     * The turn's preflight (permission mode) and `runtime_start`. Returns the
      * runtime scope, or null after publishing a Failed terminal when either failed: the caller
      * gets a failed turn, never an escaped exception or a silent cancel. A cancellation is only
      * rethrown while this turn is itself being cancelled; a CancellationException a client throws
@@ -891,7 +891,7 @@ class AppServerTurnEngine(
 
     /**
      * Sends the turn's input and reads its acknowledgement (see [untilCollectorEnds]).
-     * letta-mobile-by4vm.7: a send that throws on a live turn is an input failure
+     * a send that throws on a live turn is an input failure
      * ([InputAcceptance.SendFailed]) that fails the turn, not an exception that escapes it.
      */
     private suspend fun CoroutineScope.sendInputOrFailure(
@@ -908,11 +908,11 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile-oqfbj + vilsn.6/vilsn.7 bookkeeping for ONE mapped draft:
+     * Bookkeeping for one mapped draft:
      * record the tool_call_ids this turn emitted/returned, and open or resolve
      * the user-input approval gate that pauses the idle watchdog.
      *
-     * lgns8.22.5: lifted out of `collectTurnWithIdleWatchdog`, which was already a
+     * lifted out of `collectTurnWithIdleWatchdog`, which was already a
      * complexity hotspot. Pure move — the branch bodies are unchanged.
      */
     private fun trackToolCallAndApprovalIds(
@@ -951,7 +951,7 @@ class AppServerTurnEngine(
 
     /**
      * Extract the returned tool_call_id from a streamed `tool_return_message`.
-     * letta-mobile-vilsn.6: a streamed tool_return resolves that specific
+     * a streamed tool_return resolves that specific
      * outstanding gate.
      */
     private fun resolveStreamedToolReturn(
@@ -967,12 +967,12 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile-vilsn.7: some App Server transports deliver the tool-call
+     * Some App Server transports deliver the tool-call
      * approval as a StreamDelta `approval_request_message` (RemoteStreamFrame)
      * rather than a ControlRequest (which maps to ApprovalRequested). That path
      * bypassed gate registration entirely, so a parked AskUserQuestion /
      * ExitPlanMode arriving this way was never added to the [ApprovalRegistry]:
-     * the idle watchdog was not paused (vilsn.6) and the submit path could not
+     * the idle watchdog was not paused and the submit path could not
      * recover the real can_use_tool request id via [userInputApprovalId].
      * Register it here exactly like the ApprovalRequested branch does.
      */
@@ -1077,7 +1077,7 @@ class AppServerTurnEngine(
 
     /**
      * Gates [received] before it touches turn state: generation, a replayed approval this engine
-     * re-answers from cache (letta-mobile-qygvv.5), runtime scope and run id. Returns false when
+     * re-answers from cache, runtime scope and run id. Returns false when
      * the frame is not this lease's to process.
      */
     private suspend fun admitFrame(received: AppServerReceivedFrame, context: TurnFrameContext): Boolean {
@@ -1098,7 +1098,7 @@ class AppServerTurnEngine(
         return context.lease.slot.runIdGate.accepts(received, context.lease.token)
     }
 
-    /** Applies [received] to the turn, then acks it when it is a durable terminal kept for this client (zxk2n.2). */
+    /** Applies [received] to the turn, then acks it when it is a durable terminal kept for this client. */
     private suspend fun processAndAcknowledge(
         received: AppServerReceivedFrame,
         context: TurnFrameContext,
@@ -1140,7 +1140,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile-qygvv.2: projects one accepted frame through the [TurnBoundaryGate] decision.
+     * Projects one accepted frame through the [TurnBoundaryGate] decision.
      * Returns false when the frame was dropped at the boundary or skipped as unprojectable.
      */
     private suspend fun projectAtBoundary(
@@ -1169,7 +1169,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile-gdvbf: TERMINAL PRECEDENCE — failing to PROJECT one frame is
+     * TERMINAL PRECEDENCE — failing to PROJECT one frame is
      * not evidence that the model's turn failed.
      *
      * An exception out of [AppServerRuntimeEventMapper.map] used to escape the
@@ -1256,9 +1256,9 @@ class AppServerTurnEngine(
      *
      * The watchdog runs CONCURRENTLY so a fully-silent turn (no frames at all)
      * still trips — checking only inside `collect` would never fire during
-     * silence, which is exactly the c0qm0 hang.
+     * silence, which is exactly a stuck turn.
      *
-     * letta-mobile-by4vm.7: the frame loop runs under its own job, `collection`.
+     * the frame loop runs under its own job, `collection`.
      * Whatever ends the turn (a terminal frame, the delayed settle window, the
      * reconnect countdown, the watchdog) completes the turn's [TurnCompletion],
      * which cancels `collection`. The loop therefore always stops by
@@ -1355,7 +1355,7 @@ class AppServerTurnEngine(
         }
     }
 
-    /** letta-mobile-oqfbj: only an idle timeout leaves dangling tool calls to settle; a clean end never does. */
+    /** Only an idle timeout leaves dangling tool calls to settle; a clean end never does. */
     private fun TurnOutcome.danglingToolCallReason(): String? =
         if (this == TurnOutcome.IdleTimedOut) "Tool execution interrupted by turn timeout" else null
 
@@ -1365,7 +1365,7 @@ class AppServerTurnEngine(
      * Handles a frame rejected by [matches]. Records telemetry for terminal-
      * bearing rejects and, for same-conversation terminals, returns the
      * lifecycle status the collect loop must emit before releasing the lease
-     * (lgns8.22.4: error_message → Failed).
+     * (error_message → Failed).
      */
     private fun handleScopeRejectedFrame(
         received: AppServerReceivedFrame,
@@ -1484,7 +1484,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile-8xxzv: the started-runtime cache is KEYED. It used to be one
+     * The started-runtime cache is KEYED. It used to be one
      * `runtime` field, so two concurrent conversations would evict each other's
      * scope on every turn (and an abort could be addressed to the wrong runtime).
      */
@@ -1616,10 +1616,10 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile-oqfbj: emit synthetic ToolReturnObserved drafts for every tool_call_id
+     * Emit synthetic ToolReturnObserved drafts for every tool_call_id
      * that was emitted but never returned. No-op when all emitted calls have returns.
      *
-     * fix(no-settle-on-clean-completion, letta-mobile-oqfbj): this must be called
+     * To avoid settling tools prematurely on clean completion, this must be called
      * ONLY on ABNORMAL turn ends — cancellation, idle timeout, stream error, or a
      * terminal lifecycle whose status is Failed/Cancelled. It must NEVER be
      * called for a clean Completed terminal (delayed-settle quiet window,
@@ -1688,7 +1688,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile-kyqdt: TELEMETRY-ONLY snapshot of who owns the [activeTurn]
+     * TELEMETRY-ONLY snapshot of who owns the [activeTurn]
      * lock. Pure metadata — never consulted for lock/[isBusy] decisions.
      *
      * @property runId server-assigned run id once observed, else null (unknown
@@ -1737,7 +1737,7 @@ class AppServerTurnEngine(
     )
 
     /**
-     * letta-mobile-kyqdt: TELEMETRY-ONLY. Records the last-seen terminal
+     * TELEMETRY-ONLY. Records the last-seen terminal
      * lifecycle status on the active-turn owner (if one is set). Pure metadata
      * write — no control-flow, no lock interaction, no effect on emitted drafts.
      */
@@ -1752,7 +1752,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile-kyqdt: TELEMETRY-ONLY. Records the accepted-vs-rejected
+     * TELEMETRY-ONLY. Records the accepted-vs-rejected
      * matches(scope) decision for a terminal-bearing frame WITHOUT altering the
      * owner's terminal status. This lets the release event prove the leading
      * hypothesis: a terminal arrived but failed matches(scope). Pure metadata.
@@ -1774,10 +1774,10 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile-kyqdt / o0atv: telemetry for a matched terminal lifecycle draft.
+     *  Telemetry for a matched terminal lifecycle draft.
      * Kept out of [collectTurnWithIdleWatchdog] to avoid Complex Method regressions.
      */
-    /** The settle window closed on a completed turn: its run is settled (letta-mobile-qygvv.2). */
+    /** The settle window closed on a completed turn: its run is settled. */
     private fun noteCompletedSettle(frameSeq: Long?, lease: LeaseRef) {
         lease.slot.boundaryGate.noteSettled(lease.current?.runId)
         noteOwnerTerminal(
@@ -1826,7 +1826,7 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile-o0atv: sanitized terminal failure breadcrumb. Captures status,
+     * Sanitized terminal failure breadcrumb. Captures status,
      * exception token, run/agent/conversation ids, and optional model handle —
      * never the raw provider reason text (may contain secrets / prompt content).
      */
@@ -1877,7 +1877,7 @@ class AppServerTurnEngine(
         const val DEFAULT_TURN_IDLE_TIMEOUT_MS: Long = 300_000L
         const val DEFAULT_TERMINAL_SETTLE_QUIET_MS: Long = 1_500L
         /**
-         * lgns8.22.5: the invocation deadline now lives with the dispatcher that
+         * The invocation deadline now lives with the dispatcher that
          * enforces it ([ExternalToolDispatcher.INVOCATION_TIMEOUT_MS], where the
          * rationale against the server's own `EXTERNAL_TOOL_CALL_TIMEOUT_MS` is
          * documented). Re-exported here so existing callers/tests keep one name.
@@ -1885,8 +1885,8 @@ class AppServerTurnEngine(
         const val EXTERNAL_TOOL_INVOCATION_TIMEOUT_MS: Long = ExternalToolDispatcher.INVOCATION_TIMEOUT_MS
 
         /**
-         * lgns8.17(d): sentinel lease token for an answer taken with NO turn lease.
-         * Real tokens come from `leaseTokenSeq.incrementAndGet()` and start at 1, so
+         * (d): sentinel lease token for an answer taken with NO turn lease.
+         * Real tokens come from `leaseTokenSeq.incrementAndGet` and start at 1, so
          * a negative value can never collide with a live lease's claim.
          */
         internal const val UNLEASED_LEASE_TOKEN: Long = -1L

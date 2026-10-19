@@ -1,7 +1,7 @@
 package com.letta.mobile.data.controller
 
 /**
- * letta-mobile-by4vm.50: whether [RuntimeSyncScheduler] may send a cadence (periodic) `sync` right
+ * Whether [RuntimeSyncScheduler] may send a cadence (periodic) `sync` right
  * now. Asked only when a periodic sync is due; recovery syncs (an `event_seq` gap, the app coming
  * back to the foreground) never ask, because they repair a view that is known to be stale.
  *

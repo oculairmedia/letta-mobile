@@ -5,7 +5,7 @@ import com.letta.mobile.data.runtime.TurnRuntimeKey
 import com.letta.mobile.util.Telemetry
 
 /**
- * letta-mobile-qygvv.9: the keyed abort behind a user cancel, skipped while [turn]'s input still
+ * The keyed abort behind a user cancel, skipped while [turn]'s input still
  * waits in the App Server queue. Such a turn has no run of its own, so an `abort_message` would stop
  * the turn ahead of it (another viewer's) and pause the queue. The cancel's synthetic terminal still
  * ends the turn, and ending its job releases the lease, which takes the input off the server queue.

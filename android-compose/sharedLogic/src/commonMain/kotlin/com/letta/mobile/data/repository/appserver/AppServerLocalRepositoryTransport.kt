@@ -19,7 +19,7 @@ interface AppServerLocalRepositoryTransport {
     suspend fun listAgents(): JsonArray
     suspend fun getContext(agentId: String, conversationId: String?): JsonObject?
 
-    /** letta-mobile-cyh28: `agent.context` with the client's streamed total to match. */
+    /** `agent.context` with the client's streamed total to match. */
     suspend fun getContextBreakdown(request: ContextBreakdownRequest): JsonObject? =
         getContext(request.agentId.value, request.conversationId?.value)
     suspend fun listAgentBlocks(agentId: String): JsonArray
@@ -27,10 +27,10 @@ interface AppServerLocalRepositoryTransport {
     /** `block.update_agent`: the App Server writes and commits `memory/system/<label>.md`. */
     suspend fun updateAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): JsonElement
 
-    /** bfooy.5 `block.create_agent`: a new committed `memory/system/<label>.md`. */
+    /** `block.create_agent`: a new committed `memory/system/<label>.md`. */
     suspend fun createAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): JsonElement
 
-    /** bfooy.5 `block.delete_agent`: a committed delete of `memory/system/<label>.md`. */
+    /** `block.delete_agent`: a committed delete of `memory/system/<label>.md`. */
     suspend fun deleteAgentBlock(target: AgentBlockTarget)
 }
 

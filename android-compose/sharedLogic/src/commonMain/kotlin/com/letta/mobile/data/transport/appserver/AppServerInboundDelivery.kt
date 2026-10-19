@@ -9,12 +9,12 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 
 /**
- * Delivers one socket's inbound frames to its collectors (letta-mobile-by4vm.5).
+ * Delivers one socket's inbound frames to its collectors.
  *
  * ## Why one ordered sequence
  *
  * The App Server writes every frame of a connection on ONE socket, in `event_seq` order. Until
- * by4vm.5 the transport split them into a control lane and a stream lane, drained each lane with
+ *  the transport split them into a control lane and a stream lane, drained each lane with
  * its own job, and `mergedFrames` merged the lanes back with two unordered collectors. Frames that
  * arrived in order were therefore delivered out of order: a `turn_finished` (control lane) could
  * overtake the last `stream_delta` (stream lane), the turn engine completed and unsubscribed, and
@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
  * The split existed so a control frame (an approval, a request response) was never stuck behind
  * a flood of deltas held up by a slow stream collector. That goal now holds by construction on
  * the ordered path: its consumers never wait on anyone. The router's per-frame work is
- * `StreamIntegrityMonitor.observe` plus `RuntimeEventFanout.route`, which since by4vm.4 offers
+ * `StreamIntegrityMonitor.observe` plus `RuntimeEventFanout.route`, which since offers
  * with `trySend` and detaches a full subscriber instead of suspending. So a control frame behind
  * N deltas waits only for the fanout to route those N deltas, never for any subscriber to
  * consume them.
@@ -119,11 +119,11 @@ internal class AppServerInboundDelivery {
         const val FRAME_BUFFER_CAPACITY = 64
 
         /**
-         * letta-mobile-eo65k: 256 was an arbitrary round number, not derived from real traffic.
+         * 256 was an arbitrary round number, not derived from real traffic.
          * Production wrapper logs showed it exceeded 4 times in 28h, each time tearing down the
          * whole shared session. Raising it to 1024 made real bursts hit the ceiling less often.
          *
-         * by4vm.4 made the router never wait on a subscriber, and by4vm.5 made the router read one
+         *  made the router never wait on a subscriber, and made the router read one
          * ordered queue, so this queue now drains as fast as the fanout routes. It can only fill if
          * a direct collector of [inboundFrames] or of a lane view stops collecting, or if this
          * process gets no CPU for over 1024 frames. The bound stays: failing the generation is a

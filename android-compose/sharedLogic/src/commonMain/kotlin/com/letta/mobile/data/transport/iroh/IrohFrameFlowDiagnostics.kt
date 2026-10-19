@@ -3,7 +3,7 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.util.Telemetry
 
 /**
- * letta-mobile-h30cy diagnostic infrastructure for the dropped-character bug.
+ *  Diagnostic infrastructure for the dropped-character bug.
  *
  * The symptom: the streamed assistant row's reducer-INPUT text is missing
  * characters (leading fragment fixed via replay=1; a residual mid-stream

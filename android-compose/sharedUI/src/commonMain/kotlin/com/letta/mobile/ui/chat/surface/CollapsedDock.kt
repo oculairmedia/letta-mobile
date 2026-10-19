@@ -154,7 +154,7 @@ internal data class CollapsedTurn(
     val startedAtEpochMs: Long? = null,
     /**
      * The turn's question that waits on the person (AskUserQuestion), which the Touch canvas
-     * answers in place (letta-mobile-bglj6.1.22); null when there is none.
+     * answers in place; null when there is none.
      */
     val pendingApproval: UiApprovalRequest? = null,
 ) {
@@ -388,7 +388,7 @@ private fun CollapsedOwnSeat(content: CollapsedDockContent, size: Dp) {
 
 /**
  * The agent while its transported character stands at another seat (the desktop sidebar's hero):
- * the same character, live (letta-mobile-ckmub.15), framed as it stands - or its initial when the
+ * the same character, live, framed as it stands - or its initial when the
  * host cannot draw its scene.
  */
 @Composable

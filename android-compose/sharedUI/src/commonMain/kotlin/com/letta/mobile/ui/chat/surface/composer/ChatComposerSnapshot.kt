@@ -33,7 +33,7 @@ data class ComposerSnapshotContent(
 )
 
 /**
- * letta-mobile-bglj6.1.9: the shared composer on its own, drawn for the content's mode in its
+ * The shared composer on its own, drawn for the content's mode in its
  * appearance's idiom exactly as the page draws it. For screenshot comparisons against the legacy
  * Android composer and for previews; hosts render the whole page through ChatSurface instead.
  */
@@ -57,7 +57,7 @@ fun ChatComposerSnapshot(content: ComposerSnapshotContent, modifier: Modifier = 
 }
 
 /**
- * letta-mobile-ckmub.1 (S4): the Touch composer's thinking token on its own, as the page draws it
+ *  (S4): the Touch composer's thinking token on its own, as the page draws it
  * over the bar when the agent has no mascot. For the row parity harness and previews.
  */
 @Composable

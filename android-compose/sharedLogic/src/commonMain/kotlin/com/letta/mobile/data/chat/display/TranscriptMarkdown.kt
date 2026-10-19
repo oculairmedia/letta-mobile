@@ -12,7 +12,7 @@ data class TranscriptInput(
 )
 
 /**
- * letta-mobile-zxk2n.5 (G91): a conversation as a Markdown document, for "Download transcript".
+ *  (G91): a conversation as a Markdown document, for "Download transcript".
  * Desktop saves it to a file; Android hands it to the share sheet. It follows the chat's display
  * options, so reasoning and compaction summaries are left out when the timeline hides them.
  */

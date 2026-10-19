@@ -24,9 +24,9 @@ import kotlin.time.Clock
 
 /**
  * The tool library: served by an Iroh host's `admin_rpc` relay (`tool.list` / `tool.get`).
- * letta-mobile-by4vm.103: the one tool repository Android and desktop sessions build (through
+ * the one tool repository Android and desktop sessions build (through
  * [com.letta.mobile.data.session.graph.adminRepositories]).
- * letta-mobile-ckmub.4: [remote] is the seam for a non-App-Server backend; production binds no
+ * [remote] is the seam for a non-App-Server backend; production binds no
  * route (the Letta REST backend was removed), so without an Iroh host tool calls fail with a
  * no-route error.
  */

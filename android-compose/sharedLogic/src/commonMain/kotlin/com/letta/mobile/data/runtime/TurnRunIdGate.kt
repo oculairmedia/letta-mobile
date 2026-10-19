@@ -14,7 +14,7 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Tracks mid-turn run-id promotion so late frames from a superseded run cannot
- * mutate the active lease (lgns8.22.4). Extracted from [AppServerTurnEngine] to
+ * mutate the active lease. Extracted from [AppServerTurnEngine] to
  * keep that hotspot's cohesion from degrading further under fanout wiring.
  */
 internal class TurnRunIdGate(
@@ -93,7 +93,7 @@ internal fun AppServerReceivedFrame.carriesLifecycleTerminal(): Boolean {
         messageType == "loop_error"
 }
 
-/** letta-mobile-qygvv.2: an explicit `is_terminal: false` error is a recoverable notice. */
+/** An explicit `is_terminal: false` error is a recoverable notice. */
 internal fun AppServerReceivedFrame.isNonTerminalErrorDelta(): Boolean {
     val streamDelta = frame as? AppServerInboundFrame.StreamDelta ?: return false
     return runCatching {

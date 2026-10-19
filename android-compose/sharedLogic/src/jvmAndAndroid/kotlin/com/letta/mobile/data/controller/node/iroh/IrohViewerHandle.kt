@@ -29,9 +29,9 @@ fun sendStreamSink(send: SendStream): ViewerFrameSink = object : ViewerFrameSink
 }
 
 /**
- * eaczz.2 — a per-connection viewer of a conversation's live turn stream.
+ * A per-connection viewer of a conversation's live turn stream.
  *
- * The h30cy frame-shape contract is stateful PER TURN PER CONNECTION: assistant
+ * The frame-shape contract is stateful PER TURN PER CONNECTION: assistant
  * text is accumulated cumulatively and its id rewritten to `cm-stream-<otid>`;
  * each wire frame carries a per-connection monotonic `event_seq` and a fresh
  * `idempotency_key`; frame-part chunking is gated on the peer's advertised
@@ -47,7 +47,7 @@ fun sendStreamSink(send: SendStream): ViewerFrameSink = object : ViewerFrameSink
  * points; the stamped ones draw event_seq under the stream lock. All are
  * best-effort: a failed write returns false so the broadcaster can de-register a
  * dead viewer, and never throws into the caller
- * (a slow/dead observer must never block the initiator's turn — eaczz.6).
+ * (a slow/dead observer must never block the initiator's turn).
  */
 internal class IrohViewerHandle(
     override val connectionId: String,
@@ -76,7 +76,7 @@ internal class IrohViewerHandle(
     ): Boolean = writeSerialized { streamDeltaFrame(runtime, delta, eventSeq.next()) }
 
     /**
-     * letta-mobile-qygvv.12: write a non-delta App Server frame (`update_loop_status`,
+     * Write a non-delta App Server frame (`update_loop_status`,
      * `turn_finished`, `update_queue`) with this viewer's own envelope: [type], [runtime],
      * event_seq, emitted_at and idempotency_key, followed by [fields].
      */
@@ -94,7 +94,7 @@ internal class IrohViewerHandle(
     override suspend fun writeFrame(frame: String): Boolean = writeSerialized { frame }
 
     /**
-     * letta-mobile-by4vm.50: the ONE serialized write step for this connection's stream.
+     * The ONE serialized write step for this connection's stream.
      * [encode] runs INSIDE [streamWriteMutex], so a stamped frame draws its event_seq in
      * the same critical section that puts it on the wire. Several chains write to one
      * handle (the connection's initiator queue, the node's observer queue, the
@@ -139,7 +139,7 @@ internal fun streamDeltaFrame(runtime: AppServerRuntimeScope, delta: JsonObject,
 /**
  * Replays a redial's parked delta bodies ([parked], newline-separated) to the reconnecting
  * initiator's [viewer]. Each body is re-tagged and stamped at REPLAY time from the new
- * connection's counter, under the same lock as live writes (letta-mobile-by4vm.50). The
+ * connection's counter, under the same lock as live writes. The
  * parked tail holds delta BODIES ([TurnFrameTracker] records them before any envelope), so
  * there is no original seq to keep, and one would be wrong anyway: it came from the dead
  * connection's counter, which the client's gap detector tracks as a separate generation.

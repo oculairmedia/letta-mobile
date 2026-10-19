@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * letta-mobile-qygvv.18: one ordered writer per relayed turn, with the terminal written LAST.
+ * One ordered writer per relayed turn, with the terminal written LAST.
  *
  * The engine's terminal lifecycle draft is not always the last draft of its flow. A completion
  * published by the settle-window job runs on a sibling coroutine of the engine's collect loop, so
@@ -24,7 +24,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * right after its terminal (the engine completes the turn by throwing out of the collector), so
  * holding costs no measurable latency.
  *
- * letta-mobile-qygvv.28: with a [tap], the held terminal is written from the App Server's own
+ * with a [tap], the held terminal is written from the App Server's own
  * tail (see [relayServerTail]) instead of being re-synthesized from the engine's lifecycle.
  */
 internal class OrderedTurnRelay(
@@ -107,7 +107,7 @@ internal class OrderedTurnRelay(
 }
 
 /**
- * letta-mobile-qygvv.28: writes a turn's end from the App Server's own frames: the frames the
+ * Writes a turn's end from the App Server's own frames: the frames the
  * engine consumed after its last relayed delta (the real `error_message` with its run id, the
  * `stop_reason`, the idle loop status), then the server's `turn_finished`. The engine's [terminal]
  * still settles the input ack and dangling tool calls, and supplies the terminal delta only when

@@ -212,7 +212,7 @@ fun CanvasOp.withActor(actorId: CanvasActorId): CanvasOp = when (this) {
     is CanvasOp.BatchOp -> copy(actorId = actorId.value, ops = ops.map { it.withActor(actorId) })
 }
 
-/** This op's [CanvasOp.opId], typed for the op log and the delivery queue (by4vm.99.1). */
+/** This op's [CanvasOp.opId], typed for the op log and the delivery queue. */
 val CanvasOp.canvasOpId: CanvasOpId get() = CanvasOpId(opId)
 
 /**

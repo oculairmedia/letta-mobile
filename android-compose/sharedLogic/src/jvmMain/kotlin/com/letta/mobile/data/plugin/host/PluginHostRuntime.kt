@@ -59,7 +59,7 @@ data class PluginHealthSnapshot(
 )
 
 /**
- * The host's plugin runtime (letta-mobile-cdgpr.6): the registry persisted at
+ * The host's plugin runtime: the registry persisted at
  * `<pluginsDir>/plugins.json` ([PluginPackageStore]), the asset quota's usage beside it ([PluginAssetQuotaFile]), every transition decided by
  * [PluginRegistryReducer], one driver per enabled plugin ([PluginDriverHost]), and the enabled
  * plugins' agent actions published as tools into [toolSource] (register it with the live
@@ -150,7 +150,7 @@ class PluginHostRuntime(private val config: PluginHostConfig, scope: CoroutineSc
     /** Stops every driver for host shutdown; the registry keeps them enabled for the next start. */
     suspend fun close() = mutex.withLock { drivers.stopAll() }
 
-    /** [pluginId]'s running plugin, for a live view's calls (letta-mobile-cdgpr.7); null when it is not running. */
+    /** [pluginId]'s running plugin, for a live view's calls; null when it is not running. */
     fun live(pluginId: PluginId): LivePlugin? = drivers.live(pluginId)
 
     /** Where [plugin]'s current version is unpacked: its pages are read from here. */

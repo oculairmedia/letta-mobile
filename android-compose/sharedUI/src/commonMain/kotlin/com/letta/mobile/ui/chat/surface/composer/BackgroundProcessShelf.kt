@@ -36,7 +36,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 
 /**
- * letta-mobile-bzvro.21: shelf above the composer listing active background processes
+ * Shelf above the composer listing active background processes
  * reported by the App Server's `device_status.background_processes`.
  */
 @Composable

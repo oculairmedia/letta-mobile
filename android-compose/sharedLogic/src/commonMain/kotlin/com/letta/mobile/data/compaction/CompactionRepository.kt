@@ -4,7 +4,7 @@ import com.letta.mobile.data.chat.runtime.SharedChatSessionResolver
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 
-/** letta-mobile-3kble: compact one conversation, optionally in a given [mode]. */
+/** Compact one conversation, optionally in a given [mode]. */
 data class CompactionRequest(
     val agentId: AgentId,
     /** Null is the agent's default conversation. */
@@ -20,7 +20,7 @@ data class CompactionRequest(
 }
 
 /**
- * letta-mobile-joigh: the conversation id letta-code uses — the bare `default` for the agent's
+ * The conversation id letta-code uses — the bare `default` for the agent's
  * default conversation (null, blank, or its addressable `conv-default-<agentId>` alias), else the
  * id itself. Slash commands scope by it: on `default` they act on the agent.
  */
@@ -54,7 +54,7 @@ sealed interface CompactionOutcome {
 }
 
 /**
- * letta-mobile-3kble: manual compaction, whichever way the session reaches letta-code.
+ * Manual compaction, whichever way the session reaches letta-code.
  *
  *  - [AdminRpcCompactionRepository]: the Iroh host's `conversation.compact` (S3);
  *  - [AppServerCompactionRepository]: a direct App Server client (desktop-bundled, embedded
@@ -68,7 +68,7 @@ interface CompactionRepository {
 }
 
 /**
- * letta-mobile-3io8k: tries this repository, then [fallback] when this one cannot compact at all
+ * Tries this repository, then [fallback] when this one cannot compact at all
  * (e.g. the Iroh relay first, then a desktop's bundled App Server). Any other outcome stands.
  */
 fun CompactionRepository.orElse(fallback: CompactionRepository): CompactionRepository = object : CompactionRepository {

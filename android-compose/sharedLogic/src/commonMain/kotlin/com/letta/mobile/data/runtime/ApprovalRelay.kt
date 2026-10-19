@@ -17,7 +17,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-bzvro.40: carries what each parked `can_use_tool` request offered (always-allow rules,
+ * Carries what each parked `can_use_tool` request offered (always-allow rules,
  * blocked path, diffs) from an Iroh host to its clients.
  *
  * The host answers its App Server's control requests itself, so a client over `iroh://` never sees
@@ -123,7 +123,7 @@ data class RelayedPendingApprovals(
 )
 
 /**
- * letta-mobile-bzvro.40: the client's view of what its Iroh host has parked, by tool call id, built from
+ * The client's view of what its Iroh host has parked, by tool call id, built from
  * `pending_approvals` snapshots. Joined onto the timeline with
  * [com.letta.mobile.data.chat.projection.withPendingApprovalDetails], exactly as a direct connection's
  * own engine details are. [clear] on disconnect: nothing the host said survives the connection, and

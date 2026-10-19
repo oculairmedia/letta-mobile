@@ -10,7 +10,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * App Server provider management over admin_rpc (letta-mobile-w4q4p).
+ * App Server provider management over admin_rpc.
  *
  * `provider.list` used to be a controller constant (one `lmstudio-local` row
  * ported from admin-shim). It now answers from the live

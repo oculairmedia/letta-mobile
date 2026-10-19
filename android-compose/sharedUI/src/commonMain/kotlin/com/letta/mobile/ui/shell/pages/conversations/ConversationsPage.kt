@@ -60,11 +60,11 @@ object ConversationsPageTags {
 }
 
 /**
- * letta-mobile-ckmub.2.4 (hard cut S16): every agent's conversations in one roster, the page a chat
+ *  (hard cut S16): every agent's conversations in one roster, the page a chat
  * route without an agent opens. Composed from the shell's primitives only: the agent panel's
  * conversation rows ([ShellConversationRow], with its menu, rename, pin, fork and delete confirm), the
  * Active / Archived / All filter, the Archived chats dialog, all in one [RosterList] grouped by agent.
- * The body reloads through [LettaRefreshable] (letta-mobile-ckmub.3.22): a pull on touch, the filter
+ * The body reloads through [LettaRefreshable]: a pull on touch, the filter
  * row's refresh on a pointer host. [modifier] carries the host frame's insets.
  */
 @Composable

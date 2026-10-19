@@ -114,7 +114,7 @@ internal fun rememberCanvasBubbleState(expanded: Boolean = false): CanvasBubbleS
     }
 
 /**
- * letta-mobile-y5q9z: carries "the card was open" across a hop. On Android each conversation is its
+ * Carries "the card was open" across a hop. On Android each conversation is its
  * own chat route with its own page, so the bubble that hopped and the bubble that arrives share no
  * state; the hop [mark]s it here and the arriving page [take]s it once. Desktop keeps one page across
  * conversations, so its bubble [take]s the mark as soon as it sees the new conversation instead.

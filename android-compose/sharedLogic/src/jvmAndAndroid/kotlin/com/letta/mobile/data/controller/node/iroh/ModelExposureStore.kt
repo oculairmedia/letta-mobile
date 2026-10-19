@@ -10,7 +10,7 @@ import kotlinx.serialization.json.Json
 
 /**
  * Which App Server models the wrapper exposes to clients' model pickers
- * (letta-mobile-w4q4p). The App Server has no notion of hiding a model, so
+ *. The App Server has no notion of hiding a model, so
  * this is wrapper-owned state keyed by model handle.
  *
  * Default: every handle is exposed. Only explicit decisions are stored, so a

@@ -42,7 +42,7 @@ class ShellWorkspaceOverlayActions(
 const val NEW_CONVERSATION_RECENTS_LIMIT = 8
 
 /**
- * The workspace's overlay stack, moved from desktop's app overlays (letta-mobile-ckmub.17.4): the New
+ * The workspace's overlay stack, moved from desktop's app overlays: the New
  * conversation directory, the command palette and the image drag hint. Render order is z-order.
  * A host draws its own overlays (desktop's model picker, its identity reset) beside these.
  */

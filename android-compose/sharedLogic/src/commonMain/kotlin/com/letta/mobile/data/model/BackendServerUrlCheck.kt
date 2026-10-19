@@ -1,7 +1,7 @@
 package com.letta.mobile.data.model
 
 /**
- * letta-mobile-ckmub.8: what the backend settings form says about a server URL before it is saved,
+ * What the backend settings form says about a server URL before it is saved,
  * the same on every client. Null means the URL is acceptable for the mode.
  */
 object BackendServerUrlCheck {

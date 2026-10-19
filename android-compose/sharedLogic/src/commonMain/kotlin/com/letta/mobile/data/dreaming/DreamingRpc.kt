@@ -3,7 +3,7 @@ package com.letta.mobile.data.dreaming
 import kotlinx.serialization.Serializable
 
 /**
- * letta-mobile-iczm7: the dreaming admin_rpc contract shared by the Iroh host that serves it and
+ * The dreaming admin_rpc contract shared by the Iroh host that serves it and
  * the clients that call it.
  *
  *  - `reflection.get` {agent_id, conversation_id?} -> {reflection_settings}
@@ -45,7 +45,7 @@ enum class DreamStartStatus {
 }
 
 /**
- * letta-mobile-iczm7: letta-code's answer to `/dream`. It arrives when the run is launched, not
+ * Letta-code's answer to `/dream`. It arrives when the run is launched, not
  * when it finishes: the run itself shows up in the subagent registry and, when it changes memory,
  * as a reflection commit.
  */

@@ -9,7 +9,7 @@ import io.ak1.drawbox.WorldDensity
 
 /**
  * Everything ON the board is sized in canvas (world) units, so it keeps its proportions to the
- * board at any zoom and is the same on a phone and a desktop (letta-mobile-bglj6.17).
+ * board at any zoom and is the same on a phone and a desktop.
  *
  * One world unit is one px before the board's zoom (`screen = world * scale + offset`). Under
  * [CanvasWorldDensity] one dp and one sp are each one px and the system font scale is 1, so a

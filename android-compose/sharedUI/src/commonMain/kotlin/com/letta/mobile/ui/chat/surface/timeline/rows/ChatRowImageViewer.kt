@@ -73,11 +73,11 @@ internal val ChatImageViewerScaleKey = SemanticsPropertyKey<Float>("ChatImageVie
 private var SemanticsPropertyReceiver.chatImageViewerScale by ChatImageViewerScaleKey
 
 /**
- * letta-mobile-bglj6.1: the page's one full-screen image viewer, lifted from desktop's
+ * The page's one full-screen image viewer, lifted from desktop's
  * DesktopFullscreenImageOverlay and extended with Android's paging between a message's
  * images. Esc dismisses; arrow keys page.
  *
- * letta-mobile-bglj6.1.23: on a phone it is the legacy black ChatImageViewer: each page pinches
+ * on a phone it is the legacy black ChatImageViewer: each page pinches
  * to zoom (1-5x), double-taps to 2.5x, pans while zoomed and swipes away vertically at rest, under
  * a top bar with the counter, Share, Save (where the host offers them, [ChatImageActions]) and
  * Close. On a pointer host a click on the scrim dismisses.

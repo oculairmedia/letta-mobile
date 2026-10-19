@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 /**
  * Platform-neutral skills API: the skill registry, what an agent has installed, and install /
  * uninstall. Served over an Iroh host's `admin_rpc` relay (`skill.*`, see
- * [com.letta.mobile.data.repository.iroh.IrohSkillsApi]); letta-mobile-ckmub.4 removed the Letta
+ * [com.letta.mobile.data.repository.iroh.IrohSkillsApi]);  removed the Letta
  * REST implementation (`/v1/skills`).
  */
 interface SkillsApi : AutoCloseable {

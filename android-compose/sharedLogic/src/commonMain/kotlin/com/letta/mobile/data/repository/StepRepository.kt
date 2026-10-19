@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 /**
- * Step queries. letta-mobile-ckmub.4: no App Server or Iroh route serves them (an Iroh host lists a
+ * Step queries. no App Server or Iroh route serves them (an Iroh host lists a
  * run's steps through the run repository), so production binds no [remote] and reports
  * [supportsStepQueries] false; [remote] is the seam a non-App-Server backend would fill.
  */

@@ -6,7 +6,7 @@ data class VaultAgent(val agentId: String)
 /** A vault request that failed, with the agent it was for and why. */
 data class AgentVaultFailure(val agent: VaultAgent, val message: String)
 
-/** Pure transitions of [AgentVaultState] (letta-mobile-bzvro.25). */
+/** Pure transitions of [AgentVaultState]. */
 object AgentVaultReducer {
     /** A new agent: its predecessor's secrets, reveals and drafts are dropped at once. */
     fun withAgent(state: AgentVaultState, agentId: String?): AgentVaultState =

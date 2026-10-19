@@ -49,7 +49,7 @@ data class SubagentTodoSheetTarget(
     val toolCallId: String,
     val description: String,
     /**
-     * letta-mobile-vo9y1: the correlated subagent agent id (`agent-local-*`)
+     * The correlated subagent agent id (`agent-local-*`)
      * for the "view conversation" affordance in the sheet. Null when the shim
      * has not yet correlated the dispatch to a concrete run — the affordance
      * is then hidden ([canViewConversation] is false).
@@ -77,7 +77,7 @@ val LocalSubagentTodoSheetOpener = staticCompositionLocalOf<(SubagentTodoSheetTa
 }
 
 /**
- * letta-mobile-73o2h.3: pure, UI-agnostic state model for the tap-to-todolist
+ * Pure, UI-agnostic state model for the tap-to-todolist
  * sheet. Kept free of Compose types so the load -> map -> render pipeline (and
  * the progress meter math) is unit-testable without a Compose harness.
  */
@@ -174,7 +174,7 @@ fun interface SubagentTodoLoader {
 }
 
 /**
- * letta-mobile-ckmub.3.19: an open [target]'s sheet, the same on every client: it loads the
+ * An open [target]'s sheet, the same on every client: it loads the
  * target's todos once through [loader] (Loading until they arrive) and draws [SubagentTodoSheet].
  */
 @Composable
@@ -199,7 +199,7 @@ fun SubagentTodoSheetHost(
 }
 
 /**
- * letta-mobile-73o2h.3: the tap-to-todolist sheet. Opens when a ring is tapped. Renders the tapped
+ * The tap-to-todolist sheet. Opens when a ring is tapped. Renders the tapped
  * subagent's [description] as the header plus its TodoWrite checklist (per-item status icon) and a
  * "N/M done" progress meter, with explicit loading / error / empty states.
  *
@@ -290,7 +290,7 @@ private val SheetListMaxHeight = LettaDimens.Pane.editorMinHeight * 2
 private const val STATE_FADE_MS = 200
 
 /**
- * letta-mobile-vo9y1: header action that jumps from the todo sheet to the
+ * Header action that jumps from the todo sheet to the
  * subagent's full conversation/transcript. Uses the external-link glyph +
  * label so the affordance reads clearly as "leave this sheet, open that
  * agent's chat".

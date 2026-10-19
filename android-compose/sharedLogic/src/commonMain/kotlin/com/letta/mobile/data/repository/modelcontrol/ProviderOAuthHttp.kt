@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonObject
 
 /**
  * The few HTTPS calls a subscription sign-in makes to the provider's own
- * authorization server (letta-mobile-zxk2n.3). The App Server takes only the
+ * authorization server. The App Server takes only the
  * finished tokens (`connect_provider.oauth_config`), so the app runs the
  * device-code or code exchange itself. Kept to one POST so the flows are
  * tested against a fake token endpoint; hosts supply a client without auth

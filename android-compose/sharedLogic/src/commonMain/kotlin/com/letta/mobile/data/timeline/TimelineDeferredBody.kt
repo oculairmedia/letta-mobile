@@ -20,7 +20,7 @@ data class TimelineDeferredBody(
  * A tool call keeps its text in one of three places depending on how it finished, and `content` is
  * not one of them: for a tool call that field holds `name(arguments)`, a serialization artifact the
  * normal projection blanks the moment it has structured tool calls to render. Paging it put escaped
- * argument JSON on screen where the tool's output belonged (letta-mobile-jp78k).
+ * argument JSON on screen where the tool's output belonged.
  *
  * So the field is discovered rather than assumed. Each attempt is one streaming pass that holds a
  * chunk at a time, and the winner's first page is carried back, so a card opens in at most four

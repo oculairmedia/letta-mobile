@@ -10,7 +10,7 @@ import com.letta.mobile.data.presence.RunEdges
 
 /**
  * The whole mapping from what the app knows about an agent to what its mascot does (letta-mobile-
- * te3n1.1): an [AgentPresence] becomes the director's [MascotSignals] (levels), and the growth of
+ *): an [AgentPresence] becomes the director's [MascotSignals] (levels), and the growth of
  * its run edge counts since the last presence becomes [MascotEvent]s (moments). Both platforms
  * reach the director through this and nothing else.
  *

@@ -3,7 +3,7 @@ package com.letta.mobile.data.subagents
 /**
  * Who is doing the work: a Letta subagent or an external coding agent (letta-code 0.34).
  *
- * letta-mobile-zxk2n.8: the ONE classifier every subagent surface asks - the roster rows and the
+ * the ONE classifier every subagent surface asks - the roster rows and the
  * timeline's dispatch and report rows - so an external agent's work is named the same way
  * everywhere and is never offered as a Letta conversation to open.
  */

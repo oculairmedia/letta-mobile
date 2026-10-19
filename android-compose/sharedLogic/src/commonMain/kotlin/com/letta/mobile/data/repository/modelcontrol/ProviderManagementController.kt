@@ -42,7 +42,7 @@ data class ProviderManagementState(
     val pendingDisconnect: ConnectableProvider? = null,
     /** A subscription provider whose terminal sign-in steps are showing (no in-app sign-in for it). */
     val signIn: ConnectableProvider? = null,
-    /** The in-app subscription sign-in (letta-mobile-zxk2n.3); Idle when none is open. */
+    /** The in-app subscription sign-in; Idle when none is open. */
     val oauth: ProviderSignInState = ProviderSignInState.Idle,
     /** True when this client can run subscription sign-ins itself; otherwise they take the terminal steps. */
     val inAppSignIn: Boolean = false,
@@ -84,11 +84,11 @@ data class ProviderManagementState(
 }
 
 /**
- * Presenter of the Providers & Models pane (letta-mobile-w4q4p.6): one state
+ * Presenter of the Providers & Models pane: one state
  * composed from the provider and catalog repositories. Hosts own [scope]
  * (Android: viewModelScope; desktop: a composition scope).
  *
- * With [oauthHttp] (letta-mobile-zxk2n.3) subscription rows the app knows
+ * With [oauthHttp]  subscription rows the app knows
  * sign in from the app; without it, or for rows it does not know, they show
  * the host-terminal steps.
  */

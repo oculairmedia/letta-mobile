@@ -27,7 +27,7 @@ interface AppServerClient {
     val isConnected: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
 
     /**
-     * Discovered server capabilities from `app_server_info` (lgns8.24).
+     * Discovered server capabilities from `app_server_info`.
      *
      * Populated after a successful [appServerInfo] call. Null until discovery
      * completes. Callers should check this before using protocol features that
@@ -39,7 +39,7 @@ interface AppServerClient {
         AppServerInboundFrame.AuthResponse(requestId = command.requestId, success = true)
 
     /**
-     * Capability discovery request (lgns8.24).
+     * Capability discovery request.
      *
      * Sends `{ type: "app_server_info", request_id: "..." }` over the WebSocket
      * to discover server capabilities before using protocol features. Call this
@@ -68,8 +68,8 @@ interface AppServerClient {
         throw UnsupportedOperationException("change_device_state is not supported by this client")
 
     /**
-     * letta-code 0.34.8+: sends `turn_finished_ack` for a durably replayed terminal
-     * (letta-mobile-zxk2n.2). There is no response frame; repeating it is harmless.
+     * Letta-code 0.34.8+: sends `turn_finished_ack` for a durably replayed terminal
+     *. There is no response frame; repeating it is harmless.
      */
     suspend fun acknowledgeTurnFinished(command: AppServerCommand.TurnFinishedAck): Unit =
         throw UnsupportedOperationException("turn_finished_ack is not supported by this client")
@@ -80,11 +80,11 @@ interface AppServerClient {
 
     suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse
 
-    /** letta-mobile-qygvv.6: releases parked queue items. Requires `request_id` to correlate the response. */
+    /** Releases parked queue items. Requires `request_id` to correlate the response. */
     suspend fun resumeQueue(command: AppServerCommand.ResumeQueue): AppServerInboundFrame.ResumeQueueResponse =
         throw UnsupportedOperationException("resume_queue is not supported by this client")
 
-    /** letta-mobile-qygvv.6: removes one queued input by queue item id. */
+    /** Removes one queued input by queue item id. */
     suspend fun removeQueueItem(command: AppServerCommand.RemoveQueueItem): AppServerInboundFrame.RemoveQueueItemResponse =
         throw UnsupportedOperationException("remove_queue_item is not supported by this client")
 
@@ -120,11 +120,11 @@ interface AppServerClient {
     suspend fun conversationUpdate(command: AppServerCommand.ConversationUpdate): AppServerInboundFrame.ConversationUpdateResponse =
         throw UnsupportedOperationException("conversation_update is not supported by this client")
 
-    /** letta-mobile-bzvro.15: forks a conversation (optionally through one message). */
+    /** Forks a conversation (optionally through one message). */
     suspend fun conversationFork(command: AppServerConversationFork): AppServerConversationForkResponse =
         throw UnsupportedOperationException("conversation_fork is not supported by this client")
 
-    /** letta-mobile-zxk2n.5: recompiles the agent's system prompt for a conversation (`/recompile`). */
+    /** Recompiles the agent's system prompt for a conversation (`/recompile`). */
     suspend fun conversationRecompile(command: AppServerConversationRecompile): AppServerConversationRecompileResponse =
         throw UnsupportedOperationException("conversation_recompile is not supported by this client")
 
@@ -163,11 +163,11 @@ interface AppServerClient {
     suspend fun skillDisable(command: AppServerCommand.SkillDisable): AppServerInboundFrame.SkillDisableResponse =
         throw UnsupportedOperationException("skill_disable is not supported by this client")
 
-    /** lgns8.9: native owner of agent memory-block writes (`block.update_agent`). */
+    /** Native owner of agent memory-block writes (`block.update_agent`). */
     suspend fun writeMemoryFile(command: AppServerCommand.WriteMemoryFile): AppServerInboundFrame.WriteMemoryFileResponse =
         throw UnsupportedOperationException("WriteMemoryFile is not supported by this client")
 
-    /** bfooy.5: native owner of agent memory-block deletes (`block.delete_agent`). */
+    /** Native owner of agent memory-block deletes (`block.delete_agent`). */
     suspend fun deleteMemoryFile(command: AppServerCommand.DeleteMemoryFile): AppServerInboundFrame.DeleteMemoryFileResponse =
         throw UnsupportedOperationException("DeleteMemoryFile is not supported by this client")
 
@@ -221,7 +221,7 @@ interface AppServerClient {
         throw UnsupportedOperationException("GetCwdMap is not supported by this client")
 
     /**
-     * letta-mobile-bzvro.24–.26: sends an agent-workspace command (MemFS, secrets, device files)
+     * Sends an agent-workspace command (MemFS, secrets, device files)
      * and returns the raw envelopes of the frames that answer it: one frame, or every page up to
      * `done: true` for an [AppServerWorkspaceCommand.isStreamed] command.
      */
@@ -266,7 +266,7 @@ class DefaultAppServerClient(
     override val isConnected: Flow<Boolean> = transport.isConnected
 
     /**
-     * Discovered server capabilities from `app_server_info` (lgns8.24).
+     * Discovered server capabilities from `app_server_info`.
      *
      * Updated automatically after a successful [appServerInfo] call. Null until
      * discovery completes.

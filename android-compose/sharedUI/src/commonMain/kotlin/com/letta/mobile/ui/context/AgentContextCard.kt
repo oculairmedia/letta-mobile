@@ -32,7 +32,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 
-/** letta-mobile-3io8k: test tags of the drawer context card and its sheet. */
+/** Test tags of the drawer context card and its sheet. */
 object AgentContextTags {
     const val CARD = "agent-context-card"
     const val CARD_MODEL = "agent-context-card-model"
@@ -40,7 +40,7 @@ object AgentContextTags {
     const val SHEET = "agent-context-sheet"
     const val SCOPE = "agent-context-scope"
 
-    /** The sheet's "Model" row that opens the model list as a second level (letta-mobile-pt1ze.5). */
+    /** The sheet's "Model" row that opens the model list as a second level. */
     const val MODEL_ROW = "agent-context-model-row"
     const val PROVENANCE = "agent-context-provenance"
     const val TOTAL = "agent-context-total"
@@ -51,7 +51,7 @@ object AgentContextTags {
 }
 
 /**
- * letta-mobile-3io8k: the one compact card under the agent's name in the drawer: the model and its
+ * The one compact card under the agent's name in the drawer: the model and its
  * reasoning effort with a chevron, a slim context bar, and "42% of 200k used". Tapping opens the
  * model-and-context sheet (a bottom sheet on a phone, a popover beside the desktop sidebar).
  */

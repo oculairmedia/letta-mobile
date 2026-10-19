@@ -17,7 +17,7 @@ object ConversationAdminHandlers {
     /**
      * Newest-window page size for single-message projection.
      *
-     * letta-mobile-leebr: walkMessagePages asks the real App Server for this
+     * walkMessagePages asks the real App Server for this
      * many RAW, unprojected messages per page over the wrapper's own WS link
      * to it (AppServerWebSocketLimits.MAX_FRAME_BYTES = 16 MiB, no chunking).
      * message.list's size guards (MessageListPageGuard, MessageListWireProjection)
@@ -141,7 +141,7 @@ object ConversationAdminHandlers {
     }
 
     /**
-     * P3.4 (gn7kr.23): restricts a conversation-list result to the peer's authorized
+     * Restricts a conversation-list result to the peer's authorized
      * conversation scope.
      */
     private fun scopeConversationList(result: JsonElement, context: AdminRpcRequestContext): JsonElement {

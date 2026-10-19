@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * How a tool's answer is printed (letta-mobile-jna0o.3). A success is the tool's result string,
+ * How a tool's answer is printed. A success is the tool's result string,
  * byte for byte, exactly what the native tool call returns. A refusal is a structured error: the
  * tool's own JSON refusal (canvas_compose's `{code, problems, hint}`) under `detail`, any other
  * message under `message`; a refusal that is about who is calling exits [MeridianExit.DENIED].

@@ -3,7 +3,7 @@ package com.letta.mobile.data.repository.api
 import com.letta.mobile.data.model.AppMessage
 
 /**
- * letta-mobile-f0ixs: one page of backfilled history plus an explicit "is there more" answer.
+ * One page of backfilled history plus an explicit "is there more" answer.
  *
  * Exists because page SIZE is not a reliable end-of-history signal. MessageListPageGuard trims
  * an oversized window to fit its byte budget, so a full-history page can arrive shorter than the

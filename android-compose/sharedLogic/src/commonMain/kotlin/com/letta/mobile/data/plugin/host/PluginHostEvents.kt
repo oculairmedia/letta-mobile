@@ -66,7 +66,7 @@ enum class PluginHostEvent(val wire: String, val level: Telemetry.Level = Teleme
 }
 
 /**
- * The plugin host's telemetry (letta-mobile-cdgpr.6, completed by letta-mobile-cdgpr.10): one typed
+ * The plugin host's telemetry : one typed
  * [PluginHostEvent] per call, always with the plugin id (`*` for host-wide events). Callers pass
  * values already scrubbed of secrets; nothing here sees a secret.
  */

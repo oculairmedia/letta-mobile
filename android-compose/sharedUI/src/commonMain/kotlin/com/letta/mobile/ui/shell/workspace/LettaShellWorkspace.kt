@@ -57,8 +57,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.flow.drop
 
 /**
- * letta-mobile-ckmub.17.4: the one shell workspace the desktop window and the browser both mount
- * (moved out of :desktop). The header (tab strip and "+", search, now-active identity), the agent
+ * Shared shell workspace mounted by the desktop window and browser.
+ * The header (tab strip and "+", search, now-active identity), the agent
  * rail, the agent panel (mascot hero, model card, sections, chats, canvases), the page, and the
  * overlays over them, in one overlay root with one inspector frame and one mascot layer.
  *
@@ -255,7 +255,7 @@ fun ShellCollapsibleSidebar(
 }
 
 /**
- * One rule for where the focused agent's mascot stands (wbin4.4): the agent pane's hero seat while
+ * One rule for where the focused agent's mascot stands: the agent pane's hero seat while
  * the pane shows, else rest. The previous agent is let go when focus moves.
  */
 @Composable

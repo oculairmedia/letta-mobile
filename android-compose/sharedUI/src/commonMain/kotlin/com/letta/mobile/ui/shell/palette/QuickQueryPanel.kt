@@ -60,7 +60,7 @@ class QuickQueryActions(
 )
 
 /**
- * letta-mobile-ckmub.3.6: the Spotlight-style quick-query bar's body: the palette's [LettaPickerContent]
+ * The Spotlight-style quick-query bar's body: the palette's [LettaPickerContent]
  * over the unified search (recent agents first, then the matches), the ambient-context chip under the search, and a key
  * hint. Enter opens the highlighted result or, with none, asks the current agent; Ctrl+Enter always
  * asks. [ambientContext] is already sanitized by the platform that captured it. The always-on-top

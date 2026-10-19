@@ -8,11 +8,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * letta-mobile-bglj6.1: the one seam between a conversation owner and the shared chat page.
+ * The one seam between a conversation owner and the shared chat page.
  *
- * Each platform's existing owner implements it: Android's `AdminChatViewModel` and
- * desktop's `DesktopChatController`. A later phase replaces both with one commonMain
- * presenter that implements the same port, so the page does not change when that lands.
+ * [TimelineChatSessionPort] binds the shared timeline and composer to this contract.
+ * Hosts supply the conversation and platform bindings; shared page presentations
+ * consume the same state and actions.
  *
  * The docked (canvas), full-screen and floating presentations all bind to the SAME port
  * instance, which is what makes the draft, the queued follow-ups and the run shared across
@@ -25,6 +25,7 @@ interface ChatSessionPort {
     /** The composer draft and its chrome. Separate so keystrokes don't recompose the timeline. */
     val composer: StateFlow<ChatComposerUiState>
 
+    /** User-intent handlers for this conversation, including composer, timeline and run controls. */
     val actions: ChatActions
 
     /**
@@ -35,7 +36,7 @@ interface ChatSessionPort {
         get() = DefaultCapabilities
 
     /**
-     * letta-mobile-bzvro.7/.8: the visible conversation's live status (loop phase, retry, server
+     * The visible conversation's live status (loop phase, retry, server
      * notices, server-side commands). Separate from [uiState] so its ticks never recompose the
      * timeline. An owner that cannot observe it leaves the default, and the status line stays hidden.
      */
@@ -43,7 +44,7 @@ interface ChatSessionPort {
         get() = DefaultLiveStatus
 
     /**
-     * letta-mobile-zxk2n.5 (G92): where the last `/recompile` stands; the page shows it as a
+     *  (G92): where the last `/recompile` stands; the page shows it as a
      * snackbar (queued until the answer, then the answer). An owner without `/recompile` leaves it idle.
      */
     val recompileStatus: StateFlow<RecompileStatus>

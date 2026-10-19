@@ -5,7 +5,7 @@ package com.letta.mobile.data.timeline
  * and the event those bytes decode to. A row with no body is a fresh write under [identity].
  *
  * [vacated] marks a row whose body belonged to a different part of the same source message
- * (letta-mobile-iyj4s). The incoming event replaces that body rather than folding into it, and the
+ *. The incoming event replaces that body rather than folding into it, and the
  * terminal ownership evidence recorded for the misfiled reply no longer describes the row.
  * [renamed] marks an event whose alias was refused, so it drops the shared otid that named the
  * other part.

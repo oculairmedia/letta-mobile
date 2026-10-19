@@ -1,7 +1,7 @@
 package com.letta.mobile.data.pairing
 
 /**
- * The scannable pairing link (letta-mobile-dpv7m): one URI that a phone camera
+ * The scannable pairing link: one URI that a phone camera
  * can hand to the app and that the in-app scanner also accepts.
  *
  * ```

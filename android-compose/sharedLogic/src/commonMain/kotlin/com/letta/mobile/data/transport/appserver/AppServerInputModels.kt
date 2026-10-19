@@ -144,7 +144,7 @@ data class AppServerCreatedRuntimeEntities(
 /**
  * `update_loop_status.loop_status`. [clientMessageIdsByRunId] and [executingToolCallIds]
  * arrived in App Server 0.32.17; both default to empty so older servers still decode
- * (letta-mobile-qygvv.8).
+ *.
  */
 @Serializable
 data class AppServerLoopStatus(

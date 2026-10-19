@@ -257,7 +257,7 @@ class TimelineExactCanonicalWriter(
      * The row [incoming] merges onto. An alias that lands on the other prose part of the same
      * source message is refused and the event takes its own server id instead; a row already
      * under that id that still holds the other part is vacated, so the event replaces the
-     * misfiled body instead of merging into it (letta-mobile-iyj4s).
+     * misfiled body instead of merging into it.
      */
     private suspend fun residentRow(
         transaction: TimelineStoreTransaction,

@@ -20,7 +20,7 @@ internal data class ApprovalSubmitParams(
     val approve: Boolean,
     val reason: String?,
     val conversationId: String? = null,
-    /** letta-mobile-bzvro.40: always-allow rule ids; only an Iroh host can apply them. */
+    /** Always-allow rule ids; only an Iroh host can apply them. */
     val selectedSuggestionIds: List<String> = emptyList(),
 )
 

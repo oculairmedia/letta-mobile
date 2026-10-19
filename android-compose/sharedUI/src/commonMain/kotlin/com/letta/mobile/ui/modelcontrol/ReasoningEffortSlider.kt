@@ -11,7 +11,7 @@ object ReasoningEffortSliderTags {
 }
 
 /**
- * letta-mobile-3io8k: one discrete reasoning-effort slider for a model, replacing a row of effort
+ * One discrete reasoning-effort slider for a model, replacing a row of effort
  * chips under every model: a [StepSlider] over the model's effort stops, applied on release.
  */
 @Composable

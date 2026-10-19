@@ -10,7 +10,7 @@ data class MemfsHistoryScope(val agentId: String, val path: String?)
 data class MemfsCommitRef(val agentId: String, val sha: String)
 
 /**
- * Pure transitions of [MemfsPageState] (letta-mobile-bzvro.24). The controller performs the I/O
+ * Pure transitions of [MemfsPageState]. The controller performs the I/O
  * and feeds results back through these; every result names the agent and file, scope or commit it
  * was for, and a result for anything no longer on screen leaves the state untouched.
  */

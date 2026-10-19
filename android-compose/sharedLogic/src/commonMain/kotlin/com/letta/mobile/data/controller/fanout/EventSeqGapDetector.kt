@@ -5,7 +5,7 @@ import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
 /**
- * letta-mobile-bzvro.6 (F06): notices when an App Server frame went missing.
+ *  (F06): notices when an App Server frame went missing.
  *
  * letta-code stamps every runtime-scoped server event (`stream_delta`, `update_loop_status`,
  * `update_queue`, `update_device_status`, `update_subagent_state`, `turn_finished`) with an
@@ -20,7 +20,7 @@ import kotlinx.atomicfu.locks.synchronized
  *
  * Only meaningful on a transport that delivers every frame of the connection. A relay that filters
  * frames per viewer shows legitimate holes unless it re-stamps the sequence per viewer. The Iroh host
- * does (one counter per viewer connection, drawn under its stream write lock, letta-mobile-by4vm.50)
+ * does (one counter per viewer connection, drawn under its stream write lock)
  * and says so with [StreamIntegrityMonitor.EVENT_SEQ_ORDERED_CAPABILITY]; clients enable detection on
  * direct sockets and on Iroh.
  */

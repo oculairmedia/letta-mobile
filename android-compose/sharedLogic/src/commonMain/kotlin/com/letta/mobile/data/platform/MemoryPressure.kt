@@ -15,7 +15,7 @@ enum class MemoryPressureLevel {
 }
 
 /**
- * letta-mobile-k5nbq.2: one signal, many owners. Hosts only [emit]; every cache that can shrink
+ * One signal, many owners. Hosts only [emit]; every cache that can shrink
  * collects [levels] on the thread that owns it, so a host thread never reaches into UI-thread state.
  */
 class MemoryPressureHub {

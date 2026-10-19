@@ -4,7 +4,7 @@ import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * letta-mobile-by4vm.98.1: a chat host's model extension point, read by a session port for the
+ * A chat host's model extension point, read by a session port for the
  * composer's model chip and the `modelSwitch` capability. [model] is null where the host cannot
  * show or switch the conversation's model (no chip).
  */

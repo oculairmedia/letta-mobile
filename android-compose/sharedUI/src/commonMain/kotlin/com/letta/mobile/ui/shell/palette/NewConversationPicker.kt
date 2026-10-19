@@ -106,7 +106,7 @@ private fun NewConversationAgent.toItem(prefix: String): PickerItem<NewConversat
     PickerItem(key = "$prefix-$id", value = this, title = name, subtitle = subtitle)
 
 /**
- * letta-mobile-ckmub.3.8 (S8b): "New conversation", a contacts-style directory on the shared
+ *  (S8b): "New conversation", a contacts-style directory on the shared
  * [LettaPicker]: create-agent (and new-canvas) actions pinned under the search, Recent, then every
  * agent under letter headers, each with its live orb. Enter opens the best match; picking an agent
  * opens (or starts) its latest conversation through the caller.

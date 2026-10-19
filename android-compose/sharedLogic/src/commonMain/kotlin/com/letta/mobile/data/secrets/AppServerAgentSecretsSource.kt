@@ -14,7 +14,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * [AgentSecretsSource] over an App Server connection (letta-mobile-bzvro.25): `secret_list` and
+ * [AgentSecretsSource] over an App Server connection: `secret_list` and
  * `secret_apply`. Nothing here logs; a response that cannot be decoded fails WITHOUT its cause,
  * because a JSON decoding error quotes the input, and the input holds the values.
  */
@@ -84,10 +84,10 @@ private data class SecretApplyResponse(
 /**
  * Blanks secret values out of a `secret_list_response` or `secret_apply` frame, for anything that
  * records or exports wire frames (a frame inspector, a diagnostics bundle, an Iroh trace). Over an
- * Iroh host the same values ride the workspace relay (letta-mobile-bzvro.37): a `secret.apply`
+ * Iroh host the same values ride the workspace relay: a `secret.apply`
  * admin_rpc carries them in `params.set`, and an `admin_rpc_response` carries the relayed
  * `secret_list_response` in `result.frames`; both are blanked too. A provider connect
- * (letta-mobile-zxk2n.3) carries an API key in `fields` or a subscription sign-in's tokens in
+ *  carries an API key in `fields` or a subscription sign-in's tokens in
  * `oauth_config`, as `connect_provider` or as a relayed `provider.connect` admin_rpc; those are
  * blanked as well. Other frames pass through untouched.
  */

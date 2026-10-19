@@ -53,7 +53,7 @@ internal const val THINKING_KEY = "__thinking__"
 internal const val LOADING_OLDER_KEY = "__loading_older__"
 
 /**
- * letta-mobile-bglj6.1: the timeline over `ChatUiState.messages`, for owners without a canonical
+ * The timeline over `ChatUiState.messages`, for owners without a canonical
  * paged timeline. Lifted from desktop's MessageList (tool folding, day dividers, follow-latest)
  * and Android's ChatMessageList (reversed layout, older-history window, render-item cache).
  */

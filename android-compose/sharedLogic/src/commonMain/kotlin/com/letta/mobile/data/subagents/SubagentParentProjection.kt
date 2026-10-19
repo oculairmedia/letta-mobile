@@ -220,12 +220,12 @@ object SubagentParentProjection {
         if (this is JsonPrimitive && isString) content else toString()
 
     /**
-     * letta-mobile-fkpd4: FAIL-SOFT wire read.
+     * FAIL-SOFT wire read.
      *
      * `.jsonPrimitive` THROWS on a JsonArray/JsonObject, and this accessor runs
      * over RAW App Server frames where several of these keys are legitimately
      * non-scalar — `content` carries Letta content blocks (an array), and a
-     * non-scalar `status` was observed in the m6oa1.6 capture. The throw
+     * non-scalar `status` was observed in the capture. The throw
      * escaped into [com.letta.mobile.data.runtime.AppServerTurnEngine]'s turn
      * collect loop, which settles the whole parent turn as "Tool execution
      * interrupted by stream error" — so a child that SUCCEEDED surfaced as a

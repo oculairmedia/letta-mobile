@@ -71,7 +71,7 @@ data class SwarmStatus(
 }
 
 /**
- * letta-mobile-jvctq: talks to the agent swarm as a paired device, over the shared App Server
+ * Talks to the agent swarm as a paired device, over the shared App Server
  * client and turn stack. [send] reports staged receipts (CONNECTED, ACCEPTED, PERSISTED,
  * PROCESSED) as a flow; the outbox makes it durable and idempotent: an entry is persisted before
  * anything is dialled, re-sent only while its input never left, and otherwise resumed from the

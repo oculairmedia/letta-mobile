@@ -38,7 +38,7 @@ import com.letta.mobile.ui.a11y.accessibilityTraversal
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * letta-mobile-bglj6.1: the shared chat timeline: status/empty/welcome states, the message
+ * The shared chat timeline: status/empty/welcome states, the message
  * list (paged when [pagedTimeline] is non-null, else `state.messages`), and every row.
  *
  * Owns the page-level overlays the rows ask for: the image viewer, the A2UI surface stack, the

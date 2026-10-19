@@ -13,7 +13,7 @@ overviews describe responsibilities, not deployment health or remote-server capa
 
 # Package com.letta.mobile.appserver
 
-Shared smoke-run support for driving real App Server turns, including concurrent conversations and image inputs. Command-line hosts supply a Ktor engine and identity factory; these diagnostic helpers exercise the client stack without providing a platform UI or installing a server. Keep installation and platform UI outside these diagnostics; hosts configure runs through `AppServerSmokeSpec` and [AppServerServeSpec](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.appserver/-app-server-serve-spec/index.html).
+Host App Server command specifications and argument validation shared by the command-line entry points. Keep process launching in host bindings; construct validated arguments with `buildAppServerServeCommand` and configure them through [AppServerServeSpec](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.appserver/-app-server-serve-spec/index.html). Smoke-run scenarios live in the separate `:appserver-testkit` module.
 
 # Package com.letta.mobile.data.a2ui
 

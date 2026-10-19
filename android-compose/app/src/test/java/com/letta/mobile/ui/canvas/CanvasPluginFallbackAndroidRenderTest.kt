@@ -16,7 +16,6 @@ import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
 import com.letta.mobile.data.storage.InMemoryAssetStore
 import com.letta.mobile.ui.canvas.plugin.CanvasPluginLayer
-import com.letta.mobile.ui.canvas.plugin.CanvasPluginTestTags
 import com.letta.mobile.ui.canvas.plugin.rememberPluginBoard
 import com.letta.mobile.ui.test.setLettaTestContent
 import java.io.File
@@ -102,7 +101,7 @@ class CanvasPluginFallbackAndroidRenderTest {
 
         elements.forEach { element ->
             composeRule.onNodeWithText(element.fallback.title).assertExists()
-            val card = composeRule.onNodeWithTag(CanvasPluginTestTags.card(element.id)).fetchSemanticsNode()
+            val card = composeRule.onNodeWithTag("canvas-plugin-card:${element.id}").fetchSemanticsNode()
             val frame = checkNotNull(element.frame)
             assertEquals("${element.id} card width", frame.width, card.size.width.toFloat(), 0.5f)
             assertEquals("${element.id} card height", frame.height, card.size.height.toFloat(), 0.5f)

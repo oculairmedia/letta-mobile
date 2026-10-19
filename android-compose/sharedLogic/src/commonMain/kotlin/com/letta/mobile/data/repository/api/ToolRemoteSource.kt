@@ -10,7 +10,7 @@ import com.letta.mobile.data.model.ToolSchemaGenerateParams
 import com.letta.mobile.data.model.ToolUpdateParams
 
 /**
- * Tool library operations a non-App-Server backend would serve. letta-mobile-ckmub.4: this is
+ * Tool library operations a non-App-Server backend would serve. this is
  * the seam for one; there is no production implementation since the Letta REST backend was
  * removed, so [com.letta.mobile.data.repository.ToolRepository] binds no route and serves tools
  * over an Iroh host's `admin_rpc` relay.

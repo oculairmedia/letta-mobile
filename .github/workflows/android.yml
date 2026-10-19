@@ -187,6 +187,9 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/tests -p test_api_package_coverage.py -v
           python3 scripts/ci/check-api-package-coverage.py
+          python3 -m unittest discover -s scripts/tests -p test_kdoc_hygiene.py -v
+          python3 scripts/ci/check-kdoc-hygiene.py
+          python3 -m unittest discover -s scripts/tests -p test_changed_kotlin_code.py -v
 
       - name: Enforce stateful mock isolation
         working-directory: ${{ github.workspace }}
@@ -620,6 +623,8 @@ jobs:
           node --test android-compose/web/service-worker.test.cjs
           python3 -m unittest discover -s scripts/tests -p test_api_doc_links.py -v
           python3 scripts/ci/check-api-package-coverage.py
+          python3 -m unittest discover -s scripts/tests -p test_kdoc_hygiene.py -v
+          python3 scripts/ci/check-kdoc-hygiene.py
           python3 -m unittest discover -s scripts/tests -p test_api_doc_undocumented.py -v
           python3 -m unittest discover -s scripts/tests -p test_api_doc_progress.py -v
       - name: Generate shared API reference

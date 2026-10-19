@@ -11,7 +11,7 @@ data class SubagentParentScope(
 )
 
 /**
- * letta-mobile-73o2h.3: single source of truth for the active-subagent
+ * Single source of truth for the active-subagent
  * registry carried over the shim's mobile WS (MOBILE_WS_PROTOCOL.md §13).
  *
  * The wire registry is per-socket, but consumers must project it through an

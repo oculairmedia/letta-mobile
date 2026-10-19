@@ -347,7 +347,7 @@ internal fun A2uiComponent.action(surface: A2uiSurfaceState, renderScope: A2uiRe
     )
 }
 
-/** The link an `openUrl` call asks for, or null when absent or not http/https/mailto (letta-mobile-by4vm.3). */
+/** The link an `openUrl` call asks for, or null when absent or not http/https/mailto. */
 internal fun A2uiComponent.localOpenUrl(surface: A2uiSurfaceState, renderScope: A2uiRenderScope): A2uiLink? {
     val action = (raw["action"] ?: raw["onClick"]) as? JsonObject ?: return null
     val functionCall = (action["functionCall"] as? JsonObject)

@@ -57,7 +57,7 @@ import kotlinx.collections.immutable.toImmutableList
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-bglj6.1: one stand-alone message, drawn as the Android timeline draws it
+ * One stand-alone message, drawn as the Android timeline draws it
  * (feature-chat ChatMessageItem / MessageBubbleSurface): the user's prompt as a bubble, plain
  * assistant prose bubble-less on the page, reasoning as a one-line "Thought" disclosure, tool
  * calls as one summary line, and structured content (generated UI, approvals) as cards.
@@ -167,7 +167,7 @@ private fun AssistantPrimaryContent(
 }
 
 /**
- * letta-mobile-bglj6.1.23: the legacy bubble's role label (MessageBubbleSurface) on a structured
+ * The legacy bubble's role label (MessageBubbleSurface) on a structured
  * row: generated UI, approvals, a subagent's report, images, a tool's own output. Plain prose and
  * a bare tool-call line stay unlabelled (bubble-less), errors label themselves, and only the
  * first row of a speaker's group carries it.
@@ -185,7 +185,7 @@ internal fun showsSpeakerHeader(message: UiMessage, position: GroupPosition): Bo
 /**
  * What turns an assistant message into a bubbled card in the legacy timeline (not
  * shouldRenderBubbleLess). An approval counts only while it waits on the person: a runtime-resolved
- * one draws no card (letta-mobile-bglj6.1.25), so it must not label the row either.
+ * one draws no card, so it must not label the row either.
  */
 private fun UiMessage.hasStructuredContent(): Boolean {
     val cards = listOf(generatedUi, approvalResponse, subagentNotification)
@@ -267,7 +267,7 @@ internal data class AgentTextParams(
     val isStreaming: Boolean = false,
     /** Set on the conversation's newest settled reply: its delivery time reads under the text. */
     val deliveryTimestamp: String? = null,
-    /** letta-mobile-7mys7: "Fork from here", shown beside Copy on hover; null hides it. */
+    /** "Fork from here", shown beside Copy on hover; null hides it. */
     val onFork: (() -> Unit)? = null,
 )
 

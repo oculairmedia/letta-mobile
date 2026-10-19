@@ -2,7 +2,7 @@ package com.letta.mobile.data.meridian
 
 /**
  * What can be wrong with the argv words or stdin of a command, before any tool runs
- * (letta-mobile-jna0o.3). Each problem knows its code, its message and, when the input is at
+ *. Each problem knows its code, its message and, when the input is at
  * fault, the JSON pointer of the property it is about.
  */
 internal sealed interface MeridianInputProblem {

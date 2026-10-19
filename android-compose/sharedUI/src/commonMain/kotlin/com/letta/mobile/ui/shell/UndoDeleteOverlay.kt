@@ -6,7 +6,7 @@ import com.letta.mobile.ui.host.Overlay
 import com.letta.mobile.ui.host.OverlayWhile
 
 /**
- * letta-mobile-bzvro.31 / ckmub.3.15 (hard cut S13): the undo offer after a delete that did not
+ *  (hard cut S13): the undo offer after a delete that did not
  * destroy the chat, through the window's [com.letta.mobile.ui.host.OverlayHost]. [offerKey] names the
  * delete just made (null shows nothing; a newer offer replaces the older one's bar). Undo calls
  * [onUndo]; a timeout or the dismiss control calls [onCommit] and the deletion stands. Replaces

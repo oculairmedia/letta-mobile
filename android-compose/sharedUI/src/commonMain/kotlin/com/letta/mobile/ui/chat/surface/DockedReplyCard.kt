@@ -42,7 +42,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-bglj6.1: the conversation inside the docked panel, so a prompt sent from the
+ * The conversation inside the docked panel, so a prompt sent from the
  * canvas gets its reply on the canvas. Newest at the bottom, drawn with the same row renderers
  * as the full page: the current turn (approvals and tool cards included) when the panel is
  * short, and as much earlier history as fits when it is taller. It follows a streaming reply

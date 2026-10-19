@@ -79,7 +79,7 @@ data class HeaderControls(
 )
 
 /**
- * The one shell header (hard cut P3, letta-mobile-ckmub.3.5): the leading nav affordance, the
+ * The one shell header: the leading nav affordance, the
  * [title], the page's ONE [search] and the trailing actions ([controls]), on every platform. Desktop
  * draws it inside its window title bar (the free width between title and search stays the native drag
  * region); Android draws it in [com.letta.mobile.ui.shell.scaffold.LettaPageScaffold]'s header slot,

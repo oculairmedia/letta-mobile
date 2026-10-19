@@ -12,7 +12,7 @@ import kotlinx.serialization.json.intOrNull
 
 /**
  * A manifest's element kinds and pages (plan sections 3.1 and 4): props schemas that are closed
- * objects of scalars, short strings and bounded arrays of those (letta-mobile-cdgpr.12) within
+ * objects of scalars, short strings and bounded arrays of those within
  * 4 KiB, migrations from earlier versions only, pages that exist and live under `pages/`, CSP
  * domains that are origins, page permissions the plugin declares.
  */

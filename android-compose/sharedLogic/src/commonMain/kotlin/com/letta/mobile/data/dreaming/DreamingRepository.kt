@@ -5,7 +5,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 
 /**
- * letta-mobile-iczm7: whose dreaming a request is about. letta-code keys the settings by agent but
+ * Whose dreaming a request is about. letta-code keys the settings by agent but
  * reads them through a conversation's runtime (its working directory picks the project file), and
  * runs a dream over one conversation's transcript; null is the agent's `default` conversation.
  */
@@ -42,7 +42,7 @@ sealed interface DreamOutcome<out T> {
 }
 
 /**
- * letta-mobile-iczm7: the dreaming operations, whichever way the session reaches letta-code — the
+ * The dreaming operations, whichever way the session reaches letta-code — the
  * Iroh host's `reflection.*` ([AdminRpcDreamingRepository]) or a direct App Server client
  * ([AppServerDreamingRepository]). Both end in letta-code's own `get/set_reflection_settings` and
  * `/dream`.

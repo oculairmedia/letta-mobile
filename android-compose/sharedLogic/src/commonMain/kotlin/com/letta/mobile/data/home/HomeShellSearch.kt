@@ -19,7 +19,7 @@ data class HomeShellSearchState(
 
 /**
  * A shell-level search field (desktop's header) that searches the Home view while Home is the
- * active page (letta-mobile-xuhmy). Home has its own field for hosts without a shell search; a host
+ * active page. Home has its own field for hosts without a shell search; a host
  * that has one hides the page's field and routes its query here instead, so there is one field.
  *
  * - On Home, every query change is the Home page's query, and closing the field keeps it: the

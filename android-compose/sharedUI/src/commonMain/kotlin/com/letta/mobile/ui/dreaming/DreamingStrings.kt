@@ -8,7 +8,7 @@ import com.letta.mobile.data.dreaming.DreamTrigger
 import com.letta.mobile.data.dreaming.DreamUnsupportedReason
 import com.letta.mobile.data.model.SubagentKind
 
-/** letta-mobile-iczm7: the Dreaming surface's text. Our own words over letta-code's behaviour. */
+/** The Dreaming surface's text. Our own words over letta-code's behaviour. */
 object DreamingStrings {
     const val TITLE = "Dreaming"
     const val INTRO = "After a turn, a background run reviews recent conversations " +

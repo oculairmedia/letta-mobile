@@ -44,7 +44,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * request_id correlation. The stream channel is receive-only and carries streaming
  * events (stream_delta, update_loop_status, etc.).
  *
- * letta-mobile-by4vm.48: this transport keeps the default, unordered-between-lanes
+ * this transport keeps the default, unordered-between-lanes
  * [AppServerTransport.inboundFrames]. That is safe because the Iroh node writes every frame that
  * carries `event_seq` (`stream_delta`, `update_loop_status`, `update_queue`, `turn_finished`) on
  * the stream QUIC stream, in `event_seq` order, and only request answers and `input_accepted`
@@ -108,7 +108,7 @@ class IrohAppServerTransport(
     @Volatile private var authCapabilities: Set<String> = emptySet()
 
     /**
-     * letta-mobile-by4vm.50: every capability the server advertised in its last successful
+     * Every capability the server advertised in its last successful
      * auth_response (recorded before that response reaches the caller of `auth`); empty before.
      */
     val serverCapabilities: Set<String> get() = authCapabilities
@@ -421,7 +421,7 @@ class IrohAppServerTransport(
     /**
      * Record the server's advertised capabilities from its auth_response ([serverCapabilities]).
      * Only a successful auth_response counts. Client writes always may use frame_part chunking for
-     * >1MiB frames: every current host decodes it (by4vm.111 dropped the negotiation).
+     * >1MiB frames: every current host decodes it ( dropped the negotiation).
      */
     private fun recordServerCapabilities(frame: AppServerReceivedFrame) {
         val auth = frame.frame as? AppServerInboundFrame.AuthResponse ?: return

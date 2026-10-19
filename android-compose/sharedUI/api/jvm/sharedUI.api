@@ -39,54 +39,6 @@ public final class com/letta/mobile/ui/a2ui/A2uiRendererStateKt {
 	public static final fun getLocalA2uiLocalState ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
-public final class com/letta/mobile/ui/a2ui/A2uiTestTags {
-	public static final field $stable I
-	public static final field ACCORDION Ljava/lang/String;
-	public static final field AUDIO_PLAYER Ljava/lang/String;
-	public static final field BADGE Ljava/lang/String;
-	public static final field BUTTON_PROGRESS Ljava/lang/String;
-	public static final field CHECKBOX Ljava/lang/String;
-	public static final field CHILDREN_TRUNCATED Ljava/lang/String;
-	public static final field CHIP Ljava/lang/String;
-	public static final field CHOICE_PICKER Ljava/lang/String;
-	public static final field CHOICE_PICKER_CHIP_OPTION Ljava/lang/String;
-	public static final field CHOICE_PICKER_LIST_OPTION Ljava/lang/String;
-	public static final field CIRCULAR_PROGRESS Ljava/lang/String;
-	public static final field DATE_TIME_INPUT Ljava/lang/String;
-	public static final field DIVIDER Ljava/lang/String;
-	public static final field DROPDOWN Ljava/lang/String;
-	public static final field FILTER_CHIP Ljava/lang/String;
-	public static final field ICON Ljava/lang/String;
-	public static final field INSTANCE Lcom/letta/mobile/ui/a2ui/A2uiTestTags;
-	public static final field LINEAR_PROGRESS Ljava/lang/String;
-	public static final field LINK_CONFIRM Ljava/lang/String;
-	public static final field LIST_VIEW Ljava/lang/String;
-	public static final field MEDIA_PLAY_PAUSE Ljava/lang/String;
-	public static final field MISSING_COMPONENT Ljava/lang/String;
-	public static final field MISSING_ICON Ljava/lang/String;
-	public static final field MISSING_IMAGE Ljava/lang/String;
-	public static final field MISSING_TEXT Ljava/lang/String;
-	public static final field MODAL Ljava/lang/String;
-	public static final field RADIO Ljava/lang/String;
-	public static final field RENDER_LIMIT Ljava/lang/String;
-	public static final field SCHEDULE_CARD Ljava/lang/String;
-	public static final field SCHEDULE_SELECTOR_INPUT Ljava/lang/String;
-	public static final field SLIDER Ljava/lang/String;
-	public static final field STEPPER Ljava/lang/String;
-	public static final field STEPPER_DECREMENT Ljava/lang/String;
-	public static final field STEPPER_INCREMENT Ljava/lang/String;
-	public static final field SURFACE_MISSING Ljava/lang/String;
-	public static final field SURFACE_PENDING Ljava/lang/String;
-	public static final field SURFACE_TOO_LARGE Ljava/lang/String;
-	public static final field SWITCH Ljava/lang/String;
-	public static final field TABS Ljava/lang/String;
-	public static final field TEXT_FIELD Ljava/lang/String;
-	public static final field TOOL_APPROVAL_CARD Ljava/lang/String;
-	public static final field TOOL_APPROVAL_COUNTDOWN Ljava/lang/String;
-	public static final field TOOL_APPROVAL_SENSITIVE_VALUE Ljava/lang/String;
-	public static final field VIDEO Ljava/lang/String;
-}
-
 public final class com/letta/mobile/ui/a2ui/ComposableSingletons$A2uiBasicWidgetsKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/a2ui/ComposableSingletons$A2uiBasicWidgetsKt;
 	public fun <init> ()V
@@ -759,21 +711,6 @@ public final class com/letta/mobile/ui/canvas/plugin/CanvasPluginLayerKt {
 	public static final fun rememberPluginBoard (Lcom/letta/mobile/data/canvas/CanvasSession;Lcom/letta/mobile/data/canvas/CanvasDocument;Lcom/letta/mobile/data/storage/AssetStore;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/canvas/plugin/PluginBoard;
 }
 
-public final class com/letta/mobile/ui/canvas/plugin/CanvasPluginTestTags {
-	public static final field $stable I
-	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/plugin/CanvasPluginTestTags;
-	public final fun badge (Ljava/lang/String;Lcom/letta/mobile/ui/canvas/plugin/PluginCardBadge;)Ljava/lang/String;
-	public final fun card (Ljava/lang/String;)Ljava/lang/String;
-	public final fun element (Ljava/lang/String;)Ljava/lang/String;
-	public final fun handle (Ljava/lang/String;)Ljava/lang/String;
-	public final fun live (Ljava/lang/String;)Ljava/lang/String;
-	public final fun open (Ljava/lang/String;)Ljava/lang/String;
-	public final fun placeholder (Ljava/lang/String;)Ljava/lang/String;
-	public final fun skeleton (Ljava/lang/String;)Ljava/lang/String;
-	public final fun snapshot (Ljava/lang/String;)Ljava/lang/String;
-	public final fun status (Ljava/lang/String;)Ljava/lang/String;
-}
-
 public final class com/letta/mobile/ui/canvas/plugin/ComposableSingletons$PluginElementRenderersKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/plugin/ComposableSingletons$PluginElementRenderersKt;
 	public fun <init> ()V
@@ -1065,13 +1002,6 @@ public final class com/letta/mobile/ui/chat/AgentIdentityPillKt {
 	public static final fun AgentPillSurface (Landroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 }
 
-public final class com/letta/mobile/ui/chat/AgentIdentityPillTestTags {
-	public static final field $stable I
-	public static final field INSTANCE Lcom/letta/mobile/ui/chat/AgentIdentityPillTestTags;
-	public static final field PILL Ljava/lang/String;
-	public static final field TRIGGER Ljava/lang/String;
-}
-
 public final class com/letta/mobile/ui/chat/AgentOrbKt {
 	public static final fun AgentActivityOrb-Kz89ssw (FLcom/letta/mobile/ui/chat/AgentActivity;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun AgentOrb-9QcgTRs (IFLandroidx/compose/ui/Modifier;FLkotlin/jvm/functions/Function0;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
@@ -1116,17 +1046,6 @@ public final class com/letta/mobile/ui/chat/QueuedSendsPanelKt {
 	public static final fun queuedOnServerLabel (Lcom/letta/mobile/data/chat/send/ServerQueueBlocker;)Ljava/lang/String;
 	public static final fun queuedSendLabel (I)Ljava/lang/String;
 	public static final fun queuedSendsHeader (Lcom/letta/mobile/data/chat/send/ConversationSendQueue;)Ljava/lang/String;
-}
-
-public final class com/letta/mobile/ui/chat/QueuedSendsPanelTestTags {
-	public static final field $stable I
-	public static final field CANCEL Ljava/lang/String;
-	public static final field INSTANCE Lcom/letta/mobile/ui/chat/QueuedSendsPanelTestTags;
-	public static final field ON_SERVER Ljava/lang/String;
-	public static final field PANEL Ljava/lang/String;
-	public static final field RESUME Ljava/lang/String;
-	public static final field ROW Ljava/lang/String;
-	public static final field SEND_NOW Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/chat/branch/ComposableSingletons$ForkNameDialogKt {
@@ -2061,45 +1980,6 @@ public final class com/letta/mobile/ui/chat/surface/composer/ComposerSnapshotCon
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/letta/mobile/ui/chat/surface/composer/ComposerTestTags {
-	public static final field $stable I
-	public static final field ATTACHMENTS Ljava/lang/String;
-	public static final field CARD Ljava/lang/String;
-	public static final field CHIP_CHEVRON Ljava/lang/String;
-	public static final field COMMAND_ROW Ljava/lang/String;
-	public static final field COMMAND_SUGGESTIONS Ljava/lang/String;
-	public static final field CONTEXT_CHIP Ljava/lang/String;
-	public static final field CONTEXT_POPOVER Ljava/lang/String;
-	public static final field CONTROLS Ljava/lang/String;
-	public static final field DOCKED_BAR Ljava/lang/String;
-	public static final field DOCKED_INPUT Ljava/lang/String;
-	public static final field EFFORT_CHIP Ljava/lang/String;
-	public static final field ERROR Ljava/lang/String;
-	public static final field EXPAND Ljava/lang/String;
-	public static final field HINT Ljava/lang/String;
-	public static final field HINT_FOOTER Ljava/lang/String;
-	public static final field INPUT Ljava/lang/String;
-	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/composer/ComposerTestTags;
-	public static final field MODEL_CHIP Ljava/lang/String;
-	public static final field MODEL_SHEET Ljava/lang/String;
-	public static final field PERMISSION_MODE_CHIP Ljava/lang/String;
-	public static final field PERMISSION_MODE_NOTE Ljava/lang/String;
-	public static final field PERMISSION_MODE_OPTION Ljava/lang/String;
-	public static final field PERMISSION_MODE_POPOVER Ljava/lang/String;
-	public static final field PERMISSION_MODE_RUNTIME Ljava/lang/String;
-	public static final field SEND Ljava/lang/String;
-	public static final field SHOW_CANVAS Ljava/lang/String;
-	public static final field STOP Ljava/lang/String;
-	public static final field TOUCH_BAR Ljava/lang/String;
-	public static final field TOUCH_COMPANION_STATUS Ljava/lang/String;
-	public static final field TOUCH_PLUS Ljava/lang/String;
-	public static final field TOUCH_RESTORE Ljava/lang/String;
-	public static final field TOUCH_SHEET Ljava/lang/String;
-	public static final field TOUCH_SHEET_ROW Ljava/lang/String;
-	public static final field TOUCH_VOICE Ljava/lang/String;
-	public static final field WORKING_DIRECTORY Ljava/lang/String;
-}
-
 public final class com/letta/mobile/ui/chat/surface/composer/ComposerWorktreeTags {
 	public static final field $stable I
 	public static final field BADGE Ljava/lang/String;
@@ -2174,12 +2054,6 @@ public final class com/letta/mobile/ui/chat/surface/sendflight/SendFlightStateKt
 	public static final fun getLocalSendFlight ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
-public final class com/letta/mobile/ui/chat/surface/sendflight/SendFlightTestTags {
-	public static final field $stable I
-	public static final field GHOST Ljava/lang/String;
-	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/sendflight/SendFlightTestTags;
-}
-
 public final class com/letta/mobile/ui/chat/surface/status/ComposableSingletons$RunStatusLineKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/status/ComposableSingletons$RunStatusLineKt;
 	public fun <init> ()V
@@ -2188,18 +2062,6 @@ public final class com/letta/mobile/ui/chat/surface/status/ComposableSingletons$
 
 public final class com/letta/mobile/ui/chat/surface/status/RunStatusLineKt {
 	public static final fun RunStatusLine (Lcom/letta/mobile/data/runtime/RuntimeLiveStatus;Landroidx/compose/ui/Modifier;ZLkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;II)V
-}
-
-public final class com/letta/mobile/ui/chat/surface/status/RunStatusTestTags {
-	public static final field $stable I
-	public static final field COMMAND Ljava/lang/String;
-	public static final field COMMAND_DISMISS Ljava/lang/String;
-	public static final field COMMAND_OUTPUT Ljava/lang/String;
-	public static final field COMPACTION Ljava/lang/String;
-	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/status/RunStatusTestTags;
-	public static final field LINE Ljava/lang/String;
-	public static final field NOTICE Ljava/lang/String;
-	public static final field PHASE Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/chat/surface/timeline/ChatTimelineSnapshotKt {
@@ -2266,14 +2128,6 @@ public final class com/letta/mobile/ui/chat/surface/timeline/TimelineDeferredBod
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/TimelineDeferredBodyTags;
 	public static final field ROOT Ljava/lang/String;
-}
-
-public final class com/letta/mobile/ui/chat/surface/timeline/rows/ChatCompactionTestTags {
-	public static final field $stable I
-	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/rows/ChatCompactionTestTags;
-	public static final field ROW Ljava/lang/String;
-	public static final field SUMMARY Ljava/lang/String;
-	public static final field TOGGLE Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/chat/surface/timeline/rows/ChatRowCompactionKt {

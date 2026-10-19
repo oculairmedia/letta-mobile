@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * letta-mobile-zxk2n.5 (G92): `conversation_recompile` (letta-code `protocol_v2.ts`
+ *  (G92): `conversation_recompile` (letta-code `protocol_v2.ts`
  * `ConversationRecompileCommand`). Recompiles the agent's system prompt for [conversationId] (its
  * memory blocks re-rendered into the prompt), the App Server side of `/recompile`.
  *
@@ -38,7 +38,7 @@ data class AppServerConversationRecompileBody(
 /**
  * `conversation_recompile_response`: whether it worked, on failure the server's reason, and the
  * compiled system prompt ([result], letta-code's `result` string; null when it sent none). The Iroh
- * relay (letta-mobile-by4vm.51) hands [result] back to the client for the inspector's preview.
+ * relay hands [result] back to the client for the inspector's preview.
  *
  * Like the fork response, the frame is outside the typed [AppServerInboundFrame] set and is read
  * from [AppServerInboundFrame.Unknown], correlated by `request_id`.

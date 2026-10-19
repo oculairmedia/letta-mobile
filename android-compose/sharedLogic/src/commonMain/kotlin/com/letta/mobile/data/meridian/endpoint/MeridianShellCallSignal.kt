@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * What one relayed App Server frame says about a shell tool call that runs `meridian`
- * (letta-mobile-jna0o.4, live-call binding).
+ * (live-call binding).
  *
  * letta-code announces every client-side tool it is about to execute with a `client_tool_start`
  * stream delta carrying `tool_call_id`, `tool_name` and the approved `tool_args`, and closes it with

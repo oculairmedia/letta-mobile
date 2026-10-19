@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * The cron task operations a backend offers to the desktop cron panel. letta-mobile-ckmub.4 removed
+ * The cron task operations a backend offers to the desktop cron panel. removed
  * the Letta REST implementation (`/v1/crons`); the App Server's `cron_*` commands are the
  * replacement (wired by the shared Schedules page, ckmub S14). Until then the panel shows as
  * unavailable unless an Iroh host relays schedules.

@@ -4,7 +4,7 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryFlag
 
 /**
- * letta-mobile-grrhq: DIAGNOSTIC-ONLY acquisition provenance for timeline holders.
+ * DIAGNOSTIC-ONLY acquisition provenance for timeline holders.
  *
  * WHY THIS EXISTS
  * ---------------
@@ -107,7 +107,7 @@ enum class TimelineConversationSelectionMode {
  * Which agent(s) the selected conversation is attributed to in the cached /
  * server-derived view at selection time.
  *
- * This enum is the A/B/C discriminator for letta-mobile-grrhq:
+ * This enum is the A/B/C discriminator for
  *  - [PARENT_AGENT_ONLY] -> outcome A: the child resolver selected a
  *    conversation that is not the child's. The defect is in resolution.
  *  - [BOTH]              -> outcome B: the backend/cache legitimately attributes
@@ -344,7 +344,7 @@ object TimelineProvenanceRedaction {
  * All events share [TimelineAcquisitionProvenance.acquisitionId].
  */
 /**
- * letta-mobile-grrhq: gate for the acquisition-provenance diagnostic.
+ * Gate for the acquisition-provenance diagnostic.
  *
  * ON by default while the subagent double-holder investigation is open, because
  * the defect only reproduces on a real background `Agent` dispatch and a missed

@@ -5,7 +5,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration
 
 /**
- * The relay's answers to one host publish (letta-mobile-qygvv.21): one Ack or Rejected per sent op,
+ * The relay's answers to one host publish: one Ack or Rejected per sent op,
  * awaited rather than drained. Reading only what had already arrived could miss a rejection that
  * came a moment later and report the publish as done.
  *

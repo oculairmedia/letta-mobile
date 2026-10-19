@@ -24,7 +24,7 @@ import kotlin.uuid.Uuid
  * to the initiator — the ONLY difference between the two paths is who supplies
  * the (agentId, conversationId, turnId, runId) context, and for
  * [RuntimeEventPayload.RemoteStreamFrame] even those are read from the wire
- * envelope first (context is only a fallback). This is the letta-mobile-r3i1z
+ * envelope first (context is only a fallback). This is the
  * "identical shape" contract: same mapper, same defaults, same output.
  *
  * Desktop's App Server controller gateway reuses this SAME object so its
@@ -32,7 +32,7 @@ import kotlin.uuid.Uuid
  * (the stamped logical_message_id / turn_id / text_seq, toolcall-/toolreturn-
  * prefixes) instead of re-deriving these hard-won conventions. A message row is
  * named by the stamp on the wire and nothing in [Context]: the context's turn and
- * run ids belong to lifecycle frames only (letta-mobile-ys9it).
+ * run ids belong to lifecycle frames only.
  */
 object RuntimeEventServerFrameMapper {
     data class Context(
@@ -194,7 +194,7 @@ object RuntimeEventServerFrameMapper {
     }
 
     /**
-     * letta-mobile-1n5py.1: the engine reports an input parked in the App Server's queue as Running
+     * The engine reports an input parked in the App Server's queue as Running
      * with [INPUT_QUEUED_REASON]; the phone shows it as "queued on server" until the turn starts.
      */
     private fun queuedFrame(payload: RuntimeEventPayload.RunLifecycleChanged, context: Context): ServerFrame.TurnQueued? =

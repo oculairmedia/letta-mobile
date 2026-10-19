@@ -51,7 +51,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * letta-mobile-ckmub.3.16 (hard cut S14): the Schedules page shared by desktop, Android and web.
+ *  (hard cut S14): the Schedules page shared by desktop, Android and web.
  *
  * Week / Agenda / Timeline / History / Rules views over every schedule the host knows (native
  * schedule-admin schedules and cron tasks, merged by [SchedulesPageModel.defs]). At or above
@@ -272,7 +272,7 @@ data class SchedulesPageState(
 /**
  * What the page asks its host to do. A null [onTogglePause] disables Pause / Resume.
  *
- * Deletes are typed by the list that rendered the row (letta-mobile-by4vm.42): [onDeleteCron] for a
+ * Deletes are typed by the list that rendered the row: [onDeleteCron] for a
  * cron task, [onDeleteSchedule] for a native schedule with the agent it belongs to, so a host never
  * has to guess the backend from a bare id.
  */

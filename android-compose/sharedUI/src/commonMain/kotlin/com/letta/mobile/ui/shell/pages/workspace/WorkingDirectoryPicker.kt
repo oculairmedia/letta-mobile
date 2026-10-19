@@ -131,7 +131,7 @@ object WorkingDirectoryPickerTags {
 }
 
 /**
- * letta-mobile-zxk2n.6 (G32): the shared working-directory picker: browse the device's folders,
+ *  (G32): the shared working-directory picker: browse the device's folders,
  * type a path, create a folder, reopen a recent folder, or move between the repository and its
  * letta-code worktrees. "Use this folder" applies from the next turn. The host's modal pane (a
  * dialog on a pointer or in a wide window, a bottom sheet on a phone); it draws nothing while [state]
@@ -327,7 +327,7 @@ private fun PickerError(error: String?) {
 
 /**
  * The recent folders, the worktrees and the browsed folder's children, as one [LettaPickerContent]
- * (letta-mobile-ckmub.3.6). Its pinned search filters the worktrees only and shows while there are
+ *. Its pinned search filters the worktrees only and shows while there are
  * worktrees; a pick browses into the path.
  */
 @Composable

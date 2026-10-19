@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 /**
- * letta-mobile-by4vm.9: whether the App Server session behind a router is carrying frames right
+ * Whether the App Server session behind a router is carrying frames right
  * now. Only a host whose router and turn engine outlive the socket (a stable
  * [com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient] pipe) ever leaves
  * [Linked]; a host that rebuilds its engine per connection ends turns through

@@ -12,7 +12,7 @@ object ShortcutGroups {
 }
 
 /**
- * letta-mobile-k5nbq.4: the one keymap every host matches. Platform modules do not register
+ * The one keymap every host matches. Platform modules do not register
  * their own in-window handlers; OS-global hotkeys (the desktop quick switcher) stay on the host.
  */
 object ShortcutRegistry {

@@ -17,13 +17,13 @@ sealed interface AgentSendResult {
 }
 
 /**
- * letta-mobile-bn008.2: direct P2P agent-to-agent SEND over Iroh.
+ * Direct P2P agent-to-agent SEND over Iroh.
  *
- * Resolves the target agent's dialable address via the bn008.1 resolver, dials it
+ * Resolves the target agent's dialable address via the resolver, dials it
  * on the a2a ALPN, opens a QUIC BiStream, writes the [IrohAgentMessage] envelope,
  * and reads a single ack. QUIC guarantees reliable/ordered delivery — the ack
  * confirms the peer received it; no gap-replay is needed. NO HTTP fallback. Only
- * the SEND path lives here (inbound routing is bn008.3).
+ * the SEND path lives here (inbound routing is).
  */
 class IrohAgentMessageSender(
     private val endpointProvider: () -> Endpoint,

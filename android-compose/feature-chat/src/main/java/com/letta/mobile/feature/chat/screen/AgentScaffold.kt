@@ -18,7 +18,7 @@ internal object AgentScaffoldTestTags {
     const val MENU_BUTTON = "agent_scaffold_menu_button"
     const val DRAWER_CONTENT = "agent_scaffold_drawer_content"
     /** The agent pill's tappable row: the shared pill's own tag, in the header and on the canvas. */
-    const val CONVERSATION_PICKER_TRIGGER = com.letta.mobile.ui.chat.AgentIdentityPillTestTags.TRIGGER
+    const val CONVERSATION_PICKER_TRIGGER = "agent_identity_pill_trigger"
     const val HEADER = "agent_scaffold_header"
     const val CANVAS_IDENTITY_PILL = "agent_scaffold_canvas_identity_pill"
     const val AGENT_PICKER_SHEET = "agent_scaffold_agent_picker_sheet"

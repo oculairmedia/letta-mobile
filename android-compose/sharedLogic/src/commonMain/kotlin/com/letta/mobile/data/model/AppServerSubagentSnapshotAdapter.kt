@@ -22,7 +22,7 @@ data class AppServerSubagentSnapshot(
     @SerialName("conversation_id") val conversationId: String? = null,
     @SerialName("agent_id") val agentId: String? = null,
     /**
-     * letta-mobile-ulcg6: letta-code sends the child's identity as `agent_url`,
+     * Letta-code sends the child's identity as `agent_url`,
      * never `agent_id`; for a local agent it IS the agent id, for a cloud agent a
      * chat URL ending in it. See `childAgentId`.
      */
@@ -137,7 +137,7 @@ object AppServerSubagentSnapshotAdapter {
     }
 
     /**
-     * letta-mobile-al6q5: canonicalize through the shared vocabulary
+     * Canonicalize through the shared vocabulary
      * ([SubagentStatus.normalize]) rather than a private map that silently
      * lacked `success`. An unrecognized value still passes through unchanged so
      * a forward-compat status stays observable downstream.

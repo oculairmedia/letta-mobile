@@ -1,7 +1,7 @@
 package com.letta.mobile.data.runtime
 
 /**
- * letta-mobile-by4vm.55: carries every held lease into [generation] instead of cancelling it, for a
+ * Carries every held lease into [generation] instead of cancelling it, for a
  * host that still fences frames by connection generation but whose turns survive a reconnect (the
  * iroh-wrapper's controller). Call it BEFORE the generation provider advances to [generation]:
  * leases are superseded only when they fall behind the provider ([isBehind]), so a carried lease

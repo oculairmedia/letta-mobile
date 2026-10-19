@@ -1,7 +1,7 @@
 package com.letta.mobile.data.repository.modelcontrol
 
 /**
- * Subscription sign-ins the app runs itself (letta-mobile-zxk2n.3, epic G54).
+ * Subscription sign-ins the app runs itself (epic G54).
  *
  * letta-code's App Server (0.34.8) runs no login of its own: `connect_provider`
  * accepts a finished `oauth_config` (`{type:"oauth", access, refresh, expires}`

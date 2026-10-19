@@ -57,7 +57,7 @@ internal class IrohFramePublisher(
         ServerFrameSharedFlow(EVENTS_SUBSCRIPTION, canonicalEvents)
 
     /**
-     * letta-mobile-qygvv.11: the single ingest dedup point. A frame that exactly
+     * The single ingest dedup point. A frame that exactly
      * repeats one already published (per [TimelineEventKeys.ingestKey]) is
      * dropped HERE, once, instead of reaching every subscriber and being dropped
      * by each coordinator after it paid to parse it.

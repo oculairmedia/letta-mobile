@@ -25,7 +25,7 @@ internal enum class StreamTextFrameSource {
 }
 
 /**
- * The one place a chat message's identity is minted (letta-mobile-jdcoj, plan
+ * The one place a chat message's identity is minted (plan
  * `chat-timeline-identity-plan.md` 1.1-1.3). One instance lives per turn inside [TurnDraftProcessor];
  * every `RemoteStreamFrame` / `ExternalTransportFrame` body passes through [stamp] before anything
  * downstream (the Iroh fanout, a direct-route timeline) sees it.
@@ -57,7 +57,7 @@ internal class TurnStreamIdentity(
      * turn processor) and is forwarded as is: its text is already the cumulative snapshot and its
      * ids are the host's, which its ledger serves on `message.list`. Re-stamping it here would
      * re-mint the ids and, for text, append each cumulative snapshot onto the last one
-     * (letta-mobile-4vtng: the desktop's engine on the Iroh route stacked `M[0:k1]+M[0:k2]+…+M`).
+     * (the desktop's engine on the Iroh route stacked `M[0:k1]+M[0:k2]+…+M`).
      */
     fun stamp(body: String, source: StreamTextFrameSource): String? {
         val frame = parseDeltaFrame(body) ?: return body

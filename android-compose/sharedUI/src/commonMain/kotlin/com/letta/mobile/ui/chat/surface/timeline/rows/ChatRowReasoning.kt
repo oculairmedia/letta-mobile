@@ -36,7 +36,7 @@ import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-ckmub.1.3: a reasoning step is one of the run's step rows ([RunStepListRow]: the
+ * A reasoning step is one of the run's step rows ([RunStepListRow]: the
  * shared [LettaListRow], the run's [RunStatusGlyph] and [DisclosureChevron]), so it reads like the
  * tool calls beside it: "Thinking…" with the run's spinner while it streams, then "Thought for 2.4s"
  * with a check, its first line under the title and a chevron; expanded, the reasoning reads below.

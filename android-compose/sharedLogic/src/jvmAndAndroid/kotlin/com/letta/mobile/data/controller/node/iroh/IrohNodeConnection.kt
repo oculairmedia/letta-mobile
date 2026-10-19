@@ -80,20 +80,20 @@ class IrohNodeConnection(
      */
     private val adminRpcRouter: AdminRpcRouter = AdminRpcRouter(),
     /**
-     * REQUIRED authentication policy (d6e8g.2). Connections only start
+     * REQUIRED authentication policy. Connections only start
      * pre-authenticated when the policy explicitly says so (anonymous
      * test-only mode or an already-vetted peer allowlist) — never because a
      * parameter was omitted.
      */
     private val authPolicy: IrohAuthPolicy,
     /**
-     * Bearer verifier (d6e8g.3): constant-time comparison + per-NodeId rate
+     * Bearer verifier: constant-time comparison + per-NodeId rate
      * limiting. Endpoints pass ONE shared instance to every connection so
      * redialing cannot reset a peer's failure budget.
      */
     private val authVerifier: IrohBearerAuthVerifier = IrohBearerAuthVerifier(authPolicy),
     /**
-     * Pairing service (d6e8g.5): peers whose NodeId is already paired
+     * Pairing service: peers whose NodeId is already paired
      * authenticate by transport identity alone; unpaired peers may redeem a
      * one-time invite via an `invite:<secret>` auth token. Null disables
      * pairing entirely.
@@ -107,20 +107,20 @@ class IrohNodeConnection(
     /**
      * Server-process-scoped duplicate-suppression for client message ids. Shared
      * across connections so a redial re-delivery of the same turn does not
-     * double-run (P3, 3wq5g). Injectable for tests.
+     * double-run. Injectable for tests.
      */
     private val clientMessageDedupe: ProcessScopedClientMessageDedupe = SHARED_CLIENT_MESSAGE_DEDUPE,
     /**
      * Server-process-scoped store of terminal frames dropped when a channel died
-     * mid-turn, replayed on redial re-send (P3, q71yi). Injectable for tests.
+     * mid-turn, replayed on redial re-send. Injectable for tests.
      */
     private val parkedTerminals: ParkedTerminalStore = SHARED_PARKED_TERMINALS,
     /**
-     * letta-mobile-qygvv.3: node-owned home of this connection's turns. A turn outlives its
+     * Node-owned home of this connection's turns. A turn outlives its
      * initiator's connection (it is detached, not cancelled), so it must not be a child of it.
      */
     private val turnHost: NodeTurnHost = NodeTurnHost.SHARED,
-    /** letta-mobile-r1xkl: the host's stream-to-stored identity join; null leaves rows unjoined. */
+    /** The host's stream-to-stored identity join; null leaves rows unjoined. */
     private val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
 ) {
     // Per-connection, strictly-monotonic event_seq with a disjoint process-scoped
@@ -135,7 +135,7 @@ class IrohNodeConnection(
     private val controlWriteMutex = Mutex()
     private var controlSend: SendStream? = null
 
-    /** letta-mobile-1n5py: a client's `remove_queue_item` / `resume_queue`, forwarded upstream. */
+    /** A client's `remove_queue_item` / `resume_queue`, forwarded upstream. */
     private val queueControlRelay = IrohQueueControlRelay(controller)
 
     private suspend fun writeControl(frame: String) {
@@ -145,7 +145,7 @@ class IrohNodeConnection(
         }
     }
     /**
-     * Auth + grants for this connection (d6e8g.5/.6, dpv7m.1): pre-authenticated
+     * Auth + grants for this connection: pre-authenticated
      * only when the policy vouches for THIS NodeId or it is paired; a revoked
      * pairing tears the connection down. See [PeerSessionAuth].
      */
@@ -161,7 +161,7 @@ class IrohNodeConnection(
     /** Whether this peer has authenticated; side protocols from the same peer are gated on it. */
     val isAuthenticated: Boolean get() = authenticated.get()
 
-    /** dpv7m.1: the peer's pairing was revoked — deauthenticate and close now. */
+    /** The peer's pairing was revoked — deauthenticate and close now. */
     fun revokeSession() = sessionAuth.revoke()
 
     /**
@@ -176,7 +176,7 @@ class IrohNodeConnection(
         IrohFrameCodec.FRAME_PART_CAPABILITY in peerCapabilities.get()
 
     /**
-     * eaczz.3: this connection's single viewer handle onto its own turn/stream
+     * This connection's single viewer handle onto its own turn/stream
      * BiStream. Built once when the stream opens in [serve] (it needs the
      * stream's [SendStream]) and reused for every conversation this connection
      * views. It reuses the connection's per-connection [eventSeq] and
@@ -187,7 +187,7 @@ class IrohNodeConnection(
     private var viewerRegistration: ViewerRegistration? = null
 
     /**
-     * eaczz.3: this connection's viewer subscription state (Option A de-scope
+     * This connection's viewer subscription state (Option A de-scope
      * rule). Built alongside [selfViewer] once the turn stream opens; null when
      * there is no [connectionRegistry] (legacy/test constructions). Both
      * subscription signals — runtime_start and message.list — call
@@ -196,10 +196,10 @@ class IrohNodeConnection(
     private var viewerSubscription: ConversationViewerSubscription? = null
 
     /**
-     * eaczz.3: build this connection's [selfViewer] once, bound to the turn
+     * Build this connection's [selfViewer] once, bound to the turn
      * stream's [SendStream]. Idempotent — later calls return the existing handle
      * so every conversation this connection views shares ONE viewer identity
-     * (so [ConnectionRegistry.unregisterAll] can drop them all on disconnect).
+     * (so [ConnectionRegistry.release] can drop them all on disconnect).
      */
     private fun ensureSelfViewer(streamSend: SendStream): IrohViewerHandle {
         selfViewer?.let { return it }
@@ -229,7 +229,7 @@ class IrohNodeConnection(
     }
 
     /**
-     * eaczz.3: register this connection as the viewer of [conversationId],
+     * Register this connection as the viewer of [conversationId],
      * applying the Option A de-scope rule (a new signal for a DIFFERENT
      * conversation unregisters the prior one first). No-op when there is no
      * registry / no live stream (subscription is null). Safe to call from either
@@ -365,7 +365,7 @@ class IrohNodeConnection(
     private fun agentScope(): Set<String>? = sessionAuth.agentScope()
 
     /**
-     * dpv7m.1: a runtime frame (runtime_start, input, sync, abort, queue
+     * A runtime frame (runtime_start, input, sync, abort, queue
      * controls) naming an agent outside the peer's scope is denied before any
      * upstream side effect. Returns the denial frame, or null to proceed.
      */
@@ -646,7 +646,7 @@ class IrohNodeConnection(
     /**
      * Deny with a fixed reason label (never derived from the secret); repeated
      * failures on one connection close it, and the endpoint-wide verifier rate
-     * limits the NodeId across redials (d6e8g.3).
+     * limits the NodeId across redials.
      */
     private fun rejectAuth(requestId: String, outcome: IrohBearerAuthVerifier.Outcome): String {
         if (outcome is IrohBearerAuthVerifier.Outcome.RateLimited) {
@@ -671,7 +671,7 @@ class IrohNodeConnection(
 
     private val authFailuresOnThisConnection = java.util.concurrent.atomic.AtomicInteger(0)
 
-    /** Effective capabilities for this connection (d6e8g.6 / dpv7m.1, see [PeerSessionAuth]). */
+    /** Effective capabilities for this connection (see [PeerSessionAuth]). */
     private fun effectiveCapabilities(): Set<String> = sessionAuth.effectiveCapabilities()
 
     private fun capabilityDenied(requestId: String?, required: String): String {
@@ -773,7 +773,7 @@ class IrohNodeConnection(
     /**
      * Builds one turn fanout with initiator parking. The initiator's writes stay on this
      * connection's queue; observer writes use the node-owned queue so a detached turn
-     * (letta-mobile-qygvv.3) still reaches the remaining viewers.
+     *  still reaches the remaining viewers.
      */
     private fun createTurnFanout(
         input: AppServerCommand.Input,
@@ -872,7 +872,7 @@ class IrohNodeConnection(
         )
     }
 
-    /** Runs the relayed turn, then joins its messages to the stored rows (letta-mobile-r1xkl). */
+    /** Runs the relayed turn, then joins its messages to the stored rows. */
     private suspend fun relayAndSettle(command: TurnCommand, turn: RelayedInputTurn) {
         var rejectedBusy = false
         try {
@@ -886,7 +886,7 @@ class IrohNodeConnection(
         }
     }
 
-    /** letta-mobile-qygvv.12: a redial re-send still gets its ack; the original turn owns the input. */
+    /** A redial re-send still gets its ack; the original turn owns the input. */
     private suspend fun ackRedialResend(input: AppServerCommand.Input) {
         val requestId = input.requestId ?: return
         runCatching { writeControl(inputAcceptedFrame(requestId, input.runtime, TurnInputAcknowledgement.Started)) }
@@ -970,7 +970,7 @@ class IrohNodeConnection(
     companion object {
         private val SUBAGENT_RPC_METHODS = setOf("subagent.list", "subagent.todos")
 
-        /** Control frames that address an agent and so are subject to the peer's agent scope (dpv7m.1). */
+        /** Control frames that address an agent and so are subject to the peer's agent scope. */
         private val AGENT_ADDRESSED_FRAME_TYPES = setOf(
             "runtime_start", "input", "sync", "abort_message", "remove_queue_item", "resume_queue",
         )

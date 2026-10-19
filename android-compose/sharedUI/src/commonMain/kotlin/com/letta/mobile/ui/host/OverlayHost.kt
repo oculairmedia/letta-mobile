@@ -7,7 +7,7 @@ import androidx.compose.runtime.setValue
 import kotlin.time.TimeSource
 
 /**
- * letta-mobile-ckmub.3.2 / ckmub.3.15 (hard cut S13, primitive P10): the one queue for what floats
+ *  (hard cut S13, primitive P10): the one queue for what floats
  * over a window without being a page — snackbars (with or without an undo) and banners.
  *
  * A surface never owns a SnackbarHostState. It calls [OverlayHost.show] on the host its window

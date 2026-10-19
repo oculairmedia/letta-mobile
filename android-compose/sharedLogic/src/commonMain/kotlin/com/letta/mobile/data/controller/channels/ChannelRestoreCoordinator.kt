@@ -13,15 +13,15 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Boot/reconnect restore of the App Server's channel accounts (lgns8.23).
+ * Boot/reconnect restore of the App Server's channel accounts.
  *
  * ## Why this exists
  *
- * Under a bare `letta app-server --listen`, upstream's `initializeChannels()` is
+ * Under a bare `letta app-server --listen`, upstream's `initializeChannels` is
  * unreachable — its only invocation lives in the `--channels` CLI branch, which
  * `--listen` forbids. `wireChannelIngress` therefore early-returns on a null
  * registry at boot, and **enabled accounts in `accounts.json` are never
- * auto-started**. The empirical probe on the 0.29.12 pin (letta-mobile-lgns8.23.1,
+ * auto-started**. The empirical probe on the 0.29.12 pin (
  * 2026-07-31) measured exactly this: after a server restart with
  * `enabled=true`, a fresh client saw `running=false` until it issued
  * `channel_start`, which restored the account to `running=true` with a full sync.
@@ -66,7 +66,7 @@ import kotlin.time.Duration.Companion.milliseconds
  *   Iroh viewers: `RuntimeEventFanout.planUnscopedControl` drops unscoped frames
  *   that are not server-initiated control requests, which these are not.
  *
- * ## Landmine 3 — the re-wire window (letta-mobile-o5bqk)
+ * ## Landmine 3 — the re-wire window
  *
  * Re-issuing `channel_start` is the re-wire, but it is not instant, and the
  * adapter keeps syncing throughout. Probe #4 (2026-08-01) measured what happens
@@ -76,7 +76,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * `scheduleQueuePump` bails because `isListenerTransportOpen(<dead socket>)` is
  * false. No error, no channel-side failure notice; the room shows typing and then
  * nothing, and the item drains only on a LATER connect (lossily, per the cron
- * drain finding in lgns8.24 (3d)).
+ * drain finding in (3d)).
  *
  * That silent-drop is upstream behaviour and cannot be fixed from here: the
  * enqueue happens inside letta-code, in a closure we do not own, and the socket
@@ -91,7 +91,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * ## Sequence (per generation-ready / connect)
  *
  * ```
- * channel_start × cached enabled accounts        (fast path; skipped on the first pass)
+ * channel_start × cached enabled accounts (fast path; skipped on the first pass)
  *   └─ on failure: channel_account_update{enabled:true}, then fall through to the retrying path
  * channels_list
  *   └─ per configured channel: channel_accounts_list
@@ -165,7 +165,7 @@ class ChannelRestoreCoordinator(
     }
 
     /**
-     * FIRST-ROUND-TRIP re-wire (letta-mobile-o5bqk). Issues `channel_start` for
+     * FIRST-ROUND-TRIP re-wire. Issues `channel_start` for
      * every account the previous enumeration found enabled, before `channels_list`
      * so nothing gates it.
      *

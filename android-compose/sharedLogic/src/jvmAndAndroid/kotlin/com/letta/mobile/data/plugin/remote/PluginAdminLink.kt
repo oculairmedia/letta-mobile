@@ -26,7 +26,7 @@ fun IrohAdminRpcClient.asPluginAdminLink(): PluginAdminLink = object : PluginAdm
 }
 
 /**
- * letta-mobile-cdgpr.8: a [PluginAdminLink] over whichever channel transport is current. [transport]
+ * A [PluginAdminLink] over whichever channel transport is current. [transport]
  * is read on every call, so a host that swaps transports (a reconnect, a backend switch) is followed.
  * With no transport the host advertises nothing, and no call is sent.
  */

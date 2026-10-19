@@ -9,7 +9,7 @@ import kotlinx.atomicfu.locks.synchronized
 /**
  * Bounded exact-event deduplication for fanout from shared bridge collectors.
  *
- * letta-mobile-qygvv.11: this is now the SAFETY NET. Exact duplicates are
+ * this is now the SAFETY NET. Exact duplicates are
  * dropped once at the transport ingest seam (`IngestFrameDeduplicator`, same
  * [TimelineEventKeys]), so [exactDuplicatesDropped] should read zero in normal
  * turns; a non-zero count means a duplicate source bypassed ingest.

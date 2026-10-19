@@ -5,7 +5,7 @@ import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.util.Telemetry
 
 /**
- * letta-mobile-by4vm.7: why a turn lease was released. Every exit of `AppServerTurnEngine.runTurn`
+ * Why a turn lease was released. Every exit of `AppServerTurnEngine.runTurn`
  * names one of these explicitly; there is no default that a failure can fall through to.
  *
  * The orphan-abort and queued-input-removal decisions ([OrphanedTurnAborter], [QueuedInputRemoval])
@@ -39,7 +39,7 @@ internal object TurnReleaseReason {
 }
 
 /**
- * letta-mobile-by4vm.7: the release reason and cause of ONE turn lease. The first reason recorded
+ * The release reason and cause of ONE turn lease. The first reason recorded
  * wins: the collector and the input path can both observe the same ending (a stream error cancels
  * the input wait; an input failure cancels the collector), and the one that saw it first knows why.
  */

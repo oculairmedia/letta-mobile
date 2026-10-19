@@ -1,7 +1,7 @@
 package com.letta.mobile.data.runtime
 
 /**
- * letta-mobile-bzvro.7 (F07): the agent loop's phase, from `update_loop_status.status`.
+ *  (F07): the agent loop's phase, from `update_loop_status.status`.
  *
  * The upstream `LoopStatus` union (letta-code 0.29 through 0.33) is open; a token this client does
  * not know yet reads as [Unknown] rather than failing, and keeps the line showing "Working".

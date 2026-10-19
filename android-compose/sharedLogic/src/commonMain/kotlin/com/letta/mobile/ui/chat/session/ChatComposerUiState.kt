@@ -12,7 +12,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 
 /**
- * letta-mobile-bglj6.1: everything the shared chat page's composer draws.
+ * Everything the shared chat page's composer draws.
  *
  * [com.letta.mobile.ui.chat.render.ChatUiState] is the timeline contract; this is the
  * composer's. They are separate flows because the composer changes on every keystroke
@@ -71,7 +71,7 @@ data class ChatComposerCommand(
 ) {
     companion object {
         /**
-         * letta-mobile-7mys7: letta-code's `/fork [name]`, which the client runs itself
+         * Letta-code's `/fork [name]`, which the client runs itself
          * ([com.letta.mobile.data.chat.branch.BranchSlashCommand]); offered where the owner can fork.
          */
         val Fork = ChatComposerCommand(
@@ -113,7 +113,7 @@ data class ChatWorkingDirectoryUiState(
 )
 
 /**
- * letta-mobile-bzvro.13: the permission-mode chip. [selected] is the mode the server confirmed;
+ * The permission-mode chip. [selected] is the mode the server confirmed;
  * [pending] a request still waiting for the server's `update_device_status` echo; [unconfirmed] a
  * request whose outcome is unknown (the server may run [selected] or it), shown as such rather than
  * as the old mode; [appliesOnStart] a choice for a conversation whose runtime has not started.
@@ -128,7 +128,7 @@ data class ChatPermissionModeUiState(
     val notSaved: Boolean = false,
     val unavailableReason: String? = null,
     val options: ImmutableList<AppServerPermissionMode> = AppServerPermissionMode.entries.toImmutableList(),
-    /** letta-mobile-a4tm7: the runtime this chip governs (named on the chip); null names none. */
+    /** The runtime this chip governs (named on the chip); null names none. */
     val runtime: com.letta.mobile.data.runtime.PermissionModeRuntime? = null,
 ) {
     val canChange: Boolean get() = unavailableReason == null && pending == null

@@ -1,7 +1,7 @@
 package com.letta.mobile.data.pairing
 
 /**
- * Where the inviter's "Pair a device" card is (letta-mobile-dpv7m.5):
+ * Where the inviter's "Pair a device" card is:
  * Configuring (scope + TTL) -> Showing (QR + countdown) -> Expiring (last
  * [InvitePhases.EXPIRING_WINDOW_MS]) -> Expired, or -> Redeemed when a new
  * device shows up, or -> Cancelled when the inviter withdraws the code.
@@ -41,7 +41,7 @@ object InvitePhases {
 }
 
 /**
- * The invite countdown (dpv7m.5): "m:ss" on screen, and screen-reader
+ * The invite countdown: "m:ss" on screen, and screen-reader
  * announcements throttled to two moments (60 s and 10 s left) instead of every tick.
  */
 object InviteCountdown {

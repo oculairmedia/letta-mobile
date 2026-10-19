@@ -67,7 +67,7 @@ internal class TimelineFrameOverlays(
 )
 
 /**
- * letta-mobile-bglj6.1: the reversed LazyColumn both timelines draw into, with the edge fades,
+ * The reversed LazyColumn both timelines draw into, with the edge fades,
  * the pinned prompt and the scroll-to-latest button. The fade wraps ONLY the list, so the button
  * and the pinned card are never dimmed (desktop MessageList). The button is desktop's quiet
  * squircle centred over the reading area on Pointer, and Android's round FAB at the bottom end,

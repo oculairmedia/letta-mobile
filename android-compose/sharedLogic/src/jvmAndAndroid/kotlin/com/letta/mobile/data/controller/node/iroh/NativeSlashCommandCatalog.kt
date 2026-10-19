@@ -28,14 +28,14 @@ enum class SlashCommandCatalogOrigin(val wireName: String) {
 /** One command the App Server will run through `execute_command`. */
 data class NativeSlashCommand(val id: String, val description: String, val source: String)
 
-/** A listing plus its provenance, for `slash_command.*` (letta-mobile-by4vm.84). */
+/** A listing plus its provenance, for `slash_command.*`. */
 data class NativeSlashCommandListing(
     val commands: List<NativeSlashCommand>,
     val origin: SlashCommandCatalogOrigin,
 )
 
 /**
- * letta-mobile-by4vm.84: the App Server's slash commands, as the controller observes them.
+ * The App Server's slash commands, as the controller observes them.
  *
  * ## Wire reality (verified against `@letta-ai/letta-code` 0.34.14, `letta.js`)
  *

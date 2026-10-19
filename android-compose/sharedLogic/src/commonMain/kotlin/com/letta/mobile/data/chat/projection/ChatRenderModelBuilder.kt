@@ -109,7 +109,7 @@ fun backfillMissingAssistantRunIds(messages: List<UiMessage>): List<UiMessage> {
 }
 
 /**
- * letta-mobile-bglj6.1: App Server opens a NEW run for every tool round of one turn (the agent
+ * App Server opens a NEW run for every tool round of one turn (the agent
  * stops with `requires_approval`, the tool runs, the next request is another run; see
  * bridge-parity/multi-round-agentic.jsonl: local-run-100 -> 101 -> 102 under one
  * `turn_finished`). Grouped by raw run id, a coding agent running Bash four times drew four
@@ -347,7 +347,7 @@ class IncrementalChatRenderItemsCache {
     }
 
     /**
-     * letta-mobile-g87l6: replace each freshly-built render item with the
+     * Replace each freshly-built render item with the
      * previous build's instance when the two are content-equal (ChatRenderItem
      * variants are data classes, so `==` is a deep content compare). This
      * preserves object identity for settled bubbles across a streaming tick so

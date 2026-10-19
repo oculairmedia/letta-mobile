@@ -14,7 +14,7 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * letta-mobile-ckmub.17.1: the session graph's channel over an App Server session the host already
+ * The session graph's channel over an App Server session the host already
  * holds ([client]), for a host with no JVM Iroh binding (the browser reaches an Iroh host's App
  * Server on `/letta/appserver/0` through iroh-wasm). It carries what the graph's Iroh admin sources
  * need: `admin_rpc` (the same [appServerAdminRpcParams] request the JVM Iroh transport sends) and

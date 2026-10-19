@@ -17,7 +17,7 @@ import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.math.roundToInt
 
 /**
- * letta-mobile-cc25e: marks the prompt field as where a sent prompt takes off. A no-op outside
+ * Marks the prompt field as where a sent prompt takes off. A no-op outside
  * a chat page.
  */
 @Composable
@@ -27,7 +27,7 @@ internal fun rememberSendFlightSource(): Modifier {
 }
 
 /**
- * letta-mobile-cc25e: marks the user-prompt row [rowId] (its identity across the optimistic ->
+ * Marks the user-prompt row [rowId] (its identity across the optimistic ->
  * server swap: the otid where it has one) showing [text] as a landing spot. The row that
  * claims a flight opens its slot with an eased insert and stays hidden until the ghost lands
  * on it; every other row is untouched. A no-op outside a chat page.
@@ -53,7 +53,7 @@ internal fun rememberSendFlightTarget(rowId: String, text: String): Modifier {
 }
 
 /**
- * letta-mobile-cc25e: [ChatActions] whose send launches a flight for [draft] first. The send
+ * [ChatActions] whose send launches a flight for [draft] first. The send
  * itself goes straight through; under reduced motion nothing flies.
  */
 @Composable

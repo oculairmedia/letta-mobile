@@ -95,9 +95,9 @@ private class CronScheduleStateStore {
 }
 
 /**
- * letta-mobile-d52f.2: single source of truth for scheduled cron tasks.
+ * Single source of truth for scheduled cron tasks.
  *
- * letta-mobile-lgns8.10.4.1 — TRANSPORT: this repository speaks only the
+ *  — TRANSPORT: this repository speaks only the
  * common [IChannelTransport] cron surface (`sendCronList` / `sendCronAdd` /
  * `sendCronDelete`). The concrete wire format is chosen by whichever transport
  * the session graph bound for the active backend:
@@ -106,7 +106,7 @@ private class CronScheduleStateStore {
  *    calls onto the native `cron.*` admin_rpc methods. No shim frame is ever
  *    emitted.
  *  - any other config -> `NoOpChannelTransport`, whose cron calls throw
- *    (the legacy shim WebSocket transport was deleted in g70jb.3).
+ *    (the legacy shim WebSocket transport was deleted).
  *
  * Platform-neutral (commonMain) so Android and Desktop share one impl
  * (Phase 4c).

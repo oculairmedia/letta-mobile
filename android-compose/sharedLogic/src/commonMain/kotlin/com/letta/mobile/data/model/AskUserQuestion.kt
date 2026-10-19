@@ -13,7 +13,7 @@ import kotlinx.serialization.json.put
 
 /**
  * Structured shape of an `AskUserQuestion` tool call's arguments and the answer
- * that closes it. See epic letta-mobile-vilsn.
+ * that closes it.
  *
  * The letta-code CLI emits AskUserQuestion with:
  * `{ questions: [{ question, header?, multiSelect?, options: [{label, description?}] }] }`
@@ -50,7 +50,7 @@ object AskUserQuestion {
      * an AskUserQuestion answer rides the `reason` channel as this prefix followed
      * by the `updated_input` JSON, and [decodeAnswerReason] unpacks it at the one
      * terminal point both clients reach (DefaultAppServerController.submitApproval).
-     * Follow-up: promote to a first-class param (letta-mobile-vilsn).
+     * Follow-up: promote to a first-class param.
      */
     private const val ANSWER_REASON_PREFIX = "askuserquestion-answer"
 

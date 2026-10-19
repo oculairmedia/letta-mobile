@@ -36,7 +36,7 @@ import com.letta.mobile.data.pairing.QrModules
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
-/** What the joining device can do from the status card and the scanner (letta-mobile-dpv7m.5). */
+/** What the joining device can do from the status card and the scanner. */
 class PairingScanActions(
     /** A scanned, opened or pasted value. */
     val onSubmit: (String) -> Unit,
@@ -51,7 +51,7 @@ class PairingScanActions(
 )
 
 /**
- * What the joining device sees once a code was read (letta-mobile-dpv7m.2/.5):
+ * What the joining device sees once a code was read:
  * the mandatory trust prompt, Verifying, Success, or one distinct error with one
  * action. Renders nothing while [PairingState.Idle] so the scanner shows through.
  * Status is always carried by text (and an icon), never colour alone.

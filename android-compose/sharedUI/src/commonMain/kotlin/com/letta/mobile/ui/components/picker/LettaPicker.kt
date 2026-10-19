@@ -57,7 +57,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * letta-mobile-ckmub.3.6 (hard cut S8, primitive P5): what a picker shows. [selected] holds item
+ *  (hard cut S8, primitive P5): what a picker shows. [selected] holds item
  * keys; [filterLocally] false means the caller already filtered the sections for [query] (a
  * controller that searches); a null [search] hides the search field.
  */

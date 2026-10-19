@@ -85,7 +85,7 @@ sealed interface MemfsNavigation {
     data class SwitchAgent(val agentId: String?) : MemfsNavigation
 }
 
-/** Everything the shared MemFS page draws (letta-mobile-bzvro.24). */
+/** Everything the shared MemFS page draws. */
 @Immutable
 data class MemfsPageState(
     val agentId: String? = null,

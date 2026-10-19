@@ -22,7 +22,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
 /**
- * letta-mobile-ckmub.2.5 (hard cut S17): a tool's read-only detail - what it does, its tags and its
+ *  (hard cut S17): a tool's read-only detail - what it does, its tags and its
  * source or schema. letta-code's tools are code-defined (`tool.list` / `tool.get` only), so there
  * is nothing to edit; the Android tool editor went with the REST backend.
  */

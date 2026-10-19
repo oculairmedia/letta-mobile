@@ -82,8 +82,8 @@ internal fun PickerItem<LettaSearchRow>.hit(): UnifiedSearchHit? = UnifiedShellS
 internal fun PaletteRowLeading(row: LettaSearchRow) = LettaSearchRowLeading(row.leading, row.label)
 
 /**
- * The Cmd/Ctrl-K command palette (letta-mobile-ckmub.3.6): [LettaPicker] in command mode over the
- * unified search (letta-mobile-ckmub.3.9: one index and ranking with the header's search), in a
+ * The Cmd/Ctrl-K command palette: [LettaPicker] in command mode over the
+ * unified search (one index and ranking with the header's search), in a
  * modal pane (a dialog on a desktop pointer, a sheet on touch). The search takes the caret on open;
  * Enter runs the highlighted row, which goes to [onOpen].
  */

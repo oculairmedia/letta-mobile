@@ -5,7 +5,7 @@ import kotlin.io.encoding.Base64
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-/** RFC 7636 S256 verifier and challenge (letta-mobile-zxk2n.3). */
+/** RFC 7636 S256 verifier and challenge. */
 internal class Pkce private constructor(val verifier: String, val challenge: String) {
     override fun toString(): String = "Pkce(<redacted>)"
 

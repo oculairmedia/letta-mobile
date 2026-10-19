@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
- * letta-mobile-by4vm.98: a [StateFlow] read off other state with no cache or coroutine of its own,
+ * A [StateFlow] read off other state with no cache or coroutine of its own,
  * so a host can expose a derived extension point without a scope to `stateIn` it in (and nothing to
  * cancel when it closes). [value] is [current] now; a collector gets [changes], deduplicated as a
  * StateFlow's are, which must start with the current value (a combine of StateFlows does).

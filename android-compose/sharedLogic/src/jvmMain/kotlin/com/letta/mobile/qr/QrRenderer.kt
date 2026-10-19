@@ -7,7 +7,7 @@ import java.io.OutputStream
 import javax.imageio.ImageIO
 
 /**
- * letta-mobile-gw0h1: render a QR matrix to (a) Unicode-block text for TTYs
+ * Render a QR matrix to (a) Unicode-block text for TTYs
  * or (b) a PNG file for headless install.
  *
  * Both renderers share the same scale model: one dark module maps to a

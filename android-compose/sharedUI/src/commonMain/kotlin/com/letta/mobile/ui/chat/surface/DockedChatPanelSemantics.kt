@@ -23,7 +23,7 @@ import com.letta.mobile.ui.theme.ChatSurfaceDimens
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-bglj6.1: the docked panel's accessibility actions. Dragging and resizing are
+ * The docked panel's accessibility actions. Dragging and resizing are
  * pointer gestures; these give keyboard and screen-reader users the same placement controls:
  * move by a step, grow or shrink, reset, and collapse or restore.
  */

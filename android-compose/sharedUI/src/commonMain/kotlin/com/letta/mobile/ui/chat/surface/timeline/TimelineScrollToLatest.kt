@@ -40,7 +40,7 @@ import kotlin.math.sqrt
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-bglj6.1: the scroll-to-latest glide both timelines run when the button is tapped.
+ * The scroll-to-latest glide both timelines run when the button is tapped.
  *
  * A tap far up the history first snaps to about one viewport from the newest edge, so the glide
  * never streams every row in between. One underdamped spring then carries the list the rest of

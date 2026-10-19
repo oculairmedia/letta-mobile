@@ -17,7 +17,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 
 /**
- * One `canvas_compose` call read into its [CanvasArtifactReceipt] (letta-mobile-bglj6.13): the
+ * One `canvas_compose` call read into its [CanvasArtifactReceipt]: the
  * receipt its return says, or the pending, refused or degraded form, named from the request where
  * the return does not say.
  */
@@ -122,7 +122,7 @@ internal class ComposeCallReading private constructor(
 
     companion object {
         /**
-         * [fromCli]: the call ran through the `meridian` CLI (letta-mobile-jna0o.6), so its return
+         * [fromCli]: the call ran through the `meridian` CLI, so its return
          * is the shell's output and the receipt JSON is read off its stdout.
          */
         fun of(event: TimelineEvent, call: ToolCall, ordinal: Int, fromCli: Boolean = false): ComposeCallReading {

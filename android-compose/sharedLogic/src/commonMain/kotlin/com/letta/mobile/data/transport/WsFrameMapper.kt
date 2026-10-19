@@ -11,7 +11,7 @@ import com.letta.mobile.data.model.UserMessage
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * letta-mobile-wecy: bridge from wire-level [ServerFrame]s to the
+ * Bridge from wire-level [ServerFrame]s to the
  * existing [LettaMessage] sealed hierarchy that the chat timeline +
  * dedupe pipeline already understand.
  *
@@ -146,7 +146,7 @@ object WsFrameMapper {
         seqId = call.seqId,
     ).stamped(logicalMessageId, turnId)
 
-    /** The wire stamp (letta-mobile-ys9it) is applied in one place, whatever the row type. */
+    /** The wire stamp is applied in one place, whatever the row type. */
     private fun LettaMessage.stamped(logicalId: String?, turn: String?, seq: Int? = null): LettaMessage =
         when (this) {
             is UserMessage -> copy(logicalMessageId = logicalId, turnId = turn)

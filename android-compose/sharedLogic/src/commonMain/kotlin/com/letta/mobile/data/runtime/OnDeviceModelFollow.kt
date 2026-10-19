@@ -13,7 +13,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-by4vm.121.18: existing on-device agents follow the device model.
+ * Existing on-device agents follow the device model.
  *
  * An agent made for the phone's model names that model's bridge handle
  * (`lmstudio/google/gemma-3n-E2B-it-litert-lm`). When the device model changes (Settings: E2B to
@@ -27,9 +27,9 @@ import kotlinx.serialization.json.put
  * The same pass heals a context window letta-code cannot work with. letta-code 0.34.14 takes an
  * agent's (or conversation's) `model_settings.context_window_limit` as the model's window
  * (letta.js:116099 `resolvePiModelForAgent`), and its pi-ai layer clamps every request's output to
- * `window - prompt estimate - 4,096` (letta.js:26056 `clampMaxTokensToContext`, :26105
+ * `window - prompt estimate - 4,096` (letta.js:26056 `clampMaxTokensToContext`,:26105
  * `CONTEXT_SAFETY_TOKENS = 4096`). A limit at the engine's real window (4,096 or 8,192, stored on
- * agents while #2094 advertised it) therefore asks the model for 1 token. On-device records get
+ * agents while the model catalog advertised it) therefore asks the model for 1 token. On-device records get
  * [OnDeviceServedModel.lettaCodeWindow] instead: the engine window plus pi-ai's margin, so the clamp
  * leaves exactly the engine's room; the bridge itself enforces the engine window (overflow 422).
  *

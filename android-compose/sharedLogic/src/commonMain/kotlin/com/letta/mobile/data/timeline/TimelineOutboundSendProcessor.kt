@@ -38,7 +38,7 @@ internal class TimelineOutboundSendProcessor(
     scope: CoroutineScope,
     private val ingestStreamEvent: suspend (LettaMessage) -> Unit,
     /**
-     * letta-mobile-r3i1z: invoked when an outbound send's response stream ends
+     * Invoked when an outbound send's response stream ends
      * (terminal or error). Each [ingestStreamEvent] call latches the loop's
      * external-transport flag (dual-ingest suppression: while OUR turn streams
      * through the send flow, the persistent stream subscriber must not ingest
@@ -50,7 +50,7 @@ internal class TimelineOutboundSendProcessor(
      */
     private val onSendStreamEnded: suspend () -> Unit = {},
     /**
-     * letta-mobile-dangling-tool (Codex #902 finding 1): the REST/timeline-
+     * The REST/timeline-
      * transport send path (this class) previously never signaled the
      * dangling-tool-call resolver's turn lifecycle — only the WS/iroh
      * ChatSendCoordinator path did, via TimelineRepository.turnStarted /
@@ -85,7 +85,7 @@ internal class TimelineOutboundSendProcessor(
     }
 
     /**
-     * letta-mobile-mxwtn: send with a pre-minted otid. When [appendLocal] is
+     * Send with a pre-minted otid. When [appendLocal] is
      * false, the Local append event is SKIPPED — the caller is expected to
      * have already inserted the Local event into the timeline state
      * synchronously via [com.letta.mobile.data.timeline.TimelineStateTransitionHandler.appendOptimisticLocalSync]

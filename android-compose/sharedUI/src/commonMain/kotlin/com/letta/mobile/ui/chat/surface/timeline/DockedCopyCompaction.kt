@@ -8,7 +8,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import com.letta.mobile.ui.chat.surface.timeline.rows.DockedPromptCompaction
 
-/** How a pinned prompt's images shrink as it docks (letta-mobile-bglj6.1.26). */
+/** How a pinned prompt's images shrink as it docks. */
 internal enum class DockedCopyMotion {
     /** The desktop's pinned card: it only shows once the prompt has left, always compact. */
     AlwaysCompact,

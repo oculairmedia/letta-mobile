@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * letta-mobile-bzvro.15 (F15): `conversation_fork` (letta-code 0.29.12+, `protocol_v2.ts`
+ *  (F15): `conversation_fork` (letta-code 0.29.12+, `protocol_v2.ts`
  * `ConversationForkCommand`). Forks [conversationId] into a new conversation; the options sit
  * in [body], because a fork without them copies the whole conversation.
  *

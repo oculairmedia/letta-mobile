@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
  * "Effort popover (real composer)"): None … Max. Shared in commonMain so the
  * desktop popover and the mobile effort sheet present the same ordered set.
  *
- * letta-mobile-bzvro.18 (F18): the full upstream `reasoning_effort` set (`none`, `minimal`,
+ *  (F18): the full upstream `reasoning_effort` set (`none`, `minimal`,
  * `low`, `medium`, `high`, `xhigh`, `max`); [wire] is the literal `update_model` sends.
  */
 @Serializable

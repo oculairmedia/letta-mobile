@@ -5,7 +5,7 @@ import com.letta.mobile.data.transport.ChannelTransportDefaults
 import com.letta.mobile.data.transport.ServerFrame
 
 /**
- * letta-mobile-fxoew.5: optional capability of a transport whose
+ * Optional capability of a transport whose
  * `subagent.list` can target an explicit parent conversation.
  *
  * The host list is conversation-scoped. [IChannelTransport.sendSubagentList]

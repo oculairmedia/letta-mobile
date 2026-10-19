@@ -19,7 +19,7 @@ import com.letta.mobile.ui.host.LettaConfirmPane
 import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.theme.LettaDimens
 
-/** Small pieces the model-control surfaces share (letta-mobile-w4q4p). */
+/** Small pieces the model-control surfaces share. */
 
 /** A group's provider name in caps: the look of the Models sheet's section headers. */
 @Composable
@@ -78,7 +78,7 @@ fun ReasoningEffortChips(
 }
 
 /**
- * Toolset chooser (letta-mobile-bzvro.22): lets the user switch the active toolset
+ * Toolset chooser: lets the user switch the active toolset
  * when the server advertises available toolsets.
  */
 @Composable

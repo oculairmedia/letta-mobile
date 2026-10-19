@@ -23,7 +23,7 @@ import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.parser.MarkdownParser
 
 /**
- * A host-supplied markdown renderer for the shared chat page (letta-mobile-bglj6.1.16).
+ * A host-supplied markdown renderer for the shared chat page.
  *
  * The default shared renderer is the stock library paint. A host that owns a richer renderer —
  * Android binds the designsystem one the legacy chat used, with syntax-highlighted code fences

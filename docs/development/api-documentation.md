@@ -28,6 +28,19 @@ syntax fail rather than silently reduce coverage; update discovery alongside
 such build changes. There is no package baseline to regenerate. This checks
 coverage, not the semantic accuracy of ownership claims, which still needs review.
 
+The same jobs reject tracking IDs in production KDoc of published modules:
+
+```bash
+python3 scripts/ci/check-kdoc-hygiene.py
+python3 -m unittest discover -s scripts/tests -p test_kdoc_hygiene.py -v
+```
+
+Describe API intent in KDoc; keep issue references in implementation comments or
+commit history. UI test selectors are internal implementation details. Shared
+smoke-run support lives in `:appserver-testkit`, while CLI-only probe metrics live
+in `:cli`; neither module is part of the product API publication. Health probes
+and bundled canvas examples remain public because production consumers use them.
+
 From `android-compose/`, with the Java/Android SDK setup in CONTRIBUTING.md:
 
 ```bash
@@ -270,3 +283,10 @@ commit to a temporary `codex/api-capture/<name>` branch. The narrow push trigger
 runs the same capture jobs. Verify artifact provenance, then delete the temporary
 remote branch after retrieving the outputs. This does not bypass PR checks or
 publish a deployment.
+
+The required Kotlin guardrail scan compares code with the PR merge base before
+selecting changed files. Comment-only edits do not bring unchanged runtime debt
+into scope. New files, code or literal changes, and malformed source remain in
+scope; staged and uncommitted edits are included locally. Git failures stop the
+scan rather than returning an empty selection. This selection does not change
+detekt rules or debt baselines.

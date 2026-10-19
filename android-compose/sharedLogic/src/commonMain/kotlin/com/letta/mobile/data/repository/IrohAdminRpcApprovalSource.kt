@@ -10,14 +10,14 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-qfa81 (P4, inventory row 13): routes user-critical approval
+ *  (P4, inventory row 13): routes user-critical approval
  * submission over `admin_rpc` while the active backend is `iroh://`.
  *
  * Approvals arrive mid-turn (an `approval_request_message` interrupts a running
  * turn). We submit on the per-request `admin_rpc` stream path
  * ([IChannelTransport.adminRpc] → its own bi-stream), so the submission is
  * isolated from the live turn stream and a failure is scoped to this request
- * only (k7yyc) — it never tears down the streaming turn.
+ * only — it never tears down the streaming turn.
  *
  * The server [ApprovalAdminHandlers] `approval.submit` handler forwards
  * [payload] verbatim to `POST /v1/agents/{agent_id}/messages`, identical to the

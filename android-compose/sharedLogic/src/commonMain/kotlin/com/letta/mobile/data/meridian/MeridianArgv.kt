@@ -1,9 +1,9 @@
 package com.letta.mobile.data.meridian
 
 /**
- * Splits a command line the way a POSIX shell splits simple words (letta-mobile-jna0o.3), for front
+ * Splits a command line the way a POSIX shell splits simple words, for front
  * doors that receive one string: the meta-tool's `command`, or a recognizer reading an agent's
- * `meridian ...` Bash call. Whitespace separates words; 'single quotes' are literal; "double
+ * `meridian...` Bash call. Whitespace separates words; 'single quotes' are literal; "double
  * quotes" honour backslash before `"`, `\` and `$`; a bare backslash escapes the next character.
  * No expansion, globbing, pipes or heredocs: JSON belongs on stdin, never here.
  *

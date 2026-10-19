@@ -57,7 +57,7 @@ sealed interface ContextLimitControl {
 }
 
 /**
- * letta-mobile-joigh: the context-limit slider — how much of the model's window the agent (on its
+ * The context-limit slider — how much of the model's window the agent (on its
  * default conversation) or this conversation actually uses. A [StepSlider] over [ContextLimitStops]
  * applied on release; under it one status line for the stop under the thumb (where letta-code
  * auto-compacts, or a warning, with a Compact action when the limit is below what the

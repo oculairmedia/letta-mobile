@@ -40,9 +40,9 @@ interface ChatApprovalAnswerHost {
 }
 
 /**
- * letta-mobile-by4vm.78: the approval-answer lifecycle, one implementation for Android's chat screen
+ * The approval-answer lifecycle, one implementation for Android's chat screen
  * and desktop's controller (each used to carry its own submit / release / reconcile pipeline around
- * the shared [ApprovalSubmissionTracker]); letta-mobile-by4vm.93: also both clients' one
+ * the shared [ApprovalSubmissionTracker]); also both clients' one
  * [ChatApprovalStateSource], with the host's outbox and parked requests mirrored by [bind].
  *
  * An answer is in flight from [submit] until the conversation's timeline stops showing its request

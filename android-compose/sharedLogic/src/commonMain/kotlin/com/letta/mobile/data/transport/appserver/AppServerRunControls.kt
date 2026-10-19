@@ -22,7 +22,7 @@ data class AppServerApprovalAnswer(
 )
 
 /**
- * letta-mobile-o4ygk.4.5: stopping a run and answering approvals over the [AppServerTurnEngine]
+ * Stopping a run and answering approvals over the [AppServerTurnEngine]
  * that runs the turns, in commonMain so every App Server client answers the same way. The engine
  * waits for the server to accept an answer and re-answers a replayed request; a rejection is
  * raised as [ApprovalRejectedException] for the caller to show.

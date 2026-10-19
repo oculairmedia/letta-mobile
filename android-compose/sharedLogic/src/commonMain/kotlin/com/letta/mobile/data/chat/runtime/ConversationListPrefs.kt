@@ -8,12 +8,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-/** letta-mobile-zxk2n.5: the emoji a conversation wears before its title, one of [ConversationListPrefs.MARKER_CHOICES]. */
+/** The emoji a conversation wears before its title, one of [ConversationListPrefs.MARKER_CHOICES]. */
 @JvmInline
 value class ConversationMarker(val emoji: String)
 
 /**
- * letta-mobile-zxk2n.5 (G37): the conversation list's client-side marks, kept in the settings store
+ *  (G37): the conversation list's client-side marks, kept in the settings store
  * so they survive a restart. letta-code's conversation record has no field for any of them
  * (`conversation_update` takes archived, summary, model and the like), so, like pins, they live on
  * the client:
@@ -133,7 +133,7 @@ object ConversationListOrder {
 /** Which way "previous / next conversation" steps through the list. */
 enum class ConversationStep { Previous, Next }
 
-/** letta-mobile-zxk2n.5: previous / next conversation over the list as it is drawn. */
+/** Previous / next conversation over the list as it is drawn. */
 object ConversationNavigation {
     /**
      * The item one [step] from [current] in [ordered] (the list top to bottom), or null at either

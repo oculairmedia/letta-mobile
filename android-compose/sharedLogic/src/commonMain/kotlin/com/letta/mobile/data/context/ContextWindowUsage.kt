@@ -98,7 +98,7 @@ data class ContextWindowUsage(
         }
 
         /**
-         * letta-mobile-r2zo8: a reading that is a total and nothing more — what the App
+         * A reading that is a total and nothing more — what the App
          * Server's `usage_statistics.context_tokens` gives. One "In context" segment, then the
          * free remainder; no category rows, because the source has none to give.
          *

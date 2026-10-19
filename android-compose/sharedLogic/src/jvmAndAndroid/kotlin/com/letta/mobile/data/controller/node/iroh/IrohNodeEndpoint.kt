@@ -53,12 +53,12 @@ class IrohNodeEndpoint(
      */
     private val secretKeyStore: IrohSecretKeyStore? = null,
     /**
-     * REQUIRED authentication policy (d6e8g.2). There is no default: anonymous
+     * REQUIRED authentication policy. There is no default: anonymous
      * operation must be selected explicitly via
      * [IrohAuthPolicy.InsecureAnonymousForTestOnly].
      */
     private val authPolicy: IrohAuthPolicy,
-    /** Optional pairing service (d6e8g.5); shared across every accepted connection. */
+    /** Optional pairing service; shared across every accepted connection. */
     private val pairingService: IrohPairingService? = null,
     /**
      * Relays shared canvases between the apps connected here. When set, the endpoint also
@@ -67,7 +67,7 @@ class IrohNodeEndpoint(
     private val canvasRelay: com.letta.mobile.data.transport.iroh.IrohCanvasRelay? = null,
     /** Additional protocols on this host-owned endpoint; handlers own their connection lifecycle. */
     private val protocolHandlers: List<IrohNodeProtocolHandler> = emptyList(),
-    /** letta-mobile-r1xkl: the host's stream-to-stored identity join, shared by every connection. */
+    /** The host's stream-to-stored identity join, shared by every connection. */
     private val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
 ) {
     /** Live App Server connections by peer id, to gate that peer's canvas connections. */
@@ -78,7 +78,7 @@ class IrohNodeEndpoint(
     // per-NodeId auth-failure rate limiting survives redials.
     private val authVerifier = IrohBearerAuthVerifier(authPolicy)
 
-    /** letta-mobile-by4vm.112: a redialling peer repeats the same failure; count it, log it sparsely. */
+    /** A redialling peer repeats the same failure; count it, log it sparsely. */
     private val handshakeFailures = IrohFailureLog("IrohNode", "incoming.handshake.failed")
 
     init {
@@ -98,7 +98,7 @@ class IrohNodeEndpoint(
     private var _adminRpcRouter: AdminRpcRouter? = null
 
     /**
-     * eaczz.1: ONE registry shared across every connection this endpoint
+     * One registry shared across every connection this endpoint
      * accepts. Maps conversationId -> the set of live viewer handles, enabling
      * a turn on one connection to fan its frames out to all connections viewing
      * the same conversation.
@@ -106,7 +106,7 @@ class IrohNodeEndpoint(
     private val connectionRegistry = ConnectionRegistry()
 
     /**
-     * letta-mobile-qygvv.3: ONE node-owned home for every connection's live turns, a child of
+     * ONE node-owned home for every connection's live turns, a child of
      * the endpoint scope and of no connection, so a peer dropping mid-turn detaches its turn
      * instead of cancelling the server turn under it.
      *
@@ -134,7 +134,7 @@ class IrohNodeEndpoint(
     }
 
     /**
-     * letta-mobile-fxoew.2: wires [publisher] to this endpoint. Its
+     * Wires [publisher] to this endpoint. Its
      * `subagents_updated` frames go to the connections viewing the frame's
      * conversation (the same audience as that conversation's turn stream), and
      * each connection that starts viewing a conversation gets its snapshot
@@ -150,7 +150,7 @@ class IrohNodeEndpoint(
     }
 
     /**
-     * letta-mobile-bzvro.40: wires [publisher] to this endpoint. Its `pending_approvals` frames go to
+     * Wires [publisher] to this endpoint. Its `pending_approvals` frames go to
      * the connections viewing the frame's conversation (the audience of that conversation's turn
      * stream), and each connection that starts viewing a conversation gets its parked requests
      * replayed to it alone.
@@ -165,7 +165,7 @@ class IrohNodeEndpoint(
     }
 
     /**
-     * letta-mobile-a4tm7: wires [publisher] to this endpoint. Its `permission_mode` frames go to the
+     * Wires [publisher] to this endpoint. Its `permission_mode` frames go to the
      * connections viewing the frame's conversation; a viewer that joins later reads the mode itself
      * (`permission_mode.get`), so nothing is replayed.
      */
@@ -469,9 +469,9 @@ class IrohNodeEndpoint(
      * NodeIds and unknown peers that come to redeem an invite are admitted too.
      * Admission never authenticates. In the auth frame ([PeerSessionAuth]):
      * a paired NodeId or a valid invite authenticates regardless of the
-     * allowlist (dpv7m.1); the static bearer token and allowlist
+     * allowlist; the static bearer token and allowlist
      * pre-authentication ([IrohBearerAuthVerifier]) are honoured only for
-     * listed NodeIds when an allowlist is set (by4vm.35), so admitted but
+     * listed NodeIds when an allowlist is set, so admitted but
      * unlisted peers cannot use a leaked token.
      */
     private fun isPeerAllowed(remoteId: String): Boolean =

@@ -3,7 +3,7 @@ package com.letta.mobile.data.controller.fanout
 import kotlinx.coroutines.CancellationException
 
 /**
- * letta-mobile-qygvv.16: the cause a turn subscriber's channel is closed with when the router
+ * The cause a turn subscriber's channel is closed with when the router
  * detaches, i.e. when the transport session that carried the turn is gone (connection closed,
  * redial, wrapper restart). A turn collector that sees it knows the session was lost, not that the
  * turn was cancelled, and ends the turn with a terminal of its own.
@@ -13,7 +13,7 @@ open class RuntimeStreamDetachedCancellation(
 ) : CancellationException(message)
 
 /**
- * letta-mobile-by4vm.4: the cause ONE subscriber's channel is closed with when it fell
+ * The cause ONE subscriber's channel is closed with when it fell
  * [capacity] frames behind and [RuntimeEventFanout.route] could not hand it [droppedFrameType]
  * without blocking. The fanout detaches that subscriber alone (every other subscriber, and the
  * router itself, keep going), so to its collector it is a stream detach like

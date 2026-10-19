@@ -6,7 +6,7 @@ import com.letta.mobile.data.model.CanvasOpId
 
 /**
  * Ops that rebuild a board from its stored snapshot, for a canvas's first join to a host when its
- * op log no longer reaches back to the board's start (letta-mobile-ckmub.17.9): a bounded log drops
+ * op log no longer reaches back to the board's start: a bounded log drops
  * settled history, so uploading only the log would give the host the kept tail, not the board.
  */
 fun interface CanvasSnapshotSeed {

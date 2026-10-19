@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 /**
- * letta-mobile-bzvro.27 (F27): the person's notification choices. A muted agent posts nothing at
+ *  (F27): the person's notification choices. A muted agent posts nothing at
  * all (approvals, finished replies, message notifications); [approvalNotificationsEnabled] turns
  * approval notifications off for every agent.
  */

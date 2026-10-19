@@ -22,7 +22,7 @@ import com.letta.mobile.ui.host.LettaConfirmRequest
  * [produceState] remembers its initial value once and only restarts its producer on a new key, so
  * the state itself is keyed on the contribution: without it a rebuilt contribution (Android builds
  * one per view-model state, with no updates flow) kept drawing the first model, and a controlled
- * field such as the Hugging Face token never showed what was typed (letta-mobile-by4vm).
+ * field such as the Hugging Face token never showed what was typed.
  */
 @Composable
 fun SettingsContributionSection(contribution: SettingsContribution, modifier: Modifier = Modifier) {

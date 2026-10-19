@@ -4,12 +4,12 @@ import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 
 /**
- * letta-mobile-5172y.1: PURE commonMain model that groups ephemeral
+ * PURE commonMain model that groups ephemeral
  * "Letta Code" subagent conversations by AUTHORITATIVE parent provenance.
  *
  * Consumed by BOTH mobile and desktop (later beads). No UI, no coroutines,
  * no java.*, no platform APIs — just a pure function + data types so it is
- * gated by :sharedLogic:allTests (jvm + android-unit + hostNative).
+ * gated by:sharedLogic:allTests (jvm + android-unit + hostNative).
  *
  * Sibling precedent: [groupConversationsByAgentName] in
  * ChatRuntimeContracts.kt groups the SAME [ChatConversationSummary] type by
@@ -20,7 +20,7 @@ import com.letta.mobile.data.model.SubagentStatus
  *
  * GRACEFUL DEGRADATION: live subagent identity
  * ([SubagentEntry.subagentConversationId] / [SubagentEntry.subagentAgentId])
- * may be null today (filled later by m6oa1.3 PR-B). When NO entry matches any
+ * may be null today (filled later by PR-B). When NO entry matches any
  * conversation, the function returns zero stacks and every conversation as
  * ungrouped — it never crashes and never guesses.
  */

@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
 /**
- * letta-mobile-73o2h.1: wire shape of a single registered subagent as
+ * Wire shape of a single registered subagent as
  * carried over the shim's active-subagent registry (sister to the cron
  * protocol). Mirrors the entry shape documented in
  * `admin-shim/docs/MOBILE_WS_PROTOCOL.md` §13.2 verbatim so the persisted
@@ -17,16 +17,15 @@ import kotlinx.serialization.Transient
  *  - [taskId] / [subagentAgentId] / [parentRunId] are derived from the
  *    background dispatch's return body; they are absent for synchronous
  *    dispatches that haven't returned identity yet.
- *  - [parentAgentId] / [parentConversationId] (letta-mobile-m6oa1.2, §13.2)
+ *  - [parentAgentId] / [parentConversationId] (§13.2)
  *    are the INTERIM shim-emitted parent provenance so mobile can group
  *    ephemeral subagents by authoritative parent identity WITHOUT inferring
  *    from the display name. Both are optional + nullable: older shims omit
  *    them, and the shim emits null when the parent identity is not in scope
- *    at the ingesting call site. Origination moves to the Kotlin App Server
- *    later in epic m6oa1.
+ *    at the ingesting call site.
  *
  * Status vocabulary (§13.2): `running` | `completed` | `failed` |
- * `cancelled`. `cancelled` (letta-mobile-drv4a) is the NON-CLEAN terminal
+ * `cancelled`. `cancelled`  is the NON-CLEAN terminal
  * outcome — a subagent that was killed / evicted / orphaned / TaskStop'd, or
  * whose backing process died without a completion frame. The shim is the
  * source of truth; mobile renders whatever string arrives — [SubagentStatus]
@@ -37,7 +36,7 @@ import kotlinx.serialization.Transient
  * eagerly at this layer.
  */
 /**
- * letta-mobile-i2f23: wire shape of the shim's per-subagent
+ * Wire shape of the shim's per-subagent
  * todo_progress snapshot — { completed: Int, total: Int }. Nullable
  * with default on [SubagentEntry] so older shims parse without error.
  */
@@ -73,17 +72,17 @@ data class SubagentEntry(
     @SerialName("todo_progress") val todoProgress: SubagentTodoProgressWire? = null,
     /** Client-owned lifecycle timestamp; never encoded onto the wire. */
     @Transient val terminalAtEpochMs: Long? = null,
-    /** letta-mobile-ve08r AC#4 (stream-timeout watchdog): last observed progress
+    /**  AC#4 (stream-timeout watchdog): last observed progress
      *  timestamp (any push mentioning this entry counts as progress). Used by
      *  SubagentRepository to flip running entries to FAILED with failureReason =
      *  "stream_timeout" once `now - lastSeenAtMs > STREAM_TIMEOUT_MS`. */
     @Transient val lastSeenAtMs: Long = 0L,
-    /** letta-mobile-ve08r AC#4: human-readable terminal-failure reason for the
+    /**  AC#4: human-readable terminal-failure reason for the
      *  UI (e.g. "stream_timeout"). Set when `status` flips to a terminal failure;
      *  remains null for success/cancelled/no-terminal outcomes. */
     @Transient val failureReason: String? = null,
     /**
-     * letta-mobile-ulcg6 (RC5): native letta-code progress, carried by hosts
+     *  (RC5): native letta-code progress, carried by hosts
      * that decode the full `update_subagent_state` snapshot. All optional:
      * older hosts omit them and older clients ignore them.
      *  - [toolCallCount]: tool calls the subagent has made so far.
@@ -106,20 +105,20 @@ object SubagentStatus {
     const val FAILED = "failed"
 
     /**
-     * letta-mobile-drv4a: non-clean terminal outcome — the subagent was
+     * Non-clean terminal outcome — the subagent was
      * killed / evicted (idle reaper) / orphaned / TaskStop'd, or its backing
      * process/session/run died without writing a completion frame. The shim's
      * reaper finalizes such entries `cancelled` so the chip stops being stuck
      * `running` forever. Rendered as a terminal (failed-styled) chip that
-     * lingers then dismisses (29h9u).
+     * lingers then dismisses.
      */
     const val CANCELLED = "cancelled"
 
     /**
-     * letta-mobile-al6q5: the ONE wire-status vocabulary.
+     * The ONE wire-status vocabulary.
      *
      * The App Server's terminal value for a successful subagent is `success`
-     * (confirmed live in the m6oa1.6 capture), not `completed`. That value used
+     * (confirmed live in the capture), not `completed`. That value used
      * to be understood by exactly one of the three mappers that read it, so a
      * SUCCESSFUL subagent decoded as an unrecognized status and fell through
      * the "unknown means still running" fallback — the chip stayed RUNNING
@@ -147,7 +146,7 @@ object SubagentStatus {
 }
 
 /**
- * letta-mobile-73o2h.1: one TodoWrite entry from a subagent's latest
+ * One TodoWrite entry from a subagent's latest
  * snapshot (§13.3). `status` mirrors the TodoWrite tool vocabulary:
  * `pending | in_progress | completed`.
  */

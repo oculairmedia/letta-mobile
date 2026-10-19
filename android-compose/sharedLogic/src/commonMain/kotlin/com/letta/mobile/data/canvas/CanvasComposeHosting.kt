@@ -14,7 +14,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * What the two hosts of `canvas_compose` share around [CanvasComposeService] (letta-mobile-bglj6.12):
+ * What the two hosts of `canvas_compose` share around [CanvasComposeService]:
  * the Iroh host ([HostCanvasTools], through the relay's log) and an app talking to its own App
  * Server ([CanvasComposeTool], through the canvas store and the live session). Each host resolves
  * the canvas and checks the caller its own way, then hands the call here, so the request is read,

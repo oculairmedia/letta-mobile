@@ -87,7 +87,7 @@ object RunPhaseReducer {
     }
 
     /**
-     * letta-mobile-bzvro.27: remember which approval request the turn is parked on. A new request
+     * Remember which approval request the turn is parked on. A new request
      * names itself; any other event keeps the id while the turn stays parked and drops it once the
      * turn moves on.
      */

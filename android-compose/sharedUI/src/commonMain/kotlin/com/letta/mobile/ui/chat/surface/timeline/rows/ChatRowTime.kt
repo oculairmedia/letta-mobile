@@ -21,7 +21,7 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * "9:41 AM", or "09:41" on a [twentyFourHour] clock, in the system zone; null for a blank or
- * unparseable timestamp. letta-mobile-bglj6.1.23: the rows pass [systemUses24HourClock], so the
+ * unparseable timestamp. the rows pass [systemUses24HourClock], so the
  * clock follows the system's 12/24-hour setting as the legacy DeliveryTimeText did.
  */
 internal fun messageClockLabel(

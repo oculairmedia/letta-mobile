@@ -10,12 +10,12 @@ import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 
 /**
- * letta-mobile-bglj6.1: every user intent the shared chat page can raise against the
+ * Every user intent the shared chat page can raise against the
  * conversation's owner.
  *
- * Android's `AdminChatViewModel` and desktop's `DesktopChatController` each implement
- * this behind [ChatSessionPort]. The page never calls a platform API to change chat
- * state; it calls one of these. Host navigation (open the canvas, open an agent,
+ * [TimelineChatSessionPort] supplies these handlers through its shared timeline and
+ * extension actions. The page forwards conversation intents through [ChatSessionPort.actions].
+ * Host navigation (open the canvas, open an agent,
  * pick a file) is not here; it is [ChatSurfaceHost]'s, because it changes what is on
  * screen rather than the conversation.
  *
@@ -33,7 +33,7 @@ interface ChatActions :
     /** Stops the active run. A second call while a stop is outstanding force-clears locally. */
     fun stopRun()
 
-    /** Stops a background process or monitor on the server (letta-mobile-bzvro.21). */
+    /** Stops a background process or monitor on the server. */
     fun stopBackgroundProcess(processId: String) = Unit
 
     fun rerun(message: UiMessage)
@@ -89,7 +89,7 @@ interface ChatHostCommandActions {
 
     fun uninstallComposerCommand(command: ChatComposerCommand)
 
-    /** letta-mobile-zxk2n.5: the page has shown a finished `/recompile` answer; the owner may clear it. */
+    /** The page has shown a finished `/recompile` answer; the owner may clear it. */
     fun dismissRecompileStatus() = Unit
 
     fun submitA2uiAction(action: A2uiAction)
@@ -98,20 +98,20 @@ interface ChatHostCommandActions {
 /** Branching the conversation from one of its messages. */
 interface ChatBranchActions {
     /**
-     * letta-mobile-bzvro.15 (F15): branch the conversation from [message] into a new one and open
+     *  (F15): branch the conversation from [message] into a new one and open
      * it ([ChatSurfaceCapabilities.fork]), named [name] when given ([ChatSurfaceCapabilities.nameForks]).
      * The original conversation is not changed.
      */
     fun forkFromMessage(message: UiMessage, name: String? = null) = Unit
 
     /**
-     * letta-mobile-bzvro.16 (F16): fork just before the user's [message], open the fork, and put
+     *  (F16): fork just before the user's [message], open the fork, and put
      * the prompt's text in its composer to edit and send ([ChatSurfaceCapabilities.editAndResend]).
      */
     fun editAndResend(message: UiMessage) = Unit
 
     /**
-     * letta-mobile-7mys7 (G36): fork just before the user's [message], open the fork and send the
+     *  (G36): fork just before the user's [message], open the fork and send the
      * prompt there again, so it is answered afresh while the original keeps its answer
      * ([ChatSurfaceCapabilities.rerunInFork]). Unlike [ChatActions.rerun] ("Send again"), nothing
      * is appended to this conversation.
@@ -147,7 +147,7 @@ interface ChatConversationSettingsActions {
 
     fun changeWorkingDirectory(directory: ChatWorkingDirectory)
 
-    /** letta-mobile-bzvro.13: asks for another permission mode on this conversation (owners with a mode chip). */
+    /** Asks for another permission mode on this conversation (owners with a mode chip). */
     fun setPermissionMode(mode: AppServerPermissionMode) = Unit
 }
 
@@ -192,7 +192,7 @@ data class ChatSurfaceCapabilities(
 data class ChatSurfaceHost(
     val openCanvas: (() -> Unit)? = null,
     /**
-     * letta-mobile-bglj6.13: "Show on canvas" on a canvas_compose card: open the conversation's
+     * "Show on canvas" on a canvas_compose card: open the conversation's
      * board and frame [CanvasArtifactReceipt.bounds]. A page that draws the canvas itself binds
      * this to its own board (ChatSurface does, through ChatCanvasActions); a host that only has a
      * canvas route passes null and the card falls back to [openCanvas], without framing. An

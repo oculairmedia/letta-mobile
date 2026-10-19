@@ -23,7 +23,7 @@ import com.letta.mobile.ui.host.LettaPaneButtons
 import com.letta.mobile.ui.host.LettaPaneKind
 
 /**
- * letta-mobile-zxk2n.5 (G37): every archived chat in one place, whatever the panel's filter, each
+ *  (G37): every archived chat in one place, whatever the panel's filter, each
  * with Restore (unarchive on the server) and a tap to open it: a [RosterList] in a dialog pane, so
  * a restored chat leaves and the rows below glide up instead of jumping.
  */

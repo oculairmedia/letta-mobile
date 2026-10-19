@@ -15,7 +15,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * letta-mobile-zxk2n.2: what a host's user inputs carry of letta-code 0.34's delivery contract.
+ * What a host's user inputs carry of letta-code 0.34's delivery contract.
  *
  * - [consumerId] names this client in `input.terminal_consumer_id`. The server then keeps the
  *   turn's `turn_finished` until this client answers `turn_finished_ack`, replays it after a
@@ -80,14 +80,14 @@ internal fun AppServerCommand.Input.withDurableFields(fields: DurableInputFields
     )
 }
 
-/** letta-mobile-zxk2n.2: what [TurnInputSender] needs for 0.34 delivery; the defaults send nothing new. */
+/** What [TurnInputSender] needs for 0.34 delivery; the defaults send nothing new. */
 internal class DurableInputSending(
     val delivery: DurableTurnDelivery = DurableTurnDelivery.OFF,
     val resumption: InputResumption = InputResumption(sessionLink = null),
 )
 
 /**
- * letta-mobile-zxk2n.2: waits for a dropped session to come back so an unacknowledged input can be
+ * Waits for a dropped session to come back so an unacknowledged input can be
  * sent again. Without a [sessionLink] (a direct client that never reconnects) nothing is waited for.
  */
 internal class InputResumption(

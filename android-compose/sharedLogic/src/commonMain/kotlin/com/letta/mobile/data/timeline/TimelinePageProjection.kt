@@ -37,7 +37,7 @@ data class TimelinePageProjectionInput(
     val envelope: TimelineRunEnvelope,
 ) {
     /**
-     * letta-mobile-bglj6.13: the page's canvas_compose receipts, attached over its presented events.
+     * The page's canvas_compose receipts, attached over its presented events.
      * A receipt follows its TOOL_CALL record: a run split across pages puts it on the tool call's
      * page (on the call itself when the narration is on another page), so it is never shown twice.
      */
@@ -76,7 +76,7 @@ private fun ChatRenderItem.withReceipts(receipts: List<CanvasArtifactReceipt>?):
  * render block owns the combined item and the remaining records are dropped from presentation.
  *
  * A single-message run is claimed too: its page-built item carries the turn latency the run
- * disclosure needs, which a per-record projection cannot see (letta-mobile-qygvv.20).
+ * disclosure needs, which a per-record projection cannot.
  */
 internal fun TimelinePageProjectionInput.aggregatePreparedRuns(
     prepared: List<TimelineSettledRecord>,
@@ -146,7 +146,7 @@ private fun TimelinePageProjectionInput.claimRun(
  * Skill instruction envelopes are hidden model context, not human turn boundaries. Returns are
  * folded into their canonical owners before projection; do not infer ownership for arbitrary
  * hidden rows (including orphan returns). A run's own stop_reason and usage frames close a step, not
- * the turn, and (letta-mobile-jqiu3) neither does a whitespace-only text segment between its tool
+ * the turn, and neither does a whitespace-only text segment between its tool
  * calls, which the settled projection drops.
  */
 private fun TimelinePageProjectionInput.spansVisibleGap(sources: List<IndexedRenderedRecord>): Boolean =

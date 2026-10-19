@@ -18,7 +18,7 @@ internal sealed interface CanvasOpsRead {
 }
 
 /**
- * `connect` is an agent input only (letta-mobile-i9yps.1). It becomes ONE [CanvasOp.BatchOp] of an
+ * `connect` is an agent input only. It becomes ONE [CanvasOp.BatchOp] of an
  * arrow and the existing binding op before the batch is checked, logged or relayed, so the op log
  * never sees `connect`, the arrow and its binding are one log entry, and every op after a connect
  * keeps the index the agent gave it (the batch's children are `2.0` and `2.1`). A connect inside a

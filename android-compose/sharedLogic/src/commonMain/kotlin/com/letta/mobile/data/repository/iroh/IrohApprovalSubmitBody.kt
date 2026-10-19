@@ -34,12 +34,12 @@ internal object IrohApprovalSubmitBody {
         )
     }
 
-    /** letta-mobile-bzvro.40: an approval that also persists the server-offered rules [suggestionIds]. */
+    /** An approval that also persists the server-offered rules [suggestionIds]. */
     fun alwaysAllow(binding: ApprovalBinding, suggestionIds: List<String>): ApprovalCreate =
         decision(binding.approvalId, binding.toolCallId, approve = true, reason = null)
             .copy(selectedPermissionSuggestionIds = suggestionIds)
 
-    /** letta-mobile-bzvro.14: an outbox entry as the host takes it (an always-allow when it carries rule ids). */
+    /** An outbox entry as the host takes it (an always-allow when it carries rule ids). */
     fun paramsFor(entry: OutboxApproval): JsonObject {
         val approval = if (entry.selectedSuggestionIds.isEmpty()) {
             decision(entry.requestId, entry.toolCallIds.firstOrNull(), entry.approve, entry.reason)
@@ -49,7 +49,7 @@ internal object IrohApprovalSubmitBody {
         return params(entry.agentId, entry.conversationId, approval)
     }
 
-    /** letta-mobile-bzvro.14: an always-allow as an outbox entry, keyed by the call it answers. */
+    /** An always-allow as an outbox entry, keyed by the call it answers. */
     fun outboxEntry(answer: AlwaysAllowAnswer): OutboxApproval = OutboxApproval.of(
         OutboxTarget(answer.agentId, answer.conversationId),
         ChatApprovalAnswer(

@@ -3,11 +3,11 @@ package com.letta.mobile.data.meridian
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 
 /**
- * How an agent is offered the host's tools (letta-mobile-jna0o.9, flag `agent-tools-mode`).
+ * How an agent is offered the host's tools (flag `agent-tools-mode`).
  *
  * - [NATIVE]: every tool as its own external tool, as hosts always have. The default.
  * - [CLI]: no tool at all; the agent runs the `meridian` CLI from its shell, pointed at by the
- *   `meridian-canvas` skill line (the shim and skill are letta-mobile-jna0o.4/.5). Only a host with
+ *   `meridian-canvas` skill line (the shim and skill are). Only a host with
  *   that front door may use it ([AgentToolsModePolicy.withoutCli]).
  * - [META]: the single `meridian` meta-tool; the tools are reached through it.
  */
@@ -36,7 +36,7 @@ fun interface AgentToolsModes {
 }
 
 /**
- * The `agent-tools-mode` flag: a host default, overridable per agent (letta-mobile-jna0o.9).
+ * The `agent-tools-mode` flag: a host default, overridable per agent.
  * [isNativeEverywhere] hosts keep their registry untouched, so native stays byte-identical.
  */
 data class AgentToolsModePolicy(
@@ -51,7 +51,7 @@ data class AgentToolsModePolicy(
     /**
      * This policy for a host with no `meridian` CLI front door (desktop direct, Android embedded):
      * [AgentToolsMode.CLI] would leave its agents with no way to reach the tools, so it is native
-     * there until the in-process loopback (letta-mobile-jna0o.11) lands.
+     * there until the in-process loopback lands.
      */
     fun withoutCli(): AgentToolsModePolicy = AgentToolsModePolicy(
         hostDefault.withoutCli(),

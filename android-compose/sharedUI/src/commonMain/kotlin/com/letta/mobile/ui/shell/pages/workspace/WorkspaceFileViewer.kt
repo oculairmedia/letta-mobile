@@ -45,7 +45,7 @@ import com.letta.mobile.ui.host.PaneSize
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * The read-only file viewer shared by desktop and Android (letta-mobile-bzvro.26): a workspace
+ * The read-only file viewer shared by desktop and Android: a workspace
  * file with line numbers and syntax colours, or why it cannot be shown (binary, too large,
  * unreadable). It draws nothing while [state] has no file open.
  *

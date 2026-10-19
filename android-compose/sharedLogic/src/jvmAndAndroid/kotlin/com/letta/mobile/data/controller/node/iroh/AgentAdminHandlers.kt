@@ -205,7 +205,7 @@ object AgentAdminHandlers {
     }
 
     /**
-     * lgns8.9: `agent.context` is served from the on-disk local backend store.
+     * `agent.context` is served from the on-disk local backend store.
      *
      * admin-shim's `GET /v1/agents/{id}/context` was itself a store read
      * (`handleAgentContext`: agent record + `system-prompt.json` + the transcript
@@ -216,7 +216,7 @@ object AgentAdminHandlers {
      * The page guard still runs on the result: context carries the prompt text,
      * and bounding it is controller-owned regardless of source.
      *
-     * letta-mobile-cyh28: an optional `reported_total` (the client's latest streamed
+     * an optional `reported_total` (the client's latest streamed
      * `context_tokens`) is what the estimated sections are matched to.
      */
     private fun registerAgentContext(router: AdminRpcRouter, store: LocalBackendAdminStore?) {
@@ -244,7 +244,7 @@ object AgentAdminHandlers {
     private const val DEFAULT_AGENT_LIST_LIMIT = 20L
 
     /**
-     * letta-mobile-pu7j7: ceiling for the offset-emulation fetch so a bogus
+     * Ceiling for the offset-emulation fetch so a bogus
      * offset cannot request an unbounded read. Far above any real roster
      * (~100 agents in production stores).
      */

@@ -20,7 +20,7 @@ data class AppServerIdentity(
 )
 
 /**
- * The classified outcome of an App Server "Test connection" probe (letta-mobile-bzvro.1, F01).
+ * The classified outcome of an App Server "Test connection" probe (F01).
  *
  * [Authentication] and [Incompatible] are terminal: retrying the same URL and token cannot succeed,
  * so a reconnect loop must stop on them (F02). [Unavailable] is transient.

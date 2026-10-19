@@ -59,17 +59,17 @@ fun interface ShellPageContent<in D : ShellDestination> {
 }
 
 /**
- * letta-mobile-ckmub.3.4 (hard cut S5, primitive P8): what [ShellPage] draws each destination with.
+ *  (hard cut S5, primitive P8): what [ShellPage] draws each destination with.
  *
  * A host fills only the pages it can show right now (Android builds one per nav entry, the desktop
  * and web all of theirs); a destination without one goes to [fallback].
  *
  * - The shared pages ([home], [channels], [skills], [schedules], [memory], [settings], and the [admin] pages) are built from the shared
- *   page bindings below ([shellHomePage], ...), so the page itself is always the sharedUI one.
+ *   page bindings below ([shellHomePage],...), so the page itself is always the sharedUI one.
  * - [chat] is the platform's chat-page container: it binds the shared ChatSurface to the platform's
  *   session port (DesktopSharedChatPage, SharedChatPage, WebSharedChatPage). It stays a slot.
  * - [fallback] is TEMPORARY: the platform pages that have no shared page yet (listed in the bead
- *   letta-mobile-ckmub.3.4 and in the hosts' fallbacks). Each later slice moves one into sharedUI
+ *    and in the hosts' fallbacks). Each later slice moves one into sharedUI
  *   and deletes its fallback branch; copying a fallback page into another platform is a review blocker.
  */
 class ShellPageDeps(
@@ -106,7 +106,7 @@ class ShellPageDeps(
     ).mapNotNull { (kind, page) -> page?.let { kind to it } }.toMap()
 
     /**
-     * letta-mobile-ckmub.3.12 (S10): Overview has no page of its own. It is the Settings page opened
+     *  (S10): Overview has no page of its own. It is the Settings page opened
      * on its diagnostics section, so a host with a Settings page never needs a fallback for it.
      */
     private val overview: ShellPageContent<ShellDestination>? = settings?.let { page ->
@@ -124,14 +124,14 @@ class ShellPageDeps(
 }
 
 /**
- * letta-mobile-ckmub.2.6: the fleet's admin pages (the run monitor, the starter templates, the projects
+ * The fleet's admin pages (the run monitor, the starter templates, the projects
  * catalog), built from [shellRunsPage], [shellTemplatesPage] and [shellProjectsPage].
  */
 class ShellAdminPages(
     val runs: ShellPageContent<ShellDestination.Runs>? = null,
     val templates: ShellPageContent<ShellDestination.Templates>? = null,
     val projects: ShellPageContent<ShellDestination.Projects>? = null,
-    /** The host's plugins (letta-mobile-cdgpr.9), built from [com.letta.mobile.ui.shell.pages.plugins.shellPluginsPage]. */
+    /** The host's plugins, built from [com.letta.mobile.ui.shell.pages.plugins.shellPluginsPage]. */
     val plugins: ShellPageContent<ShellDestination.Plugins>? = null,
 )
 
@@ -188,7 +188,7 @@ fun shellSkillsPage(
     )
 }
 
-/** The shared Schedules page (letta-mobile-ckmub.3.16). */
+/** The shared Schedules page. */
 fun shellSchedulesPage(
     state: SchedulesPageState,
     actions: SchedulesPageActions,
@@ -203,7 +203,7 @@ fun shellMemoryPage(binding: MemoryWorkspaceBinding) = ShellPageContent<ShellDes
 }
 
 /**
- * A chat destination without an agent: the fleet conversations page (letta-mobile-ckmub.2.4). A host
+ * A chat destination without an agent: the fleet conversations page. A host
  * whose chat page is its own container registers this only where a chat route has no agent.
  */
 fun shellConversationsPage(
@@ -223,7 +223,7 @@ fun shellSettingsPage(
 }
 
 /**
- * letta-mobile-ckmub.3.24 (hard cut S15): what the shared agent editor is bound to. [controller] is the
+ *  (hard cut S15): what the shared agent editor is bound to. [controller] is the
  * host's editor for an agent id (null: a new agent), kept by the host for as long as it shows the page
  * (Android's view model, the desktop pane's composition); [options] wires the page for that editor.
  */
@@ -239,7 +239,7 @@ fun shellAgentEditorPage(binding: AgentEditorBinding) = ShellPageContent<ShellDe
     AgentEditorPage(state = state, actions = controller, options = binding.options(destination.agentId, controller), modifier = modifier)
 }
 
-/** The shared run monitor (letta-mobile-ckmub.2.5); [slots] are the host's search field and refresh. */
+/** The shared run monitor; [slots] are the host's search field and refresh. */
 fun shellRunsPage(
     state: RunsPageState,
     actions: RunsPageActions,
@@ -248,14 +248,14 @@ fun shellRunsPage(
     RunsPage(state = state, actions = actions, modifier = modifier, slots = slots)
 }
 
-/** The shared starter templates (letta-mobile-ckmub.2.5). */
+/** The shared starter templates. */
 fun shellTemplatesPage(state: AgentTemplatesState, actions: TemplatesPageActions) =
     ShellPageContent<ShellDestination.Templates> { _, modifier ->
         TemplatesPage(state = state, actions = actions, modifier = modifier)
     }
 
 /**
- * The shared projects catalog (letta-mobile-ckmub.2.5). Projects ride an Iroh host's relay: a host
+ * The shared projects catalog. Projects ride an Iroh host's relay: a host
  * whose backend cannot list them binds [shellProjectsUnavailablePage] instead.
  */
 fun shellProjectsPage(
@@ -266,7 +266,7 @@ fun shellProjectsPage(
     ProjectsPage(state = state, actions = actions, modifier = modifier, slots = slots)
 }
 
-/** The Projects destination on a backend without projects: says so, and why (letta-mobile-ckmub.2.6). */
+/** The Projects destination on a backend without projects: says so, and why. */
 fun shellProjectsUnavailablePage(onOpenSettings: (() -> Unit)? = null) =
     ShellPageContent<ShellDestination.Projects> { _, modifier ->
         ProjectsUnavailable(onOpenSettings = onOpenSettings, modifier = modifier)

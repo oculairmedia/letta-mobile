@@ -4,7 +4,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationClass
 
 /**
- * letta-mobile-bn008.3: routing decision for an inbound direct agent-to-agent
+ * Routing decision for an inbound direct agent-to-agent
  * message. Pure + deterministic so it is fully headless-testable; the QUIC
  * listener and turn-trigger wire around it.
  *
@@ -18,7 +18,7 @@ import com.letta.mobile.data.model.ConversationClass
  *  - Queue-if-busy: the chosen interactive conversation is busy -> queue on it;
  *    NEVER reroute to a different conversation on busy.
  *  - Never hard-fail on a missing conversation.
- *  - letta-mobile-5m1qy: an explicit targetConversationId overrides the
+ *  - an explicit targetConversationId overrides the
  *    most-recent pick (Deliver/Queue per busy state); a target that does not
  *    exist is dropped with the distinct reason "target_conversation_not_found"
  *    (never created). All safety guards still run before explicit targeting.
@@ -53,7 +53,7 @@ class IrohAgentMessageRouter(
      * Decide where an inbound message goes. [candidates] are the target agent's
      * conversations with busy state (any order); most-recent is picked by
      * lastMessageAt/updatedAt among the INTERACTIVE ones. When
-     * [targetConversationId] is non-null (5m1qy), the message routes to that
+     * [targetConversationId] is non-null, the message routes to that
      * exact conversation instead of the most-recent-interactive pick.
      */
     fun route(
@@ -114,7 +114,7 @@ class IrohAgentMessageRouter(
          * Pure most-recent-INTERACTIVE pick (never AUTONOMOUS/heartbeat).
          * This is the "which conversation" half of [route]; the busy flag
          * only decides Deliver-vs-Queue, not which. Exposed so the
-         * client-side tap-to-navigate picker (letta-mobile-i9h61.3) can
+         * client-side tap-to-navigate picker can
          * run the identical deterministic policy against the target
          * agent's conversation list and land on the same conversation the
          * router chose at receive time.
@@ -126,7 +126,7 @@ class IrohAgentMessageRouter(
     }
 
     /**
-     * letta-mobile-5m1qy: route to the sender-declared target conversation.
+     * Route to the sender-declared target conversation.
      * A target missing from [candidates] is dropped with a distinct reason —
      * never created — so an explicit send cannot silently open a fresh conv.
      */

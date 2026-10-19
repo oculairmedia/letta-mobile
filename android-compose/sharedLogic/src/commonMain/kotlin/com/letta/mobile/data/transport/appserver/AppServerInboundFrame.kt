@@ -31,9 +31,9 @@ sealed interface AppServerInboundFrame {
          * Absent/null means baseline framing only.
          */
         val capabilities: List<String>? = null,
-        /** letta-mobile-dpv7m: true when this auth bound (or found) a paired NodeId via an invite. */
+        /** True when this auth bound (or found) a paired NodeId via an invite. */
         val paired: Boolean? = null,
-        /** letta-mobile-dpv7m: the NodeId was already paired; the presented invite was left unused. */
+        /** The NodeId was already paired; the presented invite was left unused. */
         @SerialName("already_paired") val alreadyPaired: Boolean? = null,
     ) : AppServerInboundFrame {
         @Transient
@@ -93,7 +93,7 @@ sealed interface AppServerInboundFrame {
         override val type: String = "abort_message_response"
     }
 
-    /** letta-mobile-qygvv.6: answer to a `resume_queue` that carried a `request_id`. */
+    /** Answer to a `resume_queue` that carried a `request_id`. */
     @Serializable
     @SerialName("resume_queue_response")
     data class ResumeQueueResponse(
@@ -108,7 +108,7 @@ sealed interface AppServerInboundFrame {
         override val type: String = "resume_queue_response"
     }
 
-    /** letta-mobile-qygvv.6: answer to `remove_queue_item`; `success=false` means no such item. */
+    /** Answer to `remove_queue_item`; `success=false` means no such item. */
     @Serializable
     @SerialName("remove_queue_item_response")
     data class RemoveQueueItemResponse(
@@ -237,7 +237,7 @@ sealed interface AppServerInboundFrame {
          */
         val removed: List<AppServerQueueRemoval> = emptyList(),
         /**
-         * letta-mobile-qygvv.6: a snapshot-level pause flag. Upstream 0.32.3 flags each parked
+         * A snapshot-level pause flag. Upstream 0.32.3 flags each parked
          * item instead ([AppServerQueueItem.paused]); this is read too in case a server sends it.
          */
         @SerialName("paused") val pausedFlag: Boolean? = null,
@@ -249,7 +249,7 @@ sealed interface AppServerInboundFrame {
         override val requestId: String? = null
 
         /**
-         * letta-mobile-qygvv.6: typed view of [queue]. An entry that does not decode is skipped
+         * Typed view of [queue]. An entry that does not decode is skipped
          * rather than failing the frame; unknown fields are ignored.
          */
         val items: List<AppServerQueueItem>
@@ -633,7 +633,7 @@ sealed interface AppServerInboundFrame {
     }
 
     /**
-     * Inbound push notifying that cron tasks have changed on the App Server (letta-mobile-bzvro.23).
+     * Inbound push notifying that cron tasks have changed on the App Server.
      */
     @Serializable
     @SerialName("crons_updated")
@@ -898,7 +898,7 @@ sealed interface AppServerInboundFrame {
     }
 
     /**
-     * Response to `app_server_info` capability discovery request (lgns8.24).
+     * Response to `app_server_info` capability discovery request.
      *
      * Upstream carries server version, protocol version, backend, and capability
      * flags as top-level fields. [info] reconstructs the typed descriptor callers
@@ -986,7 +986,7 @@ sealed interface AppServerInboundFrame {
     /**
      * A frame that could not be decoded (malformed known frame, non-object frame,
      * or invalid JSON syntax). Surfacing this instead of throwing keeps receive
-     * loops alive (letta-mobile-lgns8.4). The raw envelope is preserved when it
+     * loops alive. The raw envelope is preserved when it
      * parsed to an object; [diagnostic] is bounded and credential-redacted and is
      * the only part safe to log/trace/fan out.
      */
@@ -1023,7 +1023,7 @@ data class AppServerQueueRemoval(
 )
 
 /**
- * letta-mobile-qygvv.6: one entry of an `update_queue` snapshot (upstream `QueueMessage`).
+ * One entry of an `update_queue` snapshot (upstream `QueueMessage`).
  * `content` stays in the raw [AppServerInboundFrame.UpdateQueue.queue] object.
  */
 @Serializable

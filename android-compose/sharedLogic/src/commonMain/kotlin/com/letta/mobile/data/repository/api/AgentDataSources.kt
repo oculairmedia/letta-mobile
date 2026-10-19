@@ -56,7 +56,7 @@ interface AgentIrohSource {
     suspend fun deleteAgent(id: AgentId)
     suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview
 
-    /** letta-mobile-cyh28: `agent.context` with the client's streamed total to match. */
+    /** `agent.context` with the client's streamed total to match. */
     suspend fun getContextBreakdown(
         agentId: AgentId,
         conversationId: ConversationId?,

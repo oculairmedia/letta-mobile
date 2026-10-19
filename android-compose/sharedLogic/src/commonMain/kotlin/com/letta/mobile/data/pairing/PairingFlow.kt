@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Every way pairing can fail, as the user should hear it (letta-mobile-dpv7m.2).
+ * Every way pairing can fail, as the user should hear it.
  * Never carries the secret, the raw QR value, or server error text.
  */
 enum class PairingError {
@@ -57,7 +57,7 @@ fun interface PairedHostStore {
     suspend fun saveAndActivate(host: PairedHost)
 }
 
-/** Human-checkable host ids (dpv7m.5): first and last six characters, never the whole key in primary UI. */
+/** Human-checkable host ids: first and last six characters, never the whole key in primary UI. */
 object HostIds {
     private const val EDGE_CHARS = 6
 
@@ -69,7 +69,7 @@ sealed interface PairingState {
     data object Idle : PairingState
 
     /**
-     * A valid code was read but NOTHING has been dialled yet (dpv7m.5): the user
+     * A valid code was read but NOTHING has been dialled yet: the user
      * must confirm "Connect to <host>?" first. Every entry — camera, paste, and
      * especially meridian:// / letta:// deep links — stops here.
      */
@@ -89,7 +89,7 @@ sealed interface PairingState {
 
 /**
  * The scan -> confirm -> pair -> persist -> connect state machine shared by
- * Android and desktop (letta-mobile-dpv7m.2, trust prompt dpv7m.5). Platforms
+ * Android and desktop (trust prompt). Platforms
  * only supply the scanned text (camera, deep link, paste) and bind the two
  * ports; on [PairingState.Paired] they open chat on the now-active host.
  *
@@ -209,7 +209,7 @@ class PairingFlow(
          */
         const val CLOCK_SKEW_ALLOWANCE_MS = 30_000L
 
-        /** Verifying gives up after this long and reports the host unreachable (dpv7m.5 design: ~15 s). */
+        /** Verifying gives up after this long and reports the host unreachable ( design: ~15 s). */
         const val VERIFY_TIMEOUT_MS = 15_000L
     }
 }

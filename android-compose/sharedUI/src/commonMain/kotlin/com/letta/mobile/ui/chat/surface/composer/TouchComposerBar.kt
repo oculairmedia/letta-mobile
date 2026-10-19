@@ -225,7 +225,7 @@ private fun <T> chipSpec(): AnimationSpec<T> {
 /**
  * Top and bottom padding. Legacy: 24 dp at rest, easing to 12 dp as the keyboard rises (driven by
  * the inset itself, so it tracks the keyboard frame by frame). The bar runs flush to the screen's
- * bottom edge (legacy ChatScreen's bottomInsetDp = 0, letta-mobile-bglj6.1.9): the opaque bar sits
+ * bottom edge (legacy ChatScreen's bottomInsetDp = 0): the opaque bar sits
  * under the navigation bar, which draws over its bottom padding, instead of growing by the
  * navigation inset and floating its controls ~48 dp up on three-button devices.
  */
@@ -244,7 +244,7 @@ internal fun touchBarVerticalPadding(imePx: Int): Dp {
 
 /**
  * The round tonal "+": the action sheet, or (with one thing to do) that thing directly. It is
- * announced as what it does (letta-mobile-bglj6.1.9): "Add to message" when it opens the sheet,
+ * announced as what it does: "Add to message" when it opens the sheet,
  * the single item's own label ("Attach image") when it does that directly, as legacy.
  */
 @Composable
@@ -344,7 +344,7 @@ private fun TouchTrailingSlot(model: ComposerModel) {
 internal enum class TouchTrailingContent { Voice, Action }
 
 /**
- * letta-mobile-bglj6.1.19: the slot keeps what it showed while its exit runs (legacy
+ * The slot keeps what it showed while its exit runs (legacy
  * LettaInputBar's retained custom slot). AnimatedVisibility composes its content through the exit,
  * and typing the first character with the keyboard up both hides the slot and ends dictation: read
  * live, the leaving mic would turn into Send for a frame.
@@ -417,7 +417,7 @@ private fun TouchActionButton(model: ComposerModel) {
 }
 
 /**
- * letta-mobile-bglj6.1.19: Send and Stop morph into each other (legacy LettaInputBar
+ * Send and Stop morph into each other (legacy LettaInputBar
  * ComposerActionIcon): the leaving glyph fades and shrinks to 0.76 while the arriving one fades
  * and grows from it, on the expressive fast springs. A plain swap under reduced motion.
  */

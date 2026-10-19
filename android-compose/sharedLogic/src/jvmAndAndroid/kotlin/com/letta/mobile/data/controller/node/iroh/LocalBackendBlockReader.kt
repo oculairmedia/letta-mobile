@@ -11,7 +11,7 @@ import kotlinx.serialization.json.put
 import java.io.File
 
 /**
- * lgns8.9: on-disk memory-block reader.
+ * On-disk memory-block reader.
  *
  * Blocks are not a first-class entity in the letta-code local backend: each
  * block is one markdown file under `memfs/<agentId>/memory/system/<label>.md`.

@@ -106,7 +106,7 @@ private class ShownConversation {
     var id: String? = null
 }
 /**
- * letta-mobile-bglj6.1: [base64] as an image, decoded off the UI thread and cached, so scrolling
+ * [base64] as an image, decoded off the UI thread and cached, so scrolling
  * a row back into view shows it at once instead of decoding it again. Null while decoding, for a
  * blank payload, or when it is not an image.
  */

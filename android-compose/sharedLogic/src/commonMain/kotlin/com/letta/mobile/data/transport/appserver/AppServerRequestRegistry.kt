@@ -17,7 +17,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * One generation-local request registry + inbound router for the App Server
- * control channel (letta-mobile-lgns8.3).
+ * control channel.
  *
  * Replaces the former per-request `AppServerRequestCorrelator` (which spawned one
  * `collect` coroutine per call) with a single long-lived collector that routes
@@ -50,7 +50,7 @@ internal class AppServerRequestRegistry(
     }
 
     /**
-     * letta-mobile-by4vm.5: this collector never suspends per frame (a map lookup under a
+     * This collector never suspends per frame (a map lookup under a
      * lock, then [Pending.offer], which completes a deferred or `trySend`s into an unlimited
      * channel). It reads the control VIEW, whose queue is separate from the ordered queue
      * the router reads, so it cannot hold up runtime event delivery either way.
@@ -87,7 +87,7 @@ internal class AppServerRequestRegistry(
 
     /**
      * A request the server answers with several frames sharing one request_id, the last of
-     * which [isFinal] recognises (letta-mobile-bzvro.24: `list_memory` pages carry `done`).
+     * which [isFinal] recognises (`list_memory` pages carry `done`).
      * Returns every matched frame in arrival order. [timeoutMs] bounds the wait for EACH frame,
      * so a long listing that keeps producing pages is never cut off, while a stalled one
      * surfaces [AppServerRequestTimeoutException] instead of a partial result.

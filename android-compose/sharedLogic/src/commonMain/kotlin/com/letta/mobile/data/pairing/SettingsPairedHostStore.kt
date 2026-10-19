@@ -14,7 +14,7 @@ interface BackendConfigSink {
 
 /**
  * Persists a newly paired host as an Iroh backend config and activates it
- * (letta-mobile-dpv7m.2), through the platform's settings repository — which
+ * through the platform's settings repository — which
  * keeps configs in encrypted storage (Android EncryptedSharedPreferences /
  * Keystore, desktop encrypted settings store).
  *

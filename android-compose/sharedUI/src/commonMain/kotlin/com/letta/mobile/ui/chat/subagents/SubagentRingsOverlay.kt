@@ -29,9 +29,9 @@ data class SubagentRingsState(
 )
 
 /**
- * letta-mobile-ckmub.3.19: the rings' clock, the same on every client. While anything visible is
+ * The rings' clock, the same on every client. While anything visible is
  * live (running, or a finished ring still lingering) the clock ticks once a second so lingering
- * rings expire and stuck rings turn; it stops once nothing would change (letta-mobile-l3j5l: a
+ * rings expire and stuck rings turn; it stops once nothing would change (a
  * retained hidden reflection never keeps it ticking). [self] (the agent's own plan) leads the rings.
  */
 @Composable
@@ -54,7 +54,7 @@ fun rememberSubagentRingsState(snapshot: ImmutableList<ActiveSubagent>, self: Ac
 private fun nowMillis(): Long = Clock.System.now().toEpochMilliseconds()
 
 /**
- * letta-mobile-ckmub.3.19: the active-subagent rings over a chat page's timeline, for a host that
+ * The active-subagent rings over a chat page's timeline, for a host that
  * lists the conversation's registry [entries] (desktop): a ring opens its todo sheet (todos through
  * [loader]) with the conversation's whole roster under it. [onViewConversation] null hides "view
  * conversation" (a host that cannot open a subagent's conversation).

@@ -23,14 +23,14 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * letta-mobile-qygvv.16: the reason a turn cut off by a lost transport session fails with. It is
+ * The reason a turn cut off by a lost transport session fails with. It is
  * classified as the `connection_lost` failure family (see [terminalReasonKind]).
  */
 internal const val SESSION_LOST_TERMINAL_REASON: String =
     "Connection lost during turn: the transport session to the App Server closed"
 
 /**
- * letta-mobile-by4vm.4: the reason a turn fails with when the fanout detached its subscriber for
+ * The reason a turn fails with when the fanout detached its subscriber for
  * falling a full buffer behind. The session is fine and the server run continues, but this turn's
  * stream has a gap, so it ends exactly like a lost session (same `connection_lost` family, so the
  * same retry/resync affordance) with a reason that says what actually happened.
@@ -39,7 +39,7 @@ internal const val SUBSCRIBER_OVERFLOW_TERMINAL_REASON: String =
     "Connection lost during turn: this client fell behind the App Server event stream and was detached"
 
 /**
- * letta-mobile-by4vm.9: how long a turn waits, keeping its lease and its fanout subscription, for
+ * How long a turn waits, keeping its lease and its fanout subscription, for
  * an interrupted App Server session to come back before it fails with
  * [SESSION_LOST_TERMINAL_REASON]. The server keeps running the turn meanwhile.
  *
@@ -51,14 +51,14 @@ internal const val SUBSCRIBER_OVERFLOW_TERMINAL_REASON: String =
 const val SESSION_RECONNECT_GRACE_MS: Long = 30_000L
 
 /**
- * letta-mobile-qygvv.16: ends [lease]'s turn when the session carrying it is gone (connection
+ * Ends [lease]'s turn when the session carrying it is gone (connection
  * closed, redial, wrapper restart), because no server terminal will ever reach it then. The
  * terminal goes through [processor]'s own terminal path, which flushes the buffered stop reason
  * and usage first and never emits a second terminal when the real one already went out.
  *
- * letta-mobile-by4vm.9: two ways a session goes away, handled differently.
+ * two ways a session goes away, handled differently.
  *  - The stream detaches ([endOnDetach]): the router was torn down for good, or this subscriber
- *    overflowed (letta-mobile-by4vm.4). Nothing will reconnect it, so the turn ends at once.
+ *    overflowed. Nothing will reconnect it, so the turn ends at once.
  *  - The session is interrupted ([watchReconnect], on a router whose [link] outlives the socket):
  *    the turn is reconnecting. It keeps its lease and subscription; if the link is restored within
  *    [graceMs] the successor socket's frames continue the turn, otherwise it fails here.

@@ -7,27 +7,27 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * letta-mobile-lgns8.22.8 / letta-mobile-5hihw: the explicit subagent-chip
+ * The explicit subagent-chip
  * lifecycle state machine.
  *
  * Before this bead the chip state was whatever `status` string the last
  * observed frame carried, so a chip could silently move backwards
  * (`completed` → `running`) or be marked terminal by something that is not an
- * authoritative subagent lifecycle event (5hihw: chips rendered "completed"
+ * authoritative subagent lifecycle event (chips rendered "completed"
  * as soon as the PARENT assistant turn finished). The state machine below is
  * the single place a chip's lifecycle may advance, and every illegal
  * transition is rejected and telemetered rather than applied.
  *
  * LEGAL TRANSITIONS
  * ```
- *   OBSERVED ─┬─▶ RUNNING ─┬─▶ COMPLETED   (authoritative completion event)
- *             │            ├─▶ FAILED      (authoritative failure event)
- *             │            ├─▶ CANCELLED   (kill / TaskStop / evicted)
- *             │            └─▶ ORPHANED    (reconciler: no live counterpart)
+ *   OBSERVED ─┬─▶ RUNNING ─┬─▶ COMPLETED (authoritative completion event)
+ *             │            ├─▶ FAILED (authoritative failure event)
+ *             │            ├─▶ CANCELLED (kill / TaskStop / evicted)
+ *             │            └─▶ ORPHANED (reconciler: no live counterpart)
  *             └───────────────▶ (any terminal, for very short subagents)
  *
- *   <terminal> ─▶ same terminal   (idempotent replay: metadata backfill only)
- *   <terminal> ─▶ anything else   (ILLEGAL — rejected + telemetry)
+ *   <terminal> ─▶ same terminal (idempotent replay: metadata backfill only)
+ *   <terminal> ─▶ anything else (ILLEGAL — rejected + telemetry)
  * ```
  *
  * Note the absence of any edge that a parent-turn terminal could take: see
@@ -50,7 +50,7 @@ enum class SubagentChipState {
     CANCELLED,
 
     /**
-     * Reconciliation terminal (lgns8.22.8): the chip survived a controller
+     * Reconciliation terminal: the chip survived a controller
      * restart but the live runtime has no counterpart for it. Never silently
      * dropped and never left spinning forever.
      */
@@ -72,7 +72,7 @@ enum class SubagentChipState {
     /**
      * Wire vocabulary (`MOBILE_WS_PROTOCOL.md` §13.2) for this state.
      * [ORPHANED] maps to `cancelled` — the documented non-clean terminal
-     * (letta-mobile-drv4a explicitly names "orphaned" as a `cancelled` cause)
+     * ( explicitly names "orphaned" as a `cancelled` cause)
      * so existing clients render a terminal chip without a wire change.
      */
     fun toWireStatus(): String = when (this) {
@@ -86,7 +86,7 @@ enum class SubagentChipState {
         /**
          * Map an observed wire `status` string onto the state machine. Unknown
          * vocabulary is conservatively treated as [OBSERVED] (pending) rather
-         * than as a terminal — never invent a completion (5hihw).
+         * than as a terminal — never invent a completion.
          */
         fun fromWireStatus(status: String?): SubagentChipState = when (val raw = status?.trim()?.lowercase()) {
             null, "" -> OBSERVED
@@ -107,7 +107,7 @@ enum class SubagentChipState {
 }
 
 /**
- * letta-mobile-7vs4s: WHICH producer a chip fact came from, and the total
+ * WHICH producer a chip fact came from, and the total
  * order between competing producers.
  *
  * The same chip can be described by three independent producers at once, and
@@ -115,10 +115,10 @@ enum class SubagentChipState {
  * up rendering a frozen SHIM snapshot that no live producer could ever clear.
  * Precedence is now an explicit, total, documented order:
  *
- * | source              | precedence | authority |
+ * | source | precedence | authority |
  * |---------------------|-----------:|-----------|
  * | [CORRELATOR_OBSERVED] | 10 | inferred locally from parent tool_call frames — weakest; can create a chip but never overrule a real registry |
- * | [HTTP_REGISTRY]       | 20 | LettaShim HTTP registry (TTL + breaker, letta-mobile-#1011) — a remote cache, may be stale |
+ * | [HTTP_REGISTRY]       | 20 | LettaShim HTTP registry (TTL + breaker) — a remote cache, may be stale |
  * | [CONTROLLER_NATIVE]   | 30 | `update_subagent_state` from the App Server the controller owns — the source of truth |
  *
  * RULE: an observation is applied only when its source precedence is **>=**
@@ -166,17 +166,17 @@ data class SubagentChipRecord(
     @SerialName("last_seen_epoch_ms") val lastSeenEpochMs: Long = 0,
     @SerialName("terminal_at_epoch_ms") val terminalAtEpochMs: Long? = null,
     /**
-     * letta-mobile-fxoew.3: why the host, not the App Server, ended this chip.
+     * Why the host, not the App Server, ended this chip.
      * [TERMINAL_REASON_STALE] marks a RUNNING chip that went unobserved past
      * [DurableSubagentRegistry.STALE_RUNNING_AFTER_MS]. Null for every
      * App-Server-reported terminal and for reconcile orphaning (its state,
      * ORPHANED, already says why). Older readers ignore the field.
      */
     @SerialName("terminal_reason") val terminalReason: String? = null,
-    /** letta-mobile-ulcg6 (RC5): native progress; see [SubagentProgress]. */
+    /**  (RC5): native progress; see [SubagentProgress]. */
     val progress: SubagentProgress = SubagentProgress(),
     /**
-     * letta-mobile-ulcg6 (RC4): when this chip last made progress (first seen,
+     *  (RC4): when this chip last made progress (first seen,
      * a new tool call, new activity, or a lifecycle change). Unlike
      * [lastSeenEpochMs] a repeated identical snapshot does not move it, so it
      * is the honest baseline for "quiet for a while".
@@ -208,13 +208,13 @@ data class SubagentChipRecord(
     )
 
     companion object {
-        /** letta-mobile-fxoew.3: the host's TTL terminalized an unobserved RUNNING chip. */
+        /** The host's TTL terminalized an unobserved RUNNING chip. */
         const val TERMINAL_REASON_STALE = "stale"
     }
 }
 
 /**
- * letta-mobile-ulcg6 (RC5): letta-code's native per-subagent progress, kept on
+ *  (RC5): letta-code's native per-subagent progress, kept on
  * the durable chip so pushes and `subagent.list` carry it. Every field is
  * optional; a producer that does not know a value leaves the stored one.
  */
@@ -261,7 +261,7 @@ data class SubagentProgress(
  *    every not-yet-returned chip unkeyable.
  *  - `conversationId` is in the key because the admin surface is
  *    conversation-scoped and chips must stay isolated per parent
- *    (letta-mobile-or40x: one process-wide slot is the defect class).
+ *    (one process-wide slot is the defect class).
  *  - `generation` is deliberately NOT in the key: a chip must be recognised as
  *    the SAME chip across a controller restart, which is the entire point of
  *    this bead. It is carried as data on [SubagentChipRecord.generation].

@@ -19,7 +19,7 @@ internal class TurnInboundSource(
     private val client: AppServerClient,
     private val eventRouter: AppServerRuntimeEventRouter?,
 ) {
-    /** letta-mobile-by4vm.9: the router's session link; null on the direct path, which never reconnects. */
+    /** The router's session link; null on the direct path, which never reconnects. */
     val sessionLink: StateFlow<RuntimeSessionLink>? get() = eventRouter?.sessionLink
 
     fun subscribe(

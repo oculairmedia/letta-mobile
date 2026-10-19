@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * What the server's `can_use_tool` control request offered for one parked tool call
- * (letta-mobile-bzvro.11 / .12), keyed by tool call so the approval card, which is
+ * What the server's `can_use_tool` control request offered for one parked tool call,
+ * keyed by tool call so the approval card, which is
  * projected from the streamed `approval_request_message`, can find it.
  *
  * An entry exists only while the request genuinely waits on the person: the engine records it
@@ -60,7 +60,7 @@ internal class PendingApprovalDetailsStore {
     val pending: StateFlow<Map<String, PendingApprovalDetails>> = view.asStateFlow()
 
     /**
-     * letta-mobile-bzvro.40: the same entries grouped by the runtime that parked them, oldest first.
+     * The same entries grouped by the runtime that parked them, oldest first.
      * A relaying node pushes each conversation's list to that conversation's viewers.
      */
     val byRuntime: StateFlow<Map<TurnRuntimeKey, List<PendingApprovalDetails>>> = scopedView.asStateFlow()
@@ -106,7 +106,7 @@ internal class PendingApprovalDetailsStore {
 }
 
 /**
- * letta-mobile-bzvro.11: the approval id an "always allow" for [suggestionIds] may be answered
+ * The approval id an "always allow" for [suggestionIds] may be answered
  * with, or null when it must be refused. The suggestion ids were offered by one specific parked
  * request (the one the card drew: [bound]); they are honoured only
  * while this, the CURRENT parked details for that call, is still that request and still offers
@@ -121,10 +121,10 @@ fun PendingApprovalDetails?.approvalIdForSuggestions(bound: ApprovalBinding?, su
 
 private fun PendingApprovalDetails.offersAll(ids: List<String>) = ids.all { id -> suggestions.any { it.id == id } }
 
-/** letta-mobile-bzvro.11/.12: what each parked control request of [this] engine offered, by tool call id. */
+/** What each parked control request of [this] engine offered, by tool call id. */
 val AppServerTurnEngine.pendingApprovalDetails: StateFlow<Map<String, PendingApprovalDetails>>
     get() = approvals.parkedDetails
 
-/** letta-mobile-bzvro.40: [pendingApprovalDetails] grouped by the runtime each request belongs to. */
+/** [pendingApprovalDetails] grouped by the runtime each request belongs to. */
 val AppServerTurnEngine.pendingApprovalsByRuntime: StateFlow<Map<TurnRuntimeKey, List<PendingApprovalDetails>>>
     get() = approvals.parkedByRuntime

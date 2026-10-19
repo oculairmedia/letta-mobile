@@ -9,7 +9,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 /**
- * letta-mobile-bzvro.15 (F15): the host side of `conversation.fork`. Sends App Server
+ *  (F15): the host side of `conversation.fork`. Sends App Server
  * `conversation_fork` with the options in its body (`agent_id`, `message_id`), then reads the
  * fork back, because upstream answers with the new id only and clients need the conversation.
  */

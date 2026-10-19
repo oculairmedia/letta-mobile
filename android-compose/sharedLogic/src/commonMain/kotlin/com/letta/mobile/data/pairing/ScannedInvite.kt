@@ -10,7 +10,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.longOrNull
 
 /**
- * A pairing invite read off a QR / deep link (letta-mobile-dpv7m.2), decoded
+ * A pairing invite read off a QR / deep link, decoded
  * from the `letta-qr-v1` envelope (reference/qr-pairing-protocol.md §5/§7).
  *
  * Trust model: the envelope's HMAC signature is host-private and cannot be

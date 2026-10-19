@@ -12,7 +12,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 
 /**
- * letta-mobile-ckmub.17.3 (W3): what the shell shows, in one holder every client binds - the page,
+ *  (W3): what the shell shows, in one holder every client binds - the page,
  * the agent editor beside the chat, the focused agent and selected conversation, the conversation
  * tabs, the overlays and the route. It replaces the desktop's `DesktopShellNavigator` and the web's
  * `WebShellState`; hosts only translate their own route models (the desktop's `DesktopDestination`,
@@ -195,7 +195,7 @@ class ShellOverlays {
     var renameChat: Boolean by mutableStateOf(false)
     var irohResetConfirm: Boolean by mutableStateOf(false)
 
-    /** Keyboard shortcut help overlay (letta-mobile-k5nbq.4). */
+    /** Keyboard shortcut help overlay. */
     var shortcutHelp: Boolean by mutableStateOf(false)
 }
 

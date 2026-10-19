@@ -48,7 +48,7 @@ object CanvasToolContract {
     const val COMPOSE_DESCRIPTION_MAX_CHARS = 700
 
     /**
-     * What export_svg answers until a real exporter runs where the tools do (letta-mobile-qsq7v).
+     * What export_svg answers until a real exporter runs where the tools do.
      * It used to return a constant empty SVG, which an agent took for the canvas's true content.
      * The tool is not offered ([all] leaves it out); a call that names it anyway is told plainly.
      */
@@ -61,7 +61,7 @@ object CanvasToolContract {
 
     private val canvasIdParam = ToolParam("canvas_id", description = CANVAS_ID_DESCRIPTION)
 
-    /** Checks a write without making it (letta-mobile-qygvv.30). */
+    /** Checks a write without making it. */
     private val dryRunParam = ToolParam(
         CanvasDryRun.PARAM,
         type = "boolean",
@@ -193,7 +193,7 @@ object CanvasToolContract {
     )
 
     /**
-     * canvas_compose v1 (letta-mobile-bglj6.6): notes, checklists, cards, text and groups by
+     * Canvas_compose v1: notes, checklists, cards, text and groups by
      * meaning, placed and sized by the board. Its input is [CanvasComposeSchema.input], strict at
      * every level, so a refusal's JSON-pointer path names a place in the schema the model saw.
      */
@@ -221,7 +221,7 @@ object CanvasToolContract {
     /**
      * The compose pair, defined here so both hosts take one contract. Both hosts answer them
      * (HostCanvasTools on the Iroh host, CanvasExternalTools on an app's own App Server;
-     * letta-mobile-bglj6.12), so they are in [all], and [applyOps]' description points at [COMPOSE].
+     *), so they are in [all], and [applyOps]' description points at [COMPOSE].
      */
     val composeTools: List<CanvasToolDefinition> = listOf(compose, composeGuide)
 

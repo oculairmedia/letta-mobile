@@ -4,7 +4,7 @@ import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
 
 /**
- * letta-mobile-te3n1.1: monotonic counts of the moments in a conversation's runs - a send, a tool
+ * Monotonic counts of the moments in a conversation's runs - a send, a tool
  * starting or ending, an approval being asked, a run completing, being cancelled or failing.
  *
  * The registry is a conflated state flow, so a consumer that only compares phases misses moments:

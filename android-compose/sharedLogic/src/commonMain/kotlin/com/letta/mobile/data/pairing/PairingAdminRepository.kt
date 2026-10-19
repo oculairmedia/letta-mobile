@@ -18,14 +18,14 @@ data class PairInviteRequest(
     val agentIds: Set<String> = emptySet(),
     /** chat (default) | desktop — admin is never offered from the app. */
     val role: String = ROLE_CHAT,
-    /** How long the code stays redeemable; the host caps it (dpv7m.1). */
+    /** How long the code stays redeemable; the host caps it. */
     val ttlMs: Long = DEFAULT_TTL_MS,
 ) {
     companion object {
         const val ROLE_CHAT = "chat"
         const val ROLE_DESKTOP = "desktop"
 
-        /** Least-privilege default (dpv7m.5): five minutes, one use. */
+        /** Least-privilege default: five minutes, one use. */
         const val DEFAULT_TTL_MS = 5 * 60 * 1000L
 
         /** The role behind the inviter's "Allow settings changes" toggle (off by default). */
@@ -58,7 +58,7 @@ data class PairedDevice(
 data class PendingInvite(val inviteId: String, val name: String, val expiresAtMs: Long)
 
 /**
- * Inviter side of scan-to-connect (letta-mobile-dpv7m.2): mint scoped invites,
+ * Inviter side of scan-to-connect: mint scoped invites,
  * watch them get accepted, and revoke devices — over the host's `pair.*`
  * admin_rpc methods, which require admin.full on the host. Shared by Android
  * and desktop through [AdminRpcInvoker].

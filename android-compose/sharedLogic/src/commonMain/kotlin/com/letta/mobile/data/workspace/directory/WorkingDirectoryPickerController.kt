@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Saves an agent's default working directory (letta-mobile-k5nbq.9). */
+/** Saves an agent's default working directory. */
 fun interface DefaultWorkingDirectoryStore {
     fun setCwd(agentId: AgentId, cwd: String?)
 }
@@ -26,7 +26,7 @@ data class WorktreeListState(
 )
 
 /**
- * letta-mobile-zxk2n.6 (G32): what the working-directory picker draws. [folder] is the folder
+ *  (G32): what the working-directory picker draws. [folder] is the folder
  * being browsed and [folders] its sub-folder names; [currentCwd] the conversation's directory
  * when the picker opened. [createFolderUnavailableReason] is set where this host cannot create
  * folders, and the picker shows it on a disabled control rather than hiding the control.
@@ -90,7 +90,7 @@ object WorkingDirectoryPickerGates {
 }
 
 /**
- * letta-mobile-zxk2n.6 (G32): the shared working-directory picker. Browses with a
+ *  (G32): the shared working-directory picker. Browses with a
  * [WorkspaceDirectorySource] (`list_in_directory`), creates folders with a [FolderCreator] where the
  * host has one, offers [RecentFolders], and lists the repository's letta-code worktrees. Choosing
  * hands the path to [onChosen], which the platform binds to `change_device_state` cwd (it applies
@@ -102,7 +102,7 @@ class WorkingDirectoryPickerController(
     private val onChosen: (String) -> Unit,
     private val recents: RecentFolders? = null,
     private val folderCreator: FolderCreator? = null,
-    /** letta-mobile-k5nbq.9: where "Make default for this agent" saves; null hides that control. */
+    /** Where "Make default for this agent" saves; null hides that control. */
     private val agentDefaults: DefaultWorkingDirectoryStore? = null,
 ) : WorkingDirectoryPickerActions {
     private val _state = MutableStateFlow(WorkingDirectoryPickerState())

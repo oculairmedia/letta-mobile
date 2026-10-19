@@ -16,11 +16,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * letta-mobile-o4ygk.4.5: the Material 3 theme for hosts of the shared UI that have no platform
+ * The Material 3 theme for hosts of the shared UI that have no platform
  * theme of their own (the web client): the cool-slate palette from the shared [LettaColorTokens],
  * the shared [CustomColors], and compact desktop-density type and shapes. Desktop's
  * `DesktopMaterialTheme` builds from the same [lettaColorScheme], [lettaCustomColors],
- * [SharedTypography] and [SharedShapes] (letta-mobile-by4vm.28), so the two hosts cannot drift.
+ * [SharedTypography] and [SharedShapes], so the two hosts cannot drift.
  */
 @Composable
 fun SharedMaterialTheme(

@@ -39,7 +39,6 @@ import com.letta.mobile.desktop.chat.FakeDesktopChatGateway
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
-import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
 import com.letta.mobile.ui.devfixtures.FixtureChatSessionPort
 import com.letta.mobile.ui.devfixtures.FixtureMascotShell
 import com.letta.mobile.ui.devfixtures.PhoneFixtures
@@ -126,7 +125,7 @@ class DesktopPhoneShellTest {
         }
         settle()
         assertTrue(!state.keyboardVisible)
-        onNodeWithTag(ComposerTestTags.INPUT, useUnmergedTree = true).requestFocus()
+        onNodeWithTag("composer-input", useUnmergedTree = true).requestFocus()
         settle()
         assertTrue(state.keyboardVisible, "focusing the composer raises the keyboard, as on Android")
     }
@@ -169,9 +168,9 @@ class DesktopPhoneShellTest {
         // letta-mobile-y5q9z), not the desktop's floating panel.
         onNodeWithTag(TOUCH_DOCK_TAG).assertExists()
         onNodeWithTag(TOUCH_HEAD_TAG).assertExists()
-        onNodeWithTag(ComposerTestTags.TOUCH_BAR, useUnmergedTree = true).assertDoesNotExist()
-        onNodeWithTag(ComposerTestTags.CARD, useUnmergedTree = true).assertDoesNotExist()
-        onNodeWithTag(ComposerTestTags.HINT, useUnmergedTree = true).assertDoesNotExist()
+        onNodeWithTag("composer-touch-bar", useUnmergedTree = true).assertDoesNotExist()
+        onNodeWithTag("composer-card", useUnmergedTree = true).assertDoesNotExist()
+        onNodeWithTag("composer-hint", useUnmergedTree = true).assertDoesNotExist()
         // The canvas mode keeps the top of the board clear: no header, only the agent pill (vgouv).
         onNodeWithTag(PhoneShellTags.CHAT_HEADER).assertDoesNotExist()
         onNodeWithTag(PhoneShellTags.CANVAS_IDENTITY_PILL).assertExists()
@@ -180,10 +179,10 @@ class DesktopPhoneShellTest {
         // laid out above WindowInsets.ime) without re-anchoring.
         onNodeWithTag(TOUCH_HEAD_TAG).performClick()
         settle()
-        val barBottom = onNodeWithTag(ComposerTestTags.TOUCH_BAR, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.bottom
+        val barBottom = onNodeWithTag("composer-touch-bar", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.bottom
         state.keyboardVisible = true
         settle()
-        val raisedBottom = onNodeWithTag(ComposerTestTags.TOUCH_BAR, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.bottom
+        val raisedBottom = onNodeWithTag("composer-touch-bar", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.bottom
         assertTrue(raisedBottom < barBottom - KEYBOARD_LIFT_FLOOR_PX, "the card rose with the keyboard: $barBottom -> $raisedBottom")
         controller.close()
     }

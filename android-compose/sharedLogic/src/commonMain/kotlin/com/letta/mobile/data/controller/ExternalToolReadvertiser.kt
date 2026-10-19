@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Re-advertises the external tools to every active runtime when the registry's live sources
- * change (letta-mobile-s416w.27, decision R2).
+ * change (decision R2).
  *
  * The protocol has no "update tools" frame, but letta-code (verified against the pinned 0.29.12)
  * replaces a live runtime's external tools on a repeated `runtime_start` for the same agent and

@@ -36,16 +36,16 @@ data class StreamTextMergeResult(
  * that ordering signal, unrelated deltas must append even if they happen to
  * resemble a prefix/suffix.
  *
- * letta-mobile-k9y5d: [incomingIsForwardDelta] tells us whether the incoming
+ * [incomingIsForwardDelta] tells us whether the incoming
  * frame is genuinely newer than the existing text (a higher seq id). A
  * forward delta that shares no prefix/suffix is an incremental continuation
- * and must APPEND (e.g. "Y" + "es ..." -> "Yes ..."). A NON-forward frame
+ * and must APPEND (e.g. "Y" + "es..." -> "Yes..."). A NON-forward frame
  * (lower-or-equal seq id) that shares no clean prefix/suffix is a replayed /
  * re-delivered snapshot colliding with a stranded partial; appending it would
  * duplicate/garble the body, so we keep the longer (complete) text instead.
  * Defaults to true so existing callers keep the historical append behaviour.
  *
- * letta-mobile-mvcr4: a forward (higher-seq) snapshot whose body overlaps
+ * a forward (higher-seq) snapshot whose body overlaps
  * the existing text WITHOUT a clean prefix/suffix relationship is also
  * effectively a non-clean snapshot — the same upstream re-tokenization or
  * repair can produce a near-match either at the start or mid/tail. With
@@ -56,12 +56,12 @@ data class StreamTextMergeResult(
  * SNAPSHOT_CONFLICT: keep the longer complete text. This is strictly
  * safer than APPEND for seq-carrying snapshots and does not regress
  * forward delta appending because genuine forward deltas that share no
- * prefix/suffix (e.g. "Y" + "es ...") are exactly the case the test
+ * prefix/suffix (e.g. "Y" + "es...") are exactly the case the test
  * suite guards; any near-match there is a coalesced snapshot, not an
  * increment.
  */
 /**
- * letta-mobile-h30cy (the reducer-side token drop): when the stream delivers
+ *  (the reducer-side token drop): when the stream delivers
  * INCREMENTAL single-token deltas (the live Iroh assistant path: each frame is a
  * new token like "I", "'m", " Lester" under one stable otid, NOT a cumulative
  * snapshot), a forward token that COINCIDENTALLY equals a prefix of the
@@ -79,7 +79,7 @@ data class StreamTextMergeResult(
  * existing → CUMULATIVE) and non-forward re-deliveries are unaffected, so the
  * stable-id cumulative snapshot path (WS) must leave this false.
  *
- * letta-mobile-bn008 / letta-mobile-wucn: [isCumulativeStream] is the
+ * [isCumulativeStream] is the
  * CUMULATIVE-STREAM SHAPE signal that the upstream caller must derive from a
  * stream-shape property (NOT from per-frame seq-id availability). The Iroh
  * client boundary stamps a stable `cm-stream-<otid>` id and a stable
@@ -103,12 +103,12 @@ data class StreamTextMergeResult(
  * full ordering signal.
  *
  * Why not gate on `incoming.startsWith(existing)` alone? Because the
- * letta-mobile-wucn counterexample demonstrates that an INCREMENTAL stream can
+ *  counterexample demonstrates that an INCREMENTAL stream can
  * deliver a delta byte-identical to the accumulation so far (the 5th fragment
  * "The quick brown fox jumps over the lazy dog " equals the accumulator at
  * that point). On an incremental stream that delta is a genuine forward token
  * and MUST append; ungating EQUAL/CUMULATIVE on the byte shape alone (the
- * original bn008 fix) drops the 5th fragment. The shape signal must come from
+ * original merge fix) drops the 5th fragment. The shape signal must come from
  * the stream SHAPE — not the per-frame content. Defaults to false so existing
  * callers keep the historical append behaviour.
  */
@@ -146,9 +146,9 @@ private data class MergeSignals(
     val forwardIncrement: Boolean get() = incrementalForwardAppend && incomingIsForwardDelta
 
     /**
-     * letta-mobile-bn008 + letta-mobile-wucn: an identical frame is only dropped when the stream is
-     * known to be cumulative (seq-id ordering OR stable-otid stream shape). Ungating EQUAL broke
-     * wucn: an incremental token can be byte-identical to the accumulator and must APPEND.
+     * An identical frame is only dropped when the stream is
+     * known to be cumulative (seq-id ordering OR stable-otid stream shape). An incremental token
+     * can be byte-identical to the accumulator and must APPEND.
      */
     val cumulativeShapeAccepted: Boolean get() = isCumulativeStream || canUseSnapshotMerge
 
@@ -172,7 +172,7 @@ private class MergeFrames(val existing: String, val incoming: String) {
     fun isSuffixOfExisting(): Boolean = existing.endsWith(incoming)
 
     /**
-     * letta-mobile-mvcr4: the two texts share all but a few characters at one end: at least 4 in
+     * The two texts share all but a few characters at one end: at least 4 in
      * common, covering three quarters of the longer side.
      */
     fun nearlyOverlaps(): Boolean {

@@ -7,7 +7,7 @@ import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.model.UserMessage
 
 /**
- * letta-mobile-jvctq: reading a send back from the conversation history. The persisted user
+ * Reading a send back from the conversation history. The persisted user
  * message is the first one after the send's anchor whose `otid` is the client message id or, when
  * the host does not echo it, whose text is exactly the text sent.
  */

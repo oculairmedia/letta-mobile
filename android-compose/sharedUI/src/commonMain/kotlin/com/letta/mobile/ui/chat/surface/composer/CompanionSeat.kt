@@ -77,7 +77,7 @@ internal class CompanionSeatAnchors {
         private set
 
     /**
-     * How much of the companion shows at the page's spot, 0..1 (letta-mobile-bglj6.1.9): the Touch
+     * How much of the companion shows at the page's spot, 0..1: the Touch
      * page raises it above the bar only while the agent works, as the legacy Android composer did.
      */
     var pageShown: Float by mutableFloatStateOf(1f)

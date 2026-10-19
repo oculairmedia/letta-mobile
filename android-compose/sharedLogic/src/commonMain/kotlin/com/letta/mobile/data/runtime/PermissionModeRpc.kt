@@ -10,7 +10,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-bzvro.40: the `admin_rpc` pair through which an Iroh client reads and changes the
+ * The `admin_rpc` pair through which an Iroh client reads and changes the
  * permission mode of a conversation's runtime on its host (the host runs the turns, so its runtime's
  * mode is the one that decides which tool calls wait on the person).
  *
@@ -55,7 +55,7 @@ object PermissionModeRpc {
     fun wire(mode: AppServerPermissionMode): String = mode.wireValue()
 
     /**
-     * letta-mobile-a4tm7: the host's push after a CONFIRMED `set`, to every viewer of the conversation,
+     * The host's push after a CONFIRMED `set`, to every viewer of the conversation,
      * so a change made on one client reaches the chips of the others without reopening the chat:
      * `permission_mode {agent_id, conversation_id, mode, at}`.
      */

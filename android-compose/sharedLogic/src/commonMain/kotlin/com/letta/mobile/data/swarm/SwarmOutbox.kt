@@ -6,7 +6,7 @@ import com.letta.mobile.data.model.MessageId
 import kotlinx.serialization.Serializable
 
 /**
- * letta-mobile-jvctq: how far one outbox entry got. The order matters: an entry is re-sent only
+ * How far one outbox entry got. The order matters: an entry is re-sent only
  * while it is [Pending] (its input never left this machine). From [Sending] on, the input may have
  * reached the host, and the server does not dedupe by `client_message_id`, so the entry is resumed
  * by reading the history, never sent again. A [Delivered] entry is kept as a tombstone for the

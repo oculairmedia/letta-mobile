@@ -109,7 +109,7 @@ object SettingsPageTags {
 }
 
 /**
- * letta-mobile-ckmub.3.12 (hard cut S10) / ckmub.3.12.1: the one Settings page of every client
+ *  (hard cut S10) / the one Settings page of every client
  * (Android, desktop, web), drawn through ShellPage's Settings destination. Groups in page order:
  * Backend (mode, status, address, test connection, pairing, the platform's runtime sections), Chat,
  * Appearance, Notifications, Providers, Diagnostics & about, Developer, and the Danger zone last.
