@@ -6,12 +6,15 @@ import kotlinx.serialization.Serializable
 /** Nonblank identity of an imported/exported agent file, distinct from its virtual path. */
 @JvmInline
 @Serializable
-value class AgentFileId(/** Validated primitive representation of this value. */ val value: String) {
+value class AgentFileId(
+    /** Nonblank agent-file key; construction does not look up or open the file. */
+    val value: String
+) {
     init {
         require(value.isNotBlank()) { "AgentFileId cannot be blank." }
     }
 
-    /** Returns the underlying value without a wrapper label. */
+    /** Returns the file key, not its virtual path or content. */
     override fun toString(): String = value
 }
 

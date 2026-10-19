@@ -8,12 +8,15 @@ import kotlinx.serialization.Serializable
  */
 @JvmInline
 @Serializable
-value class BackendId(/** Validated primitive representation of this value. */ val value: String) {
+value class BackendId(
+    /** Nonblank backend key; whitespace is preserved and backend existence is not checked. */
+    val value: String
+) {
     init {
         require(value.isNotBlank()) { "BackendId cannot be blank." }
     }
 
-    /** Returns the underlying value without a wrapper label. */
+    /** Returns the backend key exactly as stored. */
     override fun toString(): String = value
 }
 
@@ -22,12 +25,15 @@ value class BackendId(/** Validated primitive representation of this value. */ v
  */
 @JvmInline
 @Serializable
-value class RuntimeId(/** Validated primitive representation of this value. */ val value: String) {
+value class RuntimeId(
+    /** Nonblank runtime key; construction does not bind it to a particular backend. */
+    val value: String
+) {
     init {
         require(value.isNotBlank()) { "RuntimeId cannot be blank." }
     }
 
-    /** Returns the underlying value without a wrapper label. */
+    /** Returns the runtime key without adding backend scope. */
     override fun toString(): String = value
 }
 
@@ -36,12 +42,15 @@ value class RuntimeId(/** Validated primitive representation of this value. */ v
  */
 @JvmInline
 @Serializable
-value class ConversationId(/** Validated primitive representation of this value. */ val value: String) {
+value class ConversationId(
+    /** Nonblank conversation key; construction does not verify a server-side conversation. */
+    val value: String
+) {
     init {
         require(value.isNotBlank()) { "ConversationId cannot be blank." }
     }
 
-    /** Returns the underlying value without a wrapper label. */
+    /** Returns the conversation key for explicit conversion at runtime boundaries. */
     override fun toString(): String = value
 }
 
@@ -50,12 +59,15 @@ value class ConversationId(/** Validated primitive representation of this value.
  */
 @JvmInline
 @Serializable
-value class RunId(/** Validated primitive representation of this value. */ val value: String) {
+value class RunId(
+    /** Nonblank run token; uniqueness and restart scoping are the caller's responsibility. */
+    val value: String
+) {
     init {
         require(value.isNotBlank()) { "RunId cannot be blank." }
     }
 
-    /** Returns the underlying value without a wrapper label. */
+    /** Returns the run token without adding runtime or connection scope. */
     override fun toString(): String = value
 }
 
@@ -64,12 +76,15 @@ value class RunId(/** Validated primitive representation of this value. */ val v
  */
 @JvmInline
 @Serializable
-value class RuntimeEventId(/** Validated primitive representation of this value. */ val value: String) {
+value class RuntimeEventId(
+    /** Nonblank event token used for replay deduplication; uniqueness is not checked here. */
+    val value: String
+) {
     init {
         require(value.isNotBlank()) { "RuntimeEventId cannot be blank." }
     }
 
-    /** Returns the underlying value without a wrapper label. */
+    /** Returns the event token retained by replay deduplication. */
     override fun toString(): String = value
 }
 
@@ -78,14 +93,17 @@ value class RuntimeEventId(/** Validated primitive representation of this value.
  */
 @JvmInline
 @Serializable
-value class RuntimeEventOffset(/** Validated primitive representation of this value. */ val value: Long) : Comparable<RuntimeEventOffset> {
+value class RuntimeEventOffset(
+    /** Nonnegative outbox cursor value; no outbox identity is encoded in this number. */
+    val value: Long
+) : Comparable<RuntimeEventOffset> {
     init {
         require(value >= 0L) { "RuntimeEventOffset cannot be negative." }
     }
 
-    /** Compares the underlying numeric values within the same logical scope. */
+    /** Orders offset numbers; callers must ensure both cursors belong to the same outbox. */
     override fun compareTo(other: RuntimeEventOffset): Int = value.compareTo(other.value)
-    /** Returns the underlying value without a wrapper label. */
+    /** Returns the outbox offset as a base-10 integer. */
     override fun toString(): String = value.toString()
 }
 
@@ -94,11 +112,14 @@ value class RuntimeEventOffset(/** Validated primitive representation of this va
  */
 @JvmInline
 @Serializable
-value class EpochMillis(/** Validated primitive representation of this value. */ val value: Long) {
+value class EpochMillis(
+    /** Nonnegative milliseconds since the Unix epoch; construction does not read a clock. */
+    val value: Long
+) {
     init {
         require(value >= 0L) { "EpochMillis cannot be negative." }
     }
 
-    /** Returns the underlying value without a wrapper label. */
+    /** Returns the timestamp as a base-10 millisecond count. */
     override fun toString(): String = value.toString()
 }

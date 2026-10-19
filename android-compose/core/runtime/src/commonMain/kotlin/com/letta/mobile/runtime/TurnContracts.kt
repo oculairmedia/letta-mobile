@@ -9,36 +9,45 @@ import kotlinx.serialization.Serializable
 /** Nonblank identity correlating a tool invocation, its result and any approval request. */
 @JvmInline
 @Serializable
-value class ToolCallId(/** Validated primitive representation of this value. */ val value: String) {
+value class ToolCallId(
+    /** Nonblank invocation key shared by tool-call, result and approval records. */
+    val value: String
+) {
     init {
         require(value.isNotBlank()) { "ToolCallId cannot be blank." }
     }
 
-    /** Returns the underlying value without a wrapper label. */
+    /** Returns the invocation key used to correlate tool records. */
     override fun toString(): String = value
 }
 
 /** Nonblank model-facing tool name. A name identifies a tool definition, not one invocation. */
 @JvmInline
 @Serializable
-value class ToolName(/** Validated primitive representation of this value. */ val value: String) {
+value class ToolName(
+    /** Nonblank tool-definition name; construction does not verify registration or permissions. */
+    val value: String
+) {
     init {
         require(value.isNotBlank()) { "ToolName cannot be blank." }
     }
 
-    /** Returns the underlying value without a wrapper label. */
+    /** Returns the model-facing tool name unchanged. */
     override fun toString(): String = value
 }
 
 /** Nonblank key for a pending approval, separate from the tool-call identity. */
 @JvmInline
 @Serializable
-value class ToolApprovalId(/** Validated primitive representation of this value. */ val value: String) {
+value class ToolApprovalId(
+    /** Nonblank approval key; construction does not check whether an approval is pending. */
+    val value: String
+) {
     init {
         require(value.isNotBlank()) { "ToolApprovalId cannot be blank." }
     }
 
-    /** Returns the underlying value without a wrapper label. */
+    /** Returns the approval key used by requests and decisions. */
     override fun toString(): String = value
 }
 

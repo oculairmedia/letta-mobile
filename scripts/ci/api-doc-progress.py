@@ -143,7 +143,7 @@ def render_summary(current, prior, gaps):
         # Keep repository-controlled identifiers from altering Markdown structure.
         safe_gap = gap.replace("`", "&#96;").replace("|", "&#124;")
         safe_path = path.replace("`", "&#96;")
-        lines.append(f"- `{safe_gap}` â€” `{safe_path}`")
+        lines.append(f"- `{safe_gap}` - `{safe_path}`")
     if len(gaps) > 20:
         lines.append(f"\nShowing 20 of {len(gaps)}; full list is in the Dokka diagnostics artifact.")
     if not gaps:

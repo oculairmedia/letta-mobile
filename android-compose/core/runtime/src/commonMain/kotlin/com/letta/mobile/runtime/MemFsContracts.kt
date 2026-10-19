@@ -10,13 +10,16 @@ import kotlinx.serialization.Serializable
  */
 @JvmInline
 @Serializable
-value class MemFsPath(/** Validated primitive representation of this value. */ val value: String) {
+value class MemFsPath(
+    /** Virtual path beginning with / and containing no //; dot segments are retained. */
+    val value: String
+) {
     init {
         require(value.startsWith("/")) { "MemFsPath must be absolute." }
         require("//" !in value) { "MemFsPath cannot contain empty segments." }
     }
 
-    /** Returns the underlying value without a wrapper label. */
+    /** Returns the virtual path unchanged, including any dot segments. */
     override fun toString(): String = value
 }
 
@@ -25,14 +28,17 @@ value class MemFsPath(/** Validated primitive representation of this value. */ v
  */
 @JvmInline
 @Serializable
-value class MemFsRevision(/** Validated primitive representation of this value. */ val value: Long) : Comparable<MemFsRevision> {
+value class MemFsRevision(
+    /** Nonnegative memory revision number; no backend or file identity is encoded. */
+    val value: Long
+) : Comparable<MemFsRevision> {
     init {
         require(value >= 0L) { "MemFsRevision cannot be negative." }
     }
 
-    /** Compares the underlying numeric values within the same logical scope. */
+    /** Orders revision numbers without checking backend or memory-store ownership. */
     override fun compareTo(other: MemFsRevision): Int = value.compareTo(other.value)
-    /** Returns the underlying value without a wrapper label. */
+    /** Returns the memory revision as a base-10 integer. */
     override fun toString(): String = value.toString()
 }
 
@@ -41,12 +47,15 @@ value class MemFsRevision(/** Validated primitive representation of this value. 
  */
 @JvmInline
 @Serializable
-value class MemFsCommitId(/** Validated primitive representation of this value. */ val value: String) {
+value class MemFsCommitId(
+    /** Nonblank memory-commit key; no particular hash format or commit existence is checked. */
+    val value: String
+) {
     init {
         require(value.isNotBlank()) { "MemFsCommitId cannot be blank." }
     }
 
-    /** Returns the underlying value without a wrapper label. */
+    /** Returns the memory-commit key in its backend-defined format. */
     override fun toString(): String = value
 }
 

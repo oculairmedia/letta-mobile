@@ -58,7 +58,8 @@ class ProgressTest(unittest.TestCase):
 
     def test_summary_is_capped_and_labels_page_level_evidence(self):
         summary = progress.render_summary({ONE}, {ONE}, [(ONE, f"file{i}.kt") for i in range(25)])
-        self.assertEqual(20, summary.count("- `"))
+        self.assertEqual(20, sum(line.startswith("- `") for line in summary.splitlines()))
+        self.assertIn(f"- `{ONE}` - `file0.kt`", summary)
         self.assertIn("Page-level association only", summary)
         self.assertIn("full list", summary)
 
