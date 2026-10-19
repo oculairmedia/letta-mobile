@@ -127,6 +127,12 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: bash scripts/tests/ci-policy-scripts-test.sh
 
+      - name: Enforce API package documentation contract
+        working-directory: ${{ github.workspace }}
+        run: |
+          python3 -m unittest discover -s scripts/tests -p test_api_package_coverage.py -v
+          python3 scripts/ci/check-api-package-coverage.py
+
       - name: Enforce stateful mock isolation
         working-directory: ${{ github.workspace }}
         run: bash scripts/ci/stateful-mock-gate.sh
@@ -526,6 +532,7 @@ jobs:
         run: |
           node --test android-compose/web/service-worker.test.cjs
           python3 -m unittest discover -s scripts/tests -p test_api_doc_links.py -v
+          python3 scripts/ci/check-api-package-coverage.py
       - name: Generate shared API reference
         working-directory: android-compose
         run: ./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -PdokkaSourceRef=${{ github.sha }} :dokkaGeneratePublicationHtml
