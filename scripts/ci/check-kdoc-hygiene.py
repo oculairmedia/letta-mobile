@@ -24,15 +24,20 @@ def kdoc_blocks(text):
                 yield start, offset, text[start:offset]
 
 
+def file_errors(path, root):
+    text = path.read_text(encoding="utf-8-sig")
+    for start, _, comment in kdoc_blocks(text):
+        for match in TRACKER.finditer(comment):
+            line = text.count("\n", 0, start + match.start()) + 1
+            yield f"{path.relative_to(root)}:{line}: describe intent instead of {match[0]}"
+
+
 def check(root):
     errors = []
     for module in coverage.published_modules(root):
-        for path in coverage.production_source_files(coverage.module_directory(root, module)):
-            text = path.read_text(encoding="utf-8-sig")
-            for start, _, comment in kdoc_blocks(text):
-                for match in TRACKER.finditer(comment):
-                    line = text.count("\n", 0, start + match.start()) + 1
-                    errors.append(f"{path.relative_to(root)}:{line}: describe intent instead of {match[0]}")
+        directory = coverage.module_directory(root, module)
+        for path in coverage.production_source_files(directory):
+            errors.extend(file_errors(path, root))
     return errors
 
 
