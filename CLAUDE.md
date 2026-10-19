@@ -107,6 +107,7 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt -Parch
 
 **CI at a glance** (full table: "CI map" in `AGENTS.md`):
 - **Required** (branch protection): `test`, `build-apk-pass` (play-release builds on main pushes only), `shared-multiplatform`.
+- `test` aggregates the parallel `test-workload` and `api-docs` jobs; both must explicitly succeed. Missing linked API declarations and documentation generation failures therefore block merging alongside test failures.
 - **Nightly + main, not a PR gate:** `perf-gate` (emulator startup macrobenchmark, one measurement; on a breach the job summary shows the last 5 main runs as a control and a human decides whether to rerun — no automatic retry; a red nightly/main run opens or updates the `perf-gate regression` issue). PRs run only the cheap `perf-scripts` self-test unless they edit the perf gate or use `[perf:rebaseline]`.
 - **Not required, but honest** (red = a new problem in your diff): `detekt` (baselined), `Platform UI gate` (`--enforce`: a new platform `@Composable` file fails), `main module tests` (main pushes only: `:sharedUI:jvmTest :desktop:test`), `embedded-runtime-node18` (a letta-code pin bump or staging change must boot the staged tree on Node 18.20.4 headless and as an App Server, within the 28 MiB gzip budget).
 - **Advisory** (never fail): `Advisory AGENTS.md policy`, `row goldens (advisory)`, `Export architecture graph`; CodeScene is external and still expected green.
