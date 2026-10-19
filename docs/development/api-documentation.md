@@ -142,3 +142,43 @@ reference without requiring a live host.
 KDoc also needs review: generated pages repeat stale comments faithfully.
 Generation and link gates prove the publication is buildable and navigable;
 they do not prove the runtime behavior described in prose.
+
+## Public API review contract
+
+The API documentation convention enables Kotlin's built-in ABI validation for
+all five published modules. The required `test` CI job runs `apiCheck`, which
+compares compiler-derived public signatures with the checked-in `api` and `api-android` dumps.
+A public signature change fails until its dump is explicitly regenerated:
+
+```bash
+cd android-compose
+./gradlew apiCheck
+./gradlew :sharedLogic:apiDump  # substitute the module whose API changed
+```
+
+Review and commit the generated signature diff with the implementation, and
+review the affected `Module.md` ownership and extension-point descriptions.
+The dump is an API snapshot, not a debt allowance: legitimate API additions and
+removals are allowed but must appear in the PR. CI never runs `apiDump` to
+silently accept changes. These tasks delegate to Kotlin's `checkKotlinAbi` and
+`updateKotlinAbi`; declarations are derived from compiled outputs rather than a
+source-text heuristic. No packages or declarations are excluded by this policy.
+
+See [Kotlin ABI validation](https://kotlinlang.org/docs/gradle-binary-compatibility-validation.html)
+for the underlying format and platform support.
+
+Kotlin 2.4.10 does not include the AGP 9 KMP Android target in its built-in
+extraction task. The convention therefore also extracts Android compilation
+class files with Kotlin's `abi-tools-embeddable` and checks `api-android/android.api`.
+Both paths participate in `apiCheck` and `apiDump`. The Android-specific mutation
+fixture prevents this target from silently falling out of coverage. Once the
+pinned Kotlin version supports this target directly, migrate its snapshot into
+the built-in format and remove the companion tasks in the same reviewed change.
+
+The repository chooses `hostNative` from the build host OS. Native ABI dumps
+therefore contain real target identifiers (for example `linuxX64.hostNative`),
+not interchangeable aliases. Generate the canonical snapshots on Linux, matching
+the required CI runner; do not relabel a Windows or macOS dump as Linux. The CI
+artifact `api-contract-<commit>` contains actual generated signatures even when
+comparison fails, for reviewing and updating a snapshot. An artifact is evidence,
+not automatic approval to change the checked-in contract.

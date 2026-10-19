@@ -12,6 +12,7 @@ kotlin {
 dependencies {
     implementation(libs.android.gradle.plugin)
     implementation(libs.kotlin.gradle.plugin)
+    implementation(libs.kotlin.abi.tools)
     implementation(libs.dokka.gradle.plugin)
 
     testImplementation(gradleTestKit())

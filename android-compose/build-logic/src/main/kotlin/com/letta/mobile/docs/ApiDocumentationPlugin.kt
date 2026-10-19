@@ -10,6 +10,7 @@ import java.net.URI
 class ApiDocumentationPlugin : Plugin<Project> {
     override fun apply(project: Project) {
         project.pluginManager.apply("org.jetbrains.dokka")
+        project.pluginManager.apply(ApiContractPlugin::class.java)
         val dokka = project.extensions.getByType(DokkaExtension::class.java)
         val moduleOverview = project.layout.projectDirectory.file("Module.md").asFile
         dokka.moduleName.set(if (project == project.rootProject) "Letta Mobile API" else project.path)

@@ -215,6 +215,7 @@ jobs:
             :app:testScreenshot
             :build-logic:test
             checkArchitectureBoundaries
+            apiCheck
             :architecture-tests:test
             :architecture-tests:architectureTest
             :architecture-tests:structureReport
@@ -224,7 +225,19 @@ jobs:
             read -r -a additive_tasks <<< "${ADDITIVE_TASKS}"
             tasks+=("${additive_tasks[@]}")
           fi
-          ./gradlew "${tasks[@]}"
+          ./gradlew "${tasks[@]}" --continue
+
+      - name: Upload actual API signatures for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-contract-${{ github.sha }}
+          path: |
+            android-compose/**/build/kotlin/abi/**
+            android-compose/**/build/api-contract/**
+          if-no-files-found: error
+          retention-days: 7
+
 
       - name: Enforce structural documentation limits
         working-directory: ${{ github.workspace }}

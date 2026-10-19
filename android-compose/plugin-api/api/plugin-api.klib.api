@@ -1,0 +1,1034 @@
+// Klib ABI Dump
+// Targets: [mingwX64.hostNative, wasmJs]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <com.letta.mobile:plugin-api>
+final enum class com.letta.mobile.plugin.api/ElementEventType : kotlin/Enum<com.letta.mobile.plugin.api/ElementEventType> { // com.letta.mobile.plugin.api/ElementEventType|null[0]
+    enum entry FOCUSED // com.letta.mobile.plugin.api/ElementEventType.FOCUSED|null[0]
+    enum entry MOVED // com.letta.mobile.plugin.api/ElementEventType.MOVED|null[0]
+    enum entry REMOVED // com.letta.mobile.plugin.api/ElementEventType.REMOVED|null[0]
+    enum entry VIEW_CLOSED // com.letta.mobile.plugin.api/ElementEventType.VIEW_CLOSED|null[0]
+    enum entry VIEW_OPENED // com.letta.mobile.plugin.api/ElementEventType.VIEW_OPENED|null[0]
+
+    final val entries // com.letta.mobile.plugin.api/ElementEventType.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.plugin.api/ElementEventType> // com.letta.mobile.plugin.api/ElementEventType.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.plugin.api/ElementEventType // com.letta.mobile.plugin.api/ElementEventType.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.plugin.api/ElementEventType> // com.letta.mobile.plugin.api/ElementEventType.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.plugin.api/ElementEventType.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/ElementEventType> // com.letta.mobile.plugin.api/ElementEventType.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.plugin.api/ElementEventType.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class com.letta.mobile.plugin.api/LcpDirection : kotlin/Enum<com.letta.mobile.plugin.api/LcpDirection> { // com.letta.mobile.plugin.api/LcpDirection|null[0]
+    enum entry EITHER // com.letta.mobile.plugin.api/LcpDirection.EITHER|null[0]
+    enum entry HOST_TO_PLUGIN // com.letta.mobile.plugin.api/LcpDirection.HOST_TO_PLUGIN|null[0]
+    enum entry PLUGIN_TO_HOST // com.letta.mobile.plugin.api/LcpDirection.PLUGIN_TO_HOST|null[0]
+
+    final val entries // com.letta.mobile.plugin.api/LcpDirection.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.plugin.api/LcpDirection> // com.letta.mobile.plugin.api/LcpDirection.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.plugin.api/LcpDirection // com.letta.mobile.plugin.api/LcpDirection.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.plugin.api/LcpDirection> // com.letta.mobile.plugin.api/LcpDirection.values|values#static(){}[0]
+}
+
+final enum class com.letta.mobile.plugin.api/LcpMethod : kotlin/Enum<com.letta.mobile.plugin.api/LcpMethod> { // com.letta.mobile.plugin.api/LcpMethod|null[0]
+    enum entry ACTIVATE // com.letta.mobile.plugin.api/LcpMethod.ACTIVATE|null[0]
+    enum entry CANCEL // com.letta.mobile.plugin.api/LcpMethod.CANCEL|null[0]
+    enum entry DEACTIVATE // com.letta.mobile.plugin.api/LcpMethod.DEACTIVATE|null[0]
+    enum entry ELEMENT_EVENT // com.letta.mobile.plugin.api/LcpMethod.ELEMENT_EVENT|null[0]
+    enum entry EMIT // com.letta.mobile.plugin.api/LcpMethod.EMIT|null[0]
+    enum entry HEALTH // com.letta.mobile.plugin.api/LcpMethod.HEALTH|null[0]
+    enum entry INITIALIZE // com.letta.mobile.plugin.api/LcpMethod.INITIALIZE|null[0]
+    enum entry INVOKE // com.letta.mobile.plugin.api/LcpMethod.INVOKE|null[0]
+    enum entry LOG // com.letta.mobile.plugin.api/LcpMethod.LOG|null[0]
+    enum entry PUT_ASSET_BEGIN // com.letta.mobile.plugin.api/LcpMethod.PUT_ASSET_BEGIN|null[0]
+    enum entry PUT_ASSET_CHUNK // com.letta.mobile.plugin.api/LcpMethod.PUT_ASSET_CHUNK|null[0]
+    enum entry PUT_ASSET_END // com.letta.mobile.plugin.api/LcpMethod.PUT_ASSET_END|null[0]
+    enum entry READ_ELEMENTS // com.letta.mobile.plugin.api/LcpMethod.READ_ELEMENTS|null[0]
+    enum entry SETTINGS_CHANGED // com.letta.mobile.plugin.api/LcpMethod.SETTINGS_CHANGED|null[0]
+
+    final val deadlineMillis // com.letta.mobile.plugin.api/LcpMethod.deadlineMillis|{}deadlineMillis[0]
+        final fun <get-deadlineMillis>(): kotlin/Long? // com.letta.mobile.plugin.api/LcpMethod.deadlineMillis.<get-deadlineMillis>|<get-deadlineMillis>(){}[0]
+    final val direction // com.letta.mobile.plugin.api/LcpMethod.direction|{}direction[0]
+        final fun <get-direction>(): com.letta.mobile.plugin.api/LcpDirection // com.letta.mobile.plugin.api/LcpMethod.direction.<get-direction>|<get-direction>(){}[0]
+    final val entries // com.letta.mobile.plugin.api/LcpMethod.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.plugin.api/LcpMethod> // com.letta.mobile.plugin.api/LcpMethod.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val notification // com.letta.mobile.plugin.api/LcpMethod.notification|{}notification[0]
+        final fun <get-notification>(): kotlin/Boolean // com.letta.mobile.plugin.api/LcpMethod.notification.<get-notification>|<get-notification>(){}[0]
+    final val spiMember // com.letta.mobile.plugin.api/LcpMethod.spiMember|{}spiMember[0]
+        final fun <get-spiMember>(): kotlin/String // com.letta.mobile.plugin.api/LcpMethod.spiMember.<get-spiMember>|<get-spiMember>(){}[0]
+    final val wire // com.letta.mobile.plugin.api/LcpMethod.wire|{}wire[0]
+        final fun <get-wire>(): kotlin/String // com.letta.mobile.plugin.api/LcpMethod.wire.<get-wire>|<get-wire>(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.plugin.api/LcpMethod // com.letta.mobile.plugin.api/LcpMethod.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.plugin.api/LcpMethod> // com.letta.mobile.plugin.api/LcpMethod.values|values#static(){}[0]
+
+    final object Companion { // com.letta.mobile.plugin.api/LcpMethod.Companion|null[0]
+        final const val MAX_ASSET_CHUNK_BYTES // com.letta.mobile.plugin.api/LcpMethod.Companion.MAX_ASSET_CHUNK_BYTES|{}MAX_ASSET_CHUNK_BYTES[0]
+            final fun <get-MAX_ASSET_CHUNK_BYTES>(): kotlin/Int // com.letta.mobile.plugin.api/LcpMethod.Companion.MAX_ASSET_CHUNK_BYTES.<get-MAX_ASSET_CHUNK_BYTES>|<get-MAX_ASSET_CHUNK_BYTES>(){}[0]
+        final const val MAX_MESSAGE_BYTES // com.letta.mobile.plugin.api/LcpMethod.Companion.MAX_MESSAGE_BYTES|{}MAX_MESSAGE_BYTES[0]
+            final fun <get-MAX_MESSAGE_BYTES>(): kotlin/Int // com.letta.mobile.plugin.api/LcpMethod.Companion.MAX_MESSAGE_BYTES.<get-MAX_MESSAGE_BYTES>|<get-MAX_MESSAGE_BYTES>(){}[0]
+
+        final val INITIALIZE_PARAMS // com.letta.mobile.plugin.api/LcpMethod.Companion.INITIALIZE_PARAMS|{}INITIALIZE_PARAMS[0]
+            final fun <get-INITIALIZE_PARAMS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.plugin.api/LcpMethod.Companion.INITIALIZE_PARAMS.<get-INITIALIZE_PARAMS>|<get-INITIALIZE_PARAMS>(){}[0]
+        final val JVM_ONLY_HOST_MEMBERS // com.letta.mobile.plugin.api/LcpMethod.Companion.JVM_ONLY_HOST_MEMBERS|{}JVM_ONLY_HOST_MEMBERS[0]
+            final fun <get-JVM_ONLY_HOST_MEMBERS>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.plugin.api/LcpMethod.Companion.JVM_ONLY_HOST_MEMBERS.<get-JVM_ONLY_HOST_MEMBERS>|<get-JVM_ONLY_HOST_MEMBERS>(){}[0]
+
+        final fun byWire(kotlin/String): com.letta.mobile.plugin.api/LcpMethod? // com.letta.mobile.plugin.api/LcpMethod.Companion.byWire|byWire(kotlin.String){}[0]
+    }
+}
+
+final enum class com.letta.mobile.plugin.api/LogLevel : kotlin/Enum<com.letta.mobile.plugin.api/LogLevel> { // com.letta.mobile.plugin.api/LogLevel|null[0]
+    enum entry DEBUG // com.letta.mobile.plugin.api/LogLevel.DEBUG|null[0]
+    enum entry ERROR // com.letta.mobile.plugin.api/LogLevel.ERROR|null[0]
+    enum entry INFO // com.letta.mobile.plugin.api/LogLevel.INFO|null[0]
+    enum entry WARN // com.letta.mobile.plugin.api/LogLevel.WARN|null[0]
+
+    final val entries // com.letta.mobile.plugin.api/LogLevel.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.plugin.api/LogLevel> // com.letta.mobile.plugin.api/LogLevel.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.plugin.api/LogLevel // com.letta.mobile.plugin.api/LogLevel.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.plugin.api/LogLevel> // com.letta.mobile.plugin.api/LogLevel.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.plugin.api/LogLevel.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/LogLevel> // com.letta.mobile.plugin.api/LogLevel.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.plugin.api/LogLevel.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+abstract interface com.letta.mobile.plugin.api/CanvasPlugin { // com.letta.mobile.plugin.api/CanvasPlugin|null[0]
+    abstract fun activate() // com.letta.mobile.plugin.api/CanvasPlugin.activate|activate(){}[0]
+    abstract fun deactivate() // com.letta.mobile.plugin.api/CanvasPlugin.deactivate|deactivate(){}[0]
+    abstract fun health(): com.letta.mobile.plugin.api/PluginHealth // com.letta.mobile.plugin.api/CanvasPlugin.health|health(){}[0]
+    abstract suspend fun invoke(com.letta.mobile.plugin.api/ActionCall): com.letta.mobile.plugin.api/ActionResult // com.letta.mobile.plugin.api/CanvasPlugin.invoke|invoke(com.letta.mobile.plugin.api.ActionCall){}[0]
+    open fun initialize(com.letta.mobile.plugin.api/PluginHost): com.letta.mobile.plugin.api/PluginInfo // com.letta.mobile.plugin.api/CanvasPlugin.initialize|initialize(com.letta.mobile.plugin.api.PluginHost){}[0]
+    open fun onSettingsChanged(kotlinx.serialization.json/JsonObject) // com.letta.mobile.plugin.api/CanvasPlugin.onSettingsChanged|onSettingsChanged(kotlinx.serialization.json.JsonObject){}[0]
+    open suspend fun onElementEvent(com.letta.mobile.plugin.api/ElementEvent) // com.letta.mobile.plugin.api/CanvasPlugin.onElementEvent|onElementEvent(com.letta.mobile.plugin.api.ElementEvent){}[0]
+}
+
+abstract interface com.letta.mobile.plugin.api/PluginHost { // com.letta.mobile.plugin.api/PluginHost|null[0]
+    abstract val contractVersion // com.letta.mobile.plugin.api/PluginHost.contractVersion|{}contractVersion[0]
+        abstract fun <get-contractVersion>(): kotlin/Int // com.letta.mobile.plugin.api/PluginHost.contractVersion.<get-contractVersion>|<get-contractVersion>(){}[0]
+    abstract val hostInfo // com.letta.mobile.plugin.api/PluginHost.hostInfo|{}hostInfo[0]
+        abstract fun <get-hostInfo>(): com.letta.mobile.plugin.api/HostInfo // com.letta.mobile.plugin.api/PluginHost.hostInfo.<get-hostInfo>|<get-hostInfo>(){}[0]
+    abstract val httpClient // com.letta.mobile.plugin.api/PluginHost.httpClient|{}httpClient[0]
+        abstract fun <get-httpClient>(): com.letta.mobile.plugin.api/PluginHttpClient // com.letta.mobile.plugin.api/PluginHost.httpClient.<get-httpClient>|<get-httpClient>(){}[0]
+    abstract val pluginId // com.letta.mobile.plugin.api/PluginHost.pluginId|{}pluginId[0]
+        abstract fun <get-pluginId>(): kotlin/String // com.letta.mobile.plugin.api/PluginHost.pluginId.<get-pluginId>|<get-pluginId>(){}[0]
+    abstract val scope // com.letta.mobile.plugin.api/PluginHost.scope|{}scope[0]
+        abstract fun <get-scope>(): kotlinx.coroutines/CoroutineScope // com.letta.mobile.plugin.api/PluginHost.scope.<get-scope>|<get-scope>(){}[0]
+    abstract val settings // com.letta.mobile.plugin.api/PluginHost.settings|{}settings[0]
+        abstract fun <get-settings>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.plugin.api/PluginHost.settings.<get-settings>|<get-settings>(){}[0]
+
+    abstract fun log(com.letta.mobile.plugin.api/LogLevel, kotlin/String, kotlin.collections/Map<kotlin/String, kotlin/String> = ...) // com.letta.mobile.plugin.api/PluginHost.log|log(com.letta.mobile.plugin.api.LogLevel;kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+    abstract fun secret(kotlin/String): kotlin/String? // com.letta.mobile.plugin.api/PluginHost.secret|secret(kotlin.String){}[0]
+    abstract suspend fun emit(com.letta.mobile.plugin.api/PluginEmit): com.letta.mobile.plugin.api/EmitReceipt // com.letta.mobile.plugin.api/PluginHost.emit|emit(com.letta.mobile.plugin.api.PluginEmit){}[0]
+    abstract suspend fun putAsset(kotlin/String, kotlin/ByteArray): kotlin/String // com.letta.mobile.plugin.api/PluginHost.putAsset|putAsset(kotlin.String;kotlin.ByteArray){}[0]
+    abstract suspend fun readElements(com.letta.mobile.plugin.api/ElementQuery): kotlin.collections/List<com.letta.mobile.plugin.api/PluginElementView> // com.letta.mobile.plugin.api/PluginHost.readElements|readElements(com.letta.mobile.plugin.api.ElementQuery){}[0]
+}
+
+abstract interface com.letta.mobile.plugin.api/PluginHttpClient { // com.letta.mobile.plugin.api/PluginHttpClient|null[0]
+    abstract suspend fun get(kotlin/String, kotlin.collections/Map<kotlin/String, kotlin/String> = ...): com.letta.mobile.plugin.api/PluginHttpResponse // com.letta.mobile.plugin.api/PluginHttpClient.get|get(kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+    abstract suspend fun post(kotlin/String, kotlin/ByteArray, kotlin/String, kotlin.collections/Map<kotlin/String, kotlin/String> = ...): com.letta.mobile.plugin.api/PluginHttpResponse // com.letta.mobile.plugin.api/PluginHttpClient.post|post(kotlin.String;kotlin.ByteArray;kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+}
+
+sealed interface com.letta.mobile.plugin.api/ActionOrigin { // com.letta.mobile.plugin.api/ActionOrigin|null[0]
+    final class Agent : com.letta.mobile.plugin.api/ActionOrigin { // com.letta.mobile.plugin.api/ActionOrigin.Agent|null[0]
+        constructor <init>(kotlin/String, kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.plugin.api/ActionOrigin.Agent.<init>|<init>(kotlin.String;kotlin.String?;kotlin.String?){}[0]
+
+        final val agentId // com.letta.mobile.plugin.api/ActionOrigin.Agent.agentId|{}agentId[0]
+            final fun <get-agentId>(): kotlin/String // com.letta.mobile.plugin.api/ActionOrigin.Agent.agentId.<get-agentId>|<get-agentId>(){}[0]
+        final val conversationId // com.letta.mobile.plugin.api/ActionOrigin.Agent.conversationId|{}conversationId[0]
+            final fun <get-conversationId>(): kotlin/String? // com.letta.mobile.plugin.api/ActionOrigin.Agent.conversationId.<get-conversationId>|<get-conversationId>(){}[0]
+        final val toolCallId // com.letta.mobile.plugin.api/ActionOrigin.Agent.toolCallId|{}toolCallId[0]
+            final fun <get-toolCallId>(): kotlin/String? // com.letta.mobile.plugin.api/ActionOrigin.Agent.toolCallId.<get-toolCallId>|<get-toolCallId>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.plugin.api/ActionOrigin.Agent.component1|component1(){}[0]
+        final fun component2(): kotlin/String? // com.letta.mobile.plugin.api/ActionOrigin.Agent.component2|component2(){}[0]
+        final fun component3(): kotlin/String? // com.letta.mobile.plugin.api/ActionOrigin.Agent.component3|component3(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.plugin.api/ActionOrigin.Agent // com.letta.mobile.plugin.api/ActionOrigin.Agent.copy|copy(kotlin.String;kotlin.String?;kotlin.String?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/ActionOrigin.Agent.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/ActionOrigin.Agent.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.plugin.api/ActionOrigin.Agent.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/ActionOrigin.Agent> { // com.letta.mobile.plugin.api/ActionOrigin.Agent.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.api/ActionOrigin.Agent.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/ActionOrigin.Agent.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/ActionOrigin.Agent.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/ActionOrigin.Agent // com.letta.mobile.plugin.api/ActionOrigin.Agent.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/ActionOrigin.Agent) // com.letta.mobile.plugin.api/ActionOrigin.Agent.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.ActionOrigin.Agent){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.api/ActionOrigin.Agent.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/ActionOrigin.Agent> // com.letta.mobile.plugin.api/ActionOrigin.Agent.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Host : com.letta.mobile.plugin.api/ActionOrigin { // com.letta.mobile.plugin.api/ActionOrigin.Host|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.plugin.api/ActionOrigin.Host.<init>|<init>(kotlin.String){}[0]
+
+        final val reason // com.letta.mobile.plugin.api/ActionOrigin.Host.reason|{}reason[0]
+            final fun <get-reason>(): kotlin/String // com.letta.mobile.plugin.api/ActionOrigin.Host.reason.<get-reason>|<get-reason>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.plugin.api/ActionOrigin.Host.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.plugin.api/ActionOrigin.Host // com.letta.mobile.plugin.api/ActionOrigin.Host.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/ActionOrigin.Host.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/ActionOrigin.Host.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.plugin.api/ActionOrigin.Host.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/ActionOrigin.Host> { // com.letta.mobile.plugin.api/ActionOrigin.Host.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.api/ActionOrigin.Host.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/ActionOrigin.Host.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/ActionOrigin.Host.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/ActionOrigin.Host // com.letta.mobile.plugin.api/ActionOrigin.Host.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/ActionOrigin.Host) // com.letta.mobile.plugin.api/ActionOrigin.Host.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.ActionOrigin.Host){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.api/ActionOrigin.Host.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/ActionOrigin.Host> // com.letta.mobile.plugin.api/ActionOrigin.Host.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class View : com.letta.mobile.plugin.api/ActionOrigin { // com.letta.mobile.plugin.api/ActionOrigin.View|null[0]
+        constructor <init>(kotlin/String, kotlin/String? = ...) // com.letta.mobile.plugin.api/ActionOrigin.View.<init>|<init>(kotlin.String;kotlin.String?){}[0]
+
+        final val elementId // com.letta.mobile.plugin.api/ActionOrigin.View.elementId|{}elementId[0]
+            final fun <get-elementId>(): kotlin/String // com.letta.mobile.plugin.api/ActionOrigin.View.elementId.<get-elementId>|<get-elementId>(){}[0]
+        final val peerId // com.letta.mobile.plugin.api/ActionOrigin.View.peerId|{}peerId[0]
+            final fun <get-peerId>(): kotlin/String? // com.letta.mobile.plugin.api/ActionOrigin.View.peerId.<get-peerId>|<get-peerId>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.plugin.api/ActionOrigin.View.component1|component1(){}[0]
+        final fun component2(): kotlin/String? // com.letta.mobile.plugin.api/ActionOrigin.View.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String? = ...): com.letta.mobile.plugin.api/ActionOrigin.View // com.letta.mobile.plugin.api/ActionOrigin.View.copy|copy(kotlin.String;kotlin.String?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/ActionOrigin.View.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/ActionOrigin.View.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.plugin.api/ActionOrigin.View.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/ActionOrigin.View> { // com.letta.mobile.plugin.api/ActionOrigin.View.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.api/ActionOrigin.View.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/ActionOrigin.View.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/ActionOrigin.View.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/ActionOrigin.View // com.letta.mobile.plugin.api/ActionOrigin.View.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/ActionOrigin.View) // com.letta.mobile.plugin.api/ActionOrigin.View.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.ActionOrigin.View){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.api/ActionOrigin.View.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/ActionOrigin.View> // com.letta.mobile.plugin.api/ActionOrigin.View.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.plugin.api/ActionOrigin.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/ActionOrigin> // com.letta.mobile.plugin.api/ActionOrigin.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.plugin.api/ActionOrigin.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.plugin.api/ActionResult { // com.letta.mobile.plugin.api/ActionResult|null[0]
+    final class Error : com.letta.mobile.plugin.api/ActionResult { // com.letta.mobile.plugin.api/ActionResult.Error|null[0]
+        constructor <init>(kotlin/String, kotlin/String) // com.letta.mobile.plugin.api/ActionResult.Error.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+        final val code // com.letta.mobile.plugin.api/ActionResult.Error.code|{}code[0]
+            final fun <get-code>(): kotlin/String // com.letta.mobile.plugin.api/ActionResult.Error.code.<get-code>|<get-code>(){}[0]
+        final val message // com.letta.mobile.plugin.api/ActionResult.Error.message|{}message[0]
+            final fun <get-message>(): kotlin/String // com.letta.mobile.plugin.api/ActionResult.Error.message.<get-message>|<get-message>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.plugin.api/ActionResult.Error.component1|component1(){}[0]
+        final fun component2(): kotlin/String // com.letta.mobile.plugin.api/ActionResult.Error.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String = ...): com.letta.mobile.plugin.api/ActionResult.Error // com.letta.mobile.plugin.api/ActionResult.Error.copy|copy(kotlin.String;kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/ActionResult.Error.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/ActionResult.Error.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.plugin.api/ActionResult.Error.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/ActionResult.Error> { // com.letta.mobile.plugin.api/ActionResult.Error.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.api/ActionResult.Error.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/ActionResult.Error.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/ActionResult.Error.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/ActionResult.Error // com.letta.mobile.plugin.api/ActionResult.Error.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/ActionResult.Error) // com.letta.mobile.plugin.api/ActionResult.Error.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.ActionResult.Error){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.api/ActionResult.Error.Companion|null[0]
+            final const val INTERNAL // com.letta.mobile.plugin.api/ActionResult.Error.Companion.INTERNAL|{}INTERNAL[0]
+                final fun <get-INTERNAL>(): kotlin/String // com.letta.mobile.plugin.api/ActionResult.Error.Companion.INTERNAL.<get-INTERNAL>|<get-INTERNAL>(){}[0]
+            final const val INVALID_INPUT // com.letta.mobile.plugin.api/ActionResult.Error.Companion.INVALID_INPUT|{}INVALID_INPUT[0]
+                final fun <get-INVALID_INPUT>(): kotlin/String // com.letta.mobile.plugin.api/ActionResult.Error.Companion.INVALID_INPUT.<get-INVALID_INPUT>|<get-INVALID_INPUT>(){}[0]
+            final const val UNAVAILABLE // com.letta.mobile.plugin.api/ActionResult.Error.Companion.UNAVAILABLE|{}UNAVAILABLE[0]
+                final fun <get-UNAVAILABLE>(): kotlin/String // com.letta.mobile.plugin.api/ActionResult.Error.Companion.UNAVAILABLE.<get-UNAVAILABLE>|<get-UNAVAILABLE>(){}[0]
+            final const val UNKNOWN_ACTION // com.letta.mobile.plugin.api/ActionResult.Error.Companion.UNKNOWN_ACTION|{}UNKNOWN_ACTION[0]
+                final fun <get-UNKNOWN_ACTION>(): kotlin/String // com.letta.mobile.plugin.api/ActionResult.Error.Companion.UNKNOWN_ACTION.<get-UNKNOWN_ACTION>|<get-UNKNOWN_ACTION>(){}[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/ActionResult.Error> // com.letta.mobile.plugin.api/ActionResult.Error.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Ok : com.letta.mobile.plugin.api/ActionResult { // com.letta.mobile.plugin.api/ActionResult.Ok|null[0]
+        constructor <init>(kotlin/String, kotlinx.serialization.json/JsonObject? = ..., com.letta.mobile.plugin.api/PluginEmit? = ...) // com.letta.mobile.plugin.api/ActionResult.Ok.<init>|<init>(kotlin.String;kotlinx.serialization.json.JsonObject?;com.letta.mobile.plugin.api.PluginEmit?){}[0]
+
+        final val emit // com.letta.mobile.plugin.api/ActionResult.Ok.emit|{}emit[0]
+            final fun <get-emit>(): com.letta.mobile.plugin.api/PluginEmit? // com.letta.mobile.plugin.api/ActionResult.Ok.emit.<get-emit>|<get-emit>(){}[0]
+        final val structured // com.letta.mobile.plugin.api/ActionResult.Ok.structured|{}structured[0]
+            final fun <get-structured>(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.plugin.api/ActionResult.Ok.structured.<get-structured>|<get-structured>(){}[0]
+        final val text // com.letta.mobile.plugin.api/ActionResult.Ok.text|{}text[0]
+            final fun <get-text>(): kotlin/String // com.letta.mobile.plugin.api/ActionResult.Ok.text.<get-text>|<get-text>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.plugin.api/ActionResult.Ok.component1|component1(){}[0]
+        final fun component2(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.plugin.api/ActionResult.Ok.component2|component2(){}[0]
+        final fun component3(): com.letta.mobile.plugin.api/PluginEmit? // com.letta.mobile.plugin.api/ActionResult.Ok.component3|component3(){}[0]
+        final fun copy(kotlin/String = ..., kotlinx.serialization.json/JsonObject? = ..., com.letta.mobile.plugin.api/PluginEmit? = ...): com.letta.mobile.plugin.api/ActionResult.Ok // com.letta.mobile.plugin.api/ActionResult.Ok.copy|copy(kotlin.String;kotlinx.serialization.json.JsonObject?;com.letta.mobile.plugin.api.PluginEmit?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/ActionResult.Ok.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/ActionResult.Ok.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.plugin.api/ActionResult.Ok.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/ActionResult.Ok> { // com.letta.mobile.plugin.api/ActionResult.Ok.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.api/ActionResult.Ok.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/ActionResult.Ok.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/ActionResult.Ok.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/ActionResult.Ok // com.letta.mobile.plugin.api/ActionResult.Ok.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/ActionResult.Ok) // com.letta.mobile.plugin.api/ActionResult.Ok.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.ActionResult.Ok){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.api/ActionResult.Ok.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/ActionResult.Ok> // com.letta.mobile.plugin.api/ActionResult.Ok.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.plugin.api/ActionResult.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/ActionResult> // com.letta.mobile.plugin.api/ActionResult.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.plugin.api/ActionResult.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.plugin.api/PluginHealth { // com.letta.mobile.plugin.api/PluginHealth|null[0]
+    final class Degraded : com.letta.mobile.plugin.api/PluginHealth { // com.letta.mobile.plugin.api/PluginHealth.Degraded|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.plugin.api/PluginHealth.Degraded.<init>|<init>(kotlin.String){}[0]
+
+        final val reason // com.letta.mobile.plugin.api/PluginHealth.Degraded.reason|{}reason[0]
+            final fun <get-reason>(): kotlin/String // com.letta.mobile.plugin.api/PluginHealth.Degraded.reason.<get-reason>|<get-reason>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.plugin.api/PluginHealth.Degraded.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.plugin.api/PluginHealth.Degraded // com.letta.mobile.plugin.api/PluginHealth.Degraded.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/PluginHealth.Degraded.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/PluginHealth.Degraded.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.plugin.api/PluginHealth.Degraded.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/PluginHealth.Degraded> { // com.letta.mobile.plugin.api/PluginHealth.Degraded.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.api/PluginHealth.Degraded.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/PluginHealth.Degraded.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/PluginHealth.Degraded.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/PluginHealth.Degraded // com.letta.mobile.plugin.api/PluginHealth.Degraded.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/PluginHealth.Degraded) // com.letta.mobile.plugin.api/PluginHealth.Degraded.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.PluginHealth.Degraded){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.api/PluginHealth.Degraded.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/PluginHealth.Degraded> // com.letta.mobile.plugin.api/PluginHealth.Degraded.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Failed : com.letta.mobile.plugin.api/PluginHealth { // com.letta.mobile.plugin.api/PluginHealth.Failed|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.plugin.api/PluginHealth.Failed.<init>|<init>(kotlin.String){}[0]
+
+        final val reason // com.letta.mobile.plugin.api/PluginHealth.Failed.reason|{}reason[0]
+            final fun <get-reason>(): kotlin/String // com.letta.mobile.plugin.api/PluginHealth.Failed.reason.<get-reason>|<get-reason>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.plugin.api/PluginHealth.Failed.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.plugin.api/PluginHealth.Failed // com.letta.mobile.plugin.api/PluginHealth.Failed.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/PluginHealth.Failed.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/PluginHealth.Failed.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.plugin.api/PluginHealth.Failed.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/PluginHealth.Failed> { // com.letta.mobile.plugin.api/PluginHealth.Failed.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.api/PluginHealth.Failed.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/PluginHealth.Failed.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/PluginHealth.Failed.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/PluginHealth.Failed // com.letta.mobile.plugin.api/PluginHealth.Failed.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/PluginHealth.Failed) // com.letta.mobile.plugin.api/PluginHealth.Failed.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.PluginHealth.Failed){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.api/PluginHealth.Failed.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/PluginHealth.Failed> // com.letta.mobile.plugin.api/PluginHealth.Failed.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.plugin.api/PluginHealth.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/PluginHealth> // com.letta.mobile.plugin.api/PluginHealth.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.plugin.api/PluginHealth.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+
+    final object Ok : com.letta.mobile.plugin.api/PluginHealth, kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.plugin.api/PluginHealth.Ok|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/PluginHealth.Ok.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/PluginHealth.Ok.hashCode|hashCode(){}[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/PluginHealth.Ok> // com.letta.mobile.plugin.api/PluginHealth.Ok.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.plugin.api/PluginHealth.Ok.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.plugin.api/PluginHealth.Ok.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.plugin.api/SnapshotSource { // com.letta.mobile.plugin.api/SnapshotSource|null[0]
+    final class Asset : com.letta.mobile.plugin.api/SnapshotSource { // com.letta.mobile.plugin.api/SnapshotSource.Asset|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.plugin.api/SnapshotSource.Asset.<init>|<init>(kotlin.String){}[0]
+
+        final val ref // com.letta.mobile.plugin.api/SnapshotSource.Asset.ref|{}ref[0]
+            final fun <get-ref>(): kotlin/String // com.letta.mobile.plugin.api/SnapshotSource.Asset.ref.<get-ref>|<get-ref>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.plugin.api/SnapshotSource.Asset.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.plugin.api/SnapshotSource.Asset // com.letta.mobile.plugin.api/SnapshotSource.Asset.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/SnapshotSource.Asset.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/SnapshotSource.Asset.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.plugin.api/SnapshotSource.Asset.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/SnapshotSource.Asset> { // com.letta.mobile.plugin.api/SnapshotSource.Asset.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.api/SnapshotSource.Asset.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/SnapshotSource.Asset.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/SnapshotSource.Asset.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/SnapshotSource.Asset // com.letta.mobile.plugin.api/SnapshotSource.Asset.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/SnapshotSource.Asset) // com.letta.mobile.plugin.api/SnapshotSource.Asset.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.SnapshotSource.Asset){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.api/SnapshotSource.Asset.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/SnapshotSource.Asset> // com.letta.mobile.plugin.api/SnapshotSource.Asset.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Bytes : com.letta.mobile.plugin.api/SnapshotSource { // com.letta.mobile.plugin.api/SnapshotSource.Bytes|null[0]
+        constructor <init>(kotlin/String, kotlin/ByteArray) // com.letta.mobile.plugin.api/SnapshotSource.Bytes.<init>|<init>(kotlin.String;kotlin.ByteArray){}[0]
+
+        final val bytes // com.letta.mobile.plugin.api/SnapshotSource.Bytes.bytes|{}bytes[0]
+            final fun <get-bytes>(): kotlin/ByteArray // com.letta.mobile.plugin.api/SnapshotSource.Bytes.bytes.<get-bytes>|<get-bytes>(){}[0]
+        final val mediaType // com.letta.mobile.plugin.api/SnapshotSource.Bytes.mediaType|{}mediaType[0]
+            final fun <get-mediaType>(): kotlin/String // com.letta.mobile.plugin.api/SnapshotSource.Bytes.mediaType.<get-mediaType>|<get-mediaType>(){}[0]
+
+        final fun toString(): kotlin/String // com.letta.mobile.plugin.api/SnapshotSource.Bytes.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/SnapshotSource.Bytes> { // com.letta.mobile.plugin.api/SnapshotSource.Bytes.$serializer|null[0]
+            final val descriptor // com.letta.mobile.plugin.api/SnapshotSource.Bytes.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/SnapshotSource.Bytes.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/SnapshotSource.Bytes.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/SnapshotSource.Bytes // com.letta.mobile.plugin.api/SnapshotSource.Bytes.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/SnapshotSource.Bytes) // com.letta.mobile.plugin.api/SnapshotSource.Bytes.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.SnapshotSource.Bytes){}[0]
+        }
+
+        final object Companion { // com.letta.mobile.plugin.api/SnapshotSource.Bytes.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/SnapshotSource.Bytes> // com.letta.mobile.plugin.api/SnapshotSource.Bytes.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.letta.mobile.plugin.api/SnapshotSource.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/SnapshotSource> // com.letta.mobile.plugin.api/SnapshotSource.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.letta.mobile.plugin.api/SnapshotSource.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/ActionCall { // com.letta.mobile.plugin.api/ActionCall|null[0]
+    constructor <init>(kotlin/String, kotlinx.serialization.json/JsonObject, com.letta.mobile.plugin.api/ActionContext) // com.letta.mobile.plugin.api/ActionCall.<init>|<init>(kotlin.String;kotlinx.serialization.json.JsonObject;com.letta.mobile.plugin.api.ActionContext){}[0]
+
+    final val action // com.letta.mobile.plugin.api/ActionCall.action|{}action[0]
+        final fun <get-action>(): kotlin/String // com.letta.mobile.plugin.api/ActionCall.action.<get-action>|<get-action>(){}[0]
+    final val context // com.letta.mobile.plugin.api/ActionCall.context|{}context[0]
+        final fun <get-context>(): com.letta.mobile.plugin.api/ActionContext // com.letta.mobile.plugin.api/ActionCall.context.<get-context>|<get-context>(){}[0]
+    final val input // com.letta.mobile.plugin.api/ActionCall.input|{}input[0]
+        final fun <get-input>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.plugin.api/ActionCall.input.<get-input>|<get-input>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.plugin.api/ActionCall.component1|component1(){}[0]
+    final fun component2(): kotlinx.serialization.json/JsonObject // com.letta.mobile.plugin.api/ActionCall.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.plugin.api/ActionContext // com.letta.mobile.plugin.api/ActionCall.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlinx.serialization.json/JsonObject = ..., com.letta.mobile.plugin.api/ActionContext = ...): com.letta.mobile.plugin.api/ActionCall // com.letta.mobile.plugin.api/ActionCall.copy|copy(kotlin.String;kotlinx.serialization.json.JsonObject;com.letta.mobile.plugin.api.ActionContext){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/ActionCall.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/ActionCall.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.api/ActionCall.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/ActionCall> { // com.letta.mobile.plugin.api/ActionCall.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.api/ActionCall.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/ActionCall.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/ActionCall.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/ActionCall // com.letta.mobile.plugin.api/ActionCall.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/ActionCall) // com.letta.mobile.plugin.api/ActionCall.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.ActionCall){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.api/ActionCall.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/ActionCall> // com.letta.mobile.plugin.api/ActionCall.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/ActionContext { // com.letta.mobile.plugin.api/ActionContext|null[0]
+    constructor <init>(com.letta.mobile.plugin.api/ActionOrigin, kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.plugin.api/ActionContext.<init>|<init>(com.letta.mobile.plugin.api.ActionOrigin;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+
+    final val callId // com.letta.mobile.plugin.api/ActionContext.callId|{}callId[0]
+        final fun <get-callId>(): kotlin/String? // com.letta.mobile.plugin.api/ActionContext.callId.<get-callId>|<get-callId>(){}[0]
+    final val canvasId // com.letta.mobile.plugin.api/ActionContext.canvasId|{}canvasId[0]
+        final fun <get-canvasId>(): kotlin/String? // com.letta.mobile.plugin.api/ActionContext.canvasId.<get-canvasId>|<get-canvasId>(){}[0]
+    final val elementId // com.letta.mobile.plugin.api/ActionContext.elementId|{}elementId[0]
+        final fun <get-elementId>(): kotlin/String? // com.letta.mobile.plugin.api/ActionContext.elementId.<get-elementId>|<get-elementId>(){}[0]
+    final val origin // com.letta.mobile.plugin.api/ActionContext.origin|{}origin[0]
+        final fun <get-origin>(): com.letta.mobile.plugin.api/ActionOrigin // com.letta.mobile.plugin.api/ActionContext.origin.<get-origin>|<get-origin>(){}[0]
+
+    final fun component1(): com.letta.mobile.plugin.api/ActionOrigin // com.letta.mobile.plugin.api/ActionContext.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.plugin.api/ActionContext.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.plugin.api/ActionContext.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // com.letta.mobile.plugin.api/ActionContext.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.plugin.api/ActionOrigin = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.plugin.api/ActionContext // com.letta.mobile.plugin.api/ActionContext.copy|copy(com.letta.mobile.plugin.api.ActionOrigin;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/ActionContext.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/ActionContext.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.api/ActionContext.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/ActionContext> { // com.letta.mobile.plugin.api/ActionContext.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.api/ActionContext.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/ActionContext.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/ActionContext.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/ActionContext // com.letta.mobile.plugin.api/ActionContext.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/ActionContext) // com.letta.mobile.plugin.api/ActionContext.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.ActionContext){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.api/ActionContext.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.plugin.api/ActionContext.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/ActionContext> // com.letta.mobile.plugin.api/ActionContext.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/ElementEvent { // com.letta.mobile.plugin.api/ElementEvent|null[0]
+    constructor <init>(kotlin/String, kotlin/String, com.letta.mobile.plugin.api/ElementEventType, com.letta.mobile.plugin.api/ElementFrame? = ..., kotlin/String? = ...) // com.letta.mobile.plugin.api/ElementEvent.<init>|<init>(kotlin.String;kotlin.String;com.letta.mobile.plugin.api.ElementEventType;com.letta.mobile.plugin.api.ElementFrame?;kotlin.String?){}[0]
+
+    final val canvasId // com.letta.mobile.plugin.api/ElementEvent.canvasId|{}canvasId[0]
+        final fun <get-canvasId>(): kotlin/String? // com.letta.mobile.plugin.api/ElementEvent.canvasId.<get-canvasId>|<get-canvasId>(){}[0]
+    final val elementId // com.letta.mobile.plugin.api/ElementEvent.elementId|{}elementId[0]
+        final fun <get-elementId>(): kotlin/String // com.letta.mobile.plugin.api/ElementEvent.elementId.<get-elementId>|<get-elementId>(){}[0]
+    final val event // com.letta.mobile.plugin.api/ElementEvent.event|{}event[0]
+        final fun <get-event>(): com.letta.mobile.plugin.api/ElementEventType // com.letta.mobile.plugin.api/ElementEvent.event.<get-event>|<get-event>(){}[0]
+    final val frame // com.letta.mobile.plugin.api/ElementEvent.frame|{}frame[0]
+        final fun <get-frame>(): com.letta.mobile.plugin.api/ElementFrame? // com.letta.mobile.plugin.api/ElementEvent.frame.<get-frame>|<get-frame>(){}[0]
+    final val kind // com.letta.mobile.plugin.api/ElementEvent.kind|{}kind[0]
+        final fun <get-kind>(): kotlin/String // com.letta.mobile.plugin.api/ElementEvent.kind.<get-kind>|<get-kind>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.plugin.api/ElementEvent.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.plugin.api/ElementEvent.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.plugin.api/ElementEventType // com.letta.mobile.plugin.api/ElementEvent.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.plugin.api/ElementFrame? // com.letta.mobile.plugin.api/ElementEvent.component4|component4(){}[0]
+    final fun component5(): kotlin/String? // com.letta.mobile.plugin.api/ElementEvent.component5|component5(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., com.letta.mobile.plugin.api/ElementEventType = ..., com.letta.mobile.plugin.api/ElementFrame? = ..., kotlin/String? = ...): com.letta.mobile.plugin.api/ElementEvent // com.letta.mobile.plugin.api/ElementEvent.copy|copy(kotlin.String;kotlin.String;com.letta.mobile.plugin.api.ElementEventType;com.letta.mobile.plugin.api.ElementFrame?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/ElementEvent.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/ElementEvent.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.api/ElementEvent.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/ElementEvent> { // com.letta.mobile.plugin.api/ElementEvent.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.api/ElementEvent.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/ElementEvent.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/ElementEvent.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/ElementEvent // com.letta.mobile.plugin.api/ElementEvent.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/ElementEvent) // com.letta.mobile.plugin.api/ElementEvent.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.ElementEvent){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.api/ElementEvent.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.plugin.api/ElementEvent.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/ElementEvent> // com.letta.mobile.plugin.api/ElementEvent.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/ElementFallback { // com.letta.mobile.plugin.api/ElementFallback|null[0]
+    constructor <init>(kotlin/String, kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.plugin.api/ElementFallback.<init>|<init>(kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+
+    final val icon // com.letta.mobile.plugin.api/ElementFallback.icon|{}icon[0]
+        final fun <get-icon>(): kotlin/String? // com.letta.mobile.plugin.api/ElementFallback.icon.<get-icon>|<get-icon>(){}[0]
+    final val openUrl // com.letta.mobile.plugin.api/ElementFallback.openUrl|{}openUrl[0]
+        final fun <get-openUrl>(): kotlin/String? // com.letta.mobile.plugin.api/ElementFallback.openUrl.<get-openUrl>|<get-openUrl>(){}[0]
+    final val subtitle // com.letta.mobile.plugin.api/ElementFallback.subtitle|{}subtitle[0]
+        final fun <get-subtitle>(): kotlin/String? // com.letta.mobile.plugin.api/ElementFallback.subtitle.<get-subtitle>|<get-subtitle>(){}[0]
+    final val title // com.letta.mobile.plugin.api/ElementFallback.title|{}title[0]
+        final fun <get-title>(): kotlin/String // com.letta.mobile.plugin.api/ElementFallback.title.<get-title>|<get-title>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.plugin.api/ElementFallback.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.plugin.api/ElementFallback.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.plugin.api/ElementFallback.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // com.letta.mobile.plugin.api/ElementFallback.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.plugin.api/ElementFallback // com.letta.mobile.plugin.api/ElementFallback.copy|copy(kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/ElementFallback.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/ElementFallback.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.api/ElementFallback.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/ElementFallback> { // com.letta.mobile.plugin.api/ElementFallback.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.api/ElementFallback.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/ElementFallback.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/ElementFallback.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/ElementFallback // com.letta.mobile.plugin.api/ElementFallback.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/ElementFallback) // com.letta.mobile.plugin.api/ElementFallback.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.ElementFallback){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.api/ElementFallback.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/ElementFallback> // com.letta.mobile.plugin.api/ElementFallback.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/ElementFrame { // com.letta.mobile.plugin.api/ElementFrame|null[0]
+    constructor <init>(kotlin/Float, kotlin/Float, kotlin/Float, kotlin/Float) // com.letta.mobile.plugin.api/ElementFrame.<init>|<init>(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
+
+    final val height // com.letta.mobile.plugin.api/ElementFrame.height|{}height[0]
+        final fun <get-height>(): kotlin/Float // com.letta.mobile.plugin.api/ElementFrame.height.<get-height>|<get-height>(){}[0]
+    final val width // com.letta.mobile.plugin.api/ElementFrame.width|{}width[0]
+        final fun <get-width>(): kotlin/Float // com.letta.mobile.plugin.api/ElementFrame.width.<get-width>|<get-width>(){}[0]
+    final val x // com.letta.mobile.plugin.api/ElementFrame.x|{}x[0]
+        final fun <get-x>(): kotlin/Float // com.letta.mobile.plugin.api/ElementFrame.x.<get-x>|<get-x>(){}[0]
+    final val y // com.letta.mobile.plugin.api/ElementFrame.y|{}y[0]
+        final fun <get-y>(): kotlin/Float // com.letta.mobile.plugin.api/ElementFrame.y.<get-y>|<get-y>(){}[0]
+
+    final fun component1(): kotlin/Float // com.letta.mobile.plugin.api/ElementFrame.component1|component1(){}[0]
+    final fun component2(): kotlin/Float // com.letta.mobile.plugin.api/ElementFrame.component2|component2(){}[0]
+    final fun component3(): kotlin/Float // com.letta.mobile.plugin.api/ElementFrame.component3|component3(){}[0]
+    final fun component4(): kotlin/Float // com.letta.mobile.plugin.api/ElementFrame.component4|component4(){}[0]
+    final fun copy(kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ...): com.letta.mobile.plugin.api/ElementFrame // com.letta.mobile.plugin.api/ElementFrame.copy|copy(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/ElementFrame.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/ElementFrame.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.api/ElementFrame.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/ElementFrame> { // com.letta.mobile.plugin.api/ElementFrame.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.api/ElementFrame.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/ElementFrame.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/ElementFrame.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/ElementFrame // com.letta.mobile.plugin.api/ElementFrame.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/ElementFrame) // com.letta.mobile.plugin.api/ElementFrame.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.ElementFrame){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.api/ElementFrame.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/ElementFrame> // com.letta.mobile.plugin.api/ElementFrame.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/ElementQuery { // com.letta.mobile.plugin.api/ElementQuery|null[0]
+    constructor <init>(kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/Boolean = ...) // com.letta.mobile.plugin.api/ElementQuery.<init>|<init>(kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.Boolean){}[0]
+
+    final val canvasId // com.letta.mobile.plugin.api/ElementQuery.canvasId|{}canvasId[0]
+        final fun <get-canvasId>(): kotlin/String? // com.letta.mobile.plugin.api/ElementQuery.canvasId.<get-canvasId>|<get-canvasId>(){}[0]
+    final val elementIds // com.letta.mobile.plugin.api/ElementQuery.elementIds|{}elementIds[0]
+        final fun <get-elementIds>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.plugin.api/ElementQuery.elementIds.<get-elementIds>|<get-elementIds>(){}[0]
+    final val kinds // com.letta.mobile.plugin.api/ElementQuery.kinds|{}kinds[0]
+        final fun <get-kinds>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.plugin.api/ElementQuery.kinds.<get-kinds>|<get-kinds>(){}[0]
+    final val ownOnly // com.letta.mobile.plugin.api/ElementQuery.ownOnly|{}ownOnly[0]
+        final fun <get-ownOnly>(): kotlin/Boolean // com.letta.mobile.plugin.api/ElementQuery.ownOnly.<get-ownOnly>|<get-ownOnly>(){}[0]
+
+    final fun component1(): kotlin/String? // com.letta.mobile.plugin.api/ElementQuery.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<kotlin/String> // com.letta.mobile.plugin.api/ElementQuery.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<kotlin/String> // com.letta.mobile.plugin.api/ElementQuery.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // com.letta.mobile.plugin.api/ElementQuery.component4|component4(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/Boolean = ...): com.letta.mobile.plugin.api/ElementQuery // com.letta.mobile.plugin.api/ElementQuery.copy|copy(kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/ElementQuery.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/ElementQuery.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.api/ElementQuery.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/ElementQuery> { // com.letta.mobile.plugin.api/ElementQuery.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.api/ElementQuery.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/ElementQuery.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/ElementQuery.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/ElementQuery // com.letta.mobile.plugin.api/ElementQuery.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/ElementQuery) // com.letta.mobile.plugin.api/ElementQuery.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.ElementQuery){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.api/ElementQuery.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.plugin.api/ElementQuery.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/ElementQuery> // com.letta.mobile.plugin.api/ElementQuery.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/EmitReceipt { // com.letta.mobile.plugin.api/EmitReceipt|null[0]
+    constructor <init>(kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<com.letta.mobile.plugin.api/EmitRefusal> = ...) // com.letta.mobile.plugin.api/EmitReceipt.<init>|<init>(kotlin.collections.List<kotlin.String>;kotlin.collections.List<com.letta.mobile.plugin.api.EmitRefusal>){}[0]
+
+    final val placed // com.letta.mobile.plugin.api/EmitReceipt.placed|{}placed[0]
+        final fun <get-placed>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.plugin.api/EmitReceipt.placed.<get-placed>|<get-placed>(){}[0]
+    final val refused // com.letta.mobile.plugin.api/EmitReceipt.refused|{}refused[0]
+        final fun <get-refused>(): kotlin.collections/List<com.letta.mobile.plugin.api/EmitRefusal> // com.letta.mobile.plugin.api/EmitReceipt.refused.<get-refused>|<get-refused>(){}[0]
+
+    final fun component1(): kotlin.collections/List<kotlin/String> // com.letta.mobile.plugin.api/EmitReceipt.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<com.letta.mobile.plugin.api/EmitRefusal> // com.letta.mobile.plugin.api/EmitReceipt.component2|component2(){}[0]
+    final fun copy(kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<com.letta.mobile.plugin.api/EmitRefusal> = ...): com.letta.mobile.plugin.api/EmitReceipt // com.letta.mobile.plugin.api/EmitReceipt.copy|copy(kotlin.collections.List<kotlin.String>;kotlin.collections.List<com.letta.mobile.plugin.api.EmitRefusal>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/EmitReceipt.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/EmitReceipt.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.api/EmitReceipt.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/EmitReceipt> { // com.letta.mobile.plugin.api/EmitReceipt.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.api/EmitReceipt.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/EmitReceipt.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/EmitReceipt.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/EmitReceipt // com.letta.mobile.plugin.api/EmitReceipt.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/EmitReceipt) // com.letta.mobile.plugin.api/EmitReceipt.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.EmitReceipt){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.api/EmitReceipt.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.plugin.api/EmitReceipt.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/EmitReceipt> // com.letta.mobile.plugin.api/EmitReceipt.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/EmitRefusal { // com.letta.mobile.plugin.api/EmitRefusal|null[0]
+    constructor <init>(kotlin/Int, kotlin/String) // com.letta.mobile.plugin.api/EmitRefusal.<init>|<init>(kotlin.Int;kotlin.String){}[0]
+
+    final val index // com.letta.mobile.plugin.api/EmitRefusal.index|{}index[0]
+        final fun <get-index>(): kotlin/Int // com.letta.mobile.plugin.api/EmitRefusal.index.<get-index>|<get-index>(){}[0]
+    final val reason // com.letta.mobile.plugin.api/EmitRefusal.reason|{}reason[0]
+        final fun <get-reason>(): kotlin/String // com.letta.mobile.plugin.api/EmitRefusal.reason.<get-reason>|<get-reason>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.plugin.api/EmitRefusal.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.plugin.api/EmitRefusal.component2|component2(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/String = ...): com.letta.mobile.plugin.api/EmitRefusal // com.letta.mobile.plugin.api/EmitRefusal.copy|copy(kotlin.Int;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/EmitRefusal.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/EmitRefusal.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.api/EmitRefusal.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/EmitRefusal> { // com.letta.mobile.plugin.api/EmitRefusal.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.api/EmitRefusal.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/EmitRefusal.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/EmitRefusal.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/EmitRefusal // com.letta.mobile.plugin.api/EmitRefusal.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/EmitRefusal) // com.letta.mobile.plugin.api/EmitRefusal.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.EmitRefusal){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.api/EmitRefusal.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/EmitRefusal> // com.letta.mobile.plugin.api/EmitRefusal.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/HostInfo { // com.letta.mobile.plugin.api/HostInfo|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String? = ...) // com.letta.mobile.plugin.api/HostInfo.<init>|<init>(kotlin.String;kotlin.String;kotlin.String?){}[0]
+
+    final val name // com.letta.mobile.plugin.api/HostInfo.name|{}name[0]
+        final fun <get-name>(): kotlin/String // com.letta.mobile.plugin.api/HostInfo.name.<get-name>|<get-name>(){}[0]
+    final val platform // com.letta.mobile.plugin.api/HostInfo.platform|{}platform[0]
+        final fun <get-platform>(): kotlin/String? // com.letta.mobile.plugin.api/HostInfo.platform.<get-platform>|<get-platform>(){}[0]
+    final val version // com.letta.mobile.plugin.api/HostInfo.version|{}version[0]
+        final fun <get-version>(): kotlin/String // com.letta.mobile.plugin.api/HostInfo.version.<get-version>|<get-version>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.plugin.api/HostInfo.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.plugin.api/HostInfo.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.plugin.api/HostInfo.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String? = ...): com.letta.mobile.plugin.api/HostInfo // com.letta.mobile.plugin.api/HostInfo.copy|copy(kotlin.String;kotlin.String;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/HostInfo.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/HostInfo.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.api/HostInfo.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/HostInfo> { // com.letta.mobile.plugin.api/HostInfo.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.api/HostInfo.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/HostInfo.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/HostInfo.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/HostInfo // com.letta.mobile.plugin.api/HostInfo.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/HostInfo) // com.letta.mobile.plugin.api/HostInfo.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.HostInfo){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.api/HostInfo.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/HostInfo> // com.letta.mobile.plugin.api/HostInfo.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/PlaceElement { // com.letta.mobile.plugin.api/PlaceElement|null[0]
+    constructor <init>(kotlin/String, kotlin/Int, kotlinx.serialization.json/JsonObject, com.letta.mobile.plugin.api/ElementFallback, kotlin/String? = ..., com.letta.mobile.plugin.api/ElementFrame? = ..., com.letta.mobile.plugin.api/SnapshotSource? = ..., kotlin/String? = ...) // com.letta.mobile.plugin.api/PlaceElement.<init>|<init>(kotlin.String;kotlin.Int;kotlinx.serialization.json.JsonObject;com.letta.mobile.plugin.api.ElementFallback;kotlin.String?;com.letta.mobile.plugin.api.ElementFrame?;com.letta.mobile.plugin.api.SnapshotSource?;kotlin.String?){}[0]
+
+    final val canvasId // com.letta.mobile.plugin.api/PlaceElement.canvasId|{}canvasId[0]
+        final fun <get-canvasId>(): kotlin/String? // com.letta.mobile.plugin.api/PlaceElement.canvasId.<get-canvasId>|<get-canvasId>(){}[0]
+    final val fallback // com.letta.mobile.plugin.api/PlaceElement.fallback|{}fallback[0]
+        final fun <get-fallback>(): com.letta.mobile.plugin.api/ElementFallback // com.letta.mobile.plugin.api/PlaceElement.fallback.<get-fallback>|<get-fallback>(){}[0]
+    final val frame // com.letta.mobile.plugin.api/PlaceElement.frame|{}frame[0]
+        final fun <get-frame>(): com.letta.mobile.plugin.api/ElementFrame? // com.letta.mobile.plugin.api/PlaceElement.frame.<get-frame>|<get-frame>(){}[0]
+    final val kind // com.letta.mobile.plugin.api/PlaceElement.kind|{}kind[0]
+        final fun <get-kind>(): kotlin/String // com.letta.mobile.plugin.api/PlaceElement.kind.<get-kind>|<get-kind>(){}[0]
+    final val props // com.letta.mobile.plugin.api/PlaceElement.props|{}props[0]
+        final fun <get-props>(): kotlinx.serialization.json/JsonObject // com.letta.mobile.plugin.api/PlaceElement.props.<get-props>|<get-props>(){}[0]
+    final val ref // com.letta.mobile.plugin.api/PlaceElement.ref|{}ref[0]
+        final fun <get-ref>(): kotlin/String? // com.letta.mobile.plugin.api/PlaceElement.ref.<get-ref>|<get-ref>(){}[0]
+    final val snapshot // com.letta.mobile.plugin.api/PlaceElement.snapshot|{}snapshot[0]
+        final fun <get-snapshot>(): com.letta.mobile.plugin.api/SnapshotSource? // com.letta.mobile.plugin.api/PlaceElement.snapshot.<get-snapshot>|<get-snapshot>(){}[0]
+    final val v // com.letta.mobile.plugin.api/PlaceElement.v|{}v[0]
+        final fun <get-v>(): kotlin/Int // com.letta.mobile.plugin.api/PlaceElement.v.<get-v>|<get-v>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.plugin.api/PlaceElement.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // com.letta.mobile.plugin.api/PlaceElement.component2|component2(){}[0]
+    final fun component3(): kotlinx.serialization.json/JsonObject // com.letta.mobile.plugin.api/PlaceElement.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.plugin.api/ElementFallback // com.letta.mobile.plugin.api/PlaceElement.component4|component4(){}[0]
+    final fun component5(): kotlin/String? // com.letta.mobile.plugin.api/PlaceElement.component5|component5(){}[0]
+    final fun component6(): com.letta.mobile.plugin.api/ElementFrame? // com.letta.mobile.plugin.api/PlaceElement.component6|component6(){}[0]
+    final fun component7(): com.letta.mobile.plugin.api/SnapshotSource? // com.letta.mobile.plugin.api/PlaceElement.component7|component7(){}[0]
+    final fun component8(): kotlin/String? // com.letta.mobile.plugin.api/PlaceElement.component8|component8(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Int = ..., kotlinx.serialization.json/JsonObject = ..., com.letta.mobile.plugin.api/ElementFallback = ..., kotlin/String? = ..., com.letta.mobile.plugin.api/ElementFrame? = ..., com.letta.mobile.plugin.api/SnapshotSource? = ..., kotlin/String? = ...): com.letta.mobile.plugin.api/PlaceElement // com.letta.mobile.plugin.api/PlaceElement.copy|copy(kotlin.String;kotlin.Int;kotlinx.serialization.json.JsonObject;com.letta.mobile.plugin.api.ElementFallback;kotlin.String?;com.letta.mobile.plugin.api.ElementFrame?;com.letta.mobile.plugin.api.SnapshotSource?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/PlaceElement.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/PlaceElement.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.api/PlaceElement.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/PlaceElement> { // com.letta.mobile.plugin.api/PlaceElement.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.api/PlaceElement.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/PlaceElement.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/PlaceElement.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/PlaceElement // com.letta.mobile.plugin.api/PlaceElement.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/PlaceElement) // com.letta.mobile.plugin.api/PlaceElement.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.PlaceElement){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.api/PlaceElement.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.plugin.api/PlaceElement.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/PlaceElement> // com.letta.mobile.plugin.api/PlaceElement.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/PlaceImage { // com.letta.mobile.plugin.api/PlaceImage|null[0]
+    constructor <init>(com.letta.mobile.plugin.api/SnapshotSource, com.letta.mobile.plugin.api/ElementFrame? = ..., kotlin/String? = ..., kotlin/String? = ...) // com.letta.mobile.plugin.api/PlaceImage.<init>|<init>(com.letta.mobile.plugin.api.SnapshotSource;com.letta.mobile.plugin.api.ElementFrame?;kotlin.String?;kotlin.String?){}[0]
+
+    final val alt // com.letta.mobile.plugin.api/PlaceImage.alt|{}alt[0]
+        final fun <get-alt>(): kotlin/String? // com.letta.mobile.plugin.api/PlaceImage.alt.<get-alt>|<get-alt>(){}[0]
+    final val canvasId // com.letta.mobile.plugin.api/PlaceImage.canvasId|{}canvasId[0]
+        final fun <get-canvasId>(): kotlin/String? // com.letta.mobile.plugin.api/PlaceImage.canvasId.<get-canvasId>|<get-canvasId>(){}[0]
+    final val frame // com.letta.mobile.plugin.api/PlaceImage.frame|{}frame[0]
+        final fun <get-frame>(): com.letta.mobile.plugin.api/ElementFrame? // com.letta.mobile.plugin.api/PlaceImage.frame.<get-frame>|<get-frame>(){}[0]
+    final val image // com.letta.mobile.plugin.api/PlaceImage.image|{}image[0]
+        final fun <get-image>(): com.letta.mobile.plugin.api/SnapshotSource // com.letta.mobile.plugin.api/PlaceImage.image.<get-image>|<get-image>(){}[0]
+
+    final fun component1(): com.letta.mobile.plugin.api/SnapshotSource // com.letta.mobile.plugin.api/PlaceImage.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.plugin.api/ElementFrame? // com.letta.mobile.plugin.api/PlaceImage.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.plugin.api/PlaceImage.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // com.letta.mobile.plugin.api/PlaceImage.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.plugin.api/SnapshotSource = ..., com.letta.mobile.plugin.api/ElementFrame? = ..., kotlin/String? = ..., kotlin/String? = ...): com.letta.mobile.plugin.api/PlaceImage // com.letta.mobile.plugin.api/PlaceImage.copy|copy(com.letta.mobile.plugin.api.SnapshotSource;com.letta.mobile.plugin.api.ElementFrame?;kotlin.String?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/PlaceImage.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/PlaceImage.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.api/PlaceImage.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/PlaceImage> { // com.letta.mobile.plugin.api/PlaceImage.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.api/PlaceImage.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/PlaceImage.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/PlaceImage.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/PlaceImage // com.letta.mobile.plugin.api/PlaceImage.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/PlaceImage) // com.letta.mobile.plugin.api/PlaceImage.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.PlaceImage){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.api/PlaceImage.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.plugin.api/PlaceImage.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/PlaceImage> // com.letta.mobile.plugin.api/PlaceImage.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/PluginElementView { // com.letta.mobile.plugin.api/PluginElementView|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/Int? = ..., com.letta.mobile.plugin.api/ElementFrame? = ..., kotlinx.serialization.json/JsonObject? = ..., kotlin/String? = ..., com.letta.mobile.plugin.api/ElementFallback? = ...) // com.letta.mobile.plugin.api/PluginElementView.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.Int?;com.letta.mobile.plugin.api.ElementFrame?;kotlinx.serialization.json.JsonObject?;kotlin.String?;com.letta.mobile.plugin.api.ElementFallback?){}[0]
+
+    final val canvasId // com.letta.mobile.plugin.api/PluginElementView.canvasId|{}canvasId[0]
+        final fun <get-canvasId>(): kotlin/String // com.letta.mobile.plugin.api/PluginElementView.canvasId.<get-canvasId>|<get-canvasId>(){}[0]
+    final val fallback // com.letta.mobile.plugin.api/PluginElementView.fallback|{}fallback[0]
+        final fun <get-fallback>(): com.letta.mobile.plugin.api/ElementFallback? // com.letta.mobile.plugin.api/PluginElementView.fallback.<get-fallback>|<get-fallback>(){}[0]
+    final val frame // com.letta.mobile.plugin.api/PluginElementView.frame|{}frame[0]
+        final fun <get-frame>(): com.letta.mobile.plugin.api/ElementFrame? // com.letta.mobile.plugin.api/PluginElementView.frame.<get-frame>|<get-frame>(){}[0]
+    final val id // com.letta.mobile.plugin.api/PluginElementView.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.letta.mobile.plugin.api/PluginElementView.id.<get-id>|<get-id>(){}[0]
+    final val props // com.letta.mobile.plugin.api/PluginElementView.props|{}props[0]
+        final fun <get-props>(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.plugin.api/PluginElementView.props.<get-props>|<get-props>(){}[0]
+    final val ref // com.letta.mobile.plugin.api/PluginElementView.ref|{}ref[0]
+        final fun <get-ref>(): kotlin/String? // com.letta.mobile.plugin.api/PluginElementView.ref.<get-ref>|<get-ref>(){}[0]
+    final val type // com.letta.mobile.plugin.api/PluginElementView.type|{}type[0]
+        final fun <get-type>(): kotlin/String // com.letta.mobile.plugin.api/PluginElementView.type.<get-type>|<get-type>(){}[0]
+    final val v // com.letta.mobile.plugin.api/PluginElementView.v|{}v[0]
+        final fun <get-v>(): kotlin/Int? // com.letta.mobile.plugin.api/PluginElementView.v.<get-v>|<get-v>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.plugin.api/PluginElementView.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.letta.mobile.plugin.api/PluginElementView.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.plugin.api/PluginElementView.component3|component3(){}[0]
+    final fun component4(): kotlin/Int? // com.letta.mobile.plugin.api/PluginElementView.component4|component4(){}[0]
+    final fun component5(): com.letta.mobile.plugin.api/ElementFrame? // com.letta.mobile.plugin.api/PluginElementView.component5|component5(){}[0]
+    final fun component6(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.plugin.api/PluginElementView.component6|component6(){}[0]
+    final fun component7(): kotlin/String? // com.letta.mobile.plugin.api/PluginElementView.component7|component7(){}[0]
+    final fun component8(): com.letta.mobile.plugin.api/ElementFallback? // com.letta.mobile.plugin.api/PluginElementView.component8|component8(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Int? = ..., com.letta.mobile.plugin.api/ElementFrame? = ..., kotlinx.serialization.json/JsonObject? = ..., kotlin/String? = ..., com.letta.mobile.plugin.api/ElementFallback? = ...): com.letta.mobile.plugin.api/PluginElementView // com.letta.mobile.plugin.api/PluginElementView.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.Int?;com.letta.mobile.plugin.api.ElementFrame?;kotlinx.serialization.json.JsonObject?;kotlin.String?;com.letta.mobile.plugin.api.ElementFallback?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/PluginElementView.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/PluginElementView.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.api/PluginElementView.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/PluginElementView> { // com.letta.mobile.plugin.api/PluginElementView.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.api/PluginElementView.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/PluginElementView.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/PluginElementView.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/PluginElementView // com.letta.mobile.plugin.api/PluginElementView.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/PluginElementView) // com.letta.mobile.plugin.api/PluginElementView.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.PluginElementView){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.api/PluginElementView.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/PluginElementView> // com.letta.mobile.plugin.api/PluginElementView.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/PluginEmit { // com.letta.mobile.plugin.api/PluginEmit|null[0]
+    constructor <init>(kotlin.collections/List<com.letta.mobile.plugin.api/PlaceElement> = ..., kotlin.collections/List<com.letta.mobile.plugin.api/UpdateElement> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<com.letta.mobile.plugin.api/PlaceImage> = ..., kotlin/String? = ...) // com.letta.mobile.plugin.api/PluginEmit.<init>|<init>(kotlin.collections.List<com.letta.mobile.plugin.api.PlaceElement>;kotlin.collections.List<com.letta.mobile.plugin.api.UpdateElement>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<com.letta.mobile.plugin.api.PlaceImage>;kotlin.String?){}[0]
+
+    final val callId // com.letta.mobile.plugin.api/PluginEmit.callId|{}callId[0]
+        final fun <get-callId>(): kotlin/String? // com.letta.mobile.plugin.api/PluginEmit.callId.<get-callId>|<get-callId>(){}[0]
+    final val isEmpty // com.letta.mobile.plugin.api/PluginEmit.isEmpty|{}isEmpty[0]
+        final fun <get-isEmpty>(): kotlin/Boolean // com.letta.mobile.plugin.api/PluginEmit.isEmpty.<get-isEmpty>|<get-isEmpty>(){}[0]
+    final val place // com.letta.mobile.plugin.api/PluginEmit.place|{}place[0]
+        final fun <get-place>(): kotlin.collections/List<com.letta.mobile.plugin.api/PlaceElement> // com.letta.mobile.plugin.api/PluginEmit.place.<get-place>|<get-place>(){}[0]
+    final val placeImages // com.letta.mobile.plugin.api/PluginEmit.placeImages|{}placeImages[0]
+        final fun <get-placeImages>(): kotlin.collections/List<com.letta.mobile.plugin.api/PlaceImage> // com.letta.mobile.plugin.api/PluginEmit.placeImages.<get-placeImages>|<get-placeImages>(){}[0]
+    final val remove // com.letta.mobile.plugin.api/PluginEmit.remove|{}remove[0]
+        final fun <get-remove>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.plugin.api/PluginEmit.remove.<get-remove>|<get-remove>(){}[0]
+    final val update // com.letta.mobile.plugin.api/PluginEmit.update|{}update[0]
+        final fun <get-update>(): kotlin.collections/List<com.letta.mobile.plugin.api/UpdateElement> // com.letta.mobile.plugin.api/PluginEmit.update.<get-update>|<get-update>(){}[0]
+
+    final fun component1(): kotlin.collections/List<com.letta.mobile.plugin.api/PlaceElement> // com.letta.mobile.plugin.api/PluginEmit.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<com.letta.mobile.plugin.api/UpdateElement> // com.letta.mobile.plugin.api/PluginEmit.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<kotlin/String> // com.letta.mobile.plugin.api/PluginEmit.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/List<com.letta.mobile.plugin.api/PlaceImage> // com.letta.mobile.plugin.api/PluginEmit.component4|component4(){}[0]
+    final fun component5(): kotlin/String? // com.letta.mobile.plugin.api/PluginEmit.component5|component5(){}[0]
+    final fun copy(kotlin.collections/List<com.letta.mobile.plugin.api/PlaceElement> = ..., kotlin.collections/List<com.letta.mobile.plugin.api/UpdateElement> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<com.letta.mobile.plugin.api/PlaceImage> = ..., kotlin/String? = ...): com.letta.mobile.plugin.api/PluginEmit // com.letta.mobile.plugin.api/PluginEmit.copy|copy(kotlin.collections.List<com.letta.mobile.plugin.api.PlaceElement>;kotlin.collections.List<com.letta.mobile.plugin.api.UpdateElement>;kotlin.collections.List<kotlin.String>;kotlin.collections.List<com.letta.mobile.plugin.api.PlaceImage>;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/PluginEmit.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/PluginEmit.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.api/PluginEmit.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/PluginEmit> { // com.letta.mobile.plugin.api/PluginEmit.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.api/PluginEmit.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/PluginEmit.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/PluginEmit.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/PluginEmit // com.letta.mobile.plugin.api/PluginEmit.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/PluginEmit) // com.letta.mobile.plugin.api/PluginEmit.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.PluginEmit){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.api/PluginEmit.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.plugin.api/PluginEmit.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/PluginEmit> // com.letta.mobile.plugin.api/PluginEmit.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/PluginHostException : kotlin/RuntimeException { // com.letta.mobile.plugin.api/PluginHostException|null[0]
+    constructor <init>(kotlin/String, kotlin/String) // com.letta.mobile.plugin.api/PluginHostException.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+    final val code // com.letta.mobile.plugin.api/PluginHostException.code|{}code[0]
+        final fun <get-code>(): kotlin/String // com.letta.mobile.plugin.api/PluginHostException.code.<get-code>|<get-code>(){}[0]
+
+    final object Companion { // com.letta.mobile.plugin.api/PluginHostException.Companion|null[0]
+        final const val CAPABILITY_DENIED // com.letta.mobile.plugin.api/PluginHostException.Companion.CAPABILITY_DENIED|{}CAPABILITY_DENIED[0]
+            final fun <get-CAPABILITY_DENIED>(): kotlin/String // com.letta.mobile.plugin.api/PluginHostException.Companion.CAPABILITY_DENIED.<get-CAPABILITY_DENIED>|<get-CAPABILITY_DENIED>(){}[0]
+        final const val DEACTIVATED // com.letta.mobile.plugin.api/PluginHostException.Companion.DEACTIVATED|{}DEACTIVATED[0]
+            final fun <get-DEACTIVATED>(): kotlin/String // com.letta.mobile.plugin.api/PluginHostException.Companion.DEACTIVATED.<get-DEACTIVATED>|<get-DEACTIVATED>(){}[0]
+        final const val LIMIT // com.letta.mobile.plugin.api/PluginHostException.Companion.LIMIT|{}LIMIT[0]
+            final fun <get-LIMIT>(): kotlin/String // com.letta.mobile.plugin.api/PluginHostException.Companion.LIMIT.<get-LIMIT>|<get-LIMIT>(){}[0]
+        final const val NOT_ACTIVE // com.letta.mobile.plugin.api/PluginHostException.Companion.NOT_ACTIVE|{}NOT_ACTIVE[0]
+            final fun <get-NOT_ACTIVE>(): kotlin/String // com.letta.mobile.plugin.api/PluginHostException.Companion.NOT_ACTIVE.<get-NOT_ACTIVE>|<get-NOT_ACTIVE>(){}[0]
+        final const val ORIGIN_DENIED // com.letta.mobile.plugin.api/PluginHostException.Companion.ORIGIN_DENIED|{}ORIGIN_DENIED[0]
+            final fun <get-ORIGIN_DENIED>(): kotlin/String // com.letta.mobile.plugin.api/PluginHostException.Companion.ORIGIN_DENIED.<get-ORIGIN_DENIED>|<get-ORIGIN_DENIED>(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/PluginHttpResponse { // com.letta.mobile.plugin.api/PluginHttpResponse|null[0]
+    constructor <init>(kotlin/Int, kotlin.collections/Map<kotlin/String, kotlin/String>, kotlin/ByteArray) // com.letta.mobile.plugin.api/PluginHttpResponse.<init>|<init>(kotlin.Int;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.ByteArray){}[0]
+
+    final val body // com.letta.mobile.plugin.api/PluginHttpResponse.body|{}body[0]
+        final fun <get-body>(): kotlin/ByteArray // com.letta.mobile.plugin.api/PluginHttpResponse.body.<get-body>|<get-body>(){}[0]
+    final val headers // com.letta.mobile.plugin.api/PluginHttpResponse.headers|{}headers[0]
+        final fun <get-headers>(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.letta.mobile.plugin.api/PluginHttpResponse.headers.<get-headers>|<get-headers>(){}[0]
+    final val status // com.letta.mobile.plugin.api/PluginHttpResponse.status|{}status[0]
+        final fun <get-status>(): kotlin/Int // com.letta.mobile.plugin.api/PluginHttpResponse.status.<get-status>|<get-status>(){}[0]
+}
+
+final class com.letta.mobile.plugin.api/PluginInfo { // com.letta.mobile.plugin.api/PluginInfo|null[0]
+    constructor <init>(kotlin/String? = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ...) // com.letta.mobile.plugin.api/PluginInfo.<init>|<init>(kotlin.String?;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+
+    final val build // com.letta.mobile.plugin.api/PluginInfo.build|{}build[0]
+        final fun <get-build>(): kotlin/String? // com.letta.mobile.plugin.api/PluginInfo.build.<get-build>|<get-build>(){}[0]
+    final val details // com.letta.mobile.plugin.api/PluginInfo.details|{}details[0]
+        final fun <get-details>(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.letta.mobile.plugin.api/PluginInfo.details.<get-details>|<get-details>(){}[0]
+
+    final fun component1(): kotlin/String? // com.letta.mobile.plugin.api/PluginInfo.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/Map<kotlin/String, kotlin/String> // com.letta.mobile.plugin.api/PluginInfo.component2|component2(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ...): com.letta.mobile.plugin.api/PluginInfo // com.letta.mobile.plugin.api/PluginInfo.copy|copy(kotlin.String?;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/PluginInfo.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/PluginInfo.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.api/PluginInfo.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/PluginInfo> { // com.letta.mobile.plugin.api/PluginInfo.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.api/PluginInfo.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/PluginInfo.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/PluginInfo.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/PluginInfo // com.letta.mobile.plugin.api/PluginInfo.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/PluginInfo) // com.letta.mobile.plugin.api/PluginInfo.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.PluginInfo){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.api/PluginInfo.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.plugin.api/PluginInfo.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/PluginInfo> // com.letta.mobile.plugin.api/PluginInfo.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.plugin.api/UpdateElement { // com.letta.mobile.plugin.api/UpdateElement|null[0]
+    constructor <init>(kotlin/String, kotlinx.serialization.json/JsonObject? = ..., com.letta.mobile.plugin.api/ElementFallback? = ..., com.letta.mobile.plugin.api/SnapshotSource? = ..., kotlin/String? = ...) // com.letta.mobile.plugin.api/UpdateElement.<init>|<init>(kotlin.String;kotlinx.serialization.json.JsonObject?;com.letta.mobile.plugin.api.ElementFallback?;com.letta.mobile.plugin.api.SnapshotSource?;kotlin.String?){}[0]
+
+    final val elementId // com.letta.mobile.plugin.api/UpdateElement.elementId|{}elementId[0]
+        final fun <get-elementId>(): kotlin/String // com.letta.mobile.plugin.api/UpdateElement.elementId.<get-elementId>|<get-elementId>(){}[0]
+    final val fallback // com.letta.mobile.plugin.api/UpdateElement.fallback|{}fallback[0]
+        final fun <get-fallback>(): com.letta.mobile.plugin.api/ElementFallback? // com.letta.mobile.plugin.api/UpdateElement.fallback.<get-fallback>|<get-fallback>(){}[0]
+    final val props // com.letta.mobile.plugin.api/UpdateElement.props|{}props[0]
+        final fun <get-props>(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.plugin.api/UpdateElement.props.<get-props>|<get-props>(){}[0]
+    final val ref // com.letta.mobile.plugin.api/UpdateElement.ref|{}ref[0]
+        final fun <get-ref>(): kotlin/String? // com.letta.mobile.plugin.api/UpdateElement.ref.<get-ref>|<get-ref>(){}[0]
+    final val snapshot // com.letta.mobile.plugin.api/UpdateElement.snapshot|{}snapshot[0]
+        final fun <get-snapshot>(): com.letta.mobile.plugin.api/SnapshotSource? // com.letta.mobile.plugin.api/UpdateElement.snapshot.<get-snapshot>|<get-snapshot>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.plugin.api/UpdateElement.component1|component1(){}[0]
+    final fun component2(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.plugin.api/UpdateElement.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.plugin.api/ElementFallback? // com.letta.mobile.plugin.api/UpdateElement.component3|component3(){}[0]
+    final fun component4(): com.letta.mobile.plugin.api/SnapshotSource? // com.letta.mobile.plugin.api/UpdateElement.component4|component4(){}[0]
+    final fun component5(): kotlin/String? // com.letta.mobile.plugin.api/UpdateElement.component5|component5(){}[0]
+    final fun copy(kotlin/String = ..., kotlinx.serialization.json/JsonObject? = ..., com.letta.mobile.plugin.api/ElementFallback? = ..., com.letta.mobile.plugin.api/SnapshotSource? = ..., kotlin/String? = ...): com.letta.mobile.plugin.api/UpdateElement // com.letta.mobile.plugin.api/UpdateElement.copy|copy(kotlin.String;kotlinx.serialization.json.JsonObject?;com.letta.mobile.plugin.api.ElementFallback?;com.letta.mobile.plugin.api.SnapshotSource?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.plugin.api/UpdateElement.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.plugin.api/UpdateElement.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.plugin.api/UpdateElement.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.letta.mobile.plugin.api/UpdateElement> { // com.letta.mobile.plugin.api/UpdateElement.$serializer|null[0]
+        final val descriptor // com.letta.mobile.plugin.api/UpdateElement.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/UpdateElement.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.letta.mobile.plugin.api/UpdateElement.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.letta.mobile.plugin.api/UpdateElement // com.letta.mobile.plugin.api/UpdateElement.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.letta.mobile.plugin.api/UpdateElement) // com.letta.mobile.plugin.api/UpdateElement.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.letta.mobile.plugin.api.UpdateElement){}[0]
+    }
+
+    final object Companion { // com.letta.mobile.plugin.api/UpdateElement.Companion|null[0]
+        final val $childSerializers // com.letta.mobile.plugin.api/UpdateElement.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.plugin.api/UpdateElement> // com.letta.mobile.plugin.api/UpdateElement.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final object com.letta.mobile.plugin.api/Base64ByteArraySerializer : kotlinx.serialization/KSerializer<kotlin/ByteArray> { // com.letta.mobile.plugin.api/Base64ByteArraySerializer|null[0]
+    final val descriptor // com.letta.mobile.plugin.api/Base64ByteArraySerializer.descriptor|{}descriptor[0]
+        final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.letta.mobile.plugin.api/Base64ByteArraySerializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+    final fun deserialize(kotlinx.serialization.encoding/Decoder): kotlin/ByteArray // com.letta.mobile.plugin.api/Base64ByteArraySerializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+    final fun serialize(kotlinx.serialization.encoding/Encoder, kotlin/ByteArray) // com.letta.mobile.plugin.api/Base64ByteArraySerializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;kotlin.ByteArray){}[0]
+}
+
+final object com.letta.mobile.plugin.api/PluginApi { // com.letta.mobile.plugin.api/PluginApi|null[0]
+    final const val CONTRACT_VERSION // com.letta.mobile.plugin.api/PluginApi.CONTRACT_VERSION|{}CONTRACT_VERSION[0]
+        final fun <get-CONTRACT_VERSION>(): kotlin/Int // com.letta.mobile.plugin.api/PluginApi.CONTRACT_VERSION.<get-CONTRACT_VERSION>|<get-CONTRACT_VERSION>(){}[0]
+    final const val VERSION // com.letta.mobile.plugin.api/PluginApi.VERSION|{}VERSION[0]
+        final fun <get-VERSION>(): kotlin/String // com.letta.mobile.plugin.api/PluginApi.VERSION.<get-VERSION>|<get-VERSION>(){}[0]
+}
