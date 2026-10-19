@@ -32,6 +32,7 @@ val productionScanTests = listOf("*RepositoryArchitectureTest", "*SharedLayering
 tasks.test {
     filter {
         productionScanTests.forEach { excludeTestsMatching(it) }
+        excludeTestsMatching("*StructureSourceExportTest")
     }
 }
 
@@ -62,6 +63,24 @@ val architectureTest = tasks.register<Test>("architectureTest") {
         .withPropertyName("chatControllerSurfaceBaseline").withPathSensitivity(PathSensitivity.RELATIVE)
     reports.junitXml.required.set(true)
     reports.html.required.set(true)
+}
+
+// Konsist retains PSI during a worker's lifetime. Keep the additional whole-repository
+// structure export out of the existing architecture scan worker's heap.
+tasks.register<Test>("structureReport") {
+    description = "Export production Kotlin structure in an isolated test worker."
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    filter { includeTestsMatching("*StructureSourceExportTest") }
+    mustRunAfter(tasks.test, architectureTest)
+    maxHeapSize = "512m"
+    inputs.files(
+        fileTree(rootProject.projectDir) {
+            include("**/src/**/*.kt")
+            exclude("**/build/**")
+        },
+    ).withPropertyName("structureSources").withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.file(rootProject.layout.buildDirectory.file("reports/structure/sources.jsonl"))
         .withPropertyName("structureSourceExport")
 }

@@ -5,6 +5,7 @@ from collections import defaultdict
 import hashlib
 import html
 import json
+import re
 from pathlib import Path
 import subprocess
 
@@ -155,8 +156,14 @@ def git(root, *arguments):
     return subprocess.check_output(['git', '-C', str(root), *arguments], text=True, encoding='utf-8').strip()
 
 
+def immutable_commit(root, base_ref):
+    if not re.fullmatch(r'(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})', base_ref):
+        raise ValueError('Base revision must be a full immutable commit SHA')
+    return git(root, 'rev-parse', '--verify', '--end-of-options', f'{base_ref}^{{commit}}')
+
+
 def baseline_growth(root, base_ref, baseline):
-    commit = git(root, 'rev-parse', '--verify', f'{base_ref}^{{commit}}')
+    commit = immutable_commit(root, base_ref)
     tree = git(root, 'ls-tree', '--name-only', commit, '--', BASELINE)
     if not tree:
         # Bootstrap only when the measured production sources are unchanged from the base.

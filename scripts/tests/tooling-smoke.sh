@@ -132,8 +132,9 @@ fi
 # misclassified as a code-intelligence stack change.
 # ci-policy-scripts-test.sh pins which architecture gates run in required CI
 # (letta-mobile-o4ygk), so a gate change may update it alongside the stack.
-stack_touch_pattern='^(\.github/workflows/architecture-graph\.yml|\.serena/.*|android-compose/architecture-tests/src/.*|android-compose/build-logic/src/(main|test)/kotlin/com/letta/mobile/architecture/.*|android-compose/build-logic/src/test/resources/fixtures/.*|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|tools/architecture_query/.*)$'
-stack_allowlist_pattern='^(\.github/workflows/.*|\.gitignore|\.serena/.*|android-compose/architecture-tests/.*|android-compose/build-logic/.*|android-compose/build\.gradle\.kts|android-compose/settings\.gradle\.kts|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|scripts/tests/ci-policy-scripts-test\.sh|scripts/tests/tooling-smoke\.sh|tools/architecture_query/.*)$'
+# Source-structure reporting shares the architecture scope and owns its API docs guide.
+stack_touch_pattern='^(\.github/workflows/architecture-graph\.yml|\.serena/.*|android-compose/architecture-tests/src/.*|android-compose/build-logic/src/(main|test)/kotlin/com/letta/mobile/architecture/.*|android-compose/build-logic/src/test/resources/fixtures/.*|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|tools/architecture_query/.*|tools/structure_report/.*)$'
+stack_allowlist_pattern='^(\.github/workflows/.*|\.gitignore|\.serena/.*|android-compose/architecture-tests/.*|android-compose/build-logic/.*|android-compose/build\.gradle\.kts|android-compose/settings\.gradle\.kts|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|scripts/tests/ci-policy-scripts-test\.sh|scripts/tests/tooling-smoke\.sh|tools/architecture_query/.*|tools/structure_report/.*|docs/development/api-documentation\.md)$'
 # Module-boundary *IsolationTest.kt files pin each module's allowed edges; adding
 # a module needs its isolation test in the same PR, so they never count as a
 # stack touch.

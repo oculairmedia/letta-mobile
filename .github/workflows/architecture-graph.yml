@@ -83,7 +83,7 @@ jobs:
         env:
           STRUCTURE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          ./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process checkArchitectureBoundaries :architecture-tests:architectureTest --tests '*StructureRepositoryArchitectureTest'
+          ./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process checkArchitectureBoundaries :architecture-tests:structureReport
           base="${STRUCTURE_BASE:-$(git rev-parse HEAD^)}"
           python3 ../tools/structure_report/structure_report.py --base-ref "$base"
       - name: Install tooling smoke dependency

@@ -107,6 +107,11 @@ class StructureTest(unittest.TestCase):
             source.write_text('package p\nclass B', encoding='utf-8')
             self.assertTrue(report.baseline_growth(root, base, self.baseline()))
 
+    def test_base_revision_rejects_options_and_mutable_refs(self):
+        for revision in ('--help', '--output=payload', 'main', 'HEAD', 'a' * 39, 'z' * 40):
+            with self.subTest(revision=revision), self.assertRaises(ValueError):
+                report.baseline_growth(Path('.'), revision, self.baseline())
+
     def test_html_escapes_source_names(self):
         data = report.metrics([{'type': 'file', 'package': '<script>', 'path': 'a', 'mentions': ''}])
         data['sourceCommit'] = 'abc'

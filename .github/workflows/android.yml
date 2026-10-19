@@ -210,6 +210,7 @@ jobs:
             checkArchitectureBoundaries
             :architecture-tests:test
             :architecture-tests:architectureTest
+            :architecture-tests:structureReport
             :quality:detekt-rules:check
           )
           if [[ -n "${ADDITIVE_TASKS}" ]]; then
