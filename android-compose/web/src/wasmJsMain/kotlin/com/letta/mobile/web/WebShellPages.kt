@@ -22,6 +22,7 @@ import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.shell.workspace.openSearchHit
 import com.letta.mobile.ui.shell.pages.ShellAgentEditorHost
+import com.letta.mobile.ui.shell.pages.home.HomePageOptions
 import com.letta.mobile.ui.shell.pages.ShellHomeHost
 import com.letta.mobile.ui.shell.pages.ShellHostPages
 import com.letta.mobile.ui.shell.pages.ShellLibrarySources
@@ -134,7 +135,7 @@ private fun webPageHost(shell: WebShell, page: WebPageInputs): ShellPageHost {
             plugins = shellPluginsPage(PluginsPageBinding(UnavailablePluginCatalog())),
             fallback = webWaitingPage(shell, page),
         ),
-        home = ShellHomeHost(),
+        home = ShellHomeHost(options = HomePageOptions(showSearch = false)),
         agentEditor = ShellAgentEditorHost(onRosterChanged = page.session.onRosterChanged),
         modelControl = services.gateway.modelControl,
         settings = services.settings,

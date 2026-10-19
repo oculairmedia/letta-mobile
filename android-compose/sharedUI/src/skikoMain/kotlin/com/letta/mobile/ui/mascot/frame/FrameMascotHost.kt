@@ -143,7 +143,8 @@ internal class FrameStillCapture(private val renderer: RiveFrameRenderer) {
                 RiveAvatarContract.applyIdentity(warm.inputSink, identity)
                 repeat(MascotStills.SETTLE_FRAMES) { warm.advance(SETTLE_STEP) }
                 warm.renderImage(IntSize(size, size))
-            }.onFailure {
+            }.onFailure { failure ->
+                println("[mascot] still capture failed: $failure")
                 // A broken scene is dropped, so the next capture starts clean.
                 scene?.close()
                 scene = null

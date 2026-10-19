@@ -67,9 +67,14 @@ internal class RiveCanvasRenderer : RiveFrameRenderer {
         return RiveCanvasScene(riveCreateScene(runtime.rive, runtime.file, RiveAvatarContract.STATE_MACHINE))
     }
 
-    override fun encodePng(image: Image): ByteArray? = image.encodeToData(EncodedImageFormat.PNG)?.bytes
+    override fun encodePng(image: Image): ByteArray? = image.encodeToData(
+        format = EncodedImageFormat.PNG,
+        pngCompressionLevel = PNG_COMPRESSION_LEVEL,
+    )?.bytes
 
     companion object {
+        private const val PNG_COMPRESSION_LEVEL = 6
+
         /** Staged into the distribution by web/build.gradle.kts from the pinned npm package. */
         const val RIVE_WASM_PATH = "rive/rive.wasm"
 

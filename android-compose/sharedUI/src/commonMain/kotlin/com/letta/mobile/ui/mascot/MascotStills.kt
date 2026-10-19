@@ -4,6 +4,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.graphics.ImageBitmap
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.ui.image.decodeImageBitmap
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -53,19 +54,19 @@ class MascotStills(
      * Reading a saved still never waits behind a capture - a list of agents seen before draws at
      * once - and only captures queue, one at a time, since they share the renderer. A new capture
      * is shown the moment it is decoded and saved after. An identity that cannot be captured is not
-     * retried this session.
+     * retried this session. A canceled caller may request the identity again.
      */
     suspend fun ensure(identity: MascotIdentity) {
         val key = keyOf(identity)
         if (images.containsKey(key) || key in failed) return
-        val saved = runCatching { store?.read(key) }.getOrNull()?.let(decode)
+        val saved = ignoreFailure { store?.read(key) }?.let(decode)
         if (saved != null) {
             images[key] = saved
             return
         }
         val png = captureLock.withLock {
             if (images.containsKey(key) || key in failed) return
-            runCatching { capture(identity) }.getOrNull()
+            ignoreFailure { capture(identity) }
         }
         val image = png?.let(decode)
         if (png == null || image == null) {
@@ -73,7 +74,17 @@ class MascotStills(
             return
         }
         images[key] = image
-        runCatching { store?.write(key, png) }
+        ignoreFailure { store?.write(key, png) }
+    }
+
+    // Leaving a tile cancels its request, not the identity's ability to be captured later.
+    private suspend fun <T> ignoreFailure(block: suspend () -> T): T? = try {
+        block()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Exception) {
+        println("[mascot] still request failed: $failure")
+        null
     }
 
     /** The key a still is kept under: format, asset, identity; safe as a file name. */
