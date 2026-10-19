@@ -620,7 +620,7 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 
 ### Running the app on this VM
 
-- Both clients are runnable here: the **Compose Desktop** app (`:desktop:run`) and the **Android**
+- Both native clients are runnable here: the **Compose Desktop** app (`:desktop:run`) and the **Android**
   `:app` in the emulator (see the Android emulator subsection below). They can run side by side on
   the same VNC display (`:1`).
 - The desktop app renders through Skiko, which **cannot create a GL context on the VNC X server**
