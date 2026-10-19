@@ -78,14 +78,14 @@ class MascotStills(
     }
 
     // Leaving a tile cancels its request, not the identity's ability to be captured later.
-    private suspend fun <T> ignoreFailure(block: suspend () -> T): T? = try {
-        block()
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (failure: Exception) {
-        println("[mascot] still request failed: $failure")
-        null
-    }
+    private suspend fun <T> ignoreFailure(block: suspend () -> T): T? =
+        runCatching { block() }.getOrElse { failure ->
+            // Optional cache/renderer failures keep the fallback avatar visible. Fatal runtime
+            // errors and coroutine cancellation still escape.
+            if (failure is CancellationException || failure !is Exception) throw failure
+            println("[mascot] still request failed: $failure")
+            null
+        }
 
     /** The key a still is kept under: format, asset, identity; safe as a file name. */
     fun keyOf(identity: MascotIdentity): String =

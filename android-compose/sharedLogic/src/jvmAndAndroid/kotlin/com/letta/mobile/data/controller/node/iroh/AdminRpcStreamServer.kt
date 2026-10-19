@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 import kotlin.time.Duration.Companion.milliseconds
+
 internal interface AdminRpcRecvStream {
     suspend fun read(maxBytes: UInt): ByteArray
 }
@@ -49,6 +50,19 @@ internal fun BiStream.asAdminRpcBiStream(): AdminRpcBiStream = object : AdminRpc
     }
 }
 
+/** Resource bounds for stream-per-request RPC. Logical frame limits apply only after authentication and frame-part negotiation. */
+internal class AdminRpcStreamLimits(
+    val maxActiveHandlers: Int = AdminRpcStreamServer.DEFAULT_MAX_ACTIVE_HANDLERS,
+    val firstFrameTimeoutMs: Long = AdminRpcStreamServer.DEFAULT_FIRST_FRAME_TIMEOUT_MS,
+    val maxFrameBytes: Int = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES,
+    /**
+     * Logical-frame cap for chunked requests/responses once the peer has
+     * authenticated and advertised `frame_part`. Unauthenticated or
+     * capability-off peers are always bounded by [maxFrameBytes].
+     */
+    val maxReassembledBytes: Int = IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES,
+)
+
 /**
  * Server side of stream-per-request admin_rpc.
  *
@@ -64,9 +78,7 @@ internal class AdminRpcStreamServer(
     private val router: AdminRpcRouter,
     private val authenticated: AtomicBoolean,
     private val remoteEndpointId: String = "",
-    maxActiveHandlers: Int = DEFAULT_MAX_ACTIVE_HANDLERS,
-    private val firstFrameTimeoutMs: Long = DEFAULT_FIRST_FRAME_TIMEOUT_MS,
-    private val maxFrameBytes: Int = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES,
+    limits: AdminRpcStreamLimits = AdminRpcStreamLimits(),
     /**
      * Whether the connected peer advertised the `frame_part` capability in its
      * auth handshake. Responses larger than [maxFrameBytes] are chunked into
@@ -75,12 +87,6 @@ internal class AdminRpcStreamServer(
      * receiving framing they cannot decode.
      */
     private val peerSupportsFrameParts: () -> Boolean = { false },
-    /**
-     * Logical-frame cap for chunked requests/responses once the peer has
-     * authenticated and advertised `frame_part`. Unauthenticated or
-     * capability-off peers are always bounded by [maxFrameBytes].
-     */
-    private val maxReassembledBytes: Int = IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES,
     /**
      * Per-connection observer of admin_rpc method calls. admin_rpc runs
      * on its own BiStream(s), disjoint from the turn/stream BiStream, so the
@@ -109,6 +115,11 @@ internal class AdminRpcStreamServer(
     private val capabilityGate: (method: String) -> String? = { null },
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
+    private val maxActiveHandlers = limits.maxActiveHandlers
+    private val firstFrameTimeoutMs = limits.firstFrameTimeoutMs
+    private val maxFrameBytes = limits.maxFrameBytes
+    private val maxReassembledBytes = limits.maxReassembledBytes
+
     private val permits = Semaphore(maxActiveHandlers)
     private val activeHandlers = AtomicInteger(0)
     private val maxObservedActiveHandlers = AtomicInteger(0)

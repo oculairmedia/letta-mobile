@@ -22,6 +22,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 import kotlin.time.Duration.Companion.milliseconds
+
 /**
  * eaczz.6 (S6-T): fault isolation + observer reconnect — a slow/dead OBSERVER
  * must NEVER block or fail the INITIATOR turn, and lifecycle transitions land
@@ -106,12 +107,14 @@ class ConversationTurnFanoutFaultIsolationTest {
     ) = ConversationTurnFanout(
         conversationId = conversationId,
         runtime = runtime,
-        viewersFor = { conv -> registry.viewersFor(conv) },
+        delivery = TurnFanoutDelivery(
+            viewersFor = { conv -> registry.viewersFor(conv) },
+            unregisterViewer = { conv, v -> registry.unregister(conv, v) },
+            observerWriteTimeoutMs = observerWriteTimeoutMs,
+            observerWrites = observerWrites,
+        ),
         initiatorViewer = initiator,
         trackInitiatorFrame = {},
-        unregisterViewer = { conv, v -> registry.unregister(conv, v) },
-        observerWriteTimeoutMs = observerWriteTimeoutMs,
-        observerWrites = observerWrites,
     )
 
     private fun countTerminals(frames: List<String>): Int = frames.count {

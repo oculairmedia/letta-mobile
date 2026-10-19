@@ -14,7 +14,7 @@ import kotlin.test.fail
 class AdminRpcRegistryTest {
     @Test
     fun registryBuildsNonEmptyRouterWithRequiredMethods() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://127.0.0.1:8291")
+        val router = AdminRpcRegistry.buildRouter()
 
         assertTrue(router.methodCount > 0)
         assertTrue("message.list" in router.registeredMethods)
@@ -25,14 +25,14 @@ class AdminRpcRegistryTest {
 
     @Test
     fun registryDoesNotRegisterSubagentMethodsWithoutSource() {
-        val router = AdminRpcRegistry.buildRouter("http://127.0.0.1:8291")
+        val router = AdminRpcRegistry.buildRouter()
 
         assertTrue(AdminRpcRegistry.subagentMethods.none { it in router.registeredMethods })
     }
 
     @Test
     fun unknownMethodReturnsStandardErrorEnvelope() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://127.0.0.1:8291")
+        val router = AdminRpcRegistry.buildRouter()
 
         val response = Json.parseToJsonElement(
             router.dispatch(
@@ -50,7 +50,7 @@ class AdminRpcRegistryTest {
 
     @Test
     fun missingRequiredParamYieldsFalseSuccessEnvelope() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://127.0.0.1:8291")
+        val router = AdminRpcRegistry.buildRouter()
 
         val response = Json.parseToJsonElement(
             router.dispatch(

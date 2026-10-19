@@ -13057,6 +13057,16 @@ public final class com/letta/mobile/data/controller/node/iroh/AdminProxyTranspor
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/controller/node/iroh/AdminRpcHostServices {
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getController ()Lcom/letta/mobile/data/controller/AppServerController;
+	public final fun getPluginRoutes ()Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;
+	public final fun getSubagentRegistrySource ()Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;
+	public final fun getVibesyncBaseUrl ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/controller/node/iroh/AdminRpcInvocation {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRequestContext;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -13075,10 +13085,39 @@ public final class com/letta/mobile/data/controller/node/iroh/AdminRpcInvocation
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/controller/node/iroh/AdminRpcNativeSources {
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/SkillsListingSource;Lcom/letta/mobile/data/controller/node/iroh/NativeSlashCommandCatalog;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/SkillsListingSource;Lcom/letta/mobile/data/controller/node/iroh/NativeSlashCommandCatalog;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getLocalBackendDir ()Ljava/lang/String;
+	public final fun getModelExposureFile ()Ljava/lang/String;
+	public final fun getNativeClient ()Lcom/letta/mobile/data/transport/appserver/AppServerClient;
+	public final fun getSkillsListing ()Lcom/letta/mobile/data/controller/node/iroh/SkillsListingSource;
+	public final fun getSlashCommands ()Lcom/letta/mobile/data/controller/node/iroh/NativeSlashCommandCatalog;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/AdminRpcNotifications {
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/AgentChangeNotifier;Lcom/letta/mobile/data/controller/node/iroh/ConversationChangeNotifier;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lcom/letta/mobile/data/controller/node/iroh/PermissionModePublisher;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/controller/node/iroh/AgentChangeNotifier;Lcom/letta/mobile/data/controller/node/iroh/ConversationChangeNotifier;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lcom/letta/mobile/data/controller/node/iroh/PermissionModePublisher;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAgentChanges ()Lcom/letta/mobile/data/controller/node/iroh/AgentChangeNotifier;
+	public final fun getConversationChanges ()Lcom/letta/mobile/data/controller/node/iroh/ConversationChangeNotifier;
+	public final fun getPermissionModes ()Lcom/letta/mobile/data/controller/node/iroh/PermissionModePublisher;
+	public final fun getTurnIdentity ()Lcom/letta/mobile/data/runtime/TurnIdentityLedger;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/AdminRpcPairing {
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/controller/node/iroh/PairingQrConfig;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/controller/node/iroh/PairingQrConfig;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getPairingQr ()Lcom/letta/mobile/data/controller/node/iroh/PairingQrConfig;
+	public final fun getPairingService ()Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;
+}
+
 public final class com/letta/mobile/data/controller/node/iroh/AdminRpcRegistry {
 	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRegistry;
-	public final fun buildRouter (Ljava/lang/String;Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/appserver/AppServerClient;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/SkillsListingSource;Lcom/letta/mobile/data/controller/node/iroh/NativeSlashCommandCatalog;Lcom/letta/mobile/data/controller/node/iroh/AgentChangeNotifier;Lcom/letta/mobile/data/controller/node/iroh/ConversationChangeNotifier;Ljava/lang/String;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lcom/letta/mobile/data/controller/node/iroh/PairingQrConfig;Lcom/letta/mobile/data/controller/node/iroh/PermissionModePublisher;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;
-	public static synthetic fun buildRouter$default (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRegistry;Ljava/lang/String;Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/SubagentRegistrySource;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/appserver/AppServerClient;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/SkillsListingSource;Lcom/letta/mobile/data/controller/node/iroh/NativeSlashCommandCatalog;Lcom/letta/mobile/data/controller/node/iroh/AgentChangeNotifier;Lcom/letta/mobile/data/controller/node/iroh/ConversationChangeNotifier;Ljava/lang/String;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;Lcom/letta/mobile/data/controller/node/iroh/PairingQrConfig;Lcom/letta/mobile/data/controller/node/iroh/PermissionModePublisher;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRoutes;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;
+	public final fun buildRouter (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcHostServices;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcPairing;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcNativeSources;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcNotifications;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;
+	public static synthetic fun buildRouter$default (Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRegistry;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcHostServices;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcPairing;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcNativeSources;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcNotifications;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;
 	public final fun getCanonicalMethods ()Ljava/util/Set;
 	public final fun getSubagentMethods ()Ljava/util/Set;
 }
@@ -13537,114 +13576,13 @@ public final class com/letta/mobile/data/controller/node/iroh/InviteSecretHash$C
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
-public abstract interface class com/letta/mobile/data/controller/node/iroh/IrohAuthPolicy {
-	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy$Companion;
-	public static final field MIN_TOKEN_LENGTH I
-	public abstract fun getAllowedPeerIds ()Ljava/util/Set;
-	public abstract fun getRequiredBearerToken ()Ljava/lang/String;
-	public abstract fun preAuthenticates (Ljava/lang/String;)Z
-}
-
-public final class com/letta/mobile/data/controller/node/iroh/IrohAuthPolicy$BearerToken : com/letta/mobile/data/controller/node/iroh/IrohAuthPolicy {
-	public fun <init> (Ljava/lang/String;Ljava/util/Set;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Ljava/util/Set;
-	public final fun copy (Ljava/lang/String;Ljava/util/Set;)Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy$BearerToken;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy$BearerToken;Ljava/lang/String;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy$BearerToken;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun getAllowedPeerIds ()Ljava/util/Set;
-	public fun getRequiredBearerToken ()Ljava/lang/String;
-	public final fun getToken ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun preAuthenticates (Ljava/lang/String;)Z
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/data/controller/node/iroh/IrohAuthPolicy$Companion {
-	public static final field MIN_TOKEN_LENGTH I
-	public final fun resolve (Ljava/lang/String;Ljava/util/Set;ZZ)Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution;
-	public static synthetic fun resolve$default (Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy$Companion;Ljava/lang/String;Ljava/util/Set;ZZILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution;
-}
-
-public final class com/letta/mobile/data/controller/node/iroh/IrohAuthPolicy$InsecureAnonymousForTestOnly : com/letta/mobile/data/controller/node/iroh/IrohAuthPolicy {
-	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy$InsecureAnonymousForTestOnly;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun getAllowedPeerIds ()Ljava/util/Set;
-	public fun getRequiredBearerToken ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun preAuthenticates (Ljava/lang/String;)Z
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/data/controller/node/iroh/IrohAuthPolicy$PairedPeersOnly : com/letta/mobile/data/controller/node/iroh/IrohAuthPolicy {
-	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy$PairedPeersOnly;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun getAllowedPeerIds ()Ljava/util/Set;
-	public fun getRequiredBearerToken ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun preAuthenticates (Ljava/lang/String;)Z
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/data/controller/node/iroh/IrohAuthPolicy$PeerAllowlist : com/letta/mobile/data/controller/node/iroh/IrohAuthPolicy {
-	public fun <init> (Ljava/util/Set;)V
-	public final fun component1 ()Ljava/util/Set;
-	public final fun copy (Ljava/util/Set;)Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy$PeerAllowlist;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy$PeerAllowlist;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy$PeerAllowlist;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun getAllowedPeerIds ()Ljava/util/Set;
-	public fun getRequiredBearerToken ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun preAuthenticates (Ljava/lang/String;)Z
-	public fun toString ()Ljava/lang/String;
-}
-
-public abstract interface class com/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution {
-}
-
-public final class com/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution$InsecureAccepted : com/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution {
-	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;Ljava/lang/String;)V
-	public final fun component1 ()Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun copy (Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution$InsecureAccepted;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution$InsecureAccepted;Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution$InsecureAccepted;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getPolicy ()Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;
-	public final fun getWarning ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution$Refused : com/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution {
-	public fun <init> (Ljava/lang/String;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution$Refused;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution$Refused;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution$Refused;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getError ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution$Secure : com/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution {
-	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;)V
-	public final fun component1 ()Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;
-	public final fun copy (Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;)Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution$Secure;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution$Secure;Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicyResolution$Secure;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getPolicy ()Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
 public final class com/letta/mobile/data/controller/node/iroh/IrohBearerAuthVerifier {
 	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/IrohBearerAuthVerifier$Companion;
 	public static final field LOCKOUT_WINDOW_MS J
 	public static final field MAX_FAILURES_BEFORE_CLOSE I
 	public static final field MAX_FAILURES_PER_WINDOW I
-	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;Lkotlin/jvm/functions/Function0;IJ)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;Lkotlin/jvm/functions/Function0;IJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lkotlin/jvm/functions/Function0;IJ)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lkotlin/jvm/functions/Function0;IJILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun deny (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/IrohBearerAuthVerifier$Outcome;
 	public final fun isRateLimited (Ljava/lang/String;)Z
 	public final fun verify (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/IrohBearerAuthVerifier$Outcome;
@@ -13681,14 +13619,35 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohBearerAuthVeri
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/controller/node/iroh/IrohConnectionAuthentication {
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohBearerAuthVerifier;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohBearerAuthVerifier;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAuthPolicy ()Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;
+	public final fun getAuthVerifier ()Lcom/letta/mobile/data/controller/node/iroh/IrohBearerAuthVerifier;
+	public final fun getPairingService ()Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;
+	public final fun getRemoteEndpointId ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/IrohEndpointBinding {
+	public fun <init> ()V
+	public fun <init> ([BLcom/letta/mobile/data/controller/node/IrohRelayConfig;Ljava/lang/String;[BLjava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/IrohSecretKeyStore;)V
+	public synthetic fun <init> ([BLcom/letta/mobile/data/controller/node/IrohRelayConfig;Ljava/lang/String;[BLjava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/IrohSecretKeyStore;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAlpn ()[B
+	public final fun getBindAddr ()Ljava/lang/String;
+	public final fun getRelayConfig ()Lcom/letta/mobile/data/controller/node/IrohRelayConfig;
+	public final fun getSecretKey ()[B
+	public final fun getSecretKeyPath ()Ljava/lang/String;
+	public final fun getSecretKeyStore ()Lcom/letta/mobile/data/controller/node/iroh/IrohSecretKeyStore;
+}
+
 public final class com/letta/mobile/data/controller/node/iroh/IrohNodeConnection {
 	public static final field ADMIN_RPC_REQUEST_TIMEOUT_MS J
 	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/IrohNodeConnection$Companion;
 	public static final field MAX_CONCURRENT_ADMIN_RPC_STREAMS I
 	public static final field MAX_FRAME_BYTES I
 	public static final field STREAM_JOB_DRAIN_TIMEOUT_MS J
-	public fun <init> (Lcomputer/iroh/Connection;Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohBearerAuthVerifier;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;Lcom/letta/mobile/data/controller/node/iroh/ProcessScopedClientMessageDedupe;Lcom/letta/mobile/data/controller/node/iroh/ParkedTerminalStore;Lcom/letta/mobile/data/controller/node/iroh/NodeTurnHost;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;)V
-	public synthetic fun <init> (Lcomputer/iroh/Connection;Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohBearerAuthVerifier;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;Lcom/letta/mobile/data/controller/node/iroh/ProcessScopedClientMessageDedupe;Lcom/letta/mobile/data/controller/node/iroh/ParkedTerminalStore;Lcom/letta/mobile/data/controller/node/iroh/NodeTurnHost;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcomputer/iroh/Connection;Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/IrohConnectionAuthentication;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;Lcom/letta/mobile/data/controller/node/iroh/ProcessScopedClientMessageDedupe;Lcom/letta/mobile/data/controller/node/iroh/ParkedTerminalStore;Lcom/letta/mobile/data/controller/node/iroh/NodeTurnHost;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;)V
+	public synthetic fun <init> (Lcomputer/iroh/Connection;Lcom/letta/mobile/data/controller/AppServerController;Lcom/letta/mobile/data/controller/node/iroh/AdminRpcRouter;Lcom/letta/mobile/data/controller/node/iroh/IrohConnectionAuthentication;Lcom/letta/mobile/data/controller/node/iroh/ConnectionRegistry;Lcom/letta/mobile/data/controller/node/iroh/ProcessScopedClientMessageDedupe;Lcom/letta/mobile/data/controller/node/iroh/ParkedTerminalStore;Lcom/letta/mobile/data/controller/node/iroh/NodeTurnHost;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun isAuthenticated ()Z
 	public final fun revokeSession ()V
 	public final fun serve (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -13699,8 +13658,8 @@ public final class com/letta/mobile/data/controller/node/iroh/IrohNodeConnection
 
 public final class com/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint {
 	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/IrohNodeEndpoint$Companion;
-	public fun <init> ([BLkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/IrohRelayConfig;Ljava/lang/String;[BLjava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/IrohSecretKeyStore;Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/iroh/IrohCanvasRelay;Ljava/util/List;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;)V
-	public synthetic fun <init> ([BLkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/IrohRelayConfig;Ljava/lang/String;[BLjava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/IrohSecretKeyStore;Lcom/letta/mobile/data/controller/node/iroh/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/iroh/IrohCanvasRelay;Ljava/util/List;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohEndpointBinding;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/iroh/IrohCanvasRelay;Ljava/util/List;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/controller/node/iroh/IrohEndpointBinding;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Lcom/letta/mobile/data/controller/node/iroh/IrohPairingService;Lcom/letta/mobile/data/transport/iroh/IrohCanvasRelay;Ljava/util/List;Lcom/letta/mobile/data/runtime/TurnIdentityLedger;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun addr ()Lcomputer/iroh/EndpointAddr;
 	public final fun agentChangeTarget ()Lcom/letta/mobile/data/controller/node/iroh/AgentChangeTarget;
 	public final fun attachPendingApprovalsPublisher (Lcom/letta/mobile/data/controller/node/iroh/PendingApprovalsPublisher;)V
@@ -14530,6 +14489,107 @@ public abstract interface class com/letta/mobile/data/controller/node/iroh/Viewe
 }
 
 public final class com/letta/mobile/data/controller/node/iroh/ViewerRegistration {
+}
+
+public abstract interface class com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy {
+	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy$Companion;
+	public static final field MIN_TOKEN_LENGTH I
+	public abstract fun getAllowedPeerIds ()Ljava/util/Set;
+	public abstract fun getRequiredBearerToken ()Ljava/lang/String;
+	public abstract fun preAuthenticates (Ljava/lang/String;)Z
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy$BearerToken : com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy {
+	public fun <init> (Ljava/lang/String;Ljava/util/Set;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/Set;
+	public final fun copy (Ljava/lang/String;Ljava/util/Set;)Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy$BearerToken;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy$BearerToken;Ljava/lang/String;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy$BearerToken;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getAllowedPeerIds ()Ljava/util/Set;
+	public fun getRequiredBearerToken ()Ljava/lang/String;
+	public final fun getToken ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun preAuthenticates (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy$Companion {
+	public static final field MIN_TOKEN_LENGTH I
+	public final fun resolve (Ljava/lang/String;Ljava/util/Set;ZZ)Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution;
+	public static synthetic fun resolve$default (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy$Companion;Ljava/lang/String;Ljava/util/Set;ZZILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy$InsecureAnonymousForTestOnly : com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy {
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy$InsecureAnonymousForTestOnly;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getAllowedPeerIds ()Ljava/util/Set;
+	public fun getRequiredBearerToken ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun preAuthenticates (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy$PairedPeersOnly : com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy {
+	public static final field INSTANCE Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy$PairedPeersOnly;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getAllowedPeerIds ()Ljava/util/Set;
+	public fun getRequiredBearerToken ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun preAuthenticates (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy$PeerAllowlist : com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy {
+	public fun <init> (Ljava/util/Set;)V
+	public final fun component1 ()Ljava/util/Set;
+	public final fun copy (Ljava/util/Set;)Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy$PeerAllowlist;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy$PeerAllowlist;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy$PeerAllowlist;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getAllowedPeerIds ()Ljava/util/Set;
+	public fun getRequiredBearerToken ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun preAuthenticates (Ljava/lang/String;)Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution {
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution$InsecureAccepted : com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution {
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Ljava/lang/String;)V
+	public final fun component1 ()Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution$InsecureAccepted;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution$InsecureAccepted;Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution$InsecureAccepted;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPolicy ()Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;
+	public final fun getWarning ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution$Refused : com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution$Refused;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution$Refused;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution$Refused;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution$Secure : com/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution {
+	public fun <init> (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;)V
+	public final fun component1 ()Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;
+	public final fun copy (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;)Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution$Secure;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution$Secure;Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;ILjava/lang/Object;)Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicyResolution$Secure;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPolicy ()Lcom/letta/mobile/data/controller/node/iroh/auth/IrohAuthPolicy;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/controller/reconnect/AppServerClientGeneration {

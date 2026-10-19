@@ -33,10 +33,13 @@ class IrohAdminOwnershipMatrixTest {
     @Test
     fun matrixCoversExactlyTheRegisteredAdminRpcMethods() {
         val router = AdminRpcRegistry.buildRouter(
-            adminBaseUrl = "http://127.0.0.1:0",
-            controller = null,
-            subagentRegistrySource = EmptySubagentSource,
-            pairingService = IrohPairingService(InMemoryPairedPeerStore()),
+            services = AdminRpcHostServices(
+                controller = null,
+                subagentRegistrySource = EmptySubagentSource,
+            ),
+            pairing = AdminRpcPairing(
+                pairingService = IrohPairingService(InMemoryPairedPeerStore()),
+            ),
         )
         val registered = router.registeredMethods
         val declared = operations.map { it.requiredString("method") }.toSet()

@@ -18,6 +18,7 @@ import kotlin.test.assertTrue
 
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+
 /**
  * eaczz.3 (S3-T): a connection subscribes to a conversation on BOTH signals —
  * runtime_start (initiator/sender) AND admin_rpc message.list (passive observer
@@ -165,7 +166,9 @@ class ConversationViewerSubscriptionTest {
         val server = AdminRpcStreamServer(
             router = router,
             authenticated = AtomicBoolean(true),
-            firstFrameTimeoutMs = 1_000,
+            limits = AdminRpcStreamLimits(
+                firstFrameTimeoutMs = 1_000,
+            ),
             onMethodObserved = { method, params ->
                 if (method == "message.list") {
                     val convId = params?.get("conversation_id")?.jsonPrimitive?.content
@@ -197,7 +200,9 @@ class ConversationViewerSubscriptionTest {
         val server = AdminRpcStreamServer(
             router = router,
             authenticated = AtomicBoolean(true),
-            firstFrameTimeoutMs = 1_000,
+            limits = AdminRpcStreamLimits(
+                firstFrameTimeoutMs = 1_000,
+            ),
             onMethodObserved = { _, _ -> throw RuntimeException("boom") },
         )
         val stream = FakeBiStream()

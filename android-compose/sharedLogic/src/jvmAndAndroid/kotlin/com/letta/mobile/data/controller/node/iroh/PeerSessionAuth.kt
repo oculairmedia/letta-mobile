@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.util.Telemetry
 import java.util.concurrent.atomic.AtomicBoolean
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 
 /**
  * Authentication + authorization state of ONE Iroh App Server connection,

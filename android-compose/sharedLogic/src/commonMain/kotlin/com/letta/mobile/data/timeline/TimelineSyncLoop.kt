@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.timeline.api.TimelineOutboundPendingPersistence
+import com.letta.mobile.data.timeline.api.TimelineOutboundStreamCallbacks
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.util.Telemetry
@@ -811,14 +813,15 @@ class TimelineSyncLoop(
         eventQueue = eventQueue,
         state = state,
         events = _events,
-        pendingLocalStore = pendingLocalStore,
-        pendingScope = pendingScope,
+        pendingPersistence = TimelineOutboundPendingPersistence(pendingLocalStore, pendingScope),
         logTag = logTag,
         scope = loopScope,
-        ingestStreamEvent = ::ingestStreamEvent,
-        onSendStreamEnded = { wsSubscription.clear() },
-        onTurnStarted = ::turnStarted,
-        onTurnEnded = ::turnEnded,
+        streamCallbacks = TimelineOutboundStreamCallbacks(
+            ingestStreamEvent = ::ingestStreamEvent,
+            onSendStreamEnded = { wsSubscription.clear() },
+            onTurnStarted = ::turnStarted,
+            onTurnEnded = ::turnEnded,
+        ),
     )
 
     private val stateTransitionHandler = TimelineStateTransitionHandler(

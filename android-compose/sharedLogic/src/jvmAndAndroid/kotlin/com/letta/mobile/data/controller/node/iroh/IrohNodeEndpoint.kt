@@ -1,7 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
-import com.letta.mobile.data.controller.node.IrohRelayConfig
 import com.letta.mobile.data.model.HostId
 import com.letta.mobile.data.transport.iroh.IrohDiagnostics
 import com.letta.mobile.data.transport.iroh.IrohFailureLog
@@ -26,32 +25,13 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 
 import kotlin.time.Duration.Companion.milliseconds
+
 class IrohNodeEndpoint(
-    private val alpn: ByteArray = DEFAULT_ALPN,
+    binding: IrohEndpointBinding = IrohEndpointBinding(),
     private val scope: CoroutineScope,
-    private val relayConfig: IrohRelayConfig = IrohRelayConfig.Default,
-    /**
-     * UDP bind address. Default binds an OS-assigned random port, which makes
-     * the ticket rotate on every restart (direct addrs change). Servers that
-     * want a STABLE ticket should pin a port, e.g. "0.0.0.0:4501".
-     */
-    private val bindAddr: String = "0.0.0.0:0",
-    /**
-     * Backward-compatible explicit key injection. Prefer [secretKeyStore].
-     */
-    private val secretKey: ByteArray? = null,
-    /**
-     * Backward-compatible file-backed key path. Prefer [secretKeyStore].
-     */
-    private val secretKeyPath: String? = null,
-    /**
-     * Identity key source. Use [FileIrohSecretKeyStore] for stable server
-     * identity; default is derived from [secretKey]/[secretKeyPath] or an
-     * ephemeral safe key when neither is configured.
-     */
-    private val secretKeyStore: IrohSecretKeyStore? = null,
     /**
      * REQUIRED authentication policy. There is no default: anonymous
      * operation must be selected explicitly via
@@ -70,6 +50,13 @@ class IrohNodeEndpoint(
     /** The host's stream-to-stored identity join, shared by every connection. */
     private val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
 ) {
+    private val alpn = binding.alpn
+    private val relayConfig = binding.relayConfig
+    private val bindAddr = binding.bindAddr
+    private val secretKey = binding.secretKey
+    private val secretKeyPath = binding.secretKeyPath
+    private val secretKeyStore = binding.secretKeyStore
+
     /** Live App Server connections by peer id, to gate that peer's canvas connections. */
     private val appServerConnections =
         java.util.concurrent.ConcurrentHashMap<String, MutableSet<IrohNodeConnection>>()
@@ -423,10 +410,12 @@ class IrohNodeEndpoint(
             connection = connection,
             controller = controller,
             adminRpcRouter = adminRpcRouter,
-            authPolicy = authPolicy,
-            authVerifier = authVerifier,
-            pairingService = pairingService,
-            remoteEndpointId = remoteId,
+            authentication = IrohConnectionAuthentication(
+                authPolicy = authPolicy,
+                authVerifier = authVerifier,
+                pairingService = pairingService,
+                remoteEndpointId = remoteId,
+            ),
             connectionRegistry = connectionRegistry,
             turnHost = turnHost,
             turnIdentity = turnIdentity,

@@ -12,6 +12,8 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -19,10 +21,18 @@ import kotlin.test.assertTrue
 /** A mascot's still is captured once per identity, then comes from memory or disk. */
 class MascotStillsTest {
 
-    private class MemoryStore : MascotStillStore {
+    private enum class CacheFailure { Read, Write }
+
+    private class MemoryStore(private val failure: CacheFailure? = null) : MascotStillStore {
         val files = mutableMapOf<String, ByteArray>()
-        override suspend fun read(key: String) = files[key]
-        override suspend fun write(key: String, png: ByteArray) { files[key] = png }
+        override suspend fun read(key: String): ByteArray? {
+            check(failure != CacheFailure.Read) { "cache unavailable" }
+            return files[key]
+        }
+        override suspend fun write(key: String, png: ByteArray) {
+            check(failure != CacheFailure.Write) { "cache full" }
+            files[key] = png
+        }
     }
 
     private val bitmap = ImageBitmap(2, 2)
@@ -99,6 +109,51 @@ class MascotStillsTest {
         started.await()
         tile.cancelAndJoin()
 
+        stills.ensure(violet)
+
+        assertEquals(2, attempts)
+        assertNotNull(stills.get(violet))
+    }
+
+    @Test
+    fun aCacheFailureStillShowsTheCapturedImage() = runTest {
+        for (failure in CacheFailure.entries) {
+            val captured = mutableListOf<MascotIdentity>()
+            val stills = stills(MemoryStore(failure), captured = captured)
+
+            stills.ensure(violet)
+            stills.ensure(violet)
+
+            assertEquals(listOf(violet), captured, "recapture after cache $failure failure")
+            assertNotNull(stills.get(violet), "missing image after cache $failure failure")
+        }
+    }
+
+    @Test
+    fun aThrownCaptureFailureIsNotRetriedThisSession() = runTest {
+        var attempts = 0
+        val stills = MascotStills("a1", null, capture = {
+            attempts++
+            error("renderer unavailable")
+        }, decode = { bitmap })
+
+        stills.ensure(violet)
+        stills.ensure(violet)
+
+        assertEquals(1, attempts)
+        assertNull(stills.get(violet))
+    }
+
+    @Test
+    fun aFatalCaptureErrorEscapesAndDoesNotPoisonTheIdentity() = runTest {
+        val fatal = AssertionError("fatal renderer failure")
+        var attempts = 0
+        val stills = MascotStills("a1", null, capture = {
+            if (++attempts == 1) throw fatal
+            byteArrayOf(1)
+        }, decode = { bitmap })
+
+        assertSame(fatal, assertFailsWith<AssertionError> { stills.ensure(violet) })
         stills.ensure(violet)
 
         assertEquals(2, attempts)

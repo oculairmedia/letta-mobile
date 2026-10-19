@@ -1,7 +1,7 @@
 package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.controller.node.FakeAppServerController
-import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
@@ -29,6 +29,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Before
 
 import kotlin.time.Duration.Companion.seconds
+
 /**
  * letta-mobile-bn008.3: OPT-IN real-loopback probe for the full receive path.
  * A sender (bn008.2) dials a receiver; the inbound message lands in the correct

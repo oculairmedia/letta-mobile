@@ -113,7 +113,11 @@ class SlashCommandAndGoalAdminHandlersTest {
 
     @Test
     fun theRegistryServesSlashCommandsWhenANativeClientIsWired() = runTest {
-        val router = AdminRpcRegistry.buildRouter(nativeClient = SilentClient())
+        val router = AdminRpcRegistry.buildRouter(
+            native = AdminRpcNativeSources(
+                nativeClient = SilentClient(),
+            ),
+        )
         val result = success(router, "slash_command.list", null)
         assertEquals("builtin_default", result.getValue("catalog_source").jsonPrimitive.content)
     }

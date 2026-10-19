@@ -10,8 +10,8 @@ import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStores
 import com.letta.mobile.data.controller.node.iroh.FilePairedPeerStore
 import com.letta.mobile.data.controller.node.iroh.FilePairingInviteStore
 import com.letta.mobile.data.controller.node.iroh.HmacPairQrSigner
-import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
-import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.PairingQrConfig

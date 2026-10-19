@@ -321,23 +321,28 @@ class ShimOffParityGateTest {
         pluginRoutes: AdminRpcRoutes? = null,
     ): AdminRpcRouter =
         AdminRpcRegistry.buildRouter(
-            adminBaseUrl = "http://127.0.0.1:9", // shim host — but transport is forced to fail
-            controller = controller,
-            subagentRegistrySource = EmptySubagentSource,
-            pairingService = IrohPairingService(pairedPeerStore()),
-            nativeClient = NativeRuntime(),
-            shimRetired = true,
-            vibesyncBaseUrl = null, // VibeSync not injected
-            // lgns8.21.2: production (AppServerServeIrohCommand) ALWAYS injects the
-            // native catalog's listing source, so the shim-off parity model must too.
-            // Without it skill.list correctly reports capability_unavailable — a
-            // wiring gap in the harness, not a parity gap in the controller.
-            skillsListing = gateSkillsCatalog().asListingSource(),
-            // lgns8.9: the read-only on-disk tier. Left OUT by default so the
-            // store-owned rows are asserted to FAIL CLOSED without it; the
-            // store-injected run is a separate, explicit expectation.
-            localBackendDir = localBackendDir,
-            pluginRoutes = pluginRoutes,
+            services = AdminRpcHostServices(
+                controller = controller,
+                subagentRegistrySource = EmptySubagentSource,
+                vibesyncBaseUrl = null,
+                // VibeSync not injected
+                pluginRoutes = pluginRoutes,
+            ),
+            pairing = AdminRpcPairing(
+                pairingService = IrohPairingService(pairedPeerStore()),
+            ),
+            native = AdminRpcNativeSources(
+                nativeClient = NativeRuntime(),
+                // lgns8.21.2: production (AppServerServeIrohCommand) ALWAYS injects the
+                // native catalog's listing source, so the shim-off parity model must too.
+                // Without it skill.list correctly reports capability_unavailable — a
+                // wiring gap in the harness, not a parity gap in the controller.
+                skillsListing = gateSkillsCatalog().asListingSource(),
+                // lgns8.9: the read-only on-disk tier. Left OUT by default so the
+                // store-owned rows are asserted to FAIL CLOSED without it; the
+                // store-injected run is a separate, explicit expectation.
+                localBackendDir = localBackendDir,
+            ),
         )
 
     /**

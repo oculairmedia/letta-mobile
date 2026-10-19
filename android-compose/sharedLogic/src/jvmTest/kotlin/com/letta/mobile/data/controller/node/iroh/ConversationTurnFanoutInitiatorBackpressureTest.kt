@@ -102,12 +102,14 @@ class ConversationTurnFanoutInitiatorBackpressureTest {
     ) = ConversationTurnFanout(
         conversationId = conversationId,
         runtime = runtime,
-        viewersFor = { conv -> registry.viewersFor(conv) },
+        delivery = TurnFanoutDelivery(
+            viewersFor = { conv -> registry.viewersFor(conv) },
+            unregisterViewer = { conv, v -> registry.unregister(conv, v) },
+            observerWriteTimeoutMs = 200L,
+            observerWrites = observerWrites,
+        ),
         initiatorViewer = initiator,
         trackInitiatorFrame = {},
-        unregisterViewer = { conv, v -> registry.unregister(conv, v) },
-        observerWriteTimeoutMs = 200L,
-        observerWrites = observerWrites,
     )
 
     private fun countTerminals(frames: List<String>): Int = frames.count {

@@ -146,10 +146,12 @@ class IrohEventSeqWireOrderTest {
         ConversationTurnFanout(
             conversationId = runtime.conversationId,
             runtime = runtime,
-            viewersFor = { setOf(viewer) },
+            delivery = TurnFanoutDelivery(
+                viewersFor = { setOf(viewer) },
+                observerWrites = ObserverWriteQueue(backgroundScope),
+                initiatorWrites = initiatorWrites,
+            ),
             initiatorViewer = viewer,
-            observerWrites = ObserverWriteQueue(backgroundScope),
-            initiatorWrites = initiatorWrites,
         )
 
     private fun assistantFrame(text: String): JsonObject = buildJsonObject {

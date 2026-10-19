@@ -8,6 +8,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicyResolution
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 
 /**
  * Consolidated adversarial security gate for the Iroh authentication and

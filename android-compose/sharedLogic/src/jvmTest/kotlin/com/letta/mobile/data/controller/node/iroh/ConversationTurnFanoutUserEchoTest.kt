@@ -95,7 +95,9 @@ class ConversationTurnFanoutUserEchoTest {
     ) = ConversationTurnFanout(
         conversationId = conversationId,
         runtime = runtime,
-        viewersFor = { conv -> registry?.viewersFor(conv) ?: emptySet() },
+        delivery = TurnFanoutDelivery(
+            viewersFor = { conv -> registry?.viewersFor(conv) ?: emptySet() },
+        ),
         initiatorViewer = initiator,
         trackInitiatorFrame = { parked.add(it) },
     )

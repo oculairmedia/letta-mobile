@@ -1,6 +1,5 @@
 package com.letta.mobile.data.controller.node.iroh
 
-import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 
 /**
@@ -87,130 +86,67 @@ object AdminRpcRegistry {
     ) + PluginAdminRpc.METHODS
 
     fun buildRouter(
-        /**
-         * Ignored since Phase 4. Former LettaShim admin base is not an accepted
-         * production route; retained so older call sites compile.
-         */
-        @Suppress("UNUSED_PARAMETER") adminBaseUrl: String = "",
-        controller: AppServerController? = null,
-        subagentRegistrySource: SubagentRegistrySource? = null,
-        pairingService: IrohPairingService? = null,
-        nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
-        /** Ignored since Phase 2/4 — conversation.delete is always fail-closed. */
-        @Suppress("UNUSED_PARAMETER") shimRetired: Boolean = true,
-        /**
-         * VibeSync product service base URL for project.* methods. When null the
-         * project methods return capability-unavailable. Production must inject
-         * VibeSync explicitly — never fall back to the LettaShim admin base.
-         */
-        vibesyncBaseUrl: String? = null,
-        /**
-         *  Retired the generic admin REST adapter: every former
-         * admin_rest_service method now has an explicit owner (App Server v2
-         * command, read-only local-backend store, controller-native catalog, or
-         * fail-closed denial). Retained, ignored, so older call sites compile —
-         * production must never reintroduce an admin REST base.
-         */
-        @Suppress("UNUSED_PARAMETER") adminRestBaseUrl: String? = null,
-        /**
-         * The letta-code on-disk backend root (`LETTA_LOCAL_BACKEND_DIR`).
-         * When set, admin READS the App Server exposes no command for — run/step
-         * history, agent context, memory blocks — are served from it directly,
-         * which is what lettashim did with the same directory. When null those
-         * methods fail closed with a typed capability error; they never dial a
-         * REST admin host.
-         */
-        localBackendDir: String? = null,
-        /**
-         * Optional skills listing projection (device-status / skills_updated).
-         * When null, skill.list returns an empty skills array until a catalog is wired.
-         */
-        skillsListing: SkillsListingSource? = null,
-        /**
-         * The App Server's slash commands, observed from
-         * `update_device_status`. Null falls back to a catalog that answers the built-in list
-         * when a [nativeClient] is wired, and `capability_unavailable` when none is.
-         */
-        slashCommands: NativeSlashCommandCatalog? = null,
-        /** See [NativeReadTiers.agentChanges]. */
-        agentChanges: AgentChangeNotifier? = null,
-        /** See [NativeReadTiers.conversationChanges]. */
-        conversationChanges: ConversationChangeNotifier? = null,
-        /**
-         * JSON file holding the model exposure decisions
-         * (`model.exposure.*`, filters `model.list`). Null keeps them in memory
-         * for the router's lifetime (tests, stub CLI).
-         */
-        modelExposureFile: String? = null,
-        /** See [NativeReadTiers.turnIdentity]. */
-        turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
-        /**
-         * How `pair.invite.create {qr:true}` signs the QR
-         * and which NodeId/dial address it names. Null = no QR minting.
-         */
-        pairingQr: PairingQrConfig? = null,
-        /** Pushes confirmed permission-mode changes to viewers; null pushes nothing. */
-        permissionModes: PermissionModePublisher? = null,
-        /**
-         * The host's `plugins.*` handlers (`PluginAdminHandlers` on a JVM host
-         * running plugins). Null (`--plugins=off`, Android) answers them `capability_unavailable`
-         * and advertises no `plugins_v1`.
-         */
-        pluginRoutes: AdminRpcRoutes? = null,
+        services: AdminRpcHostServices = AdminRpcHostServices(),
+        pairing: AdminRpcPairing = AdminRpcPairing(),
+        native: AdminRpcNativeSources = AdminRpcNativeSources(),
+        notifications: AdminRpcNotifications = AdminRpcNotifications(),
     ): AdminRpcRouter {
         val router = AdminRpcRouter()
 
         // Constructed only when a backend root is explicitly configured, and
         // read-only by construction (see LocalBackendAdminStore).
-        val localBackendStore = localBackendDir
+        val localBackendStore = native.localBackendDir
             ?.takeIf { it.isNotBlank() }
             ?.let { runCatching { LocalBackendAdminStore(java.io.File(it)) }.getOrNull() }
         // Beside the store it annotates, but written only by Meridian (the store stays read-only).
-        val agentMetadata = localBackendDir
+        val agentMetadata = native.localBackendDir
             ?.takeIf { it.isNotBlank() }
             ?.let { AgentMetadataSidecar.inLocalBackend(java.io.File(it)) }
-        val tiers = NativeReadTiers(nativeClient, localBackendStore, agentMetadata, agentChanges, conversationChanges, turnIdentity)
+        val tiers = NativeReadTiers(
+            native.nativeClient, localBackendStore, agentMetadata,
+            notifications.agentChanges, notifications.conversationChanges, notifications.turnIdentity,
+        )
 
-        HealthAdminHandlers.register(router, controller)
-        AgentAdminHandlers.register(router, controller, tiers)
-        SubagentAdminHandlers.register(router, subagentRegistrySource)
-        ConversationAdminHandlers.register(router, tiers, controller = controller)
-        ProjectAdminHandlers.register(router, vibesyncBaseUrl?.trimEnd('/'))
+        HealthAdminHandlers.register(router, services.controller)
+        AgentAdminHandlers.register(router, services.controller, tiers)
+        SubagentAdminHandlers.register(router, services.subagentRegistrySource)
+        ConversationAdminHandlers.register(router, tiers, controller = services.controller)
+        ProjectAdminHandlers.register(router, services.vibesyncBaseUrl?.trimEnd('/'))
         RunAdminHandlers.register(router, localBackendStore)
         ArchiveAdminHandlers.register(router)
         IdentityAdminHandlers.register(router)
-        ModelAdminHandlers.register(router, nativeClient, modelExposureStore(modelExposureFile))
-        ScheduleAdminHandlers.register(router, nativeClient)
-        ToolAdminHandlers.register(router, localBackendStore, nativeClient)
+        ModelAdminHandlers.register(router, native.nativeClient, modelExposureStore(native.modelExposureFile))
+        ScheduleAdminHandlers.register(router, native.nativeClient)
+        ToolAdminHandlers.register(router, localBackendStore, native.nativeClient)
         McpAdminHandlers.register(router)
         // letta-mobile-by4vm.84: goals have no App Server owner; slash commands come from device status.
         GoalAdminHandlers.register(router)
-        SlashCommandAdminHandlers.register(router, slashCommands ?: nativeClient?.let { NativeSlashCommandCatalog() })
+        SlashCommandAdminHandlers.register(router, native.slashCommands ?: native.nativeClient?.let { NativeSlashCommandCatalog() })
         SkillAdminHandlers.register(
             router,
-            nativeClient = nativeClient,
-            controller = controller,
-            skillsListing = skillsListing,
+            nativeClient = native.nativeClient,
+            controller = services.controller,
+            skillsListing = native.skillsListing,
         )
-        ApprovalAdminHandlers.register(router, controller)
+        ApprovalAdminHandlers.register(router, services.controller)
         // letta-mobile-bzvro.40: the conversation's permission mode for Iroh clients.
-        PermissionModeAdminHandlers.register(router, controller, permissionModes)
-        PairingAdminHandlers.register(router, pairingService, pairingQr)
-        CronAdminHandlers.register(router, nativeClient)
-        ReflectionAdminHandlers.register(router, nativeClient)
+        PermissionModeAdminHandlers.register(router, services.controller, notifications.permissionModes)
+        PairingAdminHandlers.register(router, pairing.pairingService, pairing.pairingQr)
+        CronAdminHandlers.register(router, native.nativeClient)
+        ReflectionAdminHandlers.register(router, native.nativeClient)
         // letta-mobile-bzvro.37: MemFS / secrets / workspace files for Iroh clients.
-        WorkspaceAdminHandlers.register(router, nativeClient)
+        WorkspaceAdminHandlers.register(router, native.nativeClient)
         // letta-mobile-57cta: manual compaction for Iroh clients (execute_command / conversation_compact).
-        ConversationCompactHandlers.register(router, nativeClient, localBackendStore)
+        ConversationCompactHandlers.register(router, native.nativeClient, localBackendStore)
         // letta-mobile-joigh: the context limit for Iroh clients (execute_command context-limit).
-        ConversationContextLimitHandlers.register(router, nativeClient)
+        ConversationContextLimitHandlers.register(router, native.nativeClient)
         // letta-mobile-by4vm.51: /recompile for Iroh clients (conversation_recompile).
-        ConversationRecompileHandlers.register(router, nativeClient)
-        pluginRoutes?.register(router)
+        ConversationRecompileHandlers.register(router, native.nativeClient)
+        services.pluginRoutes?.register(router)
             ?: CapabilityUnavailable.register(router, PluginAdminRpc.METHODS, "plugin host")
 
         router.requireNonEmpty()
-        val enabledMethods = if (subagentRegistrySource == null) {
+        val enabledMethods = if (services.subagentRegistrySource == null) {
             canonicalMethods - subagentMethods
         } else {
             canonicalMethods

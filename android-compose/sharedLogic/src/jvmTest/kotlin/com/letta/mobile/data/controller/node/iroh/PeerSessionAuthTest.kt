@@ -6,6 +6,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 
 /**
  * Fail-closed regression suite for one connection's auth/grant state

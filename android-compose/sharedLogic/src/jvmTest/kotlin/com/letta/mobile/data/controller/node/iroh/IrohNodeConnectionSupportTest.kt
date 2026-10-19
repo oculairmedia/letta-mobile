@@ -15,6 +15,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 
 class IrohNodeConnectionSupportTest {
     @Test
@@ -22,7 +23,9 @@ class IrohNodeConnectionSupportTest {
         assertFailsWith<IllegalArgumentException> {
             IrohNodeEndpoint(
                 scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-                relayConfig = IrohRelayConfig.Default,
+                binding = IrohEndpointBinding(
+                    relayConfig = IrohRelayConfig.Default,
+                ),
                 authPolicy = IrohAuthPolicy.InsecureAnonymousForTestOnly,
                 protocolHandlers = listOf(object : IrohNodeProtocolHandler {
                     override val alpn = IrohNodeEndpoint.DEFAULT_ALPN.copyOf()

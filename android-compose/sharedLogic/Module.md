@@ -145,7 +145,13 @@ Node identity, client/server contracts and relay configuration. These abstractio
 
 # Package com.letta.mobile.data.controller.node.iroh
 
-JVM/Android Iroh controller hosting: authentication, pairing, viewer fanout and explicit admin-RPC handlers. Native App Server commands and read-only local storage are separate ownership tiers; sensitive workspace/plugin operations use dedicated handlers. Keep product UI and direct backend-file mutation outside protocol handling; add routes through [AdminRpcRoutes](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh/-admin-rpc-routes/index.html) and inject trust/storage policy through [IrohAuthPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh/-iroh-auth-policy/index.html) and [PairedPeerStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh/-paired-peer-store/index.html).
+JVM/Android Iroh controller hosting: authentication, pairing, viewer fanout and explicit admin-RPC handlers. Native App Server commands and read-only local storage are separate ownership tiers; sensitive workspace/plugin operations use dedicated handlers. Keep product UI and direct backend-file mutation outside protocol handling; add routes through [AdminRpcRoutes](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh/-admin-rpc-routes/index.html) and inject trust/storage policy through [IrohAuthPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh.auth/-iroh-auth-policy/index.html) and [PairedPeerStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh/-paired-peer-store/index.html).
+
+Host construction separates endpoint network/identity binding (`IrohEndpointBinding`) from per-peer authentication (`IrohConnectionAuthentication`). Admin routes receive native sources, change notifications and pairing dependencies via `AdminRpcNativeSources`, `AdminRpcNotifications` and `AdminRpcPairing`, alongside host bindings in `AdminRpcHostServices`; omitted optional sources continue to fail closed.
+
+# Package com.letta.mobile.data.controller.node.iroh.auth
+
+JVM/Android authentication policy values and operator-configuration resolution for Iroh hosts. The sealed `IrohAuthPolicy` contract distinguishes bearer credentials, a vetted peer allowlist, pairing-only access and explicit anonymous test mode; `IrohAuthPolicy.resolve(...)` returns a secure policy, a warned test-only selection or a refusal. This leaf package owns configuration validation and pre-authentication decisions; it must not depend on endpoint lifecycle, verifier state, pairing persistence or RPC handlers. Hosts provide the policy to their connection/authentication boundaries, which own verification, rate limits and revocation.
 
 # Package com.letta.mobile.data.controller.reconnect
 
@@ -401,7 +407,7 @@ Timeline reducers, synchronization and bounded canonical storage/presentation. G
 
 # Package com.letta.mobile.data.timeline.api
 
-The narrow external-transport timeline writer contract. Send/transport code performs optimistic append, delivery changes and ingest through this boundary rather than directly mutating presentation rows. Keep UI code from bypassing canonical commit policy; external transports submit through [TimelineExternalTransportWriter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.timeline.api/-timeline-external-transport-writer/index.html).
+The narrow external-transport timeline writer contract and internal outbound stream lifecycle/scoped-persistence dependency contracts. Send/transport code performs optimistic append, delivery changes and ingest through this boundary rather than directly mutating presentation rows. Keep UI code from bypassing canonical commit policy; external transports submit through [TimelineExternalTransportWriter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.timeline.api/-timeline-external-transport-writer/index.html).
 
 # Package com.letta.mobile.data.timeline.headless
 

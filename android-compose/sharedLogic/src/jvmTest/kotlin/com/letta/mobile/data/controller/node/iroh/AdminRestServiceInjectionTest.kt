@@ -114,13 +114,18 @@ class AdminRestServiceInjectionTest {
     @Test
     fun withNothingInjectedTheFormerAdminRestSurfaceNeverDialsAnHttpHost() = runTest {
         val router = AdminRpcRegistry.buildRouter(
-            adminBaseUrl = "http://127.0.0.1:8291",
-            controller = null,
-            subagentRegistrySource = EmptySubagentSource,
-            pairingService = IrohPairingService(InMemoryPairedPeerStore()),
-            nativeClient = null,
-            vibesyncBaseUrl = null,
-            localBackendDir = null,
+            services = AdminRpcHostServices(
+                controller = null,
+                subagentRegistrySource = EmptySubagentSource,
+                vibesyncBaseUrl = null,
+            ),
+            pairing = AdminRpcPairing(
+                pairingService = IrohPairingService(InMemoryPairedPeerStore()),
+            ),
+            native = AdminRpcNativeSources(
+                nativeClient = null,
+                localBackendDir = null,
+            ),
         )
         val nativeConstants = IrohAdminOwnershipMatrix.operations
             .filter { it.requiredString("post_shim_owner") == "controller_native" }

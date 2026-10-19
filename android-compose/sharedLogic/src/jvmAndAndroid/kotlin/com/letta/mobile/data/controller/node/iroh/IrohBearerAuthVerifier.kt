@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import java.security.MessageDigest
+import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 
 /**
  * Hardened bootstrap bearer verification for Iroh connections

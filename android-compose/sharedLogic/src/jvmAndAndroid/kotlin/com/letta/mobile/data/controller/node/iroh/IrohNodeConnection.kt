@@ -49,6 +49,7 @@ import kotlinx.serialization.json.put
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.runCatchingCancellable
 
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -56,12 +57,9 @@ import kotlin.time.Duration.Companion.milliseconds
 private suspend fun <T> recoverUnlessCancelled(
     action: suspend () -> T,
     recover: (Exception) -> T,
-): T = try {
-    action()
-} catch (error: CancellationException) {
-    throw error
-} catch (error: Exception) {
-    recover(error)
+): T = runCatchingCancellable(action).getOrElse { failure ->
+    if (failure !is Exception) throw failure
+    recover(failure)
 }
 
 /**
@@ -79,27 +77,7 @@ class IrohNodeConnection(
      * before connections arrive (e.g. in IrohNodeEndpoint.start).
      */
     private val adminRpcRouter: AdminRpcRouter = AdminRpcRouter(),
-    /**
-     * REQUIRED authentication policy. Connections only start
-     * pre-authenticated when the policy explicitly says so (anonymous
-     * test-only mode or an already-vetted peer allowlist) — never because a
-     * parameter was omitted.
-     */
-    private val authPolicy: IrohAuthPolicy,
-    /**
-     * Bearer verifier: constant-time comparison + per-NodeId rate
-     * limiting. Endpoints pass ONE shared instance to every connection so
-     * redialing cannot reset a peer's failure budget.
-     */
-    private val authVerifier: IrohBearerAuthVerifier = IrohBearerAuthVerifier(authPolicy),
-    /**
-     * Pairing service: peers whose NodeId is already paired
-     * authenticate by transport identity alone; unpaired peers may redeem a
-     * one-time invite via an `invite:<secret>` auth token. Null disables
-     * pairing entirely.
-     */
-    private val pairingService: IrohPairingService? = null,
-    private val remoteEndpointId: String = "",
+    authentication: IrohConnectionAuthentication,
     // eaczz.1: shared per-endpoint registry mapping conversationId -> viewers,
     // so a turn on one connection fans out to every connection viewing the same
     // conversation. Null in legacy/test constructions that don't use fanout.
@@ -123,6 +101,8 @@ class IrohNodeConnection(
     /** The host's stream-to-stored identity join; null leaves rows unjoined. */
     private val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
 ) {
+    private val remoteEndpointId = authentication.remoteEndpointId
+
     // Per-connection, strictly-monotonic event_seq with a disjoint process-scoped
     // base — replaces the shared mutable companion var that raced across
     // connections/threads (P3).
@@ -150,9 +130,9 @@ class IrohNodeConnection(
      * pairing tears the connection down. See [PeerSessionAuth].
      */
     private val sessionAuth = PeerSessionAuth(
-        policy = authPolicy,
-        verifier = authVerifier,
-        pairing = pairingService,
+        policy = authentication.authPolicy,
+        verifier = authentication.authVerifier,
+        pairing = authentication.pairingService,
         remoteId = remoteEndpointId,
         onRevoked = { runCatching { connection.close(4403L, "peer_revoked".encodeToByteArray()) } },
     )
@@ -312,9 +292,11 @@ class IrohNodeConnection(
             router = adminRpcRouter,
             authenticated = authenticated,
             remoteEndpointId = remoteEndpointId,
-            maxActiveHandlers = MAX_CONCURRENT_ADMIN_RPC_STREAMS,
-            firstFrameTimeoutMs = ADMIN_RPC_REQUEST_TIMEOUT_MS,
-            maxFrameBytes = MAX_FRAME_BYTES,
+            limits = AdminRpcStreamLimits(
+                maxActiveHandlers = MAX_CONCURRENT_ADMIN_RPC_STREAMS,
+                firstFrameTimeoutMs = ADMIN_RPC_REQUEST_TIMEOUT_MS,
+                maxFrameBytes = MAX_FRAME_BYTES,
+            ),
             peerSupportsFrameParts = { peerSupportsFrameParts() },
             requestContextProvider = ::currentAdminRpcRequestContext,
             // P0.4: enforce the SAME per-method capability matrix the control
@@ -359,10 +341,8 @@ class IrohNodeConnection(
                 capabilities = effectiveCapabilities(),
                 viewedConversationId = viewerSubscription?.currentConversation,
             ),
-            authorizedAgentIds = agentScope(),
+            authorizedAgentIds = sessionAuth.agentScope(),
         )
-
-    private fun agentScope(): Set<String>? = sessionAuth.agentScope()
 
     /**
      * A runtime frame (runtime_start, input, sync, abort, queue
@@ -372,7 +352,7 @@ class IrohNodeConnection(
     private fun agentScopeViolation(frame: JsonObject): String? {
         val type = frame["type"]?.jsonPrimitive?.contentOrNull
         if (type !in AGENT_ADDRESSED_FRAME_TYPES || !authenticated.get()) return null
-        if (AgentScopeGuard.allowsParams(agentScope(), frame)) return null
+        if (AgentScopeGuard.allowsParams(sessionAuth.agentScope(), frame)) return null
         Telemetry.event("IrohNode", "authz.agent_scope_denied", "remoteEndpointId" to remoteEndpointId, "type" to type)
         val requestId = frame["request_id"]?.jsonPrimitive?.contentOrNull.orEmpty()
         return """{"type":"error","request_id":"$requestId","message":"forbidden","reason":"agent_scope"}"""
@@ -497,8 +477,7 @@ class IrohNodeConnection(
     ): String? {
         return try {
             val json = Json { ignoreUnknownKeys = true }
-            val element = json.parseToJsonElement(frameJson)
-            val obj = element.jsonObject
+            val obj = json.parseToJsonElement(frameJson).jsonObject
             val type = obj["type"]?.jsonPrimitive?.content
             val requestId = obj["request_id"]?.jsonPrimitive?.content
 
@@ -783,12 +762,14 @@ class IrohNodeConnection(
     ) = ConversationTurnFanout(
         conversationId = input.runtime.conversationId,
         runtime = input.runtime,
-        viewersFor = { conversationId -> connectionRegistry?.viewersFor(conversationId) ?: emptySet() },
+        delivery = TurnFanoutDelivery(
+            viewersFor = { conversationId -> connectionRegistry?.viewersFor(conversationId) ?: emptySet() },
+            unregisterViewer = { conversationId, viewer -> connectionRegistry?.unregister(conversationId, viewer) },
+            observerWrites = turnHost.observerWrites,
+            initiatorWrites = observerWrites,
+        ),
         initiatorViewer = ensureSelfViewer(streamSend),
         trackInitiatorFrame = { deltaJson -> tracker?.track(deltaJson) },
-        unregisterViewer = { conversationId, viewer -> connectionRegistry?.unregister(conversationId, viewer) },
-        observerWrites = turnHost.observerWrites,
-        initiatorWrites = observerWrites,
         turnId = firstUserMessage(input)?.clientMessageId,
         identity = turnIdentity?.let { TurnIdentityBinding(it, input.runtime.conversationId, clientMessageId) },
     )
