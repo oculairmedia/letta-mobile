@@ -81,7 +81,8 @@ jobs:
 
       - name: Probe assertion + CLI unit tests
         run: |
-          ./gradlew :sharedLogic:jvmTest --tests 'com.letta.mobile.data.transport.iroh.IrohProbeAssertionsTest'
+          # Probe helpers and their assertions are CLI tooling, not shared runtime API.
+          # :cli:test includes IrohProbeAssertionsTest and the command/permission tests.
           ./gradlew :cli:test
 
   probe-hermetic:

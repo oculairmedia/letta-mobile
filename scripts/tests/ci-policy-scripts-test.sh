@@ -10,6 +10,18 @@ assert_eq() { [[ "$1" == "$2" ]] || fail "expected '$2', got '$1'"; }
 assert_contains() { [[ "$1" == *"$2"* ]] || fail "expected output to contain '$2': $1"; }
 assert_not_contains() { [[ "$1" != *"$2"* ]] || fail "expected output not to contain '$2': $1"; }
 
+# Probe assertions moved with the probe helpers into the JVM CLI. Keep the
+# workflow pointed at that owner: the old sharedLogic filter selects no tests
+# and prevents the hermetic/red-path jobs from running.
+probe_workflow="$(<"$SOURCE_ROOT/.github/workflows/iroh-probe.yml")"
+probe_unit_job="$(awk '/^  probe-unit:$/ { active=1; next }
+  active && /^  [[:alnum:]_-]+:$/ { exit }
+  active { print }' <<<"$probe_workflow")"
+assert_contains "$probe_unit_job" './gradlew :cli:test'
+assert_not_contains "$probe_unit_job" ':sharedLogic:jvmTest'
+[[ -f "$SOURCE_ROOT/android-compose/cli/src/test/java/com/letta/mobile/data/transport/iroh/IrohProbeAssertionsTest.kt" ]] ||
+  fail 'probe assertion suite must exist in the CLI test source set'
+
 # Keep the required Android jobs fanned out. Reintroducing a dependency from
 # build-apk to test adds the full test duration to the workflow critical path.
 android_workflow="$SOURCE_ROOT/.github/workflows/android.yml"
