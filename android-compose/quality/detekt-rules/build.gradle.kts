@@ -30,11 +30,12 @@ tasks.test {
 
 val changedKotlinFiles = providers.provider {
     val repositoryRoot = rootProject.projectDir.parentFile
-    val base = providers.environmentVariable("GITHUB_BASE_REF").orNull?.let { "origin/$it" } ?: "origin/main"
     val python = if (System.getProperty("os.name").startsWith("Windows")) "python" else "python3"
     val paths = providers.exec {
         workingDir(repositoryRoot)
-        commandLine(python, "scripts/ci/changed-kotlin-code.py", "--base", base)
+        // Track the PR context as an input; the selector also handles an empty value on push events.
+        environment("GITHUB_BASE_REF", providers.environmentVariable("GITHUB_BASE_REF").orElse("").get())
+        commandLine(python, "scripts/ci/changed-kotlin-code.py")
     }.standardOutput.asText.get().lineSequence().filter(String::isNotBlank).toSet()
     paths.asSequence()
         .filter { it.startsWith("android-compose/") && it.endsWith(".kt") }

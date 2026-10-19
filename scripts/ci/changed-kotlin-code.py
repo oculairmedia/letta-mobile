@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Select changed Kotlin files, excluding changes limited to comments/whitespace."""
 import argparse
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -219,8 +220,14 @@ def changed_files(root, base):
             yield name
 
 
+def default_base():
+    """PRs compare with their target branch; push/local runs have no PR base."""
+    branch = os.environ.get("GITHUB_BASE_REF", "")
+    return f"origin/{branch}" if branch.strip() else "origin/main"
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base", default="origin/main")
+    parser.add_argument("--base", default=default_base())
     args = parser.parse_args()
     print("\n".join(changed_files(Path(__file__).resolve().parents[2], args.base)))

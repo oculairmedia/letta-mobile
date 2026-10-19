@@ -1,5 +1,6 @@
 """Comment-only edits must not expand the required Kotlin policy scan."""
 import importlib.util
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -12,6 +13,17 @@ SPEC.loader.exec_module(selector)
 
 
 class ChangedKotlinCodeTest(unittest.TestCase):
+    def test_push_and_local_contexts_use_main_and_prs_use_the_target_branch(self):
+        for environment, expected in (
+            ({}, "origin/main"),
+            ({"GITHUB_BASE_REF": ""}, "origin/main"),
+            ({"GITHUB_BASE_REF": "  "}, "origin/main"),
+            ({"GITHUB_BASE_REF": "main"}, "origin/main"),
+            ({"GITHUB_BASE_REF": "codex/stack-base"}, "origin/codex/stack-base"),
+        ):
+            with self.subTest(environment=environment), patch.dict(os.environ, environment, clear=True):
+                self.assertEqual(expected, selector.default_base())
+
     def test_tree_paths_and_batch_contents_use_distinct_delimiters(self):
         oid = b"a" * 40
         path = "android-compose/a space/a\nname.kt"
@@ -83,6 +95,7 @@ class ChangedKotlinCodeTest(unittest.TestCase):
             git('add', '.')
             git('commit', '-qm', 'base')
             base = git('rev-parse', 'HEAD').decode().strip()
+            git('update-ref', 'refs/remotes/origin/main', base)
             (sources / 'Docs.kt').write_text('/** updated */\nval x = "value"\n', encoding='utf-8')
             (sources / 'Staged.kt').write_text('val x = "staged"\n', encoding='utf-8')
             git('add', 'android-compose/sample/Staged.kt')
@@ -92,5 +105,10 @@ class ChangedKotlinCodeTest(unittest.TestCase):
             (sources / 'Deleted.kt').unlink()
             selected = {Path(path).stem for path in selector.changed_files(root, base)}
             self.assertEqual({'Staged', 'Literal', 'Broken', 'New'}, selected)
+            with patch.dict(os.environ, {"GITHUB_BASE_REF": ""}):
+                self.assertEqual(selected, {Path(path).stem for path in selector.changed_files(root, selector.default_base())})
+            with patch.dict(os.environ, {"GITHUB_BASE_REF": "missing-pr-target"}):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    list(selector.changed_files(root, selector.default_base()))
             with self.assertRaises(subprocess.CalledProcessError):
                 list(selector.changed_files(root, 'missing-base'))
