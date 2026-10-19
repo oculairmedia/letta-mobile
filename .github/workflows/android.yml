@@ -620,7 +620,6 @@ jobs:
           node --test android-compose/web/service-worker.test.cjs
           python3 -m unittest discover -s scripts/tests -p test_api_doc_links.py -v
           python3 scripts/ci/check-api-package-coverage.py
-
           python3 -m unittest discover -s scripts/tests -p test_api_doc_undocumented.py -v
           python3 -m unittest discover -s scripts/tests -p test_api_doc_progress.py -v
       - name: Generate shared API reference

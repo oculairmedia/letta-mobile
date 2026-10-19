@@ -112,10 +112,11 @@ API moves or is renamed, update its overview link in the same PR. A link proves
 that the published declaration exists, not that prose about its platform or
 behavior is accurate; review those claims against the declaration's source sets.
 
-The required `test` status aggregates `test-workload` and `api-docs`. Both run in
-parallel; generation errors, missing linked declarations and failed tests all
-block that status. The aggregate runs even when a dependency is skipped or
-cancelled and accepts only explicit success from both jobs.
+The required `test` status aggregates `test-workload`, `api-docs` and
+`api-contract-windows`. These run in parallel; generation errors, missing linked
+declarations, changed API signatures and failed tests all block that status.
+The aggregate runs even when a dependency is skipped or cancelled and accepts
+only explicit success from all three jobs.
 
 ## Maintaining the KDoc contract
 
