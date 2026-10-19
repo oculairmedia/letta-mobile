@@ -141,7 +141,7 @@ object ConversationAdminHandlers {
     }
 
     /**
-     * P3.4 (gn7kr.23): restricts a conversation-list result to the peer's authorized
+     * Restricts a conversation-list result to the peer's authorized
      * conversation scope.
      */
     private fun scopeConversationList(result: JsonElement, context: AdminRpcRequestContext): JsonElement {

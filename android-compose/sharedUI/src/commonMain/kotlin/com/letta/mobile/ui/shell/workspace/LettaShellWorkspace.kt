@@ -255,7 +255,7 @@ fun ShellCollapsibleSidebar(
 }
 
 /**
- * One rule for where the focused agent's mascot stands (wbin4.4): the agent pane's hero seat while
+ * One rule for where the focused agent's mascot stands: the agent pane's hero seat while
  * the pane shows, else rest. The previous agent is let go when focus moves.
  */
 @Composable

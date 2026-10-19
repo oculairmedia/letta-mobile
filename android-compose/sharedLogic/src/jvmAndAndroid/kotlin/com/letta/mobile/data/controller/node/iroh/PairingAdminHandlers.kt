@@ -22,7 +22,7 @@ import kotlinx.serialization.json.put
  * invites or manage pairings. Invite secrets appear ONLY in the response to
  * the caller who minted them — never in telemetry or errors.
  *
- *  (sixv8.2): when the caller sets `qr: true`, the response
+ * When the caller sets `qr: true`, the response
  * carries an additive `qr_invite` field (the `letta-qr-v1.<base64url>` wire
  * format from `reference/qr-pairing-protocol.md` §5.1 + §7.1) and, since
  * a scannable `pair_link` that adds the host's dial
