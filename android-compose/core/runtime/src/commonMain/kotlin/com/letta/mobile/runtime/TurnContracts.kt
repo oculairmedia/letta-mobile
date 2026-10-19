@@ -110,3 +110,166 @@ sealed interface TurnInput {
          * Inline multimodal image parts (base64 + media type). When non-empty,
          * the local turn is sent to the embedded runtime as a content ARRAY
          * (Letta `LettaMessageContentUnion` shape) instead of a plain text
+         * string, so a vision-capable provider receives the images.
+         * Empty means no inline images were supplied by this field.
+         */
+        val imageParts: List<TurnImagePart> = emptyList(),
+        /**
+         * Raw App Server / websocket-compatible multimodal content array. Iroh
+         * uses this to preserve text/image parts byte-for-byte with the WS path.
+         */
+        val contentPartsJson: String? = null,
+    ) : TurnInput
+
+    /** Answer to a previously requested tool approval, preserving its correlation IDs. */
+    @Serializable
+    @SerialName("tool_approval_response")
+    data class ToolApprovalResponse(
+        /** Correlated approval decision supplied by the person. */
+        val decision: ToolApprovalDecision,
+    ) : TurnInput
+}
+
+/**
+ * Requested allow/deny sets and approval mode. Engines interpret and enforce the policy;
+ * this value does not itself authorize execution or resolve overlapping sets.
+ */
+@Serializable
+data class ToolPolicy(
+    /** Requested approval prompting policy. */
+    val approvalMode: ToolApprovalMode = ToolApprovalMode.RequireForSensitiveTools,
+    /** Tools explicitly requested as permitted. */
+    val allowedTools: Set<ToolName> = emptySet(),
+    /** Tools explicitly requested as denied. */
+    val deniedTools: Set<ToolName> = emptySet(),
+)
+
+/** Requested frequency of approval prompts; the engine applies supported policy. */
+@Serializable
+enum class ToolApprovalMode {
+    /** Request execution without ordinary approval prompts. */
+    NeverRequire,
+    /** Request prompts for tools classified as sensitive. */
+    RequireForSensitiveTools,
+    /** Request approval for every tool invocation. */
+    RequireForEveryCall,
+}
+
+/** Progress or terminal outcome of one tool invocation. */
+@Serializable
+enum class ToolExecutionStatus {
+    /** Invocation is awaiting execution. */
+    Pending,
+    /** Invocation is executing. */
+    Running,
+    /** Invocation completed successfully. */
+    Succeeded,
+    /** Invocation terminated with an error. */
+    Failed,
+    /** Invocation was cancelled. */
+    Cancelled,
+}
+
+/**
+ * Human decision request correlated by approval and call IDs.
+ * Arguments and diffs are display previews; submit the correlated IDs when answering.
+ */
+@Serializable
+data class ToolApprovalRequest(
+    /** Identity of the approval request being answered or displayed. */
+    val approvalId: ToolApprovalId,
+    /** Tool invocation associated with this record. */
+    val callId: ToolCallId,
+    /** Model-facing name of the invoked tool. */
+    val toolName: ToolName,
+    /** Question shown to the person deciding the approval. */
+    val prompt: String,
+    /** Optional tool arguments formatted for review. */
+    val argumentsPreview: String? = null,
+    /** Reusable "always allow" rules the server offered for this call. */
+    val suggestions: List<PermissionSuggestion> = emptyList(),
+    /** The path that tripped the permission check, when the server named one. */
+    val blockedPath: String? = null,
+    /** The change the call would make (Edit/Write), when previewable. */
+    val diffs: List<ApprovalDiffPreview> = emptyList(),
+)
+
+/** One `permission_suggestions` entry: choosing [id] approves the call and persists the rule [text]. */
+@Serializable
+data class PermissionSuggestion(
+    /** Server token to submit when selecting this rule. */
+    val id: String,
+    /** Human-readable reusable permission rule. */
+    val text: String,
+)
+
+/**
+ * One `diffs` entry of a `can_use_tool` control request, normalised to unified-diff text so the
+ * shared diff renderer can draw it. [unifiedDiff] is null for a file the server could not preview
+ * (then [note] says why, when it did).
+ */
+@Serializable
+data class ApprovalDiffPreview(
+    /** File affected by the proposed change, when known. */
+    val path: String? = null,
+    /** Preview in unified-diff format, or null when unavailable. */
+    val unifiedDiff: String? = null,
+    /** Explanation of an unavailable or incomplete preview. */
+    val note: String? = null,
+) {
+    /** Nothing to show: no file, no diff and no note. */
+    fun isEmpty(): Boolean = path == null && unifiedDiff == null && note == null
+}
+
+/**
+ * Decision for an approval/call pair with a requested reuse scope.
+ * The backend determines supported scopes; selecting Forever alone does not persist a rule.
+ */
+@Serializable
+data class ToolApprovalDecision(
+    /** Identity of the approval request being answered or displayed. */
+    val approvalId: ToolApprovalId,
+    /** Tool invocation associated with this record. */
+    val callId: ToolCallId,
+    /** Approved, denied or timed-out outcome. */
+    val decision: ToolApprovalDecisionValue,
+    /** Requested lifetime for reusing the decision. */
+    val scope: ToolApprovalScope,
+    /** Optional human answer carried with the approval decision. */
+    val response: String? = null,
+)
+
+/** Human approval outcome, including expiry without an answer. */
+@Serializable
+enum class ToolApprovalDecisionValue {
+    /** The person allowed the invocation. */
+    Approved,
+    /** The person rejected the invocation. */
+    Denied,
+    /** No decision arrived before expiry. */
+    TimedOut,
+}
+
+/** Requested reuse lifetime for an approval; persistence is backend-dependent. */
+@Serializable
+enum class ToolApprovalScope {
+    /** Apply only to this invocation. */
+    Once,
+    /** Request reuse for the current session. */
+    Session,
+    /** Request a persistent rule where the backend supports it. */
+    Forever,
+}
+
+/**
+ * Execution boundary producing unsequenced drafts for a requested turn.
+ * The returned Flow carries lifecycle/content/tool events without assigning outbox offsets.
+ * Implementations own execution and terminal/cancellation semantics; obtaining a flow alone
+ * is not evidence that a remote turn has started.
+ */
+fun interface TurnEngine {
+    /**
+     * Produce events for [command]. The caller owns collection and its cancellation.
+     */
+    fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft>
+}

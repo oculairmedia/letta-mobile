@@ -35,3 +35,49 @@ data class BackendDescriptor(
 /**
  * Backend-advertised features used to select supported UI/runtime operations.
  *
+ * Tool event projection, execution and approval round-trips are independent flags. A backend
+ * may expose tool cards without executing tools locally. These flags describe support; they do
+ * not replace per-call authorization or the human answers required by user-input tools.
+ */
+@Serializable
+data class BackendCapabilities(
+    /** Whether incremental runtime events are available. */
+    val supportsStreaming: Boolean,
+    /** Whether virtual-memory file operations are available. */
+    val supportsMemFs: Boolean,
+    /** Whether tool call and return events can be projected. */
+    val supportsToolEvents: Boolean,
+    /** Whether this backend can execute tools. */
+    val supportsToolExecution: Boolean,
+    /** Whether tool approval request/response round-trips are supported. */
+    val supportsApprovals: Boolean,
+    /** Whether agent file import is supported. */
+    val supportsAgentFileImport: Boolean,
+    /** Whether agent file export is supported. */
+    val supportsAgentFileExport: Boolean,
+)
+
+/**
+ * Append/read boundary for runtime events. Implementations choose their storage lifetime;
+ * this interface does not promise disk persistence, transport delivery or idempotent retries.
+ * Consumers resume with outbox offsets, not upstream wire sequence numbers.
+ */
+interface RuntimeEventOutbox {
+    /**
+     * Append one draft, assigning envelope identity and offset through [appendAll].
+     */
+    suspend fun append(draft: RuntimeEventDraft): RuntimeEventEnvelope = appendAll(listOf(draft)).single()
+
+    /**
+     * Append drafts in caller order and return their assigned envelopes.
+     * Transaction/failure semantics are implementation-specific; retrying a payload is not an
+     * idempotency guarantee.
+     */
+    suspend fun appendAll(drafts: List<RuntimeEventDraft>): List<RuntimeEventEnvelope>
+
+    /**
+     * Observe records strictly after [afterOffset]. Retention and collection lifetime follow
+     * the chosen implementation; the cursor is exclusive.
+     */
+    fun events(afterOffset: RuntimeEventOffset): Flow<RuntimeEventEnvelope>
+}
