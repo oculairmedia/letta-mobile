@@ -82,7 +82,10 @@ run only in the non-required `web-wasm` job.
 
 The App Server gateway is the only client transport. The former HTTP/REST Letta backend has been
 removed, so a client cannot fall back to REST: an App Server change that alters a frame requires a
-matched wrapper and client deploy (see Development notes).
+matched wrapper and client deploy (see Development notes). Remote App Server traffic travels over
+Iroh QUIC to the host wrapper, which bridges to the runtime's loopback WebSocket; canvas relay,
+sync and presence use separate Iroh ALPNs. See the generated
+[App Server protocol and admin ownership reference](docs/reference/current-app-server-protocol.md).
 
 ## Runnable entry points
 
