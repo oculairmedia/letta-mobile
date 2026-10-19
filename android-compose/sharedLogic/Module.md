@@ -11,7 +11,6 @@ facilities. Android, host-native and wasmJs actuals implement their declared sea
 appearing here does not mean its native runtime is available on every target. These package
 overviews describe responsibilities, not deployment health or remote-server capabilities.
 
-
 # Package com.letta.mobile.appserver
 
 Shared smoke-run support for driving real App Server turns, including concurrent conversations and image inputs. Command-line hosts supply a Ktor engine and identity factory; these diagnostic helpers exercise the client stack without providing a platform UI or installing a server. Keep installation and platform UI outside these diagnostics; hosts configure runs through `AppServerSmokeSpec` and `AppServerServeSpec`.
@@ -246,7 +245,7 @@ Attention preferences, event gating and notification copy. Shared policy identif
 
 # Package com.letta.mobile.data.observability
 
-JVM-side Kotzilla monitoring bootstrap via reflective generated initialization. Desktop integration stays out of portable source sets and does not require common code to import JVM SDK classes. Keep JVM monitoring SDK dependencies outside common code; JVM/Android hosts opt into the reflective integration through `startKotzillaMonitoring`.
+JVM-side Kotzilla monitoring bootstrap via reflective generated initialization. Desktop integration stays out of portable source sets and does not require common code to import JVM SDK classes. Keep JVM monitoring SDK dependencies outside common code; the desktop host starts the JVM-only reflective integration through `startKotzillaMonitoring`.
 
 # Package com.letta.mobile.data.onboarding
 

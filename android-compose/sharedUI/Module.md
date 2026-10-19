@@ -86,7 +86,7 @@ User/assistant, tool-step, approval, reasoning, error and canvas-receipt rendere
 
 # Package com.letta.mobile.ui.components
 
-Reusable menus, list parts, chips, errors, refresh and pane primitives. Use the composable parameters, slots and modifiers directly; business workflows and repository access belong to callers.
+Reusable menus, list parts, chips, errors, refresh and pane primitives. Supply menu entries and callbacks through `LettaMenuItem` and `LettaPopupMenu`, and content through composable slots and modifiers; business workflows and repository access belong to callers.
 
 # Package com.letta.mobile.ui.components.list
 
@@ -126,19 +126,19 @@ Centralized Lucide icon selection for product components. Consume LettaIcons dir
 
 # Package com.letta.mobile.ui.image
 
-Image-byte to Compose bitmap decoding contracts and actual implementations. Use the decoder API and platform actuals directly; network loading, asset persistence and cache policy belong to the caller.
+Image-byte to Compose bitmap decoding contracts and actual implementations. Call `decodeImageBitmap` through its shared contract and platform actuals; network loading, asset persistence and cache policy belong to the caller.
 
 # Package com.letta.mobile.ui.markdown
 
-Markdown rendering and streaming document/parser state. LocalSharedRichMarkdownRenderer and LocalMermaidDiagramRenderer are optional rendering seams; message persistence, transport parsing and untrusted-code execution do not belong in markdown presentation.
+Markdown rendering and streaming document/parser state. `LocalSharedRichMarkdownRenderer` and `LocalMermaidDiagramRenderer` are optional rendering seams; message persistence, transport parsing and untrusted-code execution do not belong in markdown presentation.
 
 # Package com.letta.mobile.ui.mascot
 
-Agent avatars/mascots, identity, presence, gaze and seat coordination. Supply MascotHost, registry/transport locals and still-store bindings; native renderer creation and authoritative agent metadata persistence remain host/data responsibilities.
+Agent avatars/mascots, identity, presence, gaze and seat coordination. Supply `MascotHost`, registry/transport locals and still-store bindings; native renderer creation and authoritative agent metadata persistence remain host/data responsibilities.
 
 # Package com.letta.mobile.ui.mascot.frame
 
-Skia frame-pipeline binding for live Rive mascots. ProvideFrameMascots accepts the frame renderer and its host dependencies; native renderer implementation and resource ownership must remain behind RiveFrameRenderer rather than enter common avatar components.
+Skia frame-pipeline binding for live Rive mascots. `ProvideFrameMascots` accepts the frame renderer and its host dependencies; native renderer implementation and resource ownership must remain behind `RiveFrameRenderer` rather than enter common avatar components.
 
 # Package com.letta.mobile.ui.memory
 
@@ -150,19 +150,19 @@ Model/provider pickers, settings and sign-in/connection panes. Supply picker mod
 
 # Package com.letta.mobile.ui.notify
 
-Per-agent notification preference controls. Provide AttentionPrefsRepository explicitly or through LocalAttentionPrefs; notification permission requests and operating-system delivery do not belong in these preference controls.
+Per-agent notification preference controls. Provide `AttentionPrefsRepository` explicitly or through `LocalAttentionPrefs`; notification permission requests and operating-system delivery do not belong in these preference controls.
 
 # Package com.letta.mobile.ui.pairing
 
-Install/pair, invite, scanner and paired-device components. PairDeviceBinding, scan inputs and action callbacks connect host services; invite verification, identity storage and trust decisions stay outside the displayed cards.
+Install/pair, invite, scanner and paired-device components. `PairDeviceBinding`, scan inputs and action callbacks connect host services; invite verification, identity storage and trust decisions stay outside the displayed cards.
 
 # Package com.letta.mobile.ui.providers.icons
 
-Provider-brand renderers and icon lookup. Consume ProviderIcon and its lookup catalog directly; authentication and provider capability discovery stay outside brand artwork.
+Provider-brand renderers and icon lookup. Consume `ProviderIcon` and its lookup catalog directly; authentication and provider capability discovery stay outside brand artwork.
 
 # Package com.letta.mobile.ui.runtime
 
-Composition-local access to host-supplied per-agent defaults. Provide LocalAgentDefaults from the host repository graph; this package must not implement a second defaults store or runtime launcher.
+Composition-local access to host-supplied per-agent defaults. Provide `LocalAgentDefaults` from the host repository graph; this package must not implement a second defaults store or runtime launcher.
 
 # Package com.letta.mobile.ui.schedules
 
@@ -174,19 +174,19 @@ Reusable search scaffold, models and anchored/inline wrappers. Supply search mod
 
 # Package com.letta.mobile.ui.settings
 
-Settings sections, search, rows and backend-connection presentation. Extend through SettingsContribution and supplied settings models/actions; secure storage, connection establishment and platform permission effects remain behind those bindings.
+Settings sections, search, rows and backend-connection presentation. Extend through `SettingsContribution` and supplied settings models/actions; secure storage, connection establishment and platform permission effects remain behind those bindings.
 
 # Package com.letta.mobile.ui.shell
 
-Navigation drawer, page selection and contextual row/undo controls. ShellPageDeps, workspace/navigation bindings and drawer actions connect destinations; repository implementations and native shell effects stay outside shared drawer composition.
+Navigation drawer, page selection and contextual row/undo controls. `ShellPageDeps`, workspace/navigation bindings and drawer actions connect destinations; repository implementations and native shell effects stay outside shared drawer composition.
 
 # Package com.letta.mobile.ui.shell.header
 
-Shell header, search slot and unified results. Supply UnifiedSearchSources and search-slot configuration; indexing inputs and navigation effects must come from the owning session/host rather than another repository in the header.
+Shell header, search slot and unified results. Supply `UnifiedSearchSources` and search-slot configuration; indexing inputs and navigation effects must come from the owning session/host rather than another repository in the header.
 
 # Package com.letta.mobile.ui.shell.nowactive
 
-The now-active conversation indicator. Supply NowActiveBarState and NowActiveBarActions directly; active-run authority and conversation selection policy stay outside the indicator.
+The now-active conversation indicator. Supply `NowActiveBarState` and `NowActiveBarActions` directly; active-run authority and conversation selection policy stay outside the indicator.
 
 # Package com.letta.mobile.ui.shell.pages
 
@@ -194,7 +194,7 @@ Bindings between page controllers and shell destinations. Supply the session rep
 
 # Package com.letta.mobile.ui.shell.pages.agents
 
-The agents library page. Supply agent page state and actions to AgentsPage; agent fetching, mutation policy and navigation effects stay with the controller/caller.
+The agents library page. Supply agent page state and actions to `AgentsPage`; agent fetching, mutation policy and navigation effects stay with the controller/caller.
 
 # Package com.letta.mobile.ui.shell.pages.channels
 
@@ -202,11 +202,11 @@ The channels page and status/filter parts. Supply channel state and action bindi
 
 # Package com.letta.mobile.ui.shell.pages.conversations
 
-Conversation library presentation and its UI model. ConversationsPageState and ConversationsPageActions are the consumption seam; conversation storage and filtering authority stay with their upstream owner.
+Conversation library presentation and its UI model. `ConversationsPageState` and `ConversationsPageActions` are the consumption seam; conversation storage and filtering authority stay with their upstream owner.
 
 # Package com.letta.mobile.ui.shell.pages.home
 
-Home dashboard and compact/expanded content sections. HomePage inputs and callbacks bind dashboard sections; fleet collection, backend connection effects and pin persistence remain outside the layout.
+Home dashboard and compact/expanded content sections. `HomePage` inputs and callbacks bind dashboard sections; fleet collection, backend connection effects and pin persistence remain outside the layout.
 
 # Package com.letta.mobile.ui.shell.pages.memfs
 
@@ -214,23 +214,23 @@ MemFS file browser, editor and history/diff views. Supply MemFS editor/list/hist
 
 # Package com.letta.mobile.ui.shell.pages.memory
 
-The Memory destination's block/file-oriented views of an agent. Supply MemoryWorkspaceBinding and its navigation actions; block/file persistence remains with the bound memory sources.
+The Memory destination's block/file-oriented views of an agent. Supply `MemoryWorkspaceBinding` and its navigation actions; block/file persistence remains with the bound memory sources.
 
 # Package com.letta.mobile.ui.shell.pages.plugins
 
-Plugin management, inspection and consent UI. Supply PluginViewsModel and consent/management actions; loading executable plugins and enforcing granted capabilities remain runtime responsibilities.
+Plugin management, inspection and consent UI. Supply `PluginViewsModel` and consent/management actions; loading executable plugins and enforcing granted capabilities remain runtime responsibilities.
 
 # Package com.letta.mobile.ui.shell.pages.projects
 
-Projects list and detail surfaces driven by controller state. Bind ProjectsPageController through project actions and optional chat-opening callbacks; project persistence and issue-work support remain backend/controller concerns.
+Projects list and detail surfaces driven by controller state. Bind `ProjectsPageController` through project actions and optional chat-opening callbacks; project persistence and issue-work support remain backend/controller concerns.
 
 # Package com.letta.mobile.ui.shell.pages.runs
 
-Run list/detail presentation in the shell. Bind RunMonitorController through run-page actions; execution control and run/step retrieval remain controller operations rather than page-local polling.
+Run list/detail presentation in the shell. Bind `RunMonitorController` through run-page actions; execution control and run/step retrieval remain controller operations rather than page-local polling.
 
 # Package com.letta.mobile.ui.shell.pages.schedules
 
-Schedule library and edit panes. Supply schedule state/actions to SchedulesPage and its form panes; submission, execution and persistence stay in the shared controller.
+Schedule library and edit panes. Supply schedule state/actions to `SchedulesPage` and its form panes; submission, execution and persistence stay in the shared controller.
 
 # Package com.letta.mobile.ui.shell.pages.skills
 
@@ -238,7 +238,7 @@ Skills catalog rows and tool detail. Supply skill/tool state and supported actio
 
 # Package com.letta.mobile.ui.shell.pages.templates
 
-Starter-agent template selection. Supply AgentTemplatesState and AgentTemplatesActions, optionally using the controller action adapter; agent creation and template retrieval stay outside rendering.
+Starter-agent template selection. Supply `AgentTemplatesState` and `TemplatesPageActions`, optionally using `AgentTemplatesController.templatesPageActions(...)`; agent creation and template retrieval stay outside rendering.
 
 # Package com.letta.mobile.ui.shell.pages.vault
 
@@ -250,7 +250,7 @@ Workspace file viewers/links and working-directory picker. Provide LocalWorkspac
 
 # Package com.letta.mobile.ui.shell.palette
 
-Command palette, new-conversation picker and quick-query panes. Supply UnifiedSearchSources and new-conversation/quick-query actions; command execution and conversation creation stay with the supplied handlers.
+Command palette, new-conversation picker and quick-query panes. Supply `UnifiedSearchSources` and new-conversation/quick-query actions; command execution and conversation creation stay with the supplied handlers.
 
 # Package com.letta.mobile.ui.shell.rail
 
@@ -258,7 +258,7 @@ Agent rail and expanded library. Supply rail/library models and ShellAgentRailAc
 
 # Package com.letta.mobile.ui.shell.scaffold
 
-Page framing and adaptive list/detail structure. Use scaffold content slots and list/detail inputs directly; child business workflows and navigation state must remain caller-owned.
+Page framing and adaptive list/detail structure. Supply `LettaPageScaffold` content slots and `ShellListDetail` list/detail callbacks; child business workflows and navigation state must remain caller-owned.
 
 # Package com.letta.mobile.ui.shell.shortcuts
 
