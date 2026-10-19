@@ -12,6 +12,7 @@ on:
       - "android-compose/build-logic/**"
       - "android-compose/architecture-tests/**"
       - "tools/architecture_query/**"
+      - "tools/structure_report/**"
       - "scripts/mcp/**"
       - "scripts/scip/**"
       - "scripts/tests/tooling-smoke.sh"
@@ -29,6 +30,7 @@ on:
       - "android-compose/build-logic/**"
       - "android-compose/architecture-tests/**"
       - "tools/architecture_query/**"
+      - "tools/structure_report/**"
       - "scripts/mcp/**"
       - "scripts/scip/**"
       - "scripts/tests/tooling-smoke.sh"
@@ -77,6 +79,13 @@ jobs:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
       - name: Test exporter and write authoritative graph
         run: ./gradlew :build-logic:test exportArchitectureGraph --configuration-cache
+      - name: Export and check source structure
+        env:
+          STRUCTURE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          ./gradlew --no-daemon --no-parallel --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process checkArchitectureBoundaries :architecture-tests:structureReport
+          base="${STRUCTURE_BASE:-$(git rev-parse HEAD^)}"
+          python3 ../tools/structure_report/structure_report.py --base-ref "$base"
       - name: Install tooling smoke dependency
         run: |
           mkdir -p "$RUNNER_TEMP/bin"
@@ -103,6 +112,8 @@ jobs:
           path: |
             android-compose/build/reports/architecture/graph.jsonl
             android-compose/build/reports/architecture/contract/**
+            android-compose/build/reports/structure/index.html
+            android-compose/build/reports/structure/report.json
             android-compose/build/reports/dependency-analysis/**
             android-compose/**/build/reports/detekt/**
             android-compose/architecture-tests/build/reports/tests/**

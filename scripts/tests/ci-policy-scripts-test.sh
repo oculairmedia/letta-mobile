@@ -76,9 +76,15 @@ assemble_pages="$(
        active && /^  [[:alnum:]_-]+:$/ { exit }
        active { print }' "$android_workflow"
 )"
-assert_contains "$assemble_pages" 'needs: [web-wasm, api-docs]'
+assert_contains "$assemble_pages" 'needs: [web-wasm, api-docs, test]'
 assert_contains "$assemble_pages" 'name: wasm-site'
 assert_contains "$assemble_pages" 'name: kotlin-api-docs'
+assert_contains "$assemble_pages" 'name: kotlin-structure-report'
+assert_contains "$assemble_pages" 'path: public/structure'
+assert_contains "$test_job" 'Enforce structural documentation limits'
+assert_contains "$test_job" ':architecture-tests:structureReport'
+assert_contains "$test_job" 'tools/structure_report/structure_report.py --base-ref "$base"'
+assert_contains "$test_job" 'STRUCTURE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}'
 assert_contains "$assemble_pages" 'path: public/api'
 assert_contains "$assemble_pages" 'test -s public/index.html && test -s public/api/index.html'
 assert_contains "$assemble_pages" "github.event_name == 'push' && github.ref == 'refs/heads/main'"
