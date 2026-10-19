@@ -7,6 +7,7 @@ import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.jetbrains.kotlin.gradle.dsl.KotlinBaseExtension
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 /** Compiler-derived public signatures for every module included in API documentation. */
 class ApiContractPlugin : Plugin<Project> {
@@ -16,6 +17,14 @@ class ApiContractPlugin : Plugin<Project> {
             project.pluginManager.withPlugin(plugin) {
                 val abi = project.extensions.getByType(KotlinBaseExtension::class.java).abiValidation
                 abi.referenceDumpDir.set(project.layout.projectDirectory.dir("api"))
+                if (plugin == "org.jetbrains.kotlin.multiplatform") {
+                    project.extensions.getByType(KotlinMultiplatformExtension::class.java)
+                        .targets.withType(KotlinNativeTarget::class.java).matching { it.name == "hostNative" }.configureEach {
+                            // hostNative selects one real target per host. Keep its contract
+                            // independent so updating Windows never overwrites Linux evidence.
+                            abi.referenceDumpDir.set(project.layout.projectDirectory.dir("api/${konanTarget.name}"))
+                        }
+                }
                 project.tasks.register("apiCheck") {
                     group = "verification"
                     description = "Compare public API with the reviewed, checked-in compiler dump."

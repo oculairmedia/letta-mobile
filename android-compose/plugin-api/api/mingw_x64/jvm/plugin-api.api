@@ -1,0 +1,973 @@
+public final class com/letta/mobile/plugin/api/ActionCall {
+	public static final field Companion Lcom/letta/mobile/plugin/api/ActionCall$Companion;
+	public fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/plugin/api/ActionContext;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component3 ()Lcom/letta/mobile/plugin/api/ActionContext;
+	public final fun copy (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/plugin/api/ActionContext;)Lcom/letta/mobile/plugin/api/ActionCall;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/ActionCall;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/plugin/api/ActionContext;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/ActionCall;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAction ()Ljava/lang/String;
+	public final fun getContext ()Lcom/letta/mobile/plugin/api/ActionContext;
+	public final fun getInput ()Lkotlinx/serialization/json/JsonObject;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/ActionCall$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/ActionCall$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/ActionCall;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/ActionCall;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ActionCall$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ActionContext {
+	public static final field Companion Lcom/letta/mobile/plugin/api/ActionContext$Companion;
+	public fun <init> (Lcom/letta/mobile/plugin/api/ActionOrigin;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/letta/mobile/plugin/api/ActionOrigin;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/plugin/api/ActionOrigin;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/plugin/api/ActionOrigin;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/plugin/api/ActionContext;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/ActionContext;Lcom/letta/mobile/plugin/api/ActionOrigin;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/ActionContext;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCallId ()Ljava/lang/String;
+	public final fun getCanvasId ()Ljava/lang/String;
+	public final fun getElementId ()Ljava/lang/String;
+	public final fun getOrigin ()Lcom/letta/mobile/plugin/api/ActionOrigin;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/ActionContext$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/ActionContext$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/ActionContext;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/ActionContext;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ActionContext$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/plugin/api/ActionOrigin {
+	public static final field Companion Lcom/letta/mobile/plugin/api/ActionOrigin$Companion;
+}
+
+public final class com/letta/mobile/plugin/api/ActionOrigin$Agent : com/letta/mobile/plugin/api/ActionOrigin {
+	public static final field Companion Lcom/letta/mobile/plugin/api/ActionOrigin$Agent$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/plugin/api/ActionOrigin$Agent;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/ActionOrigin$Agent;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/ActionOrigin$Agent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId ()Ljava/lang/String;
+	public final fun getConversationId ()Ljava/lang/String;
+	public final fun getToolCallId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/ActionOrigin$Agent$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/ActionOrigin$Agent$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/ActionOrigin$Agent;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/ActionOrigin$Agent;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ActionOrigin$Agent$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ActionOrigin$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ActionOrigin$Host : com/letta/mobile/plugin/api/ActionOrigin {
+	public static final field Companion Lcom/letta/mobile/plugin/api/ActionOrigin$Host$Companion;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/plugin/api/ActionOrigin$Host;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/ActionOrigin$Host;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/ActionOrigin$Host;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/ActionOrigin$Host$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/ActionOrigin$Host$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/ActionOrigin$Host;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/ActionOrigin$Host;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ActionOrigin$Host$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ActionOrigin$View : com/letta/mobile/plugin/api/ActionOrigin {
+	public static final field Companion Lcom/letta/mobile/plugin/api/ActionOrigin$View$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/plugin/api/ActionOrigin$View;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/ActionOrigin$View;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/ActionOrigin$View;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getElementId ()Ljava/lang/String;
+	public final fun getPeerId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/ActionOrigin$View$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/ActionOrigin$View$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/ActionOrigin$View;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/ActionOrigin$View;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ActionOrigin$View$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/plugin/api/ActionResult {
+	public static final field Companion Lcom/letta/mobile/plugin/api/ActionResult$Companion;
+}
+
+public final class com/letta/mobile/plugin/api/ActionResult$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ActionResult$Error : com/letta/mobile/plugin/api/ActionResult {
+	public static final field Companion Lcom/letta/mobile/plugin/api/ActionResult$Error$Companion;
+	public static final field INTERNAL Ljava/lang/String;
+	public static final field INVALID_INPUT Ljava/lang/String;
+	public static final field UNAVAILABLE Ljava/lang/String;
+	public static final field UNKNOWN_ACTION Ljava/lang/String;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/plugin/api/ActionResult$Error;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/ActionResult$Error;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/ActionResult$Error;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getMessage ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/ActionResult$Error$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/ActionResult$Error$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/ActionResult$Error;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/ActionResult$Error;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ActionResult$Error$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ActionResult$Ok : com/letta/mobile/plugin/api/ActionResult {
+	public static final field Companion Lcom/letta/mobile/plugin/api/ActionResult$Ok$Companion;
+	public fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/plugin/api/PluginEmit;)V
+	public synthetic fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/plugin/api/PluginEmit;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component3 ()Lcom/letta/mobile/plugin/api/PluginEmit;
+	public final fun copy (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/plugin/api/PluginEmit;)Lcom/letta/mobile/plugin/api/ActionResult$Ok;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/ActionResult$Ok;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/plugin/api/PluginEmit;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/ActionResult$Ok;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEmit ()Lcom/letta/mobile/plugin/api/PluginEmit;
+	public final fun getStructured ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/ActionResult$Ok$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/ActionResult$Ok$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/ActionResult$Ok;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/ActionResult$Ok;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ActionResult$Ok$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/Base64ByteArraySerializer : kotlinx/serialization/KSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/Base64ByteArraySerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public fun deserialize (Lkotlinx/serialization/encoding/Decoder;)[B
+	public fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun serialize (Lkotlinx/serialization/encoding/Encoder;[B)V
+}
+
+public abstract interface class com/letta/mobile/plugin/api/CanvasPlugin {
+	public abstract fun activate ()V
+	public abstract fun deactivate ()V
+	public abstract fun health ()Lcom/letta/mobile/plugin/api/PluginHealth;
+	public fun initialize (Lcom/letta/mobile/plugin/api/PluginHost;)Lcom/letta/mobile/plugin/api/PluginInfo;
+	public abstract fun invoke (Lcom/letta/mobile/plugin/api/ActionCall;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun onElementEvent (Lcom/letta/mobile/plugin/api/ElementEvent;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun onSettingsChanged (Lkotlinx/serialization/json/JsonObject;)V
+}
+
+public final class com/letta/mobile/plugin/api/CanvasPlugin$DefaultImpls {
+	public static fun initialize (Lcom/letta/mobile/plugin/api/CanvasPlugin;Lcom/letta/mobile/plugin/api/PluginHost;)Lcom/letta/mobile/plugin/api/PluginInfo;
+	public static fun onElementEvent (Lcom/letta/mobile/plugin/api/CanvasPlugin;Lcom/letta/mobile/plugin/api/ElementEvent;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun onSettingsChanged (Lcom/letta/mobile/plugin/api/CanvasPlugin;Lkotlinx/serialization/json/JsonObject;)V
+}
+
+public final class com/letta/mobile/plugin/api/ElementEvent {
+	public static final field Companion Lcom/letta/mobile/plugin/api/ElementEvent$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/plugin/api/ElementEventType;Lcom/letta/mobile/plugin/api/ElementFrame;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/plugin/api/ElementEventType;Lcom/letta/mobile/plugin/api/ElementFrame;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lcom/letta/mobile/plugin/api/ElementEventType;
+	public final fun component4 ()Lcom/letta/mobile/plugin/api/ElementFrame;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/plugin/api/ElementEventType;Lcom/letta/mobile/plugin/api/ElementFrame;Ljava/lang/String;)Lcom/letta/mobile/plugin/api/ElementEvent;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/ElementEvent;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/plugin/api/ElementEventType;Lcom/letta/mobile/plugin/api/ElementFrame;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/ElementEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCanvasId ()Ljava/lang/String;
+	public final fun getElementId ()Ljava/lang/String;
+	public final fun getEvent ()Lcom/letta/mobile/plugin/api/ElementEventType;
+	public final fun getFrame ()Lcom/letta/mobile/plugin/api/ElementFrame;
+	public final fun getKind ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/ElementEvent$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/ElementEvent$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/ElementEvent;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/ElementEvent;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ElementEvent$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ElementEventType : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/plugin/api/ElementEventType$Companion;
+	public static final field FOCUSED Lcom/letta/mobile/plugin/api/ElementEventType;
+	public static final field MOVED Lcom/letta/mobile/plugin/api/ElementEventType;
+	public static final field REMOVED Lcom/letta/mobile/plugin/api/ElementEventType;
+	public static final field VIEW_CLOSED Lcom/letta/mobile/plugin/api/ElementEventType;
+	public static final field VIEW_OPENED Lcom/letta/mobile/plugin/api/ElementEventType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/plugin/api/ElementEventType;
+	public static fun values ()[Lcom/letta/mobile/plugin/api/ElementEventType;
+}
+
+public final class com/letta/mobile/plugin/api/ElementEventType$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ElementFallback {
+	public static final field Companion Lcom/letta/mobile/plugin/api/ElementFallback$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/plugin/api/ElementFallback;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/ElementFallback;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/ElementFallback;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIcon ()Ljava/lang/String;
+	public final fun getOpenUrl ()Ljava/lang/String;
+	public final fun getSubtitle ()Ljava/lang/String;
+	public final fun getTitle ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/ElementFallback$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/ElementFallback$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/ElementFallback;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/ElementFallback;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ElementFallback$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ElementFrame {
+	public static final field Companion Lcom/letta/mobile/plugin/api/ElementFrame$Companion;
+	public fun <init> (FFFF)V
+	public final fun component1 ()F
+	public final fun component2 ()F
+	public final fun component3 ()F
+	public final fun component4 ()F
+	public final fun copy (FFFF)Lcom/letta/mobile/plugin/api/ElementFrame;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/ElementFrame;FFFFILjava/lang/Object;)Lcom/letta/mobile/plugin/api/ElementFrame;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHeight ()F
+	public final fun getWidth ()F
+	public final fun getX ()F
+	public final fun getY ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/ElementFrame$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/ElementFrame$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/ElementFrame;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/ElementFrame;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ElementFrame$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ElementQuery {
+	public static final field Companion Lcom/letta/mobile/plugin/api/ElementQuery$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/util/List;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/util/List;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/util/List;Ljava/util/List;Z)Lcom/letta/mobile/plugin/api/ElementQuery;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/ElementQuery;Ljava/lang/String;Ljava/util/List;Ljava/util/List;ZILjava/lang/Object;)Lcom/letta/mobile/plugin/api/ElementQuery;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCanvasId ()Ljava/lang/String;
+	public final fun getElementIds ()Ljava/util/List;
+	public final fun getKinds ()Ljava/util/List;
+	public final fun getOwnOnly ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/ElementQuery$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/ElementQuery$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/ElementQuery;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/ElementQuery;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/ElementQuery$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/EmitReceipt {
+	public static final field Companion Lcom/letta/mobile/plugin/api/EmitReceipt$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;Ljava/util/List;)Lcom/letta/mobile/plugin/api/EmitReceipt;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/EmitReceipt;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/EmitReceipt;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPlaced ()Ljava/util/List;
+	public final fun getRefused ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/EmitReceipt$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/EmitReceipt$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/EmitReceipt;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/EmitReceipt;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/EmitReceipt$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/EmitRefusal {
+	public static final field Companion Lcom/letta/mobile/plugin/api/EmitRefusal$Companion;
+	public fun <init> (ILjava/lang/String;)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (ILjava/lang/String;)Lcom/letta/mobile/plugin/api/EmitRefusal;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/EmitRefusal;ILjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/EmitRefusal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIndex ()I
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/EmitRefusal$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/EmitRefusal$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/EmitRefusal;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/EmitRefusal;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/EmitRefusal$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/HostInfo {
+	public static final field Companion Lcom/letta/mobile/plugin/api/HostInfo$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/plugin/api/HostInfo;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/HostInfo;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/HostInfo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPlatform ()Ljava/lang/String;
+	public final fun getVersion ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/HostInfo$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/HostInfo$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/HostInfo;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/HostInfo;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/HostInfo$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/LcpDirection : java/lang/Enum {
+	public static final field EITHER Lcom/letta/mobile/plugin/api/LcpDirection;
+	public static final field HOST_TO_PLUGIN Lcom/letta/mobile/plugin/api/LcpDirection;
+	public static final field PLUGIN_TO_HOST Lcom/letta/mobile/plugin/api/LcpDirection;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/plugin/api/LcpDirection;
+	public static fun values ()[Lcom/letta/mobile/plugin/api/LcpDirection;
+}
+
+public final class com/letta/mobile/plugin/api/LcpMethod : java/lang/Enum {
+	public static final field ACTIVATE Lcom/letta/mobile/plugin/api/LcpMethod;
+	public static final field CANCEL Lcom/letta/mobile/plugin/api/LcpMethod;
+	public static final field Companion Lcom/letta/mobile/plugin/api/LcpMethod$Companion;
+	public static final field DEACTIVATE Lcom/letta/mobile/plugin/api/LcpMethod;
+	public static final field ELEMENT_EVENT Lcom/letta/mobile/plugin/api/LcpMethod;
+	public static final field EMIT Lcom/letta/mobile/plugin/api/LcpMethod;
+	public static final field HEALTH Lcom/letta/mobile/plugin/api/LcpMethod;
+	public static final field INITIALIZE Lcom/letta/mobile/plugin/api/LcpMethod;
+	public static final field INVOKE Lcom/letta/mobile/plugin/api/LcpMethod;
+	public static final field LOG Lcom/letta/mobile/plugin/api/LcpMethod;
+	public static final field MAX_ASSET_CHUNK_BYTES I
+	public static final field MAX_MESSAGE_BYTES I
+	public static final field PUT_ASSET_BEGIN Lcom/letta/mobile/plugin/api/LcpMethod;
+	public static final field PUT_ASSET_CHUNK Lcom/letta/mobile/plugin/api/LcpMethod;
+	public static final field PUT_ASSET_END Lcom/letta/mobile/plugin/api/LcpMethod;
+	public static final field READ_ELEMENTS Lcom/letta/mobile/plugin/api/LcpMethod;
+	public static final field SETTINGS_CHANGED Lcom/letta/mobile/plugin/api/LcpMethod;
+	public final fun getDeadlineMillis ()Ljava/lang/Long;
+	public final fun getDirection ()Lcom/letta/mobile/plugin/api/LcpDirection;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getNotification ()Z
+	public final fun getSpiMember ()Ljava/lang/String;
+	public final fun getWire ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/plugin/api/LcpMethod;
+	public static fun values ()[Lcom/letta/mobile/plugin/api/LcpMethod;
+}
+
+public final class com/letta/mobile/plugin/api/LcpMethod$Companion {
+	public final fun byWire (Ljava/lang/String;)Lcom/letta/mobile/plugin/api/LcpMethod;
+	public final fun getINITIALIZE_PARAMS ()Ljava/util/Set;
+	public final fun getJVM_ONLY_HOST_MEMBERS ()Ljava/util/Set;
+}
+
+public final class com/letta/mobile/plugin/api/LogLevel : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/plugin/api/LogLevel$Companion;
+	public static final field DEBUG Lcom/letta/mobile/plugin/api/LogLevel;
+	public static final field ERROR Lcom/letta/mobile/plugin/api/LogLevel;
+	public static final field INFO Lcom/letta/mobile/plugin/api/LogLevel;
+	public static final field WARN Lcom/letta/mobile/plugin/api/LogLevel;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/plugin/api/LogLevel;
+	public static fun values ()[Lcom/letta/mobile/plugin/api/LogLevel;
+}
+
+public final class com/letta/mobile/plugin/api/LogLevel$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/PlaceElement {
+	public static final field Companion Lcom/letta/mobile/plugin/api/PlaceElement$Companion;
+	public fun <init> (Ljava/lang/String;ILkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/plugin/api/ElementFallback;Ljava/lang/String;Lcom/letta/mobile/plugin/api/ElementFrame;Lcom/letta/mobile/plugin/api/SnapshotSource;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;ILkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/plugin/api/ElementFallback;Ljava/lang/String;Lcom/letta/mobile/plugin/api/ElementFrame;Lcom/letta/mobile/plugin/api/SnapshotSource;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()I
+	public final fun component3 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component4 ()Lcom/letta/mobile/plugin/api/ElementFallback;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Lcom/letta/mobile/plugin/api/ElementFrame;
+	public final fun component7 ()Lcom/letta/mobile/plugin/api/SnapshotSource;
+	public final fun component8 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;ILkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/plugin/api/ElementFallback;Ljava/lang/String;Lcom/letta/mobile/plugin/api/ElementFrame;Lcom/letta/mobile/plugin/api/SnapshotSource;Ljava/lang/String;)Lcom/letta/mobile/plugin/api/PlaceElement;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/PlaceElement;Ljava/lang/String;ILkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/plugin/api/ElementFallback;Ljava/lang/String;Lcom/letta/mobile/plugin/api/ElementFrame;Lcom/letta/mobile/plugin/api/SnapshotSource;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/PlaceElement;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCanvasId ()Ljava/lang/String;
+	public final fun getFallback ()Lcom/letta/mobile/plugin/api/ElementFallback;
+	public final fun getFrame ()Lcom/letta/mobile/plugin/api/ElementFrame;
+	public final fun getKind ()Ljava/lang/String;
+	public final fun getProps ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getRef ()Ljava/lang/String;
+	public final fun getSnapshot ()Lcom/letta/mobile/plugin/api/SnapshotSource;
+	public final fun getV ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/PlaceElement$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/PlaceElement$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/PlaceElement;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/PlaceElement;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/PlaceElement$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/PlaceImage {
+	public static final field Companion Lcom/letta/mobile/plugin/api/PlaceImage$Companion;
+	public fun <init> (Lcom/letta/mobile/plugin/api/SnapshotSource;Lcom/letta/mobile/plugin/api/ElementFrame;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/letta/mobile/plugin/api/SnapshotSource;Lcom/letta/mobile/plugin/api/ElementFrame;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/plugin/api/SnapshotSource;
+	public final fun component2 ()Lcom/letta/mobile/plugin/api/ElementFrame;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/plugin/api/SnapshotSource;Lcom/letta/mobile/plugin/api/ElementFrame;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/plugin/api/PlaceImage;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/PlaceImage;Lcom/letta/mobile/plugin/api/SnapshotSource;Lcom/letta/mobile/plugin/api/ElementFrame;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/PlaceImage;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlt ()Ljava/lang/String;
+	public final fun getCanvasId ()Ljava/lang/String;
+	public final fun getFrame ()Lcom/letta/mobile/plugin/api/ElementFrame;
+	public final fun getImage ()Lcom/letta/mobile/plugin/api/SnapshotSource;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/PlaceImage$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/PlaceImage$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/PlaceImage;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/PlaceImage;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/PlaceImage$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/PluginApi {
+	public static final field CONTRACT_VERSION I
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/PluginApi;
+	public static final field VERSION Ljava/lang/String;
+}
+
+public final class com/letta/mobile/plugin/api/PluginElementView {
+	public static final field Companion Lcom/letta/mobile/plugin/api/PluginElementView$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Lcom/letta/mobile/plugin/api/ElementFrame;Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;Lcom/letta/mobile/plugin/api/ElementFallback;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Lcom/letta/mobile/plugin/api/ElementFrame;Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;Lcom/letta/mobile/plugin/api/ElementFallback;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/Integer;
+	public final fun component5 ()Lcom/letta/mobile/plugin/api/ElementFrame;
+	public final fun component6 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Lcom/letta/mobile/plugin/api/ElementFallback;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Lcom/letta/mobile/plugin/api/ElementFrame;Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;Lcom/letta/mobile/plugin/api/ElementFallback;)Lcom/letta/mobile/plugin/api/PluginElementView;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/PluginElementView;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Lcom/letta/mobile/plugin/api/ElementFrame;Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;Lcom/letta/mobile/plugin/api/ElementFallback;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/PluginElementView;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCanvasId ()Ljava/lang/String;
+	public final fun getFallback ()Lcom/letta/mobile/plugin/api/ElementFallback;
+	public final fun getFrame ()Lcom/letta/mobile/plugin/api/ElementFrame;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getProps ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getRef ()Ljava/lang/String;
+	public final fun getType ()Ljava/lang/String;
+	public final fun getV ()Ljava/lang/Integer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/PluginElementView$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/PluginElementView$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/PluginElementView;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/PluginElementView;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/PluginElementView$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/PluginEmit {
+	public static final field Companion Lcom/letta/mobile/plugin/api/PluginEmit$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/plugin/api/PluginEmit;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/PluginEmit;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/PluginEmit;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCallId ()Ljava/lang/String;
+	public final fun getPlace ()Ljava/util/List;
+	public final fun getPlaceImages ()Ljava/util/List;
+	public final fun getRemove ()Ljava/util/List;
+	public final fun getUpdate ()Ljava/util/List;
+	public fun hashCode ()I
+	public final fun isEmpty ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/PluginEmit$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/PluginEmit$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/PluginEmit;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/PluginEmit;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/PluginEmit$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/plugin/api/PluginHealth {
+	public static final field Companion Lcom/letta/mobile/plugin/api/PluginHealth$Companion;
+}
+
+public final class com/letta/mobile/plugin/api/PluginHealth$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/PluginHealth$Degraded : com/letta/mobile/plugin/api/PluginHealth {
+	public static final field Companion Lcom/letta/mobile/plugin/api/PluginHealth$Degraded$Companion;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/plugin/api/PluginHealth$Degraded;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/PluginHealth$Degraded;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/PluginHealth$Degraded;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/PluginHealth$Degraded$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/PluginHealth$Degraded$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/PluginHealth$Degraded;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/PluginHealth$Degraded;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/PluginHealth$Degraded$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/PluginHealth$Failed : com/letta/mobile/plugin/api/PluginHealth {
+	public static final field Companion Lcom/letta/mobile/plugin/api/PluginHealth$Failed$Companion;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/plugin/api/PluginHealth$Failed;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/PluginHealth$Failed;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/PluginHealth$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/PluginHealth$Failed$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/PluginHealth$Failed$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/PluginHealth$Failed;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/PluginHealth$Failed;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/PluginHealth$Failed$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/PluginHealth$Ok : com/letta/mobile/plugin/api/PluginHealth {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/PluginHealth$Ok;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/plugin/api/PluginHost {
+	public abstract fun emit (Lcom/letta/mobile/plugin/api/PluginEmit;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getContractVersion ()I
+	public abstract fun getHostInfo ()Lcom/letta/mobile/plugin/api/HostInfo;
+	public abstract fun getHttpClient ()Lcom/letta/mobile/plugin/api/PluginHttpClient;
+	public abstract fun getPluginId ()Ljava/lang/String;
+	public abstract fun getScope ()Lkotlinx/coroutines/CoroutineScope;
+	public abstract fun getSettings ()Lkotlinx/serialization/json/JsonObject;
+	public abstract fun log (Lcom/letta/mobile/plugin/api/LogLevel;Ljava/lang/String;Ljava/util/Map;)V
+	public static synthetic fun log$default (Lcom/letta/mobile/plugin/api/PluginHost;Lcom/letta/mobile/plugin/api/LogLevel;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)V
+	public abstract fun putAsset (Ljava/lang/String;[BLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun readElements (Lcom/letta/mobile/plugin/api/ElementQuery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun secret (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/plugin/api/PluginHost$DefaultImpls {
+	public static synthetic fun log$default (Lcom/letta/mobile/plugin/api/PluginHost;Lcom/letta/mobile/plugin/api/LogLevel;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)V
+}
+
+public final class com/letta/mobile/plugin/api/PluginHostException : java/lang/RuntimeException {
+	public static final field CAPABILITY_DENIED Ljava/lang/String;
+	public static final field Companion Lcom/letta/mobile/plugin/api/PluginHostException$Companion;
+	public static final field DEACTIVATED Ljava/lang/String;
+	public static final field LIMIT Ljava/lang/String;
+	public static final field NOT_ACTIVE Ljava/lang/String;
+	public static final field ORIGIN_DENIED Ljava/lang/String;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun getCode ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/plugin/api/PluginHostException$Companion {
+}
+
+public abstract interface class com/letta/mobile/plugin/api/PluginHttpClient {
+	public abstract fun get (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun get$default (Lcom/letta/mobile/plugin/api/PluginHttpClient;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun post (Ljava/lang/String;[BLjava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun post$default (Lcom/letta/mobile/plugin/api/PluginHttpClient;Ljava/lang/String;[BLjava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/plugin/api/PluginHttpClient$DefaultImpls {
+	public static synthetic fun get$default (Lcom/letta/mobile/plugin/api/PluginHttpClient;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun post$default (Lcom/letta/mobile/plugin/api/PluginHttpClient;Ljava/lang/String;[BLjava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/plugin/api/PluginHttpResponse {
+	public fun <init> (ILjava/util/Map;[B)V
+	public final fun getBody ()[B
+	public final fun getHeaders ()Ljava/util/Map;
+	public final fun getStatus ()I
+}
+
+public final class com/letta/mobile/plugin/api/PluginInfo {
+	public static final field Companion Lcom/letta/mobile/plugin/api/PluginInfo$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/Map;
+	public final fun copy (Ljava/lang/String;Ljava/util/Map;)Lcom/letta/mobile/plugin/api/PluginInfo;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/PluginInfo;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/PluginInfo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBuild ()Ljava/lang/String;
+	public final fun getDetails ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/PluginInfo$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/PluginInfo$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/PluginInfo;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/PluginInfo;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/PluginInfo$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/plugin/api/SnapshotSource {
+	public static final field Companion Lcom/letta/mobile/plugin/api/SnapshotSource$Companion;
+}
+
+public final class com/letta/mobile/plugin/api/SnapshotSource$Asset : com/letta/mobile/plugin/api/SnapshotSource {
+	public static final field Companion Lcom/letta/mobile/plugin/api/SnapshotSource$Asset$Companion;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/plugin/api/SnapshotSource$Asset;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/SnapshotSource$Asset;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/SnapshotSource$Asset;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRef ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/SnapshotSource$Asset$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/SnapshotSource$Asset$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/SnapshotSource$Asset;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/SnapshotSource$Asset;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/SnapshotSource$Asset$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/SnapshotSource$Bytes : com/letta/mobile/plugin/api/SnapshotSource {
+	public static final field Companion Lcom/letta/mobile/plugin/api/SnapshotSource$Bytes$Companion;
+	public fun <init> (Ljava/lang/String;[B)V
+	public final fun getBytes ()[B
+	public final fun getMediaType ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/SnapshotSource$Bytes$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/SnapshotSource$Bytes$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/SnapshotSource$Bytes;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/SnapshotSource$Bytes;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/SnapshotSource$Bytes$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/SnapshotSource$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/UpdateElement {
+	public static final field Companion Lcom/letta/mobile/plugin/api/UpdateElement$Companion;
+	public fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/plugin/api/ElementFallback;Lcom/letta/mobile/plugin/api/SnapshotSource;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/plugin/api/ElementFallback;Lcom/letta/mobile/plugin/api/SnapshotSource;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component3 ()Lcom/letta/mobile/plugin/api/ElementFallback;
+	public final fun component4 ()Lcom/letta/mobile/plugin/api/SnapshotSource;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/plugin/api/ElementFallback;Lcom/letta/mobile/plugin/api/SnapshotSource;Ljava/lang/String;)Lcom/letta/mobile/plugin/api/UpdateElement;
+	public static synthetic fun copy$default (Lcom/letta/mobile/plugin/api/UpdateElement;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lcom/letta/mobile/plugin/api/ElementFallback;Lcom/letta/mobile/plugin/api/SnapshotSource;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/plugin/api/UpdateElement;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getElementId ()Ljava/lang/String;
+	public final fun getFallback ()Lcom/letta/mobile/plugin/api/ElementFallback;
+	public final fun getProps ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getRef ()Ljava/lang/String;
+	public final fun getSnapshot ()Lcom/letta/mobile/plugin/api/SnapshotSource;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/plugin/api/UpdateElement$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/plugin/api/UpdateElement$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/plugin/api/UpdateElement;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/plugin/api/UpdateElement;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/plugin/api/UpdateElement$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+

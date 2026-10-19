@@ -76,6 +76,52 @@ env:
   GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v2
 
 jobs:
+  api-contract-windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: android-compose
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+      - name: Expose JDK 21 to Gradle's daemon resolver
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.gradle"
+          echo "org.gradle.java.installations.fromEnv=JAVA_HOME_21_X64" >> "$HOME/.gradle/gradle.properties"
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - name: Cache Konan toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-konan-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/sharedLogic/build.gradle.kts') }}
+          restore-keys: |
+            ${{ runner.os }}-konan-
+      - name: Check Windows public API contracts
+        run: ./gradlew.bat --no-daemon --no-parallel --max-workers=1 "-Pkotlin.compiler.execution.strategy=in-process" apiCheck
+      - name: Upload actual Windows API signatures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-contract-windows-${{ github.sha }}
+          path: |
+            android-compose/**/build/kotlin/abi/**
+            android-compose/**/build/api-contract/**
+          if-no-files-found: warn
+          retention-days: 7
+
   test:
     name: test-workload
     runs-on: ubuntu-latest
@@ -233,7 +279,7 @@ jobs:
             read -r -a additive_tasks <<< "${ADDITIVE_TASKS}"
             tasks+=("${additive_tasks[@]}")
           fi
-          ./gradlew "${tasks[@]}" --continue
+          ./gradlew "${tasks[@]}"
 
       - name: Upload actual API signatures for review
         if: always()

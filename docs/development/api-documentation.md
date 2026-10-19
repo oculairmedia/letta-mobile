@@ -175,10 +175,24 @@ fixture prevents this target from silently falling out of coverage. Once the
 pinned Kotlin version supports this target directly, migrate its snapshot into
 the built-in format and remove the companion tasks in the same reviewed change.
 
-The repository chooses `hostNative` from the build host OS. Native ABI dumps
-therefore contain real target identifiers (for example `linuxX64.hostNative`),
-not interchangeable aliases. Generate the canonical snapshots on Linux, matching
-the required CI runner; do not relabel a Windows or macOS dump as Linux. The CI
-artifact `api-contract-<commit>` contains actual generated signatures even when
-comparison fails, for reviewing and updating a snapshot. An artifact is evidence,
-not automatic approval to change the checked-in contract.
+The repository chooses `hostNative` from the build host OS. Modules with that
+target keep separate reference roots under `api/linux_x64` and `api/mingw_x64`
+(Windows). `apiDump` and `apiCheck` select the real compiler target automatically,
+so Windows developers can update and verify contracts locally without Linux.
+Each root includes the complete Kotlin dump, including JVM and Wasm declarations:
+this intentional duplication uses Kotlin's supported whole-directory validator,
+rather than rewriting target identities or relying on internal task APIs.
+Android references remain shared under `api-android`; modules without host-native
+targets keep their host-independent `api` root.
+
+Both Linux and Windows API checks gate the required `test` status. A common API
+change requires updated snapshots on both hosts. Run `apiDump` on each host or
+retrieve the actual signatures from its CI artifact, review the signature diff,
+and commit the corresponding host root. CI never updates references itself and
+stops at the first failure. Artifacts may therefore contain only outputs completed
+before that failure; missing output is not evidence that a contract is unchanged.
+The artifacts are `api-contract-<commit>` (Linux) and
+`api-contract-windows-<commit>` (Windows). Preserve the real compiler output bytes;
+never relabel one platform's dump as another. macOS uses its own compiler target
+root (`api/macos_arm64` or `api/macos_x64`); initialize it with `apiDump` before
+checking on a Mac. Linux and Windows are the CI-verified host contracts.

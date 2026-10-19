@@ -89,6 +89,10 @@ assert_contains "$test_job" 'github.event.pull_request.base.sha'
 assert_not_contains "$test_job" 'changed-gradle-modules.sh origin/main'
 gradle_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$test_job")"
 assert_eq "$gradle_invocations" '1'
+assert_contains "$test_job" 'apiCheck'
+assert_not_contains "$test_job" '--continue'
+assert_contains "$(cat "$android_workflow")" 'api-contract-windows:'
+assert_contains "$(cat "$android_workflow")" 'Check Windows public API contracts'
 
 # One Pages deployment must contain both the app and generated API reference.
 # Uploading each site independently would let one replace the other.
