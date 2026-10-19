@@ -163,6 +163,7 @@ class TimelineChatSessionPort(
 
     override val recompileStatus: StateFlow<RecompileStatus> get() = extensions.recompileStatus
 
+    /** Stable handlers bound to this session's draft, timeline and configured extension actions. */
     override val actions: ChatActions = TimelineChatActions(
         port = this,
         options = options,

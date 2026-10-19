@@ -25,6 +25,7 @@ interface ChatSessionPort {
     /** The composer draft and its chrome. Separate so keystrokes don't recompose the timeline. */
     val composer: StateFlow<ChatComposerUiState>
 
+    /** User-intent handlers for this conversation, including composer, timeline and run controls. */
     val actions: ChatActions
 
     /**

@@ -13,9 +13,9 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
  * Every user intent the shared chat page can raise against the
  * conversation's owner.
  *
- * Android's `AdminChatViewModel` and desktop's `DesktopChatController` each implement
- * this behind [ChatSessionPort]. The page never calls a platform API to change chat
- * state; it calls one of these. Host navigation (open the canvas, open an agent,
+ * [TimelineChatSessionPort] supplies these handlers through its shared timeline and
+ * extension actions. The page forwards conversation intents through [ChatSessionPort.actions].
+ * Host navigation (open the canvas, open an agent,
  * pick a file) is not here; it is [ChatSurfaceHost]'s, because it changes what is on
  * screen rather than the conversation.
  *
