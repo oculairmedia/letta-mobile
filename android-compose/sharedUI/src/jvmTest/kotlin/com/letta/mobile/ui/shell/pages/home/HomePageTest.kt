@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -116,6 +117,9 @@ class HomePageTest {
                 }
             }
         }
+        waitForIdle()
+        assertEquals(listOf("refresh"), actions.events, "entering Home refreshes it once")
+        actions.events.clear()
     }
 
     /** letta-mobile-ckmub.3.22: a pull reloads the page on touch, and there is no refresh button. */
@@ -128,13 +132,35 @@ class HomePageTest {
         assertEquals(listOf("refresh"), actions.events)
     }
 
-    /** On a pointer host the header's refresh reloads it instead. */
+    /** Automatic entry refresh replaces the persistent pointer-host refresh action. */
     @Test
-    fun onPointerTheHeaderRefreshReloadsTheDashboard() = runComposeUiTest {
+    fun onPointerHomeHasNoRefreshButton() = runComposeUiTest {
         show(baseState(), HomePageOptions(), host = LettaHost.Pointer)
         onNodeWithTag(LettaRefreshTags.PULL).assertDoesNotExist()
-        onNodeWithTag(HomePageTags.REFRESH).performClick()
+        onNodeWithTag(HomePageTags.REFRESH).assertDoesNotExist()
+        onNodeWithText("Retry").assertDoesNotExist()
+        assertEquals(emptyList(), actions.events)
+    }
+
+    @Test
+    fun returningHomeRefreshesButRecompositionDoesNot() = runComposeUiTest {
+        val visible = mutableStateOf(true)
+        val state = mutableStateOf(baseState())
+        setContent {
+            MaterialTheme {
+                if (visible.value) HomePage(state.value, HomePageCallbacks(actions, navigation.navigation))
+            }
+        }
+        waitForIdle()
         assertEquals(listOf("refresh"), actions.events)
+        runOnIdle { state.value = state.value.copy(stats = HomeStats(loading = false, toolCount = 14)) }
+        waitForIdle()
+        assertEquals(listOf("refresh"), actions.events)
+        runOnIdle { visible.value = false }
+        waitForIdle()
+        runOnIdle { visible.value = true }
+        waitForIdle()
+        assertEquals(listOf("refresh", "refresh"), actions.events)
     }
 
     @Test
@@ -281,6 +307,8 @@ class HomePageTest {
         onNodeWithTag(HomePageTags.ERROR).assertExists()
         onNodeWithText("Backend unreachable").assertExists()
         onNodeWithTag(HomePageTags.SEARCH).assertDoesNotExist()
+        onNodeWithText("Retry").performClick()
+        assertEquals(listOf("refresh", "refresh"), actions.events, "entry and error Retry use the shared action")
     }
 
     /** Desktop: the header's field searches Home (letta-mobile-xuhmy), so the page draws no field of its own. */

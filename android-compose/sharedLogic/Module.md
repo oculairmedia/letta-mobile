@@ -189,6 +189,8 @@ Server health probing, state and repository contracts. Service availability is r
 
 Renderer-independent Home/fleet projections and page controller. Injected sources, pins, recent navigation and agent activity combine into state for the shared Home page. Keep host widgets and duplicate fleet calculations outside home state; bind resources through [HomePageSource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.home/-home-page-source/index.html), pins through [HomePinStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.home/-home-pin-store/index.html) and actions through [HomePageActions](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.home/-home-page-actions/index.html).
 
+The session source reloads backend figures on graph changes and transport reconnection. Page-entry and error Retry requests share an in-flight load; hosts must not add their own refresh timers or reconnect handlers for these figures.
+
 # Package com.letta.mobile.data.lens
 
 The Work/Play presentation lens over common underlying data. It changes vocabulary and framing rather than creating separate agents, conversations or memory. Keep changes to underlying agents or memory outside lens selection; hosts map [LensDestination](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.lens/-lens-destination/index.html) and [WorkPlayMode](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.lens/-work-play-mode/index.html) to their navigation surfaces.
@@ -360,6 +362,8 @@ Named production JSON configurations for wire and persistence layers. Central co
 # Package com.letta.mobile.data.session
 
 Backend connection keys, session graph contracts and backend-scoped cache coordination. Session changes define repository/cache lifetime boundaries instead of leaving global state attached to obsolete backends. Keep stale process-global backend state outside resource graphs; construct graphs through [SessionRepositoryGraphFactory](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.session/-session-repository-graph-factory/index.html) and scope caches with [BackendConnectionKey](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.session/-backend-connection-key/index.html).
+
+The internal session-readiness projection lets page data sources follow connection changes through the session boundary without importing transport state types or adding their own platform observers.
 
 # Package com.letta.mobile.data.session.graph
 
