@@ -196,3 +196,28 @@ The artifacts are `api-contract-<commit>` (Linux) and
 never relabel one platform's dump as another. macOS uses its own compiler target
 root (`api/macos_arm64` or `api/macos_x64`); initialize it with `apiDump` before
 checking on a Mac. Linux and Windows are the CI-verified host contracts.
+
+To prepare both host snapshots from any workstation, dispatch the isolated
+capture workflow on the branch containing the intended API change:
+
+```bash
+gh workflow run api-contract-capture.yml --ref your-branch
+gh run list --workflow api-contract-capture.yml --branch your-branch
+gh run download RUN_ID --dir api-capture
+```
+
+The Linux/Windows jobs run only `apiDump` and upload actual compiler outputs with
+`source-commit.txt` and `host.txt`; they neither commit changes nor change the
+required checks. Verify the recorded source SHA matches your reviewed checkout.
+For each module, copy its `build/kotlin/abi` contents into the matching reference
+root (`api/linux_x64`, `api/mingw_x64`, or host-independent `api`), and its
+`build/api-contract/android.api` into `api-android/android.api`. Review and commit
+the resulting diff, then require both checks to pass. A failed capture publishes
+no artifact; resolve its compilation failure rather than accepting partial data.
+
+Before this workflow reaches the default branch (GitHub's prerequisite for
+manual dispatch), or for an explicit capture from a local commit, push that
+commit to a temporary `codex/api-capture/<name>` branch. The narrow push trigger
+runs the same capture jobs. Verify artifact provenance, then delete the temporary
+remote branch after retrieving the outputs. This does not bypass PR checks or
+publish a deployment.

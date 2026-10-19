@@ -1,0 +1,58 @@
+name: Capture API contracts for review
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["codex/api-capture/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+        working-directory: android-compose
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+      - name: Expose JDK 21 to Gradle
+        run: |
+          mkdir -p "$HOME/.gradle"
+          echo "org.gradle.java.installations.fromEnv=JAVA_HOME_21_X64" >> "$HOME/.gradle/gradle.properties"
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+        with:
+          cache-read-only: true
+      - name: Generate actual signatures without accepting them
+        run: ./gradlew --no-daemon --no-parallel --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process apiDump
+      - name: Record capture source
+        run: |
+          mkdir -p build/api-capture
+          git rev-parse HEAD > build/api-capture/source-commit.txt
+          printf '%s\n' '${{ runner.os }}' > build/api-capture/host.txt
+      - name: Upload compiler outputs for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-capture-${{ runner.os }}-${{ github.sha }}
+          path: |
+            android-compose/**/build/kotlin/abi/**
+            android-compose/**/build/api-contract/**
+            android-compose/build/api-capture/**
+          if-no-files-found: error
+          retention-days: 7
