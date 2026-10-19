@@ -363,6 +363,8 @@ Named production JSON configurations for wire and persistence layers. Central co
 
 Backend connection keys, session graph contracts and backend-scoped cache coordination. Session changes define repository/cache lifetime boundaries instead of leaving global state attached to obsolete backends. Keep stale process-global backend state outside resource graphs; construct graphs through [SessionRepositoryGraphFactory](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.session/-session-repository-graph-factory/index.html) and scope caches with [BackendConnectionKey](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.session/-backend-connection-key/index.html).
 
+The internal session-readiness projection lets page data sources follow connection changes through the session boundary without importing transport state types or adding their own platform observers.
+
 # Package com.letta.mobile.data.session.graph
 
 Shared host repository graph construction and session-client adapters. Explicit unserved repositories preserve unsupported-route behavior when a host cannot provide a backend capability. Keep unsupported sources explicit instead of fabricating host capabilities; bind clients through [HostAppServerClients](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.session.graph/-host-app-server-clients/index.html) and repository implementations through [HostRepositoryAdapters](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.session.graph/-host-repository-adapters/index.html).

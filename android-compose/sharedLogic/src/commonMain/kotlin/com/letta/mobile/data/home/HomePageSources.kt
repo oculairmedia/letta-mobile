@@ -12,8 +12,8 @@ import com.letta.mobile.runtime.RunId
 import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
+import com.letta.mobile.data.session.connectionReadiness
 import com.letta.mobile.data.storage.SecureSettingsStore
-import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -26,9 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -78,9 +76,7 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
                 reloadStats(graph)
                 coroutineScope {
                     launch { followCatalog(graph) }
-                    graph.channelTransport.state
-                        .map { it is ChannelTransportState.Connected }
-                        .distinctUntilChanged()
+                    graph.connectionReadiness()
                         .drop(1)
                         .collect { connected -> if (connected) reloadStats(graph) }
                 }

@@ -7707,6 +7707,7 @@ public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$Hom
 	public final fun getLambda$-858596876$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$1028033273$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$122529946$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$530305426$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/shell/pages/home/ComposableSingletons$HomePinnedGridKt {
