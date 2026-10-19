@@ -12,7 +12,7 @@ class ApiDocumentationPluginTest {
     lateinit var projectDir: File
 
     @Test
-    fun `aggregates KDoc with revision links and excludes internal declarations`() {
+    fun `aggregates module and package overviews with KDoc and revision links`() {
         projectDir.resolve("settings.gradle.kts").writeText("""
             rootProject.name = "api-fixture"
             include(":contract")
@@ -22,7 +22,18 @@ class ApiDocumentationPluginTest {
             repositories { mavenCentral() }
             dependencies { add("dokka", project(":contract")) }
         """.trimIndent())
+        projectDir.resolve("Module.md").writeText("""
+            # Module Letta Mobile API
+            Shared contracts connect the product hosts through portable Kotlin domain and rendering APIs.
+        """.trimIndent())
         val module = projectDir.resolve("contract").apply { mkdirs() }
+        module.resolve("Module.md").writeText("""
+            # Module :contract
+            Extension authors implement this contract while the host owns lifecycle and capability enforcement.
+
+            # Package example
+            This fixture demonstrates how module and package overviews reach the generated API publication.
+        """.trimIndent())
         module.resolve("build.gradle.kts").writeText("""
             plugins {
                 id("org.jetbrains.kotlin.jvm")
@@ -52,5 +63,8 @@ class ApiDocumentationPluginTest {
         assertTrue(clock.contains("A clock carried by a shared contract."))
         assertTrue(clock.contains("/tree/fixture-sha/"))
         assertFalse(pages.any { it.path.contains("hidden-clock") })
+        assertTrue(publication.resolve("index.html").readText().contains("Shared contracts connect the product hosts"))
+        assertTrue(pages.any { it.readText().contains("Extension authors implement this contract") })
+        assertTrue(pages.any { it.readText().contains("This fixture demonstrates how module and package overviews") })
     }
 }
