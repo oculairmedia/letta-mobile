@@ -114,6 +114,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Live external tools and re-advertisement](architecture/live-external-tools.md)
 - [Message Sync Architecture Migration Plan](architecture/message-sync-migration.md)
 - [Mobile embedded bridge and desktop runtime hosting](architecture/mobile-embedded-bridge-vs-desktop.md)
+- [Plugin-first application architecture](architecture/plugin-first-application.md)
 - [POC Validation Results](architecture/poc-validation-results.md)
 - [Progressive Composer Affordances: Design &amp; Migration Plan](architecture/progressive-composer-affordances.md)
 - [Android Project Work API Contract](architecture/project-work-api-android-contract.md)
