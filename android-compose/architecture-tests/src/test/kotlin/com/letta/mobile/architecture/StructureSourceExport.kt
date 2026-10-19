@@ -1,5 +1,6 @@
 package com.letta.mobile.architecture
 
+import com.lemonappdev.konsist.api.declaration.KoBaseDeclaration
 import com.lemonappdev.konsist.api.declaration.KoClassDeclaration
 import com.lemonappdev.konsist.api.declaration.KoFileDeclaration
 import com.lemonappdev.konsist.api.declaration.KoInterfaceDeclaration
@@ -35,26 +36,27 @@ internal object StructureSourceExport {
             // candidate, never proof of non-use: reflection and external consumers are invisible.
             val mentions = Regex("[A-Za-z_][A-Za-z_0-9]*").findAll(file.text).map { it.value }.toSortedSet()
             add(record("file", *attributes, "mentions" to mentions.joinToString(" ")))
-            file.declarations(includeNested = true, includeLocal = false).forEach { declaration ->
-                val kind = when (declaration) {
-                    is KoClassDeclaration -> "class"
-                    is KoInterfaceDeclaration -> "interface"
-                    is KoObjectDeclaration -> "object"
-                    else -> null
-                }
-                if (kind != null) {
-                    val name = (declaration as KoFullyQualifiedNameProvider).fullyQualifiedName ?: return@forEach
-                    add(record("type", *attributes, "name" to name, "kind" to kind))
-                }
-            }
-            file.declarations(includeNested = false, includeLocal = false).forEach { declaration ->
-                val visibility = declaration as? KoVisibilityModifierProvider
-                val name = (declaration as? KoNameProvider)?.name
-                if (visibility?.hasPublicOrDefaultModifier == true && name != null) {
-                    add(record("public", *attributes, "name" to name))
-                }
-            }
+            addAll(file.declarations(includeNested = true, includeLocal = false).mapNotNull { typeRecord(it, attributes) })
+            addAll(file.declarations(includeNested = false, includeLocal = false).mapNotNull { publicRecord(it, attributes) })
         }
+    }
+
+    private fun typeRecord(declaration: KoBaseDeclaration, attributes: Array<Pair<String, String>>): String? {
+        val kind = when (declaration) {
+            is KoClassDeclaration -> "class"
+            is KoInterfaceDeclaration -> "interface"
+            is KoObjectDeclaration -> "object"
+            else -> return null
+        }
+        val name = (declaration as KoFullyQualifiedNameProvider).fullyQualifiedName ?: return null
+        return record("type", *attributes, "name" to name, "kind" to kind)
+    }
+
+    private fun publicRecord(declaration: KoBaseDeclaration, attributes: Array<Pair<String, String>>): String? {
+        val visibility = declaration as? KoVisibilityModifierProvider
+        if (visibility?.hasPublicOrDefaultModifier != true) return null
+        val name = (declaration as? KoNameProvider)?.name ?: return null
+        return record("public", *attributes, "name" to name)
     }
 
     internal fun record(type: String, vararg fields: Pair<String, String>): String =

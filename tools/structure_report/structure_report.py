@@ -46,39 +46,62 @@ def declaration_candidates(records):
     return [row for row in declarations if not (mentions[row['name']] - {row['path']})]
 
 
+def grouped(records, key):
+    result = defaultdict(list)
+    for row in records:
+        result[row[key]].append(row)
+    return result
+
+
+def mirrored_names(names):
+    result = []
+    for name, declarations in sorted(names.items()):
+        prefix = next((prefix for prefix in ('Desktop', 'Web') if name.startswith(prefix)), None)
+        if prefix is None:
+            continue
+        shared = 'Shared' + name.removeprefix(prefix)
+        if shared in names:
+            paths = sorted({row['path'] for row in declarations + names[shared]})
+            result.append({'platform': name, 'shared': shared, 'paths': paths})
+    return result
+
+
 def name_candidates(types):
     names = defaultdict(list)
     for row in types:
         names[row['name'].rsplit('.', 1)[-1]].append(row)
-    mirrors, helpers = [], []
-    for name, declarations in sorted(names.items()):
-        for prefix in ('Desktop', 'Web'):
-            shared = 'Shared' + name.removeprefix(prefix)
-            if name.startswith(prefix) and shared in names:
-                mirrors.append({'platform': name, 'shared': shared,
-                                'paths': sorted({row['path'] for row in declarations + names[shared]})})
-        if any(part in name for part in ('TestTags', 'Probe', 'Smoke', 'Sample')):
-            helpers.extend(declarations)
-    return mirrors, helpers
+    helpers = [row for name, declarations in names.items() if helper_name(name) for row in declarations]
+    return mirrored_names(names), helpers
+
+
+def helper_name(name):
+    return any(part in name for part in ('TestTags', 'Probe', 'Smoke', 'Sample'))
+
+
+def package_type_counts(types):
+    # Actual/expect declarations and platform implementations count once per module/name.
+    return {package: len({(row['module'], row['kind'], row['name']) for row in declarations})
+            for package, declarations in grouped(types, 'package').items()}
+
+
+def package_metrics(files, types, edges):
+    counts = package_type_counts(types)
+    fan_in, fan_out = defaultdict(set), defaultdict(set)
+    for source, target in edges:
+        fan_in[target].add(source)
+        fan_out[source].add(target)
+    return [{'package': package, 'types': counts.get(package, 0),
+             'files': len({row['path'] for row in rows}),
+             'fanIn': len(fan_in[package]), 'fanOut': len(fan_out[package])}
+            for package, rows in sorted(grouped(files, 'package').items())]
 
 
 def metrics(records):
-    package_types, package_files = defaultdict(set), defaultdict(set)
-    types = [row for row in records if row['type'] == 'type']
-    for row in records:
-        if row['type'] == 'file':
-            package_files[row['package']].add(row['path'])
-    for row in types:
-        # Actual/expect declarations and platform implementations count once per module/name.
-        package_types[row['package']].add((row['module'], row['kind'], row['name']))
-    edges = {(row['from'], row['to']) for row in records if row['type'] == 'importEdge'}
-    packages = []
-    for package, files in sorted(package_files.items()):
-        packages.append({'package': package, 'types': len(package_types[package]), 'files': len(files),
-                         'fanIn': len({a for a, b in edges if b == package}),
-                         'fanOut': len({b for a, b in edges if a == package})})
-    mirrors, helpers = name_candidates(types)
-    return {'packages': packages, 'cyclicImportEdges': cyclic_edges(edges),
+    kinds = grouped(records, 'type')
+    edges = {(row['from'], row['to']) for row in kinds['importEdge']}
+    mirrors, helpers = name_candidates(kinds['type'])
+    return {'packages': package_metrics(kinds['file'], kinds['type'], edges),
+            'cyclicImportEdges': cyclic_edges(edges),
             'zeroOtherFileMentionCandidates': declaration_candidates(records),
             'mirroredNameCandidates': mirrors, 'helperNameCandidates': helpers}
 
@@ -90,32 +113,42 @@ def expected_baseline(report):
             'cyclicImportEdges': report['cyclicImportEdges']}
 
 
-def validate_baseline_shape(baseline):
-    if baseline.get('schema') != 1 or baseline.get('defaultTypeLimit') != DEFAULT_TYPE_LIMIT:
-        raise ValueError('Unsupported baseline schema or changed default type limit')
-    limits = baseline['packageTypeLimits']
+def validate_type_limits(limits):
     if any(type(value) is not int or value <= DEFAULT_TYPE_LIMIT for value in limits.values()):
         raise ValueError('Type limits must be integers above the default')
+
+
+def validate_baseline_shape(baseline):
+    if (baseline.get('schema'), baseline.get('defaultTypeLimit')) != (1, DEFAULT_TYPE_LIMIT):
+        raise ValueError('Unsupported baseline schema or changed default type limit')
+    validate_type_limits(baseline['packageTypeLimits'])
     cycles = baseline['cyclicImportEdges']
     if cycles != sorted(set(cycles)):
         raise ValueError('Cyclic import edges must be sorted and unique')
 
 
-def baseline_drift(actual, baseline):
-    validate_baseline_shape(baseline)
+def size_drift(actual, baseline):
     problems = []
-    for package in sorted(actual['packageTypeLimits'].keys() | baseline['packageTypeLimits'].keys()):
-        current = actual['packageTypeLimits'].get(package, DEFAULT_TYPE_LIMIT)
-        allowed = baseline['packageTypeLimits'].get(package, DEFAULT_TYPE_LIMIT)
+    for package in sorted(actual.keys() | baseline.keys()):
+        current = actual.get(package, DEFAULT_TYPE_LIMIT)
+        allowed = baseline.get(package, DEFAULT_TYPE_LIMIT)
         if current > allowed:
             problems.append(f'{package}: {current} types exceeds {allowed}; split the package')
         elif current < allowed:
             problems.append(f'{package}: lower/remove stale type baseline {allowed} to {current}')
-    new = set(actual['cyclicImportEdges']) - set(baseline['cyclicImportEdges'])
-    stale = set(baseline['cyclicImportEdges']) - set(actual['cyclicImportEdges'])
-    problems.extend(f'New cyclic import edge: {edge}' for edge in sorted(new))
-    problems.extend(f'Remove stale cyclic edge baseline: {edge}' for edge in sorted(stale))
     return problems
+
+
+def cycle_drift(actual, baseline):
+    new, stale = set(actual) - set(baseline), set(baseline) - set(actual)
+    return ([f'New cyclic import edge: {edge}' for edge in sorted(new)] +
+            [f'Remove stale cyclic edge baseline: {edge}' for edge in sorted(stale)])
+
+
+def baseline_drift(actual, baseline):
+    validate_baseline_shape(baseline)
+    return (size_drift(actual['packageTypeLimits'], baseline['packageTypeLimits']) +
+            cycle_drift(actual['cyclicImportEdges'], baseline['cyclicImportEdges']))
 
 
 def git(root, *arguments):
