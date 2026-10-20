@@ -7,6 +7,7 @@ import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.InMemoryCanvasArchiveStore
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.CoroutineScope
@@ -61,12 +62,12 @@ class CanvasLibraryController(
     }
 
     /** Creates a board using the host's injected sync bindings; refresh retry never creates another. */
-    fun createNew(agentId: String?, onReady: (CanvasSession) -> Unit) {
+    fun createNew(agentId: AgentId?, onReady: (CanvasSession) -> Unit) {
         execute("create", {
             val ordinal = store.listAll().size + 1
             CanvasSession.create(store, CanvasCreateOptions(
                 title = "Canvas $ordinal",
-                agentId = agentId,
+                agentId = agentId?.value,
                 opLog = options.opLog,
                 syncTransport = options.syncTransport,
                 clock = options.clock,

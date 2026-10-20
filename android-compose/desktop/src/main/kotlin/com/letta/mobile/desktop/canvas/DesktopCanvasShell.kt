@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.desktop.OpenDesktopCanvasParams
 import com.letta.mobile.desktop.openDesktopCanvasSession
 import com.letta.mobile.ui.shell.workspace.ShellCanvasOwner
@@ -30,7 +31,7 @@ internal class DesktopCanvasShell(
 
     fun open(id: CanvasId) = library.open(id) { activeSession = it }
 
-    fun createNew(agentId: String?) = library.createNew(agentId) { activeSession = it }
+    fun createNew(agentId: String?) = library.createNew(agentId?.let(::AgentId)) { activeSession = it }
 
     /** The conversation's own canvas, created on first open. */
     fun openForConversation(owner: ShellCanvasOwner) = openDesktopCanvasSession(
