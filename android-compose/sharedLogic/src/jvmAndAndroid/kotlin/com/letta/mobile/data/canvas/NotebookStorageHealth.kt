@@ -271,6 +271,11 @@ internal class NotebookStorageHealth(
 
     val isReadOnly: Boolean get() = readOnlyReason != null
 
+    /** A transient read deadline keeps the document intact and retryable; it does not quarantine it. */
+    fun readTimedOut(key: String, error: Throwable) {
+        record(CanvasStorageFault.Kind.LOAD_FAILED, Subject(key), "Notebook lookup timed out; retry loading it", error)
+    }
+
     /**
      * [key]'s board layout is newer than this build: refuse to write it, so an older reader does
      * not overwrite fields it cannot see, and say so once.

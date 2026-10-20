@@ -7,7 +7,7 @@ import com.letta.mobile.util.Telemetry
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
 import org.automerge.repo.DocumentId
 
 /** Canvas view of the notebook repository. Canvas identity and metadata live in each notebook CRDT,
@@ -21,7 +21,7 @@ class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) :
     CanvasDocumentStore, CanvasDeletedElementStore, CanvasStorageHealth {
     override val storageFaults: StateFlow<List<CanvasStorageFault>> get() = notebooks.storageFaults
 
-    private suspend fun <T> locked(action: () -> T): T = withContext(Dispatchers.IO) { notebooks.withCanvasLock(action) }
+    private suspend fun <T> locked(action: () -> T): T = runInterruptible(Dispatchers.IO) { notebooks.withCanvasLock(action) }
 
     /**
      * Which notebook last held each canvas. Only a hint: a hit is checked against that notebook's

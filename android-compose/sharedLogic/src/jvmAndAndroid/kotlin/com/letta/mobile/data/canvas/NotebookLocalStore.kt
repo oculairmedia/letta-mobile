@@ -11,6 +11,7 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
@@ -287,7 +288,14 @@ class NotebookLocalStore(
     fun open(id: DocumentId): DocHandle? {
         health.awaitPrepared()
         if (health.isQuarantined(id.stableKey()) || health.isRetired(id.stableKey())) return null
-        return repo.find(id).get(TIMEOUT_SECONDS, TimeUnit.SECONDS).orElse(null)
+        return try {
+            repo.find(id).get(TIMEOUT_SECONDS, TimeUnit.SECONDS).orElse(null)
+        } catch (timeout: TimeoutException) {
+            val key = id.stableKey()
+            val failure = TimeoutException("Notebook $key did not load within $TIMEOUT_SECONDS seconds").apply { initCause(timeout) }
+            health.readTimedOut(key, failure)
+            throw failure
+        }
     }
 
     private fun remember(id: DocumentId, doc: CanvasDocument) = health.rememberCanvas(id.stableKey(), doc.id)

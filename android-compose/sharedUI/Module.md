@@ -28,6 +28,10 @@ Agent-editor page, identity section and adaptive panes. Supply the editor contro
 
 Interactive canvas layers, gestures, cameras, selection, notes, formatting and synchronization status. Compose CanvasWorkspace around a supplied CanvasSession and asset/image bindings; durable document storage and replication belong to sharedLogic rather than gesture handlers.
 
+# Package com.letta.mobile.ui.canvas.library
+
+Canvas-library status presented through the shared overlay host. `CanvasLibraryNotice` keeps storage failures visible, offers reload-only retry, and withdraws the notice after recovery. Hosts supply the shared library controller; keep persistence and retry policy in sharedLogic rather than the composable.
+
 # Package com.letta.mobile.ui.canvas.plugin
 
 Plugin element renderers, fallback cards and live-view host contracts. Extend through PluginElementRenderers and PluginViewHost composition locals; plugin execution, capability enforcement and sandbox setup belong to the runtime/host, not fallback rendering.
