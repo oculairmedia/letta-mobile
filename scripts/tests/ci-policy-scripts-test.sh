@@ -165,14 +165,12 @@ branch_protection="$(
     --jq '.required_status_checks.contexts | sort | join(",")' \
     2>/dev/null || echo ''
 )"
-# perf-gate left the required set when it moved to nightly + main. Until the
-# live protection rule is updated, tolerate the old set with a loud note so this
-# suite does not go red on a repo-admin setting it cannot change.
-if [[ "$branch_protection" == 'build-apk-pass,perf-gate,shared-multiplatform,test' ]]; then
-  echo "ci-policy-scripts-test: branch protection still requires perf-gate; remove it (perf-gate is nightly + main now)" >&2
-elif [[ -n "$branch_protection" ]]; then
+# Exact match, no tolerated legacy sets: a tolerance branch would let this
+# suite pass while main silently lacks a required gate (detekt was promoted on
+# 2026-10-20; perf-gate left when it moved to nightly + main).
+if [[ -n "$branch_protection" ]]; then
   assert_eq "$branch_protection" \
-    'build-apk-pass,shared-multiplatform,test'
+    'build-apk-pass,detekt,shared-multiplatform,test'
 else
   echo "ci-policy-scripts-test: skipping branch-protection assertion (gh unavailable)" >&2
 fi

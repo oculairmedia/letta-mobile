@@ -207,7 +207,7 @@ without updating `baselines.json`.
 
 `perf-gate` is deliberately **not** in branch protection: it runs nightly and
 on main pushes (see "When it runs"). The required set is `test`,
-`build-apk-pass` and `shared-multiplatform` (`scripts/bootstrap-branch-protection.sh`).
+`build-apk-pass`, `shared-multiplatform` and `detekt` (`scripts/bootstrap-branch-protection.sh`).
 `perf-scripts` is not required either; it is a cheap, honest self-test.
 
 ## Known quirks
