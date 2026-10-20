@@ -5,6 +5,7 @@ import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.InMemoryCanvasArchiveStore
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.AgentId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -17,6 +18,30 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CanvasLibraryControllerTest {
+    @Test
+    fun retryDoesNotRepeatCreationThatFailedAfterPersisting() = runTest {
+        val backing = InMemoryCanvasDocumentStore()
+        var writes = 0
+        val store = object : CanvasDocumentStore by backing {
+            override suspend fun upsert(doc: CanvasDocument) {
+                writes++
+                backing.upsert(doc)
+                error("Storage acknowledgement timed out")
+            }
+        }
+        val library = CanvasLibraryController(store, backgroundScope)
+        var navigated = false
+        library.createNew(AgentId("agent")) { navigated = true }
+        runCurrent()
+        assertNotNull(library.state.value.error)
+        assertFalse(navigated)
+        library.refresh()
+        runCurrent()
+        assertEquals(1, writes)
+        assertEquals("agent", library.state.value.documents.single().agentId)
+        assertNull(library.state.value.error)
+    }
+
     @Test
     fun failedRefreshRetainsBoardsAndArchiveThenRetryRecovers() = runTest {
         val board = CanvasDocument(id = CanvasId("retained"), title = "Keep me")

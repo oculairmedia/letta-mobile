@@ -706,6 +706,10 @@ public final class com/letta/mobile/ui/canvas/WheelZoomRegionsKt {
 	public static final fun getLocalWheelZoomRegions ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
+public final class com/letta/mobile/ui/canvas/library/CanvasLibraryNoticeKt {
+	public static final fun CanvasLibraryNotice (Lcom/letta/mobile/data/canvas/library/CanvasLibraryController;Landroidx/compose/runtime/Composer;I)V
+}
+
 public final class com/letta/mobile/ui/canvas/plugin/CanvasPluginLayerKt {
 	public static final fun CanvasPluginLayer (Lcom/letta/mobile/ui/canvas/plugin/PluginBoard;Lio/ak1/drawbox/domain/model/Viewport;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/canvas/plugin/PluginBoardSelection;Landroidx/compose/runtime/Composer;II)V
 	public static final fun rememberPluginBoard (Lcom/letta/mobile/data/canvas/CanvasSession;Lcom/letta/mobile/data/canvas/CanvasDocument;Lcom/letta/mobile/data/storage/AssetStore;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/canvas/plugin/PluginBoard;

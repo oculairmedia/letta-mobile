@@ -24512,6 +24512,40 @@ final class com.letta.mobile.data.canvas.compose/WorstCaseWrap { // com.letta.mo
     final fun lines(kotlin/String): kotlin/Int // com.letta.mobile.data.canvas.compose/WorstCaseWrap.lines|lines(kotlin.String){}[0]
 }
 
+final class com.letta.mobile.data.canvas.library/CanvasLibraryController { // com.letta.mobile.data.canvas.library/CanvasLibraryController|null[0]
+    constructor <init>(com.letta.mobile.data.canvas/CanvasDocumentStore, kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.canvas/CanvasArchiveStore = ..., com.letta.mobile.data.canvas/CanvasConversationOptions = ...) // com.letta.mobile.data.canvas.library/CanvasLibraryController.<init>|<init>(com.letta.mobile.data.canvas.CanvasDocumentStore;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.canvas.CanvasArchiveStore;com.letta.mobile.data.canvas.CanvasConversationOptions){}[0]
+
+    final val state // com.letta.mobile.data.canvas.library/CanvasLibraryController.state|{}state[0]
+        final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.canvas.library/CanvasLibraryState> // com.letta.mobile.data.canvas.library/CanvasLibraryController.state.<get-state>|<get-state>(){}[0]
+
+    final fun createNew(com.letta.mobile.data.model/AgentId?, kotlin/Function1<com.letta.mobile.data.canvas/CanvasSession, kotlin/Unit>) // com.letta.mobile.data.canvas.library/CanvasLibraryController.createNew|createNew(com.letta.mobile.data.model.AgentId?;kotlin.Function1<com.letta.mobile.data.canvas.CanvasSession,kotlin.Unit>){}[0]
+    final fun open(com.letta.mobile.data.model/CanvasId, kotlin/Function1<com.letta.mobile.data.canvas/CanvasSession, kotlin/Unit>) // com.letta.mobile.data.canvas.library/CanvasLibraryController.open|open(com.letta.mobile.data.model.CanvasId;kotlin.Function1<com.letta.mobile.data.canvas.CanvasSession,kotlin.Unit>){}[0]
+    final fun refresh() // com.letta.mobile.data.canvas.library/CanvasLibraryController.refresh|refresh(){}[0]
+    final fun setArchived(com.letta.mobile.data.model/CanvasId, kotlin/Boolean) // com.letta.mobile.data.canvas.library/CanvasLibraryController.setArchived|setArchived(com.letta.mobile.data.model.CanvasId;kotlin.Boolean){}[0]
+}
+
+final class com.letta.mobile.data.canvas.library/CanvasLibraryState { // com.letta.mobile.data.canvas.library/CanvasLibraryState|null[0]
+    constructor <init>(kotlin.collections/List<com.letta.mobile.data.canvas/CanvasDocument> = ..., kotlin.collections/Set<com.letta.mobile.data.model/CanvasId> = ..., kotlin/Boolean = ..., kotlin/String? = ...) // com.letta.mobile.data.canvas.library/CanvasLibraryState.<init>|<init>(kotlin.collections.List<com.letta.mobile.data.canvas.CanvasDocument>;kotlin.collections.Set<com.letta.mobile.data.model.CanvasId>;kotlin.Boolean;kotlin.String?){}[0]
+
+    final val archived // com.letta.mobile.data.canvas.library/CanvasLibraryState.archived|{}archived[0]
+        final fun <get-archived>(): kotlin.collections/Set<com.letta.mobile.data.model/CanvasId> // com.letta.mobile.data.canvas.library/CanvasLibraryState.archived.<get-archived>|<get-archived>(){}[0]
+    final val documents // com.letta.mobile.data.canvas.library/CanvasLibraryState.documents|{}documents[0]
+        final fun <get-documents>(): kotlin.collections/List<com.letta.mobile.data.canvas/CanvasDocument> // com.letta.mobile.data.canvas.library/CanvasLibraryState.documents.<get-documents>|<get-documents>(){}[0]
+    final val error // com.letta.mobile.data.canvas.library/CanvasLibraryState.error|{}error[0]
+        final fun <get-error>(): kotlin/String? // com.letta.mobile.data.canvas.library/CanvasLibraryState.error.<get-error>|<get-error>(){}[0]
+    final val isLoading // com.letta.mobile.data.canvas.library/CanvasLibraryState.isLoading|{}isLoading[0]
+        final fun <get-isLoading>(): kotlin/Boolean // com.letta.mobile.data.canvas.library/CanvasLibraryState.isLoading.<get-isLoading>|<get-isLoading>(){}[0]
+
+    final fun component1(): kotlin.collections/List<com.letta.mobile.data.canvas/CanvasDocument> // com.letta.mobile.data.canvas.library/CanvasLibraryState.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/Set<com.letta.mobile.data.model/CanvasId> // com.letta.mobile.data.canvas.library/CanvasLibraryState.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.data.canvas.library/CanvasLibraryState.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // com.letta.mobile.data.canvas.library/CanvasLibraryState.component4|component4(){}[0]
+    final fun copy(kotlin.collections/List<com.letta.mobile.data.canvas/CanvasDocument> = ..., kotlin.collections/Set<com.letta.mobile.data.model/CanvasId> = ..., kotlin/Boolean = ..., kotlin/String? = ...): com.letta.mobile.data.canvas.library/CanvasLibraryState // com.letta.mobile.data.canvas.library/CanvasLibraryState.copy|copy(kotlin.collections.List<com.letta.mobile.data.canvas.CanvasDocument>;kotlin.collections.Set<com.letta.mobile.data.model.CanvasId>;kotlin.Boolean;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.library/CanvasLibraryState.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.library/CanvasLibraryState.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.canvas.library/CanvasLibraryState.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.canvas.plugin/CanvasPluginElement { // com.letta.mobile.data.canvas.plugin/CanvasPluginElement|null[0]
     constructor <init>(kotlin/String, kotlin/String, kotlin/Int = ..., com.letta.mobile.data.canvas/CanvasDocumentFrame? = ..., com.letta.mobile.data.canvas/CanvasGeometryOwner? = ..., kotlin/String? = ..., kotlinx.serialization.json/JsonObject = ..., com.letta.mobile.data.canvas.plugin/CanvasPluginSnapshot? = ..., com.letta.mobile.data.canvas.plugin/CanvasPluginFallback, kotlinx.serialization.json/JsonObject? = ...) // com.letta.mobile.data.canvas.plugin/CanvasPluginElement.<init>|<init>(kotlin.String;kotlin.String;kotlin.Int;com.letta.mobile.data.canvas.CanvasDocumentFrame?;com.letta.mobile.data.canvas.CanvasGeometryOwner?;kotlin.String?;kotlinx.serialization.json.JsonObject;com.letta.mobile.data.canvas.plugin.CanvasPluginSnapshot?;com.letta.mobile.data.canvas.plugin.CanvasPluginFallback;kotlinx.serialization.json.JsonObject?){}[0]
 
