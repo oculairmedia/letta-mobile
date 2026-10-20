@@ -61,7 +61,7 @@ internal class IrohObserverIngestor(
 ) {
     /** Observer terminal fallbacks waiting out their grace window, one per engine-owned turn. */
     private val pendingObserverTerminals = java.util.concurrent.ConcurrentHashMap<String, Job>()
-    private val observedTurns = ObservedTurnTracker()
+    private val observedTurns = ObservedTurnTracker<ConversationId>()
 
     private val observerGeneration = atomic(0)
 
@@ -243,7 +243,7 @@ internal class IrohObserverIngestor(
         RuntimeEventServerFrameMapper.map(
             payload = RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Completed),
             context = RuntimeEventServerFrameMapper.Context(
-                agentId = current.agentId, conversationId = current.conversationId,
+                agentId = current.agentId, conversationId = current.conversationId.value,
                 turnId = current.turnId, runId = current.runId,
             ),
         ).forEach { emitBoth(it) }
@@ -350,7 +350,7 @@ internal class IrohObserverIngestor(
         val active = observedTurns.active(ConversationId(scope.conversationId))
         val effectiveTurn = wireTurn ?: active?.turnId
         val effectiveRun = wireRun ?: active?.runId
-        val effective = ObservedTurn(scope.agentId, scope.conversationId, effectiveTurn, effectiveRun)
+        val effective = ObservedTurn(scope.agentId, ConversationId(scope.conversationId), effectiveTurn, effectiveRun)
         if (isTerminalDeltaObject(delta) && observedTurns.isCompleted(effective)) return
         // The observer has no turn of its own: a row is named by the host's stamp on the frame, and the
         // context carries only what the frame itself says (or the active observed turn for unstamped
@@ -361,7 +361,9 @@ internal class IrohObserverIngestor(
             observedTurns.markCompleted(effective)
         } else if (delta != null) {
             observedTurns.recordDelta(
-                ObservedTurn(scope.agentId, scope.conversationId, wireTurn, wireRun, isContinuingStopReason(delta)),
+                ObservedTurn(
+                    scope.agentId, ConversationId(scope.conversationId), wireTurn, wireRun, isContinuingStopReason(delta),
+                ),
                 delta["message_type"]?.jsonPrimitive?.contentOrNull,
             )
         }
@@ -373,7 +375,7 @@ internal class IrohObserverIngestor(
         received: AppServerReceivedFrame,
     ) {
         val incoming = ObservedTurn(
-            scope.agentId, scope.conversationId,
+            scope.agentId, ConversationId(scope.conversationId),
             turnFinished.turnId.takeIf { it.isNotBlank() },
             turnFinished.runId?.takeIf { it.isNotBlank() },
         )

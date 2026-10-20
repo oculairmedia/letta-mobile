@@ -1,18 +1,17 @@
 package com.letta.mobile.data.runtime.observer
 
-import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
 /** Identity and round boundary of a passively observed conversation turn. */
-internal data class ObservedTurn(
+internal data class ObservedTurn<Conversation : Any>(
     val agentId: String,
-    val conversationId: String,
+    val conversationId: Conversation,
     val turnId: String?,
     val runId: String?,
     val roundContinues: Boolean = false,
 ) {
-    fun after(previous: ObservedTurn?, messageType: String?): ObservedTurn {
+    fun after(previous: ObservedTurn<Conversation>?, messageType: String?): ObservedTurn<Conversation> {
         val sameTurn = previous?.takeIf { canContinue(it) }
         return copy(
             turnId = turnId ?: sameTurn?.turnId,
@@ -21,11 +20,11 @@ internal data class ObservedTurn(
         )
     }
 
-    private fun canContinue(previous: ObservedTurn): Boolean {
+    private fun canContinue(previous: ObservedTurn<Conversation>): Boolean {
         return turnId == null || previous.turnId == null || previous.turnId == turnId
     }
 
-    private fun continuesRound(previous: ObservedTurn?, messageType: String?): Boolean {
+    private fun continuesRound(previous: ObservedTurn<Conversation>?, messageType: String?): Boolean {
         return when (messageType) {
             "stop_reason" -> roundContinues
             "approval_request_message" -> true
@@ -34,28 +33,28 @@ internal data class ObservedTurn(
         }
     }
 
-    fun matches(other: ObservedTurn): Boolean {
+    fun matches(other: ObservedTurn<Conversation>): Boolean {
         if (turnId != null && turnId != other.turnId) return false
         return runId == null || runId == other.runId
     }
 }
 
-/** Bounded completion history; duplicate terminals never clear a newer active turn. */
-internal class ObservedTurnTracker {
+/** Bounded completion history keyed by the caller's conversation identity type. */
+internal class ObservedTurnTracker<Conversation : Any> {
     private val lock = SynchronizedObject()
-    private val activeByConversation = HashMap<String, ObservedTurn>()
+    private val activeByConversation = HashMap<Conversation, ObservedTurn<Conversation>>()
     private val completedTurnIds = LinkedHashSet<String>()
     private val completedRunIds = LinkedHashSet<String>()
-    private val completedWithoutTurnConversations = HashSet<String>()
+    private val completedWithoutTurnConversations = HashSet<Conversation>()
 
-    fun active(conversation: ConversationId): ObservedTurn? {
-        return synchronized(lock) { activeByConversation[conversation.value] }
+    fun active(conversation: Conversation): ObservedTurn<Conversation>? {
+        return synchronized(lock) { activeByConversation[conversation] }
     }
 
-    fun clearConversation(conversation: ConversationId) {
+    fun clearConversation(conversation: Conversation) {
         synchronized(lock) {
-            activeByConversation.remove(conversation.value)
-            completedWithoutTurnConversations.remove(conversation.value)
+            activeByConversation.remove(conversation)
+            completedWithoutTurnConversations.remove(conversation)
         }
     }
 
@@ -68,11 +67,11 @@ internal class ObservedTurnTracker {
         }
     }
 
-    fun isCompleted(incoming: ObservedTurn): Boolean {
+    fun isCompleted(incoming: ObservedTurn<Conversation>): Boolean {
         return synchronized(lock) { isCompletedLocked(incoming) }
     }
 
-    fun resolveTerminal(incoming: ObservedTurn): ObservedTurn? {
+    fun resolveTerminal(incoming: ObservedTurn<Conversation>): ObservedTurn<Conversation>? {
         return synchronized(lock) {
             val active = activeByConversation[incoming.conversationId]
             val effective = incoming.copy(
@@ -84,7 +83,7 @@ internal class ObservedTurnTracker {
         }
     }
 
-    private fun consumeCompletedTurnFinished(incoming: ObservedTurn): Boolean {
+    private fun consumeCompletedTurnFinished(incoming: ObservedTurn<Conversation>): Boolean {
         val closedWithoutTurn = completedWithoutTurnConversations.remove(incoming.conversationId)
         val completedTurn = incoming.turnId?.let { it in completedTurnIds } == true
         val completedRun = incoming.runId?.let { it in completedRunIds } == true
@@ -97,7 +96,7 @@ internal class ObservedTurnTracker {
         return alreadyDone
     }
 
-    fun markCompleted(incoming: ObservedTurn) {
+    fun markCompleted(incoming: ObservedTurn<Conversation>) {
         synchronized(lock) {
             activeByConversation.remove(incoming.conversationId)
             rememberBounded(completedTurnIds, incoming.turnId)
@@ -110,7 +109,7 @@ internal class ObservedTurnTracker {
         }
     }
 
-    fun recordDelta(incoming: ObservedTurn, messageType: String?) {
+    fun recordDelta(incoming: ObservedTurn<Conversation>, messageType: String?) {
         synchronized(lock) {
             if (isCompletedLocked(incoming)) return@synchronized
             if (messageType == null) return@synchronized
@@ -122,16 +121,16 @@ internal class ObservedTurnTracker {
         }
     }
 
-    fun completeOnIdleLoop(conversation: ConversationId): ObservedTurn? {
+    fun completeOnIdleLoop(conversation: Conversation): ObservedTurn<Conversation>? {
         return synchronized(lock) {
-            val current = activeByConversation[conversation.value] ?: return@synchronized null
+            val current = activeByConversation[conversation] ?: return@synchronized null
             if (current.roundContinues) return@synchronized null
             markCompleted(current)
             current
         }
     }
 
-    private fun isCompletedLocked(incoming: ObservedTurn): Boolean {
+    private fun isCompletedLocked(incoming: ObservedTurn<Conversation>): Boolean {
         return when {
             incoming.turnId != null -> incoming.turnId in completedTurnIds
             incoming.runId != null -> incoming.runId in completedRunIds
