@@ -64,4 +64,53 @@ internal abstract class IrohObserverFixture {
         recordFrameOwnership = { _, _ -> },
     )
 
+    protected data class TerminalFrameSpec(
+        val agentId: String,
+        val conversationId: String,
+        val seq: Long,
+        val turnId: String,
+        val runId: String? = null,
+        val stopReason: String = "end_turn",
+    )
+
+    protected fun turnFinishedFrame(spec: TerminalFrameSpec): AppServerReceivedFrame {
+        val runField = spec.runId?.let { """"run_id": "$it",""" } ?: ""
+        val body = """
+            {
+              "type": "turn_finished",
+              "runtime": {"agent_id": "${spec.agentId}", "conversation_id": "${spec.conversationId}"},
+              "event_seq": ${spec.seq},
+              "emitted_at": "2026-07-09T00:00:0${spec.seq}Z",
+              "idempotency_key": "obs-fin-${spec.conversationId}-${spec.seq}",
+              "turn_id": "${spec.turnId}",
+              $runField
+              "stop_reason": "${spec.stopReason}"
+            }
+        """.trimIndent()
+        return AppServerProtocol.decodeFrame(body, AppServerChannel.Stream)
+    }
+
+    protected data class LoopFrameSpec(
+        val agentId: String,
+        val conversationId: String,
+        val seq: Long,
+        val status: String,
+        val activeRunIds: List<String> = emptyList(),
+    )
+
+    protected fun loopStatusFrame(spec: LoopFrameSpec): AppServerReceivedFrame {
+        val runsJson = spec.activeRunIds.joinToString(",") { "\"$it\"" }
+        val body = """
+            {
+              "type": "update_loop_status",
+              "runtime": {"agent_id": "${spec.agentId}", "conversation_id": "${spec.conversationId}"},
+              "event_seq": ${spec.seq},
+              "emitted_at": "2026-07-09T00:00:0${spec.seq}Z",
+              "idempotency_key": "obs-loop-${spec.conversationId}-${spec.seq}",
+              "loop_status": {"status": "${spec.status}", "active_run_ids": [$runsJson]}
+            }
+        """.trimIndent()
+        return AppServerProtocol.decodeFrame(body, AppServerChannel.Stream)
+    }
+
 }

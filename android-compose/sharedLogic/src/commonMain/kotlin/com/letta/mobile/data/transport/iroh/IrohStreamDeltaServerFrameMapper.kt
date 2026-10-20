@@ -519,19 +519,24 @@ internal fun canonicalToolReturn(delta: JsonObject, defaultId: String? = null): 
     )
 }
 
-private fun JsonObject.stringValue(key: String): String? =
-    (this[key] as? JsonPrimitive)?.contentOrNull
+private fun JsonObject.stringValue(key: String): String? {
+    return (this[key] as? JsonPrimitive)?.contentOrNull
+}
 
-private fun JsonElement?.argumentValue(): String = when (this) {
-    is JsonPrimitive -> contentOrNull ?: toString()
-    null -> "{}"
-    else -> toString()
+private fun JsonElement?.argumentValue(): String {
+    return when (this) {
+        is JsonPrimitive -> contentOrNull ?: toString()
+        null -> "{}"
+        else -> toString()
+    }
 }
 
 /** Wire identity shared by message projection and observer lifecycle tracking. */
-internal fun streamDeltaTurnId(envelope: JsonObject, delta: JsonObject?): String? =
-    (delta?.stringValue("turn_id") ?: envelope.stringValue("turn_id"))?.takeIf { it.isNotBlank() }
+internal fun streamDeltaTurnId(envelope: JsonObject, delta: JsonObject?): String? {
+    return (delta?.stringValue("turn_id") ?: envelope.stringValue("turn_id"))?.takeIf { it.isNotBlank() }
+}
 
-internal fun streamDeltaRunId(envelope: JsonObject, delta: JsonObject?): String? =
-    (delta?.stringValue("run_id") ?: delta?.stringValue("runId") ?: envelope.stringValue("run_id"))
+internal fun streamDeltaRunId(envelope: JsonObject, delta: JsonObject?): String? {
+    return (delta?.stringValue("run_id") ?: delta?.stringValue("runId") ?: envelope.stringValue("run_id"))
         ?.takeIf { it.isNotBlank() }
+}
