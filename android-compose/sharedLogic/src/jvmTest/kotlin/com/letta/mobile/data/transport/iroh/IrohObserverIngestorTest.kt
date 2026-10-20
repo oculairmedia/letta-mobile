@@ -532,4 +532,136 @@ class IrohObserverIngestorTest {
         assertEquals(0L, ingestor.subagentCorrelator.revision)
         assertTrue(ingestor.subagentCorrelator.snapshot().isEmpty())
     }
+
+    private fun turnFinishedFrame(
+        agentId: String,
+        conversationId: String,
+        seq: Long,
+        turnId: String,
+        runId: String? = null,
+        stopReason: String = "end_turn",
+    ): AppServerReceivedFrame {
+        val runField = runId?.let { """"run_id": "$it",""" } ?: ""
+        val body = """
+            {
+              "type": "turn_finished",
+              "runtime": {"agent_id": "$agentId", "conversation_id": "$conversationId"},
+              "event_seq": $seq,
+              "emitted_at": "2026-07-09T00:00:0${seq}Z",
+              "idempotency_key": "obs-fin-$conversationId-$seq",
+              "turn_id": "$turnId",
+              $runField
+              "stop_reason": "$stopReason"
+            }
+        """.trimIndent()
+        return AppServerProtocol.decodeFrame(body, AppServerChannel.Stream)
+    }
+
+    private fun loopStatusFrame(
+        agentId: String,
+        conversationId: String,
+        seq: Long,
+        status: String,
+        activeRunIds: List<String> = emptyList(),
+    ): AppServerReceivedFrame {
+        val runsJson = activeRunIds.joinToString(",") { "\"$it\"" }
+        val body = """
+            {
+              "type": "update_loop_status",
+              "runtime": {"agent_id": "$agentId", "conversation_id": "$conversationId"},
+              "event_seq": $seq,
+              "emitted_at": "2026-07-09T00:00:0${seq}Z",
+              "idempotency_key": "obs-loop-$conversationId-$seq",
+              "loop_status": {"status": "$status", "active_run_ids": [$runsJson]}
+            }
+        """.trimIndent()
+        return AppServerProtocol.decodeFrame(body, AppServerChannel.Stream)
+    }
+
+    @Test
+    fun passiveObserverTurnFinishedEmitsTurnDoneForAutonomousTurn() = testScope.runTest {
+        val emitted = CopyOnWriteArrayList<ServerFrame>()
+        val ingestor = observerIngestor(IrohTurnRegistry(), emitted)
+
+        val delta = """
+            {"message_type":"assistant_message","id":"m1","logical_message_id":"lm-m1",
+            "turn_id":"turn-auto-1","run_id":"run-auto-1","text_seq":1,"content":"Subagent report ready."}
+        """.trimIndent()
+        ingestor.ingestObserverFrame(ObserverFrameRequest(streamDelta("agent-1", "conv-auto", 1L, delta), 1L))
+        ingestor.ingestObserverFrame(
+            ObserverFrameRequest(turnFinishedFrame("agent-1", "conv-auto", 2L, "turn-auto-1", "run-auto-1"), 1L),
+        )
+
+        assertEquals(listOf("AssistantMessage", "TurnDone"), emitted.map { it::class.simpleName })
+        val done = assertIs<ServerFrame.TurnDone>(emitted.last())
+        assertEquals("turn-auto-1", done.turnId)
+        assertEquals("run-auto-1", done.runId)
+        assertEquals("completed", done.status)
+    }
+
+    @Test
+    fun passiveObserverStopReasonFollowedByTurnFinishedEmitsSingleTurnDoneWithTurnId() = testScope.runTest {
+        val emitted = CopyOnWriteArrayList<ServerFrame>()
+        val ingestor = observerIngestor(IrohTurnRegistry(), emitted)
+
+        val delta = """
+            {"message_type":"assistant_message","id":"m1","logical_message_id":"lm-m1",
+            "turn_id":"turn-auto-2","run_id":"run-auto-2","text_seq":1,"content":"Done."}
+        """.trimIndent()
+        val stop = """{"message_type":"stop_reason","stop_reason":"end_turn","run_id":"run-auto-2"}"""
+        ingestor.ingestObserverFrame(ObserverFrameRequest(streamDelta("agent-1", "conv-auto", 1L, delta), 1L))
+        ingestor.ingestObserverFrame(ObserverFrameRequest(streamDelta("agent-1", "conv-auto", 2L, stop), 1L))
+        ingestor.ingestObserverFrame(
+            ObserverFrameRequest(turnFinishedFrame("agent-1", "conv-auto", 3L, "turn-auto-2", "run-auto-2"), 1L),
+        )
+
+        assertEquals(listOf("AssistantMessage", "StopReason", "TurnDone"), emitted.map { it::class.simpleName })
+        val stopFrame = assertIs<ServerFrame.StopReason>(emitted[1])
+        assertEquals("turn-auto-2", stopFrame.turnId)
+        assertEquals("run-auto-2", stopFrame.runId)
+        val done = assertIs<ServerFrame.TurnDone>(emitted[2])
+        assertEquals("turn-auto-2", done.turnId)
+        assertEquals("run-auto-2", done.runId)
+        assertEquals("completed", done.status)
+    }
+
+    @Test
+    fun passiveObserverIdleLoopStatusAfterEvidenceCompletesAutonomousTurnOnce() = testScope.runTest {
+        val emitted = CopyOnWriteArrayList<ServerFrame>()
+        val ingestor = observerIngestor(IrohTurnRegistry(), emitted)
+
+        val delta = """
+            {"message_type":"assistant_message","id":"m1","logical_message_id":"lm-m1",
+            "turn_id":"turn-auto-3","run_id":"run-auto-3","text_seq":1,"content":"Finished."}
+        """.trimIndent()
+        ingestor.ingestObserverFrame(ObserverFrameRequest(streamDelta("agent-1", "conv-auto", 1L, delta), 1L))
+        ingestor.ingestObserverFrame(
+            ObserverFrameRequest(loopStatusFrame("agent-1", "conv-auto", 2L, "WAITING_ON_INPUT"), 1L),
+        )
+        ingestor.ingestObserverFrame(
+            ObserverFrameRequest(turnFinishedFrame("agent-1", "conv-auto", 3L, "turn-auto-3", "run-auto-3"), 1L),
+        )
+
+        assertEquals(listOf("AssistantMessage", "TurnDone"), emitted.map { it::class.simpleName })
+        val done = assertIs<ServerFrame.TurnDone>(emitted.single { it is ServerFrame.TurnDone })
+        assertEquals("turn-auto-3", done.turnId)
+        assertEquals("run-auto-3", done.runId)
+    }
+
+    @Test
+    fun retiredEngineTurnFinishedIsSkippedByObserver() = testScope.runTest {
+        val emitted = CopyOnWriteArrayList<ServerFrame>()
+        val registry = IrohTurnRegistry()
+        val turn = engineOwnedTurn(registry)
+        val publication = IrohTerminalPublication(turn, IrohTerminalStatus("completed"), IrohTerminalSource.Engine)
+        assertTrue(registry.claimTerminal(publication))
+        assertTrue(registry.retireClaimed(publication))
+
+        val ingestor = observerIngestor(registry, emitted)
+        ingestor.ingestObserverFrame(
+            ObserverFrameRequest(turnFinishedFrame("agent-1", "conv-1", 1L, "turn-1", "local-run-55"), 1L),
+        )
+
+        assertTrue(emitted.isEmpty(), "Retired local turn's turn_finished must not re-emit TurnDone")
+    }
 }

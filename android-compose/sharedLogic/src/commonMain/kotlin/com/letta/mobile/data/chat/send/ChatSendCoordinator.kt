@@ -231,7 +231,51 @@ class ChatSendCoordinator(
 
         /** True while this conversation owns a send or a turn that has not settled. */
         val isTracking: Boolean
-            get() = identity.active != null || otid != null || turnId != null
+            get() = identity.active != null || otid != null || turnId != null || runId != null
+
+        fun adoptPassiveDelta(event: WsTimelineEvent.MessageDelta): Boolean {
+            if (otid != null) return false
+            val observedTurn = event.turnId?.takeIf { it.isNotBlank() }
+            val observedRun = event.message.runId?.takeIf { it.isNotBlank() }
+            val effectiveConv = localConversationId ?: conversationId
+            val startsNewTurn = !isTracking || reachedTerminal ||
+                (observedTurn != null && turnId != null && turnId != observedTurn)
+            if (startsNewTurn) {
+                if (observedTurn != null) {
+                    identity.turnStarted(effectiveConv, observedTurn, observedRun.orEmpty())
+                    turnId = observedTurn
+                }
+                if (observedRun != null) runId = observedRun
+                reachedTerminal = false
+                activeAssistantMessageRunIds.clear()
+                stopReason = null
+                usageRecorded = false
+                bufferedErrorMessage = null
+                bufferedErrorKind = null
+                deliveredAssistantContent = false
+            } else {
+                if (observedTurn != null && turnId == null) {
+                    identity.turnStarted(effectiveConv, observedTurn, observedRun ?: runId.orEmpty())
+                    turnId = observedTurn
+                }
+                if (observedRun != null && observedRun != runId) {
+                    runId = observedRun
+                    turnId?.let { activeTurn -> identity.turnStarted(effectiveConv, activeTurn, observedRun) }
+                }
+            }
+            return true
+        }
+
+        fun recordTerminalIdentity(event: WsTimelineEvent.TurnDone) {
+            val effectiveConv = localConversationId ?: conversationId
+            if (event.turnId.isNotBlank() && turnId == null) {
+                identity.turnStarted(effectiveConv, event.turnId, event.runId)
+                turnId = event.turnId
+            }
+            if (event.runId.isNotBlank() && runId == null) {
+                runId = event.runId
+            }
+        }
     }
 
     private fun recordConversationAliasLocked(serverConversationId: String, originatingConversationId: String) {
@@ -530,7 +574,7 @@ class ChatSendCoordinator(
 
     /** Live state a stop/usage tail may mutate; a retired turn's tail is only forwarded ([forwardRetiredTurnTail]). */
     private fun liveTailStateOrForward(event: WsTimelineEvent, tail: TurnTail): ConversationTurnState? {
-        val state = resolveStateByTurnId(tail.turnId)
+        val state = if (!tail.turnId.isNullOrBlank()) resolveStateByTurnId(tail.turnId) else resolveStateByRunId(tail.runId)
         when {
             state == null -> reportUnmatchedFrame(event, tail.turnId, tail.runId)
             !isRetiredTurn(state, tail.turnId) -> return state
@@ -982,6 +1026,31 @@ class ChatSendCoordinator(
         return states.singleOrNull { it.turnId == null && it.identity.active != null && ownsConversation(it) }
     }
 
+    private fun resolveDeltaState(
+        event: WsTimelineEvent.MessageDelta,
+        conversationId: String,
+        boundState: ConversationTurnState?,
+        retiredTail: Boolean,
+    ): ConversationTurnState? {
+        if (!shouldAdoptPassiveDelta(event, boundState, retiredTail)) {
+            return peekState(conversationId)
+        }
+        return stateFor(conversationId).also { state ->
+            if (state.adoptPassiveDelta(event)) {
+                lastActiveConversationId = state.localConversationId ?: state.conversationId
+            }
+        }
+    }
+
+    private fun shouldAdoptPassiveDelta(
+        event: WsTimelineEvent.MessageDelta,
+        boundState: ConversationTurnState?,
+        retiredTail: Boolean,
+    ): Boolean {
+        if (retiredTail || event.isReplay || boundState != null) return false
+        return !event.turnId.isNullOrBlank() || !event.message.runId.isNullOrBlank()
+    }
+
 
 
     private suspend fun handleMessageDelta(event: WsTimelineEvent.MessageDelta) {
@@ -1010,13 +1079,14 @@ class ChatSendCoordinator(
             return
         }
         runtimeEventBatcher.enqueue(event, conversationId)
+        val retiredTail = isRetiredTurnTail(event, conversationId)
+        val deltaState = resolveDeltaState(event, conversationId, boundState, retiredTail)
         rememberActiveAssistantMessageRunId(
-            state = peekState(conversationId),
+            state = deltaState,
             message = event.message,
             frameConversationId = event.conversationId,
             isReplay = event.isReplay,
         )
-        val retiredTail = isRetiredTurnTail(event, conversationId)
         timelineRepository.ingestExternalTransportMessage(
             agentId, conversationId, event.message,
             source = TimelineIngestSources.coordinator(retiredTail),
@@ -1046,6 +1116,16 @@ class ChatSendCoordinator(
         }
     }
 
+    private fun resolveTurnDoneOwner(event: WsTimelineEvent.TurnDone): ConversationTurnState? {
+        if (event.turnId.isBlank()) return resolveStateByRunId(event.runId)
+        val states = snapshotStates()
+        val runMatch = states.firstOrNull { it.turnId == null && it.runId == event.runId && event.runId.isNotBlank() }
+        if (runMatch != null && states.none { s -> s.turnId == event.turnId || s.identity.isFenced(event.turnId) }) {
+            return runMatch
+        }
+        return resolveStateByTurnId(event.turnId)
+    }
+
     /**
      * Lifecycle ownership is the terminal fence, resolved to the OWNING
      * conversation first. It rejects delayed terminals from older generations
@@ -1056,7 +1136,7 @@ class ChatSendCoordinator(
      * otherwise accept any terminal, double-finishing the conversation.
      */
     private suspend fun handleTurnDoneFrame(event: WsTimelineEvent.TurnDone) {
-        val owner = resolveStateByTurnId(event.turnId)
+        val owner = resolveTurnDoneOwner(event)
         val stale = owner == null ||
             isRetiredTurn(owner, event.turnId) ||
             !owner.identity.acceptsTerminal(event.turnId)
@@ -1696,6 +1776,7 @@ class ChatSendCoordinator(
             ui.onSendQueued(bounced.conversationId.value)
             return
         }
+        owner.recordTerminalIdentity(event)
         finishActiveTurn(
             state = owner,
             status = event.status,

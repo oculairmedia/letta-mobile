@@ -4,13 +4,19 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.subagent.ParentContext
 import com.letta.mobile.data.repository.subagent.SubagentCorrelator
 import com.letta.mobile.data.runtime.AppServerRuntimeEventMapper
+import com.letta.mobile.data.runtime.TurnBoundaryGate
 import com.letta.mobile.data.subagents.SubagentParentProjection
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.data.transport.appserver.AppServerStopReason
+import com.letta.mobile.data.transport.appserver.AppServerTurnBoundary
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
+import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeId
+import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import com.letta.mobile.util.Telemetry
@@ -53,6 +59,7 @@ internal class IrohObserverIngestor(
 ) {
     /** Observer terminal fallbacks waiting out their grace window, one per engine-owned turn. */
     private val pendingObserverTerminals = java.util.concurrent.ConcurrentHashMap<String, Job>()
+    private val observedTurns = ObservedTurnTracker()
 
     private val observerGeneration = atomic(0)
 
@@ -112,6 +119,7 @@ internal class IrohObserverIngestor(
         job.cancel()
         pendingObserverTerminals.values.forEach { it.cancel() }
         pendingObserverTerminals.clear()
+        observedTurns.reset()
         Telemetry.event("IrohObserver", "ingest.stop", "reason" to request.reason)
     }
 
@@ -159,8 +167,12 @@ internal class IrohObserverIngestor(
         if (request.expectedGeneration != null && connectionGeneration() != request.expectedGeneration) return
         val received = request.received
         if (republishDevicePush(received)) return
-        val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return
-        ingestStreamDelta(streamDelta, received)
+        when (val frame = received.frame) {
+            is AppServerInboundFrame.StreamDelta -> ingestStreamDelta(frame, received)
+            is AppServerInboundFrame.TurnFinished -> ingestTurnFinished(frame, received)
+            is AppServerInboundFrame.UpdateLoopStatus -> ingestLoopStatus(frame)
+            else -> Unit
+        }
     }
 
     private suspend fun ingestStreamDelta(streamDelta: AppServerInboundFrame.StreamDelta, received: AppServerReceivedFrame) {
@@ -168,9 +180,10 @@ internal class IrohObserverIngestor(
             observeChildActivity(streamDelta)
             return
         }
-        val scope = observerScope(streamDelta)
+        val scope = observerScope(streamDelta.runtime)
         recordFrameOwnership(scope.conversationId, scope.localTurn)
         if (scope.localTurn != null) {
+            observedTurns.clearConversation(scope.conversationId)
             // letta-mobile-p0gc: ONE aggregated skip event per turn (delta types +
             // counts) instead of one log line per frame.
             engineOwnedSkipTelemetry.record(
@@ -184,6 +197,38 @@ internal class IrohObserverIngestor(
         if (isRetiredObserverRun(streamDelta, scope.conversationId)) return
         correlateAgentFrame(streamDelta)
         projectPassiveObserverDelta(scope, sanitizeAgentReturn(streamDelta, received))
+    }
+
+    private suspend fun ingestTurnFinished(
+        turnFinished: AppServerInboundFrame.TurnFinished,
+        received: AppServerReceivedFrame,
+    ) {
+        if (!received.raw.string("subagent_id").isNullOrBlank()) return
+        val scope = observerScope(turnFinished.runtime)
+        recordFrameOwnership(scope.conversationId, scope.localTurn)
+        if (scope.localTurn != null) {
+            observedTurns.clearConversation(scope.conversationId)
+            engineOwnedSkipTelemetry.record(
+                conversationId = scope.conversationId,
+                turnId = scope.localTurn.turnId,
+                deltaType = "turn_finished",
+            )
+            projectEngineOwnedObserverDelta(scope, received)
+            engineOwnedSkipTelemetry.endTurn()
+            return
+        }
+        projectPassiveObserverTurnFinished(scope, turnFinished, received)
+    }
+
+    private suspend fun ingestLoopStatus(loopStatusFrame: AppServerInboundFrame.UpdateLoopStatus) {
+        val scope = observerScope(loopStatusFrame.runtime)
+        recordFrameOwnership(scope.conversationId, scope.localTurn)
+        if (scope.localTurn != null) {
+            observedTurns.clearConversation(scope.conversationId)
+            return
+        }
+        val terminal = observedTurns.completeOnIdleLoop(scope.conversationId, loopStatusFrame) ?: return
+        emitBoth(terminal)
     }
 
     /**
@@ -252,11 +297,11 @@ internal class IrohObserverIngestor(
         }
     }
 
-    private fun observerScope(streamDelta: AppServerInboundFrame.StreamDelta): ObserverProjectionScope =
+    private fun observerScope(runtime: AppServerRuntimeScope): ObserverProjectionScope =
         ObserverProjectionScope(
-            agentId = streamDelta.runtime.agentId,
-            conversationId = streamDelta.runtime.conversationId,
-            localTurn = turnRegistry.getActiveTurn(IrohConversationId(streamDelta.runtime.conversationId)),
+            agentId = runtime.agentId,
+            conversationId = runtime.conversationId,
+            localTurn = turnRegistry.getActiveTurn(IrohConversationId(runtime.conversationId)),
         )
 
     private fun isRetiredObserverRun(
@@ -270,26 +315,91 @@ internal class IrohObserverIngestor(
         return true
     }
 
+    private fun isRetiredObserverTurnFinished(
+        turnFinished: AppServerInboundFrame.TurnFinished,
+        scope: ObserverProjectionScope,
+    ): Boolean {
+        val run = turnFinished.runId?.takeIf { it.isNotBlank() }
+        val turn = turnFinished.turnId.takeIf { it.isNotBlank() }
+        val retiredRun = run != null && turnRegistry.isRetiredRun(IrohRunId(run))
+        val retiredTurn = turn != null && turnRegistry.isRetiredTurn(IrohTurnId(turn))
+        if (!retiredRun && !retiredTurn) return false
+        Telemetry.event(
+            "IrohObserver", "ingest.skip_already_retired",
+            "conversationId" to scope.conversationId,
+            "runId" to (run ?: ""),
+        )
+        return true
+    }
+
     private suspend fun projectPassiveObserverDelta(scope: ObserverProjectionScope, received: AppServerReceivedFrame) {
+        val delta = (received.frame as? AppServerInboundFrame.StreamDelta)?.delta as? JsonObject
+        val wireTurn = wireTurnId(received)
+        val wireRun = (delta?.string("run_id") ?: delta?.string("runId"))?.takeIf { it.isNotBlank() }
+        val active = observedTurns.active(scope.conversationId)
+        val effectiveTurn = wireTurn ?: active?.turnId
+        val effectiveRun = wireRun ?: active?.runId
+        if (isTerminalDeltaObject(delta) && observedTurns.isCompleted(effectiveTurn, effectiveRun)) return
         // The observer has no turn of its own: a row is named by the host's stamp on the frame, and the
-        // context carries only what the frame itself says (never a per-conversation stand-in id).
-        val frameTurnId = wireTurnId(received)
-        observerMapper.map(observerTurnCommand(scope.agentId, scope.conversationId), received).forEach { draft ->
+        // context carries only what the frame itself says (or the active observed turn for unstamped
+        // lifecycle frames like stop_reason / usage_statistics / error_message).
+        val frames = projectObserverFrames(scope, received, effectiveTurn, effectiveRun)
+        frames.forEach { emitBoth(it) }
+        if (frames.any { it is ServerFrame.TurnDone }) {
+            observedTurns.markCompleted(scope.conversationId, effectiveTurn, effectiveRun)
+        } else if (delta != null) {
+            observedTurns.recordDelta(scope, delta, wireTurn, wireRun)
+        }
+    }
+
+    private suspend fun projectPassiveObserverTurnFinished(
+        scope: ObserverProjectionScope,
+        turnFinished: AppServerInboundFrame.TurnFinished,
+        received: AppServerReceivedFrame,
+    ) {
+        if (isRetiredObserverTurnFinished(turnFinished, scope)) {
+            observedTurns.clearConversation(scope.conversationId)
+            return
+        }
+        val active = observedTurns.active(scope.conversationId)
+        val effectiveTurn = turnFinished.turnId.takeIf { it.isNotBlank() } ?: active?.turnId
+        val effectiveRun = turnFinished.runId?.takeIf { it.isNotBlank() } ?: active?.runId
+        if (observedTurns.consumeCompletedTurnFinished(scope.conversationId, effectiveTurn, effectiveRun)) return
+        val frames = projectObserverFrames(scope, received, effectiveTurn, effectiveRun)
+        frames.forEach { emitBoth(it) }
+        if (frames.any { it is ServerFrame.TurnDone }) {
+            observedTurns.markCompleted(scope.conversationId, effectiveTurn, effectiveRun)
+        }
+    }
+
+    private fun projectObserverFrames(
+        scope: ObserverProjectionScope,
+        received: AppServerReceivedFrame,
+        turn: String?,
+        run: String?,
+    ): List<ServerFrame> =
+        observerMapper.map(observerTurnCommand(scope.agentId, scope.conversationId), received).flatMap { draft ->
             RuntimeEventServerFrameMapper.map(
                 payload = draft.payload,
                 context = RuntimeEventServerFrameMapper.Context(
                     agentId = draft.agentId?.value ?: scope.agentId,
                     conversationId = draft.conversationId?.value ?: scope.conversationId,
-                    turnId = frameTurnId,
-                    runId = draft.runId?.value,
+                    turnId = turn,
+                    runId = draft.runId?.value ?: run,
                 ),
-            ).forEach { emitBoth(it) }
+            )
         }
+
+    private fun isTerminalDeltaObject(delta: JsonObject?): Boolean = when (delta?.string("message_type")) {
+        "stop_reason", "loop_error", "error_message" -> true
+        else -> false
     }
 
-    private fun wireTurnId(received: AppServerReceivedFrame): String? =
-        ((received.frame as? AppServerInboundFrame.StreamDelta)?.delta as? JsonObject)
-            ?.string("turn_id")?.takeIf { it.isNotBlank() }
+    private fun wireTurnId(received: AppServerReceivedFrame): String? = when (val frame = received.frame) {
+        is AppServerInboundFrame.StreamDelta -> (frame.delta as? JsonObject)?.string("turn_id")?.takeIf { it.isNotBlank() }
+        is AppServerInboundFrame.TurnFinished -> frame.turnId.takeIf { it.isNotBlank() }
+        else -> null
+    }
 
     private suspend fun projectEngineOwnedObserverDelta(
         scope: ObserverProjectionScope,
@@ -468,6 +578,7 @@ internal class IrohObserverIngestor(
         resubscribeJob?.cancel()
         resubscribeJob = null
         subagentCorrelator.reset()
+        observedTurns.reset()
         engineOwnedSkipTelemetry.endTurn()
     }
 
@@ -484,12 +595,6 @@ internal class IrohObserverIngestor(
         val path: String,
         val conversationId: String?,
         val generation: Long,
-    )
-
-    private data class ObserverProjectionScope(
-        val agentId: String,
-        val conversationId: String,
-        val localTurn: IrohActiveTurn?,
     )
 
     companion object {
@@ -538,3 +643,151 @@ internal data class ViewedConversationRequest(val method: String, val path: Stri
 internal data class ObserverResubscribeRequest(val generation: Long)
 internal data class ObserverFrameRequest(val received: AppServerReceivedFrame, val expectedGeneration: Long? = null)
 internal data class SubagentRpcScope(val conversationId: String, val agentId: String?)
+
+private data class ObserverProjectionScope(
+    val agentId: String,
+    val conversationId: String,
+    val localTurn: IrohActiveTurn?,
+)
+
+private data class ObservedTurn(
+    val agentId: String,
+    val conversationId: String,
+    val turnId: String?,
+    val runId: String?,
+    val roundContinues: Boolean,
+)
+
+private class ObservedTurnTracker {
+    private val lock = Any()
+    private val activeByConversation = HashMap<String, ObservedTurn>()
+    private val completedTurnIds = LinkedHashSet<String>()
+    private val completedRunIds = LinkedHashSet<String>()
+    private val completedWithoutTurnConversations = HashSet<String>()
+
+    fun active(conversation: String): ObservedTurn? = synchronized(lock) {
+        activeByConversation[conversation]
+    }
+
+    fun clearConversation(conversation: String) = synchronized(lock) {
+        activeByConversation.remove(conversation)
+        completedWithoutTurnConversations.remove(conversation)
+    }
+
+    fun reset() = synchronized(lock) {
+        activeByConversation.clear()
+        completedTurnIds.clear()
+        completedRunIds.clear()
+        completedWithoutTurnConversations.clear()
+    }
+
+    fun isCompleted(turn: String?, run: String?): Boolean = synchronized(lock) {
+        isCompletedLocked(turn, run)
+    }
+
+    fun consumeCompletedTurnFinished(conversation: String, turn: String?, run: String?): Boolean =
+        synchronized(lock) {
+            val closedWithoutTurn = completedWithoutTurnConversations.remove(conversation)
+            val alreadyDone = closedWithoutTurn ||
+                (turn != null && turn in completedTurnIds) ||
+                (activeByConversation[conversation] == null && run != null && run in completedRunIds)
+            if (alreadyDone) {
+                activeByConversation.remove(conversation)
+                rememberBounded(completedTurnIds, turn)
+                rememberBounded(completedRunIds, run)
+            }
+            alreadyDone
+        }
+
+    fun markCompleted(conversation: String, turn: String?, run: String?) = synchronized(lock) {
+        activeByConversation.remove(conversation)
+        rememberBounded(completedTurnIds, turn)
+        rememberBounded(completedRunIds, run)
+        if (turn == null) {
+            completedWithoutTurnConversations.add(conversation)
+        } else {
+            completedWithoutTurnConversations.remove(conversation)
+        }
+    }
+
+    fun recordDelta(
+        scope: ObserverProjectionScope,
+        delta: JsonObject,
+        wireTurn: String?,
+        wireRun: String?,
+    ) = synchronized(lock) {
+        val messageType = delta["message_type"]?.jsonPrimitive?.contentOrNull
+        val ignore = isCompletedLocked(wireTurn, wireRun) ||
+            messageType == null || messageType == "ping" || messageType == "heartbeat"
+        if (!ignore) {
+            if (wireTurn != null && wireRun != null) completedRunIds.remove(wireRun)
+            completedWithoutTurnConversations.remove(scope.conversationId)
+            val previous = activeByConversation[scope.conversationId]
+            val sameTurn = previous != null &&
+                (wireTurn == null || previous.turnId == null || previous.turnId == wireTurn)
+            val nextContinues = when (messageType) {
+                "stop_reason" -> isContinuingStopReason(delta)
+                "approval_request_message" -> true
+                "usage_statistics" -> previous?.roundContinues ?: false
+                else -> false
+            }
+            activeByConversation[scope.conversationId] = ObservedTurn(
+                agentId = scope.agentId,
+                conversationId = scope.conversationId,
+                turnId = wireTurn ?: previous?.takeIf { sameTurn }?.turnId,
+                runId = wireRun ?: previous?.takeIf { sameTurn }?.runId,
+                roundContinues = nextContinues,
+            )
+        }
+    }
+
+    fun completeOnIdleLoop(
+        conversation: String,
+        frame: AppServerInboundFrame.UpdateLoopStatus,
+    ): ServerFrame.TurnDone? = synchronized(lock) {
+        val status = frame.loopStatus
+        val current = activeByConversation[conversation]
+        val canComplete = current != null &&
+            !current.roundContinues &&
+            status.status == TurnBoundaryGate.LOOP_WAITING_ON_INPUT &&
+            status.activeRunIds.isEmpty()
+        if (!canComplete || current == null) return@synchronized null
+        markCompleted(conversation, current.turnId, current.runId)
+        RuntimeEventServerFrameMapper.map(
+            payload = RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Completed),
+            context = RuntimeEventServerFrameMapper.Context(
+                agentId = current.agentId,
+                conversationId = current.conversationId,
+                turnId = current.turnId,
+                runId = current.runId,
+            ),
+        ).filterIsInstance<ServerFrame.TurnDone>().firstOrNull()
+    }
+
+    private fun isCompletedLocked(turn: String?, run: String?): Boolean = when {
+        turn != null -> turn in completedTurnIds
+        run != null -> run in completedRunIds
+        else -> false
+    }
+
+    private fun isContinuingStopReason(delta: JsonObject): Boolean {
+        val reason = delta["stop_reason"]?.jsonPrimitive?.contentOrNull
+            ?: delta["reason"]?.jsonPrimitive?.contentOrNull
+        val boundary = AppServerStopReason.boundaryOf(reason)
+        return boundary == AppServerTurnBoundary.AwaitingApproval ||
+            boundary == AppServerTurnBoundary.Continuing
+    }
+
+    private fun rememberBounded(target: LinkedHashSet<String>, value: String?) {
+        val key = value?.takeIf { it.isNotBlank() } ?: return
+        target.remove(key)
+        target.add(key)
+        while (target.size > MAX_COMPLETED_OBSERVER_TURNS) {
+            target.remove(target.first())
+        }
+    }
+
+    companion object {
+        private const val MAX_COMPLETED_OBSERVER_TURNS = 32
+    }
+}
