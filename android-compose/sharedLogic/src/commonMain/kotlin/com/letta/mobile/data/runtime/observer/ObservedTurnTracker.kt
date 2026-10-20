@@ -1,6 +1,6 @@
 package com.letta.mobile.data.runtime.observer
 
-import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 

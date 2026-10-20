@@ -1,6 +1,5 @@
 package com.letta.mobile.data.transport.iroh
 
-import com.letta.mobile.data.model.ConversationId as DataConversationId
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.subagent.ParentContext
 import com.letta.mobile.data.repository.subagent.SubagentCorrelator
@@ -187,7 +186,7 @@ internal class IrohObserverIngestor(
         val localTurn = turnRegistry.getActiveTurn(IrohConversationId(scope.conversationId))
         recordFrameOwnership(scope.conversationId, localTurn)
         if (localTurn != null) {
-            observedTurns.clearConversation(DataConversationId(scope.conversationId))
+            observedTurns.clearConversation(ConversationId(scope.conversationId))
             // letta-mobile-p0gc: ONE aggregated skip event per turn (delta types +
             // counts) instead of one log line per frame.
             engineOwnedSkipTelemetry.record(
@@ -217,7 +216,7 @@ internal class IrohObserverIngestor(
             val matches = turnFinished.runId?.takeIf { it.isNotBlank() }?.let { it == localTurn.runId }
                 ?: (turnFinished.turnId == localTurn.turnId)
             if (!matches) return
-            observedTurns.clearConversation(DataConversationId(scope.conversationId))
+            observedTurns.clearConversation(ConversationId(scope.conversationId))
             engineOwnedSkipTelemetry.record(
                 conversationId = scope.conversationId,
                 turnId = localTurn.turnId,
@@ -235,12 +234,12 @@ internal class IrohObserverIngestor(
         val localTurn = turnRegistry.getActiveTurn(IrohConversationId(scope.conversationId))
         recordFrameOwnership(scope.conversationId, localTurn)
         if (localTurn != null) {
-            observedTurns.clearConversation(DataConversationId(scope.conversationId))
+            observedTurns.clearConversation(ConversationId(scope.conversationId))
             return
         }
         val status = loopStatusFrame.loopStatus
         if (status.status != TurnBoundaryGate.LOOP_WAITING_ON_INPUT || status.activeRunIds.isNotEmpty()) return
-        val current = observedTurns.completeOnIdleLoop(DataConversationId(scope.conversationId)) ?: return
+        val current = observedTurns.completeOnIdleLoop(ConversationId(scope.conversationId)) ?: return
         RuntimeEventServerFrameMapper.map(
             payload = RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Completed),
             context = RuntimeEventServerFrameMapper.Context(
@@ -348,7 +347,7 @@ internal class IrohObserverIngestor(
         val delta = (received.frame as? AppServerInboundFrame.StreamDelta)?.delta as? JsonObject
         val wireTurn = streamDeltaTurnId(received.raw, delta)
         val wireRun = streamDeltaRunId(received.raw, delta)
-        val active = observedTurns.active(DataConversationId(scope.conversationId))
+        val active = observedTurns.active(ConversationId(scope.conversationId))
         val effectiveTurn = wireTurn ?: active?.turnId
         val effectiveRun = wireRun ?: active?.runId
         val effective = ObservedTurn(scope.agentId, scope.conversationId, effectiveTurn, effectiveRun)
