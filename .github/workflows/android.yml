@@ -331,18 +331,19 @@ jobs:
           retention-days: 7
 
   detekt:
-    # letta-mobile-by4vm.32: honest, non-required static analysis. Every module's
-    # existing findings are in its detekt-baseline.xml, so main is green and only
-    # a NEW finding fails this job. Not a required check (branch protection is
-    # untouched), but it is no longer masked: a new finding shows red.
+    # letta-mobile-by4vm.32: honest static analysis. Every module's existing
+    # findings are in its detekt-baseline.xml, so main is green and only a NEW
+    # finding fails this job. Required on main since 2026-10-20 (branch
+    # protection, scripts/bootstrap-branch-protection.sh): while advisory, findings
+    # in files no PR touched merged and accumulated until #2134 cleared them.
     # Covers the Android modules (app, core:android-data, designsystem,
     # feature-chat), quality:detekt-rules and (letta-mobile-by4vm.65) every
     # src/<sourceSet>/kotlin dir of sharedLogic, sharedUI, plugin-view, desktop
     # and web (commonMain, jvmMain, androidMain, wasmJsMain, tests, ...).
     # The changed-file guardrailDetekt rules run inside the required `test` job.
     name: detekt
-    # Keep non-required work out of the initial runner queue so required checks
-    # acquire capacity first.
+    # Runs after the other three required checks so they acquire runner
+    # capacity first; it still reports wherever they report.
     needs: [test, shared-multiplatform, build-apk-pass]
     runs-on: ubuntu-latest
     defaults:
