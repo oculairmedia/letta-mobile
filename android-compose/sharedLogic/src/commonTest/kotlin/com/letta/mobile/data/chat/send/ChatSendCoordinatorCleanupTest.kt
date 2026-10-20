@@ -503,7 +503,12 @@ class ChatSendCoordinatorCleanupTest {
     // It must still reach the timeline projection (so the run folds with its stop
     // reason and usage) without re-opening or re-settling the retired turn.
     @Test
-    fun retiredTurnStopAndUsageTailIsForwardedToRuntimeEvents() = runTest(UnconfinedTestDispatcher()) {
+    fun retiredTurnStopAndUsageTailIsForwardedToRuntimeEvents() = assertRetiredTailForwarded("turn-1")
+
+    @Test
+    fun retiredRunOnlyStopAndUsageTailIsForwardedToRuntimeEvents() = assertRetiredTailForwarded("")
+
+    private fun assertRetiredTailForwarded(tailTurnId: String) = runTest(UnconfinedTestDispatcher()) {
         val timeline = RecordingTimelineWriter()
         val ui = RecordingUiSink()
         val recorded = mutableListOf<Pair<WsTimelineEvent, String?>>()
@@ -521,9 +526,9 @@ class ChatSendCoordinatorCleanupTest {
         val visualCompletionsAtRetire = ui.visualCompletions
         assertFalse(ui.isStreaming())
 
-        val stop = WsTimelineEvent.StopReason(turnId = "turn-1", runId = "run-1", stopReason = "end_turn")
+        val stop = WsTimelineEvent.StopReason(turnId = tailTurnId, runId = "run-1", stopReason = "end_turn")
         val usage = WsTimelineEvent.UsageStatistics(
-            turnId = "turn-1",
+            turnId = tailTurnId,
             runId = "run-1",
             promptTokens = 10L,
             completionTokens = 5L,

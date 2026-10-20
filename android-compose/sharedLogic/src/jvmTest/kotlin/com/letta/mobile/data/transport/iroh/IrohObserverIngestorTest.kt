@@ -664,4 +664,66 @@ class IrohObserverIngestorTest {
 
         assertTrue(emitted.isEmpty(), "Retired local turn's turn_finished must not re-emit TurnDone")
     }
+
+    @Test
+    fun unobservedTerminalDoesNotEmitUnscopedTurnDone() = testScope.runTest {
+        val emitted = CopyOnWriteArrayList<ServerFrame>()
+        val ingestor = observerIngestor(IrohTurnRegistry(), emitted)
+        ingestor.ingestObserverFrame(
+            ObserverFrameRequest(turnFinishedFrame("agent-1", "conv-foreign", 1L, "foreign-turn", "foreign-run"), 1L),
+        )
+        assertTrue(emitted.isEmpty(), "A terminal without observer evidence cannot be assigned to a local send")
+    }
+
+    @Test
+    fun oldTerminalCannotRetireCurrentEngineTurn() = testScope.runTest {
+        val emitted = CopyOnWriteArrayList<ServerFrame>()
+        val registry = IrohTurnRegistry()
+        val current = engineOwnedTurn(registry)
+        val ingestor = observerIngestor(registry, emitted)
+        ingestor.ingestObserverFrame(
+            ObserverFrameRequest(turnFinishedFrame("agent-1", "conv-1", 1L, "old-turn", "old-run"), 1L),
+        )
+        advanceTimeBy(IrohObserverIngestor.OBSERVER_TERMINAL_GRACE_MS + 1)
+        runCurrent()
+        assertFalse(current.hasTerminal, "The old run must not claim the current engine turn")
+        assertTrue(emitted.isEmpty())
+    }
+
+    @Test
+    fun duplicateTerminalPreservesNewerPassiveTurnForIdleCompletion() = testScope.runTest {
+        val emitted = CopyOnWriteArrayList<ServerFrame>()
+        val ingestor = observerIngestor(IrohTurnRegistry(), emitted)
+        suspend fun ingest(frame: AppServerReceivedFrame) = ingestor.ingestObserverFrame(ObserverFrameRequest(frame, 1L))
+        ingest(observedAssistant("old", 1L))
+        ingest(turnFinishedFrame("agent-1", "conv-auto", 2L, "turn-old", "run-old"))
+        ingest(observedAssistant("new", 3L))
+        ingest(turnFinishedFrame("agent-1", "conv-auto", 4L, "turn-old", "run-old"))
+        ingest(loopStatusFrame("agent-1", "conv-auto", 5L, "WAITING_ON_INPUT"))
+        assertEquals(listOf("turn-old", "turn-new"), emitted.filterIsInstance<ServerFrame.TurnDone>().map { it.turnId })
+    }
+
+    @Test
+    fun envelopeIdentitySurvivesIdleCompletionAndAuthoritativeTerminal() = testScope.runTest {
+        val emitted = CopyOnWriteArrayList<ServerFrame>()
+        val ingestor = observerIngestor(IrohTurnRegistry(), emitted)
+        val frame = observedAssistant("envelope", 1L)
+        val delta = (frame.frame as AppServerInboundFrame.StreamDelta).delta as kotlinx.serialization.json.JsonObject
+        val raw = kotlinx.serialization.json.JsonObject(frame.raw + mapOf(
+            "turn_id" to delta.getValue("turn_id"),
+            "run_id" to delta.getValue("run_id"),
+            "delta" to kotlinx.serialization.json.JsonObject(delta - "turn_id" - "run_id"),
+        ))
+        ingestor.ingestObserverFrame(ObserverFrameRequest(AppServerProtocol.decodeFrame(raw.toString(), AppServerChannel.Stream), 1L))
+        ingestor.ingestObserverFrame(ObserverFrameRequest(loopStatusFrame("agent-1", "conv-auto", 2L, "WAITING_ON_INPUT"), 1L))
+        ingestor.ingestObserverFrame(ObserverFrameRequest(turnFinishedFrame("agent-1", "conv-auto", 3L, "turn-envelope", "run-envelope"), 1L))
+        val done = emitted.filterIsInstance<ServerFrame.TurnDone>().single()
+        assertEquals("turn-envelope", done.turnId)
+        assertEquals("run-envelope", done.runId)
+    }
+
+    private fun observedAssistant(id: String, seq: Long) = streamDelta(
+        "agent-1", "conv-auto", seq,
+        """{"message_type":"assistant_message","logical_message_id":"lm-$id","turn_id":"turn-$id","run_id":"run-$id","content":"Reply"}""",
+    )
 }
