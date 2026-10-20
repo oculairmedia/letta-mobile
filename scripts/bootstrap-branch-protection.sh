@@ -12,8 +12,10 @@
 # What this enforces on `main`:
 #   - Direct pushes are rejected; changes must arrive via a PR.
 #   - PRs must be up-to-date with main before merging (strict).
-#   - Required status checks must pass: test, build-apk-pass, and
-#     shared-multiplatform (KMP all-target gate, see letta-mobile-kx1r3).
+#   - Required status checks must pass: test, build-apk-pass,
+#     shared-multiplatform (KMP all-target gate, see letta-mobile-kx1r3), and
+#     detekt (full per-module baselines; promoted 2026-10-20 after findings in
+#     files no PR touched accumulated on main while it was advisory, cleared by #2134).
 #     perf-gate is NOT required: the emulator macrobenchmark runs nightly and
 #     on main pushes (.github/workflows/android-perf.yml), not on every PR.
 #   - Linear history only -- squash-merge or rebase-merge, no merge commits.
@@ -38,7 +40,7 @@ set -euo pipefail
 
 REPO="${REPO:-oculairmedia/letta-mobile}"
 BRANCH="${BRANCH:-main}"
-CHECKS=(test build-apk-pass shared-multiplatform)
+CHECKS=(test build-apk-pass shared-multiplatform detekt)
 
 contexts=$(printf '"%s",' "${CHECKS[@]}")
 contexts="[${contexts%,}]"

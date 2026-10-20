@@ -170,9 +170,11 @@ branch_protection="$(
 # suite does not go red on a repo-admin setting it cannot change.
 if [[ "$branch_protection" == 'build-apk-pass,perf-gate,shared-multiplatform,test' ]]; then
   echo "ci-policy-scripts-test: branch protection still requires perf-gate; remove it (perf-gate is nightly + main now)" >&2
+elif [[ "$branch_protection" == 'build-apk-pass,shared-multiplatform,test' ]]; then
+  echo "ci-policy-scripts-test: branch protection does not require detekt yet; run scripts/bootstrap-branch-protection.sh" >&2
 elif [[ -n "$branch_protection" ]]; then
   assert_eq "$branch_protection" \
-    'build-apk-pass,shared-multiplatform,test'
+    'build-apk-pass,detekt,shared-multiplatform,test'
 else
   echo "ci-policy-scripts-test: skipping branch-protection assertion (gh unavailable)" >&2
 fi
