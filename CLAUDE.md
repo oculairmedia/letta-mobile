@@ -54,6 +54,7 @@ Module and source paths below are relative to `android-compose/` unless prefixed
 | `app/` | Android host — navigation, ViewModels, Hilt DI and containers around shared pages |
 | `feature-chat/` | Android chat route/scaffold and AdminChatViewModel, lifecycle/voice/DI bindings; `ChatScreen` hosts `SharedChatPage` and sharedUI `ChatSurface` content |
 | `core/android-data/` | Repositories, Room DB, transport-bound data sources |
+| `core/data/` | Shared Android/JVM Room entities, DAO contracts and model conversions; database construction remains in Android bindings |
 | `core/runtime/` | App Server runtime contracts, turn lifecycle interfaces |
 | `core/ids/` | Shared identifiers; wire schemas live in source packages |
 | `designsystem/` | Reusable Android Compose UI, theming, and dialogs |

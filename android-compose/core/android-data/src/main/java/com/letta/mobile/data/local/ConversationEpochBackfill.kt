@@ -6,17 +6,6 @@ import androidx.sqlite.db.SupportSQLiteStatement
 import com.letta.mobile.data.model.ConversationRecency
 
 /**
- * letta-mobile-by4vm.19: turns a conversation's ISO-8601 timestamp into epoch millis so the
- * cached lists sort chronologically. letta-mobile-by4vm.72: delegates to the shared
- * [ConversationRecency] parser, so the cache's epoch columns (and the DAO's
- * `COALESCE(last, updated, created, 0) DESC, id` order) agree with every other conversation
- * ordering. Anything unparseable maps to null, which the DAO sorts last.
- */
-internal object ConversationTimestamps {
-    fun epochMillisOrNull(raw: String?): Long? = ConversationRecency.epochMillisOrNull(raw)
-}
-
-/**
  * letta-mobile-by4vm.19 (v21 -> v22): fills the epoch columns of rows cached before v22 with the
  * same parser new writes use. SQLite's `strftime` is not used: its fraction and offset handling
  * varies with the SQLite version a device ships, and a mismatch with write-time parsing would
@@ -51,9 +40,9 @@ internal object ConversationEpochBackfill {
     /** Typed binds (no `Array<Any?>` bind list): a null epoch binds SQL NULL. */
     private fun writeEpochs(update: SupportSQLiteStatement, row: Row) {
         update.clearBindings()
-        update.bindEpochOrNull(1, ConversationTimestamps.epochMillisOrNull(row.lastMessageAt))
-        update.bindEpochOrNull(2, ConversationTimestamps.epochMillisOrNull(row.updatedAt))
-        update.bindEpochOrNull(3, ConversationTimestamps.epochMillisOrNull(row.createdAt))
+        update.bindEpochOrNull(1, ConversationRecency.epochMillisOrNull(row.lastMessageAt))
+        update.bindEpochOrNull(2, ConversationRecency.epochMillisOrNull(row.updatedAt))
+        update.bindEpochOrNull(3, ConversationRecency.epochMillisOrNull(row.createdAt))
         update.bindString(4, row.id)
         update.executeUpdateDelete()
     }

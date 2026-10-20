@@ -12,7 +12,8 @@ interface BugReportDao {
 
     @Query(
         """
-        SELECT * FROM project_bug_reports
+        SELECT id, projectIdentifier, title, description, severity, tagsJson,
+               attachmentReferencesJson, structuredPrompt, createdAt FROM project_bug_reports
         WHERE projectIdentifier = :projectIdentifier
         ORDER BY createdAt DESC
         LIMIT :limit
