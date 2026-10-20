@@ -27,7 +27,8 @@ kotlin {
         commonMain.dependencies {
             api(project(":sharedLogic"))
             api(libs.androidx.room.runtime)
-            implementation(libs.kotlinx.serialization.json)
+            api(libs.kotlinx.coroutines.core)
+            api(libs.kotlinx.serialization.json)
             implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.8")
         }
         commonTest.dependencies {
