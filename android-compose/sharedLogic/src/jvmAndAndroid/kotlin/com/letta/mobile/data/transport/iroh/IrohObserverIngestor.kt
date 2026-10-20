@@ -405,6 +405,7 @@ internal class IrohObserverIngestor(
         }
 
     private fun isContinuingStopReason(delta: JsonObject): Boolean {
+        if (delta.string("message_type") != "stop_reason") return false
         val reason = delta["stop_reason"]?.jsonPrimitive?.contentOrNull
             ?: delta["reason"]?.jsonPrimitive?.contentOrNull
         val boundary = AppServerStopReason.boundaryOf(reason)

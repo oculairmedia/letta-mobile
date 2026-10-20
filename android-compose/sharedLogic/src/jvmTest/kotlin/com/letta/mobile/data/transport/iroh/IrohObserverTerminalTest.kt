@@ -188,6 +188,17 @@ internal class IrohObserverTerminalTest : IrohObserverFixture() {
         assertEquals("turn-new", emitted.filterIsInstance<ServerFrame.TurnDone>().single().turnId)
     }
 
+    @Test
+    fun nonStopDeltaDoesNotInterpretUnrelatedReasonPayload() = testScope.runTest {
+        val emitted = CopyOnWriteArrayList<ServerFrame>()
+        val ingestor = observerIngestor(IrohTurnRegistry(), emitted)
+        val frame = observedAssistant("reason", 1L)
+        val delta = assertIs<JsonObject>(frame.raw["delta"])
+        val raw = JsonObject(frame.raw + ("delta" to JsonObject(delta + ("reason" to JsonObject(emptyMap())))))
+        ingestor.ingestObserverFrame(ObserverFrameRequest(AppServerProtocol.decodeFrame(raw.toString(), AppServerChannel.Stream), 1L))
+        assertIs<ServerFrame.AssistantMessage>(emitted.single())
+    }
+
     private fun assertAutonomousCompletion(emitted: List<ServerFrame>, expected: TerminalFrameSpec) {
         assertEquals(listOf("AssistantMessage", "TurnDone"), emitted.map { it::class.simpleName })
         val done = assertIs<ServerFrame.TurnDone>(emitted.last())
