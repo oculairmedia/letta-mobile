@@ -574,10 +574,13 @@ class ChatSendCoordinator(
 
     /** Live state a stop/usage tail may mutate; a retired turn's tail is only forwarded ([forwardRetiredTurnTail]). */
     private fun liveTailStateOrForward(event: WsTimelineEvent, tail: TurnTail): ConversationTurnState? {
-        val state = if (!tail.turnId.isNullOrBlank()) resolveStateByTurnId(tail.turnId) else resolveStateByRunId(tail.runId)
+        val state = if (!tail.turnId.isNullOrBlank()) resolveStateByTurnId(tail.turnId) else {
+            resolveStateByRunId(tail.runId) ?: snapshotStates().firstOrNull { tail.runId in it.settledRunIds }
+        }
         when {
             state == null -> reportUnmatchedFrame(event, tail.turnId, tail.runId)
-            !isRetiredTurn(state, tail.turnId) -> return state
+            !isRetiredTurn(state, tail.turnId) &&
+                !(tail.runId != state.runId && tail.runId in state.settledRunIds) -> return state
             else -> forwardRetiredTurnTail(runtimeEventBatcher, event, tail, state.localConversationId ?: state.conversationId)
         }
         return null

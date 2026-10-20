@@ -295,7 +295,7 @@ internal object IrohStreamDeltaServerFrameMapper {
         companion object {
             fun from(envelope: JsonObject, delta: JsonObject) = Stamp(
                 logicalId = delta.string("logical_message_id")?.takeIf { it.isNotBlank() },
-                turnId = (delta.string("turn_id") ?: envelope.string("turn_id"))?.takeIf { it.isNotBlank() },
+                turnId = streamDeltaTurnId(envelope, delta),
                 textSeq = delta.long("text_seq")?.takeIf { it in 0L..Int.MAX_VALUE.toLong() }?.toInt(),
             )
         }
@@ -342,9 +342,7 @@ internal object IrohStreamDeltaServerFrameMapper {
                         ?: context.conversationId,
                     stamp = stamp,
                     turnId = stamp.turnId ?: context.turnId,
-                    runId = delta.string("run_id")
-                        ?: envelope.string("run_id")
-                        ?: context.runId,
+                    runId = streamDeltaRunId(envelope, delta) ?: context.runId,
                     messageId = delta.string("id") ?: delta.string("message_id") ?: payload.messageId,
                 )
             }
@@ -529,3 +527,11 @@ private fun JsonElement?.argumentValue(): String = when (this) {
     null -> "{}"
     else -> toString()
 }
+
+/** Wire identity shared by message projection and observer lifecycle tracking. */
+internal fun streamDeltaTurnId(envelope: JsonObject, delta: JsonObject?): String? =
+    (delta?.stringValue("turn_id") ?: envelope.stringValue("turn_id"))?.takeIf { it.isNotBlank() }
+
+internal fun streamDeltaRunId(envelope: JsonObject, delta: JsonObject?): String? =
+    (delta?.stringValue("run_id") ?: delta?.stringValue("runId") ?: envelope.stringValue("run_id"))
+        ?.takeIf { it.isNotBlank() }
