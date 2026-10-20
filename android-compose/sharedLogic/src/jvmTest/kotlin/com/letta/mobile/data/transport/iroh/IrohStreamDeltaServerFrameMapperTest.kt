@@ -98,6 +98,24 @@ class IrohStreamDeltaServerFrameMapperTest {
     }
 
     @Test
+    fun reasoningTextPreservesFieldPriorityAndSkipsBlankValues() {
+        val cases = listOf(
+            """"reasoning":"first","hidden_reasoning":"second","content":"third"""" to "first",
+            """"reasoning":" ","hidden_reasoning":"second","content":"third"""" to "second",
+            """"hidden_reasoning":" ","content":"third","text":"fourth"""" to "third",
+            """"content":" ","text":"fourth","message":"fifth"""" to "fourth",
+            """"text":" ","message":"fifth"""" to "fifth",
+            """"message":" """" to "",
+        )
+        cases.forEach { (fields, expected) ->
+            val frame = assertIs<ServerFrame.ReasoningMessage>(map(
+                """{"delta":{"message_type":"reasoning_message","logical_message_id":"lm-r",$fields}}""",
+            ).single())
+            assertEquals(expected, frame.reasoning)
+        }
+    }
+
+    @Test
     fun mapsToolCallDeltaToTypedFrame() {
         val toolCall = assertIs<ServerFrame.ToolCallMessage>(
             map(

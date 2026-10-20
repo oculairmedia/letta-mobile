@@ -410,13 +410,10 @@ internal object IrohStreamDeltaServerFrameMapper {
     private fun JsonObject.contentText(): String =
         textFrom("content") ?: textFrom("text") ?: textFrom("message") ?: ""
 
-    private fun JsonObject.reasoningText(): String =
-        textFrom("reasoning")
-            ?: textFrom("hidden_reasoning")
-            ?: textFrom("content")
-            ?: textFrom("text")
-            ?: textFrom("message")
-            ?: ""
+    private fun JsonObject.reasoningText(): String {
+        val textKeys = listOf("reasoning", "hidden_reasoning", "content", "text", "message")
+        return textKeys.firstNotNullOfOrNull { textFrom(it) }.orEmpty()
+    }
 
     private fun JsonObject.errorText(): String =
         textFrom("message")
