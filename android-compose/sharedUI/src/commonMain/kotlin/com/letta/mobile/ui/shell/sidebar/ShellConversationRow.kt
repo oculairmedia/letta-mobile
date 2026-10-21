@@ -52,6 +52,7 @@ import com.letta.mobile.ui.shell.ShellConversationManageMenu
 import com.letta.mobile.ui.shell.ShellConversationMenuActions
 import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LocalReducedMotion
 
 /** What a conversation row can do besides open (the roster's selection opens it); a null rename or pin is one the host does not offer. */
 data class ShellConversationRowActions(
@@ -257,19 +258,27 @@ private fun ConversationLeadingIcon(model: ShellConversationRowModel, hovered: B
 
 /** While its agent is thinking the icon pulses in the primary colour. */
 @Composable
-private fun conversationIconColor(thinking: Boolean, selected: Boolean): Color {
-    val transition = rememberInfiniteTransition(label = "convThinking")
-    val pulse by transition.animateFloat(
+private fun conversationIconColor(thinking: Boolean, selected: Boolean): Color = when {
+    thinking -> MaterialTheme.colorScheme.primary.copy(alpha = thinkingPulseAlpha())
+    selected -> MaterialTheme.colorScheme.onSurface
+    else -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+/**
+ * The pulse exists only while a row is thinking: an infinite transition asks for a frame every
+ * vsync, so one per idle row would keep the frame clock awake for as long as the drawer is on
+ * screen. With reduced motion the thinking colour holds still.
+ */
+@Composable
+private fun thinkingPulseAlpha(): Float {
+    if (LocalReducedMotion.current) return 1f
+    val pulse by rememberInfiniteTransition(label = "convThinking").animateFloat(
         initialValue = PULSE_MIN_ALPHA,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(PULSE_MS), RepeatMode.Reverse),
         label = "convThinkingAlpha",
     )
-    return when {
-        thinking -> MaterialTheme.colorScheme.primary.copy(alpha = pulse)
-        selected -> MaterialTheme.colorScheme.onSurface
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    return pulse
 }
 
 @Composable
