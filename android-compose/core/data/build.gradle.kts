@@ -29,7 +29,6 @@ kotlin {
             api(libs.androidx.room.runtime)
             api(libs.kotlinx.coroutines.core)
             api(libs.kotlinx.serialization.json)
-            implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.8")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
