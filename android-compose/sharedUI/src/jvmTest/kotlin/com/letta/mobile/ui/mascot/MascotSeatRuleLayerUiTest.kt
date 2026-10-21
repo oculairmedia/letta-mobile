@@ -30,7 +30,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * letta-mobile-te3n1.8: Android mounts the transport layer with [MascotLayerDrawing.SEAT_RULE].
+ * letta-mobile-te3n1.8: Android mounts the transport layer following each seat's rule
+ * ([MascotTransport.followsSeatRule]).
  * Opening the agent pane hands the one character from the composer companion to the pane's hero
  * (never two at once), the hero keeps the avatar's live-or-still rule (an idle agent is its still,
  * as ShellDrawerMascotTest pins in place), the layer draws in the agent's own scene so the host's
@@ -41,12 +42,12 @@ class MascotSeatRuleLayerUiTest {
     private class Stage(val shell: FakeMascotShell, val paneOpen: MutableState<Boolean>)
 
     private fun ComposeUiTest.stage(
-        drawing: MascotLayerDrawing = MascotLayerDrawing.SEAT_RULE,
+        followsSeatRule: Boolean = true,
         activity: AgentActivityKind = AgentActivityKind.IDLE,
         host: MascotHost = FakeMascotHost,
         extra: @Composable () -> Unit = {},
     ): Stage {
-        val shell = FakeMascotShell(AGENT, layerMounted = false, host = host, drawing = drawing)
+        val shell = FakeMascotShell(AGENT, layerMounted = false, host = host, followsSeatRule = followsSeatRule)
         shell.registry.setPresence(AGENT, AgentPresence(activity = activity))
         val paneOpen = mutableStateOf(false)
         // A live mascot ticks every frame, so the clock never idles on its own.
@@ -118,7 +119,7 @@ class MascotSeatRuleLayerUiTest {
 
     @Test
     fun theDesktopLayerStillDrawsAnIdleHeroLive() = runComposeUiTest {
-        val stage = stage(drawing = MascotLayerDrawing.LIVE_SLOTS)
+        val stage = stage(followsSeatRule = false)
         stage.paneOpen.value = true
         settle()
         assertEquals(true, theCharacter().live())

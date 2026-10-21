@@ -33,7 +33,7 @@ import com.letta.mobile.avatar.core.MascotBodyTune
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAvailable
-import com.letta.mobile.ui.mascot.pointerInputPassThrough
+import com.letta.mobile.ui.input.pointerInputPassThrough
 import com.letta.mobile.ui.theme.ChatMascotDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.math.roundToInt

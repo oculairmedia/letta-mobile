@@ -56,6 +56,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import com.letta.mobile.ui.haptics.LocalHaptics
+import com.letta.mobile.ui.input.pointerInputPassThrough
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 
@@ -92,7 +93,7 @@ internal data class MascotSeatInfo(
      * per frame. Zero means the same as [bounds].
      */
     val layoutWidth: Float = 0f,
-    /** The seat's live-or-still rule ([MascotSeat]'s `live`); a [MascotLayerDrawing.SEAT_RULE] layer honours it. */
+    /** The seat's live-or-still rule ([MascotSeat]'s `live`); a [MascotTransport.followsSeatRule] layer honours it. */
     val live: Boolean = true,
 ) {
     val onClick: (() -> Unit)? get() = handlers.onClick
@@ -151,6 +152,11 @@ internal class SeatHandlers {
     val touch: MascotTouch
         get() = MascotTouch.answering(onClick, onEdit.takeIf { editable }, onDrag.takeIf { draggable })
 
+    /** Lets the touches a seat that answers nothing receives go on to what is under the layer. */
+    fun passThrough(): Modifier {
+        return if (touch == MascotTouch.PASSES_THROUGH) Modifier.pointerInputPassThrough() else Modifier
+    }
+
     /** Writes [editable] only when it changes, so an unchanged handler swap records no state write. */
     private fun syncEditable() {
         val hasHandler = onEdit != null
@@ -164,22 +170,6 @@ internal class SeatHandlers {
     }
 }
 
-/** How a [MascotTransportLayer] pictures the characters it carries. */
-enum class MascotLayerDrawing {
-    /**
-     * Desktop and web: every carried character live, in one scene per layer slot that is
-     * re-skinned as focus moves, so agent A morphs into agent B where it stands.
-     */
-    LIVE_SLOTS,
-
-    /**
-     * Android: each seat's live-or-still rule (an idle agent's hero is its still, as every avatar
-     * of it is), drawn in the agent's own scene so the host's one-live-driver rule spans the layer
-     * and every other avatar of that agent - no extra live Rive surface on a battery.
-     */
-    SEAT_RULE,
-}
-
 /**
  * The transport verb, and the seats it can send a mascot to. One per window (or activity): every
  * surface declares its seat with [MascotSeat], the shell calls [transportTo] / [rest], and
@@ -187,8 +177,15 @@ enum class MascotLayerDrawing {
  * between them - so the choreography lives here and nowhere else.
  */
 class MascotTransport(
-    /** How the layer pictures what it carries; [MascotLayerDrawing.LIVE_SLOTS] unless the host says otherwise. */
-    val drawing: MascotLayerDrawing = MascotLayerDrawing.LIVE_SLOTS,
+    /**
+     * How the layer pictures what it carries. False (desktop and web): every carried character
+     * live, in one scene per layer slot that is re-skinned as focus moves, so agent A morphs into
+     * agent B where it stands. True (Android): each seat's live-or-still rule (an idle agent's hero
+     * is its still, as every avatar of it is), in the agent's own scene, so the host's
+     * one-live-driver rule spans the layer and every other avatar of that agent - no extra live
+     * Rive surface on a battery.
+     */
+    val followsSeatRule: Boolean = false,
 ) {
     internal val seats = mutableStateMapOf<SeatKey, MascotSeatInfo>()
     private val requested = mutableStateMapOf<String, MascotStage>()
@@ -305,8 +302,15 @@ class MascotTransport(
 
     internal fun seat(key: SeatKey): MascotSeatInfo? = seats[key]
 
-    /** Whether the layer draws [seat]'s character live: always for [MascotLayerDrawing.LIVE_SLOTS], else as the seat says. */
-    internal fun drawsLive(seat: MascotSeatInfo): Boolean = drawing == MascotLayerDrawing.LIVE_SLOTS || seat.live
+    /** Whether the layer draws [seat]'s character live: always, unless it [followsSeatRule] and the seat says still. */
+    internal fun drawsLive(seat: MascotSeatInfo): Boolean {
+        return !followsSeatRule || seat.live
+    }
+
+    /** The scene layer [slot] draws [agent] in: the slot's own (re-skinned as focus moves), or the agent's when it [followsSeatRule]. */
+    internal fun sceneKey(slot: Int, agent: AgentId): String {
+        return if (followsSeatRule) agent.value else "mascot-focus-$slot"
+    }
 
     internal data class SeatKey(val agentId: String, val stage: MascotStage)
 
@@ -330,10 +334,6 @@ internal fun MascotTransport.publishSeat(key: MascotTransport.SeatKey?, bounds: 
 
 /** One agent's mascot as the layer draws it: who, in what look, at which seat. */
 private class SeatedMascot(val agentId: String, val identity: MascotIdentity, val seat: MascotSeatInfo)
-
-/** The scene layer [slot] draws [seated] in: the slot's own (re-skinned as focus moves), or the agent's under [MascotLayerDrawing.SEAT_RULE]. */
-private fun MascotTransport.sceneKey(slot: Int, seated: SeatedMascot): String =
-    if (drawing == MascotLayerDrawing.SEAT_RULE) seated.agentId else "mascot-focus-$slot"
 
 @Composable
 private fun TransportedMascot(
@@ -362,7 +362,7 @@ private fun TransportedMascot(
     val host = LocalMascotHost.current
     // A still has no scene to direct: it is carried and squashed on the layer alone.
     val live = transport.drawsLive(seat)
-    val director = remember(host, sceneKey, identity, live) { if (live) host.entry(sceneKey, identity) else null }?.director
+    val director = remember(host, sceneKey, identity, live) { host.takeIf { live }?.entry(sceneKey, identity) }?.director
     val currentDirector by rememberUpdatedState(director)
     LaunchedEffect(director) { if (director?.carriesBody == true) transport.rigCarriesBody = true }
     LaunchedEffect(director, flight) {
@@ -527,8 +527,7 @@ private class SeatDrag(val flight: MascotTransport.Flight, val feel: MascotDragF
 private fun Modifier.seatInput(handlers: SeatHandlers, hover: MutableInteractionSource, drag: SeatDrag): Modifier {
     val hoverInput = if (handlers.editable) Modifier.hoverable(hover) else Modifier
     val dragInput = if (handlers.draggable) Modifier.seatDrag(handlers, drag) else Modifier
-    val passThrough = if (handlers.touch == MascotTouch.PASSES_THROUGH) Modifier.pointerInputPassThrough() else Modifier
-    return then(passThrough).then(hoverInput).then(dragInput)
+    return then(handlers.passThrough()).then(hoverInput).then(dragInput)
 }
 
 /**
@@ -645,7 +644,7 @@ fun MascotTransportLayer(
         // the focused agent changes, so agent A morphs into agent B where it stands instead of a
         // fresh scene loading in with a flash.
         transport.seatedMascots(registry).forEachIndexed { slot, seated ->
-            val sceneKey = transport.sceneKey(slot, seated)
+            val sceneKey = transport.sceneKey(slot, AgentId(seated.agentId))
             key(sceneKey) {
                 TransportedMascot(seated, origin, reducedMotion, sceneKey = sceneKey)
             }

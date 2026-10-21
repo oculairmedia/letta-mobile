@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.mascot
+package com.letta.mobile.ui.input
 
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEvent

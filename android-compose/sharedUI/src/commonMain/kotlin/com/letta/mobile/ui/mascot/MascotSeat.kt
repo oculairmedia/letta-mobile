@@ -172,8 +172,8 @@ fun MascotSeat(
     /**
      * Whether the seat pictures the agent live or as its still ([MascotInPlace]); a seat that
      * pictures an agent at rest, as the agent panel's hero does, passes [mascotAtWork] so it shows
-     * what every avatar of the agent shows. Drawn in place, or by a [MascotLayerDrawing.SEAT_RULE]
-     * layer (Android); a [MascotLayerDrawing.LIVE_SLOTS] layer draws live.
+     * what every avatar of the agent shows. Drawn in place, or by a layer that
+     * [MascotTransport.followsSeatRule] (Android); any other layer draws live.
      */
     live: Boolean = true,
     empty: @Composable (MascotSeatVacancy) -> Unit,
