@@ -62,6 +62,13 @@ interface ChatBranchingSource {
     fun editAndResend(message: UiMessage, view: ChatBranchView)
 
     fun rerun(message: UiMessage, view: ChatBranchView)
+
+    /**
+     * A branching command sent from the composer (letta-code's terminal `/fork [name]`, which the
+     * App Server does not run): forks the open conversation. False where this host runs it
+     * elsewhere or not at all, so the text is sent as written.
+     */
+    fun runBranchCommand(text: String): Boolean = false
 }
 
 /**

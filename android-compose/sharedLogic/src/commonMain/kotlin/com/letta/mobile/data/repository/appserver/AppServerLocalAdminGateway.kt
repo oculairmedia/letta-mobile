@@ -1,11 +1,18 @@
 package com.letta.mobile.data.repository.appserver
 
+import com.letta.mobile.data.chat.branch.ConversationForkGateway
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
+import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
 import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
+import com.letta.mobile.data.chat.runtime.ChatConversationStore
+import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
+import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.controller.node.iroh.withDefaultContextWindow
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppServerListModelsAdapter
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
@@ -30,7 +37,8 @@ class AppServerLocalAdminGateway(
     private val client: AppServerClient,
     private val requestId: (String) -> String,
 ) {
-    suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> {
+    /** The newest conversations, every agent's or only [agentId]'s (`conversation_list`'s `agent_id` filter). */
+    suspend fun listConversations(limit: Int, archiveStatus: String?, agentId: AgentId? = null): List<Conversation> {
         val response = client.conversationList(
             AppServerCommand.ConversationList(
                 requestId = requestId(Operation.ConversationList.requestName),
@@ -38,6 +46,7 @@ class AppServerLocalAdminGateway(
                     // A number: letta-code's local store ignores a string limit and returns 20.
                     put("limit", limit)
                     archiveStatus?.let { put("archive_status", it) }
+                    agentId?.let { put("agent_id", it.value) }
                     put("order", "desc")
                     put("order_by", "last_message_at")
                 },
@@ -47,11 +56,11 @@ class AppServerLocalAdminGateway(
             .decodeList(Operation.ConversationList, Conversation.serializer())
     }
 
-    suspend fun getConversation(conversationId: String): Conversation {
+    suspend fun getConversation(conversation: ConversationId): Conversation {
         val response = client.conversationRetrieve(
             AppServerCommand.ConversationRetrieve(
                 requestId = requestId(Operation.ConversationRetrieve.requestName),
-                conversationId = conversationId,
+                conversationId = conversation.value,
             ),
         )
         return Payload(response.success, response.error, response.conversation)
@@ -59,19 +68,19 @@ class AppServerLocalAdminGateway(
     }
 
     suspend fun listConversationMessages(
-        conversationId: String,
+        conversation: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
-    ): List<LettaMessage> = listMessages(conversationId, MessagePageQuery(limit, after, null, order))
+    ): List<LettaMessage> = listMessages(conversation, MessagePageQuery(limit, after, null, order))
 
     /** The older-history read. Separate from the tail read because a page is bounded by one cursor. */
     suspend fun listConversationMessagesBefore(
-        conversationId: String,
+        conversation: ConversationId,
         limit: Int,
         before: String,
         order: String,
-    ): List<LettaMessage> = listMessages(conversationId, MessagePageQuery(limit, null, before, order))
+    ): List<LettaMessage> = listMessages(conversation, MessagePageQuery(limit, null, before, order))
 
     /** The cursors one `message.list` accepts, so neither read grows a parameter for the other's. */
     private data class MessagePageQuery(
@@ -82,13 +91,13 @@ class AppServerLocalAdminGateway(
     )
 
     private suspend fun listMessages(
-        conversationId: String,
+        conversation: ConversationId,
         query: MessagePageQuery,
     ): List<LettaMessage> {
         val response = client.conversationMessagesList(
             AppServerCommand.ConversationMessagesList(
                 requestId = requestId(Operation.MessageList.requestName),
-                conversationId = conversationId,
+                conversationId = conversation.value,
                 query = buildJsonObject {
                     query.limit?.let { put("limit", it) }
                     query.after?.let { put("after", it) }
@@ -151,12 +160,12 @@ class AppServerLocalAdminGateway(
         return AppServerListModelsAdapter.toLlmModels(entries)
     }
 
-    suspend fun createConversation(agentId: String, summary: String?): Conversation {
+    suspend fun createConversation(agent: AgentId, summary: String?): Conversation {
         val response = client.conversationCreate(
             AppServerCommand.ConversationCreate(
                 requestId = requestId(Operation.ConversationCreate.requestName),
                 body = buildJsonObject {
-                    put("agent_id", agentId)
+                    put("agent_id", agent.value)
                     summary?.let { put("summary", it) }
                 },
             ),
@@ -165,15 +174,15 @@ class AppServerLocalAdminGateway(
             .decode(Operation.ConversationCreate, Conversation.serializer())
     }
 
-    suspend fun setConversationModel(conversationId: String, model: String): Conversation =
-        updateConversation(conversationId, buildJsonObject { put("model", model) })
+    suspend fun setConversationModel(conversation: ConversationId, model: String): Conversation =
+        updateConversation(conversation, buildJsonObject { put("model", model) })
 
-    suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation =
-        updateConversation(conversationId, buildJsonObject { put("archived", archived) })
+    suspend fun setConversationArchived(conversation: ConversationId, archived: Boolean): Conversation =
+        updateConversation(conversation, buildJsonObject { put("archived", archived) })
 
     /** The conversation's title is its `summary`. */
     suspend fun renameConversation(update: ConversationSummaryUpdate): Conversation =
-        updateConversation(update.conversationId.value, buildJsonObject { put("summary", update.summary.value) })
+        updateConversation(update.conversationId, buildJsonObject { put("summary", update.summary.value) })
 
     /**
      * The App Server has no `conversation_delete`, so a delete archives the
@@ -182,7 +191,7 @@ class AppServerLocalAdminGateway(
      */
     suspend fun setConversationRemoved(conversationId: ConversationId, removed: Boolean): Conversation =
         updateConversation(
-            conversationId.value,
+            conversationId,
             buildJsonObject {
                 put("archived", removed)
                 put("hidden", removed)
@@ -195,7 +204,7 @@ class AppServerLocalAdminGateway(
      */
     suspend fun restoreRemovedConversation(conversationId: ConversationId, archived: Boolean): Conversation =
         updateConversation(
-            conversationId.value,
+            conversationId,
             buildJsonObject {
                 put("archived", archived)
                 put("hidden", false)
@@ -219,7 +228,7 @@ class AppServerLocalAdminGateway(
         )
         val forkedId = Payload(response.success, response.error, response.conversationId)
             .requireValue(Operation.ConversationFork)
-        return getConversation(forkedId)
+        return getConversation(ConversationId(forkedId))
     }
 
     /** `conversation_recompile`; throws with the server's reason when it refuses. */
@@ -234,11 +243,11 @@ class AppServerLocalAdminGateway(
         check(response.success) { response.error ?: Operation.ConversationRecompile.failureMessage }
     }
 
-    private suspend fun updateConversation(conversationId: String, body: JsonObject): Conversation {
+    private suspend fun updateConversation(conversation: ConversationId, body: JsonObject): Conversation {
         val response = client.conversationUpdate(
             AppServerCommand.ConversationUpdate(
                 requestId = requestId(Operation.ConversationUpdate.requestName),
-                conversationId = conversationId,
+                conversationId = conversation.value,
                 body = body,
             ),
         )
@@ -277,5 +286,68 @@ class AppServerLocalAdminGateway(
 
         val failureMessage = "Bundled App Server $responseDescription failed"
         val missingPayloadMessage = "Bundled App Server $responseDescription returned no $payloadDescription"
+    }
+}
+
+/**
+ * An App Server session's conversation operations over its own protocol commands
+ * (`conversation_list` / `_create` / `_update` / `_fork` / `_recompile`), as the chat gateway
+ * capabilities every host probes for. Desktop's App Server gateway and the web's ws:// gateway
+ * both answer through it. An Iroh host takes none of these commands (only
+ * `admin_rpc`), so it is served by [com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway]
+ * instead.
+ */
+class AppServerConversationAdmin(private val admin: AppServerLocalAdminGateway) :
+    ChatConversationStore,
+    ChatGatewayExtras,
+    ConversationSummaryGateway,
+    ConversationForkGateway,
+    ConversationRecompileGateway {
+    override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> =
+        admin.listConversations(limit, archiveStatus)
+
+    /** The agent's own conversations, active and archived; filtered here too, for a store that ignores `agent_id`. */
+    override suspend fun listConversationsForAgent(agentId: String, limit: Int): List<Conversation> =
+        AgentId(agentId).let { agent -> admin.listConversations(limit, ARCHIVE_STATUS_ALL, agent).filter { it.agentId == agent } }
+
+    override suspend fun getConversation(conversationId: String): Conversation = admin.getConversation(ConversationId(conversationId))
+
+    /**
+     * The App Server has no `conversation_delete`, so a delete archives and hides the conversation;
+     * it leaves every list (Archived too) and stays on disk, and the undo brings it back.
+     */
+    override suspend fun deleteConversation(conversationId: String) {
+        admin.setConversationRemoved(ConversationId(conversationId), removed = true)
+    }
+
+    override val deleteBehavior: ConversationDeleteBehavior get() = ConversationDeleteBehavior.RemovesFromLists
+
+    /** The undo of [deleteConversation]: un-hide, and archived again only if it was archived before. */
+    override suspend fun restoreDeletedConversation(conversationId: String, wasArchived: Boolean) {
+        admin.restoreRemovedConversation(ConversationId(conversationId), archived = wasArchived)
+    }
+
+    override suspend fun createConversation(agentId: String, summary: String?): Conversation =
+        admin.createConversation(AgentId(agentId), summary)
+
+    override suspend fun createAgent(params: AgentCreateParams): Agent = admin.createAgent(params)
+
+    override suspend fun listLlmModels(): List<LlmModel> = admin.listLlmModels()
+
+    override suspend fun setConversationModel(conversationId: String, model: String): Conversation =
+        admin.setConversationModel(ConversationId(conversationId), model)
+
+    override suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation =
+        admin.setConversationArchived(ConversationId(conversationId), archived)
+
+    /** Rename (and the generated title) is the conversation's `summary`. */
+    override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation = admin.renameConversation(update)
+
+    override suspend fun forkConversation(request: ConversationForkRequest): Conversation = admin.forkConversation(request)
+
+    override suspend fun recompileConversation(request: ConversationRecompileRequest) = admin.recompileConversation(request)
+
+    private companion object {
+        const val ARCHIVE_STATUS_ALL = "all"
     }
 }

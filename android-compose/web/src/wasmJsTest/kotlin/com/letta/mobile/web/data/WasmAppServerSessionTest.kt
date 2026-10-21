@@ -57,7 +57,6 @@ class WasmAppServerSessionTest {
                 router = router,
                 appServerAdmin = AppServerLocalAdminGateway(client) { operation -> "test-$operation" },
             ),
-            scope = this,
         )
         val (_, events) = router.subscribe(AgentId("agent-1"), ConversationId("conv-1"))
         val started = CompletableDeferred<Unit>()
@@ -140,7 +139,6 @@ class WasmAppServerSessionTest {
                 router = router,
                 appServerAdmin = AppServerLocalAdminGateway(client) { operation -> "test-$operation" },
             ),
-            scope = this,
         )
         assertNull(session.permissionModes, "no mode chip until the host's gateway is bound")
 
@@ -152,9 +150,11 @@ class WasmAppServerSessionTest {
         session.bindIrohChat(gateway)
 
         assertSame(gateway, session.permissionModes)
+        assertSame(gateway, session.conversations, "the conversation owner lists and edits through the same gateway")
         assertNotNull(gateway.permissionModes, "the host advertises the mode relay")
         session.close()
         assertNull(session.irohChat)
+        assertNull(session.conversations)
     }
 
     private fun nativeAdmin() = AppServerLocalAdminGateway(DefaultAppServerClient(FakeTransport())) { operation -> "test-$operation" }

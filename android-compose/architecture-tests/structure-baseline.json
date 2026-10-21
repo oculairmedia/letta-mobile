@@ -1417,8 +1417,6 @@
     "com.letta.mobile.util -> com.letta.mobile.data.model",
     "com.letta.mobile.util -> com.letta.mobile.data.repository.api",
     "com.letta.mobile.util -> com.letta.mobile.ui.common",
-    "com.letta.mobile.web.chat -> com.letta.mobile.web.data",
-    "com.letta.mobile.web.data -> com.letta.mobile.web.chat",
     "com.letta.mobile.web.data -> com.letta.mobile.web.iroh",
     "com.letta.mobile.web.iroh -> com.letta.mobile.web.data"
   ],

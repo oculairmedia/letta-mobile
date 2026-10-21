@@ -1,5 +1,8 @@
 package com.letta.mobile.data.shell
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.letta.mobile.data.desktopshell.ConversationTabsReducer
 import com.letta.mobile.data.home.conversationRecency
 import com.letta.mobile.data.model.AgentId
@@ -28,6 +31,39 @@ interface ShellChatPort {
 
     /** Puts [text] in the composer for the person to send. */
     fun stageComposerText(text: String)
+}
+
+/**
+ * The chat of a host whose conversation owner is rebuilt with each backend session (the web's):
+ * the navigator outlives a connection, so it talks to this, which follows the current [owner];
+ * with none (no session) the verbs do nothing.
+ */
+class SessionShellChatPort : ShellChatPort {
+    var owner: ShellChatPort? by mutableStateOf(null)
+
+    override fun conversations(): List<ShellConversationRef> = owner?.conversations().orEmpty()
+
+    override val selectedConversation: ConversationId? get() = owner?.selectedConversation
+
+    override fun selectConversation(conversation: ConversationId) {
+        owner?.selectConversation(conversation)
+    }
+
+    override fun createConversationForAgent(agent: AgentId, onCreated: (ConversationId) -> Unit) {
+        owner?.createConversationForAgent(agent, onCreated)
+    }
+
+    override fun startNewChat(agent: AgentId?) {
+        owner?.startNewChat(agent)
+    }
+
+    override fun send(conversation: ConversationId, text: String) {
+        owner?.send(conversation, text)
+    }
+
+    override fun stageComposerText(text: String) {
+        owner?.stageComposerText(text)
+    }
 }
 
 /** A prompt typed into Home's chatbox, and the agents it can go to. */

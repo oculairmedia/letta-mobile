@@ -7,8 +7,13 @@ import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.timeline.TimelineTransport
 
-interface ChatGateway : TimelineTransport {
-    suspend fun listConversations(limit: Int = DEFAULT_CONVERSATION_LIMIT, archiveStatus: String? = null): List<Conversation>
+/**
+ * A backend's conversation records: list, read, delete and the undo. Part of every [ChatGateway];
+ * a host that serves them apart from a timeline (an App Server session's own commands) implements
+ * just this, and a gateway delegates to it.
+ */
+interface ChatConversationStore {
+    suspend fun listConversations(limit: Int = ChatGateway.DEFAULT_CONVERSATION_LIMIT, archiveStatus: String? = null): List<Conversation>
     // letta-mobile-i9h61.3.2: agent-scoped list (the OTHER agent's
     // conversations, for tap-to-navigate). Reads via the wrapper's
     // conversation.list_agent admin_rpc when the Iroh transport is
@@ -19,7 +24,7 @@ interface ChatGateway : TimelineTransport {
     // count.
     suspend fun listConversationsForAgent(
         agentId: String,
-        limit: Int = DEFAULT_AGENT_CONVERSATION_LIMIT,
+        limit: Int = ChatGateway.DEFAULT_AGENT_CONVERSATION_LIMIT,
     ): List<Conversation> = emptyList()
     suspend fun getConversation(conversationId: String): Conversation
     suspend fun deleteConversation(conversationId: String) {
@@ -37,7 +42,10 @@ interface ChatGateway : TimelineTransport {
     suspend fun restoreDeletedConversation(conversationId: String, wasArchived: Boolean) {
         throw UnsupportedOperationException("restoreDeletedConversation is not supported by this gateway")
     }
+}
 
+/** A backend the chat runs over: its timeline and its conversation records. */
+interface ChatGateway : TimelineTransport, ChatConversationStore {
     companion object {
         const val DEFAULT_CONVERSATION_LIMIT = 40
         const val DEFAULT_AGENT_CONVERSATION_LIMIT = 500

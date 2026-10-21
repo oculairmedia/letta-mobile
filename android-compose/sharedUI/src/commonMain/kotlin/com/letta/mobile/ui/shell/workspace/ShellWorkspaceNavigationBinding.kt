@@ -12,6 +12,8 @@ import com.letta.mobile.ui.shell.header.UnifiedSearchHit
 import com.letta.mobile.ui.shell.header.UnifiedSearchKind
 import com.letta.mobile.ui.shell.navDrawerActions
 import com.letta.mobile.ui.shell.navDrawerState
+import com.letta.mobile.ui.shell.ShellDrawerConversations
+import com.letta.mobile.ui.shell.conversations.ShellTimelineConversationList
 import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
 import com.letta.mobile.ui.shell.rail.ShellRailFocus
 import kotlin.time.Instant
@@ -23,8 +25,9 @@ fun ShellWorkspaceState.workspaceNavigation(
     agents: List<Pair<String, String>>,
     now: Instant,
     identities: Map<String, MascotIdentity> = emptyMap(),
+    conversations: ShellTimelineConversationList? = null,
 ): ShellWorkspaceNavigation {
-    val drawer = navDrawerState(agents, now)
+    val drawer = navDrawerState(agents, now, conversations?.drawer(focusedAgentId) ?: ShellDrawerConversations())
     return ShellWorkspaceNavigation(
         rail = ShellLibraryRailState(
             agents = agents,
@@ -40,7 +43,9 @@ fun ShellWorkspaceState.workspaceNavigation(
  * The workspace's navigation verbs: the drawer's, with the rail's "+" opening the New conversation
  * picker and a pick from the expanded rail (the library) closing it, as on the desktop.
  */
-fun ShellWorkspaceNavigator.workspaceNavigationActions(): ShellWorkspaceNavigationActions {
+fun ShellWorkspaceNavigator.workspaceNavigationActions(
+    conversations: ShellTimelineConversationList? = null,
+): ShellWorkspaceNavigationActions {
     val drawer = navDrawerActions(afterNavigate = {})
     return ShellWorkspaceNavigationActions(
         rail = drawer.rail.copy(
@@ -50,7 +55,7 @@ fun ShellWorkspaceNavigator.workspaceNavigationActions(): ShellWorkspaceNavigati
             },
             onNewSession = { state.overlays.newConversation = true },
         ),
-        panel = drawer.panel,
+        panel = conversations?.panelActions(drawer.panel) ?: drawer.panel,
         onRailDismiss = { state.railExpanded = false },
     )
 }

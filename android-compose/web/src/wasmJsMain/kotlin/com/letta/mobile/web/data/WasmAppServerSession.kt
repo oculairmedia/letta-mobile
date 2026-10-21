@@ -2,9 +2,9 @@ package com.letta.mobile.web.data
 
 import com.letta.mobile.data.canvas.CanvasRelayDial
 import com.letta.mobile.data.chat.runtime.EnginePermissionModes
+import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.PermissionModeGateway
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
-import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.HostId
 import com.letta.mobile.data.model.IrohServerAddress
 import com.letta.mobile.data.model.LettaConfig
@@ -16,7 +16,6 @@ import com.letta.mobile.data.runtime.DurableTurnDelivery
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.permissionGovernedTurnStackSpec
 import com.letta.mobile.data.runtime.attachTurnStack
-import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerWebSocketDial
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
@@ -24,27 +23,20 @@ import com.letta.mobile.data.transport.appserver.openAppServerWebSocket
 import com.letta.mobile.web.iroh.IrohWasmAppServerTransport
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import kotlin.time.Duration.Companion.milliseconds
 
 internal class WasmAppServerSession(
     private val link: WasmAppServerLink,
     services: WasmAppServerServices,
-    private val scope: CoroutineScope,
 ) {
     val client: DefaultAppServerClient get() = link.client
     val isConnected: Flow<Boolean> get() = link.isConnected
@@ -68,56 +60,28 @@ internal class WasmAppServerSession(
     /** The composer's mode chip: the Iroh host's over Iroh, this session's own turn stack over ws://. */
     val permissionModes: PermissionModeGateway? get() = irohChat ?: turnStackModes
 
+    /**
+     * The gateway the shared conversation owner lists and edits through: the Iroh host's [irohChat]
+     * (the same instance), or over ws:// the App Server's own commands ([bindConversations]).
+     */
+    var conversations: ChatGateway? = null
+        private set
+
     fun bindIrohChat(gateway: IrohAdminRpcChatGateway) {
         irohChat?.close()
         irohChat = gateway
+        conversations = gateway
+    }
+
+    fun bindConversations(gateway: ChatGateway) {
+        conversations = gateway
     }
 
     private fun releaseIrohChat() {
         // A queued answer stays in the durable outbox; the next session's gateway sends it.
         irohChat?.close()
         irohChat = null
-    }
-
-    val conversationByAgent = mutableMapOf<String, String>()
-    private val conversationInFlight = mutableMapOf<String, Deferred<String>>()
-
-    suspend fun ensureConversation(agentId: String, nextRequestId: (String) -> String): String {
-        conversationByAgent[agentId]?.let { return it }
-        val pending = conversationInFlight[agentId] ?: scope.async {
-            resolveConversation(agentId, nextRequestId)
-        }.also { conversationInFlight[agentId] = it }
-        return try {
-            pending.await().also { conversationByAgent[agentId] = it }
-        } finally {
-            if (pending.isCompleted && conversationInFlight[agentId] === pending) {
-                conversationInFlight -= agentId
-            }
-        }
-    }
-
-    private suspend fun resolveConversation(agentId: String, nextRequestId: (String) -> String): String {
-        val listed = admin(
-            method = "conversation.list",
-            params = buildJsonObject {
-                put("limit", "100")
-                put("order", "desc")
-                put("order_by", "last_message_at")
-            },
-            nextRequestId = nextRequestId,
-        ) as? JsonArray ?: JsonArray(emptyList())
-        val existing = AppServerProtocol.json
-            .decodeFromJsonElement(ListSerializer(Conversation.serializer()), listed)
-            .firstOrNull { it.agentId.value == agentId }
-        val conversation = existing ?: AppServerProtocol.json.decodeFromJsonElement(
-            Conversation.serializer(),
-            admin(
-                method = "conversation.create",
-                params = buildJsonObject { put("agent_id", agentId) },
-                nextRequestId = nextRequestId,
-            ) ?: error("Conversation create returned no result"),
-        )
-        return conversation.id.value
+        conversations = null
     }
 
     suspend fun admin(
@@ -148,9 +112,6 @@ internal class WasmAppServerSession(
         withContext(NonCancellable) {
             releaseIrohChat()
             router.detach()
-            conversationInFlight.values.forEach { it.cancel() }
-            conversationInFlight.clear()
-            conversationByAgent.clear()
         }
     }
 }
@@ -189,7 +150,7 @@ internal suspend fun connectWasmAppServerSession(
     val router = AppServerRuntimeEventRouter()
     try {
         val services = attachServices(link, router, scope, TurnStackOptions(modes.takeIf { !iroh }, nextRequestId))
-        return WasmAppServerSession(link, services, scope)
+        return WasmAppServerSession(link, services)
     } catch (error: Throwable) {
         withContext(NonCancellable) {
             router.detach()

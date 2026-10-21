@@ -201,8 +201,7 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopCha
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopChatSessionPort.kt 234
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopChatSubagents.kt 36
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopChatTimelineInputs.kt 99
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopConversationBrancher.kt 146
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopConversationManagement.kt 173
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopConversationBrancher.kt 38
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopConversationMarks.kt 51
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopConversationPrefs.kt 41
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopDeletionUndo.kt 73

@@ -1,6 +1,9 @@
 package com.letta.mobile.web.chat
 
 import com.letta.mobile.data.chat.approval.ChatApprovalAnswerer
+import com.letta.mobile.data.chat.conversations.TimelineConversationChat
+import com.letta.mobile.data.chat.conversations.withConversations
+import com.letta.mobile.data.chat.recompile.RecompileStatus
 import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.timeline.TimelineSyncLoop
@@ -38,19 +41,20 @@ class WebChatBinding(
      * gateway); null keeps the port's own in-flight tracking only.
      */
     val hostApprovals: IrohAdminRpcChatGateway? = null,
+    /** The shared conversation owner (fork, edit, rerun, `/recompile`) and the shell's `/` palette; null: neither. */
+    val conversations: TimelineConversationChat? = null,
 )
 
 /**
  * letta-mobile-o4ygk.4.5: the web client's [ChatSessionPort], the way Android's
  * `AdminChatSessionPort` and desktop's `DesktopChatSessionPort` bind theirs.
  *
- * The web has no conversation owner of its own, so this only binds: the shared timeline loop runs
- * over [WebChatBinding.transport], and the commonMain [TimelineChatSessionPort] presents it (the
+ * The web binds only: the shared timeline loop runs over [WebChatBinding.transport], and the
+ * commonMain [TimelineChatSessionPort] presents it with the shared owner's extension points (the
  * same timeline presenter, composer policy and optimistic send every client uses). Build one per
  * conversation in a scope that ends with it, and [close] it when the page moves on.
  *
- * The timeline lives in memory: a reload hydrates it again from the server (the web has no
- * persistent timeline store or paged history yet: letta-mobile-o4ygk.4.7).
+ * The timeline lives in memory: a reload hydrates it again (no persistent store yet: letta-mobile-o4ygk.4.7).
  */
 class WebChatSessionPort(
     binding: WebChatBinding,
@@ -68,7 +72,7 @@ class WebChatSessionPort(
         controls = binding.controls,
         approvals = hostApprovalState(binding, scope),
         composerHost = hostInputs,
-    ).withChips(scope, binding.target, binding.chips)
+    ).withChips(scope, binding.target, binding.chips).withConversations(binding.conversations)
     private val port = TimelineChatSessionPort(
         session = TimelineSyncLoopSession(loop),
         target = binding.target,
@@ -94,6 +98,7 @@ class WebChatSessionPort(
     override val composer: StateFlow<ChatComposerUiState> get() = port.composer
     override val actions: ChatActions get() = port.actions
     override val capabilities: StateFlow<ChatSurfaceCapabilities> get() = port.capabilities
+    override val recompileStatus: StateFlow<RecompileStatus> get() = port.recompileStatus
 
     /** Stops the conversation's timeline (its stream subscriber and send pipeline). */
     fun close() = loop.close()

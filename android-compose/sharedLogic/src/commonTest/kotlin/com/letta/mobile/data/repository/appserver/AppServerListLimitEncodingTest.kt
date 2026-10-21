@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.appserver
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.runtime.TurnEngineTestStreamClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -34,8 +35,8 @@ class AppServerListLimitEncodingTest {
         val gateway = AppServerLocalAdminGateway(client) { it }
 
         gateway.listConversations(limit = 200, archiveStatus = null)
-        gateway.listConversationMessages("conv-1", limit = 50, after = null, order = "desc")
-        gateway.listConversationMessagesBefore("conv-1", limit = 30, before = "msg-9", order = "desc")
+        gateway.listConversationMessages(ConversationId("conv-1"), limit = 50, after = null, order = "desc")
+        gateway.listConversationMessagesBefore(ConversationId("conv-1"), limit = 30, before = "msg-9", order = "desc")
 
         assertEquals(listOf(200, 50, 30).map(::JsonPrimitive), client.queries.map { it["limit"] })
     }

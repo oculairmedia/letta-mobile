@@ -20,6 +20,7 @@ import com.letta.mobile.desktop.agent.agentEditorHost
 import com.letta.mobile.ui.shell.workspace.ShellCanvasOwner
 import com.letta.mobile.ui.chat.session.ChatHostCommand
 import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
+import com.letta.mobile.data.chat.conversations.ClientCommandRoutes
 import com.letta.mobile.desktop.chat.DesktopChatSubagents
 import com.letta.mobile.desktop.chat.DesktopChatSessionPort
 import com.letta.mobile.desktop.chat.DesktopSharedChatPage
@@ -105,11 +106,11 @@ private fun rememberDesktopShellChatHost(context: DesktopShellContext, frame: De
             onEditAgent = { navigator.editAgentId = it?.let(::AgentId) },
             onCanvasSessionChange = { core.canvasShell.activeSession = it },
             showDockedCanvas = showDockedCanvas,
-            client = DesktopClientCommandRoutes(
-                onSearch = { context.overlays.commandPalette = true },
-                onOpenModelPicker = { context.overlays.modelPicker = true },
-                onRenameChat = { context.overlays.renameChat = true },
-                onNewChat = { context.openNewChatForFocusedAgent(focus) },
+            client = ClientCommandRoutes(
+                search = { context.overlays.commandPalette = true },
+                models = { context.overlays.modelPicker = true },
+                rename = { context.overlays.renameChat = true },
+                newChat = { context.openNewChatForFocusedAgent(focus) },
             ),
         ),
     )
