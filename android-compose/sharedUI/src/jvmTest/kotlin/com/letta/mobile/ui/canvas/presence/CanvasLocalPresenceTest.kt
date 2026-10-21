@@ -54,29 +54,24 @@ class CanvasLocalPresenceTest {
         assertEquals(LocalCursorPosition(Offset(4f, 8f), false), cursor.current)
     }
 
-    @Test
-    fun stalledDepartureHasABoundedLifetime() = runTest {
+    private suspend fun departUsing(update: suspend () -> Unit) {
         val transport = object : CanvasPresenceTransport by RecordingTransport() {
-            override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence) {
-                awaitCancellation()
-            }
+            override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence) = update()
         }
         departCanvasPresence(target(transport), LocalPeerPresence(
             PresenceIdentity.forPeer(CanvasPresencePeerId("peer")), LocalCursorPosition(Offset.Zero, active = true),
         ))
+    }
+
+    @Test
+    fun stalledDepartureHasABoundedLifetime() = runTest {
+        departUsing { awaitCancellation() }
         assertEquals(500L, testScheduler.currentTime)
     }
 
     @Test
     fun failedDepartureDoesNotCrashDisposal() = runTest {
-        val transport = object : CanvasPresenceTransport by RecordingTransport() {
-            override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence) {
-                error("Transport is already closed")
-            }
-        }
-        departCanvasPresence(target(transport), LocalPeerPresence(
-            PresenceIdentity.forPeer(CanvasPresencePeerId("peer")), LocalCursorPosition(Offset.Zero, active = true),
-        ))
+        departUsing { error("Transport is already closed") }
     }
 
     @Test
