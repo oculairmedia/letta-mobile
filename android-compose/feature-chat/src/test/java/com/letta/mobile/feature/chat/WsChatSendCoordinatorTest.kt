@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ReasoningMessage
@@ -149,6 +150,17 @@ class WsChatSendCoordinatorTest {
             )
         }
 
+        // The shim runs the send in a conversation of its own. Its echo of the user message
+        // carries the send's otid, which binds that server conversation to this chat's; a bare
+        // TurnStarted for an unknown conversation may never select it on its own (that is
+        // another conversation's screen, see ChatSendCoordinatorForegroundRoutingTest).
+        val otid = timelineRepository.externalLocals.single().otid
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                UserMessage(id = "user-echo", contentRaw = JsonPrimitive("hello"), otid = otid, runId = "run-1", turnId = "turn-1"),
+                conversationId = "conv-shim-created",
+            )
+        )
         coordinator.handleEvent(
             WsTimelineEvent.TurnStarted(
                 turnId = "turn-1",
@@ -157,12 +169,23 @@ class WsChatSendCoordinatorTest {
                 runId = "run-1",
             )
         )
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("hi"), runId = "run-1"),
+                conversationId = "conv-shim-created",
+            )
+        )
         advanceUntilIdle()
 
-        assertEquals("conv-shim-created", activeConversation)
-        assertEquals("conv-shim-created", observedConversation)
+        // The chat stays on its own conversation, and the shim's turn and reply land in it.
+        assertEquals("conv-rest-fallback", activeConversation)
+        assertEquals("conv-rest-fallback", observedConversation)
         assertEquals("conv-rest-fallback", timelineRepository.externalLocals.first().conversationId)
-        assertEquals(ConversationState.Ready("conv-shim-created"), uiState.value.conversationState)
+        assertEquals(
+            listOf("conv-rest-fallback"),
+            timelineRepository.ingestedMessages.filter { it.message.id == "reply-1" }.map { it.conversationId },
+        )
+        assertTrue(uiState.value.isStreaming)
     }
 
     // letta-mobile-sfex6: a TurnStarted for a DIFFERENT agent (e.g. the main
@@ -1267,7 +1290,10 @@ class WsChatSendCoordinatorTest {
             conversationRepository = stubConversationRepository(),
             uiState = uiState,
             clearComposerAfterSend = {},
-            activeConversationId = { "conv-active" },
+            // The repaired conversation is the one on screen, so its stale error is the one cleared;
+            // a background repair leaves the visible conversation's error alone
+            // (ChatSendCoordinatorForegroundRoutingTest.backgroundCursorRepairSuccessDoesNotClearForegroundError).
+            activeConversationId = { "conv-expired" },
             setActiveConversationId = {},
             startTimelineObserver = {},
             clientVersionProvider = clientVersionProvider,
