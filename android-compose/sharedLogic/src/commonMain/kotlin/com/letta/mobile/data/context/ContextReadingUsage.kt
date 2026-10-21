@@ -77,6 +77,10 @@ fun Flow<ContextReadingInputs>.contextUsageStates(breakdown: ContextBreakdownLoa
     }
 }
 
+/** Matched to the reading on show, loaded since it came in, or the only figure there is. */
+private fun ContextBreakdown.isCurrentFor(total: Int?, loadedAt: Int?): Boolean =
+    total == null || reportedTotal == total || loadedAt == total
+
 /** What the meter chooses between at one instant. */
 private class MeterInputs(val reading: ContextWindowUsageState, val key: ContextBreakdownKey?, val cached: ContextBreakdown?)
 
@@ -92,14 +96,15 @@ private class MeterChoice(
 ) {
     fun advance(next: MeterInputs): MeterChoice {
         val total = next.reading.usage?.usedTokens
-        val arrivedNow = next.cached != null && next.key == key && next.cached !== cached
-        val loadedAt = when {
-            arrivedNow -> total
-            next.key == key && next.cached === cached -> readingWhenLoaded
-            else -> null
-        }
-        val current = next.cached?.takeIf { total == null || it.reportedTotal == total || (loadedAt != null && loadedAt == total) }
+        val loadedAt = loadedAtFor(next, total)
+        val current = next.cached?.takeIf { it.isCurrentFor(total, loadedAt) }
         return MeterChoice(current?.let { ContextWindowUsagePolicy.read(it.overview) } ?: next.reading, next.key, next.cached, loadedAt)
+    }
+
+    /** The reading on show when [next]'s breakdown arrived; unknown for a breakdown found already cached. */
+    private fun loadedAtFor(next: MeterInputs, total: Int?): Int? {
+        if (next.cached == null || next.key != key) return null
+        return if (next.cached === cached) readingWhenLoaded else total
     }
 }
 
