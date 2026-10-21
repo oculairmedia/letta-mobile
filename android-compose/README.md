@@ -76,9 +76,9 @@ Two categories were removed, and they are not the same:
 ## Prerequisites
 
 - Android Studio with Android SDK Platform 37 and Build-Tools 36+ installed
-- A full JDK 26 for CI parity. Gradle 9.6.1 can run on JDK 17-26, so Android
-  Studio's bundled JBR is still acceptable for local builds when it is within
-  that range.
+- A supported full JDK to launch Gradle (the examples use JDK 26).
+  `gradle/gradle-daemon-jvm.properties` selects JDK 21 for the build daemon,
+  independently of `JAVA_HOME`; see [Java setup](../CONTRIBUTING.md#local-android-setup).
 - `local.properties` pointing at your Android SDK
 
 `compileSdk`, `targetSdk`, `minSdk`, kotlinx-coroutines, Ktor, Hilt, AGP, and

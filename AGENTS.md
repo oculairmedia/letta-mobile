@@ -54,8 +54,8 @@ git push --force-with-lease                 # safe force-push to your branch
 
 | Check | Workflow | Runs on | What it actually runs |
 |---|---|---|---|
-| `test` | `android.yml` | PRs + main pushes touching the workflow's paths | Required aggregate of `test-workload` and `api-docs`; neither may fail, skip or cancel. The workload runs: CI policy script tests, stateful-mock gate, then one Gradle graph: `:app:compileSideloadDebugKotlin :core:android-data:testDebugUnitTest :app:testRootDebugUnitTest :app:testScreenshot :build-logic:test checkArchitectureBoundaries :architecture-tests:test :architecture-tests:architectureTest :quality:detekt-rules:check` (the last includes `guardrailDetekt`, blocking, on changed `.kt` files). **PRs only**, path-filtered additive tasks from `scripts/ci/changed-gradle-modules.sh` (`:feature-chat`, `:designsystem`, `:sharedUI:jvmTest`, `:desktop:test`, `:cli`, `:plugin-*`, … only when that module's own tree changed). |
-| `shared-multiplatform` | `android.yml` | same | `:sharedLogic:jvmTest` (12 min bound), `:appserver-cli:test`, `:iroh-wrapper-cli:test`, then **compiles only** for hostNative and wasmJs (`:sharedLogic`, `:sharedUI`) plus a Node unit test of the karma reporter config (`sharedLogic/karma.config.test.cjs`); browser tests run only in `web-wasm`. Not `:sharedLogic:allTests` (hostNativeTest hangs) and not `:desktop:test`. |
+| `test` | `android.yml` | PRs + main pushes touching the workflow's paths | Required aggregate of `test-workload`, `api-docs` and `api-contract-windows`; all three must explicitly succeed. The workload runs policy/docs checks, the stateful-mock gate and a Gradle graph: `:app:compileSideloadDebugKotlin :core:android-data:testDebugUnitTest :app:testRootDebugUnitTest :app:testScreenshot :build-logic:test checkArchitectureBoundaries apiCheck :architecture-tests:test :architecture-tests:architectureTest :architecture-tests:structureReport :quality:detekt-rules:check` (the last includes blocking `guardrailDetekt` on changed Kotlin code). API signatures are checked on Linux and Windows; KDoc/package coverage and generated-reference checks also gate this status. **PRs only**, path-filtered additive tasks from `scripts/ci/changed-gradle-modules.sh` (`:feature-chat`, `:designsystem`, `:sharedUI:jvmTest`, `:desktop:test`, `:cli`, `:plugin-*`, …). |
+| `shared-multiplatform` | `android.yml` | same | Bounded `:sharedLogic:jvmTest`, `:appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist :core:runtime:jvmTest`, host-native/WASM test compiles for `:core:runtime` and `:sharedLogic`, WASM main/test compiles for `:sharedUI`, and `sharedLogic/karma.config.test.cjs`. Browser tests run only in `web-wasm`. Not `:sharedLogic:allTests` (hostNativeTest hangs) or `:desktop:test`. |
 | `build-apk-pass` | `android.yml` | same | `:app:assembleRootDebug`. `:app:assemblePlayRelease` + APK size/R8 validation run on **main pushes only**; on PRs that matrix leg skips its build but still reports success. |
 | `detekt` | `android.yml` | PRs + main pushes touching the workflow's paths, after the other three | `./gradlew detekt -Parchitecture.strict=true` against each module's `detekt-baseline.xml`: only findings not already in the baseline fail, wherever they are (a finding in a file the PR never touched still blocks). Covers `app`, `core:android-data`, `designsystem`, `feature-chat`, `quality:detekt-rules`, and every `src/<sourceSet>/kotlin` dir of `sharedLogic`, `sharedUI`, `plugin-view`, `desktop`, `web` (by4vm.65). |
 
@@ -254,8 +254,8 @@ When running compilation, test execution, or deployment commands, you must confi
 ### Windows Environments (PowerShell)
 Explicitly configure the environment variables in your shell session before running Gradle:
 ```powershell
-# Prefer a full JDK 26 for CI parity. Android Studio's bundled JBR is acceptable
-# for local builds when it is a supported Gradle runtime (JDK 17-26).
+# Example launcher JDK. gradle/gradle-daemon-jvm.properties selects JDK 21
+# for the daemon independently of JAVA_HOME; see CONTRIBUTING.md.
 $env:JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-26"
 $env:ANDROID_HOME="$env:USERPROFILE\AppData\Local\Android\Sdk"
 ./gradlew :app:compileRootDebugKotlin
@@ -272,7 +272,7 @@ $env:ANDROID_HOME="$env:USERPROFILE\AppData\Local\Android\Sdk"
 Use standard Bash syntax to prefix the build command with the required paths if they are not already in your environment:
 ```bash
 # Set if not globally available:
-export JAVA_HOME="/usr/lib/jvm/jdk-26"  # Or another supported JDK 17-26 path
+export JAVA_HOME="/usr/lib/jvm/jdk-26"  # launcher; configured daemon uses JDK 21
 export ANDROID_HOME="$HOME/Android/Sdk"
 ./gradlew :app:compileRootDebugKotlin
 ./gradlew :app:testRootDebugUnitTest

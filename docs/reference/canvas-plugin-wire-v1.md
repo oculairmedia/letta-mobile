@@ -3,9 +3,10 @@
 > Source audit, 2026-10-18: The wire contract includes process and service framing; that does not mean both are hosted today. `PluginDriverHost` currently launches only process runtimes with empty `PluginSecrets`; `host.readElements` remains refused in v1. The concrete [trust model](plugin-trust-model.md) describes the implemented host subset.
 
 The protocol a `process` plugin (any language, a subprocess of the host) and a `service` plugin (a
-WebSocket server the host connects to) speak with the Letta host. It mirrors the Kotlin SPI of
-`:plugin-api` one to one (`CanvasPlugin` / `PluginHost`), so a plugin behaves the same whatever its
-runtime. Design: `docs/design/canvas-plugin-platform-plan.md` section 5. The method registry
+WebSocket server the host connects to) speak with the Letta host. It corresponds to the Kotlin SPI
+of `:plugin-api` (`CanvasPlugin` / `PluginHost`). These are shared contract shapes;
+the production host currently executes process plugins, not JVM or service plugins.
+Design: `docs/design/canvas-plugin-platform-plan.md` section 5. The method registry
 (names, directions, SPI members, deadlines, size limits) and the message shapes are `:plugin-api`'s
 (`com.letta.mobile.plugin.api.LcpMethod` and its DTOs); the codec, framing, peer, session and
 guards are `sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/wire/` (typed table
@@ -134,8 +135,9 @@ Shapes (see the transcripts for complete examples):
   `{uploadId}`; `host.putAsset.chunk {uploadId, index, base64}` in order from 0, each at most 1 MiB
   of bytes; `host.putAsset.end {uploadId, sha256}` (lowercase hex of all the bytes) answers
   `{"ref":"sha256:<hex>"}`. Any broken rule answers `-32011` and drops the upload.
-- `host.readElements {query: {canvasId?, elementIds?, kinds?, ownOnly?}}` answers `{elements}`, each
-  `{id, type, canvasId, v?, frame?, props?, ref?, fallback?}` (props, ref and fallback for the plugin's own only).
+- `host.readElements {query: {canvasId?, elementIds?, kinds?, ownOnly?}}` declares an `{elements}` result,
+  each `{id, type, canvasId, v?, frame?, props?, ref?, fallback?}`. The production v1 host refuses
+  every read because it does not grant `canvas:read`; the result shape is not implemented read support.
 - `host.log {level: debug|info|warn|error, message, fields}`.
 - `plugin.health` answers `{status: ok|degraded|failed, reason?}`.
 - `$/cancel` is wire plumbing: it has no SPI member (on the SPI side the call's coroutine is cancelled).
@@ -159,9 +161,10 @@ Notifications run in arrival order.
   `assets:write`, `host.readElements` `canvas:read`, `host.emit` `canvas:place` for placements,
   updates and removals and `assets:write` for images and inline bytes. A refusal is `-32006` with
   `"data":{"capability":"..."}`.
-- **Secrets never travel in the protocol.** A `process` plugin gets them in its environment, a
-  `service` plugin in its connection headers; the host refuses to send any message that holds one.
-- Everything a plugin sends is held to its secrets (verbatim and base64), failing closed: a
+- The production launcher supplies manifest setting defaults and no secrets. The process driver's
+  environment-template resolver can consume injected secrets, but the owning runtime has no
+  secret-store/injection flow yet. Service-header injection remains a design proposal.
+- Secrets supplied to the driver/handlers are guarded (verbatim and base64), failing closed: a
   `host.log` keeps its shape with each leaking string replaced; any other call or result holding a
   secret is refused whole with `-32007`; an error's message is scrubbed and its data dropped.
 
