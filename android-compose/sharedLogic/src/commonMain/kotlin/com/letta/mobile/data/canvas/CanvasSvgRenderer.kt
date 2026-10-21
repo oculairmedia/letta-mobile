@@ -46,7 +46,10 @@ internal fun renderCanvasSvg(sceneJson: String): String {
     val extent = drawings.map { it.second }.let { rects ->
         if (rects.isEmpty()) CanvasPreviewRect(0f, 0f, 1000f, 1000f) else rects.reduce(::union)
     }.padded(SVG_PADDING)
-    val (x, y, w, h) = listOf(extent.left, extent.top, extent.right - extent.left, extent.bottom - extent.top)
+    val x = extent.left
+    val y = extent.top
+    val w = extent.right - extent.left
+    val h = extent.bottom - extent.top
     return """<svg xmlns="http://www.w3.org/2000/svg" viewBox="$x $y $w $h">
 <rect x="$x" y="$y" width="$w" height="$h" fill="${root.need("bgColor").xml()}"/>
 ${drawings.joinToString("\n") { it.first }}
@@ -77,10 +80,10 @@ private fun svgElement(e: JsonObject): SvgDrawing {
 }
 
 private fun svgShape(e: JsonObject): SvgDrawing {
-    val points = e.points()
+    val points = (e["points"] as JsonArray).map { it.jsonPrimitive.content.toConnectPoint() }
     val first = points.first()
     val last = points.last()
-    val width = e.strokeWidth()
+    val width = e.number("strokeWidth") ?: 2f
     val style = e.shapeStyle()
     val (body, extent) = when (val kind = e.need("shapeType")) {
         "RECTANGLE" -> """<rect x="${min(first.x, last.x)}" y="${min(first.y, last.y)}" """ +
@@ -98,7 +101,7 @@ private fun svgShape(e: JsonObject): SvgDrawing {
                 "${min(first.x, last.x)},${max(first.y, last.y)} ${max(first.x, last.x)},${max(first.y, last.y)}"
             """<polygon points="$vertices" $style/>""" to extentOf(points).padded(width / 2)
         }
-        "LINE", "ARROW" -> svgConnector(e)
+        "LINE", "ARROW" -> svgConnector(e, points)
         else -> error("Unsupported SVG shape: $kind")
     }
     if (e.text("text").isNullOrEmpty()) return body to extent
@@ -106,14 +109,13 @@ private fun svgShape(e: JsonObject): SvgDrawing {
     return body + svgTextBlock(e, center) to extent
 }
 
-private fun svgConnector(e: JsonObject): SvgDrawing {
+private fun svgConnector(e: JsonObject, points: List<ConnectPoint>): SvgDrawing {
     require(e["bend"] == null && e["startHandle"] == null && e["endHandle"] == null) {
         "SVG export does not support curved connectors yet"
     }
-    val points = e.points()
     val first = points.first()
     val last = points.last()
-    val width = e.strokeWidth()
+    val width = e.number("strokeWidth") ?: 2f
     val line = """<line x1="${first.x}" y1="${first.y}" x2="${last.x}" y2="${last.y}" ${e.shapeStyle()}/>"""
     if (e.need("shapeType") != "ARROW") return line to extentOf(points).padded(width / 2)
     val angle = atan2(last.y - first.y, last.x - first.x)
@@ -127,7 +129,7 @@ private fun svgConnector(e: JsonObject): SvgDrawing {
 
 private fun svgText(e: JsonObject): SvgDrawing {
     val start = e.need("textTopLeft").toConnectPoint()
-    val size = e.fontSize()
+    val size = e.number("fontSize") ?: 24f
     val width = e.number("wrapWidth") ?: 320f
     val x = start.x + when (textAnchor(e)) { "middle" -> width / 2; "end" -> width; else -> 0f }
     val height = e.need("text").split('\n').size * size * LINE_HEIGHT
@@ -145,7 +147,7 @@ private fun textAnchor(e: JsonObject): String =
 
 /** [e]'s text at [at]: a shape label takes its text colour, a text element its stroke colour. */
 private fun svgTextBlock(e: JsonObject, at: ConnectPoint): String {
-    val size = e.fontSize()
+    val size = e.number("fontSize") ?: 24f
     val color = (if (e.need("type") == "Shape") e.text("textColor") else null) ?: e.need("strokeColor")
     val lines = e.need("text").split('\n').mapIndexed { index, line ->
         """<tspan x="${at.x}" dy="${if (index == 0) 0f else size * LINE_HEIGHT}">${line.xml()}</tspan>"""
@@ -182,7 +184,7 @@ private fun svgImage(e: JsonObject): SvgDrawing {
     require(data.all { it.isLetterOrDigit() || it in "+/=" }) { "Invalid imageData" }
     val mime = e.text("imageMediaType") ?: "image/png"
     require(mime in listOf("image/png", "image/jpeg", "image/gif", "image/webp")) { "Unsupported image media type" }
-    val b = extentOf(e.points())
+    val b = extentOf((e["points"] as JsonArray).map { it.jsonPrimitive.content.toConnectPoint() })
     val svg = """<image x="${b.left}" y="${b.top}" width="${b.right - b.left}" height="${b.bottom - b.top}" """ +
         """href="data:$mime;base64,$data" opacity="${e.number("opacity") ?: 1f}"/>"""
     return svg to b
@@ -190,7 +192,7 @@ private fun svgImage(e: JsonObject): SvgDrawing {
 
 /** Stroke, width, fill and dash pattern of a shape's outline. */
 private fun JsonObject.shapeStyle(): String {
-    val width = strokeWidth()
+    val width = number("strokeWidth") ?: 2f
     val fill = (text("fillColor") ?: "none").xml()
     return """stroke="${strokeOrNone().xml()}" stroke-width="$width" fill="$fill"${dash(width)}"""
 }
@@ -201,14 +203,8 @@ private fun JsonObject.dash(width: Float): String = when (text("strokeStyle")) {
     else -> ""
 }
 
-private fun JsonObject.strokeWidth(): Float = number("strokeWidth") ?: 2f
-
-private fun JsonObject.fontSize(): Float = number("fontSize") ?: 24f
-
 private fun JsonObject.strokeOrNone(): String =
     if (this["strokeEnabled"]?.jsonPrimitive?.booleanOrNull == false) "none" else need("strokeColor")
-
-private fun JsonObject.points(): List<ConnectPoint> = (this["points"] as JsonArray).map { it.jsonPrimitive.content.toConnectPoint() }
 
 private fun extentOf(points: List<ConnectPoint>): CanvasPreviewRect = CanvasPreviewRect(
     points.minOf { it.x }, points.minOf { it.y }, points.maxOf { it.x }, points.maxOf { it.y },

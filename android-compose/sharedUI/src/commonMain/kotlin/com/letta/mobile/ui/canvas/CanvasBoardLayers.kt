@@ -128,7 +128,7 @@ internal fun BoxScope.CanvasBoardLayers(board: CanvasBoard) {
             val screen = board.state.viewport.worldToScreen(Offset(presence.cursorX, presence.cursorY))
             presence.copy(cursorX = screen.x, cursorY = screen.y)
         },
-        currentPeerId = board.host.currentPeerId,
+        currentPeerId = board.host.localPeer?.peerId,
     )
     CanvasBoardDocumentEffects(board)
     CanvasBoardSnapIndicator(board)

@@ -35,7 +35,13 @@ private val HEARTBEAT = 1.seconds
 private val DEPARTURE_TIMEOUT = 500.milliseconds
 
 /** Cursor colours, chosen per peer ID so every device shows a peer in the same colour. */
-internal val CANVAS_PEER_COLORS = listOf("#2196F3", "#9C27B0", "#00897B", "#EF6C00", "#C62828")
+private val CANVAS_PEER_COLORS = listOf("#2196F3", "#9C27B0", "#00897B", "#EF6C00", "#C62828")
+
+/** This device's presence as [peerId], shown to peers as [name] or, without one, as the stable peer ID itself. */
+internal fun localCanvasPeer(peerId: String, name: String?): CanvasPresence {
+    val color = CANVAS_PEER_COLORS[(peerId.hashCode().toUInt() % CANVAS_PEER_COLORS.size.toUInt()).toInt()]
+    return CanvasPresence(peerId = peerId, displayName = name ?: peerId, colorHex = color, cursorX = 0f, cursorY = 0f)
+}
 
 /**
  * Publishes this device's pointer on the board, in world coordinates, as [identity]. Observes
