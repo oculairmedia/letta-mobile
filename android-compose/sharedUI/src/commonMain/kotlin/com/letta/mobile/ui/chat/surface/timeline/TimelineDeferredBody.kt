@@ -3,9 +3,12 @@ package com.letta.mobile.ui.chat.surface.timeline
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -149,7 +152,27 @@ fun TimelineDeferredBody(rowKey: String, read: DeferredBodyRead, modifier: Modif
     val currentRead by rememberUpdatedState(read)
     val reader = remember(rowKey) { DeferredPageReader(scope) { currentRead } }
     DisposableEffect(rowKey) { onDispose { reader.cancel() } }
-    Column(modifier.testTag(TimelineDeferredBodyTags.ROOT)) {
+    // letta-mobile-ivsx0: a labelled card, so the row reads as a message held back rather than a
+    // stray link on the page.
+    Surface(
+        modifier = modifier.testTag(TimelineDeferredBodyTags.ROOT),
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Column(Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm)) {
+            Text(
+                text = "Message too large to show inline",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            DeferredBodyContent(reader)
+        }
+    }
+}
+
+@Composable
+private fun DeferredBodyContent(reader: DeferredPageReader) {
+    Column {
         reader.text?.let { Text(it) }
         if (reader.busy) Text("Loading…", style = MaterialTheme.typography.bodySmall)
         reader.failure?.let {

@@ -157,4 +157,10 @@ class TimelineDayDividersTest {
         assertNull(pagedBoundaryDate(item("a", ""), older = null, zone = utc))
         assertNull(pagedBoundaryDate(item("a", "not-a-date"), older = null, zone = utc))
     }
+
+    /** letta-mobile-ivsx0: the row after an undated one opened "Today" under rows already from today. */
+    @Test
+    fun anUndatedOlderNeighbourOpensNoDivider() {
+        assertNull(pagedBoundaryDate(item("a", "2026-09-12T09:00:00Z"), item("deferred", ""), utc))
+    }
 }

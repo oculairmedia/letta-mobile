@@ -2086,9 +2086,9 @@ public final class com/letta/mobile/ui/chat/surface/timeline/ComposableSingleton
 public final class com/letta/mobile/ui/chat/surface/timeline/ComposableSingletons$TimelineDeferredBodyKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/ComposableSingletons$TimelineDeferredBodyKt;
 	public fun <init> ()V
+	public final fun getLambda$-158926270$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-74494069$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1093551903$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$1464871821$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$1653308196$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$220030344$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
