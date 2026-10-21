@@ -2,6 +2,9 @@ package com.letta.mobile.ui.chat.surface
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import com.letta.mobile.data.chat.recompile.RecompileStatus
@@ -22,10 +25,13 @@ import com.letta.mobile.ui.host.OverlayPresentation
  * snackbar above its composer.
  */
 @Composable
-internal fun ChatSurfaceOverlays(uiState: ChatUiState, port: ChatSessionPort, overlays: OverlayHost) {
+internal fun ChatSurfaceOverlays(uiState: State<ChatUiState>, port: ChatSessionPort, overlays: OverlayHost) {
     val actions = port.actions
-    A2uiSnackbarEffect(uiState.a2uiActionSnackbar, overlays, actions)
-    ErrorSnackbarEffect(uiState.error, overlays, actions)
+    // Read here, not by the page: only these two effects follow the chat state.
+    val snackbar by remember(uiState) { derivedStateOf { uiState.value.a2uiActionSnackbar } }
+    val error by remember(uiState) { derivedStateOf { uiState.value.error } }
+    A2uiSnackbarEffect(snackbar, overlays, actions)
+    ErrorSnackbarEffect(error, overlays, actions)
     val recompile by port.recompileStatus.collectForChatSurface()
     RecompileSnackbarEffect(recompile, overlays, actions)
 }
