@@ -28,7 +28,11 @@ internal data class LocalCursorPosition(val position: Offset, val active: Boolea
 @JvmInline
 internal value class CanvasPresencePeerId(val value: String)
 
-internal data class PresenceIdentity(val peerId: CanvasPresencePeerId, val displayName: String, val colorHex: String) {
+internal data class PresenceIdentity(
+    val peerId: CanvasPresencePeerId,
+    val displayName: String,
+    val colorHex: String,
+) {
     companion object {
         fun forPeer(peerId: CanvasPresencePeerId): PresenceIdentity {
             val index = (peerId.value.hashCode().toUInt() % PEER_COLORS.size.toUInt()).toInt()
@@ -44,7 +48,10 @@ internal data class LocalPeerPresence(
 )
 
 /** The board binds its session/transport here; pointer observation does not depend on board models. */
-internal class LocalPresenceTarget(val peerId: CanvasPresencePeerId, val publish: suspend (LocalPeerPresence) -> Unit)
+internal class LocalPresenceTarget(
+    val peerId: CanvasPresencePeerId,
+    val publish: suspend (LocalPeerPresence) -> Unit,
+)
 
 internal class LocalCursor {
     var current: LocalCursorPosition? = null

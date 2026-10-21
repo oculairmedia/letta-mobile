@@ -38,12 +38,13 @@ class CanvasLocalPresenceTest {
         override fun observePresence(canvasId: CanvasId): Flow<List<CanvasPresence>> = flowOf(emptyList())
     }
 
-    private fun target(transport: CanvasPresenceTransport) = LocalPresenceTarget(CanvasPresencePeerId("local-peer")) { update ->
-        transport.updatePresence(CanvasId("board"), CanvasPresence(
-            update.identity.peerId.value, update.identity.displayName, update.identity.colorHex,
-            update.cursor.position.x, update.cursor.position.y, update.lastActiveEpochMs, update.cursor.active,
-        ))
-    }
+    private fun target(transport: CanvasPresenceTransport): LocalPresenceTarget =
+        LocalPresenceTarget(CanvasPresencePeerId("local-peer")) { update ->
+            transport.updatePresence(CanvasId("board"), CanvasPresence(
+                update.identity.peerId.value, update.identity.displayName, update.identity.colorHex,
+                update.cursor.position.x, update.cursor.position.y, update.lastActiveEpochMs, update.cursor.active,
+            ))
+        }
 
     @Test
     fun exitWithoutChangesStillMarksTheCursorInactive() {
