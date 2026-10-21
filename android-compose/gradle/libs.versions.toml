@@ -20,6 +20,8 @@ hilt = "2.60.1"
 paging = "3.5.0"
 konsist = "0.17.3"
 archunit = "1.4.2"
+# PMD CPD: the cross-module duplicate-code ratchet in :architecture-tests (letta-mobile-ewtaq).
+pmd = "7.7.0"
 junit-jupiter = "6.1.0"
 junit-platform = "6.1.0"
 kotlinx-serialization-json = "1.11.0"
@@ -129,6 +131,7 @@ androidx-concurrent-futures = { module = "androidx.concurrent:concurrent-futures
 androidx-concurrent-futures-ktx = { module = "androidx.concurrent:concurrent-futures-ktx", version.ref = "androidx-concurrent" }
 konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
 archunit = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
+pmd-kotlin = { module = "net.sourceforge.pmd:pmd-kotlin", version.ref = "pmd" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit-jupiter" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit-jupiter" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit-jupiter" }

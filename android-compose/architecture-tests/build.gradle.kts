@@ -16,6 +16,7 @@ kotlin {
 dependencies {
     testImplementation(libs.konsist)
     testImplementation(libs.archunit)
+    testImplementation(libs.pmd.kotlin)
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
@@ -27,7 +28,7 @@ tasks.withType<Test>().configureEach {
 }
 
 // Production scans run in architectureTest; both tasks run in the required CI `test` job.
-val productionScanTests = listOf("*RepositoryArchitectureTest", "*SharedLayeringTest")
+val productionScanTests = listOf("*RepositoryArchitectureTest", "*SharedLayeringTest", "*DuplicateCodeRatchetTest")
 
 tasks.test {
     filter {
@@ -61,6 +62,9 @@ val architectureTest = tasks.register<Test>("architectureTest") {
     // ChatControllerSurfaceRepositoryArchitectureTest (letta-mobile-by4vm.80) reads its baseline.
     inputs.file("chat-controller-surface-baseline.txt")
         .withPropertyName("chatControllerSurfaceBaseline").withPathSensitivity(PathSensitivity.RELATIVE)
+    // DuplicateCodeRatchetTest (letta-mobile-ewtaq) reads its cross-module duplicate baseline.
+    inputs.file("duplicate-code-baseline.txt")
+        .withPropertyName("duplicateCodeBaseline").withPathSensitivity(PathSensitivity.RELATIVE)
     reports.junitXml.required.set(true)
     reports.html.required.set(true)
 }

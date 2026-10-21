@@ -1,0 +1,29 @@
+# Core binding contracts (letta-mobile-ewtaq): the shared shell, composer, settings and capability
+# inputs every platform (desktop, web, android) must bind. scripts/ci/parity_gates.py fails when a
+# platform does not construct one of these, directly or through one of the shared builders named
+# after it, and fails for every param a constructing platform leaves unbound.
+# Format: <SharedClass> [shared builder ...]. Lines may be added, never removed or changed
+# (scripts/ci/baseline-ratchet-guard.py): retiring a contract means deleting the class in shared code.
+AgentContextCardActions
+AgentContextCardBinding
+BackendSettingsActions
+ChatSurfaceCapabilities timelineCapabilities TimelineChatSessionPort
+ChatSurfaceHost
+HostSessionBinding
+LettaShellWorkspaceHost
+LettaShellWorkspaceSlots
+PluginsPageBinding
+SettingsPageServices
+ShellAgentEditorHost
+ShellAgentPanelActions workspaceNavigationActions
+ShellAgentRailActions workspaceNavigationActions
+ShellHomeHost
+ShellHostPages
+ShellPageFocus
+ShellPageHost
+ShellShortcutBinding
+ShellWorkspaceEvents
+ShellWorkspaceHeaderBinding
+ShellWorkspaceNavigationActions workspaceNavigationActions
+ShellWorkspaceOverlayActions
+ShortcutActions

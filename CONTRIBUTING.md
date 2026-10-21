@@ -169,7 +169,7 @@ CI takes ~20 minutes per iteration, and the most common reason PRs loop through 
 
 Required (blocks merge): `test`, `build-apk-pass`, `shared-multiplatform`, `detekt` (baselined per module). (`codecov` runs on main pushes only.) `perf-gate` (emulator macrobenchmark) is not a PR gate: it runs nightly, on main pushes, and on PRs that edit the perf gate; other PRs run the cheap `perf-scripts` self-test.
 
-Not required, but honest (red means a new problem in your diff — fix it): `Platform UI gate`, and on main pushes `main module tests`.
+The parity guardrails run inside required `test` (letta-mobile-ewtaq): no unshared frontend or logic, shrink-only baselines, and a `Shared implementation searched: <paths>` line in every PR description. See "No unshared frontend or logic" in [`AGENTS.md`](AGENTS.md).
 
 Advisory only (findings never fail the job): CodeScene Code Health Review, `Advisory AGENTS.md policy`, `row goldens (advisory)`. Required-gate failures come first. The full "CI map" is in [`AGENTS.md`](AGENTS.md).
 

@@ -125,6 +125,10 @@ jobs:
   test:
     name: test-workload
     runs-on: ubuntu-latest
+    # pull-requests: read lets the shared-search check read the PR's current description.
+    permissions:
+      contents: read
+      pull-requests: read
     defaults:
       run:
         working-directory: android-compose
@@ -182,6 +186,28 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: bash scripts/tests/ci-policy-scripts-test.sh
 
+      # letta-mobile-ewtaq: owner rule "no unshared frontend or logic". Required and never
+      # advisory: no path filter or label skips it, and nothing in the PR body relaxes
+      # it. Each gate prints exactly what to do; its baseline under scripts/ci/ only shrinks.
+      - name: Self-test platform parity guardrails
+        working-directory: ${{ github.workspace }}
+        run: |
+          python3 -m unittest discover -s scripts/tests -p test_parity_gates.py -v
+          bash scripts/tests/platform-ui-gate-test.sh
+
+      - name: Enforce platform parity guardrails
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          status=0
+          python3 scripts/ci/parity_gates.py || status=1
+          bash scripts/ci/platform-ui-gate.sh --enforce > /tmp/platform-ui.txt || status=1
+          cat /tmp/platform-ui.txt
+          grep -E '^ERROR\|' /tmp/platform-ui.txt | while IFS='|' read -r _ rule path msg; do
+            echo "::error file=${path},title=${rule}::${msg}"
+          done || true
+          exit "$status"
+
       - name: Enforce API package documentation contract
         working-directory: ${{ github.workspace }}
         run: |
@@ -210,8 +236,8 @@ jobs:
           node --test scripts/appserver/generate-protocol-reference.test.mjs
           node scripts/appserver/verify-v2-audit-doc.mjs
 
-      # Additive module tests: when a PR only (or also) touches feature/designsystem/
-      # desktop/cli trees, run those unit tests in addition to the base set.
+      # Additive module tests: the unit tests of every module a PR touches and of every
+      # module that depends on it, in addition to the base set (all of them on push).
       # Never used to skip :sharedLogic:allTests — that stays in shared-multiplatform.
       # Diff against the GitHub PR base, not origin/main. Stacked PRs otherwise
       # re-run every additive module from lower layers (e.g. designsystem on a
@@ -230,15 +256,45 @@ jobs:
           git fetch --no-tags origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}" 2>/dev/null \
             || git fetch --no-tags origin "${BASE_REF}"
 
-      - name: Resolve additive module tests
-        id: additive_modules
+      - name: Reject raised parity baselines
         if: github.event_name == 'pull_request'
         working-directory: ${{ github.workspace }}
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python3 scripts/ci/baseline-ratchet-guard.py --diff-base "$BASE_SHA"
+
+      # Reads the description live (not the event payload), so editing it and re-running the
+      # job is enough. Only a dependabot[bot] PR, whose body is generated, is exempt.
+      - name: Require "Shared implementation searched" in the PR description
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          set -euo pipefail
+          PR_BODY="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.body // ""')"
+          export PR_BODY
+          bash scripts/ci/agents-policy-check.sh --require-shared-search
+
+      # Every push to main runs the full additive set; a PR runs the changed modules and,
+      # transitively, every module that depends on them (letta-mobile-l8lcn).
+      - name: Resolve additive module tests
+        id: additive_modules
+        working-directory: ${{ github.workspace }}
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
+          if [[ "${EVENT_NAME}" != pull_request ]]; then
+            tasks="$(./scripts/ci/changed-gradle-modules.sh --all)"
+            echo "tasks=${tasks}" >> "$GITHUB_OUTPUT"
+            echo "Full additive Gradle tasks on ${EVENT_NAME}: ${tasks}"
+            exit 0
+          fi
           if git rev-parse --verify -q "${BASE_SHA}^{commit}" >/dev/null; then
             base="${BASE_SHA}"
           else
@@ -393,56 +449,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  main-module-tests:
-    # letta-mobile-by4vm.32: on PRs, :sharedUI:jvmTest and :desktop:test run in
-    # the required `test` job only when their own trees change
-    # (scripts/ci/changed-gradle-modules.sh), so a sharedLogic change that breaks
-    # them lands silently, and push runs never resolve additive tasks at all.
-    # Every push to main (and workflow_dispatch) runs both unconditionally here,
-    # so main is never silently broken. Not a PR check and not required.
-    name: main module tests (sharedUI jvm + desktop)
-    if: github.event_name != 'pull_request'
-    needs: [test]
-    runs-on: ubuntu-latest
-    # :desktop:test once hung for 25 min in shared-multiplatform. Healthy runs are
-    # well under this; the bound turns a hang into an honest red, not a 6 h wait.
-    timeout-minutes: 40
-    defaults:
-      run:
-        working-directory: android-compose
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Java 26
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 26
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
-        with:
-          # The required test job owns cache writes.
-          cache-read-only: true
-
-      - name: Run sharedUI JVM and desktop tests
-        run: ./gradlew :sharedUI:jvmTest :desktop:test --continue
-
-      - name: Upload test reports
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: main-module-test-reports-${{ github.run_id }}
-          path: |
-            android-compose/sharedUI/build/test-results/jvmTest/**
-            android-compose/sharedUI/build/reports/tests/jvmTest/**
-            android-compose/desktop/build/test-results/test/**
-            android-compose/desktop/build/reports/tests/test/**
-          if-no-files-found: warn
-          retention-days: 7
-
   row-parity:
     # Hard cut S9 (letta-mobile-ckmub.2.2): the shared sharedUI chat rows against
     # their committed goldens (feature-chat/src/test/snapshots/rows), rendered from
@@ -570,8 +576,8 @@ jobs:
         # Do not request :sharedLogic:allTests (hostNativeTest hangs) or
         # :desktop:test in this job (:desktop:test hung for the 25m timeout
         # on follow-up PRs even when run before Konan). Desktop unit tests
-        # still run in the required `test` job when android-compose/desktop
-        # changes (additive module tasks). Native compile still catches
+        # run in the required `test` job on every push to main and on PRs that
+        # touch desktop or anything it depends on (additive module tasks). Native compile still catches
         # JVM-only API leaks in commonMain/commonTest (b97bcf48). The wasmJs
         # compiles catch breakage in wasmJsMain/wasmJsTest and dependencies
         # that ship no wasm artifact, without making web-wasm required
@@ -587,7 +593,7 @@ jobs:
   required-test:
     name: test
     runs-on: ubuntu-latest
-    needs: [test, api-docs, api-contract-windows]
+    needs: [test, api-docs, api-contract-windows, web-wasm]
     if: always()
     permissions:
       contents: read
@@ -597,10 +603,12 @@ jobs:
           TEST_RESULT: ${{ needs.test.result }}
           DOCS_RESULT: ${{ needs.api-docs.result }}
           WINDOWS_API_RESULT: ${{ needs.api-contract-windows.result }}
+          WEB_RESULT: ${{ needs.web-wasm.result }}
         run: |
           test "$TEST_RESULT" = success
           test "$DOCS_RESULT" = success
           test "$WINDOWS_API_RESULT" = success
+          test "$WEB_RESULT" = success
 
   api-docs:
     runs-on: ubuntu-latest

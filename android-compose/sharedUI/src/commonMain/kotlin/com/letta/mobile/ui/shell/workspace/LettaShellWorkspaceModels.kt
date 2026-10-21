@@ -66,16 +66,20 @@ sealed interface ShellWindowChrome {
     class Hoisted(val onHeader: (ShellWorkspaceHeaderState) -> Unit) : ShellWindowChrome
 }
 
-/** The host's content inside the workspace. */
+/**
+ * The host's content inside the workspace. Every slot is required: a platform
+ * binds each one, and an empty slot is a visible decision the parity gate (scripts/ci/parity_gates.py)
+ * holds against its exemption list, never a silent default.
+ */
 class LettaShellWorkspaceSlots(
     /** The page beside the navigation (the shared shell pages). */
     val main: @Composable (Modifier) -> Unit,
     /** The model-and-context card under the agent's name in the panel. */
-    val agentCard: (@Composable () -> Unit)? = null,
+    val agentCard: @Composable () -> Unit,
     /** A pane after the page (desktop's background tasks). */
-    val sidePane: @Composable () -> Unit = {},
+    val sidePane: @Composable () -> Unit,
     /** Drawn over the whole workspace (pickers, the palette, banners). */
-    val overlays: @Composable () -> Unit = {},
+    val overlays: @Composable () -> Unit,
 )
 
 /** Everything the workspace draws. */
@@ -86,14 +90,17 @@ data class LettaShellWorkspaceState(
     val layout: ShellWorkspaceLayout = ShellWorkspaceLayout(),
 )
 
-/** How the host takes part: its actions, its slots, where its header goes and its window events. */
+/**
+ * How the host takes part: its actions, its slots, where its header goes, the compact drawer's state
+ * and its window events. All required: no platform inherits a fallback.
+ */
 class LettaShellWorkspaceHost(
     val actions: ShellWorkspaceNavigationActions,
     val slots: LettaShellWorkspaceSlots,
-    val chrome: ShellWindowChrome = ShellWindowChrome.Inline,
-    /** The compact drawer's state; null keeps the workspace's own. */
-    val drawer: ShellWorkspaceDrawer? = null,
-    val events: ShellWorkspaceEvents = ShellWorkspaceEvents(),
+    val chrome: ShellWindowChrome,
+    /** The compact drawer's state; the host owns it so its own chrome can open the drawer. */
+    val drawer: ShellWorkspaceDrawer,
+    val events: ShellWorkspaceEvents,
 )
 
 /** The window events the workspace reports. */

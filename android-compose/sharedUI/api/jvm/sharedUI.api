@@ -9771,13 +9771,6 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellSidebarMapping {
 	public final fun panelState (Lcom/letta/mobile/ui/shell/sidebar/ShellSidebarInput;Lkotlin/time/Instant;)Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelState;
 }
 
-public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$LettaShellWorkspaceModelsKt {
-	public static final field INSTANCE Lcom/letta/mobile/ui/shell/workspace/ComposableSingletons$LettaShellWorkspaceModelsKt;
-	public fun <init> ()V
-	public final fun getLambda$1966574900$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$473257336$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-}
-
 public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellSidebarOverflowMenuKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellSidebarOverflowMenuKt;
 	public fun <init> ()V
@@ -9787,7 +9780,6 @@ public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$Shel
 public final class com/letta/mobile/ui/shell/workspace/LettaShellWorkspaceHost {
 	public static final field $stable I
 	public fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;)V
-	public synthetic fun <init> (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots;Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceEvents;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getActions ()Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;
 	public final fun getChrome ()Lcom/letta/mobile/ui/shell/workspace/ShellWindowChrome;
 	public final fun getDrawer ()Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceDrawer;
@@ -9803,7 +9795,6 @@ public final class com/letta/mobile/ui/shell/workspace/LettaShellWorkspaceKt {
 public final class com/letta/mobile/ui/shell/workspace/LettaShellWorkspaceSlots {
 	public static final field $stable I
 	public fun <init> (Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;)V
-	public synthetic fun <init> (Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getAgentCard ()Lkotlin/jvm/functions/Function2;
 	public final fun getMain ()Lkotlin/jvm/functions/Function3;
 	public final fun getOverlays ()Lkotlin/jvm/functions/Function2;

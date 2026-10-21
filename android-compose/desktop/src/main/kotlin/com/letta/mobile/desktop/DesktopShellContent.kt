@@ -41,6 +41,7 @@ import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceHost
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceSlots
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceState
 import com.letta.mobile.ui.shell.workspace.ShellWindowChrome
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceDrawer
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceEvents
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceLayout
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigation
@@ -68,6 +69,8 @@ private fun ShellPluginViews(pluginViews: PluginViewsModel?, content: @Composabl
 internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: DesktopShellFrame, header: DesktopShellHeader) {
     val layout = context.core.layout
     val phone = LocalDesktopPhone.current
+    // The window's compact drawer; the phone preview brings its own.
+    val windowDrawer = remember { ShellWorkspaceDrawer() }
     CompositionLocalProvider(
         LocalDesktopPermissionModeSettings provides context.core.bootstrap.dataBindings.permissionModeSettings,
         LocalAttentionPrefs provides context.core.attentionPrefs,
@@ -89,7 +92,7 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                     actions = desktopWorkspaceActions(context, frame),
                     slots = desktopWorkspaceSlots(context, frame),
                     chrome = ShellWindowChrome.Hoisted(header.onHoisted),
-                    drawer = phone?.drawer,
+                    drawer = phone?.drawer ?: windowDrawer,
                     events = ShellWorkspaceEvents(
                         // A phone's width says nothing about the layout the person saved.
                         onWidthChanged = { width ->
