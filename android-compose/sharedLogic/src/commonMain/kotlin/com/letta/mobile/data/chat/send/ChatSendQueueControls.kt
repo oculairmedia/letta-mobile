@@ -67,7 +67,6 @@ internal class CoordinatorQueueTurns(
         } ?: false
     }
 
-    private companion object {
-        const val CONNECT_WAIT_MS = 1_500L
-    }
 }
+
+private const val CONNECT_WAIT_MS = 1_500L
