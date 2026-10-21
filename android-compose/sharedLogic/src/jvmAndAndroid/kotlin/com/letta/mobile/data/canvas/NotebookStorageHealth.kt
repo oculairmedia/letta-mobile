@@ -40,6 +40,12 @@ internal class NotebookStorageHealth(
     private val retiredStorage = ConcurrentHashMap.newKeySet<String>()
     private val retiredOffers = ConcurrentHashMap.newKeySet<String>()
 
+    /** Storage names of documents the repository compacted since the store opened. */
+    private val compacted = ConcurrentHashMap.newKeySet<String>()
+
+    @Volatile
+    private var repositoryStorage: Storage? = null
+
     @Volatile
     private var repositoryPool: ExecutorService? = null
 
@@ -213,7 +219,30 @@ internal class NotebookStorageHealth(
      * The repository's storage: failures are reported, and retired documents are neither loaded
      * nor stored, so a peer offering one cannot bring it back.
      */
-    fun observe(storage: Storage): Storage = RetiredDocumentFilter(ObservedStorage(storage, ::onStorageFailure))
+    fun observe(storage: Storage): Storage =
+        RetiredDocumentFilter(ObservedStorage(storage, ::onStorageFailure)).also { repositoryStorage = it }
+
+    /**
+     * Once the repository has closed, leave each document it compacted in one snapshot; see
+     * [settleCompaction]. Skipped while read-only: the store cannot vouch for what it would write.
+     */
+    fun settleCompactions() {
+        val storage = repositoryStorage ?: return
+        if (isReadOnly) return
+        compacted.toList().forEach { name ->
+            compacted -= name
+            try {
+                lock { settleCompaction(storage, name) }
+            } catch (error: Exception) {
+                // Its chunks are all still on disk; the repository compacts them on next open.
+                Telemetry.event(
+                    CanvasStorageFaults.TAG, "compaction_unsettled",
+                    "storageName" to name, "error" to error.toString(),
+                    level = Telemetry.Level.WARN,
+                )
+            }
+        }
+    }
 
     private inner class RetiredDocumentFilter(private val delegate: Storage) : Storage {
         private fun retired(key: StorageKey): Boolean = key.parts.firstOrNull()?.let { it in retiredStorage } == true
@@ -246,6 +275,7 @@ internal class NotebookStorageHealth(
                 refused(key)
                 CompletableFuture.completedFuture(null)
             } else {
+                if (isCompactionSnapshot(key)) compacted += key.parts.first()
                 delegate.put(key, value)
             }
 
