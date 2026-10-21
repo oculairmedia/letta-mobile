@@ -295,7 +295,7 @@ internal object IrohStreamDeltaServerFrameMapper {
         companion object {
             fun from(envelope: JsonObject, delta: JsonObject) = Stamp(
                 logicalId = delta.string("logical_message_id")?.takeIf { it.isNotBlank() },
-                turnId = (delta.string("turn_id") ?: envelope.string("turn_id"))?.takeIf { it.isNotBlank() },
+                turnId = streamDeltaTurnId(envelope, delta),
                 textSeq = delta.long("text_seq")?.takeIf { it in 0L..Int.MAX_VALUE.toLong() }?.toInt(),
             )
         }
@@ -342,9 +342,7 @@ internal object IrohStreamDeltaServerFrameMapper {
                         ?: context.conversationId,
                     stamp = stamp,
                     turnId = stamp.turnId ?: context.turnId,
-                    runId = delta.string("run_id")
-                        ?: envelope.string("run_id")
-                        ?: context.runId,
+                    runId = streamDeltaRunId(envelope, delta) ?: context.runId,
                     messageId = delta.string("id") ?: delta.string("message_id") ?: payload.messageId,
                 )
             }
@@ -412,13 +410,10 @@ internal object IrohStreamDeltaServerFrameMapper {
     private fun JsonObject.contentText(): String =
         textFrom("content") ?: textFrom("text") ?: textFrom("message") ?: ""
 
-    private fun JsonObject.reasoningText(): String =
-        textFrom("reasoning")
-            ?: textFrom("hidden_reasoning")
-            ?: textFrom("content")
-            ?: textFrom("text")
-            ?: textFrom("message")
-            ?: ""
+    private fun JsonObject.reasoningText(): String {
+        val textKeys = listOf("reasoning", "hidden_reasoning", "content", "text", "message")
+        return textKeys.firstNotNullOfOrNull { textFrom(it) }.orEmpty()
+    }
 
     private fun JsonObject.errorText(): String =
         textFrom("message")
@@ -521,11 +516,24 @@ internal fun canonicalToolReturn(delta: JsonObject, defaultId: String? = null): 
     )
 }
 
-private fun JsonObject.stringValue(key: String): String? =
-    (this[key] as? JsonPrimitive)?.contentOrNull
+private fun JsonObject.stringValue(key: String): String? {
+    return (this[key] as? JsonPrimitive)?.contentOrNull
+}
 
-private fun JsonElement?.argumentValue(): String = when (this) {
-    is JsonPrimitive -> contentOrNull ?: toString()
-    null -> "{}"
-    else -> toString()
+private fun JsonElement?.argumentValue(): String {
+    return when (this) {
+        is JsonPrimitive -> contentOrNull ?: toString()
+        null -> "{}"
+        else -> toString()
+    }
+}
+
+/** Wire identity shared by message projection and observer lifecycle tracking. */
+internal fun streamDeltaTurnId(envelope: JsonObject, delta: JsonObject?): String? {
+    return (delta?.stringValue("turn_id") ?: envelope.stringValue("turn_id"))?.takeIf { it.isNotBlank() }
+}
+
+internal fun streamDeltaRunId(envelope: JsonObject, delta: JsonObject?): String? {
+    return (delta?.stringValue("run_id") ?: delta?.stringValue("runId") ?: envelope.stringValue("run_id"))
+        ?.takeIf { it.isNotBlank() }
 }

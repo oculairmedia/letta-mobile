@@ -76,6 +76,7 @@ class IrohTurnRegistry {
     private val activeSendJobs = ConcurrentHashMap<String, Job>()
     private val frameOwnership = ConcurrentHashMap<String, IrohFrameOwner>()
     private val recentlyRetiredRuns = ConcurrentHashMap<String, Long>()
+    private val recentlyRetiredTurns = ConcurrentHashMap<String, Long>()
     private val interruptedTurns = ConcurrentHashMap<String, RedialWhileTurnActive>()
 
     fun tryStart(request: IrohTurnRequest): IrohTryStartResult {
@@ -139,6 +140,13 @@ class IrohTurnRegistry {
         return valid
     }
 
+    internal fun isRetiredTurn(turnId: IrohTurnId): Boolean {
+        val retiredAt = recentlyRetiredTurns[turnId.value] ?: return false
+        val valid = System.currentTimeMillis() - retiredAt <= RETIRED_RUN_TTL_MS
+        if (!valid) recentlyRetiredTurns.remove(turnId.value, retiredAt)
+        return valid
+    }
+
     fun recordFrameOwnership(conversationId: IrohConversationId, turn: IrohActiveTurn?): FrameOwnershipResult {
         val owner = if (turn == null) IrohFrameOwner.Observer else IrohFrameOwner.Engine
         val previous = frameOwnership.put(conversationId.value, owner)
@@ -192,6 +200,7 @@ class IrohTurnRegistry {
     fun clear() {
         interruptedTurns.clear()
         recentlyRetiredRuns.clear()
+        recentlyRetiredTurns.clear()
         frameOwnership.clear()
         cancelSendJobs()
         activeTurns.values.forEach { it.terminalReached.complete(IrohTerminalStatus("disconnected")) }
@@ -217,7 +226,10 @@ class IrohTurnRegistry {
         frameOwnership.remove(conversationId.value)
         // letta-mobile-qygvv.16: a run cut off by session loss may still be running on the
         // server; after the redial the observer re-attaches to it instead of dropping its frames.
-        if (!turn.cutOffBySessionLoss) rememberRetiredRun(IrohRunId(turn.runId))
+        if (!turn.cutOffBySessionLoss) {
+            rememberRetiredRun(IrohRunId(turn.runId))
+            rememberRetiredTurn(turn.token.turnId)
+        }
         activeTurns.remove(conversationId.value, turn)
         turn.terminalReached.complete(publication.status)
     }
@@ -227,6 +239,13 @@ class IrohTurnRegistry {
         val now = System.currentTimeMillis()
         recentlyRetiredRuns.entries.removeIf { now - it.value > RETIRED_RUN_TTL_MS }
         recentlyRetiredRuns[runId.value] = now
+    }
+
+    private fun rememberRetiredTurn(turnId: IrohTurnId) {
+        if (turnId.value.isBlank()) return
+        val now = System.currentTimeMillis()
+        recentlyRetiredTurns.entries.removeIf { now - it.value > RETIRED_RUN_TTL_MS }
+        recentlyRetiredTurns[turnId.value] = now
     }
 
     sealed interface FrameOwnershipResult {

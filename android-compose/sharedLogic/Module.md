@@ -347,6 +347,10 @@ App Server turn execution, scoped leases, approval dispatch, queued input and te
 
 Local App Server launch contracts and lease-based supervision. Platform launchers start processes; shared host state tracks readiness/lifecycle, including embedded runtimes that permit only one launch per process. Keep platform launch mechanics behind [LocalAppServerLauncher](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.runtime.host/-local-app-server-launcher/index.html) and [LocalAppServerProcess](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.runtime.host/-local-app-server-process/index.html); use [LocalAppServerHost](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.runtime.host/-local-app-server-host/index.html) for shared lease and lifecycle coordination.
 
+# Package com.letta.mobile.data.runtime.observer
+
+Passive turn identity tracking and bounded completion history. The internal `ObservedTurnTracker` preserves newer activity when duplicate terminals arrive; transport adapters supply observed identities and round-continuation evidence. This package must not publish frames, own engine turns or perform network operations.
+
 # Package com.letta.mobile.data.runtime.supervisor
 
 Pure crash/backoff policy and runtime health models. Exit decisions describe ignore/retry/intervention outcomes; process creation and termination remain host effects. Keep process creation and host UI outside crash decisions; feed [RuntimeExit](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.runtime.supervisor/-runtime-exit/index.html) and [RuntimeHealth](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.runtime.supervisor/-runtime-health/index.html) into [RuntimeCrashPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.runtime.supervisor/-runtime-crash-policy/index.html) under [RuntimeCrashPolicyConfig](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.runtime.supervisor/-runtime-crash-policy-config/index.html).
