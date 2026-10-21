@@ -669,13 +669,13 @@ class CanvasSession(
             applyLocalLocked(op)
         }
 
-    suspend fun applyLocalScene(newJson: String, actorId: CanvasActorId = LOCAL_USER_ACTOR): List<CanvasOp> {
+    suspend fun applyLocalScene(newJson: String, actorId: CanvasActorId = LOCAL_USER_ACTOR): List<CanvasOp> = locked {
         val doc = currentDoc()
         if (doc.acl != null && !doc.acl.canWrite(actorId.value)) {
             throw UnauthorizedCanvasMutationException(actorId, canvasId)
         }
         val current = sceneJsonOrEmpty()
-        if (newJson == current) return emptyList()
+        if (newJson == current) return@locked emptyList()
 
         val generatedOps = CanvasOpDiffer.diff(
             oldSceneJson = current,
@@ -684,12 +684,10 @@ class CanvasSession(
             lamportSupplier = { ++lamportClock },
         )
 
-        if (generatedOps.isEmpty()) {
-            return emptyList()
+        if (generatedOps.isNotEmpty()) {
+            applyOpsLocked(generatedOps, isRemote = false)
         }
-
-        applyOps(generatedOps, isRemote = false)
-        return generatedOps
+        generatedOps
     }
 
     /**
@@ -728,10 +726,11 @@ class CanvasSession(
             throw UnauthorizedCanvasMutationException(actorId, canvasId)
         }
 
+        val lamport = ++lamportClock
         val op = CanvasOp.ReplaceSceneOp(
-            opId = "restore-${++lamportClock}-${clock()}",
+            opId = "restore-$lamport-${clock()}",
             actorId = actorId.value,
-            lamport = ++lamportClock,
+            lamport = lamport,
             sceneJson = checkpoint.sceneJson,
         )
         appendLocal(listOf(op))

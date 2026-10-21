@@ -3,6 +3,7 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.model.CanvasActorId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,6 +13,37 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CanvasSessionTest {
+
+    @Test
+    fun restoreUsesExactlyOneLamport() = runTest {
+        val log = InMemoryCanvasOpLog()
+        val session = CanvasSession.create(
+            store = InMemoryCanvasDocumentStore(),
+            options = CanvasCreateOptions(title = "Clock", initialSceneJson = """{"elements":[]}""", opLog = log),
+        )
+        val checkpoint = session.checkpoints.value.single()
+        val edits = session.applyLocalScene("""{"elements":[{"id":"a","type":"rect"}]}""")
+        val before = edits.maxOf { it.lamport }
+        session.restoreCheckpoint(checkpoint.checkpointId)
+        val restored = log.getOps(session.canvasId, before).single()
+        assertEquals(before + 1, restored.lamport)
+        assertTrue(restored.opId.startsWith("restore-${restored.lamport}-"))
+    }
+
+    @Test
+    fun concurrentLocalScenesHaveDistinctLamports() = runTest {
+        val session = CanvasSession.create(
+            store = InMemoryCanvasDocumentStore(),
+            options = CanvasCreateOptions(title = "Concurrent", initialSceneJson = """{"elements":[]}"""),
+        )
+        val edits = (1..40).map { index ->
+            async(kotlinx.coroutines.Dispatchers.Default) {
+                session.applyLocalScene("""{"elements":[{"id":"shape-$index","type":"rect"}]}""")
+            }
+        }.map { it.await() }.flatten()
+        assertTrue(edits.isNotEmpty())
+        assertEquals(edits.size, edits.map { it.lamport }.toSet().size)
+    }
 
     @Test
     fun revisionIncrementsOnSave() = runTest {
