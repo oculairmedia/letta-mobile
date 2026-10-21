@@ -257,19 +257,26 @@ private fun ConversationLeadingIcon(model: ShellConversationRowModel, hovered: B
 
 /** While its agent is thinking the icon pulses in the primary colour. */
 @Composable
-private fun conversationIconColor(thinking: Boolean, selected: Boolean): Color {
-    val transition = rememberInfiniteTransition(label = "convThinking")
-    val pulse by transition.animateFloat(
+private fun conversationIconColor(thinking: Boolean, selected: Boolean): Color = when {
+    thinking -> MaterialTheme.colorScheme.primary.copy(alpha = thinkingPulseAlpha())
+    selected -> MaterialTheme.colorScheme.onSurface
+    else -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+/**
+ * The pulse exists only while a row is thinking (letta-mobile-hv54v): an infinite transition asks
+ * for a frame every vsync, so one per idle row kept the frame clock awake for as long as the drawer
+ * was on screen.
+ */
+@Composable
+private fun thinkingPulseAlpha(): Float {
+    val pulse by rememberInfiniteTransition(label = "convThinking").animateFloat(
         initialValue = PULSE_MIN_ALPHA,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(PULSE_MS), RepeatMode.Reverse),
         label = "convThinkingAlpha",
     )
-    return when {
-        thinking -> MaterialTheme.colorScheme.primary.copy(alpha = pulse)
-        selected -> MaterialTheme.colorScheme.onSurface
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    return pulse
 }
 
 @Composable
