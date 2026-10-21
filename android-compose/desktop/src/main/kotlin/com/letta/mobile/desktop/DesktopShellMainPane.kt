@@ -1,6 +1,5 @@
 package com.letta.mobile.desktop
 
-import com.letta.mobile.data.session.llmModelsOrEmpty
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.runtime.Composable
@@ -23,13 +22,11 @@ import com.letta.mobile.ui.chat.session.ChatHostCommand
 import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
 import com.letta.mobile.desktop.chat.DesktopChatSubagents
 import com.letta.mobile.desktop.chat.DesktopChatSessionPort
-import com.letta.mobile.desktop.chat.DesktopContextFocus
-import com.letta.mobile.desktop.chat.DesktopContextWindowSources
 import com.letta.mobile.desktop.chat.DesktopSharedChatPage
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageNavigation
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageState
-import com.letta.mobile.desktop.chat.rememberFocusedContextUsage
 import com.letta.mobile.ui.chat.subagents.BackgroundTasksToggle
+import com.letta.mobile.ui.context.rememberFocusedContextUsage
 import com.letta.mobile.ui.chat.subagents.SubagentTodoLoader
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.pages.ShellHostPages
@@ -128,21 +125,13 @@ private fun rememberDesktopShellChatHost(context: DesktopShellContext, frame: De
 
 /** letta-mobile-r2zo8: the composer chip's reading for the focused conversation. */
 @Composable
-private fun rememberShellContextUsage(context: DesktopShellContext, frame: DesktopShellFrame): ContextWindowUsageState {
-    val core = context.core
-    val sessionGraph = core.sessionGraph.value
-    val models by remember(sessionGraph) { sessionGraph.llmModelsOrEmpty() }.collectAsState()
-    val modelSelections by core.chatController.models.selections.collectAsState()
-    return rememberFocusedContextUsage(
-        focus = DesktopContextFocus(
-            agentId = frame.focus.selectedAgentId,
-            conversationId = frame.chatState.selectedConversationId,
-            settled = !frame.activity.isThinkingSelected && !frame.activity.isStreamingReplySelected,
-        ),
-        readings = sessionGraph.contextTokenReadings,
-        window = DesktopContextWindowSources(frame.focus.rosterAgents, models, modelSelections),
+private fun rememberShellContextUsage(context: DesktopShellContext, frame: DesktopShellFrame): ContextWindowUsageState =
+    rememberFocusedContextUsage(
+        focus = frame.contextFocus(),
+        readings = context.core.sessionGraph.value.contextTokenReadings,
+        breakdown = context.core.sessionGraph.value.contextBreakdown,
+        window = rememberDesktopContextWindow(context, frame),
     )
-}
 
 private fun DesktopShellFrame.conversationCanvasOwner(): ShellCanvasOwner {
     return ShellCanvasOwner(chatState.selectedConversationId, focus.selectedAgentId, focus.selectedAgentName)

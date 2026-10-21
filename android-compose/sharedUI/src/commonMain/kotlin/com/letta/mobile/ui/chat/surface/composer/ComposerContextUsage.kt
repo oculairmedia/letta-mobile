@@ -43,6 +43,7 @@ import com.letta.mobile.sharedui.resources.composer_context_unknown_value
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.context.ContextUsageBar
 import com.letta.mobile.ui.context.ContextUsageRows
+import com.letta.mobile.ui.context.animatedContextUsage
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
@@ -57,7 +58,9 @@ import org.jetbrains.compose.resources.stringResource
  * itemised breakdown, which no tooltip could hold.
  */
 @Composable
-internal fun ComposerContextIndicator(state: ContextWindowUsageState) {
+internal fun ComposerContextIndicator(reading: ContextWindowUsageState) {
+    // Changing numbers travel to their new values, never snap.
+    val state = reading.copy(usage = animatedContextUsage(reading.usage))
     var open by remember { mutableStateOf(false) }
     Box {
         LocalLettaHost.current.tooltip(contextSummaryText(state)) {

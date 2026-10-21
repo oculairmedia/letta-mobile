@@ -108,6 +108,10 @@ private fun stubSessionManager(session: FixtureSession) = mockk<SessionManager>(
     every { current.backendDescriptor.backendId } returns BackendId(session.tag)
     every { current.backendDescriptor.runtimeId } returns RuntimeId(session.tag)
     every { currentGraph } returns MutableStateFlow(
-        mockk<SessionGraph>(relaxed = true) { every { contextTokenReadings } returns session.contextReadings },
+        mockk<SessionGraph>(relaxed = true) {
+            every { contextTokenReadings } returns session.contextReadings
+            // A host without `agent.context`: the chip keeps the streamed total.
+            coEvery { agentRepository.getContextBreakdown(any(), any(), any()) } throws IllegalStateException("capability_unavailable")
+        },
     )
 }

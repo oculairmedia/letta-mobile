@@ -1,15 +1,18 @@
 package com.letta.mobile.web.chat
 
 import com.letta.mobile.data.chat.approval.ChatApprovalAnswerer
+import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.data.timeline.TimelineTransport
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatApprovalStateSource
+import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
+import com.letta.mobile.ui.chat.session.ConversationModels
 import com.letta.mobile.ui.chat.session.TimelineChatRunControls
 import com.letta.mobile.ui.chat.session.TimelineChatSessionOptions
 import com.letta.mobile.ui.chat.session.TimelineChatSessionPort
@@ -18,7 +21,9 @@ import com.letta.mobile.ui.chat.session.TimelineChipSources
 import com.letta.mobile.ui.chat.session.TimelineSyncLoopSession
 import com.letta.mobile.ui.chat.session.withChips
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 
 /** What the live App Server session hands the web's chat page for one conversation. */
 class WebChatBinding(
@@ -58,13 +63,29 @@ class WebChatSessionPort(
         logTag = LOG_TAG,
         agentId = binding.target.agentId,
     )
+    private val hostInputs = MutableStateFlow(ChatComposerHostInputs())
+    private val options = TimelineChatSessionOptions(
+        controls = binding.controls,
+        approvals = hostApprovalState(binding, scope),
+        composerHost = hostInputs,
+    ).withChips(scope, binding.target, binding.chips)
     private val port = TimelineChatSessionPort(
         session = TimelineSyncLoopSession(loop),
         target = binding.target,
         scope = scope,
-        options = TimelineChatSessionOptions(controls = binding.controls, approvals = hostApprovalState(binding, scope))
-            .withChips(scope, binding.target, binding.chips),
+        options = options,
     )
+
+    /**
+     * The conversation's model list and picks (the model chip's), which
+     * size the context meter's and card's window and take the card's model pick; null without chips.
+     */
+    val models: ConversationModels? = options.models as? ConversationModels
+
+    /** The composer's context meter, the shell's reading for this conversation. */
+    fun updateContextUsage(usage: ContextWindowUsageState) {
+        hostInputs.update { it.copy(contextUsage = usage) }
+    }
 
     /** The conversation this port serves; the canvas docked under the page is that conversation's board. */
     val target: TimelineChatTarget = binding.target
