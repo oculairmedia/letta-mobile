@@ -8412,6 +8412,26 @@ public final class com/letta/mobile/data/chat/branch/PendingDraft {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/chat/display/BackgroundCommandReport {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)Lcom/letta/mobile/data/chat/display/BackgroundCommandReport;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/display/BackgroundCommandReport;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/display/BackgroundCommandReport;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCommand ()Ljava/lang/String;
+	public final fun getDetail ()Ljava/lang/String;
+	public final fun getStreams ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/display/BackgroundCommandReportKt {
+	public static final fun isCommand (Lcom/letta/mobile/data/model/UiSubagentNotification;)Z
+	public static final fun parseBackgroundCommandReport (Ljava/lang/String;)Lcom/letta/mobile/data/chat/display/BackgroundCommandReport;
+}
+
 public final class com/letta/mobile/data/chat/display/ChatDisplayOptions {
 	public static final field Companion Lcom/letta/mobile/data/chat/display/ChatDisplayOptions$Companion;
 	public fun <init> ()V
@@ -8479,11 +8499,48 @@ public final class com/letta/mobile/data/chat/display/ChatTextSize$Companion {
 	public final fun nearest (F)Lcom/letta/mobile/data/chat/display/ChatTextSize;
 }
 
+public final class com/letta/mobile/data/chat/display/CommandStream {
+	public fun <init> (Lcom/letta/mobile/data/chat/display/CommandStream$Kind;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Lcom/letta/mobile/data/chat/display/CommandStream$Kind;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/data/chat/display/CommandStream$Kind;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/chat/display/CommandStream;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/display/CommandStream;Lcom/letta/mobile/data/chat/display/CommandStream$Kind;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/display/CommandStream;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKind ()Lcom/letta/mobile/data/chat/display/CommandStream$Kind;
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/display/CommandStream$Kind : java/lang/Enum {
+	public static final field Output Lcom/letta/mobile/data/chat/display/CommandStream$Kind;
+	public static final field Stderr Lcom/letta/mobile/data/chat/display/CommandStream$Kind;
+	public static final field Stdout Lcom/letta/mobile/data/chat/display/CommandStream$Kind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/chat/display/CommandStream$Kind;
+	public static fun values ()[Lcom/letta/mobile/data/chat/display/CommandStream$Kind;
+}
+
 public final class com/letta/mobile/data/chat/display/OpenChatsOnCanvas {
 	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlinx/coroutines/CoroutineDispatcher;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlinx/coroutines/CoroutineDispatcher;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getEnabled ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun setEnabled (ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/chat/display/TaskActivity : java/lang/Enum {
+	public static final field Command Lcom/letta/mobile/data/chat/display/TaskActivity;
+	public static final field Subagent Lcom/letta/mobile/data/chat/display/TaskActivity;
+	public static final field Task Lcom/letta/mobile/data/chat/display/TaskActivity;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/chat/display/TaskActivity;
+	public static fun values ()[Lcom/letta/mobile/data/chat/display/TaskActivity;
+}
+
+public final class com/letta/mobile/data/chat/display/TaskActivityKt {
+	public static final fun activity (Lcom/letta/mobile/data/model/UiSubagentNotification;)Lcom/letta/mobile/data/chat/display/TaskActivity;
 }
 
 public final class com/letta/mobile/data/chat/display/TranscriptInput {
@@ -8863,10 +8920,6 @@ public final class com/letta/mobile/data/chat/projection/StepDotIcon : java/lang
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/chat/projection/StepDotIcon;
 	public static fun values ()[Lcom/letta/mobile/data/chat/projection/StepDotIcon;
-}
-
-public final class com/letta/mobile/data/chat/projection/TaskNotificationPresentationKt {
-	public static final fun activityLabel (Lcom/letta/mobile/data/model/UiSubagentNotification;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/chat/projection/TimelineEventToUiMessageKt {

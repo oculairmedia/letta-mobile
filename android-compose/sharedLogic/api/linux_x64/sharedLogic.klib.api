@@ -505,6 +505,18 @@ final enum class com.letta.mobile.data.chat.display/ChatTextSize : kotlin/Enum<c
     }
 }
 
+final enum class com.letta.mobile.data.chat.display/TaskActivity : kotlin/Enum<com.letta.mobile.data.chat.display/TaskActivity> { // com.letta.mobile.data.chat.display/TaskActivity|null[0]
+    enum entry Command // com.letta.mobile.data.chat.display/TaskActivity.Command|null[0]
+    enum entry Subagent // com.letta.mobile.data.chat.display/TaskActivity.Subagent|null[0]
+    enum entry Task // com.letta.mobile.data.chat.display/TaskActivity.Task|null[0]
+
+    final val entries // com.letta.mobile.data.chat.display/TaskActivity.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.chat.display/TaskActivity> // com.letta.mobile.data.chat.display/TaskActivity.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.chat.display/TaskActivity // com.letta.mobile.data.chat.display/TaskActivity.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.chat.display/TaskActivity> // com.letta.mobile.data.chat.display/TaskActivity.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.chat.projection/CanvasArtifactStatus : kotlin/Enum<com.letta.mobile.data.chat.projection/CanvasArtifactStatus> { // com.letta.mobile.data.chat.projection/CanvasArtifactStatus|null[0]
     enum entry DryRun // com.letta.mobile.data.chat.projection/CanvasArtifactStatus.DryRun|null[0]
     enum entry Failed // com.letta.mobile.data.chat.projection/CanvasArtifactStatus.Failed|null[0]
@@ -28068,6 +28080,25 @@ final class com.letta.mobile.data.chat.branch/PendingDraft { // com.letta.mobile
     final fun toString(): kotlin/String // com.letta.mobile.data.chat.branch/PendingDraft.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.chat.display/BackgroundCommandReport { // com.letta.mobile.data.chat.display/BackgroundCommandReport|null[0]
+    constructor <init>(kotlin/String?, kotlin/String?, kotlin.collections/List<com.letta.mobile.data.chat.display/CommandStream>) // com.letta.mobile.data.chat.display/BackgroundCommandReport.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.chat.display.CommandStream>){}[0]
+
+    final val command // com.letta.mobile.data.chat.display/BackgroundCommandReport.command|{}command[0]
+        final fun <get-command>(): kotlin/String? // com.letta.mobile.data.chat.display/BackgroundCommandReport.command.<get-command>|<get-command>(){}[0]
+    final val detail // com.letta.mobile.data.chat.display/BackgroundCommandReport.detail|{}detail[0]
+        final fun <get-detail>(): kotlin/String? // com.letta.mobile.data.chat.display/BackgroundCommandReport.detail.<get-detail>|<get-detail>(){}[0]
+    final val streams // com.letta.mobile.data.chat.display/BackgroundCommandReport.streams|{}streams[0]
+        final fun <get-streams>(): kotlin.collections/List<com.letta.mobile.data.chat.display/CommandStream> // com.letta.mobile.data.chat.display/BackgroundCommandReport.streams.<get-streams>|<get-streams>(){}[0]
+
+    final fun component1(): kotlin/String? // com.letta.mobile.data.chat.display/BackgroundCommandReport.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.chat.display/BackgroundCommandReport.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<com.letta.mobile.data.chat.display/CommandStream> // com.letta.mobile.data.chat.display/BackgroundCommandReport.component3|component3(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<com.letta.mobile.data.chat.display/CommandStream> = ...): com.letta.mobile.data.chat.display/BackgroundCommandReport // com.letta.mobile.data.chat.display/BackgroundCommandReport.copy|copy(kotlin.String?;kotlin.String?;kotlin.collections.List<com.letta.mobile.data.chat.display.CommandStream>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.display/BackgroundCommandReport.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.display/BackgroundCommandReport.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.chat.display/BackgroundCommandReport.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.chat.display/ChatDisplayOptions { // com.letta.mobile.data.chat.display/ChatDisplayOptions|null[0]
     constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.letta.mobile.data.chat.display/ChatDisplayOptions.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
 
@@ -28113,6 +28144,37 @@ final class com.letta.mobile.data.chat.display/ChatFontScaleStore { // com.letta
 
     final fun load(): kotlin/Float // com.letta.mobile.data.chat.display/ChatFontScaleStore.load|load(){}[0]
     final fun save(kotlin/Float) // com.letta.mobile.data.chat.display/ChatFontScaleStore.save|save(kotlin.Float){}[0]
+}
+
+final class com.letta.mobile.data.chat.display/CommandStream { // com.letta.mobile.data.chat.display/CommandStream|null[0]
+    constructor <init>(com.letta.mobile.data.chat.display/CommandStream.Kind, kotlin/String?, kotlin/String) // com.letta.mobile.data.chat.display/CommandStream.<init>|<init>(com.letta.mobile.data.chat.display.CommandStream.Kind;kotlin.String?;kotlin.String){}[0]
+
+    final val kind // com.letta.mobile.data.chat.display/CommandStream.kind|{}kind[0]
+        final fun <get-kind>(): com.letta.mobile.data.chat.display/CommandStream.Kind // com.letta.mobile.data.chat.display/CommandStream.kind.<get-kind>|<get-kind>(){}[0]
+    final val label // com.letta.mobile.data.chat.display/CommandStream.label|{}label[0]
+        final fun <get-label>(): kotlin/String? // com.letta.mobile.data.chat.display/CommandStream.label.<get-label>|<get-label>(){}[0]
+    final val text // com.letta.mobile.data.chat.display/CommandStream.text|{}text[0]
+        final fun <get-text>(): kotlin/String // com.letta.mobile.data.chat.display/CommandStream.text.<get-text>|<get-text>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.chat.display/CommandStream.Kind // com.letta.mobile.data.chat.display/CommandStream.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.chat.display/CommandStream.component2|component2(){}[0]
+    final fun component3(): kotlin/String // com.letta.mobile.data.chat.display/CommandStream.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.data.chat.display/CommandStream.Kind = ..., kotlin/String? = ..., kotlin/String = ...): com.letta.mobile.data.chat.display/CommandStream // com.letta.mobile.data.chat.display/CommandStream.copy|copy(com.letta.mobile.data.chat.display.CommandStream.Kind;kotlin.String?;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.display/CommandStream.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.display/CommandStream.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.chat.display/CommandStream.toString|toString(){}[0]
+
+    final enum class Kind : kotlin/Enum<com.letta.mobile.data.chat.display/CommandStream.Kind> { // com.letta.mobile.data.chat.display/CommandStream.Kind|null[0]
+        enum entry Output // com.letta.mobile.data.chat.display/CommandStream.Kind.Output|null[0]
+        enum entry Stderr // com.letta.mobile.data.chat.display/CommandStream.Kind.Stderr|null[0]
+        enum entry Stdout // com.letta.mobile.data.chat.display/CommandStream.Kind.Stdout|null[0]
+
+        final val entries // com.letta.mobile.data.chat.display/CommandStream.Kind.entries|#static{}entries[0]
+            final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.chat.display/CommandStream.Kind> // com.letta.mobile.data.chat.display/CommandStream.Kind.entries.<get-entries>|<get-entries>#static(){}[0]
+
+        final fun valueOf(kotlin/String): com.letta.mobile.data.chat.display/CommandStream.Kind // com.letta.mobile.data.chat.display/CommandStream.Kind.valueOf|valueOf#static(kotlin.String){}[0]
+        final fun values(): kotlin/Array<com.letta.mobile.data.chat.display/CommandStream.Kind> // com.letta.mobile.data.chat.display/CommandStream.Kind.values|values#static(){}[0]
+    }
 }
 
 final class com.letta.mobile.data.chat.display/OpenChatsOnCanvas { // com.letta.mobile.data.chat.display/OpenChatsOnCanvas|null[0]
@@ -66515,7 +66577,8 @@ final fun (com.letta.mobile.data.model/UiApprovalRequest).com.letta.mobile.data.
 final fun (com.letta.mobile.data.model/UiGeneratedComponent).com.letta.mobile.data.a2ui/toA2uiSurfaceStateOrNull(): com.letta.mobile.data.a2ui/A2uiSurfaceState? // com.letta.mobile.data.a2ui/toA2uiSurfaceStateOrNull|toA2uiSurfaceStateOrNull@com.letta.mobile.data.model.UiGeneratedComponent(){}[0]
 final fun (com.letta.mobile.data.model/UiMessage).com.letta.mobile.data.chat.projection/hasNoRenderableContent(): kotlin/Boolean // com.letta.mobile.data.chat.projection/hasNoRenderableContent|hasNoRenderableContent@com.letta.mobile.data.model.UiMessage(){}[0]
 final fun (com.letta.mobile.data.model/UiMessage).com.letta.mobile.data.chat.projection/runStepDotIcon(): com.letta.mobile.data.chat.projection/StepDotIcon // com.letta.mobile.data.chat.projection/runStepDotIcon|runStepDotIcon@com.letta.mobile.data.model.UiMessage(){}[0]
-final fun (com.letta.mobile.data.model/UiSubagentNotification).com.letta.mobile.data.chat.projection/activityLabel(): kotlin/String // com.letta.mobile.data.chat.projection/activityLabel|activityLabel@com.letta.mobile.data.model.UiSubagentNotification(){}[0]
+final fun (com.letta.mobile.data.model/UiSubagentNotification).com.letta.mobile.data.chat.display/activity(): com.letta.mobile.data.chat.display/TaskActivity // com.letta.mobile.data.chat.display/activity|activity@com.letta.mobile.data.model.UiSubagentNotification(){}[0]
+final fun (com.letta.mobile.data.model/UiSubagentNotification).com.letta.mobile.data.chat.display/isCommand(): kotlin/Boolean // com.letta.mobile.data.chat.display/isCommand|isCommand@com.letta.mobile.data.model.UiSubagentNotification(){}[0]
 final fun (com.letta.mobile.data.plugin/PluginOrigin).com.letta.mobile.data.plugin.view/covers(com.letta.mobile.data.plugin.view/ViewLink): kotlin/Boolean // com.letta.mobile.data.plugin.view/covers|covers@com.letta.mobile.data.plugin.PluginOrigin(com.letta.mobile.data.plugin.view.ViewLink){}[0]
 final fun (com.letta.mobile.data.repository.api/ISettingsRepository).com.letta.mobile.data.repository/activeBackendUsesChannel(): kotlin/Boolean // com.letta.mobile.data.repository/activeBackendUsesChannel|activeBackendUsesChannel@com.letta.mobile.data.repository.api.ISettingsRepository(){}[0]
 final fun (com.letta.mobile.data.repository.modelcontrol/ConnectableProvider).com.letta.mobile.data.repository.modelcontrol/connectMethodOn(kotlin/Boolean): com.letta.mobile.data.repository.modelcontrol/ProviderConnectMethod // com.letta.mobile.data.repository.modelcontrol/connectMethodOn|connectMethodOn@com.letta.mobile.data.repository.modelcontrol.ConnectableProvider(kotlin.Boolean){}[0]
@@ -66606,6 +66669,7 @@ final fun com.letta.mobile.data.canvas/mayRunNotebookPlugin(com.letta.mobile.dat
 final fun com.letta.mobile.data.canvas/mayUseNotebookAgentTool(com.letta.mobile.data.canvas/NotebookItem, com.letta.mobile.data.canvas/NotebookItemContract?, com.letta.mobile.data.canvas/NotebookPeerGrant?, kotlin.collections/Set<kotlin/String>): kotlin/Boolean // com.letta.mobile.data.canvas/mayUseNotebookAgentTool|mayUseNotebookAgentTool(com.letta.mobile.data.canvas.NotebookItem;com.letta.mobile.data.canvas.NotebookItemContract?;com.letta.mobile.data.canvas.NotebookPeerGrant?;kotlin.collections.Set<kotlin.String>){}[0]
 final fun com.letta.mobile.data.canvas/traverseNotebookDocuments(com.letta.mobile.data.canvas/NotebookDocumentId, kotlin/Function1<com.letta.mobile.data.canvas/NotebookDocumentId, com.letta.mobile.data.canvas/NotebookDocument?>): kotlin.collections/List<com.letta.mobile.data.canvas/NotebookDocument> // com.letta.mobile.data.canvas/traverseNotebookDocuments|traverseNotebookDocuments(com.letta.mobile.data.canvas.NotebookDocumentId;kotlin.Function1<com.letta.mobile.data.canvas.NotebookDocumentId,com.letta.mobile.data.canvas.NotebookDocument?>){}[0]
 final fun com.letta.mobile.data.channel/projectChannelLibrary(kotlin.collections/List<com.letta.mobile.data.channel/ChannelDisplayItem>, com.letta.mobile.data.channel/ChannelDisplayStatus?, kotlin/String): com.letta.mobile.data.channel/ChannelLibraryProjection // com.letta.mobile.data.channel/projectChannelLibrary|projectChannelLibrary(kotlin.collections.List<com.letta.mobile.data.channel.ChannelDisplayItem>;com.letta.mobile.data.channel.ChannelDisplayStatus?;kotlin.String){}[0]
+final fun com.letta.mobile.data.chat.display/parseBackgroundCommandReport(kotlin/String): com.letta.mobile.data.chat.display/BackgroundCommandReport // com.letta.mobile.data.chat.display/parseBackgroundCommandReport|parseBackgroundCommandReport(kotlin.String){}[0]
 final fun com.letta.mobile.data.chat.projection/backfillMissingAssistantRunIds(kotlin.collections/List<com.letta.mobile.data.model/UiMessage>): kotlin.collections/List<com.letta.mobile.data.model/UiMessage> // com.letta.mobile.data.chat.projection/backfillMissingAssistantRunIds|backfillMissingAssistantRunIds(kotlin.collections.List<com.letta.mobile.data.model.UiMessage>){}[0]
 final fun com.letta.mobile.data.chat.projection/buildChatRenderModel(kotlin.collections/List<com.letta.mobile.data.model/UiMessage>, com.letta.mobile.data.chat.projection/ChatDisplayMode, kotlin/String? = ...): com.letta.mobile.data.chat.projection/ChatRenderModel // com.letta.mobile.data.chat.projection/buildChatRenderModel|buildChatRenderModel(kotlin.collections.List<com.letta.mobile.data.model.UiMessage>;com.letta.mobile.data.chat.projection.ChatDisplayMode;kotlin.String?){}[0]
 final fun com.letta.mobile.data.chat.projection/chainToolRoundRunIds(kotlin.collections/List<com.letta.mobile.data.model/UiMessage>): kotlin.collections/List<com.letta.mobile.data.model/UiMessage> // com.letta.mobile.data.chat.projection/chainToolRoundRunIds|chainToolRoundRunIds(kotlin.collections.List<com.letta.mobile.data.model.UiMessage>){}[0]
