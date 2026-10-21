@@ -344,6 +344,13 @@ git -C "$repo" add . && git -C "$repo" commit -qm "touch drawbox"
 actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" HEAD~1)"
 assert_eq "$actual" ":drawbox:jvmTest :sharedUI:jvmTest"
 
+# Shared Room contracts must exercise their JVM driver and the Android consumers.
+mkdir -p "$repo/android-compose/core/data/src"
+touch "$repo/android-compose/core/data/src/Entity.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm "touch shared Room data"
+actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" HEAD~1)"
+assert_eq "$actual" ":core:android-data:testDebugUnitTest :core:data:jvmTest"
+
 repo="$TMP/policy"
 new_repo "$repo"
 mkdir -p "$repo/android-compose/app/src" "$repo/android-compose/sharedLogic/src/commonMain/kotlin" \

@@ -7,10 +7,11 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ConversationModelSettings
+import com.letta.mobile.data.model.ConversationRecency
+import com.letta.mobile.data.serialization.LettaJson
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.json.Json
 
 @Entity(
     tableName = "conversations",
@@ -32,17 +33,17 @@ data class ConversationEntity(
     val archivedAt: String? = null,
     val inContextMessageIdsJson: String = "[]",
     val isolatedBlockIdsJson: String = "[]",
-    val cachedAtEpochMs: Long = System.currentTimeMillis(),
+    val cachedAtEpochMs: Long = kotlin.time.Clock.System.now().toEpochMilliseconds(),
     /**
-     * letta-mobile-dxz5s (v19): the conversation's own model override, its window and effort, so a
+     * The conversation's own model override, its window and effort, so a
      * cold start shows the host's override before the first refresh instead of the agent's model.
      */
     val model: String? = null,
     val contextWindowLimit: Int? = null,
     val modelEffort: String? = null,
     /**
-     * letta-mobile-by4vm.19 (v22): the three timestamps above as epoch millis, parsed once at write
-     * time by [ConversationTimestamps]. Lists sort on these, not on the ISO strings, whose mixed
+     * The three timestamps above as epoch millis, parsed once at write
+     * time by [ConversationRecency]. Lists sort on these, not on the ISO strings, whose mixed
      * formats (`Z` vs `+00:00`, fraction precision) do not sort chronologically as text. The String
      * columns stay for compatibility this release.
      */
@@ -67,10 +68,13 @@ data class ConversationEntity(
     )
 
     companion object {
-        private val json = Json { ignoreUnknownKeys = true }
+        private val json = LettaJson.persisted
         private val stringListSerializer = ListSerializer(String.serializer())
 
-        fun fromConversation(conversation: Conversation, cachedAtEpochMs: Long = System.currentTimeMillis()) = ConversationEntity(
+        fun fromConversation(
+            conversation: Conversation,
+            cachedAtEpochMs: Long = kotlin.time.Clock.System.now().toEpochMilliseconds(),
+        ) = ConversationEntity(
             id = conversation.id.value,
             agentId = conversation.agentId.value,
             summary = conversation.summary,
@@ -85,9 +89,9 @@ data class ConversationEntity(
             model = conversation.model,
             contextWindowLimit = conversation.hostContextWindowLimit,
             modelEffort = conversation.modelSettings?.effectiveEffort,
-            lastMessageAtEpochMs = ConversationTimestamps.epochMillisOrNull(conversation.lastMessageAt),
-            updatedAtEpochMs = ConversationTimestamps.epochMillisOrNull(conversation.updatedAt),
-            createdAtEpochMs = ConversationTimestamps.epochMillisOrNull(conversation.createdAt),
+            lastMessageAtEpochMs = ConversationRecency.epochMillisOrNull(conversation.lastMessageAt),
+            updatedAtEpochMs = ConversationRecency.epochMillisOrNull(conversation.updatedAt),
+            createdAtEpochMs = ConversationRecency.epochMillisOrNull(conversation.createdAt),
         )
 
         fun encodeStringList(values: List<String>): String = json.encodeToString(stringListSerializer, values)

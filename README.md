@@ -58,6 +58,7 @@ modules; `app/` provides the Android host rather than owning the whole product.
 | `feature-chat/` | Chat feature UI, presentation state and coordination (the `AdminChatViewModel` stack) |
 | `designsystem/` | Reusable Compose UI, theming, and dialogs |
 | `core/android-data/` | Android data bindings, repositories, Room database, data sources |
+| `core/data/` | Shared Android/JVM Room entities, DAO contracts and model conversions |
 | `core/runtime/` | Portable runtime contracts, IDs, projection and outbox; AppServerTurnEngine/fanout implementations live in sharedLogic |
 | `core/ids/` | Shared identifiers; wire schemas are source packages under `core/schemas/`, not a `:core:schemas` Gradle module |
 | `core/testutil/` | Shared test doubles and harnesses |

@@ -54,6 +54,7 @@ while IFS= read -r file; do
     android-compose/drawbox/*) TASKS[":drawbox:jvmTest"]=1; TASKS[":sharedUI:jvmTest"]=1 ;;
     android-compose/plugin-view/*) TASKS[":plugin-view:jvmTest"]=1; TASKS[":plugin-view:testAndroidHostTest"]=1 ;;
     android-compose/core/android-data/*) TASKS[":core:android-data:testDebugUnitTest"]=1 ;;
+    android-compose/core/data/*) TASKS[":core:data:jvmTest"]=1; TASKS[":core:android-data:testDebugUnitTest"]=1 ;;
     android-compose/core/ids/*) TASKS[":core:ids:jvmTest"]=1 ;;
     android-compose/core/runtime/*) TASKS[":core:runtime:jvmTest"]=1 ;;
     android-compose/desktop/*) TASKS[":desktop:test"]=1 ;;
@@ -76,6 +77,7 @@ ORDERED=(
   ":plugin-view:jvmTest"
   ":plugin-view:testAndroidHostTest"
   ":core:android-data:testDebugUnitTest"
+  ":core:data:jvmTest"
   ":core:ids:jvmTest"
   ":core:runtime:jvmTest"
   ":desktop:test"

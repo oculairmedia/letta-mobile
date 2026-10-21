@@ -18,6 +18,7 @@ their supporting source/config directories, which are not separate projects.
 | `desktop` | Compose Desktop host (JVM): entry point, single-instance/OS lock, bundled JBR, installers | `:desktop:test` (additive in `test` when desktop changes) |
 | `web` | Browser client (Kotlin/WASM, Compose for Web) | `web-wasm` job (not required): `:web:wasmJsBrowserDistribution :web:wasmJsBrowserTest`; wasmJs compiles are in required `shared-multiplatform` |
 | `core/android-data` | Android data bindings, Ktor wiring, Room, mappers | `:core:android-data:testDebugUnitTest` (required `test` job) |
+| `core/data` | Shared Android/JVM Room entities, DAO contracts and model conversions | `:core:data:jvmTest` |
 | `core/runtime` | Turn engine, runtime event fanout | covered by host builds |
 | `core/ids` | Shared identifiers (`core/schemas/` holds wire schemas as source packages, not a module) | covered by host builds |
 | `core/testutil` | Shared test doubles and harnesses | test-only |
