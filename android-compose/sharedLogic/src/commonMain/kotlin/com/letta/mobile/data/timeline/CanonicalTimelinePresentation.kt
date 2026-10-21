@@ -365,7 +365,7 @@ class CanonicalTimelinePresentation private constructor(
 }
 
 /**
- * letta-mobile-ivsx0: a deferred row is never decoded, but its ledger order is the message time,
+ * A deferred row is never decoded, but its ledger order is the message time,
  * so it still dates itself. Blank, it reset the day divider and the next row opened "Today" again.
  */
 private fun TimelinePageKey.ledgerTimestamp(): String =

@@ -321,7 +321,7 @@ private fun LazyItemScope.PagedSlot(scope: PagedRowsScope, index: Int, offset: I
 }
 
 /**
- * A body too large to decode inline pages in on demand. letta-mobile-ivsx0: it is a row of the
+ * A body too large to decode inline pages in on demand. It is a row of the
  * chat column like any other (its day divider first, then its card, centred to the column width);
  * its placeholder item has no content, so drawing it too only added an empty band.
  */
