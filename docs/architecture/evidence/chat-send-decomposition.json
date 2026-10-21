@@ -3,7 +3,8 @@
     "physical": "Exact Git source lines, all recursive commonMain/data/chat/send production Kotlin files.",
     "health": "Default cs review scores; null denotes unscorable code, never a fabricated 10.0.",
     "codeSceneLoc": "Exact Git bytes, isolated temp-repository LOC-warning=1 parser probe; customized probe scores excluded; non-scorable files remain unmeasured.",
-    "pins": "Implementation source before documentation-only acceptance edits; no production metric/configuration gate was changed."
+    "pins": "Implementation source before documentation-only acceptance edits; no production metric/configuration gate was changed.",
+    "cli": "cs 1.0.41, build 341169b662167b7a7f07c2ecc06fb560ef96c71a, Windows amd64; local default reviews, not cloud scores."
   },
   "refs": {
     "b090c766bee52e8aa176249446df6ad73f7af702": {
