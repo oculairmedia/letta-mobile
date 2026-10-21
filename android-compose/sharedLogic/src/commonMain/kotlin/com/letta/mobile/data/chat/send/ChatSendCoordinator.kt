@@ -27,10 +27,15 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
 
 import kotlin.time.Duration.Companion.milliseconds
@@ -1479,28 +1484,6 @@ class ChatSendCoordinator(
         }
     }
 
-    /** Delivered-then-failed keeps whatever was already on screen: the user got their answer. */
-    private fun nextErrorFor(
-        state: ConversationTurnState,
-        status: BridgeTurnStatus,
-        deadTurn: Boolean,
-        terminalNotice: TurnFailureNotice?,
-    ): String? {
-        val stopReasonError = state.stopReason.equals("error", ignoreCase = true)
-        return when (status) {
-            BridgeTurnStatus.Completed -> state.bufferedErrorMessage
-                ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else ui.currentError()
-            BridgeTurnStatus.Cancelled -> ui.currentError()
-            BridgeTurnStatus.Failed -> if (deadTurn) {
-                state.bufferedErrorMessage ?: terminalNotice?.message
-            } else {
-                ui.currentError()
-            }
-            is BridgeTurnStatus.Unknown -> state.bufferedErrorMessage
-                ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else "Turn ended unexpectedly (${status.raw})"
-        }
-    }
-
     private suspend fun finishActiveTurn(
         state: ConversationTurnState,
         status: BridgeTurnStatus,
@@ -1513,7 +1496,7 @@ class ChatSendCoordinator(
     ) {
         val conversationId = (state.localConversationId ?: state.conversationId).takeIf { it.isNotBlank() }
             ?: defaultShimConversationId(agentId)
-        val completion = MainReplyCompletionPolicy.classify(
+        val completion = TurnTerminalPolicy.classify(
             deliveredAssistantContent = state.deliveredAssistantContent,
             stopReason = state.stopReason,
             bufferedErrorMessage = state.bufferedErrorMessage,
@@ -1529,82 +1512,107 @@ class ChatSendCoordinator(
             else -> null
         }
         val deadTurn = status is BridgeTurnStatus.Failed && terminalNotice != null
-        if (shouldCleanupAbandonedAssistantFragments(status, deadTurn, runId)) {
-            cleanupAbandonedAssistantFragmentsSafely(
-                conversationId = conversationId,
-                runId = runId,
-                turnId = turnId,
-                reason = "turn_done_$status",
-                candidateRunIds = activeCleanupCandidateRunIds(state, runId),
-            )
-        }
-        if (recordEvent != null) {
-            runtimeEventBatcher.enqueue(recordEvent, conversationId)
-        }
-        if (lossy) {
-            Telemetry.event(
-                "AdminChatVM", "ws.turnDone.lossy",
-                "dropCount" to dropCount,
-                "turnId" to turnId,
-                "runId" to runId,
-            )
-            state.otid?.let { otid ->
-                timelineRepository.reconcileExternalTransportSend(
+        // Reconciliation/notice writes remain cancellable. Their failure must not strand the
+        // terminal's ownership: retain the failure until the mandatory local retirement finishes.
+        val terminalWrites = runCatching {
+            if (shouldCleanupAbandonedAssistantFragments(status, deadTurn, runId)) {
+                cleanupAbandonedAssistantFragmentsSafely(
                     conversationId = conversationId,
-                    agentId = agentId,
-                    externalConversationId = state.serverConversationId ?: conversationId,
-                    otid = otid,
+                    runId = runId,
+                    turnId = turnId,
+                    reason = "turn_done_$status",
+                    candidateRunIds = activeCleanupCandidateRunIds(state, runId),
                 )
             }
+            if (recordEvent != null) {
+                runtimeEventBatcher.enqueue(recordEvent, conversationId)
+            }
+            if (lossy) {
+                Telemetry.event(
+                    "AdminChatVM", "ws.turnDone.lossy",
+                    "dropCount" to dropCount,
+                    "turnId" to turnId,
+                    "runId" to runId,
+                )
+                state.otid?.let { otid ->
+                    timelineRepository.reconcileExternalTransportSend(
+                        conversationId = conversationId,
+                        agentId = agentId,
+                        externalConversationId = state.serverConversationId ?: conversationId,
+                        otid = otid,
+                    )
+                }
+            }
+            if (status is BridgeTurnStatus.Failed && terminalNotice == null) {
+                Telemetry.event(
+                    "AdminChatVM", "ws.turnDone.failedAfterDelivery",
+                    "turnId" to turnId,
+                    "runId" to runId,
+                    // Sanitized family only — never the raw reason (letta-mobile-o0atv).
+                    "reasonKind" to (state.bufferedErrorKind ?: terminalReasonKind(state.bufferedErrorMessage) ?: "<none>"),
+                )
+            }
+            terminalNotice?.let { notice ->
+                appendTurnFailureNotice(conversationId, runId, turnId, notice)
+            }
         }
-        if (status is BridgeTurnStatus.Failed && terminalNotice == null) {
-            Telemetry.event(
-                "AdminChatVM", "ws.turnDone.failedAfterDelivery",
-                "turnId" to turnId,
-                "runId" to runId,
-                // Sanitized family only — never the raw reason (letta-mobile-o0atv).
-                "reasonKind" to (state.bufferedErrorKind ?: terminalReasonKind(state.bufferedErrorMessage) ?: "<none>"),
-            )
-        }
-        terminalNotice?.let { notice ->
-            appendTurnFailureNotice(conversationId, runId, turnId, notice)
-        }
-        settlePendingSend(state, conversationId, deadTurn)
-        val nextError = nextErrorFor(state, status, deadTurn, terminalNotice)
-        // Finding 1: only the VISIBLE conversation's terminal may clear presence
-        // or paint an error. A background conversation settles its own timeline
-        // rows above and leaves the foreground alone.
-        if (ownsForegroundUi(conversationId)) {
-            ui.onTurnFinished(nextError)
-        } else {
-            reportBackgroundUiSuppressed(conversationId, "onTurnFinished")
-        }
+        val stopReason = state.stopReason
+        val retirementWrites = retireTerminalTurn(state, ConversationId(conversationId), status, terminalNotice)
         Telemetry.event(
             "AdminChatVM", "ws.turnComplete",
             "conversationId" to conversationId,
             "status" to status,
             "turnId" to turnId,
             "runId" to runId,
-            "stopReason" to (state.stopReason ?: ""),
+            "stopReason" to (stopReason ?: ""),
             "lossy" to lossy,
             "reason" to reason,
         )
-        // letta-mobile-dangling-tool: this is the seam that observes every
-        // turn-end path (turnDone, subscribeDone, redial-recovery all funnel
-        // through finishActiveTurn). `clean` (status == "completed") is
-        // passed through for telemetry only — per Codex #902 review finding
-        // 3, turnEnded schedules its sweep unconditionally, on clean AND
-        // abnormal endings alike. That's safe: THIS turn's own calls are
-        // already settled synchronously in AppServerTurnEngine on non-clean
-        // endings and so never show up as unresolved, but an EARLIER turn's
-        // still-dangling card (whose sweep this turn's own turnStarted()
-        // cancelled) needs exactly this unconditional reschedule or it would
-        // never resolve.
-        runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = status is BridgeTurnStatus.Completed) }
-        state.reachedTerminal = true
-        clearActiveTurnState(state, reason = "turnFinished")
-        timelineRepository.clearExternalTransportActive(conversationId)
-        queueDriver.onTurnFinishedLocked(QueueConversationId(conversationId))
+        releaseTerminalQueue(QueueConversationId(conversationId), listOf(terminalWrites) + retirementWrites)
+    }
+
+    /**
+     * Called under the lifecycle mutex. Attempt every local retirement write before propagating
+     * cancellation; reconciliation and queue dispatch remain outside this NonCancellable boundary.
+     */
+    private suspend fun retireTerminalTurn(
+        state: ConversationTurnState,
+        conversationId: ConversationId,
+        status: BridgeTurnStatus,
+        terminalNotice: TurnFailureNotice?,
+    ): List<Result<Unit>> {
+        val deadTurn = status is BridgeTurnStatus.Failed && terminalNotice != null
+        return withContext(NonCancellable) {
+            val localSettlement = runCatching { settlePendingSend(state, conversationId.value, deadTurn) }
+            val foregroundPresence = runCatching {
+                // Evaluate after suspension: the user may have selected a different conversation.
+                if (ownsForegroundUi(conversationId.value)) {
+                    ui.onTurnFinished(TurnTerminalPolicy.nextError(state, status, terminalNotice, ui.currentError()))
+                } else {
+                    reportBackgroundUiSuppressed(conversationId.value, "onTurnFinished")
+                }
+            }
+            // Unconditional: an earlier turn's dangling card may need its cancelled sweep restored.
+            val toolSweep = runCatching {
+                timelineRepository.turnEnded(agentId, conversationId.value, clean = status is BridgeTurnStatus.Completed)
+            }
+            state.reachedTerminal = true
+            clearActiveTurnState(state, reason = "turnFinished")
+            val transportPresence = runCatching { timelineRepository.clearExternalTransportActive(conversationId.value) }
+            listOf(localSettlement, foregroundPresence, toolSweep, transportPresence)
+        }
+    }
+
+    /** Cancellation retires the turn but never starts another send; ordinary write failures do. */
+    private suspend fun releaseTerminalQueue(conversationId: QueueConversationId, writes: List<Result<*>>) {
+        val failures = writes.mapNotNull { it.exceptionOrNull() }
+        failures.filterNot { it is CancellationException }.forEach { failure ->
+            Telemetry.error("AdminChatVM", "ws.turnSettlement.failed", failure, "conversationId" to conversationId.value)
+        }
+        // Never consume cancellation, including one thrown by a writer inside NonCancellable.
+        failures.firstOrNull { it is CancellationException }?.let { throw it }
+        currentCoroutineContext().ensureActive()
+        if (scope.isActive) queueDriver.onTurnFinishedLocked(conversationId)
     }
 
     /**
@@ -1892,34 +1900,8 @@ class ChatSendCoordinator(
         // frames arrive for many conversations. Overflow eviction is telemetered.
         private const val MAX_TRACKED_CONVERSATION_TURN_STATES = 32
         internal var postSendReconcileDelaysMs = longArrayOf(750L, 2_500L, 6_000L)
-        private const val BARE_STOP_REASON_ERROR_MESSAGE =
-            "Agent run failed after your message was sent. No error details were provided by the shim."
         private const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"
         private fun defaultShimConversationId(agentId: String): String = "conv-default-$agentId"
-    }
-
-    /**
-     * Keeps terminal classification out of the coordinator lifecycle hotspot.
-     * Delivery without a buffered error is authoritative for Agent turns that
-     * omit a main-reply stop reason; any buffered error remains terminal evidence.
-     */
-    private data class MainReplyCompletion(
-        val isAuthoritativelyComplete: Boolean,
-    )
-
-    private object MainReplyCompletionPolicy {
-        fun classify(
-            deliveredAssistantContent: Boolean,
-            stopReason: String?,
-            bufferedErrorMessage: String?,
-        ): MainReplyCompletion {
-            val hasBufferedTerminalError = !bufferedErrorMessage.isNullOrBlank()
-            val completedStop = TurnFailureNotices.isCompletedMainReplyStopReason(stopReason)
-            return MainReplyCompletion(
-                isAuthoritativelyComplete = deliveredAssistantContent &&
-                    (completedStop || !hasBufferedTerminalError),
-            )
-        }
     }
 
 }

@@ -25,7 +25,11 @@ import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -293,7 +297,8 @@ class ChatSendCoordinatorCleanupTest {
     @Test
     fun cleanupCancellationExceptionPropagates() = runTest(UnconfinedTestDispatcher()) {
         val timeline = RecordingTimelineWriter(cleanupFailure = CancellationException("cancel cleanup"))
-        val coordinator = coordinator(timeline = timeline, ui = RecordingUiSink(), transport = FakeChannelTransport(mutableListOf(true)), activeConversationId = { "conv-1" })
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline = timeline, ui = ui, transport = FakeChannelTransport(mutableListOf(true)), activeConversationId = { "conv-1" })
 
         coordinator.send("hello").join()
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
@@ -301,6 +306,123 @@ class ChatSendCoordinatorCleanupTest {
         assertFailsWith<CancellationException> {
             coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
         }
+        assertFalse(ui.isStreaming(), "cancellation must retire foreground presence")
+        assertEquals(listOf("conv-1"), timeline.clearedActiveConversations)
+        assertEquals(1, timeline.failedLocals.size)
+    }
+
+    @Test
+    fun interruptedTerminalWritesStillRetireAndFenceTheTurn() = runTest(UnconfinedTestDispatcher()) {
+        for (write in SettlementWrite.entries) {
+            for (cancelled in listOf(false, true)) assertInterruptedTerminalRetires(write, cancelled)
+        }
+    }
+
+    private suspend fun assertInterruptedTerminalRetires(write: SettlementWrite, cancelled: Boolean) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(mutableListOf(true))
+        val coordinator = coordinator(timeline, ui, transport, { "conv-1" })
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        val failure = if (cancelled) CancellationException("interrupted $write") else IllegalStateException("failed $write")
+        timeline.beforeSettlementWrite = { if (it == write) throw failure }
+        val terminal = WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed, lossy = true)
+        if (cancelled) {
+            assertEquals(failure, assertFailsWith<CancellationException> { coordinator.handleEvent(terminal) })
+        } else {
+            coordinator.handleEvent(terminal)
+        }
+        assertFalse(ui.isStreaming(), "$write cancelled=$cancelled left presence active")
+        assertTrue(SettlementWrite.CLEAR_ACTIVE in timeline.settlementWrites, "$write skipped active clear")
+        assertTrue(SettlementWrite.LOCAL_MARK in timeline.settlementWrites, "$write skipped optimistic settlement")
+        assertTrue(SettlementWrite.TURN_ENDED in timeline.settlementWrites, "$write skipped tool sweep")
+        assertFalse("conv-1" in timeline.activeConversations, "$write left transport presence active")
+
+        // A retired run's tail must not reopen presence, even after interrupted writes.
+        timeline.beforeSettlementWrite = {}
+        coordinator.handleEvent(WsTimelineEvent.MessageDelta(
+            message = AssistantMessage(id = "late", contentRaw = JsonPrimitive("tail"), runId = "run-1"),
+            conversationId = "conv-1",
+            turnId = "turn-1",
+        ))
+        assertFalse(ui.isStreaming(), "$write failed to retain the terminal fence")
+        coordinator.send("next").join()
+        val marks = timeline.failedLocals.size + timeline.sentLocals.size
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Completed))
+        assertTrue(ui.isStreaming(), "$write allowed old terminal to clear next send")
+        assertEquals(marks, timeline.failedLocals.size + timeline.sentLocals.size)
+    }
+
+    @Test
+    fun cancellationDuringTerminalReconcileRetiresButLeavesQueuedSendForExplicitResume() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(mutableListOf(true, false, true))
+        val coordinator = coordinator(timeline, ui, transport, { "conv-1" })
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        transport.activeChatTurn = true
+        coordinator.send("queued").join()
+        val sentBeforeTerminal = timeline.sentLocals.size
+        val entered = CompletableDeferred<Unit>()
+        timeline.beforeSettlementWrite = {
+            if (it == SettlementWrite.RECONCILE) {
+                entered.complete(Unit)
+                awaitCancellation()
+            }
+        }
+        transport.activeChatTurn = false
+        val terminalJob = launch {
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Completed, lossy = true))
+        }
+        entered.await()
+        terminalJob.cancelAndJoin()
+        assertFalse(ui.isStreaming())
+        assertEquals(listOf("first", "queued"), transport.sentTexts, "cancelled settlement must not retry queued work")
+        assertEquals(1, coordinator.sendQueue.state.value[QueueConversationId("conv-1")]?.items?.size)
+        assertEquals(listOf("conv-1"), timeline.clearedActiveConversations)
+        assertEquals(sentBeforeTerminal + 1, timeline.sentLocals.size)
+        timeline.beforeSettlementWrite = {}
+        coordinator.sendQueue.resume(QueueConversationId("conv-1")).join()
+        assertEquals(listOf("first", "queued", "queued"), transport.sentTexts, "retirement must release the lifecycle mutex")
+    }
+
+    @Test
+    fun failedTerminalReconcileStillDrainsPendingSendAfterRetirement() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(mutableListOf(true, false, true))
+        val coordinator = coordinator(timeline, ui, transport, { "conv-1" })
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        transport.activeChatTurn = true
+        coordinator.send("queued").join()
+        val sentBeforeTerminal = timeline.sentLocals.size
+        timeline.beforeSettlementWrite = {
+            check(it != SettlementWrite.RECONCILE) { "disk unavailable" }
+        }
+        transport.activeChatTurn = false
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Completed, lossy = true))
+        assertEquals(listOf("first", "queued", "queued"), transport.sentTexts)
+        assertTrue(coordinator.sendQueue.state.value.isEmpty())
+        assertTrue(ui.isStreaming(), "the drained send now owns presence")
+        assertEquals(listOf("conv-1"), timeline.clearedActiveConversations)
+        assertEquals(sentBeforeTerminal + 1, timeline.sentLocals.size)
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Unknown("duplicate")))
+        assertTrue(ui.isStreaming(), "retired terminal must not clear the drained send")
+        assertEquals(sentBeforeTerminal + 1, timeline.sentLocals.size)
+    }
+
+    @Test
+    fun successfulTerminalPreservesSettlementWriteOrder() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val coordinator = coordinator(timeline, RecordingUiSink(), FakeChannelTransport(mutableListOf(true)))
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        timeline.settlementWrites.clear()
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed, lossy = true))
+        assertEquals(SettlementWrite.entries.toList(), timeline.settlementWrites)
     }
 
     @Test
@@ -1060,6 +1182,13 @@ class ChatSendCoordinatorCleanupTest {
         private val cleanupFailure: Throwable? = null,
         private val ingestFailure: Throwable? = null,
     ) : TimelineExternalTransportWriter {
+        var beforeSettlementWrite: suspend (SettlementWrite) -> Unit = {}
+        val settlementWrites = mutableListOf<SettlementWrite>()
+        val activeConversations = mutableSetOf<String>()
+        private suspend fun settlementWrite(write: SettlementWrite) {
+            settlementWrites += write
+            beforeSettlementWrite(write)
+        }
         var reconcileOutcome: RecentMessagesReconcileOutcome = RecentMessagesReconcileOutcome.Applied(0)
         val externalLocals = mutableListOf<ExternalLocal>()
         val ingestedMessages = mutableListOf<LettaMessage>()
@@ -1068,27 +1197,43 @@ class ChatSendCoordinatorCleanupTest {
         val clearedActiveConversations = mutableListOf<String>()
         val cleanupTails = mutableListOf<CleanupTail>()
         val reconciles = mutableListOf<Reconcile>()
-        override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String { externalLocals += ExternalLocal(conversationId, content, otid); return otid }
+        override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String { activeConversations += conversationId; externalLocals += ExternalLocal(conversationId, content, otid); return otid }
         override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String = appendExternalTransportLocal(conversationId, content, otid, attachments)
-        override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage, source: String) { ingestFailure?.let { throw it }; ingestedMessages += message }
+        override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage, source: String) {
+            if (message is ErrorMessage) {
+                settlementWrite(SettlementWrite.NOTICE)
+            }
+            ingestFailure?.let { throw it }
+            ingestedMessages += message
+        }
         override suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage, source: String) = ingestExternalTransportMessage(conversationId, message, source)
         override suspend fun markExternalTransportLocalSent(conversationId: String, otid: String) { sentLocals += LocalMarker(conversationId, otid) }
-        override suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String) { sentLocals += LocalMarker(conversationId, otid) }
+        override suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String) { settlementWrite(SettlementWrite.LOCAL_MARK); sentLocals += LocalMarker(conversationId, otid) }
         override suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String) { failedLocals += LocalMarker(conversationId, otid) }
-        override suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String) { failedLocals += LocalMarker(conversationId, otid) }
-        override suspend fun reconcileExternalTransportSend(conversationId: String, agentId: String, externalConversationId: String, otid: String) = Unit
+        override suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String) { settlementWrite(SettlementWrite.LOCAL_MARK); failedLocals += LocalMarker(conversationId, otid) }
+        override suspend fun reconcileExternalTransportSend(conversationId: String, agentId: String, externalConversationId: String, otid: String) { settlementWrite(SettlementWrite.RECONCILE) }
         override suspend fun reconcileExternalTransportSendScoped(agentId: String?, conversationId: String, externalConversationId: String, otid: String) = Unit
         override suspend fun repairExpiredConversationCursor(conversationId: String, fallbackSeq: Long?) = Unit
         override suspend fun repairExpiredConversationCursorScoped(agentId: String?, conversationId: String, fallbackSeq: Long?) = Unit
-        override suspend fun clearExternalTransportActive(conversationId: String) { clearedActiveConversations += conversationId }
+        override suspend fun clearExternalTransportActive(conversationId: String) {
+            settlementWrite(SettlementWrite.CLEAR_ACTIVE)
+            activeConversations -= conversationId
+            clearedActiveConversations += conversationId
+        }
         override suspend fun clearExternalTransportActive(agentId: String?, conversationId: String) { clearedActiveConversations += conversationId }
-        override suspend fun cleanupAbandonedAssistantFragments(agentId: String?, conversationId: String, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int { cleanupFailure?.let { throw it }; cleanupTails += CleanupTail(agentId, conversationId, runId, turnId, candidateRunIds); return 0 }
+        override suspend fun cleanupAbandonedAssistantFragments(agentId: String?, conversationId: String, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int { settlementWrite(SettlementWrite.CLEANUP); cleanupFailure?.let { throw it }; cleanupTails += CleanupTail(agentId, conversationId, runId, turnId, candidateRunIds); return 0 }
+        override suspend fun turnEnded(agentId: String?, conversationId: String, clean: Boolean) {
+            settlementWrite(SettlementWrite.TURN_ENDED)
+            activeConversations -= conversationId
+        }
         override suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean, connectionGeneration: Long): RecentMessagesReconcileOutcome { reconciles += Reconcile(conversationId, reason, forceRefresh); return reconcileOutcome }
         data class ExternalLocal(val conversationId: String, val content: String, val otid: String)
         data class LocalMarker(val conversationId: String, val otid: String)
         data class CleanupTail(val agentId: String?, val conversationId: String, val activeRunId: String?, val activeTurnId: String?, val candidateRunIds: Set<String>)
         data class Reconcile(val conversationId: String, val reason: String, val forceRefresh: Boolean)
     }
+
+    private enum class SettlementWrite { CLEANUP, RECONCILE, NOTICE, LOCAL_MARK, TURN_ENDED, CLEAR_ACTIVE }
 
     /**
      * letta-mobile-or40x PR2: the fake now answers turn ownership PER
