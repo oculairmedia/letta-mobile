@@ -26,18 +26,14 @@ import kotlinx.coroutines.awaitCancellation
 @Composable
 internal fun InstallTabletPen(window: Window, penRegistry: CanvasPenRegistry) {
     LaunchedEffect(window, penRegistry) {
-        // Opening the Windows Ink bridge costs the EDT a few hundred milliseconds; it waits for the
-        // window's first frame, so the person sees the app first. A pen down that early has no
-        // canvas to land on.
+        // The Ink bridge costs the EDT ~300 ms: open it after the window's first frame.
         withFrameNanos { }
         val pen = TabletPen(window, penRegistry)
         val polling = pen.start(this)
         try {
             awaitCancellation()
         } finally {
-            // Cancelled BEFORE the handles close: it stops the poll loop and any open that has
-            // not finished, so no handle can be registered after this point and outlive the
-            // window it belongs to.
+            // Cancelled BEFORE the handles close, so no handle outlives the window it belongs to.
             polling?.cancel()
             pen.stop()
         }
