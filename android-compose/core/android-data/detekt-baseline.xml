@@ -220,7 +220,6 @@
     <ID>TooGenericExceptionCaught:SessionManager.kt$SessionManager$t: Throwable</ID>
     <ID>TooGenericExceptionThrown:BackendSwitchInvalidatorTest.kt$BackendSwitchInvalidatorTest$throw RuntimeException("b")</ID>
     <ID>TooGenericExceptionThrown:CoroutineExtensionsTest.kt$CoroutineExtensionsTest$throw RuntimeException("Test Error")</ID>
-    <ID>TooManyFunctions:ConversationDao.kt$ConversationDao</ID>
     <ID>TooManyFunctions:ConversationRepository.kt$ConversationRepository : IConversationRepositoryBackendScopedCache</ID>
     <ID>TooManyFunctions:DomainIdConverters.kt$DomainIdConverters</ID>
     <ID>TooManyFunctions:IrohAdminRpcTimelineTransport.kt$IrohAdminRpcTimelineTransport : TimelineTransport</ID>

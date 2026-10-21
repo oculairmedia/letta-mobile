@@ -6,12 +6,9 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.model.CanvasId
-import kotlinx.serialization.json.Json
+import com.letta.mobile.data.serialization.LettaJson
 
-private val opSerializer = Json {
-    ignoreUnknownKeys = true
-    encodeDefaults = true
-}
+private val opSerializer = LettaJson.persisted
 
 @Entity(
     tableName = "canvas_ops",
@@ -29,7 +26,7 @@ data class CanvasOpEntity(
     val payloadJson: String,
     val createdAtEpochMs: Long,
     /**
-     * Whether the stored canvas document holds this op (letta-mobile-by4vm.22): appended unsettled,
+     * Whether the stored canvas document holds this op: appended unsettled,
      * settled once the document write carrying it succeeded. Rows from before the journal are
      * settled (the migration's default), since nothing records which of them the document missed.
      */
@@ -43,7 +40,7 @@ data class CanvasOpEntity(
         fun fromCanvasOp(
             canvasId: CanvasId,
             op: CanvasOp,
-            clock: () -> Long = { System.currentTimeMillis() },
+            clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
         ): CanvasOpEntity {
             val opType = when (op) {
                 is CanvasOp.ReplaceSceneOp -> "replace_scene"
