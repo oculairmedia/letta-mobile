@@ -66,8 +66,8 @@ typealias SendQueues = Map<QueueConversationId, ConversationSendQueue>
 /**
  * The client-held send queue, per conversation, unbounded.
  *
- * Only the queue's shape lives here; WHEN to run the head is the coordinator's decision (it knows
- * whether the transport still owns a turn). Every mutation is one atomic [MutableStateFlow.update],
+ * Only the queue's shape lives here; [QueuedSendDriver] owns admission and drain policy through
+ * the coordinator's existing turn adapter. Every mutation is one atomic [MutableStateFlow.update],
  * so the UI always sees a consistent order.
  */
 class ChatSendQueue {
