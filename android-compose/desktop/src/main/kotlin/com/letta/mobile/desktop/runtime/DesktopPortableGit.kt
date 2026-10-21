@@ -2,6 +2,8 @@ package com.letta.mobile.desktop.runtime
 
 import java.io.File
 import java.net.URI
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.zip.ZipInputStream
 
@@ -34,6 +36,11 @@ internal fun portableGitCmdDirectory(
 /**
  * Downloads [release], refuses a SHA-256 mismatch, extracts `cmd/git.exe`. [download] and [digest]
  * are faked in tests so the pin is exercised without the network.
+ *
+ * letta-mobile-k5nbq.13: the archive is downloaded and unpacked in a staging directory beside the
+ * versioned one and renamed into place only once complete, so neither a crash mid-extract nor the
+ * git availability poll ever sees a half tree under `<version>/cmd`. Staging is removed on any
+ * failure, including a checksum mismatch.
  */
 internal class PortableGitInstaller(
     private val root: File,
@@ -45,15 +52,22 @@ internal class PortableGitInstaller(
 
     fun install(): File {
         val dest = File(root, release.version)
-        val git = File(dest, "cmd/git.exe")
+        val git = File(dest, GIT_EXE)
         if (git.isFile) return git.parentFile
-        dest.mkdirs()
-        val zip = File(dest, "mingit.zip")
-        download(release.url, zip)
-        verifyChecksum(zip)
-        extractZip(zip, dest)
-        zip.delete()
-        check(git.isFile) { "PortableGit extract did not contain cmd/git.exe" }
+        dest.deleteRecursively()
+        root.mkdirs()
+        val zip = Files.createTempFile(root.toPath(), ".${release.version}-", ".zip").toFile()
+        val staging = Files.createTempDirectory(root.toPath(), ".${release.version}-").toFile()
+        try {
+            download(release.url, zip)
+            verifyChecksum(zip)
+            extractZip(zip, staging)
+            check(File(staging, GIT_EXE).isFile) { "PortableGit extract did not contain cmd/git.exe" }
+            Files.move(staging.toPath(), dest.toPath(), StandardCopyOption.ATOMIC_MOVE)
+        } finally {
+            zip.delete()
+            staging.deleteRecursively()
+        }
         return git.parentFile
     }
 
@@ -65,9 +79,14 @@ internal class PortableGitInstaller(
     }
 }
 
+/** Downloads [url] to [dest], failing instead of hanging when the server stalls. */
 internal fun downloadUrlTo(url: String, dest: File) {
     dest.parentFile?.mkdirs()
-    URI(url).toURL().openStream().use { input ->
+    val connection = URI(url).toURL().openConnection().apply {
+        connectTimeout = DOWNLOAD_CONNECT_TIMEOUT_MS
+        readTimeout = DOWNLOAD_READ_TIMEOUT_MS
+    }
+    connection.getInputStream().use { input ->
         dest.outputStream().use { output -> input.copyTo(output) }
     }
 }
@@ -116,10 +135,14 @@ private fun writeZipEntry(stream: ZipInputStream, dest: File, name: String, alre
     return written
 }
 
+/** Absolute, parent-escaping, drive-relative (`C:foo`) or alternate-data-stream (`a:b`) entry names. */
 internal fun isUnsafeZipPath(name: String): Boolean {
     val normalized = name.replace('\\', '/')
-    return normalized.startsWith("/") || normalized.split('/').any { it == ".." }
+    return normalized.startsWith("/") || ':' in normalized || normalized.split('/').any { it == ".." }
 }
 
+private const val GIT_EXE = "cmd/git.exe"
+private const val DOWNLOAD_CONNECT_TIMEOUT_MS = 15_000
+private const val DOWNLOAD_READ_TIMEOUT_MS = 30_000
 private const val HASH_BUFFER_BYTES = 64 * 1024
 private const val MAX_UNPACKED_BYTES = 256L * 1024 * 1024
