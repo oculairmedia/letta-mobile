@@ -5,6 +5,7 @@ import com.letta.mobile.ui.chat.session.TimelineSubagentViewSessions
 import com.letta.mobile.ui.chat.subagents.rememberSubagentDualView
 import com.letta.mobile.ui.chat.subagents.rememberSubagentDualViewHost
 import com.letta.mobile.ui.shell.workspace.ShellChatLook
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.remember
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
@@ -13,6 +14,10 @@ import com.letta.mobile.data.plugin.catalog.UnavailablePluginCatalog
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
+import com.letta.mobile.ui.shell.workspace.OpenConversation
+import com.letta.mobile.ui.shell.workspace.OpenConversationAgentContextCard
+import com.letta.mobile.ui.shell.workspace.OpenConversationContextMeter
+import com.letta.mobile.ui.shell.workspace.OpenConversationContextSession
 import com.letta.mobile.ui.chat.surface.rememberChatDockGeometry
 import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
 import com.letta.mobile.ui.settings.BackendConnectionStatusRow
@@ -52,6 +57,7 @@ import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlays
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceSearch
 import com.letta.mobile.ui.shell.workspace.rememberShellChatPresentation
 import com.letta.mobile.web.chat.WebChatLoad
+import com.letta.mobile.web.chat.WebChatSessionPort
 import com.letta.mobile.web.data.WasmAppServerClientGateway
 import kotlin.time.Clock
 
@@ -70,7 +76,7 @@ internal class WebWorkspace(val state: LettaShellWorkspaceState, val host: Letta
 /**
  * letta-mobile-ckmub.17.4: the browser binds the same [com.letta.mobile.ui.shell.workspace.LettaShellWorkspace]
  * the desktop window does: the shared navigation over the workspace and its roster, the shared pages
- * in the main pane, the shared overlays, and the connection's status as the panel's card.
+ * in the main pane, the shared overlays, and the shared agent context card with the connection's status.
  */
 internal fun webWorkspace(shell: WebShell, page: WebPageInputs, header: ShellWorkspaceHeaderState): WebWorkspace {
     val workspace = shell.workspace
@@ -85,7 +91,17 @@ internal fun webWorkspace(shell: WebShell, page: WebPageInputs, header: ShellWor
                     val deps = rememberShellPageDeps(page.session.graph, page.session.controllers, webPageHost(shell, page))
                     ShellPage(destination = workspace.destination, deps = deps, modifier = modifier)
                 },
-                agentCard = { BackendConnectionStatusRow(page.connection) },
+                // The shared model and context card desktop shows, over the connection's status.
+                agentCard = {
+                    Column {
+                        OpenConversationAgentContextCard(
+                            session = webContextSession(shell, page),
+                            focusedAgent = shell.workspace.focusedAgentId,
+                            conversation = page.openConversation(),
+                        )
+                        BackendConnectionStatusRow(page.connection)
+                    }
+                },
                 // The browser has no background-task roster yet (parity-exemptions.txt).
                 sidePane = {},
                 overlays = {
@@ -159,6 +175,7 @@ private fun webChatPage(shell: WebShell, page: WebPageInputs, ready: WebChatLoad
     val subagentViews = rememberSubagentDualView(ConversationId(target.conversationId), webSubagentViewSessions(page))
     val base = remember(agentNames, shell) { ChatSurfaceHost(resolveAgentName = agentNames::get, openAgentPane = shell::showNavigation) }
     val host = rememberSubagentDualViewHost(base, subagentViews, emptyList())
+    OpenConversationContextMeter(webContextSession(shell, page), port.openConversation(), onUsage = port::updateContextUsage)
     ShellChatDestination(
         page = ShellChatPage(
             port = port,
@@ -190,6 +207,18 @@ private fun webWaitingPage(shell: WebShell, page: WebPageInputs) = ShellPageCont
         modifier = modifier,
     )
 }
+
+/** What the shared context meter and card read: the live graph, the gateway's routes and the roster. */
+private fun webContextSession(shell: WebShell, page: WebPageInputs) = OpenConversationContextSession(
+    graph = page.session.graph,
+    routes = page.session.services.gateway.contextRoutes,
+    modelControl = page.session.services.gateway.modelControl,
+    agents = shell.backend.agents.value,
+)
+
+private fun WebChatSessionPort.openConversation() = OpenConversation(target.agentId, target.conversationId, this, models)
+
+private fun WebPageInputs.openConversation(): OpenConversation? = (chat as? WebChatLoad.Ready)?.port?.openConversation()
 
 /** Where the dual view reads a subagent's conversation: the gateway's live session. */
 private fun webSubagentViewSessions(page: WebPageInputs) = TimelineSubagentViewSessions(page.session.services.gateway::subagentTimeline)

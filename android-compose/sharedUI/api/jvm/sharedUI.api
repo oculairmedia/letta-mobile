@@ -541,7 +541,7 @@ public final class com/letta/mobile/ui/canvas/CanvasTableBlock {
 }
 
 public final class com/letta/mobile/ui/canvas/CanvasWorkspaceKt {
-	public static final fun CanvasWorkspace-S1kTVRY (Landroidx/compose/ui/Modifier;Lio/ak1/drawbox/presentation/viewmodel/DrawBoxController;Lcom/letta/mobile/data/canvas/CanvasSession;Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;Ljava/lang/String;Lcom/letta/mobile/data/canvas/CanvasPresenceTransport;Lcom/letta/mobile/data/storage/AssetStore;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;ZLkotlin/jvm/functions/Function2;Lcom/letta/mobile/ui/canvas/CanvasLayout;ZFLcom/letta/mobile/ui/canvas/CanvasCameraRequest;Landroidx/compose/runtime/Composer;III)V
+	public static final fun CanvasWorkspace-ZqFPiAU (Landroidx/compose/ui/Modifier;Lio/ak1/drawbox/presentation/viewmodel/DrawBoxController;Lcom/letta/mobile/data/canvas/CanvasSession;Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;Ljava/lang/String;Lcom/letta/mobile/data/canvas/CanvasPresenceTransport;Lcom/letta/mobile/data/storage/AssetStore;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;ZLkotlin/jvm/functions/Function2;Lcom/letta/mobile/ui/canvas/CanvasLayout;ZFLcom/letta/mobile/ui/canvas/CanvasCameraRequest;Landroidx/compose/runtime/Composer;III)V
 }
 
 public final class com/letta/mobile/ui/canvas/ComposableSingletons$CanvasHistoryDialogKt {
@@ -3104,6 +3104,16 @@ public final class com/letta/mobile/ui/context/AgentContextPicker {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/context/AgentContextSession {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/data/context/ContextTokenReadings;Lcom/letta/mobile/data/context/ContextBreakdownLoader;Lcom/letta/mobile/data/context/limit/AgentContextRoutes;)V
+	public final fun cardDeps (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;Lcom/letta/mobile/data/notify/AttentionPrefsRepository;)Lcom/letta/mobile/ui/context/AgentContextCardDeps;
+	public static synthetic fun cardDeps$default (Lcom/letta/mobile/ui/context/AgentContextSession;Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;Lcom/letta/mobile/data/notify/AttentionPrefsRepository;ILjava/lang/Object;)Lcom/letta/mobile/ui/context/AgentContextCardDeps;
+	public final fun getBreakdown ()Lcom/letta/mobile/data/context/ContextBreakdownLoader;
+	public final fun getReadings ()Lcom/letta/mobile/data/context/ContextTokenReadings;
+	public final fun getRoutes ()Lcom/letta/mobile/data/context/limit/AgentContextRoutes;
+}
+
 public final class com/letta/mobile/ui/context/AgentContextSheetKt {
 	public static final fun AgentContextSheetContent (Landroidx/compose/foundation/layout/ColumnScope;Lcom/letta/mobile/data/context/AgentContextCardModel;Lcom/letta/mobile/ui/context/AgentContextPicker;Lkotlin/jvm/functions/Function0;Lcom/letta/mobile/ui/context/ContextLimitControl;Landroidx/compose/runtime/Composer;II)V
 }
@@ -3163,6 +3173,22 @@ public final class com/letta/mobile/ui/context/ComposableSingletons$ContextLimit
 	public static final field INSTANCE Lcom/letta/mobile/ui/context/ComposableSingletons$ContextLimitSliderKt;
 	public fun <init> ()V
 	public final fun getLambda$169497150$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
+public final class com/letta/mobile/ui/context/ContextConversationFocus {
+	public static final field $stable I
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Z)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Z)Lcom/letta/mobile/ui/context/ContextConversationFocus;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/context/ContextConversationFocus;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Lcom/letta/mobile/ui/context/ContextConversationFocus;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId ()Ljava/lang/String;
+	public final fun getConversationId ()Ljava/lang/String;
+	public final fun getTurnRunning ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class com/letta/mobile/ui/context/ContextLimitControl {
@@ -3230,6 +3256,28 @@ public final class com/letta/mobile/ui/context/ContextLimitTags {
 	public static final field STATUS Ljava/lang/String;
 	public static final field UNSUPPORTED Ljava/lang/String;
 	public static final field VALUE Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/context/ContextWindowSources {
+	public static final field $stable I
+	public fun <init> (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/repository/modelcontrol/ConversationModelChoices;)V
+	public final fun agentOf (Lcom/letta/mobile/ui/context/ContextConversationFocus;)Lcom/letta/mobile/data/model/Agent;
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Lcom/letta/mobile/data/repository/modelcontrol/ConversationModelChoices;
+	public final fun copy (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/repository/modelcontrol/ConversationModelChoices;)Lcom/letta/mobile/ui/context/ContextWindowSources;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/context/ContextWindowSources;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/repository/modelcontrol/ConversationModelChoices;ILjava/lang/Object;)Lcom/letta/mobile/ui/context/ContextWindowSources;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgents ()Ljava/util/List;
+	public final fun getModelSelections ()Lcom/letta/mobile/data/repository/modelcontrol/ConversationModelChoices;
+	public final fun getModels ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/context/FocusedAgentContextKt {
+	public static final fun FocusedAgentContextCard (Lcom/letta/mobile/ui/context/AgentContextCardBinding;Lcom/letta/mobile/ui/context/ContextConversationFocus;Lcom/letta/mobile/ui/context/ContextWindowSources;Ljava/lang/String;Landroidx/compose/runtime/Composer;I)V
+	public static final fun rememberFocusedContextUsage (Lcom/letta/mobile/ui/context/ContextConversationFocus;Lcom/letta/mobile/data/context/ContextTokenReadings;Lcom/letta/mobile/data/context/ContextBreakdownLoader;Lcom/letta/mobile/ui/context/ContextWindowSources;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/data/context/ContextWindowUsageState;
 }
 
 public final class com/letta/mobile/ui/dreaming/ComposableSingletons$DreamingPanelKt {
@@ -9827,6 +9875,24 @@ public final class com/letta/mobile/ui/shell/workspace/LettaShellWorkspaceTags {
 	public static final field WORKSPACE Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/shell/workspace/OpenConversation {
+	public static final field $stable I
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/ui/chat/session/ChatSessionPort;Lcom/letta/mobile/ui/chat/session/ConversationModels;)V
+	public final fun getAgentId ()Ljava/lang/String;
+	public final fun getConversationId ()Ljava/lang/String;
+	public final fun getModels ()Lcom/letta/mobile/ui/chat/session/ConversationModels;
+	public final fun getPort ()Lcom/letta/mobile/ui/chat/session/ChatSessionPort;
+}
+
+public final class com/letta/mobile/ui/shell/workspace/OpenConversationContextSession {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/data/session/graph/SharedSessionRepositoryGraph;Lcom/letta/mobile/data/context/limit/AgentContextRoutes;Lcom/letta/mobile/data/repository/modelcontrol/ModelControlSession;Ljava/util/List;)V
+	public final fun getAgents ()Ljava/util/List;
+	public final fun getGraph ()Lcom/letta/mobile/data/session/graph/SharedSessionRepositoryGraph;
+	public final fun getModelControl ()Lcom/letta/mobile/data/repository/modelcontrol/ModelControlSession;
+	public final fun getRoutes ()Lcom/letta/mobile/data/context/limit/AgentContextRoutes;
+}
+
 public final class com/letta/mobile/ui/shell/workspace/ShellCanvasOwner {
 	public static final field $stable I
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
@@ -9950,6 +10016,11 @@ public final class com/letta/mobile/ui/shell/workspace/ShellLayoutController {
 public final class com/letta/mobile/ui/shell/workspace/ShellLayoutControllerKt {
 	public static final fun rememberShellLayoutController (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/data/storage/SecureSettingsStore;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/workspace/ShellLayoutController;
 	public static final fun shellLayoutStore (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/data/storage/SecureSettingsStore;)Lcom/letta/mobile/data/desktopshell/ShellLayoutStore;
+}
+
+public final class com/letta/mobile/ui/shell/workspace/ShellOpenConversationContextKt {
+	public static final fun OpenConversationAgentContextCard-ETgpYbM (Lcom/letta/mobile/ui/shell/workspace/OpenConversationContextSession;Ljava/lang/String;Lcom/letta/mobile/ui/shell/workspace/OpenConversation;Landroidx/compose/runtime/Composer;I)V
+	public static final fun OpenConversationContextMeter (Lcom/letta/mobile/ui/shell/workspace/OpenConversationContextSession;Lcom/letta/mobile/ui/shell/workspace/OpenConversation;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;I)V
 }
 
 public final class com/letta/mobile/ui/shell/workspace/ShellSidebarControl {

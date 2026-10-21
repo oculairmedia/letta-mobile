@@ -86,6 +86,7 @@ The `canvas.*` tools an agent sees are defined once in `CanvasToolContract` and 
 4. **Wire Framing & Live Transport (P3.1 Live LAN MVP)**:
    - Canvas synchronization operates over a dedicated Iroh QUIC ALPN (`meridian/canvas-sync/1`).
    - Ephemeral peer presence and cursor telemetry operate over dedicated Iroh QUIC ALPN (`meridian/canvas-presence/1`).
+   - `CanvasPresence.cursorX` / `cursorY` are **world coordinates**, before viewport pan/zoom (`screen = world * scale + offset`), not sender-local pixels. Receivers map them through their own viewport. There is no coordinate-version field yet; all clients must follow this convention.
    - Canvas operations and presence are **never** multiplexed onto App Server WebSocket chat frames.
    - **Direct-peer transport capability (original P3.1 surface; production uses the host relay below)**:
      - `IrohCanvasSyncTransport`: Full live endpoint lifecycle with accept loop, dial APIs (`connectToPeer`, `connectToPeerByTicket`), length-prefixed binary framing, and historical catch-up via `requestCatchUpSinceLamport`. Fallback to `LoopbackCanvasSyncTransport` when endpoint is absent.

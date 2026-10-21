@@ -189,6 +189,30 @@ interface ModelPickerSource {
          */
         fun withFallback(primary: ModelPickerSource, fallback: ModelPickerSource): ModelPickerSource =
             FallbackPickerSource(primary, fallback)
+
+        /**
+         * A chat's
+         * picker. The host's admin catalog ([session]) while it answers, else the chat's own
+         * [chatModels]; either way a catalog load re-reads the chat's list through [reloadChatModels],
+         * so the picked model routes. [recents] head the list. Desktop and the web bind it.
+         */
+        fun forChat(
+            session: ModelControlSession?,
+            chatModels: Flow<List<LlmModel>>,
+            reloadChatModels: suspend () -> Unit,
+            recents: Flow<List<String>> = flowOf(emptyList()),
+        ): ModelPickerSource {
+            val fallback = of(chatModels) { reloadChatModels() }
+            val catalog = session?.pickerSource() ?: return fallback.withRecents(recents)
+            // A catalog load also re-reads the chat's model list, which routes the picked model.
+            val synced = object : ModelPickerSource by catalog {
+                override suspend fun load(mode: ModelLoad) {
+                    catalog.load(mode)
+                    reloadChatModelsQuietly(reloadChatModels)
+                }
+            }
+            return withFallback(synced, fallback).withRecents(recents)
+        }
     }
 }
 
@@ -234,6 +258,14 @@ private class FallbackPickerSource(
 
     private fun <T> preferPrimary(fromPrimary: Flow<T>, fromFallback: Flow<T>): Flow<T> =
         combine(primaryWorks, fromPrimary, fromFallback) { works, p, f -> if (works) p else f }
+}
+
+/**
+ * Re-reads the chat's model list. The list is a mirror; failing to re-read it must not fail the
+ * picker, so the chat keeps its previous list and the next picker load tries again.
+ */
+suspend fun reloadChatModelsQuietly(reload: suspend () -> Unit) {
+    attempt(reload)
 }
 
 /** Runs [block]; false when it failed (cancellation still propagates). */

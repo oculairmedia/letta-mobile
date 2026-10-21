@@ -182,7 +182,7 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopWindowsC
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/DesktopMascotStills.kt 73
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/DesktopRiveRenderer.kt 42
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/RiveDesktopBridge.kt 285
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/canvas/DesktopCanvasHostSync.kt 78
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/canvas/DesktopCanvasHostSync.kt 86
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopAppServerChatAdapter.kt 106
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopAppServerChatGateway.kt 585
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopAppServerChatGatewayBuilder.kt 363
@@ -317,7 +317,7 @@ android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/ModelPickerReasoning.kt 16
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/SharedNavDrawerViewModel.kt 206
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/AdminChatComposerMapping.kt 103
-android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/AdminChatContextUsage.kt 65
+android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/AdminChatContextUsage.kt 76
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/SharedChatDualView.kt 32
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/WorkspaceFilesViewModel.kt 49
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/send/ChatSendStrategy.kt 25
@@ -334,11 +334,11 @@ android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/BrowserRouteBindi
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/WebMemoryPressureMonitor.kt 30
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/WebSettingsServices.kt 29
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/WebShellBindings.kt 161
-android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/WebShellPages.kt 195
+android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/WebShellPages.kt 224
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/WebShortcuts.kt 37
-android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/chat/WebChatSessionPort.kt 89
+android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/chat/WebChatSessionPort.kt 110
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/BrowserErrors.kt 21
-android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WasmAppServerClientGateway.kt 355
+android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WasmAppServerClientGateway.kt 364
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WasmAppServerSession.kt 308
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WebSessionBinding.kt 41
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WebSettingsStore.kt 34

@@ -9,16 +9,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
-import com.letta.mobile.data.repository.modelcontrol.ModelLoad
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerController
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
+import com.letta.mobile.data.repository.modelcontrol.reloadChatModelsQuietly
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.modelcontrol.ModelPickerActions
 import com.letta.mobile.ui.modelcontrol.ModelPickerContent
 import com.letta.mobile.ui.modelcontrol.ModelsEditActions
 import com.letta.mobile.ui.modelcontrol.ModelsEditContent
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -41,12 +40,7 @@ internal data class DesktopModelControlHost(
     val recentModels: Flow<List<String>> = flowOf(emptyList()),
 ) {
     /** The admin catalog while the host answers it, else the chat's list; both keep the chat's list current. */
-    fun pickerSource(): ModelPickerSource {
-        val fallback = ModelPickerSource.of(chatModels) { reloadChatModels() }
-        val catalog = session?.pickerSource()
-            ?: return fallback.withRecents(recentModels)
-        return ModelPickerSource.withFallback(ChatSyncedSource(catalog, reloadChatModels), fallback).withRecents(recentModels)
-    }
+    fun pickerSource(): ModelPickerSource = ModelPickerSource.forChat(session, chatModels, reloadChatModels, recentModels)
 }
 
 /** Which of the two model surfaces is open; the app's overlay stack owns the flags. */
@@ -90,7 +84,7 @@ internal fun DesktopModelControlOverlays(
             onDismiss = {
                 surfaces.modelsEditor = false
                 // What the picker shows may have changed; the chat routes picks through its own list.
-                scope.launch { reloadQuietly(host.reloadChatModels) }
+                scope.launch { reloadChatModelsQuietly(host.reloadChatModels) }
             },
         )
     }
@@ -138,27 +132,5 @@ private fun DesktopModelsEditor(
     val actions = remember(controller) { ModelsEditActions.bind(controller, onClose = onDismiss, onAddProvider = onAddProvider) }
     LettaPane(LettaPaneKind.Modal, onDismiss = onDismiss) {
         ModelsEditContent(state = state, actions = actions, autoFocusSearch = true)
-    }
-}
-
-/** A catalog load also re-reads the chat's model list, which routes the picked model. */
-private class ChatSyncedSource(
-    private val delegate: ModelPickerSource,
-    private val reloadChatModels: suspend () -> Unit,
-) : ModelPickerSource by delegate {
-    override suspend fun load(mode: ModelLoad) {
-        delegate.load(mode)
-        reloadQuietly(reloadChatModels)
-    }
-}
-
-/** The chat's list is a mirror; failing to re-read it must not fail the picker. */
-private suspend fun reloadQuietly(reload: suspend () -> Unit) {
-    try {
-        reload()
-    } catch (e: CancellationException) {
-        throw e
-    } catch (_: Exception) {
-        // The chat keeps its previous list; the next picker load tries again.
     }
 }

@@ -6,9 +6,13 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.transport.iroh.AdminRpcErrors
 import com.letta.mobile.util.runCatchingCancellable
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -18,7 +22,16 @@ data class ContextBreakdownRequest(
     val conversationId: ConversationId?,
     /** The latest exact streamed total; null when there is none or it is a post-compaction estimate. */
     val reportedTotal: Int?,
-)
+) {
+    /** The conversation this breakdown describes, whatever total it was matched to. */
+    val key: ContextBreakdownKey get() = ContextBreakdownKey(agentId, conversationId)
+}
+
+/** One conversation's place in the breakdown cache. */
+data class ContextBreakdownKey(val agentId: AgentId, val conversationId: ConversationId?)
+
+/** A conversation's loaded breakdown and the streamed total it was matched to (null: none was known). */
+data class ContextBreakdown(val overview: ContextWindowOverview, val reportedTotal: Int?)
 
 /** Why a breakdown is not shown; the meter falls back to the streamed total either way. */
 enum class ContextBreakdownUnavailable {
@@ -44,11 +57,14 @@ sealed interface ContextBreakdownState {
 }
 
 /**
- * Fetches the estimated breakdown on demand, never on a timer.
+ * The single owner of the context breakdown a session shows: the composer meter and the agent
+ * context card both read [breakdowns], so they never disagree.
  *
- * Callers [load] when the context sheet opens and again after a turn settles or a compaction
- * finishes; a repeat request for the same conversation and total is served from the last answer.
- * The meter never waits on it: [ContextMeter.of] draws the streamed total until a breakdown lands.
+ * Nothing polls. [follow] fetches the focused conversation's breakdown when it is opened and again
+ * once each turn settles (its total changes), dropping a stale fetch when the focus moves; the
+ * card's sheet [load]s too and after a compaction. A repeat request for the same conversation and
+ * total is served from the last answer, and each conversation's last breakdown stays in
+ * [breakdowns], so a revisit draws it at once while the refresh runs.
  */
 class ContextBreakdownLoader(
     private val fetch: suspend (ContextBreakdownRequest) -> ContextWindowOverview,
@@ -60,17 +76,43 @@ class ContextBreakdownLoader(
     private val mutableState = MutableStateFlow<ContextBreakdownState>(ContextBreakdownState.Idle)
     val state: StateFlow<ContextBreakdownState> = mutableState.asStateFlow()
 
+    private val cache = MutableStateFlow<Map<ContextBreakdownKey, ContextBreakdown>>(emptyMap())
+
+    /**
+     * Each conversation's last loaded breakdown. A refresh that fails drops a breakdown matched to
+     * an older total, so nothing shows numbers the conversation has moved on from.
+     */
+    val breakdowns: StateFlow<Map<ContextBreakdownKey, ContextBreakdown>> = cache.asStateFlow()
+
     private val lock = Mutex()
 
     suspend fun load(request: ContextBreakdownRequest, force: Boolean = false): ContextBreakdownState = lock.withLock {
         if (!force) answeredFor(request)?.let { return@withLock it }
         mutableState.value = ContextBreakdownState.Loading(request)
         val next = runCatchingCancellable { fetch(request) }.fold(
-            onSuccess = { ContextBreakdownState.Loaded(request, it) },
-            onFailure = { ContextBreakdownState.Unavailable(request, classify(it), it.message) },
+            onSuccess = { overview ->
+                cache.update { it + (request.key to ContextBreakdown(overview, request.reportedTotal)) }
+                ContextBreakdownState.Loaded(request, overview)
+            },
+            onFailure = { failure ->
+                cache.update { known ->
+                    val stale = known[request.key]?.takeIf { it.reportedTotal != request.reportedTotal }
+                    if (stale != null) known - request.key else known
+                }
+                ContextBreakdownState.Unavailable(request, classify(failure), failure.message)
+            },
         )
         mutableState.value = next
         next
+    }
+
+    /**
+     * Keeps the focused conversation's breakdown loaded until cancelled: each new request (a
+     * conversation opened, or a settled turn's new total) is fetched in the background, and one
+     * still in flight when the focus moves on is cancelled. Null is no focus.
+     */
+    suspend fun follow(requests: Flow<ContextBreakdownRequest?>) {
+        requests.distinctUntilChanged().collectLatest { request -> request?.let { load(it) } }
     }
 
     private fun answeredFor(request: ContextBreakdownRequest): ContextBreakdownState.Loaded? =

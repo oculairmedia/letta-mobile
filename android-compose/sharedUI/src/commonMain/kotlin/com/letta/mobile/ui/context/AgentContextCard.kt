@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.context.AgentContextCardModel
 import com.letta.mobile.data.context.ContextMeterLevel
+import com.letta.mobile.data.context.ContextWindowUsage
 import com.letta.mobile.data.context.formatContextTokens
 import com.letta.mobile.data.repository.modelcontrol.ReasoningTier
 import com.letta.mobile.ui.components.ChevronIndication
@@ -31,6 +32,7 @@ import com.letta.mobile.ui.theme.AgentContextDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import kotlin.math.roundToInt
 
 /** Test tags of the drawer context card and its sheet. */
 object AgentContextTags {
@@ -74,11 +76,13 @@ fun AgentContextCard(model: AgentContextCardModel, onClick: () -> Unit, modifier
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             CardModelLine(model)
-            model.meter?.usage?.takeIf { it.maxTokens > 0 }?.let { usage ->
-                ContextUsageBar(usage, Modifier.height(AgentContextDimens.cardBarHeight))
+            // Changing numbers travel to their new values, never snap.
+            val usage = animatedContextUsage(model.meter?.usage)
+            usage?.takeIf { it.maxTokens > 0 }?.let { shown ->
+                ContextUsageBar(shown, Modifier.height(AgentContextDimens.cardBarHeight))
             }
             Text(
-                text = usageLine(model),
+                text = usageLine(model, usage),
                 style = MaterialTheme.typography.labelSmall,
                 color = levelColor(model.level),
                 maxLines = 1,
@@ -111,10 +115,9 @@ internal fun modelLine(model: AgentContextCardModel): String {
     return "$name · $effort"
 }
 
-internal fun usageLine(model: AgentContextCardModel): String {
-    val usage = model.meter?.usage
+internal fun usageLine(model: AgentContextCardModel, usage: ContextWindowUsage? = model.meter?.usage): String {
     return AgentContextStrings.usedLine(
-        percent = model.usedPercent,
+        percent = if (usage === model.meter?.usage) model.usedPercent else usage?.percentUsed(),
         window = usage?.maxTokens?.takeIf { it > 0 }?.let(::formatContextTokens),
         used = usage?.usedTokens?.takeIf { it > 0 }?.let(::formatContextTokens),
     )
@@ -127,3 +130,9 @@ internal fun levelColor(level: ContextMeterLevel): Color = when (level) {
     ContextMeterLevel.Warning -> MaterialTheme.colorScheme.tertiary
     ContextMeterLevel.Critical -> MaterialTheme.colorScheme.error
 }
+
+/** Whole percent of the window [this] fills, as [AgentContextCardModel.usedPercent] rounds it. */
+private fun ContextWindowUsage.percentUsed(): Int? =
+    maxTokens.takeIf { it > 0 }?.let { (usedTokens.toFloat() / it * PERCENT).roundToInt() }
+
+private const val PERCENT = 100

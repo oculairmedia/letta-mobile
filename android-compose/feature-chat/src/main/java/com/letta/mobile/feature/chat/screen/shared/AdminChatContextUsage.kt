@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.screen.shared
 
+import com.letta.mobile.data.context.ContextBreakdownLoader
 import com.letta.mobile.data.context.ContextReadingInputs
 import com.letta.mobile.data.context.ContextReadingKey
 import com.letta.mobile.data.context.ContextWindowUsageKey
@@ -12,8 +13,12 @@ import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * letta-mobile-0ofhc: everything Android's context chip is derived from. All of it is already
@@ -28,6 +33,8 @@ internal data class AdminChatContextSources(
     val models: Flow<List<LlmModel>>,
     /** Per-conversation models and windows (host override or this session's switch). */
     val modelSelections: Flow<ConversationModelChoices>,
+    /** The session's breakdown owner, the one the drawer card reads. */
+    val breakdown: Flow<ContextBreakdownLoader?> = flowOf(null),
 )
 
 /** What the model window is drawn from at one instant. */
@@ -40,12 +47,16 @@ private data class WindowInputs(
 /**
  * The chip state for the conversation on screen: loaded as soon as the conversation has a
  * reading and its turn has settled, through the shared [contextUsageStates] fold — the same
- * rules desktop runs — rather than on a drawer tap.
+ * rules desktop runs — rather than on a drawer tap; the session's breakdown replaces the streamed
+ * total once it is fetched in the background.
  */
-internal fun AdminChatContextSources.contextUsage(): Flow<ContextWindowUsageState> =
-    combine(ui, readings, combine(agent, models, modelSelections, ::WindowInputs)) { state, byConversation, window ->
+@OptIn(ExperimentalCoroutinesApi::class)
+internal fun AdminChatContextSources.contextUsage(): Flow<ContextWindowUsageState> {
+    val inputs = combine(ui, readings, combine(agent, models, modelSelections, ::WindowInputs)) { state, byConversation, window ->
         inputsFor(state, byConversation, window)
-    }.contextUsageStates()
+    }
+    return breakdown.distinctUntilChanged().flatMapLatest { loader -> inputs.contextUsageStates(loader) }
+}
 
 private fun AdminChatContextSources.inputsFor(
     state: ChatUiState,
