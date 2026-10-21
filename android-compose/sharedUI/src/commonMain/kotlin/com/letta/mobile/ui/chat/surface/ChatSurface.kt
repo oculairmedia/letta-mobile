@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -127,7 +130,9 @@ fun ChatSurface(
 ) {
     // Lifecycle-aware on Android: a backgrounded app stops collecting, so the owner's
     // WhileSubscribed flows (the composer projection) can stop with it.
-    val uiState by port.uiState.collectForChatSurface()
+    // Held as a State and read only where a value is used: the page itself never reads it, so a
+    // streaming token recomposes the timeline and the few readers of run state, not every layer.
+    val uiState = port.uiState.collectForChatSurface()
     val composer by port.composer.collectForChatSurface()
     val capabilities by port.capabilities.collectForChatSurface()
     val shareFailed = stringResource(Res.string.chat_surface_canvas_share_failed)
@@ -142,7 +147,9 @@ fun ChatSurface(
         pageHost(stableHost, canvas != null, canvasActions, stableOnIntent)
     }
     // One scroll position per conversation (and paged presentation), kept across mode changes.
-    val conversationId = (uiState.conversationState as? ConversationState.Ready)?.conversationId
+    val conversationId by remember(uiState) {
+        derivedStateOf { (uiState.value.conversationState as? ConversationState.Ready)?.conversationId }
+    }
     ReleaseImagesOnConversationChange(conversationId)
     val listState = remember(conversationId, pagedTimeline) { LazyListState() }
     val dockReady = dockGeometry != null
@@ -152,8 +159,11 @@ fun ChatSurface(
     val imageAttacher = rememberComposerImageAttacher()
     // The page's one composer-companion seat; the composers only say where it should stand.
     val companionAnchors = remember { CompanionSeatAnchors() }
+    val session = remember(port, uiState, composer, capabilities, pagedTimeline, listState) {
+        ChatSurfaceSession(port, uiState, composer, capabilities, pagedTimeline, listState)
+    }
     val frame = ChatSurfaceFrame(
-        session = ChatSurfaceSession(port, uiState, composer, capabilities, pagedTimeline, listState),
+        session = session,
         presentation = presentation,
         onIntent = stableOnIntent,
         host = effectiveHost,
@@ -244,21 +254,38 @@ internal object ChatSurfaceTags {
     const val CANVAS_OVERLAY = "chat_surface_canvas_overlay"
 }
 
-/** The session inputs collected for this composition, shared by every presentation of the page. */
-@Immutable
+/**
+ * The session inputs collected for this composition, shared by every presentation of the page.
+ * [uiState] is read through its State, so only the composables that read it follow each update.
+ */
+@Stable
 internal class ChatSurfaceSession(
     val port: ChatSessionPort,
-    val uiState: ChatUiState,
+    private val uiStateSource: State<ChatUiState>,
     val composer: ChatComposerUiState,
     val capabilities: ChatSurfaceCapabilities,
     val pagedTimeline: CanonicalTimelinePresentation?,
     /** One scroll position per conversation/paged timeline, preserved across presentation changes. */
     val listState: LazyListState,
-)
+) {
+    /** The current chat state; reading it subscribes the reading composable to every update. */
+    val uiState: ChatUiState get() = uiStateSource.value
 
-/** One composition's session inputs and the page's host-owned presentation and geometry. */
+    // The slices the page's chrome reads: each invalidates its readers only when it changes, not on
+    // every streamed token.
+    val agentId by derivedStateOf { uiStateSource.value.agentId }
+    val agentName by derivedStateOf { uiStateSource.value.agentName }
+    val a2uiSurfaces by derivedStateOf { uiStateSource.value.a2uiSurfaces }
+    val a2uiResolvedActionCounters by derivedStateOf { uiStateSource.value.a2uiResolvedActionCounters }
+    val activeApprovalRequestId by derivedStateOf { uiStateSource.value.activeApprovalRequestId }
+}
+
+/**
+ * One composition's session inputs and the page's host-owned presentation and geometry. Equal
+ * when its parts are, so a recomposition of the page that changes none of them skips every layer.
+ */
 @Immutable
-internal class ChatSurfaceFrame(
+internal data class ChatSurfaceFrame(
     val session: ChatSurfaceSession,
     val presentation: ChatSurfacePresentation,
     val onIntent: (ChatSurfaceIntent) -> Unit,
@@ -453,20 +480,20 @@ private fun touchDockSlots(frame: ChatSurfaceFrame, approval: UiApprovalRequest?
 /** The pending question (with its approve, reject and answer controls) and the A2UI forms, if any. */
 @Composable
 private fun TouchCanvasInput(frame: ChatSurfaceFrame, approval: UiApprovalRequest?) {
-    val surfaces = frame.session.uiState.a2uiSurfaces
+    val surfaces = frame.session.a2uiSurfaces
     if (!touchInputPending(frame, approval)) return
     TouchInputTray {
         if (approval != null) {
             val session = frame.session
-            val owner = remember(session.uiState.activeApprovalRequestId, session.capabilities.approvals, session.port.actions) {
-                ApprovalOwner.of(session.uiState.activeApprovalRequestId, session.capabilities.approvals, session.port.actions)
+            val owner = remember(session.activeApprovalRequestId, session.capabilities.approvals, session.port.actions) {
+                ApprovalOwner.of(session.activeApprovalRequestId, session.capabilities.approvals, session.port.actions)
             }
             val decider = rememberApprovalDecider(approval, owner)
             ApprovalRequestCard(approval, decider)
         }
         A2uiSurfaceStack(
             surfaces = surfaces,
-            resolvedActionCounters = frame.session.uiState.a2uiResolvedActionCounters,
+            resolvedActionCounters = frame.session.a2uiResolvedActionCounters,
             actions = frame.session.port.actions,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -496,7 +523,7 @@ private fun rememberTouchCanvasChrome(host: ChatSurfaceHost): CanvasHostChrome {
 
 /** The Touch canvas's input tray is up: a question, or a generated form, waits on the person. */
 private fun touchInputPending(frame: ChatSurfaceFrame, approval: UiApprovalRequest?): Boolean =
-    approval != null || frame.session.uiState.a2uiSurfaces.isNotEmpty()
+    approval != null || frame.session.a2uiSurfaces.isNotEmpty()
 
 /**
  * What the chat head shows and does, from the page's frame. In the canvas bubble its reply opens
@@ -510,8 +537,8 @@ private fun ChatSurfaceFrame.touchHeadContent(
 ): TouchHeadContent {
     return TouchHeadContent(
         dock = dock,
-        agentId = session.uiState.agentId,
-        agentName = session.uiState.agentName,
+        agentId = session.agentId,
+        agentName = session.agentName,
         openChat = bubble?.state?.let { it::expand } ?: { onIntent(ChatSurfaceIntent.Expand) },
         openAgent = host.openAgentPane,
         turn = turn,
@@ -533,7 +560,7 @@ private fun CompanionSeat(
 ) {
     CompanionSeatOverlay(
         anchors = frame.companionAnchors,
-        agentId = frame.session.uiState.agentId,
+        agentId = frame.session.agentId,
         pageWeight = pageWeight,
         // Over the Touch chat head the character is the head's: its own gestures (drag, tap, long press) win.
         onClick = frame.host.openAgentPane.takeIf { interactive },
@@ -585,8 +612,8 @@ private fun dockedPanelContent(
         conversation = { conversationModifier -> DockedReplyCard(dockedReplyParams(frame), conversationModifier) },
         composer = { collapsed -> DockComposer(frame, composerMode, collapsed) },
         collapsed = CollapsedDockContent(
-            agentId = frame.session.uiState.agentId,
-            agentName = frame.session.uiState.agentName,
+            agentId = frame.session.agentId,
+            agentName = frame.session.agentName,
             openAgent = frame.host.openAgentPane,
             editAgent = frame.host.editAgent,
             turn = { rememberCollapsedTurn(dockedReplyParams(frame)) },
@@ -708,8 +735,8 @@ private fun LiveRunStatus(frame: ChatSurfaceFrame) {
 @Composable
 private fun DockedA2uiStack(frame: ChatSurfaceFrame) {
     A2uiSurfaceStack(
-        surfaces = frame.session.uiState.a2uiSurfaces,
-        resolvedActionCounters = frame.session.uiState.a2uiResolvedActionCounters,
+        surfaces = frame.session.a2uiSurfaces,
+        resolvedActionCounters = frame.session.a2uiResolvedActionCounters,
         actions = frame.session.port.actions,
         modifier = Modifier
             .fillMaxWidth()

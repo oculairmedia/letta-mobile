@@ -77,7 +77,7 @@ internal class BubbleRecents(
 private fun ChatSurfaceFrame.bubbleRecents(state: CanvasBubbleState, recents: ChatRecentInteractions): BubbleRecents =
     BubbleRecents(
         state = state,
-        content = RecentInteractionsContent(session.uiState.agentId, session.uiState.agentName, recents.conversations),
+        content = RecentInteractionsContent(session.agentId, session.agentName, recents.conversations),
         hop = recentsHop(this, recents, state::closeRecents),
     )
 
