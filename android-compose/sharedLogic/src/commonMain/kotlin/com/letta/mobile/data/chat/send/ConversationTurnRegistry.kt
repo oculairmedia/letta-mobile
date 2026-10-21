@@ -3,9 +3,9 @@ package com.letta.mobile.data.chat.send
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
+import kotlin.concurrent.Volatile
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
-import kotlin.concurrent.Volatile
 
 /**
  * The single index of conversation turn ownership, aliases and replay fences.
@@ -83,7 +83,7 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
         serverConversationId: ConversationId,
         tail: TurnTail,
     ): ConversationId? {
-        val originatingConv = ConversationId(localConversationId ?: conversationId)
+        val originatingConv = ConversationId(ownerConversationId)
         val serverConv = serverConversationId
         if (serverConv == originatingConv) return null
         conversationAliases.remove(serverConv)
@@ -266,10 +266,8 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
         if (states.any { identityOf(it) != null }) return null
         return fallbackState()
     }
-
-    private companion object {
-        const val MAX_SETTLED_OTIDS = 16
-        const val MAX_CONVERSATION_ALIASES = 64
-        const val MAX_TRACKED_CONVERSATION_TURN_STATES = 32
-    }
 }
+
+private const val MAX_SETTLED_OTIDS = 16
+private const val MAX_CONVERSATION_ALIASES = 64
+private const val MAX_TRACKED_CONVERSATION_TURN_STATES = 32

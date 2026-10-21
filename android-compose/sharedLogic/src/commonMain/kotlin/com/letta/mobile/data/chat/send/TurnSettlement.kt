@@ -98,17 +98,15 @@ internal class TurnSettlement(
         candidateRunIds: Set<String> = emptySet(),
     ) {
         val conversationId = conversation.value
-        val runId = tail.runId
-        val turnId = tail.turnId
         runCatching {
             val removed = timelineRepository.cleanupAbandonedAssistantFragments(
-                agentId, conversationId, runId, turnId, reason, candidateRunIds,
+                agentId, conversationId, tail.runId, tail.turnId, reason, candidateRunIds,
             )
             Telemetry.event(
                 "AdminChatVM", "cleanupAbandonedAssistantFragments.completed",
                 "conversationId" to conversationId,
-                "runId" to (runId ?: ""),
-                "turnId" to (turnId ?: ""),
+                "runId" to (tail.runId ?: ""),
+                "turnId" to (tail.turnId ?: ""),
                 "candidateRunIds" to candidateRunIds.joinToString(","),
                 "removedCount" to removed,
                 "reason" to reason,
@@ -118,8 +116,8 @@ internal class TurnSettlement(
             Telemetry.error(
                 "AdminChatVM", "cleanupAbandonedAssistantFragments.failed", error,
                 "conversationId" to conversationId,
-                "runId" to (runId ?: ""),
-                "turnId" to (turnId ?: ""),
+                "runId" to (tail.runId ?: ""),
+                "turnId" to (tail.turnId ?: ""),
                 "reason" to reason,
             )
         }
@@ -151,8 +149,7 @@ internal class TurnSettlement(
         cancelledNotice: TurnFailureNotice?,
     ): List<Result<Unit>> {
         val event = request.event
-        val conversationId = (state.localConversationId ?: state.conversationId).takeIf { it.isNotBlank() }
-            ?: defaultConversationId
+        val conversationId = state.ownerConversationId.takeIf { it.isNotBlank() } ?: defaultConversationId
         val outcome = TurnTerminalPolicy.decide(TurnTerminalEvidence.from(state), request, cancelledNotice)
         val terminalWrites = runCatching { writeTerminal(state, request, outcome, ConversationId(conversationId)) }
         val stopReason = state.stopReason
@@ -176,12 +173,10 @@ internal class TurnSettlement(
         outcome: TurnTerminalOutcome,
         conversation: ConversationId,
     ) {
+        val tail = TurnTail(request.event.turnId, request.event.runId)
         if (outcome.cleanupFragments) {
             cleanupAbandonedAssistantFragmentsSafely(
-                conversation = conversation,
-                tail = TurnTail(request.event.turnId, request.event.runId),
-                reason = "turn_done_${request.event.status}",
-                candidateRunIds = activeCleanupCandidateRunIds(state, TurnTail(request.event.turnId, request.event.runId)),
+                conversation, tail, "turn_done_${request.event.status}", activeCleanupCandidateRunIds(state, tail),
             )
         }
         if (request.recordEvent) {
@@ -198,7 +193,7 @@ internal class TurnSettlement(
             )
         }
         outcome.notice?.let { notice ->
-            appendTurnFailureNotice(conversation, TurnTail(request.event.turnId, request.event.runId), notice)
+            appendTurnFailureNotice(conversation, tail, notice)
         }
     }
 
@@ -238,12 +233,8 @@ internal class TurnSettlement(
             val localSettlement = runCatching { settlePendingSend(state, conversationId, outcome.deadTurn) }
             val foregroundPresence = runCatching {
                 // Evaluate after suspension: the user may have selected a different conversation.
-                if (foreground.owns(conversationId)) {
-                    ui.onTurnFinished(
-                        TurnTerminalPolicy.nextError(TurnTerminalEvidence.from(state), status, outcome.notice, ui.currentError()),
-                    )
-                } else {
-                    foreground.suppressed(conversationId, "onTurnFinished")
+                foreground.turnFinished(conversationId) {
+                    TurnTerminalPolicy.nextError(TurnTerminalEvidence.from(state), status, outcome.notice, ui.currentError())
                 }
             }
             // Unconditional: an earlier turn's dangling card may need its cancelled sweep restored.
@@ -289,20 +280,10 @@ internal class TurnSettlement(
         timelineRepository.markExternalTransportLocalFailed(agentId, localConversationId, otid)
     }
 
-    private suspend fun cleanupDisconnectedTurnFragments(
-        state: ConversationTurnState,
-        conversation: ConversationId,
-    ) {
-        val conversationId = conversation.value
-        val cleanupRunId = state.runId
-        val cleanupTurnId = state.turnId
-        if (listOf(state.otid, cleanupRunId, cleanupTurnId).all { it == null }) return
-        cleanupAbandonedAssistantFragmentsSafely(
-            conversation = ConversationId(conversationId),
-            tail = TurnTail(cleanupTurnId, cleanupRunId),
-            reason = "disconnect",
-            candidateRunIds = activeCleanupCandidateRunIds(state, TurnTail(cleanupTurnId, cleanupRunId)),
-        )
+    private suspend fun cleanupDisconnectedTurnFragments(state: ConversationTurnState, conversation: ConversationId) {
+        if (listOf(state.otid, state.runId, state.turnId).all { it == null }) return
+        val tail = TurnTail(state.turnId, state.runId)
+        cleanupAbandonedAssistantFragmentsSafely(conversation, tail, "disconnect", activeCleanupCandidateRunIds(state, tail))
     }
 
     /**
@@ -320,17 +301,8 @@ internal class TurnSettlement(
         runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = false) }
     }
 
-    private fun activeCleanupCandidateRunIds(
-        state: ConversationTurnState,
-        primary: TurnTail,
-    ): Set<String> = buildSet {
-        primary.runId?.takeIf { it.isNotBlank() }?.let(::add)
-        state.runId?.takeIf { it.isNotBlank() }?.let(::add)
-        state.activeAssistantMessageRunIds.mapNotNullTo(this) { it.takeIf(String::isNotBlank) }
-    }
-
     suspend fun markTurnVisuallyComplete(state: ConversationTurnState, reason: String) {
-        val conversationId = (state.localConversationId ?: state.conversationId).takeIf { it.isNotBlank() }
+        val conversationId = state.ownerConversationId.takeIf { it.isNotBlank() }
             ?: foreground.visibleConversation?.value
             ?: defaultConversationId
         state.otid?.let { otid ->
@@ -364,5 +336,38 @@ internal class TurnSettlement(
         )
     }
 
+    /** A delayed terminal may clean its old run only; it never retires the live owner. */
+    suspend fun staleTerminal(owner: ConversationTurnState?, event: WsTimelineEvent.TurnDone) {
+        if (event.status is BridgeTurnStatus.Failed || event.status is BridgeTurnStatus.Cancelled) {
+            val conversationId = ownership.staleConversation(owner)?.value ?: defaultConversationId
+            cleanupAbandonedAssistantFragmentsSafely(
+                conversation = ConversationId(conversationId),
+                tail = TurnTail(event.turnId, event.runId),
+                reason = "turn_done_stale_${event.status}",
+                // Scope cleanup to the OLD run only — do NOT fold in the
+                // active (newer) run's candidate ids.
+                candidateRunIds = event.runId.takeIf { it.isNotBlank() }?.let { setOf(it) } ?: emptySet(),
+            )
+        }
+        Telemetry.event(
+            "AdminChatVM", "ws.turnDone.staleIgnored",
+            "incomingTurnId" to event.turnId,
+            "incomingRunId" to event.runId,
+            "ownerConversationId" to (owner?.conversationId ?: ""),
+            "activeTurnId" to (owner?.turnId ?: ""),
+            "activeRunId" to (owner?.runId ?: ""),
+            "status" to event.status,
+        )
+    }
+
     private val defaultConversationId: String get() = IdFormats.defaultConversationIdFor(agent.value)
+}
+
+private fun activeCleanupCandidateRunIds(
+    state: ConversationTurnState,
+    primary: TurnTail,
+): Set<String> = buildSet {
+    primary.runId?.takeIf { it.isNotBlank() }?.let(::add)
+    state.runId?.takeIf { it.isNotBlank() }?.let(::add)
+    state.activeAssistantMessageRunIds.mapNotNullTo(this) { it.takeIf(String::isNotBlank) }
 }
