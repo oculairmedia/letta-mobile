@@ -1,9 +1,4 @@
-    // letta-mobile-om38i: forward only, as in [withDayDividers]; an earlier-stamped row (a
-    // compaction summary) never names a day behind the one its older neighbour already opened.
-    // letta-mobile-ivsx0: an undated neighbour (a deferred body) stays in the open section, as an
-    // unreadable stamp does there; it is no evidence of a new day.
-    val olderKnown = olderDay ?: return null
-    return newerDay.takeIf { it > olderKnown }package com.letta.mobile.ui.chat.surface.timeline
+package com.letta.mobile.ui.chat.surface.timeline
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
