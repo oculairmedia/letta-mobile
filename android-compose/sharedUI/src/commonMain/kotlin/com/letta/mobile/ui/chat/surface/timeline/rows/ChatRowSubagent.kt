@@ -384,7 +384,7 @@ private fun NotificationReport(report: String, model: NotificationModel) {
 }
 
 /**
- * letta-mobile-2a7yv: a shell's report in the tool card's own pieces. The command and each output
+ * A shell's report in the tool card's own pieces. The command and each output
  * tail get their own [ToolOutputBlock] (monospace, newlines kept, horizontally scrollable), and
  * stderr takes the error inset whatever the exit code, so a traceback never reads as output.
  */

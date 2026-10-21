@@ -2,7 +2,7 @@ package com.letta.mobile.data.model
 
 /**
  * A background shell's `<task-notification>` report, split into the parts letta-code wrote
- * (letta-mobile-2a7yv). A `Bash` report is `$ <command>`, an optional detail line (`Exit code: 1`),
+ * (each shown in its own code block). A `Bash` report is `$ <command>`, an optional detail line (`Exit code: 1`),
  * then `[stdout]` / `[stderr]` tails (`[stdout - last 20 of 54 lines]`), or `(no output)`. An
  * `exec_command` report has `Session ID: <id>` after the command and one unlabelled output tail.
  * Any part may be missing, and middle truncation may cut through one; the text is kept verbatim.
@@ -19,6 +19,7 @@ data class CommandStream(
     val label: String?,
     val text: String,
 ) {
+    /** Which stream a tail came from; [Output] is exec_command's unlabelled mix. */
     enum class Kind { Stdout, Stderr, Output }
 }
 
@@ -28,6 +29,7 @@ fun UiSubagentNotification.isCommand(): Boolean =
 
 private val COMMAND_TASK_PREFIXES = listOf("bash_", "exec_")
 
+/** Splits a command [result] into its sections; never fails, unparsed text stays in the command. */
 fun parseBackgroundCommandReport(result: String): BackgroundCommandReport {
     val headers = STREAM_HEADER.findAll(result).toList()
     val prelude = (headers.firstOrNull()?.let { result.substring(0, it.range.first) } ?: result).trimEnd()
