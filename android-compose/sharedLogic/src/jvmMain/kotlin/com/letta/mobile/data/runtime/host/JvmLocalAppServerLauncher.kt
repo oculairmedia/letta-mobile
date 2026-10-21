@@ -12,6 +12,7 @@ import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermissions
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -27,6 +28,9 @@ class JvmLocalAppServerLauncher(
     private val onSpawned: (Process) -> Unit = {},
     private val stopTimeoutMs: Long = DEFAULT_STOP_TIMEOUT_MS,
 ) : LocalAppServerLauncher {
+    /** The runtime scan and the spawn block; the host may be acquired from a UI thread (desktop's EDT). */
+    override val blockingContext: CoroutineContext = Dispatchers.IO
+
     override fun start(launch: LocalAppServerLaunch, tokenFile: String, token: String): LocalAppServerProcess {
         val process = try {
             writeOwnerOnly(File(tokenFile), token)
@@ -64,7 +68,6 @@ fun ownedLocalAppServerHost(
     scope = scope,
     logLine = logLine,
     policy = RuntimeCrashPolicy(RuntimeCrashPolicyConfig(maxCrashesInWindow = 1)),
-    blockingContext = Dispatchers.IO,
 )
 
 private class JvmLocalAppServerProcess(

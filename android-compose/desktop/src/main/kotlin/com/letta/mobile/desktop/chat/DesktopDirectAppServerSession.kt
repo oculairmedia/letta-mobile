@@ -1,6 +1,6 @@
 package com.letta.mobile.desktop.chat
 
-import com.letta.mobile.data.transport.TransportTeardown
+import com.letta.mobile.data.transport.teardown.TransportTeardown
 import com.letta.mobile.data.controller.reconnect.AppServerClientGeneration
 import com.letta.mobile.data.controller.reconnect.GiveUpKind
 import com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient

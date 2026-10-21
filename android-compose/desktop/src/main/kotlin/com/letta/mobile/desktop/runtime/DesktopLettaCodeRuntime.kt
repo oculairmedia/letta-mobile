@@ -115,9 +115,6 @@ internal object DesktopLocalRuntimeHost {
         readyz = AppServerDiscovery(HttpClient(CIO))::readyz,
         scope = supervisorScope,
         logLine = { line -> appendLog(localRuntimeLogFile(), line) },
-        // Acquired from the chat controller, whose scope runs on the Swing EDT: the runtime scan
-        // and the node spawn must not freeze the window.
-        blockingContext = Dispatchers.IO,
     )
 
     /**

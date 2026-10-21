@@ -1,6 +1,6 @@
 package com.letta.mobile.desktop.chat
 
-import com.letta.mobile.data.transport.TransportTeardown
+import com.letta.mobile.data.transport.teardown.TransportTeardown
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.model.AssistantMessage

@@ -12,5 +12,4 @@ internal fun idleLocalAppServerHost(): LocalAppServerHost = LocalAppServerHost(
     launch = { error("the local runtime does not start in tests") },
     readyz = { false },
     scope = CoroutineScope(Dispatchers.Unconfined),
-    blockingContext = Dispatchers.Unconfined,
 )

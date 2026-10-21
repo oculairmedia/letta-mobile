@@ -1,4 +1,4 @@
-package com.letta.mobile.data.transport
+package com.letta.mobile.data.transport.teardown
 
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executor

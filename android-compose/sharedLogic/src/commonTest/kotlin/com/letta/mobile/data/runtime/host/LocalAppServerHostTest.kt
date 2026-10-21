@@ -518,6 +518,7 @@ class LocalAppServerHostTest {
         val host = LocalAppServerHost(
             launcher = object : LocalAppServerLauncher {
                 override val singleLaunch = singleLaunch
+                override val blockingContext = CoroutineName(BLOCKING)
 
                 override fun start(launch: LocalAppServerLaunch, tokenFile: String, token: String): LocalAppServerProcess {
                     starts += Start(launch.command, launch.environment, launch.workingDirectory, tokenFile, token)
@@ -542,7 +543,6 @@ class LocalAppServerHostTest {
             readyTimeoutMs = 2_000,
             clockMs = { scope.testScheduler.currentTime },
             newToken = { "token-${++tokens}" },
-            blockingContext = CoroutineName(BLOCKING),
         )
 
         private fun nextProcess(): FakeProcess {
