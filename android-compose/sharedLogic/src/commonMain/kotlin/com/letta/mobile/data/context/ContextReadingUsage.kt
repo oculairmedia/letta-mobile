@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.launch
 
@@ -53,10 +54,11 @@ fun Flow<ContextReadingInputs>.contextUsageStates(): Flow<ContextWindowUsageStat
         .distinctUntilChanged()
 
 /**
- * The chip state with the conversation's real breakdown. While this is
- * collected, [breakdown] fetches the focused conversation's breakdown in the background (on open,
- * and once each turn settles), and the chip shows it in place of the streamed estimate as soon as
- * it is known; a revisited conversation shows its last breakdown at once. The card reads the same
+ * The chip state with the conversation's real breakdown. While this is collected, [breakdown]
+ * fetches the focused conversation's breakdown in the background (on open, and once each turn
+ * settles), and the chip shows it in place of the streamed estimate while it is current: matched to
+ * the reading on show, or loaded since that reading came in. A reading that has moved past it (a
+ * settled turn whose refresh has not landed, or failed) shows instead. The card reads the same
  * [ContextBreakdownLoader.breakdowns], so the two never disagree. Without a [breakdown], the
  * streamed reading alone ([contextUsageStates]).
  */
@@ -67,8 +69,37 @@ fun Flow<ContextReadingInputs>.contextUsageStates(breakdown: ContextBreakdownLoa
         launch { breakdown.follow(inputs.filter { it.key.settled }.map(ContextReadingInputs::breakdownRequest)) }
         combine(inputs.contextUsageStates(), inputs.map { it.key.breakdownKey() }.distinctUntilChanged(), breakdown.breakdowns) {
                 reading, key, known ->
-            key?.let(known::get)?.let(ContextWindowUsagePolicy::read) ?: reading
-        }.distinctUntilChanged().collect { send(it) }
+            MeterInputs(reading, key, key?.let(known::get))
+        }.scan(MeterChoice()) { previous, next -> previous.advance(next) }
+            .mapNotNull { it.shown }
+            .distinctUntilChanged()
+            .collect { send(it) }
+    }
+}
+
+/** What the meter chooses between at one instant. */
+private class MeterInputs(val reading: ContextWindowUsageState, val key: ContextBreakdownKey?, val cached: ContextBreakdown?)
+
+/**
+ * The meter's pick, and the reading that was on show when its breakdown arrived: a breakdown that
+ * landed after the latest reading is newer than it, even when it was not matched to a total.
+ */
+private class MeterChoice(
+    val shown: ContextWindowUsageState? = null,
+    val key: ContextBreakdownKey? = null,
+    val cached: ContextBreakdown? = null,
+    val readingWhenLoaded: Int? = null,
+) {
+    fun advance(next: MeterInputs): MeterChoice {
+        val total = next.reading.usage?.usedTokens
+        val arrivedNow = next.cached != null && next.key == key && next.cached !== cached
+        val loadedAt = when {
+            arrivedNow -> total
+            next.key == key && next.cached === cached -> readingWhenLoaded
+            else -> null
+        }
+        val current = next.cached?.takeIf { total == null || it.reportedTotal == total || (loadedAt != null && loadedAt == total) }
+        return MeterChoice(current?.let { ContextWindowUsagePolicy.read(it.overview) } ?: next.reading, next.key, next.cached, loadedAt)
     }
 }
 

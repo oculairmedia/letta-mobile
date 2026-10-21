@@ -30,6 +30,9 @@ data class ContextBreakdownRequest(
 /** One conversation's place in the breakdown cache. */
 data class ContextBreakdownKey(val agentId: AgentId, val conversationId: ConversationId?)
 
+/** A conversation's loaded breakdown and the streamed total it was matched to (null: none was known). */
+data class ContextBreakdown(val overview: ContextWindowOverview, val reportedTotal: Int?)
+
 /** Why a breakdown is not shown; the meter falls back to the streamed total either way. */
 enum class ContextBreakdownUnavailable {
     /** The host has no local-backend store (`capability_unavailable`), or no `agent.context` at all. */
@@ -73,10 +76,13 @@ class ContextBreakdownLoader(
     private val mutableState = MutableStateFlow<ContextBreakdownState>(ContextBreakdownState.Idle)
     val state: StateFlow<ContextBreakdownState> = mutableState.asStateFlow()
 
-    private val cache = MutableStateFlow<Map<ContextBreakdownKey, ContextWindowOverview>>(emptyMap())
+    private val cache = MutableStateFlow<Map<ContextBreakdownKey, ContextBreakdown>>(emptyMap())
 
-    /** Each conversation's last loaded breakdown. */
-    val breakdowns: StateFlow<Map<ContextBreakdownKey, ContextWindowOverview>> = cache.asStateFlow()
+    /**
+     * Each conversation's last loaded breakdown. A refresh that fails drops a breakdown matched to
+     * an older total, so nothing shows numbers the conversation has moved on from.
+     */
+    val breakdowns: StateFlow<Map<ContextBreakdownKey, ContextBreakdown>> = cache.asStateFlow()
 
     private val lock = Mutex()
 
@@ -85,10 +91,16 @@ class ContextBreakdownLoader(
         mutableState.value = ContextBreakdownState.Loading(request)
         val next = runCatchingCancellable { fetch(request) }.fold(
             onSuccess = { overview ->
-                cache.update { it + (request.key to overview) }
+                cache.update { it + (request.key to ContextBreakdown(overview, request.reportedTotal)) }
                 ContextBreakdownState.Loaded(request, overview)
             },
-            onFailure = { ContextBreakdownState.Unavailable(request, classify(it), it.message) },
+            onFailure = { failure ->
+                cache.update { known ->
+                    val stale = known[request.key]?.takeIf { it.reportedTotal != request.reportedTotal }
+                    if (stale != null) known - request.key else known
+                }
+                ContextBreakdownState.Unavailable(request, classify(failure), failure.message)
+            },
         )
         mutableState.value = next
         next

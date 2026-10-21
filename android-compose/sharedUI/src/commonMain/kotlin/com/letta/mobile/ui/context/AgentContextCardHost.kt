@@ -117,7 +117,7 @@ fun AgentContextCardHost(binding: AgentContextCardBinding, focus: AgentContextFo
     val requests = CardRequests.of(focus, rememberReading(deps.readings, focus))
     val windows = rememberWindows(deps, focus, requests)
     // The session's one breakdown cache, the same the composer meter reads.
-    val overview = deps.breakdown?.breakdowns?.collectAsState()?.value?.get(requests.breakdown.key)
+    val overview = deps.breakdown?.breakdowns?.collectAsState()?.value?.get(requests.breakdown.key)?.overview
     val model = rememberCardModel(deps, focus, requests, CardSnapshot(windows, overview, lastOutcome))
     LaunchedEffect(open, requests.breakdown, focus.turnRunning) {
         if (open && !focus.turnRunning) deps.breakdown?.load(requests.breakdown)

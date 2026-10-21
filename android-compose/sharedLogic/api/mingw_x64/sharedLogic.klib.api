@@ -29978,6 +29978,22 @@ final class com.letta.mobile.data.context/AgentContextCardModel { // com.letta.m
     }
 }
 
+final class com.letta.mobile.data.context/ContextBreakdown { // com.letta.mobile.data.context/ContextBreakdown|null[0]
+    constructor <init>(com.letta.mobile.data.model/ContextWindowOverview, kotlin/Int?) // com.letta.mobile.data.context/ContextBreakdown.<init>|<init>(com.letta.mobile.data.model.ContextWindowOverview;kotlin.Int?){}[0]
+
+    final val overview // com.letta.mobile.data.context/ContextBreakdown.overview|{}overview[0]
+        final fun <get-overview>(): com.letta.mobile.data.model/ContextWindowOverview // com.letta.mobile.data.context/ContextBreakdown.overview.<get-overview>|<get-overview>(){}[0]
+    final val reportedTotal // com.letta.mobile.data.context/ContextBreakdown.reportedTotal|{}reportedTotal[0]
+        final fun <get-reportedTotal>(): kotlin/Int? // com.letta.mobile.data.context/ContextBreakdown.reportedTotal.<get-reportedTotal>|<get-reportedTotal>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.model/ContextWindowOverview // com.letta.mobile.data.context/ContextBreakdown.component1|component1(){}[0]
+    final fun component2(): kotlin/Int? // com.letta.mobile.data.context/ContextBreakdown.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.model/ContextWindowOverview = ..., kotlin/Int? = ...): com.letta.mobile.data.context/ContextBreakdown // com.letta.mobile.data.context/ContextBreakdown.copy|copy(com.letta.mobile.data.model.ContextWindowOverview;kotlin.Int?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.context/ContextBreakdown.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.context/ContextBreakdown.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.context/ContextBreakdown.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.context/ContextBreakdownKey { // com.letta.mobile.data.context/ContextBreakdownKey|null[0]
     constructor <init>(com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId?) // com.letta.mobile.data.context/ContextBreakdownKey.<init>|<init>(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.ConversationId?){}[0]
 
@@ -29999,7 +30015,7 @@ final class com.letta.mobile.data.context/ContextBreakdownLoader { // com.letta.
     constructor <init>(kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.context/ContextBreakdownRequest, com.letta.mobile.data.model/ContextWindowOverview>) // com.letta.mobile.data.context/ContextBreakdownLoader.<init>|<init>(kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.context.ContextBreakdownRequest,com.letta.mobile.data.model.ContextWindowOverview>){}[0]
 
     final val breakdowns // com.letta.mobile.data.context/ContextBreakdownLoader.breakdowns|{}breakdowns[0]
-        final fun <get-breakdowns>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/Map<com.letta.mobile.data.context/ContextBreakdownKey, com.letta.mobile.data.model/ContextWindowOverview>> // com.letta.mobile.data.context/ContextBreakdownLoader.breakdowns.<get-breakdowns>|<get-breakdowns>(){}[0]
+        final fun <get-breakdowns>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/Map<com.letta.mobile.data.context/ContextBreakdownKey, com.letta.mobile.data.context/ContextBreakdown>> // com.letta.mobile.data.context/ContextBreakdownLoader.breakdowns.<get-breakdowns>|<get-breakdowns>(){}[0]
     final val state // com.letta.mobile.data.context/ContextBreakdownLoader.state|{}state[0]
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.context/ContextBreakdownState> // com.letta.mobile.data.context/ContextBreakdownLoader.state.<get-state>|<get-state>(){}[0]
 

@@ -33,7 +33,7 @@ class ContextBreakdownPrefetchTest {
         assertEquals(41_000, asked.single().reportedTotal)
         // The breakdown's numbers, not the streamed estimate's.
         assertEquals(ContextWindowUsage.from(overview(used = 42_000)), shown.usage)
-        assertEquals(overview(used = 42_000), loader.breakdowns.value[asked.single().key])
+        assertEquals(overview(used = 42_000), loader.breakdowns.value[asked.single().key]?.overview)
     }
 
     @Test
@@ -81,10 +81,56 @@ class ContextBreakdownPrefetchTest {
         focus.value = settled(CONVERSATION_B, tokens = 4_000)
         loader.breakdowns.first { it.size == 2 }
 
-        focus.value = settled(CONVERSATION_A, tokens = 30_500)
+        // Back on A with no turn since: its reading is the one the breakdown was matched to.
+        focus.value = settled(CONVERSATION_A, tokens = 30_000)
         runCurrent()
 
         assertEquals(31_000, states.last().usage?.usedTokens)
+        collector.cancel()
+    }
+
+    @Test
+    fun aRunningTurnFetchesNothingAndEachSettledTurnFetchesOnce() = runTest {
+        val focus = MutableStateFlow(settled(CONVERSATION_A, tokens = 10_000))
+        val asked = mutableListOf<Int?>()
+        val loader = ContextBreakdownLoader { request -> asked += request.reportedTotal; overview(used = request.reportedTotal ?: 0) }
+        val collector = launch { focus.contextUsageStates(loader).collect {} }
+        runCurrent()
+
+        focus.value = running(CONVERSATION_A, tokens = 10_000)
+        runCurrent()
+        focus.value = running(CONVERSATION_A, tokens = 15_000)
+        runCurrent()
+        assertEquals(listOf<Int?>(10_000), asked, "nothing is fetched while the turn runs")
+
+        focus.value = settled(CONVERSATION_A, tokens = 15_000)
+        runCurrent()
+        // The same settled reading again (a window change, a recomposition) is not another turn.
+        focus.value = settled(CONVERSATION_A, tokens = 15_000).copy(windowTokens = 300_000)
+        runCurrent()
+
+        assertEquals(listOf<Int?>(10_000, 15_000), asked)
+        collector.cancel()
+    }
+
+    @Test
+    fun aFailedRefreshShowsTheNewReadingNotTheOldBreakdown() = runTest {
+        val focus = MutableStateFlow(settled(CONVERSATION_A, tokens = 10_000))
+        val loader = ContextBreakdownLoader { request ->
+            if (request.reportedTotal == 10_000) overview(used = 11_000) else error("socket closed")
+        }
+        val states = mutableListOf<ContextWindowUsageState>()
+        val collector = launch { focus.contextUsageStates(loader).collect { states += it } }
+        loader.breakdowns.first { it.isNotEmpty() }
+        runCurrent()
+        assertEquals(11_000, states.last().usage?.usedTokens)
+
+        focus.value = settled(CONVERSATION_A, tokens = 20_000)
+        runCurrent()
+
+        assertEquals(20_000, states.last().usage?.usedTokens)
+        assertEquals(listOf(ContextWindowUsage.IN_CONTEXT_LABEL), states.last().usage?.segments?.map { it.label })
+        assertTrue(loader.breakdowns.value.isEmpty(), "the breakdown matched to the old total is dropped")
         collector.cancel()
     }
 
@@ -107,6 +153,9 @@ class ContextBreakdownPrefetchTest {
         contextTokens = tokens,
         windowTokens = 200_000,
     )
+
+    private fun running(conversation: String, tokens: Int) =
+        settled(conversation, tokens).let { it.copy(key = it.key.copy(settled = false)) }
 
     private fun overview(used: Int) = ContextWindowOverview(
         contextWindowSizeMax = 200_000,
