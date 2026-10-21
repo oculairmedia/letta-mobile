@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -20,9 +21,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import com.letta.mobile.data.chat.display.CommandStream
+import com.letta.mobile.data.chat.display.isCommand
+import com.letta.mobile.data.chat.display.parseBackgroundCommandReport
+import com.letta.mobile.data.chat.display.TaskActivity
+import com.letta.mobile.data.chat.display.activity
 import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiSubagentNotification
 import com.letta.mobile.data.model.UiToolCall
@@ -34,6 +42,7 @@ import com.letta.mobile.sharedui.resources.rows_activity_command
 import com.letta.mobile.sharedui.resources.rows_activity_subagent
 import com.letta.mobile.sharedui.resources.rows_activity_task
 import com.letta.mobile.sharedui.resources.rows_completed
+import com.letta.mobile.sharedui.resources.rows_copy_transcript_path
 import com.letta.mobile.sharedui.resources.rows_dispatch_done
 import com.letta.mobile.sharedui.resources.rows_dispatch_failed
 import com.letta.mobile.sharedui.resources.rows_dispatch_running
@@ -49,6 +58,9 @@ import com.letta.mobile.sharedui.resources.rows_show_transcript
 import com.letta.mobile.sharedui.resources.rows_status_unknown
 import com.letta.mobile.sharedui.resources.rows_subagent_background
 import com.letta.mobile.sharedui.resources.rows_subagent_dispatched
+import com.letta.mobile.sharedui.resources.rows_task_id
+import com.letta.mobile.sharedui.resources.rows_tool_argument_line
+import com.letta.mobile.sharedui.resources.rows_tool_output
 import com.letta.mobile.sharedui.resources.rows_transcript
 import com.letta.mobile.sharedui.resources.rows_view_conversation
 import com.letta.mobile.ui.chat.subagents.ExternalAgentBadge
@@ -58,6 +70,7 @@ import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.markdown.SharedMarkdownText
+import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.StringResource
@@ -196,7 +209,7 @@ internal fun SubagentNotificationCard(
     toolCallId: String? = null,
 ) {
     val callId = toolCallId ?: notification.toolCallId ?: notification.taskId
-    val isSubagent = notification.activityLabel() == Res.string.rows_activity_subagent
+    val isSubagent = notification.activity() == TaskActivity.Subagent
     val fallback = stringResource(Res.string.rows_activity_subagent)
     val model = NotificationModel(
         notification = notification,
@@ -229,12 +242,10 @@ private class NotificationActions(
     val onToggleDetails: () -> Unit,
 )
 
-private fun UiSubagentNotification.activityLabel(): StringResource {
-    return when {
-        isCommand() -> Res.string.rows_activity_command
-        !subagentAgentId.isNullOrBlank() -> Res.string.rows_activity_subagent
-        else -> Res.string.rows_activity_task
-    }
+private fun UiSubagentNotification.activityLabel(): StringResource = when (activity()) {
+    TaskActivity.Command -> Res.string.rows_activity_command
+    TaskActivity.Subagent -> Res.string.rows_activity_subagent
+    TaskActivity.Task -> Res.string.rows_activity_task
 }
 
 @Composable
@@ -301,28 +312,56 @@ private fun NotificationHeader(model: NotificationModel, onOpen: (() -> Unit)?) 
 @Composable
 private fun NotificationBody(model: NotificationModel, expanded: Boolean, actions: NotificationActions) {
     val notification = model.notification
-    notification.summary?.let { summary ->
+    // letta-mobile-2a7yv: a completed task's summary already heads it in the compact row.
+    notification.summary?.takeUnless { model.isSuccessfulCompletion }?.let { summary ->
         Text(
             text = summary,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-        notification.usage?.takeIf { it.isNotBlank() }?.let { MetaChip(it) }
-        notification.durationMs?.let { MetaChip(formatDuration(it)) }
-        notification.taskId?.let { MetaChip(it) }
+    // One humanized duration: the usage block's `duration_ms` line is the same number again.
+    val usage = remember(notification.usage) { notification.usage?.withoutDurationLine() }
+    if (usage != null || notification.durationMs != null) {
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+            usage?.let { MetaChip(it) }
+            notification.durationMs?.let { MetaChip(formatDuration(it)) }
+        }
     }
     NotificationActionRow(model, expanded, actions)
     if (expanded && model.hasDetails()) {
-        model.report?.let { NotificationReport(report = it, model = model) }
-        notification.transcriptUri?.let { transcript ->
-            Text(
-                text = stringResource(Res.string.rows_transcript, transcript),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        if (model.report != null) NotificationReport(model)
+        NotificationFooter(notification)
+    }
+}
+
+private fun String.withoutDurationLine(): String? =
+    lines().filterNot { it.trim().startsWith("duration_ms", ignoreCase = true) }
+        .joinToString("\n").trim().takeIf { it.isNotBlank() }
+
+/** The task id (an internal handle, so quiet) and a transcript path the reader can copy. */
+@Composable
+private fun NotificationFooter(notification: UiSubagentNotification) {
+    notification.taskId?.let { taskId ->
+        Text(
+            text = stringResource(Res.string.rows_task_id, taskId),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.alpha(ChatRowAlpha.deliveryTime),
+        )
+    }
+    notification.transcriptUri?.let { transcript ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SelectionContainer(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(Res.string.rows_transcript, transcript),
+                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag(ChatRowTestTags.NOTIFICATION_TRANSCRIPT),
+                )
+            }
+            CopyIconButton(
+                CopyAction(text = transcript, contentDescription = stringResource(Res.string.rows_copy_transcript_path)),
             )
         }
     }
@@ -336,15 +375,60 @@ private fun NotificationBody(model: NotificationModel, expanded: Boolean, action
  * is the agent's own prose and keeps the markdown paint.
  */
 @Composable
-private fun NotificationReport(report: String, model: NotificationModel) {
+private fun NotificationReport(model: NotificationModel) {
     if (model.notification.isCommand()) {
-        ToolOutputBlock(text = report, isError = model.isFailure)
+        CommandReport(model)
     } else {
-        SharedMarkdownText(text = report)
+        SharedMarkdownText(text = model.report.orEmpty())
     }
 }
 
-private fun UiSubagentNotification.isCommand(): Boolean = taskId?.startsWith("exec_") == true
+/**
+ * A shell's report in the tool card's own pieces. The command and each output
+ * tail get their own [ToolOutputBlock] (monospace, newlines kept, horizontally scrollable), and
+ * stderr takes the error inset whatever the exit code, so a traceback never reads as output.
+ */
+@Composable
+private fun CommandReport(model: NotificationModel) {
+    val parsed = remember(model.report) { parseBackgroundCommandReport(model.report.orEmpty()) }
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.COMMAND_REPORT),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+    ) {
+        parsed.command?.let { command ->
+            ReportLabel(stream = null)
+            ToolOutputBlock(stringResource(Res.string.rows_tool_argument_line, command))
+        }
+        parsed.detail?.let { detail ->
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (model.isFailure) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        parsed.streams.forEach { stream ->
+            ReportLabel(stream)
+            ToolOutputBlock(stream.text, isError = stream.kind == CommandStream.Kind.Stderr)
+        }
+    }
+}
+
+/** A section's heading: "Command" for the command ([stream] null), else the tail's own header. */
+@Composable
+private fun ReportLabel(stream: CommandStream?) {
+    val header = stream?.label
+    val text = when {
+        stream == null -> stringResource(Res.string.rows_activity_command)
+        header != null -> header.replace(" - ", " · ")
+        else -> stringResource(Res.string.rows_tool_output)
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = LettaDimens.Space.xs),
+    )
+}
 
 @Composable
 private fun NotificationActionRow(model: NotificationModel, expanded: Boolean, actions: NotificationActions) {
