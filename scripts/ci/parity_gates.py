@@ -181,30 +181,50 @@ def _platform_sources(repo: Path, paths: list[Path], candidates: set[str]) -> Pl
     return PlatformSources(calls, "\n".join(k.strip_comments(k.read(path)) for path in paths))
 
 
-def _contract_gaps(contract: str, params: list[k.Param], platform: str, sources: PlatformSources, builders: list[str] | None) -> list[str]:
-    calls = sources.calls.get(contract)
-    if not calls:
-        missing = builders is not None and not any(map(sources.uses, builders))
-        return [f"{platform} {contract}"] if missing else []
-    return [
-        f"{platform} {contract}.{param.name}"
-        for index, param in enumerate(params)
-        if not any(_binds(call, index, param, len(params)) for call in calls)
-    ]
+@dataclass(frozen=True)
+class Contract:
+    """A shared binding contract: its constructor params and, for a core one, its shared builders."""
+
+    name: str
+    params: list[k.Param]
+    builders: list[str] | None
+
+    def unbound_params(self, calls: list[k.Call]) -> list[str]:
+        count = len(self.params)
+        return [p.name for i, p in enumerate(self.params) if not any(_binds(call, i, p, count) for call in calls)]
+
+    def gaps(self, platform: str, sources: PlatformSources) -> list[str]:
+        calls = sources.calls.get(self.name)
+        if calls:
+            return [f"{platform} {self.name}.{param}" for param in self.unbound_params(calls)]
+        return [f"{platform} {self.name}"] if self.missing_on(sources) else []
+
+    def missing_on(self, sources: PlatformSources) -> bool:
+        """A core contract a platform neither constructs nor reaches through a shared builder."""
+        return self.builders is not None and not any(map(sources.uses, self.builders))
+
+
+def _is_candidate(name: str, found: list[k.SharedClass], core: dict[str, list[str]]) -> bool:
+    named_like_contract = CONTRACT_SUFFIX.search(name) is not None or name in core
+    return len(found) == 1 and named_like_contract
+
+
+def _scan_platforms(repo: Path, candidates: set[str]) -> dict[str, PlatformSources]:
+    return {platform: _platform_sources(repo, paths, candidates) for platform, paths in k.platform_files(repo).items()}
+
+
+def _gaps(contract: Contract, platforms: dict[str, PlatformSources]) -> list[str]:
+    return [gap for platform, sources in platforms.items() for gap in contract.gaps(platform, sources)]
 
 
 def parity_actual(repo: Path) -> dict[str, int]:
     shared = k.shared_classes(repo, k.shared_files(repo))
     core = core_contracts(repo)
-    candidates = {name for name, found in shared.items() if len(found) == 1 and (CONTRACT_SUFFIX.search(name) or name in core)}
-    platforms = {platform: _platform_sources(repo, paths, candidates) for platform, paths in k.platform_files(repo).items()}
-    contracts = sorted(candidates & ({name for p in platforms.values() for name in p.calls} | set(core)))
-    return {
-        gap: 1
-        for contract in contracts
-        for platform, sources in platforms.items()
-        for gap in _contract_gaps(contract, shared[contract][0].params, platform, sources, core.get(contract))
-    }
+    candidates = {name for name, found in shared.items() if _is_candidate(name, found, core)}
+    platforms = _scan_platforms(repo, candidates)
+    constructed = set().union(*(sources.calls for sources in platforms.values()))
+    contracts = [Contract(name, shared[name][0].params, core.get(name)) for name in sorted(candidates & (constructed | set(core)))]
+    return dict.fromkeys((gap for contract in contracts for gap in _gaps(contract, platforms)), 1)
 
 
 PARITY = Messages(

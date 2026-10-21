@@ -227,9 +227,13 @@ def parse_params(param_text: str) -> list[Param]:
     return [p for p in map(parse_param, split_top_level(param_text)) if p is not None]
 
 
+def _public_constructor(ctor: re.Match[str] | None) -> bool:
+    return ctor is not None and (ctor.group("vis") or "").strip() not in _HIDDEN_CTOR
+
+
 def _primary_constructor(text: str, after_name: int) -> list[Param] | None:
     ctor = _PRIMARY_CTOR.match(text, after_name)
-    if ctor is None or (ctor.group("vis") or "").strip() in _HIDDEN_CTOR:
+    if not _public_constructor(ctor):
         return None
     open_idx = ctor.end() - 1
     return parse_params(text[open_idx + 1 : balanced_end(text, open_idx) - 1])
