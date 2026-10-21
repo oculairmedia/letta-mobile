@@ -1,6 +1,7 @@
 package com.letta.mobile.data.session.graph
 
 import com.letta.mobile.data.backend.SessionCapabilities
+import com.letta.mobile.data.context.ContextBreakdownLoader
 import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.repository.api.IAgentBlockRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -94,6 +95,12 @@ class SharedSessionRepositoryGraph(
 
     /** Each conversation's latest context total, fed by [channelTransport]. */
     val contextTokenReadings: ContextTokenReadings = transportBound.contextTokenReadings
+
+    /**
+     * The session's one context breakdown owner, which the composer meter
+     * and the agent context card both read; a new session starts with an empty cache.
+     */
+    val contextBreakdown: ContextBreakdownLoader = ContextBreakdownLoader(agentRepository)
 
     private val closed = atomic(false)
 

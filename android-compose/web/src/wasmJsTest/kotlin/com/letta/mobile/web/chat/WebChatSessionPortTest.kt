@@ -1,5 +1,6 @@
 package com.letta.mobile.web.chat
 
+import com.letta.mobile.data.context.ContextWindowUsagePolicy
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LlmModel
@@ -118,6 +119,22 @@ class WebChatSessionPortTest {
 
         assertEquals("Sol", model?.currentLabel)
         assertTrue(port.capabilities.value.modelSwitch)
+        port.close()
+    }
+
+    @Test
+    fun theShellsContextReadingIsTheComposersMeter() = runTest {
+        val transport = FakeAppServer(history = EMPTY_HISTORY).transport()
+        val port = WebChatSessionPort(WebChatBinding(target, transport, TimelineChatRunControls()), scope)
+        val reading = ContextWindowUsagePolicy.readTotal(contextTokens = 50_000, windowTokens = 200_000)
+
+        port.updateContextUsage(reading)
+
+        val shown = withContext(Dispatchers.Default) {
+            withTimeout(TIMEOUT_MS) { port.composer.first { it.contextUsage != null }.contextUsage }
+        }
+        assertEquals(50_000, shown?.usage?.usedTokens)
+        assertEquals(200_000, shown?.usage?.maxTokens)
         port.close()
     }
 

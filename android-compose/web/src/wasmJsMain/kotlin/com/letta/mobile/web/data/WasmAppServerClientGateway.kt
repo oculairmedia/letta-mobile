@@ -2,6 +2,7 @@ package com.letta.mobile.web.data
 
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.canvas.CanvasRelayDial
+import com.letta.mobile.data.context.limit.AgentContextRoutes
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.Agent
@@ -92,12 +93,20 @@ class WasmAppServerClientGateway(
         SessionPlatform.WEB,
     )
 
-    /** letta-mobile-ckmub.17.5: the agent's MemFS files over the live session, with its `memory_updated` pushes. */
-    /** The provider and model catalog over the live session's `admin_rpc`, as desktop's Providers reads them. */
-    val modelControl: ModelControlSession = ModelControlSession(
-        AdminRpcInvoker.overTransport { activeSession?.let { sessionGraphProvider.current.channelTransport } },
-    )
+    /** The live session's `admin_rpc`. */
+    private val adminRpc = AdminRpcInvoker.overTransport { activeSession?.let { sessionGraphProvider.current.channelTransport } }
 
+    /** The provider and model catalog over the live session's `admin_rpc`, as desktop's Providers reads them. */
+    val modelControl: ModelControlSession = ModelControlSession(adminRpc)
+
+    /**
+     * The context card's compaction and context limit, over the live session's `admin_rpc` and,
+     * where a ws:// App Server does not serve them there, its own commands. An Iroh host takes no
+     * native commands on its control channel, so there `admin_rpc` is the only route.
+     */
+    val contextRoutes: AgentContextRoutes = AgentContextRoutes(adminRpc) { activeSession?.takeIf { it.irohChat == null }?.client }
+
+    /** letta-mobile-ckmub.17.5: the agent's MemFS files over the live session, with its `memory_updated` pushes. */
     @OptIn(ExperimentalCoroutinesApi::class)
     val memfs: MemfsSource = AppServerMemfsSource(
         client = { activeSession?.client ?: error("Connect to an App Server first") },

@@ -10823,10 +10823,38 @@ public final class com/letta/mobile/data/context/CompactionNotice : java/lang/En
 	public static fun values ()[Lcom/letta/mobile/data/context/CompactionNotice;
 }
 
+public final class com/letta/mobile/data/context/ContextBreakdown {
+	public fun <init> (Lcom/letta/mobile/data/model/ContextWindowOverview;Ljava/lang/Integer;)V
+	public final fun component1 ()Lcom/letta/mobile/data/model/ContextWindowOverview;
+	public final fun component2 ()Ljava/lang/Integer;
+	public final fun copy (Lcom/letta/mobile/data/model/ContextWindowOverview;Ljava/lang/Integer;)Lcom/letta/mobile/data/context/ContextBreakdown;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/context/ContextBreakdown;Lcom/letta/mobile/data/model/ContextWindowOverview;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/letta/mobile/data/context/ContextBreakdown;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOverview ()Lcom/letta/mobile/data/model/ContextWindowOverview;
+	public final fun getReportedTotal ()Ljava/lang/Integer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/context/ContextBreakdownKey {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-zqmzO_A ()Ljava/lang/String;
+	public final fun component2-hsG4S5c ()Ljava/lang/String;
+	public final fun copy-1yRki1U (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/context/ContextBreakdownKey;
+	public static synthetic fun copy-1yRki1U$default (Lcom/letta/mobile/data/context/ContextBreakdownKey;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/context/ContextBreakdownKey;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId-zqmzO_A ()Ljava/lang/String;
+	public final fun getConversationId-hsG4S5c ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/context/ContextBreakdownLoader {
 	public fun <init> (Lcom/letta/mobile/data/repository/api/IAgentRepository;)V
 	public fun <init> (Lkotlin/jvm/functions/Function2;)V
 	public final fun clear ()V
+	public final fun follow (Lkotlinx/coroutines/flow/Flow;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getBreakdowns ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun load (Lcom/letta/mobile/data/context/ContextBreakdownRequest;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun load$default (Lcom/letta/mobile/data/context/ContextBreakdownLoader;Lcom/letta/mobile/data/context/ContextBreakdownRequest;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
@@ -10846,6 +10874,7 @@ public final class com/letta/mobile/data/context/ContextBreakdownRequest {
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAgentId-zqmzO_A ()Ljava/lang/String;
 	public final fun getConversationId-hsG4S5c ()Ljava/lang/String;
+	public final fun getKey ()Lcom/letta/mobile/data/context/ContextBreakdownKey;
 	public final fun getReportedTotal ()Ljava/lang/Integer;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -11022,6 +11051,7 @@ public final class com/letta/mobile/data/context/ContextReadingSnapshots$Compani
 public final class com/letta/mobile/data/context/ContextReadingUsageKt {
 	public static final fun advance (Lcom/letta/mobile/data/context/ContextReadingDisplay;Lcom/letta/mobile/data/context/ContextReadingInputs;)Lcom/letta/mobile/data/context/ContextReadingDisplay;
 	public static final fun contextUsageStates (Lkotlinx/coroutines/flow/Flow;)Lkotlinx/coroutines/flow/Flow;
+	public static final fun contextUsageStates (Lkotlinx/coroutines/flow/Flow;Lcom/letta/mobile/data/context/ContextBreakdownLoader;)Lkotlinx/coroutines/flow/Flow;
 }
 
 public final class com/letta/mobile/data/context/ContextTokenReadings {
@@ -11159,6 +11189,10 @@ public final class com/letta/mobile/data/context/ContextWindowUsageState {
 	public final fun getUsage ()Lcom/letta/mobile/data/context/ContextWindowUsage;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/context/ContextWindowUsageTweenKt {
+	public static final fun towards (Lcom/letta/mobile/data/context/ContextWindowUsage;Lcom/letta/mobile/data/context/ContextWindowUsage;F)Lcom/letta/mobile/data/context/ContextWindowUsage;
 }
 
 public final class com/letta/mobile/data/context/ConversationModelView {
@@ -11384,6 +11418,12 @@ public final class com/letta/mobile/data/context/limit/AdminRpcContextLimitRepos
 	public fun <init> (Lcom/letta/mobile/data/repository/modelcontrol/AdminRpcInvoker;Lkotlinx/serialization/json/Json;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/repository/modelcontrol/AdminRpcInvoker;Lkotlinx/serialization/json/Json;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun apply (Lcom/letta/mobile/data/context/limit/ContextLimitRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/context/limit/AgentContextRoutes {
+	public fun <init> (Lcom/letta/mobile/data/repository/modelcontrol/AdminRpcInvoker;Lkotlin/jvm/functions/Function1;)V
+	public final fun getCompaction ()Lcom/letta/mobile/data/compaction/CompactionRepository;
+	public final fun getContextLimit ()Lcom/letta/mobile/data/context/limit/ContextLimitRepository;
 }
 
 public final class com/letta/mobile/data/context/limit/AppServerContextLimitRepository : com/letta/mobile/data/context/limit/ContextLimitRepository {
@@ -37970,6 +38010,10 @@ public final class com/letta/mobile/data/repository/modelcontrol/ModelPickerGrou
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/repository/modelcontrol/ModelPickerKt {
+	public static final fun reloadChatModelsQuietly (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public abstract interface class com/letta/mobile/data/repository/modelcontrol/ModelPickerSource {
 	public static final field Companion Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource$Companion;
 	public abstract fun getCanEditModels ()Lkotlinx/coroutines/flow/Flow;
@@ -37982,6 +38026,8 @@ public abstract interface class com/letta/mobile/data/repository/modelcontrol/Mo
 
 public final class com/letta/mobile/data/repository/modelcontrol/ModelPickerSource$Companion {
 	public final fun catalog (Lcom/letta/mobile/data/repository/modelcontrol/ProviderConnectionRepository;Lcom/letta/mobile/data/repository/modelcontrol/ModelCatalogRepository;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
+	public final fun forChat (Lcom/letta/mobile/data/repository/modelcontrol/ModelControlSession;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function1;Lkotlinx/coroutines/flow/Flow;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
+	public static synthetic fun forChat$default (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource$Companion;Lcom/letta/mobile/data/repository/modelcontrol/ModelControlSession;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function1;Lkotlinx/coroutines/flow/Flow;ILjava/lang/Object;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
 	public final fun of (Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function2;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
 	public final fun withFallback (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
 }
@@ -41340,6 +41386,7 @@ public final class com/letta/mobile/data/session/graph/SharedSessionRepositoryGr
 	public fun getBlockRepository ()Lcom/letta/mobile/data/repository/api/IAgentBlockRepository;
 	public fun getCapabilities ()Lcom/letta/mobile/data/backend/SessionCapabilities;
 	public fun getChannelTransport ()Lcom/letta/mobile/data/transport/api/IChannelTransport;
+	public final fun getContextBreakdown ()Lcom/letta/mobile/data/context/ContextBreakdownLoader;
 	public final fun getContextTokenReadings ()Lcom/letta/mobile/data/context/ContextTokenReadings;
 	public fun getConversationRepository ()Lcom/letta/mobile/data/repository/api/IConversationRepository;
 	public fun getCronRepository ()Lcom/letta/mobile/data/repository/api/ICronRepository;

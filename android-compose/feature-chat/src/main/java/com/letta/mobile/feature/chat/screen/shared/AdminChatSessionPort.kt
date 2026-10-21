@@ -119,6 +119,7 @@ internal class AdminChatSessionPort(
             agent = viewModel.activeAgent,
             models = viewModel.llmModels,
             modelSelections = viewModel.conversationModelSelections,
+            breakdown = viewModel.contextCardSession.map { it.breakdown },
         ).contextUsage()
         val slash = viewModel.composerState.map { it.slashCommands }.distinctUntilChanged()
         return combine(slash, usage, fileMentions) { commands, contextUsage, files ->

@@ -5,45 +5,34 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import com.letta.mobile.data.compaction.AdminRpcCompactionRepository
-import com.letta.mobile.data.compaction.AppServerCompactionRepository
-import com.letta.mobile.data.compaction.CompactionController
-import com.letta.mobile.data.compaction.CompactionRepository
-import com.letta.mobile.data.compaction.orElse
-import com.letta.mobile.data.context.ContextBreakdownLoader
-import com.letta.mobile.data.context.ConversationModelView
-import com.letta.mobile.data.context.limit.AdminRpcContextLimitRepository
-import com.letta.mobile.data.context.limit.AppServerContextLimitRepository
-import com.letta.mobile.data.context.limit.ContextLimitController
-import com.letta.mobile.data.context.limit.ContextLimitRepository
-import com.letta.mobile.data.context.limit.orElse
-import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
+import com.letta.mobile.data.context.limit.AgentContextRoutes
 import com.letta.mobile.desktop.chat.DesktopModelControlHost
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
 import com.letta.mobile.ui.context.AgentContextCardActions
 import com.letta.mobile.ui.context.AgentContextCardBinding
-import com.letta.mobile.ui.context.AgentContextCardDeps
-import com.letta.mobile.ui.context.AgentContextCardHost
-import com.letta.mobile.ui.context.AgentContextFocus
+import com.letta.mobile.ui.context.AgentContextSession
+import com.letta.mobile.ui.context.ContextConversationFocus
+import com.letta.mobile.ui.context.ContextWindowSources
+import com.letta.mobile.ui.context.FocusedAgentContextCard
 
 /**
- * letta-mobile-3io8k: the sidebar's model-and-context card for the focused agent, opening as a
- * popover under it. Desktop only binds: the session's streamed readings and agent repository, the
- * host's model control (falling back to the chat's model list), and compaction and the context
- * limit over the Iroh relay or, without one, the bundled App Server.
+ * The sidebar's shared model-and-context card for the focused agent. Desktop
+ * only binds: the session graph, the host's model control (falling back to the chat's model list),
+ * and compaction and the context limit over the Iroh relay or, without one, the bundled App Server.
  */
 @Composable
 internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: DesktopShellFrame) {
-    val agentId = frame.focus.selectedAgentId ?: return
     val core = context.core
     val graph = core.sessionGraph.value
     val chatController = core.chatController
     val dataBindings = core.bootstrap.dataBindings
-    val deps = remember(graph, dataBindings, core.attentionPrefs) {
-        AgentContextCardDeps(
+    val binding = remember(graph, dataBindings, core.attentionPrefs, chatController) {
+        val session = AgentContextSession(
             readings = graph.contextTokenReadings,
-            breakdown = ContextBreakdownLoader(graph.agentRepository),
-            compaction = CompactionController(desktopCompactionRepository(dataBindings.modelControlRpc), graph.contextTokenReadings),
+            breakdown = graph.contextBreakdown,
+            routes = AgentContextRoutes(dataBindings.modelControlRpc) { DesktopLocalAppServerClientRegistry.shared.currentOrNull() },
+        )
+        val deps = session.cardDeps(
             pickerSource = DesktopModelControlHost(
                 session = dataBindings.modelControl,
                 chatModels = chatController.models.available,
@@ -51,45 +40,31 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
                 onModelSelected = chatController.models::select,
                 recentModels = chatController.conversationManagement.recentModels,
             ).pickerSource(),
-            contextLimit = ContextLimitController(desktopContextLimitRepository(dataBindings.modelControlRpc)),
             attention = core.attentionPrefs,
         )
+        AgentContextCardBinding(deps, AgentContextCardActions(onModelSelected = { entry -> chatController.models.select(entry.value) }))
     }
-    val models by remember(graph) { graph.llmModelsOrEmpty() }.collectAsState()
-    val selections by chatController.models.selections.collectAsState()
-    val conversationId = frame.chatState.selectedConversationId
-    val agent = frame.focus.rosterAgents.firstOrNull { it.id.value == agentId }
-    // letta-mobile-dxz5s: the same resolution Android uses — the conversation's own model and window first.
-    val view = ConversationModelView.of(selections, conversationId, agent, models)
-    val binding = remember(deps, chatController) {
-        AgentContextCardBinding(
-            deps = deps,
-            actions = AgentContextCardActions(onModelSelected = { entry -> chatController.models.select(entry.value) }),
-        )
-    }
-    AgentContextCardHost(
+    FocusedAgentContextCard(
         binding = binding,
-        focus = AgentContextFocus(
-            agentId = agentId,
-            conversationId = conversationId,
-            modelLabel = frame.chatState.composerModelLabel,
-            modelValue = view.model,
-            effort = view.effort,
-            windowTokens = view.windowTokens,
-            modelWindowTokens = view.modelWindowTokens,
-            turnRunning = frame.activity.isThinkingSelected || frame.activity.isStreamingReplySelected,
-        ),
+        focus = frame.contextFocus(),
+        window = rememberDesktopContextWindow(context, frame),
+        modelLabel = frame.chatState.composerModelLabel,
     )
 }
 
-/** The Iroh host's relay when connected over iroh://, else the bundled App Server directly. */
-private fun desktopCompactionRepository(rpc: AdminRpcInvoker?): CompactionRepository {
-    val direct = AppServerCompactionRepository(client = { DesktopLocalAppServerClientRegistry.shared.currentOrNull() })
-    return rpc?.let { AdminRpcCompactionRepository(it).orElse(direct) } ?: direct
-}
+/** The conversation the composer meter and the context card describe. */
+internal fun DesktopShellFrame.contextFocus() = ContextConversationFocus(
+    agentId = focus.selectedAgentId,
+    conversationId = chatState.selectedConversationId,
+    turnRunning = activity.isThinkingSelected || activity.isStreamingReplySelected,
+)
 
-/** letta-mobile-joigh: letta-code's `/context-limit` through the Iroh relay, else the bundled App Server directly. */
-private fun desktopContextLimitRepository(rpc: AdminRpcInvoker?): ContextLimitRepository {
-    val direct = AppServerContextLimitRepository(client = { DesktopLocalAppServerClientRegistry.shared.currentOrNull() })
-    return rpc?.let { AdminRpcContextLimitRepository(it).orElse(direct) } ?: direct
+/** The roster, the session's model list and each conversation's own model: what the windows are sized from. */
+@Composable
+internal fun rememberDesktopContextWindow(context: DesktopShellContext, frame: DesktopShellFrame): ContextWindowSources {
+    val core = context.core
+    val graph = core.sessionGraph.value
+    val models by remember(graph) { graph.llmModelsOrEmpty() }.collectAsState()
+    val selections by core.chatController.models.selections.collectAsState()
+    return ContextWindowSources(frame.focus.rosterAgents, models, selections)
 }

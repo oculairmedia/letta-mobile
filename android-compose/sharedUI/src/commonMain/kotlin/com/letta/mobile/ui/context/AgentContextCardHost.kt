@@ -22,7 +22,6 @@ import com.letta.mobile.data.context.AgentContextCardModel
 import com.letta.mobile.data.context.ModelChangeScope
 import com.letta.mobile.data.context.ContextBreakdownLoader
 import com.letta.mobile.data.context.ContextBreakdownRequest
-import com.letta.mobile.data.context.ContextBreakdownState
 import com.letta.mobile.data.context.ContextMeter
 import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.context.FocusedContextWindows
@@ -30,7 +29,6 @@ import com.letta.mobile.data.context.contextReadingKeyOf
 import com.letta.mobile.data.context.modelCatalogWindowOf
 import com.letta.mobile.data.context.limit.ContextLimitController
 import com.letta.mobile.data.model.ContextWindowOverview
-import com.letta.mobile.data.context.overviewFor
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.ui.notify.AgentNotificationsSection
@@ -118,8 +116,8 @@ fun AgentContextCardHost(binding: AgentContextCardBinding, focus: AgentContextFo
     var lastOutcome by remember(focus.agentId, focus.conversationId) { mutableStateOf<CompactionOutcome?>(null) }
     val requests = CardRequests.of(focus, rememberReading(deps.readings, focus))
     val windows = rememberWindows(deps, focus, requests)
-    val breakdownState = deps.breakdown?.state?.collectAsState()?.value ?: ContextBreakdownState.Idle
-    val overview = breakdownState.overviewFor(requests.breakdown)
+    // The session's one breakdown cache, the same the composer meter reads.
+    val overview = deps.breakdown?.breakdowns?.collectAsState()?.value?.get(requests.breakdown.key)?.overview
     val model = rememberCardModel(deps, focus, requests, CardSnapshot(windows, overview, lastOutcome))
     LaunchedEffect(open, requests.breakdown, focus.turnRunning) {
         if (open && !focus.turnRunning) deps.breakdown?.load(requests.breakdown)
