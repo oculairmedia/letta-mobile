@@ -56,6 +56,8 @@ fun main(args: Array<String>) {
         { com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore.documents },
         { if (Platform.Current == Platform.Windows) com.letta.mobile.desktop.touch.DesktopWindowsTouchKeyboard },
     ).start()
+    // Packaging's AOT-cache training launch exits itself once startup has settled.
+    DesktopAotTrainingExit().install()
     initializeDesktopLifecycleMainThread()
     // Kotzilla observability — must run before any UI composition so the SDK
     // captures the full session including startup. Android target boots via
@@ -168,7 +170,6 @@ private fun runDesktopApplication(
                         state = rememberWindowState(width = 1280.dp, height = 820.dp),
                         header = headerChrome,
                     ) {
-                        DesktopAotTrainingExit { exitProcess(0) }
                         LaunchedEffect(Unit) {
                             activationHandler.attach(window)
                             window.minimumSize = Dimension(960, 640)

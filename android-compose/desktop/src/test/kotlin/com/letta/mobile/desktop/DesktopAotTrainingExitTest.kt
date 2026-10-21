@@ -1,32 +1,41 @@
-@file:OptIn(ExperimentalTestApi::class)
-
 package com.letta.mobile.desktop
 
-import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.runComposeUiTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class DesktopAotTrainingExitTest {
-    @Test
-    fun aTrainingRunExitsOnceStartupHasSettled() = runComposeUiTest {
-        mainClock.autoAdvance = false
-        var exits = 0
-        setContent { DesktopAotTrainingExit(training = true) { exits++ } }
+    private val scheduled = mutableListOf<Long>()
+    private var exits = 0
 
-        mainClock.advanceTimeBy(AOT_TRAINING_SETTLE_MS / 2)
-        assertEquals(0, exits, "exited before startup settled")
-        mainClock.advanceTimeBy(AOT_TRAINING_SETTLE_MS)
+    private fun trainingExit(training: Boolean) = DesktopAotTrainingExit(
+        training = training,
+        schedule = { delayMs, action ->
+            scheduled += delayMs
+            action()
+        },
+        exit = { exits++ },
+    )
+
+    @Test
+    fun aTrainingRunExitsOnceStartupHasSettledAfterItsFirstWindow() {
+        val training = trainingExit(training = true)
+
+        training.onWindowOpened()
+        training.onWindowOpened()
+
+        assertEquals(listOf(AOT_TRAINING_SETTLE_MS), scheduled, "one exit, after the settle time")
         assertEquals(1, exits)
     }
 
     @Test
-    fun aNormalLaunchNeverExits() = runComposeUiTest {
-        mainClock.autoAdvance = false
-        var exits = 0
-        setContent { DesktopAotTrainingExit(training = false) { exits++ } }
+    fun aNormalLaunchNeverExits() {
+        val normal = trainingExit(training = false)
 
-        mainClock.advanceTimeBy(AOT_TRAINING_SETTLE_MS * 2)
+        normal.install()
+        normal.onWindowOpened()
+
+        assertTrue(scheduled.isEmpty())
         assertEquals(0, exits)
     }
 }
