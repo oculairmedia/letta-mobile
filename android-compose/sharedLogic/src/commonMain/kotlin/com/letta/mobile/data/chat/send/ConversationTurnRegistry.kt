@@ -3,9 +3,9 @@ package com.letta.mobile.data.chat.send
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
+import kotlin.concurrent.Volatile
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
-import kotlin.concurrent.Volatile
 
 /**
  * The single index of conversation turn ownership, aliases and replay fences.
@@ -265,6 +265,110 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
         if (awaiting.size == 1) return awaiting.single()
         if (states.any { identityOf(it) != null }) return null
         return fallbackState()
+    }
+
+    /** One resolved owner for a delta; replay fences determine whether it may change live presence. */
+    data class DeltaResolution(
+        val conversation: ConversationId,
+        val state: ConversationTurnState?,
+        val retired: Boolean,
+    )
+
+    fun resolveDelta(
+        event: WsTimelineEvent.MessageDelta,
+        boundState: ConversationTurnState?,
+        visibleConversation: ConversationId?,
+    ): DeltaResolution? {
+        val conversation = deltaConversation(event, boundState, visibleConversation) ?: return null
+        val retired = isRetiredDelta(event, conversation)
+        val state = if (shouldAdoptPassiveDelta(event, boundState, retired)) {
+            stateFor(conversation).also {
+                if (it.adoptPassiveDelta(event)) lastActiveConversationId = it.localConversationId ?: it.conversationId
+            }
+        } else {
+            peekState(conversation)
+        }
+        return DeltaResolution(conversation, state, retired)
+    }
+
+    /** Named frames follow their own conversation; only untagged legacy frames use visible fallback. */
+    private fun deltaConversation(
+        event: WsTimelineEvent.MessageDelta,
+        boundState: ConversationTurnState?,
+        visibleConversation: ConversationId?,
+    ): ConversationId? {
+        val named = event.conversationId?.let(::ConversationId)
+        return if (named != null) namedDeltaConversation(event, boundState, named)
+        else legacyDeltaConversation(event, boundState, visibleConversation)
+    }
+
+    /** A named frame never falls through to the visible conversation's fabricated state. */
+    private fun namedDeltaConversation(
+        event: WsTimelineEvent.MessageDelta,
+        boundState: ConversationTurnState?,
+        named: ConversationId,
+    ): ConversationId {
+        val resolved = resolveConversationId(named) ?: named
+        val owner = boundState ?: ownedDeltaState(TurnTail(event.turnId, null), resolved) ?: peekState(resolved)
+        return owner?.let { ConversationId(it.localConversationId ?: it.conversationId) } ?: resolved
+    }
+
+    /** Only legacy untagged frames may use this chat's active send or visible fallback. */
+    private fun legacyDeltaConversation(
+        event: WsTimelineEvent.MessageDelta,
+        boundState: ConversationTurnState?,
+        visibleConversation: ConversationId?,
+    ): ConversationId? {
+        val owner = boundState ?: event.turnId?.let { turn ->
+            resolveStateByTurn(TurnTail(turn, null))?.takeUnless { isRetiredTurn(it, TurnTail(turn, null)) }
+        }
+        return owner?.let { ConversationId(it.localConversationId ?: it.conversationId) }
+            ?: lastActiveConversationId?.let(::ConversationId)
+            ?: visibleConversation
+    }
+
+    private fun ownedDeltaState(tail: TurnTail, conversation: ConversationId): ConversationTurnState? {
+        val turn = tail.turnId?.takeIf { it.isNotBlank() } ?: return null
+        val states = statesSnapshot
+        states.firstOrNull { it.turnId == turn }?.let { return it.takeUnless { state -> isRetiredTurn(state, tail) } }
+        states.firstOrNull { it.identity.isFenced(turn) }?.let { return it }
+        return states.singleOrNull {
+            it.turnId == null && it.identity.active != null &&
+                (it.conversationId == conversation.value || it.localConversationId == conversation.value)
+        }
+    }
+
+    fun isRetiredTurn(state: ConversationTurnState, tail: TurnTail): Boolean {
+        val turn = tail.turnId?.takeIf { it.isNotBlank() } ?: return false
+        return state.turnId != turn && state.identity.isFenced(turn)
+    }
+
+    private fun isRetiredDelta(event: WsTimelineEvent.MessageDelta, conversation: ConversationId): Boolean {
+        val state = peekState(conversation) ?: return false
+        val turn = event.turnId?.takeIf { it.isNotBlank() }
+        if (turn != null) return isRetiredTurn(state, TurnTail(turn, null))
+        val run = event.message.runId?.takeIf { it.isNotBlank() } ?: return false
+        return run != state.runId && run in state.settledRunIds
+    }
+
+    /** Error frames can create state only for this coordinator's visible conversation. */
+    fun resolveError(event: WsTimelineEvent.Error, visibleConversation: ConversationId?): ConversationTurnState? {
+        val named = event.conversationId?.takeIf { it.isNotBlank() }
+            ?: return resolveStateByTurn(TurnTail(event.turnId, event.runId))
+        val resolved = resolveConversationId(ConversationId(named)) ?: ConversationId(named)
+        peekState(resolved)?.let { return it }
+        return if (resolved == visibleConversation) stateFor(resolved) else null
+    }
+
+    fun resolveTerminal(event: WsTimelineEvent.TurnDone): ConversationTurnState? {
+        if (event.turnId.isBlank()) return resolveStateByRun(TurnTail(null, event.runId))
+        val states = statesSnapshot
+        val runMatch = states.firstOrNull { it.canAdoptTerminal(event) }
+        val turnAlreadyKnown = states.any { s -> s.turnId == event.turnId || s.identity.isFenced(event.turnId) }
+        if (runMatch != null && !turnAlreadyKnown) {
+            return runMatch
+        }
+        return resolveStateByTurn(TurnTail(event.turnId, event.runId))
     }
 
     private companion object {

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.util.Telemetry
 
 /** Local ownership retirement under the coordinator mutex, before releasing its pending queue.
@@ -10,6 +11,10 @@ internal class TurnSettlementOwnership(
     private val queuedSends: ChatSendQueue,
 ) {
     fun retainSettledOtid(otid: QueuedSendId) = registry.retainSettledOtid(otid)
+
+    /** The existing stale-terminal fallback must not be used for a live terminal. */
+    fun staleConversation(owner: ConversationTurnState?): ConversationId? =
+        ((owner ?: registry.fallbackState())?.conversationId ?: registry.lastActiveConversationId)?.let(::ConversationId)
 
     /**
      * Clears ONE conversation's turn state. Callers must pass the entry they own —

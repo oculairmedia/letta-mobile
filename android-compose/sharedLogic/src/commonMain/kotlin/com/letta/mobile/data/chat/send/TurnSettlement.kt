@@ -364,5 +364,29 @@ internal class TurnSettlement(
         )
     }
 
+    /** A delayed terminal may clean its old run only; it never retires the live owner. */
+    suspend fun staleTerminal(owner: ConversationTurnState?, event: WsTimelineEvent.TurnDone) {
+        if (event.status is BridgeTurnStatus.Failed || event.status is BridgeTurnStatus.Cancelled) {
+            val conversationId = ownership.staleConversation(owner)?.value ?: defaultConversationId
+            cleanupAbandonedAssistantFragmentsSafely(
+                conversation = ConversationId(conversationId),
+                tail = TurnTail(event.turnId, event.runId),
+                reason = "turn_done_stale_${event.status}",
+                // Scope cleanup to the OLD run only — do NOT fold in the
+                // active (newer) run's candidate ids.
+                candidateRunIds = event.runId.takeIf { it.isNotBlank() }?.let { setOf(it) } ?: emptySet(),
+            )
+        }
+        Telemetry.event(
+            "AdminChatVM", "ws.turnDone.staleIgnored",
+            "incomingTurnId" to event.turnId,
+            "incomingRunId" to event.runId,
+            "ownerConversationId" to (owner?.conversationId ?: ""),
+            "activeTurnId" to (owner?.turnId ?: ""),
+            "activeRunId" to (owner?.runId ?: ""),
+            "status" to event.status,
+        )
+    }
+
     private val defaultConversationId: String get() = IdFormats.defaultConversationIdFor(agent.value)
 }

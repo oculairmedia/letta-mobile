@@ -1,6 +1,7 @@
 package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.timeline.IROH_SYNTHETIC_RUN_ID_PREFIXES
 import com.letta.mobile.data.transport.WsTimelineEvent
 import kotlin.concurrent.Volatile
@@ -76,6 +77,14 @@ internal class ConversationTurnState(val conversationId: String) {
         while (settledRunIds.size > MAX_SETTLED_RUN_IDS) {
             settledRunIds.remove(settledRunIds.first())
         }
+    }
+
+    fun acceptsError(event: WsTimelineEvent.Error): Boolean =
+        event.turnId == null || turnId == null || event.turnId == turnId
+
+    fun bufferError(event: WsTimelineEvent.Error) {
+        bufferedErrorMessage = event.message.ifBlank { event.code }
+        bufferedErrorKind = event.code.takeIf { TurnFailureNotices.isKnownKind(it) }
     }
 
     /** True while this conversation owns a send or a turn that has not settled. */
