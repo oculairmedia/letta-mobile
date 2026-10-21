@@ -1,8 +1,12 @@
 package com.letta.mobile.desktop.runtime
 
 import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.URI
+import java.nio.file.AccessDeniedException
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.zip.ZipInputStream
@@ -34,13 +38,26 @@ internal fun portableGitCmdDirectory(
 ): File = File(portableGitRoot(home), "${release.version}/cmd")
 
 /**
+ * [portableGitCmdDirectory] once an install finished (its marker is written last, before the
+ * rename), or null: a tree without the marker is never offered to the git probe.
+ */
+internal fun installedPortableGitCmdDirectory(
+    home: File = File(System.getProperty("user.home")),
+    release: PortableGitRelease = PortableGitRelease.Current,
+): File? = portableGitCmdDirectory(home, release).takeIf { isCompletePortableGit(it.parentFile) }
+
+private fun isCompletePortableGit(versionDirectory: File): Boolean =
+    File(versionDirectory, GIT_EXE).isFile && File(versionDirectory, INSTALL_COMPLETE_MARKER).isFile
+
+/**
  * Downloads [release], refuses a SHA-256 mismatch, extracts `cmd/git.exe`. [download] and [digest]
  * are faked in tests so the pin is exercised without the network.
  *
- * letta-mobile-k5nbq.13: the archive is downloaded and unpacked in a staging directory beside the
- * versioned one and renamed into place only once complete, so neither a crash mid-extract nor the
- * git availability poll ever sees a half tree under `<version>/cmd`. Staging is removed on any
- * failure, including a checksum mismatch.
+ * letta-mobile-k5nbq.13: the archive is downloaded and unpacked in a hidden staging directory
+ * beside the versioned one, marked complete last, and renamed into place, so neither a crash
+ * mid-extract nor the git availability poll ever sees a half tree under `<version>/cmd`. A tree
+ * without the marker (a crashed or older install) is replaced; staging left by an earlier crash is
+ * cleared first, and this run's staging is removed on any failure, including a checksum mismatch.
  */
 internal class PortableGitInstaller(
     private val root: File,
@@ -52,24 +69,33 @@ internal class PortableGitInstaller(
 
     fun install(): File {
         val dest = File(root, release.version)
-        val git = File(dest, GIT_EXE)
-        if (git.isFile) return git.parentFile
-        dest.deleteRecursively()
-        root.mkdirs()
-        val zip = Files.createTempFile(root.toPath(), ".${release.version}-", ".zip").toFile()
-        val staging = Files.createTempDirectory(root.toPath(), ".${release.version}-").toFile()
+        if (isCompletePortableGit(dest)) return cmdDirectory()
+        clearIncomplete(dest)
+        val zip = Files.createTempFile(root.toPath(), stagingPrefix(), ".zip").toFile()
+        val staging = Files.createTempDirectory(root.toPath(), stagingPrefix()).toFile()
         try {
             download(release.url, zip)
             verifyChecksum(zip)
             extractZip(zip, staging)
             check(File(staging, GIT_EXE).isFile) { "PortableGit extract did not contain cmd/git.exe" }
-            Files.move(staging.toPath(), dest.toPath(), StandardCopyOption.ATOMIC_MOVE)
+            File(staging, INSTALL_COMPLETE_MARKER).writeText(release.sha256)
+            moveWithRetry(staging.toPath(), dest.toPath())
         } finally {
             zip.delete()
             staging.deleteRecursively()
         }
-        return git.parentFile
+        return cmdDirectory()
     }
+
+    /** Removes an unmarked `<version>` tree and staging an earlier crash left behind. */
+    private fun clearIncomplete(dest: File) {
+        root.mkdirs()
+        root.listFiles().orEmpty().filter { it.name.startsWith(stagingPrefix()) }.forEach { it.deleteRecursively() }
+        dest.deleteRecursively()
+        check(!dest.exists()) { "Could not remove the incomplete PortableGit at $dest; close programs using it and retry" }
+    }
+
+    private fun stagingPrefix(): String = ".${release.version}-"
 
     private fun verifyChecksum(zip: File) {
         val actual = digest(zip)
@@ -79,15 +105,47 @@ internal class PortableGitInstaller(
     }
 }
 
-/** Downloads [url] to [dest], failing instead of hanging when the server stalls. */
+/**
+ * Atomically renames [source] to [target], retrying a few times on [AccessDeniedException]: on
+ * Windows an antivirus scan of the freshly unpacked files briefly holds them open.
+ */
+internal fun moveWithRetry(
+    source: Path,
+    target: Path,
+    move: (Path, Path) -> Unit = { from, to -> Files.move(from, to, StandardCopyOption.ATOMIC_MOVE) },
+    pause: (Long) -> Unit = Thread::sleep,
+) {
+    repeat(RENAME_ATTEMPTS - 1) {
+        try {
+            return move(source, target)
+        } catch (_: AccessDeniedException) {
+            pause(RENAME_RETRY_DELAY_MS)
+        }
+    }
+    move(source, target)
+}
+
+/** Downloads [url] to [dest], failing instead of hanging when the server stalls or trickles. */
 internal fun downloadUrlTo(url: String, dest: File) {
     dest.parentFile?.mkdirs()
     val connection = URI(url).toURL().openConnection().apply {
         connectTimeout = DOWNLOAD_CONNECT_TIMEOUT_MS
         readTimeout = DOWNLOAD_READ_TIMEOUT_MS
     }
+    val deadline = System.nanoTime() + DOWNLOAD_DEADLINE_NANOS
     connection.getInputStream().use { input ->
-        dest.outputStream().use { output -> input.copyTo(output) }
+        dest.outputStream().use { output -> copyBefore(deadline, input, output) }
+    }
+}
+
+/** Copies [input] to [output], failing once [now] passes [deadline] (both in nanoseconds). */
+internal fun copyBefore(deadline: Long, input: InputStream, output: OutputStream, now: () -> Long = System::nanoTime) {
+    val buffer = ByteArray(HASH_BUFFER_BYTES)
+    while (true) {
+        val read = input.read(buffer)
+        if (read < 0) return
+        check(now() - deadline < 0) { "PortableGit download did not finish in time" }
+        output.write(buffer, 0, read)
     }
 }
 
@@ -144,5 +202,9 @@ internal fun isUnsafeZipPath(name: String): Boolean {
 private const val GIT_EXE = "cmd/git.exe"
 private const val DOWNLOAD_CONNECT_TIMEOUT_MS = 15_000
 private const val DOWNLOAD_READ_TIMEOUT_MS = 30_000
+private const val DOWNLOAD_DEADLINE_NANOS = 10L * 60 * 1_000_000_000
+private const val INSTALL_COMPLETE_MARKER = ".install-complete"
+private const val RENAME_ATTEMPTS = 5
+private const val RENAME_RETRY_DELAY_MS = 200L
 private const val HASH_BUFFER_BYTES = 64 * 1024
 private const val MAX_UNPACKED_BYTES = 256L * 1024 * 1024

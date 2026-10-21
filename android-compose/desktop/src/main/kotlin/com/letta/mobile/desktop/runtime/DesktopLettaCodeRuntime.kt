@@ -125,13 +125,11 @@ internal object DesktopLocalRuntimeHost {
         probe = { DesktopGitProbe.forThisMachine().check() },
         runtimeActive = { appServer.health.value.active },
         restartRuntime = { appServer.forceRestart() },
-        applyPathDirectory = { DesktopRuntimeLaunchPreference.extraPathDirectory = it },
     )
 
     /** letta-mobile-k5nbq.8: pinned MinGit into the per-user dir, then recheck so PATH and restart run. */
     fun installPortableGit() {
-        DesktopRuntimeLaunchPreference.extraPathDirectory = PortableGitInstaller(portableGitRoot()).install()
-        gitEnvironment.refresh()
+        gitEnvironment.installPortableGit(PortableGitInstaller(portableGitRoot()))
     }
 
     /**
