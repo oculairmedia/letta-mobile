@@ -1,6 +1,9 @@
 package com.letta.mobile.data.canvas.export
 
 import com.letta.mobile.data.canvas.CanvasSceneSchema
+import com.letta.mobile.data.canvas.CanvasOpProjector
+import com.letta.mobile.data.canvas.CanvasSceneCheck
+import com.letta.mobile.data.canvas.CanvasSceneValidator
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -10,6 +13,15 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class CanvasSvgRendererTest {
+    private fun prepare(scene: String): String {
+        val checked = CanvasSceneValidator.scene(CanvasOpProjector.stripMetadataForDrawBox(scene))
+        require(checked is CanvasSceneCheck.Valid) { (checked as CanvasSceneCheck.Invalid).message }
+        return checked.json
+    }
+
+    private fun render(scene: String, prepareDrawing: (String) -> String = ::prepare): String =
+        CanvasSvgRenderer.render(scene, prepareDrawing)
+
     private fun scene(vararg elements: JsonObject): String = JsonObject(mapOf(
         "bgColor" to JsonPrimitive("#eceff1ff"), "elements" to JsonArray(elements.toList()),
     )).toString()
@@ -21,7 +33,7 @@ class CanvasSvgRendererTest {
             "imageMediaType" to JsonPrimitive("image/png"),
         ))
         val shape = JsonObject(CanvasSceneSchema.shape.example - "text")
-        val svg = CanvasSvgRenderer.render(scene(shape, CanvasSceneSchema.path.example, image))
+        val svg = render(scene(shape, CanvasSceneSchema.path.example, image))
         assertTrue(svg.contains("viewBox=\""))
         assertEquals(2, Regex("<rect ").findAll(svg).count())
         assertEquals(2, Regex("<line ").findAll(svg).count())
@@ -36,7 +48,7 @@ class CanvasSvgRendererTest {
             {"id":"idea-tri","type":"Shape","zIndex":1,"points":["210.0,542.0","490.0,762.0"],"strokeColor":"#f39c12ff","strokeWidth":5.0,"shapeType":"TRIANGLE","fillColor":"#fce9c4ff","cornerRadius":12.0},
             {"id":"plan-rect","type":"Shape","zIndex":1,"points":["568.0,560.0","868.0,740.0"],"strokeColor":"#16a085ff","strokeWidth":5.0,"shapeType":"RECTANGLE","fillColor":"#d1f2ebff","cornerRadius":24.0}
         ]}"""
-        val svg = CanvasSvgRenderer.render(sample)
+        val svg = render(sample)
         assertEquals(1, Regex("<polygon ").findAll(svg).count())
         assertEquals(2, Regex("<rect ").findAll(svg).count())
         assertTrue(svg.contains("width=\"300.0\""))
@@ -48,9 +60,9 @@ class CanvasSvgRendererTest {
             "text" to JsonPrimitive("A long line whose wrapping cannot be measured without the board fonts"),
             "wrapWidth" to JsonPrimitive(20), "rotation" to JsonPrimitive(45),
         ))
-        val error = assertFailsWith<IllegalStateException> { CanvasSvgRenderer.render(scene(text)) }
+        val error = assertFailsWith<IllegalStateException> { render(scene(text)) }
         assertTrue(error.message.orEmpty().contains("text wrapping"))
-        assertFailsWith<IllegalArgumentException> { CanvasSvgRenderer.render(scene(CanvasSceneSchema.shape.example)) }
+        assertFailsWith<IllegalArgumentException> { render(scene(CanvasSceneSchema.shape.example)) }
     }
 
     @Test
@@ -58,7 +70,7 @@ class CanvasSvgRendererTest {
         val patterned = """{"elements":[],"_bgPattern":{"kind":"grid","spacing":24,"color":"#112233ff"}}"""
         var prepared = false
         assertFailsWith<IllegalArgumentException> {
-            CanvasSvgRenderer.render(patterned) {
+            render(patterned) {
                 prepared = true
                 scene()
             }
@@ -71,7 +83,7 @@ class CanvasSvgRendererTest {
         val path = JsonObject(CanvasSceneSchema.path.example + mapOf(
             "alpha" to JsonPrimitive(0.4), "strokeColor" to JsonPrimitive("#123456ff"),
         ))
-        val svg = CanvasSvgRenderer.render(scene(path))
+        val svg = render(scene(path))
         assertEquals(1, Regex("opacity=").findAll(svg).count())
         assertTrue(svg.contains("<g opacity=\"0.4\">"))
         assertEquals(2, Regex("stroke=\"#123456\"").findAll(svg).count())
@@ -81,7 +93,7 @@ class CanvasSvgRendererTest {
     fun rejectsCorruptOrUnsupportedScenesInsteadOfExportingBlankSvg() {
         for (input in listOf("not JSON", "{}", """{"elements":[{"type":"alien"}]}""",
             """{"elements":[],"_documents":[{"id":"note"}]}""")) {
-            assertFailsWith<IllegalArgumentException> { CanvasSvgRenderer.render(input) }
+            assertFailsWith<IllegalArgumentException> { render(input) }
         }
     }
 }
