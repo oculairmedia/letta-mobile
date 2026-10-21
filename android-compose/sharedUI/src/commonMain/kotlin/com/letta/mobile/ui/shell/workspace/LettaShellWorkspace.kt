@@ -25,27 +25,23 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.ui.host.InspectorFrame
 import com.letta.mobile.ui.host.InspectorHost
 import com.letta.mobile.ui.host.OverlayHostRoot
 import com.letta.mobile.ui.host.ProvideInspectorHost
 import com.letta.mobile.ui.host.rememberInspectorHost
 import com.letta.mobile.ui.host.rememberOverlayHost
-import com.letta.mobile.ui.mascot.LocalMascotTransport
-import com.letta.mobile.ui.mascot.MascotStage
+import com.letta.mobile.ui.mascot.DriveMascotStage
 import com.letta.mobile.ui.mascot.MascotTransportLayer
 import com.letta.mobile.ui.shell.ShellNavDrawerSheet
 import com.letta.mobile.ui.shell.rail.ShellLibraryRail
-import com.letta.mobile.ui.shell.rail.ShellRailFocus
 import com.letta.mobile.ui.shell.rail.railLightDismiss
 import com.letta.mobile.ui.memory.ReleaseCachesUnderPressure
 import com.letta.mobile.ui.a11y.AccessibilityTraversal
@@ -161,7 +157,7 @@ internal fun inlineHeaderHeight(tabbed: Boolean): Dp =
 private fun WorkspaceBody(frame: WorkspaceFrame, modifier: Modifier) {
     // The panel's card and the page's panels open their detail in the frame around the page.
     val inspectors = rememberInspectorHost()
-    ShellMascotStage(frame.state.navigation.rail.focus, frame.agentPaneVisible())
+    DriveMascotStage(frame.state.navigation.rail.focus.selectedAgentId?.let(::AgentId), frame.agentPaneVisible())
     Box(modifier.fillMaxWidth()) {
         // Every seated mascot draws here, over the shell, and travels between seats (wbin4.4).
         MascotTransportLayer {
@@ -251,23 +247,5 @@ fun ShellCollapsibleSidebar(
         modifier = modifier,
     ) {
         Row(Modifier.fillMaxHeight()) { content() }
-    }
-}
-
-/**
- * One rule for where the focused agent's mascot stands: the agent pane's hero seat while
- * the pane shows, else rest. The previous agent is let go when focus moves.
- */
-@Composable
-private fun ShellMascotStage(focus: ShellRailFocus, agentPaneVisible: Boolean) {
-    val selectedAgentId = focus.selectedAgentId
-    val transport = LocalMascotTransport.current
-    var placedAgent by remember { mutableStateOf<String?>(null) }
-    val stage = if (agentPaneVisible) MascotStage.AGENT_PANE_HERO else null
-    LaunchedEffect(selectedAgentId, stage) {
-        placedAgent?.takeIf { it != selectedAgentId }?.let(transport::rest)
-        placedAgent = selectedAgentId
-        val agent = selectedAgentId ?: return@LaunchedEffect
-        if (stage != null) transport.transportTo(agent, stage) else transport.rest(agent)
     }
 }

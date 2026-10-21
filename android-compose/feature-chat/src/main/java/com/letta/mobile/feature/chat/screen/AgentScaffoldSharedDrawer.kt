@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.screen
 
 import android.widget.Toast
+import androidx.compose.material3.DrawerValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,6 +17,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.ui.mascot.DriveMascotStage
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.shell.ShellNavDrawerActions
 import com.letta.mobile.ui.shell.ShellNavDrawerInput
@@ -61,6 +63,7 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
         drawer.failures.collect { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
     }
     val open = state.drawerState.isOpen
+    DriveMascotStage(AgentId(state.agentIdValue), agentPaneVisible = state.drawerState.targetValue == DrawerValue.Open)
     LaunchedEffect(open) {
         if (open) {
             drawer.refreshCanvases()

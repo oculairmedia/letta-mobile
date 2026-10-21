@@ -446,6 +446,17 @@ final enum class com.letta.mobile.ui.mascot/MascotGazeSurface : kotlin/Enum<com.
     final fun values(): kotlin/Array<com.letta.mobile.ui.mascot/MascotGazeSurface> // com.letta.mobile.ui.mascot/MascotGazeSurface.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.ui.mascot/MascotLayerDrawing : kotlin/Enum<com.letta.mobile.ui.mascot/MascotLayerDrawing> { // com.letta.mobile.ui.mascot/MascotLayerDrawing|null[0]
+    enum entry LIVE_SLOTS // com.letta.mobile.ui.mascot/MascotLayerDrawing.LIVE_SLOTS|null[0]
+    enum entry SEAT_RULE // com.letta.mobile.ui.mascot/MascotLayerDrawing.SEAT_RULE|null[0]
+
+    final val entries // com.letta.mobile.ui.mascot/MascotLayerDrawing.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.ui.mascot/MascotLayerDrawing> // com.letta.mobile.ui.mascot/MascotLayerDrawing.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.ui.mascot/MascotLayerDrawing // com.letta.mobile.ui.mascot/MascotLayerDrawing.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.ui.mascot/MascotLayerDrawing> // com.letta.mobile.ui.mascot/MascotLayerDrawing.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.ui.mascot/MascotSeatVacancy : kotlin/Enum<com.letta.mobile.ui.mascot/MascotSeatVacancy> { // com.letta.mobile.ui.mascot/MascotSeatVacancy|null[0]
     enum entry NO_MASCOT // com.letta.mobile.ui.mascot/MascotSeatVacancy.NO_MASCOT|null[0]
     enum entry SEATED_ELSEWHERE // com.letta.mobile.ui.mascot/MascotSeatVacancy.SEATED_ELSEWHERE|null[0]
@@ -4023,7 +4034,10 @@ final class com.letta.mobile.ui.mascot/MascotStills { // com.letta.mobile.ui.mas
 }
 
 final class com.letta.mobile.ui.mascot/MascotTransport { // com.letta.mobile.ui.mascot/MascotTransport|null[0]
-    constructor <init>() // com.letta.mobile.ui.mascot/MascotTransport.<init>|<init>(){}[0]
+    constructor <init>(com.letta.mobile.ui.mascot/MascotLayerDrawing = ...) // com.letta.mobile.ui.mascot/MascotTransport.<init>|<init>(com.letta.mobile.ui.mascot.MascotLayerDrawing){}[0]
+
+    final val drawing // com.letta.mobile.ui.mascot/MascotTransport.drawing|{}drawing[0]
+        final fun <get-drawing>(): com.letta.mobile.ui.mascot/MascotLayerDrawing // com.letta.mobile.ui.mascot/MascotTransport.drawing.<get-drawing>|<get-drawing>(){}[0]
 
     final var motionListener // com.letta.mobile.ui.mascot/MascotTransport.motionListener|{}motionListener[0]
         final fun <get-motionListener>(): com.letta.mobile.ui.mascot/MascotMotionListener? // com.letta.mobile.ui.mascot/MascotTransport.motionListener.<get-motionListener>|<get-motionListener>(){}[0]
@@ -12025,6 +12039,7 @@ final fun com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_Rive
 final fun com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_RivePointerEvent$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.mascot.frame/com_letta_mobile_ui_mascot_frame_RivePointerEvent$stableprop_getter|com_letta_mobile_ui_mascot_frame_RivePointerEvent$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.mascot/AgentAvatar(kotlin/String?, kotlin/String, androidx.compose.ui.unit/Dp, androidx.compose.ui/Modifier?, androidx.compose.ui.unit/Dp, kotlin/Boolean, kotlin/Function0<kotlin/Unit>?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.mascot/AgentAvatar|AgentAvatar(kotlin.String?;kotlin.String;androidx.compose.ui.unit.Dp;androidx.compose.ui.Modifier?;androidx.compose.ui.unit.Dp;kotlin.Boolean;kotlin.Function0<kotlin.Unit>?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.mascot/AgentInitialTile(kotlin/String, androidx.compose.ui.unit/Dp, androidx.compose.ui.unit/Dp, androidx.compose.ui/Modifier?, kotlin/Function0<kotlin/Unit>?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.mascot/AgentInitialTile|AgentInitialTile(kotlin.String;androidx.compose.ui.unit.Dp;androidx.compose.ui.unit.Dp;androidx.compose.ui.Modifier?;kotlin.Function0<kotlin.Unit>?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.mascot/DriveMascotStage(kotlin/String?, kotlin/Boolean, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.mascot/DriveMascotStage|DriveMascotStage(kotlin.String?;kotlin.Boolean;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.mascot/MascotAvatar(kotlin/String?, androidx.compose.ui.unit/Dp, androidx.compose.ui/Modifier?, androidx.compose.ui.unit/Dp, kotlin/Function0<kotlin/Unit>?, kotlin/Float, kotlin/Boolean, kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.mascot/MascotAvatar|MascotAvatar(kotlin.String?;androidx.compose.ui.unit.Dp;androidx.compose.ui.Modifier?;androidx.compose.ui.unit.Dp;kotlin.Function0<kotlin.Unit>?;kotlin.Float;kotlin.Boolean;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.mascot/MascotCandidate(com.letta.mobile.avatar.core/MascotIdentity, androidx.compose.ui.unit/Dp, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.mascot/MascotCandidate|MascotCandidate(com.letta.mobile.avatar.core.MascotIdentity;androidx.compose.ui.unit.Dp;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.mascot/MascotCursorCapture(com.letta.mobile.ui.mascot/MascotIdentityRegistry, kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.mascot/MascotCursorCapture|MascotCursorCapture(com.letta.mobile.ui.mascot.MascotIdentityRegistry;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int){}[0]

@@ -76,8 +76,10 @@ internal class FakeMascotShell(
     layerMounted: Boolean = true,
     /** The renderer: [PointerObservingMascotHost] to stand in for Android's Rive surface. */
     private val host: MascotHost = FakeMascotHost,
+    /** How a mounted layer pictures the characters: [MascotLayerDrawing.SEAT_RULE] as on Android. */
+    drawing: MascotLayerDrawing = MascotLayerDrawing.LIVE_SLOTS,
 ) {
-    val transport = MascotTransport().also { it.layerMounted = layerMounted }
+    val transport = MascotTransport(drawing).also { it.layerMounted = layerMounted }
     val registry = MascotIdentityRegistry().also { registry ->
         registry.update(agentIds.associateWith { MascotIdentity(MascotShape.entries.first(), TEST_COLOR) })
     }

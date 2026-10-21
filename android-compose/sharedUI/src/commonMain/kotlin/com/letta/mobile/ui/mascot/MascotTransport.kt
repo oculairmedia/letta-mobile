@@ -92,18 +92,14 @@ internal data class MascotSeatInfo(
      * per frame. Zero means the same as [bounds].
      */
     val layoutWidth: Float = 0f,
+    /** The seat's live-or-still rule ([MascotSeat]'s `live`); a [MascotLayerDrawing.SEAT_RULE] layer honours it. */
+    val live: Boolean = true,
 ) {
     val onClick: (() -> Unit)? get() = handlers.onClick
     val onEdit: (() -> Unit)? get() = handlers.onEdit
 
     /** The seat answers anything at all - a click, the pencil, a drag - so its character may be touched. */
-    // The edit and drag flags are snapshot state: a seat that gains a pencil or a drag later re-installs the input.
-    val touch: MascotTouch
-        get() = MascotTouch.answering(
-            handlers.onClick,
-            handlers.onEdit.takeIf { handlers.editable },
-            handlers.onDrag.takeIf { handlers.draggable },
-        )
+    val touch: MascotTouch get() = handlers.touch
 
     /** The box the character is drawn in, before the seat's own scale. */
     val drawWidth: Float get() = seatDrawWidth()
@@ -150,6 +146,11 @@ internal class SeatHandlers {
     var draggable: Boolean by mutableStateOf(false)
         private set
 
+    /** Whether the seat answers anything at all - a click, the pencil, a drag - so its character may be touched. */
+    // The edit and drag flags are snapshot state: a seat that gains a pencil or a drag later re-installs the input.
+    val touch: MascotTouch
+        get() = MascotTouch.answering(onClick, onEdit.takeIf { editable }, onDrag.takeIf { draggable })
+
     /** Writes [editable] only when it changes, so an unchanged handler swap records no state write. */
     private fun syncEditable() {
         val hasHandler = onEdit != null
@@ -163,13 +164,32 @@ internal class SeatHandlers {
     }
 }
 
+/** How a [MascotTransportLayer] pictures the characters it carries. */
+enum class MascotLayerDrawing {
+    /**
+     * Desktop and web: every carried character live, in one scene per layer slot that is
+     * re-skinned as focus moves, so agent A morphs into agent B where it stands.
+     */
+    LIVE_SLOTS,
+
+    /**
+     * Android: each seat's live-or-still rule (an idle agent's hero is its still, as every avatar
+     * of it is), drawn in the agent's own scene so the host's one-live-driver rule spans the layer
+     * and every other avatar of that agent - no extra live Rive surface on a battery.
+     */
+    SEAT_RULE,
+}
+
 /**
  * The transport verb, and the seats it can send a mascot to. One per window (or activity): every
  * surface declares its seat with [MascotSeat], the shell calls [transportTo] / [rest], and
  * [MascotTransportLayer] draws each agent's live mascot at whichever seat is active - animating
  * between them - so the choreography lives here and nowhere else.
  */
-class MascotTransport {
+class MascotTransport(
+    /** How the layer pictures what it carries; [MascotLayerDrawing.LIVE_SLOTS] unless the host says otherwise. */
+    val drawing: MascotLayerDrawing = MascotLayerDrawing.LIVE_SLOTS,
+) {
     internal val seats = mutableStateMapOf<SeatKey, MascotSeatInfo>()
     private val requested = mutableStateMapOf<String, MascotStage>()
     private val previews = mutableStateMapOf<String, MascotIdentity>()
@@ -285,6 +305,9 @@ class MascotTransport {
 
     internal fun seat(key: SeatKey): MascotSeatInfo? = seats[key]
 
+    /** Whether the layer draws [seat]'s character live: always for [MascotLayerDrawing.LIVE_SLOTS], else as the seat says. */
+    internal fun drawsLive(seat: MascotSeatInfo): Boolean = drawing == MascotLayerDrawing.LIVE_SLOTS || seat.live
+
     internal data class SeatKey(val agentId: String, val stage: MascotStage)
 
     companion object {
@@ -307,6 +330,10 @@ internal fun MascotTransport.publishSeat(key: MascotTransport.SeatKey?, bounds: 
 
 /** One agent's mascot as the layer draws it: who, in what look, at which seat. */
 private class SeatedMascot(val agentId: String, val identity: MascotIdentity, val seat: MascotSeatInfo)
+
+/** The scene layer [slot] draws [seated] in: the slot's own (re-skinned as focus moves), or the agent's under [MascotLayerDrawing.SEAT_RULE]. */
+private fun MascotTransport.sceneKey(slot: Int, seated: SeatedMascot): String =
+    if (drawing == MascotLayerDrawing.SEAT_RULE) seated.agentId else "mascot-focus-$slot"
 
 @Composable
 private fun TransportedMascot(
@@ -333,7 +360,9 @@ private fun TransportedMascot(
     // The slot's scene (the one MascotLive below draws): its director hears the body's travel and
     // landings (te3n1.1 over te3n1.3), and a rig that animates them itself takes the deform over.
     val host = LocalMascotHost.current
-    val director = remember(host, sceneKey, identity) { host.entry(sceneKey, identity) }?.director
+    // A still has no scene to direct: it is carried and squashed on the layer alone.
+    val live = transport.drawsLive(seat)
+    val director = remember(host, sceneKey, identity, live) { if (live) host.entry(sceneKey, identity) else null }?.director
     val currentDirector by rememberUpdatedState(director)
     LaunchedEffect(director) { if (director?.carriesBody == true) transport.rigCarriesBody = true }
     LaunchedEffect(director, flight) {
@@ -378,13 +407,13 @@ private fun TransportedMascot(
         modifier = Modifier
             .offset { flight.placement(seat, origin) }
             .requiredSize(boxSize)
-            .graphicsLayer { flight.applyPose(this, seat, reducedMotion, deform = !transport.rigCarriesBody) }
+            .graphicsLayer { flight.applyPose(this, seat, reducedMotion, deform = !(live && transport.rigCarriesBody)) }
             // Hover (for the pencil) and drag only where the seat has them: a seat with neither
             // takes no input at all, and what it stands over (the Touch chat head) keeps its own.
             .seatInput(seat.handlers, hover, SeatDrag(flight, dragFeel)),
         contentAlignment = Alignment.Center,
     ) {
-        SeatedLive(seated, boxSize, sceneKey)
+        SeatedCharacter(seated, boxSize, sceneKey, live)
         // The pencil, in front of the character (the layer draws above every seat), on hover only:
         // one way to edit the agent from any mascot, so no seat needs to travel to the editor.
         seat.onEdit?.let { onEdit ->
@@ -394,17 +423,23 @@ private fun TransportedMascot(
 }
 
 /**
- * [seated]'s live character in a [boxSize] slot. A seat that takes input at all lets the character
- * be poked and petted; one that takes none (over the Touch chat head) leaves every touch to what
- * is under it.
+ * [seated]'s character in a [boxSize] slot: live, or the identity's still when the layer honours a
+ * seat picturing its agent at rest ([MascotTransport.drawsLive]). A seat that takes input at all
+ * lets the character be poked and petted; one that takes none (over the Touch chat head) leaves
+ * every touch to what is under it.
  */
 @Composable
-private fun SeatedLive(seated: SeatedMascot, boxSize: Dp, sceneKey: String) {
+private fun SeatedCharacter(seated: SeatedMascot, boxSize: Dp, sceneKey: String, live: Boolean) {
     val seat = seated.seat
+    val size = boxSize * seat.overscale
+    if (!live) {
+        MascotInPlace(seated.agentId, seated.identity, size = size, live = false, onClick = seat.onClick)
+        return
+    }
     MascotLive(
         seated.agentId,
         seated.identity,
-        size = boxSize * seat.overscale,
+        size = size,
         onClick = seat.onClick,
         sceneKey = sceneKey,
         touch = seat.touch,
@@ -483,11 +518,17 @@ private fun rememberDragFeel(flight: MascotTransport.Flight, director: MascotDir
 /** What a seat drag moves: the slot's body (its lean) and what it tells the character ([MascotDragFeel]). */
 private class SeatDrag(val flight: MascotTransport.Flight, val feel: MascotDragFeel)
 
-/** Hover for the pencil when the seat is [SeatHandlers.editable], drag when it is [SeatHandlers.draggable]. */
+/**
+ * Hover for the pencil when the seat is [SeatHandlers.editable], drag when it is
+ * [SeatHandlers.draggable]. A seat that answers nothing passes every touch on to what is drawn
+ * under the layer: a renderer's own pointer filter (Android's Rive surface) is a hit that would
+ * otherwise end the hit test at the character, over the Touch chat head's drag, tap and long press.
+ */
 private fun Modifier.seatInput(handlers: SeatHandlers, hover: MutableInteractionSource, drag: SeatDrag): Modifier {
     val hoverInput = if (handlers.editable) Modifier.hoverable(hover) else Modifier
     val dragInput = if (handlers.draggable) Modifier.seatDrag(handlers, drag) else Modifier
-    return then(hoverInput).then(dragInput)
+    val passThrough = if (handlers.touch == MascotTouch.PASSES_THROUGH) Modifier.pointerInputPassThrough() else Modifier
+    return then(passThrough).then(hoverInput).then(dragInput)
 }
 
 /**
@@ -604,8 +645,9 @@ fun MascotTransportLayer(
         // the focused agent changes, so agent A morphs into agent B where it stands instead of a
         // fresh scene loading in with a flash.
         transport.seatedMascots(registry).forEachIndexed { slot, seated ->
-            key(slot) {
-                TransportedMascot(seated, origin, reducedMotion, sceneKey = "mascot-focus-$slot")
+            val sceneKey = transport.sceneKey(slot, seated)
+            key(sceneKey) {
+                TransportedMascot(seated, origin, reducedMotion, sceneKey = sceneKey)
             }
         }
     }

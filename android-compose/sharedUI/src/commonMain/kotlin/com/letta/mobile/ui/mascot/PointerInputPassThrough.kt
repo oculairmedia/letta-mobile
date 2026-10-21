@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.chat.surface.composer
+package com.letta.mobile.ui.mascot
 
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEvent
