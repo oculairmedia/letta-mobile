@@ -90,8 +90,9 @@ fun CanvasWorkspace(
             CanvasPresence(peer, currentPeerName ?: peer, canvasPeerColor(peer.hashCode()), cursorX = 0f, cursorY = 0f)
         },
         callbacks = CanvasWorkspaceCallbacks(onNavigateBack, onExportJson, onExportSvg, onShareToChat),
-        chrome = CanvasWorkspaceChromeOptions(showTitle, headerTrailing, layout, longPressDrawsSelectionBox, chromeTopInset),
-        cameraRequest = cameraRequest,
+        chrome = CanvasWorkspaceChromeOptions(
+            showTitle, headerTrailing, layout, longPressDrawsSelectionBox, chromeTopInset, cameraRequest,
+        ),
     )
     CanvasWorkspaceBoard(host, modifier)
 }

@@ -47,7 +47,7 @@ internal fun CanvasBoardCameraEffects(board: CanvasBoard) {
     // A region asked for from outside (the chat's "Show on canvas"): framed once the board is
     // loaded and measured, never zoomed in past 100%, after the open-time fit so it wins. A jump,
     // not an animation, so reduced motion has nothing to honour here.
-    val cameraTarget = board.host.cameraRequest?.target
+    val cameraTarget = board.host.chrome.cameraRequest?.target
     LaunchedEffect(cameraTarget, ui.initialLoadDone, ui.boardSize) { board.frameCameraRequest(cameraTarget) }
     CanvasKeyboardCameraEffect(board)
 }
@@ -68,7 +68,7 @@ private fun CanvasBoard.shouldFitOnOpen(layout: CanvasLayout?): Boolean {
 }
 
 private fun CanvasBoard.frameCameraRequest(target: CanvasCameraTarget?) {
-    val request = host.cameraRequest ?: return
+    val request = host.chrome.cameraRequest ?: return
     request.frameOn(target, CameraBoard(session?.canvasId?.value, ui.boardSize, ui.initialLoadDone)) { fit -> jumpTo(fit) }
 }
 

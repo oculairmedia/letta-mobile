@@ -131,30 +131,32 @@ private fun svgText(e: JsonObject): SvgDrawing {
     val start = e.need("textTopLeft").toConnectPoint()
     val size = e.number("fontSize") ?: 24f
     val width = e.number("wrapWidth") ?: 320f
-    val x = start.x + when (textAnchor(e)) { "middle" -> width / 2; "end" -> width; else -> 0f }
     val height = e.need("text").split('\n').size * size * LINE_HEIGHT
-    val svg = svgTextBlock(e, ConnectPoint(x, start.y + size))
+    val svg = svgTextBlock(e, ConnectPoint(start.x, start.y + size))
     return svg to CanvasPreviewRect(start.x, start.y, start.x + width, start.y + height)
 }
 
-/** A shape's label is centred on the shape; a text element follows its own alignment. */
-private fun textAnchor(e: JsonObject): String =
-    if (e.need("type") == "Shape") "middle" else when (e.text("alignment")) {
+/**
+ * [e]'s text. A shape label is centred on [at] in the shape's text colour; a text element starts
+ * its first baseline at [at] and follows its own alignment across its wrap width, in its stroke colour.
+ */
+private fun svgTextBlock(e: JsonObject, at: ConnectPoint): String {
+    val size = e.number("fontSize") ?: 24f
+    val label = e.need("type") == "Shape"
+    val color = (if (label) e.text("textColor") else null) ?: e.need("strokeColor")
+    val anchor = if (label) "middle" else when (e.text("alignment")) {
         "CENTER" -> "middle"
         "RIGHT" -> "end"
         else -> "start"
     }
-
-/** [e]'s text at [at]: a shape label takes its text colour, a text element its stroke colour. */
-private fun svgTextBlock(e: JsonObject, at: ConnectPoint): String {
-    val size = e.number("fontSize") ?: 24f
-    val color = (if (e.need("type") == "Shape") e.text("textColor") else null) ?: e.need("strokeColor")
+    val width = e.number("wrapWidth") ?: 320f
+    val x = at.x + if (label) 0f else when (anchor) { "middle" -> width / 2; "end" -> width; else -> 0f }
     val lines = e.need("text").split('\n').mapIndexed { index, line ->
-        """<tspan x="${at.x}" dy="${if (index == 0) 0f else size * LINE_HEIGHT}">${line.xml()}</tspan>"""
+        """<tspan x="$x" dy="${if (index == 0) 0f else size * LINE_HEIGHT}">${line.xml()}</tspan>"""
     }.joinToString("")
     val family = when (e.text("fontFamilyKey")) { "serif" -> "serif"; "mono" -> "monospace"; else -> "sans-serif" }
-    return """<text x="${at.x}" y="${at.y}" font-size="$size" font-family="$family" """ +
-        """text-anchor="${textAnchor(e)}" fill="${color.xml()}" opacity="${e.number("opacity") ?: 1f}">$lines</text>"""
+    return """<text x="$x" y="${at.y}" font-size="$size" font-family="$family" """ +
+        """text-anchor="$anchor" fill="${color.xml()}" opacity="${e.number("opacity") ?: 1f}">$lines</text>"""
 }
 
 private fun svgPath(e: JsonObject): SvgDrawing {
