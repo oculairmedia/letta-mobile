@@ -211,7 +211,6 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopIma
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopIrohGenerations.kt 95
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopRuntimeEventSource.kt 44
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopTranscriptExport.kt 47
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopTransportResources.kt 60
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopCanonicalChatSend.kt 69
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopCanonicalTimelineHost.kt 116
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopCanonicalTimelinePresentation.kt 23

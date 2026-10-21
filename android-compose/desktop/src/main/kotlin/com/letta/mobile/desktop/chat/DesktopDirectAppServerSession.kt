@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.transport.TransportTeardown
 import com.letta.mobile.data.controller.reconnect.AppServerClientGeneration
 import com.letta.mobile.data.controller.reconnect.GiveUpKind
 import com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient
@@ -80,9 +81,7 @@ internal class DesktopDirectAppServerSession private constructor(
     override fun resumeNow() = client.resumeNow()
 
     /** Stops reconnecting, closes the live generation, then whatever the dial shares across generations. */
-    fun resources(): DesktopTransportResources = DesktopTransportResources(
-        teardownSteps = listOf<suspend () -> Unit>({ supervisor.cancelAndJoin() }) + releaseSteps,
-    )
+    fun resources(): TransportTeardown = TransportTeardown(listOf<suspend () -> Unit>({ supervisor.cancelAndJoin() }) + releaseSteps)
 
     companion object {
         /** ws:// — one WebSocket per generation over a shared HTTP client. */

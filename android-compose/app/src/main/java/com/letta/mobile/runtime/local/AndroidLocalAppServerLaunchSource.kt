@@ -13,6 +13,7 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -111,4 +112,6 @@ fun androidLocalAppServerHost(
     readyz = discovery::readyz,
     scope = scope,
     logLine = launchSource.lifecycleLog::line,
+    // Asset extraction and the node start are blocking; the caller may be the main thread.
+    blockingContext = Dispatchers.IO,
 )

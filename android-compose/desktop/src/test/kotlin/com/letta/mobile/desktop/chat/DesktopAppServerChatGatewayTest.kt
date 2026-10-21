@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.transport.TransportTeardown
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.model.AssistantMessage
@@ -67,7 +68,7 @@ class DesktopAppServerChatGatewayTest {
     private fun gateway(
         turnEngine: FakeTurnEngine,
         client: FakeAppServerClient = FakeAppServerClient(),
-        transportResources: DesktopTransportResources? = null,
+        transportResources: TransportTeardown? = null,
         heartbeatIntervalMs: Long = 60_000L,
     ): DesktopAppServerChatGateway =
         DesktopAppServerChatGateway(
@@ -466,8 +467,8 @@ class DesktopAppServerChatGatewayTest {
     @Test
     fun close_closesTransportResources() = runTest {
         val calls = mutableListOf<String>()
-        val resources = DesktopTransportResources(
-            teardownSteps = listOf(
+        val resources = TransportTeardown(
+            steps = listOf(
                 { calls += "transport" },
                 { calls += "shutdown" },
                 { calls += "close" },

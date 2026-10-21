@@ -9,7 +9,6 @@ import com.letta.mobile.data.runtime.supervisor.StderrRing
 import com.letta.mobile.data.transport.TerminalConnectionFailure
 import kotlin.concurrent.Volatile
 import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.atomicfu.atomic
@@ -104,7 +103,7 @@ class LocalAppServerHost(
     private val readyTimeoutMs: Long = DEFAULT_READY_TIMEOUT_MS,
     private val clockMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     private val newToken: () -> String = ::newCapabilityToken,
-    private val blockingContext: CoroutineContext = EmptyCoroutineContext,
+    private val blockingContext: CoroutineContext,
 ) : AutoCloseable {
     private class RunningServer(val process: LocalAppServerProcess, val serverUrl: String, val bearerToken: String) {
         @Volatile

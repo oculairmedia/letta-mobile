@@ -64,6 +64,7 @@ fun ownedLocalAppServerHost(
     scope = scope,
     logLine = logLine,
     policy = RuntimeCrashPolicy(RuntimeCrashPolicyConfig(maxCrashesInWindow = 1)),
+    blockingContext = Dispatchers.IO,
 )
 
 private class JvmLocalAppServerProcess(
