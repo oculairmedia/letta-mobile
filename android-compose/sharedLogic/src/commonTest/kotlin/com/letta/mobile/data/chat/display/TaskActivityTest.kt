@@ -1,4 +1,4 @@
-package com.letta.mobile.data.chat.projection
+package com.letta.mobile.data.chat.display
 
 import com.letta.mobile.data.model.UiSubagentNotification
 import kotlin.test.Test

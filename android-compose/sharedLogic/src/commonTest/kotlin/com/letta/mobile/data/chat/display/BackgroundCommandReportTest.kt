@@ -1,5 +1,6 @@
-package com.letta.mobile.data.model
+package com.letta.mobile.data.chat.display
 
+import com.letta.mobile.data.model.UiSubagentNotification
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

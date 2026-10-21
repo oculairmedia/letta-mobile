@@ -1,7 +1,6 @@
-package com.letta.mobile.data.chat.projection
+package com.letta.mobile.data.chat.display
 
 import com.letta.mobile.data.model.UiSubagentNotification
-import com.letta.mobile.data.model.isCommand
 
 /** What produced a task notification; each client names it in its own copy. */
 enum class TaskActivity { Command, Subagent, Task }

@@ -1,4 +1,6 @@
-package com.letta.mobile.data.model
+package com.letta.mobile.data.chat.display
+
+import com.letta.mobile.data.model.UiSubagentNotification
 
 /**
  * A background shell's `<task-notification>` report, split into the parts letta-code wrote
