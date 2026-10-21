@@ -805,6 +805,10 @@ internal class ChatSendCoordinatorConcurrentConversationsTest : ChatSendCoordina
 
 @OptIn(ExperimentalCoroutinesApi::class)
 internal abstract class ChatSendCoordinatorConversationFixture {
+    protected val selectedConversations = mutableListOf<String>()
+    protected val observedConversations = mutableListOf<String>()
+    protected var composerClears = 0
+
     protected fun coordinator(
         timeline: RecordingTimelineWriter,
         ui: RecordingUiSink,
@@ -823,10 +827,10 @@ internal abstract class ChatSendCoordinatorConversationFixture {
         timelineRepository = timeline,
         conversationRepository = FakeConversationRepository(),
         ui = ui,
-        clearComposerAfterSend = {},
+        clearComposerAfterSend = { composerClears++ },
         activeConversationId = activeConversationId,
-        setActiveConversationId = {},
-        startTimelineObserver = {},
+        setActiveConversationId = { selectedConversations += it },
+        startTimelineObserver = { observedConversations += it },
         clientVersion = { "test" },
         otidGenerator = { "otid-${++otid}" },
         recordRuntimeEvents = recordRuntimeEvents,
@@ -837,6 +841,7 @@ internal abstract class ChatSendCoordinatorConversationFixture {
         private var isStreaming: Boolean = false,
         private var isAgentTyping: Boolean = false,
     ) : ChatSendUiSink {
+        val usages = mutableListOf<Triple<Int, Int, Int>>()
         var visualCompletions = 0
         val turnsFinished = mutableListOf<String?>()
         override fun currentError(): String? = error
@@ -848,7 +853,9 @@ internal abstract class ChatSendCoordinatorConversationFixture {
         override fun onError(message: String?) { error = message }
         override fun onTurnStarted(conversationId: String) { error = null; isStreaming = true; isAgentTyping = true }
         override fun onMessageDelta(conversationId: String) { error = null; isStreaming = true; isAgentTyping = true }
-        override fun onUsage(promptTokens: Int, completionTokens: Int, totalTokens: Int) = Unit
+        override fun onUsage(promptTokens: Int, completionTokens: Int, totalTokens: Int) {
+            usages += Triple(promptTokens, completionTokens, totalTokens)
+        }
         override fun onTurnFinished(
             error: String?,
         ) {
@@ -869,6 +876,12 @@ internal abstract class ChatSendCoordinatorConversationFixture {
     }
 
     protected class RecordingTimelineWriter : TimelineExternalTransportWriter {
+        var appendStarted: CompletableDeferred<Unit>? = null
+        var appendRelease: CompletableDeferred<Unit>? = null
+        var cursorRepairStarted: CompletableDeferred<Unit>? = null
+        var cursorRepairRelease: CompletableDeferred<Unit>? = null
+        var cursorRepairFailure: Throwable? = null
+        val cursorRepairs = mutableListOf<String>()
         val externalLocals = mutableListOf<ExternalLocal>()
         val ingestedMessages = mutableListOf<LettaMessage>()
         val sentLocals = mutableListOf<LocalMarker>()
@@ -880,6 +893,8 @@ internal abstract class ChatSendCoordinatorConversationFixture {
             otid: String,
             attachments: List<MessageContentPart.Image>,
         ): String {
+            appendStarted?.complete(Unit)
+            appendRelease?.await()
             externalLocals += ExternalLocal(conversationId, content, otid)
             return otid
         }
@@ -944,7 +959,12 @@ internal abstract class ChatSendCoordinatorConversationFixture {
             otid: String,
         ) = Unit
         override suspend fun repairExpiredConversationCursor(conversationId: String, fallbackSeq: Long?) = Unit
-        override suspend fun repairExpiredConversationCursorScoped(agentId: String?, conversationId: String, fallbackSeq: Long?) = Unit
+        override suspend fun repairExpiredConversationCursorScoped(agentId: String?, conversationId: String, fallbackSeq: Long?) {
+            cursorRepairs += conversationId
+            cursorRepairStarted?.complete(Unit)
+            cursorRepairRelease?.await()
+            cursorRepairFailure?.let { throw it }
+        }
         override suspend fun clearExternalTransportActive(conversationId: String) { clearedActiveConversations += conversationId }
         override suspend fun clearExternalTransportActive(
             agentId: String?,
