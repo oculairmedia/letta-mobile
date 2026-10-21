@@ -683,8 +683,11 @@ class ChatSendCoordinator(
             foreground.queued(bounced, clearComposer = false)
             return
         }
+        // Read before the terminal binds its identity: afterwards every state looks owned. A terminal
+        // naming its turn is that turn's; one naming only a run is ours only if we track something.
+        val owned = owner.isTracking || event.turnId.isNotBlank()
         owner.recordTerminalIdentity(event)
-        finishActiveTurn(owner, TurnSettlementRequest(event, reason = "turnDone"))
+        finishActiveTurn(owner, TurnSettlementRequest(event, reason = "turnDone", ownedTurn = owned))
         if (send == null) queueDriver.onForeignTerminalLocked()
     }
 

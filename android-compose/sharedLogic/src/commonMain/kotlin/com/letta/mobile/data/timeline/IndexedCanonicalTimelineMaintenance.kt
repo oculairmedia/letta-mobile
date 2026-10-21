@@ -28,6 +28,8 @@ class IndexedCanonicalTimelineMaintenance(
         mutex.withLock {
             jobs.remove(owner)?.cancel()
             val generation = owner.session.engine.advanceToolSweep(owner.selection)
+            // Successful terminal evidence supersedes the failure notices of earlier turns.
+            if (clean) owner.session.engine.retireTurnFailureNotices(owner.selection)
             coordinator.retainRepair(owner)
             jobs[owner] = scope.launch(start = kotlinx.coroutines.CoroutineStart.ATOMIC) {
                 try {

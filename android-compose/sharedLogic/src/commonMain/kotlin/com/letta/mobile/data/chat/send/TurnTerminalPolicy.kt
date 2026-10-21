@@ -33,7 +33,9 @@ internal object TurnTerminalPolicy {
         val status = request.event.status
         val completion = classify(evidence.deliveredAssistantContent, evidence.stopReason, evidence.bufferedErrorMessage)
         val notice = when (status) {
-            BridgeTurnStatus.Failed -> TurnFailureNotices.forFailedTerminal(
+            // letta-mobile-zrode: a terminal that names no turn this conversation owns (one re-emitted
+            // without its turn id, reaching an idle coordinator) is somebody else's failure.
+            BridgeTurnStatus.Failed -> if (!request.ownedTurn) null else TurnFailureNotices.forFailedTerminal(
                 reason = evidence.bufferedErrorMessage,
                 deliveredAssistantContent = evidence.deliveredAssistantContent,
                 mainReplyCompleted = completion.isAuthoritativelyComplete,
@@ -99,6 +101,8 @@ internal data class TurnSettlementRequest(
     val event: WsTimelineEvent.TurnDone,
     val reason: String,
     val recordEvent: Boolean = true,
+    /** Whether the conversation owned a send or turn before this terminal named one for it. */
+    val ownedTurn: Boolean = true,
 )
 
 /** Decisions only; applying them cannot run I/O or retire ownership. */

@@ -46981,6 +46981,7 @@ public final class com/letta/mobile/data/timeline/TimelineRecentMessagesReconcil
 
 public final class com/letta/mobile/data/timeline/TimelineReducerContractsKt {
 	public static final fun enrichTimelineFromSnapshot (Lcom/letta/mobile/data/timeline/Timeline;Ljava/util/List;)Lcom/letta/mobile/data/timeline/Timeline;
+	public static final fun isTurnFailureNoticeId (Ljava/lang/String;)Z
 	public static final fun reduceCleanup (Lcom/letta/mobile/data/timeline/TimelineReducerState;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;)Lcom/letta/mobile/data/timeline/TimelineReduction;
 	public static synthetic fun reduceCleanup$default (Lcom/letta/mobile/data/timeline/TimelineReducerState;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/timeline/TimelineReduction;
 	public static final fun reduceLocalAppend (Lcom/letta/mobile/data/timeline/TimelineReducerState;Lcom/letta/mobile/data/timeline/LocalAppendPayload;)Lcom/letta/mobile/data/timeline/TimelineReduction;
@@ -46991,6 +46992,7 @@ public final class com/letta/mobile/data/timeline/TimelineReducerContractsKt {
 	public static final fun reduceProductionMutation (Lcom/letta/mobile/data/timeline/TimelineReducerState;Lcom/letta/mobile/data/timeline/TimelineMutation;)Lcom/letta/mobile/data/timeline/TimelineReduction;
 	public static final fun reduceRetryLocal (Lcom/letta/mobile/data/timeline/TimelineReducerState;Ljava/lang/String;)Lcom/letta/mobile/data/timeline/TimelineReduction;
 	public static final fun reduceSnapshotEnrichment (Lcom/letta/mobile/data/timeline/TimelineReducerState;Ljava/util/List;)Lcom/letta/mobile/data/timeline/TimelineReduction;
+	public static final fun turnFailureNoticeId (Ljava/lang/String;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/timeline/TimelineReducerInput {

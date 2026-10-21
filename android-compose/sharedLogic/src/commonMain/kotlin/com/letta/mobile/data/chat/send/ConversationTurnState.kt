@@ -73,8 +73,9 @@ internal class ConversationTurnState(val conversationId: String) {
             onAccepted()
         }
 
-    fun retainSettledRun() {
-        val key = runId?.takeIf { it.isNotBlank() } ?: return
+    /** Fences [settledRun] (the state's own run by default) against a delayed run-keyed terminal. */
+    fun retainSettledRun(settledRun: String? = runId) {
+        val key = settledRun?.takeIf { it.isNotBlank() } ?: return
         settledRunIds += key
         while (settledRunIds.size > MAX_SETTLED_RUN_IDS) {
             settledRunIds.remove(settledRunIds.first())

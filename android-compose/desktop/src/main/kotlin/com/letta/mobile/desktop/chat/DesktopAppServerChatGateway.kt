@@ -41,6 +41,7 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.runtime.ApprovalBinding
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.pendingApprovalDetails
+import com.letta.mobile.data.runtime.TurnFailureNotice
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -65,6 +66,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import com.letta.mobile.data.chat.runtime.ConnectionStatusGateway
+import com.letta.mobile.data.timeline.turnFailureNoticeId
 import com.letta.mobile.data.transport.ChannelTransportState
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.first
@@ -334,14 +336,7 @@ class DesktopAppServerChatGateway internal constructor(
                             deliveredAssistantContent = deliveredAssistantContent,
                             mainReplyCompleted = mainReplyCompleted,
                         ) ?: return@collect
-                        emit(
-                            ErrorMessage(
-                                id = "turn-failed-${draft.runId?.value ?: turnId.value}",
-                                contentRaw = JsonPrimitive(notice.message),
-                                code = notice.kind,
-                                runId = draft.runId?.value ?: syntheticRunId.value,
-                            ),
-                        )
+                        emit(draft.failureNoticeRow(notice, turnId, syntheticRunId))
                         throw TimelineTransportHttpException(
                             502,
                             "App Server turn failed: ${lifecycle.reason ?: "unknown"}",
@@ -553,6 +548,21 @@ class DesktopAppServerChatGateway internal constructor(
     private suspend fun agentIdFor(conversationId: ConversationId): AgentId =
         agentIdByConversation[conversationId] ?: AgentId(agentIdResolver(conversationId.value))
             .also { agentIdByConversation[conversationId] = it }
+
+    /** The failed turn's notice row, keyed by its run (or this send's turn when the draft names none). */
+    private fun RuntimeEventDraft.failureNoticeRow(
+        notice: TurnFailureNotice,
+        turnId: DesktopTurnId,
+        fallbackRunId: DesktopRunId,
+    ): ErrorMessage {
+        val run = runId?.value
+        return ErrorMessage(
+            id = turnFailureNoticeId(run ?: turnId.value),
+            contentRaw = JsonPrimitive(notice.message),
+            code = notice.kind,
+            runId = run ?: fallbackRunId.value,
+        )
+    }
 
     private fun RuntimeEventDraft.toLettaMessages(
         agentId: AgentId,

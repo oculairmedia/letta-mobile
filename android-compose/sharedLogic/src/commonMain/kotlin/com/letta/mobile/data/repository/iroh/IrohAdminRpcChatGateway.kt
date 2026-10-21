@@ -35,6 +35,7 @@ import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.runtime.terminalReasonKind
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
+import com.letta.mobile.data.timeline.turnFailureNoticeId
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -645,7 +646,7 @@ class IrohAdminRpcChatGateway(
             }
             emit(
                 ErrorMessage(
-                    id = "turn-failed-${turnId?.value ?: conversationId.value}",
+                    id = turnFailureNoticeId(turnId?.value ?: conversationId.value),
                     contentRaw = JsonPrimitive(notice.message),
                     code = notice.kind,
                 ),
