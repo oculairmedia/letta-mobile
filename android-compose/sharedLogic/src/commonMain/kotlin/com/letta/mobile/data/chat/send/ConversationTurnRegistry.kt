@@ -267,6 +267,15 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
         return fallbackState()
     }
 
+    /** Replayed echoes cannot bind a live send; UI publication occurs after this index operation. */
+    fun bindDelta(event: WsTimelineEvent.MessageDelta): Binding? {
+        val otid = event.message.otid ?: return null
+        if (event.isReplay) return null
+        return bindInboundTurnByOtid(
+            QueuedSendId(otid), event.conversationId?.let(::ConversationId), TurnTail(event.turnId, event.message.runId),
+        )
+    }
+
     /** One resolved owner for a delta; replay fences determine whether it may change live presence. */
     data class DeltaResolution(
         val conversation: ConversationId,

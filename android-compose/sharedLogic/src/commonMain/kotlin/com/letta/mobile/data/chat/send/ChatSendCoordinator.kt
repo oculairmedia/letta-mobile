@@ -470,8 +470,8 @@ class ChatSendCoordinator(
     private suspend fun handleSubscribeDone(event: WsTimelineEvent.SubscribeDone) {
         // SubscribeDone carries a run id only; resolve the owning
         // conversation from it before finalizing anything.
-        val state = turnRegistry.resolveStateByRun(TurnTail(null, event.runId))
-        if (state != null && (state.otid != null || ui.isStreaming())) {
+        val state = turnRegistry.resolveStateByRun(TurnTail(null, event.runId)) ?: return
+        if (state.otid != null || ui.isStreaming()) {
             finishActiveTurn(state, TurnSettlementRequest(
                 WsTimelineEvent.TurnDone(state.turnId.orEmpty(), event.runId, BridgeTurnStatus.fromWire(event.status)),
                 reason = "subscribeDone", recordEvent = false,

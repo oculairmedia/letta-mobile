@@ -1,7 +1,6 @@
 package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.timeline.api.TimelineIngestSources
@@ -11,7 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /** Incoming turn projection under the coordinator's lifecycle mutex.
- * The registry resolves ownership once; this owner records delivery evidence and timeline writes.
+ * The registry resolves ownership once; turn state records evidence and this owner writes the timeline.
  * Buffered legacy deltas and the existing stale-local launch retain the caller's lifecycle/scope.
  * No independent collector, mutex, index or scope is created here.
  */
@@ -26,19 +25,9 @@ internal class IncomingTurnProjection(
     private val preConversationMessageDeltas = ArrayDeque<WsTimelineEvent.MessageDelta>()
 
     suspend fun messageDelta(event: WsTimelineEvent.MessageDelta): ConversationId? {
-        val otid = event.message.otid
-        val boundState = if (otid != null && !event.isReplay) {
-            val binding = turnRegistry.bindInboundTurnByOtid(
-                QueuedSendId(otid),
-                event.conversationId?.let(::ConversationId),
-                TurnTail(event.turnId, event.message.runId),
-            )
-            binding.rekeyedConversationId?.let(foreground::started)
-            binding.state
-        } else {
-            null
-        }
-        val resolution = turnRegistry.resolveDelta(event, boundState, foreground.visibleConversation)
+        val binding = turnRegistry.bindDelta(event)
+        binding?.rekeyedConversationId?.let(foreground::started)
+        val resolution = turnRegistry.resolveDelta(event, binding?.state, foreground.visibleConversation)
         Telemetry.event(
             "IrohGate", "gate3.coordinatorMessageDelta",
             "resolvedConversationId" to resolution?.conversation?.value,
@@ -53,7 +42,8 @@ internal class IncomingTurnProjection(
         val conversationId = resolution.conversation.value
         runtimeEventBatcher.enqueue(event, conversationId)
         val retiredTail = resolution.retired
-        rememberActiveAssistantMessageRunId(resolution.state, event)
+        val resolvedFrame = turnRegistry.resolveConversationId(event.conversationId?.let(::ConversationId))
+        resolution.state?.recordAssistantEvidence(event, resolvedFrame)
         timelineRepository.ingestExternalTransportMessage(
             agentId, conversationId, event.message,
             source = TimelineIngestSources.coordinator(retiredTail),
@@ -76,31 +66,7 @@ internal class IncomingTurnProjection(
     suspend fun started(event: WsTimelineEvent.TurnStarted, scope: CoroutineScope): ConversationTurnState? {
         val state = turnRegistry.resolveStateForTurnStarted(event)
         val effectiveConversationId = state.localConversationId ?: state.conversationId
-        val identityTransition = state.identity.turnStarted(
-            conversationId = effectiveConversationId,
-            turnId = event.turnId,
-            runId = event.runId,
-        )
-        // Iroh run-id promotion re-emits TurnStarted for the SAME turn
-        // once the real server run id replaces the synthetic
-        // `iroh-run-*` placeholder. That is a run-id update, not a new
-        // turn: resetting per-turn state here (stop/usage/error guards,
-        // assistant run-id set) mid-turn corrupted post-tool
-        // settlement and contributed to the flicker. Update the run id
-        // and keep the turn state intact.
-        // Conversation equality is now implicit: `state` IS this conversation's entry.
-        val exactActiveTurn = event.turnId == state.turnId
-        if (identityTransition is TurnIdentityTransition.SameTurn && exactActiveTurn) {
-            Telemetry.event(
-                "AdminChatVM", "ws.turnStarted.runPromoted",
-                "conversationId" to effectiveConversationId,
-                "turnId" to event.turnId,
-                "previousRunId" to (state.runId ?: ""),
-                "runId" to event.runId,
-            )
-            state.runId = event.runId
-            return null
-        }
+        if (state.advanceStartedIdentity(event)) return null
         // dir4k (z5vfy PR-3): optimistic-local / OTID settlement. A new
         // turn is starting while a PREVIOUS turn's optimistic-local user
         // bubble may still be unsettled (this conversation's otid set, no terminal
@@ -126,10 +92,7 @@ internal class IncomingTurnProjection(
             )
         }
         turnRegistry.lastActiveConversationId = effectiveConversationId
-        state.turnId = event.turnId
-        state.runId = event.runId
-        state.reachedTerminal = false
-        state.resetDeliveryEvidence()
+        state.recordStarted(event)
         // letta-mobile-dangling-tool: a fresh turn on this conversation
         // supersedes whatever the previous turn's post-turn dangling-
         // tool-call sweep left pending.
@@ -140,66 +103,14 @@ internal class IncomingTurnProjection(
         return state
     }
 
-    /** Only non-replay, nonblank assistant content from this conversation's live run is delivery.
-     * A missing/synthetic run retains the existing active-turn fallback; historical runs never
-     * widen the set that terminal cleanup may touch.
-     */
-    private fun countsAsActiveTurnDelivery(
-        state: ConversationTurnState,
-        message: AssistantMessage,
-        event: WsTimelineEvent.MessageDelta,
-    ): Boolean {
-        if (event.isReplay) return false
-        if (state.turnId == null) return false
-        if (message.content.isBlank()) return false
-        if (!frameConversationMatchesActive(state, event.conversationId?.let(::ConversationId))) return false
-        return state.runMatchesActiveTurn(message)
-    }
-
-    private fun frameConversationMatchesActive(
-        state: ConversationTurnState,
-        frameConversationId: ConversationId?,
-    ): Boolean {
-        val tagged = frameConversationId?.value ?: return true
-        val targetConv = state.localConversationId ?: state.conversationId
-        return tagged == targetConv ||
-            tagged == state.serverConversationId ||
-            turnRegistry.resolveConversationId(ConversationId(tagged))?.value == targetConv
-    }
-
-    private fun rememberActiveAssistantMessageRunId(
-        state: ConversationTurnState?,
-        event: WsTimelineEvent.MessageDelta,
-    ) {
-        if (state == null) return
-        val message = event.message
-        if (message !is AssistantMessage) return
-        if (countsAsActiveTurnDelivery(state, message, event)) {
-            state.deliveredAssistantContent = true
-        }
-        val messageRunId = message.runId?.takeIf { it.isNotBlank() }
-        if (messageRunId == null) return
-        // A replayed frame describes a run that already finished. This set
-        // feeds activeCleanupCandidateRunIds, so latching a historical run id
-        // onto the CURRENT turn hands abandoned-fragment cleanup a licence to
-        // sweep rows belonging to older completed runs the next time this turn
-        // reaches turn_done or the connection drops. Replay may still mark
-        // delivery above (that check carries its own replay guard); it must
-        // never widen the set of runs this turn is allowed to clean up.
-        if (event.isReplay) return
-        state.activeAssistantMessageRunIds += messageRunId
-        while (state.activeAssistantMessageRunIds.size > MAX_ACTIVE_ASSISTANT_RUN_IDS) {
-            state.activeAssistantMessageRunIds.remove(state.activeAssistantMessageRunIds.first())
-        }
-    }
-
     suspend fun drainBuffered(conversation: ConversationId) {
         val conversationId = conversation.value
         val state = turnRegistry.peekState(conversation)
         while (true) {
             val delta = preConversationMessageDeltas.removeFirstOrNull() ?: return
             runtimeEventBatcher.enqueue(delta, conversationId)
-            rememberActiveAssistantMessageRunId(state, delta)
+            val resolvedFrame = turnRegistry.resolveConversationId(delta.conversationId?.let(::ConversationId))
+            state?.recordAssistantEvidence(delta, resolvedFrame)
             timelineRepository.ingestExternalTransportMessage(
                 agentId, conversationId, delta.message, source = "coordinator.preConversationDrain",
             )
@@ -275,6 +186,5 @@ internal class IncomingTurnProjection(
 
     private companion object {
         const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"
-        const val MAX_ACTIVE_ASSISTANT_RUN_IDS = 8
     }
 }
