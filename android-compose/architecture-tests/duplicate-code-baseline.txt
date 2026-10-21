@@ -1,0 +1,6 @@
+# Cross-module duplicate Kotlin (letta-mobile-ewtaq): PMD CPD clones whose copies sit in two Gradle
+# modules, as `<fileA>|<fileB> <duplicated lines>`. Shrink-only: DuplicateCodeRatchetTest fails on a
+# new or grown pair and on a pair that shrank (lower or delete its line); scripts/ci/baseline-ratchet-guard.py
+# rejects any added or raised line. Seeded from main on 2026-10-21.
+android-compose/appserver-cli/src/main/kotlin/com/letta/mobile/appservercli/AppServerSmokeCommand.kt|android-compose/cli/src/main/java/com/letta/mobile/cli/commands/AppServerSmokeCommand.kt 34
+android-compose/core/data/src/commonMain/kotlin/com/letta/mobile/data/local/CanvasOpEntity.kt|android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasBatchSteps.kt 15

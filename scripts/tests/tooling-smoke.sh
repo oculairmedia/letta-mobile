@@ -137,8 +137,10 @@ stack_touch_pattern='^(\.github/workflows/architecture-graph\.yml|\.serena/.*|an
 stack_allowlist_pattern='^(\.github/workflows/.*|\.gitignore|\.serena/.*|android-compose/architecture-tests/.*|android-compose/build-logic/.*|android-compose/build\.gradle\.kts|android-compose/settings\.gradle\.kts|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|scripts/tests/ci-policy-scripts-test\.sh|scripts/tests/tooling-smoke\.sh|tools/architecture_query/.*|tools/structure_report/.*|docs/development/api-documentation\.md)$'
 # Module-boundary *IsolationTest.kt files pin each module's allowed edges; adding
 # a module needs its isolation test in the same PR, so they never count as a
-# stack touch.
-stack_candidates=$(printf '%s\n' "$changed_files" | rg -v '^android-compose/architecture-tests/src/.*IsolationTest\.kt$' || true)
+# stack touch. Nor do the duplicate-code ratchet and its fixture (letta-mobile-ewtaq):
+# a parity guardrail that ships with the gates it feeds, not code-intelligence tooling.
+stack_candidates=$(printf '%s\n' "$changed_files" \
+  | rg -v '^android-compose/architecture-tests/src/.*(IsolationTest|DuplicateCode(Ratchet|Fixture)Test|DuplicateCodeScan)\.kt$' || true)
 if ! printf '%s\n' "$stack_candidates" | rg -q "$stack_touch_pattern"; then
   pass 'Code-intelligence stack changes stay within declared boundaries'
 elif printf '%s\n' "$changed_files" | rg -v "$stack_allowlist_pattern" | rg -q .; then

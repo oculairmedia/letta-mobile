@@ -5,6 +5,36 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCAN="${ROOT}/android-compose"
+
+# --require-shared-search: the one REQUIRED rule here (letta-mobile-ewtaq, AGENTS.md "No unshared
+# frontend or logic"). The PR body (env PR_BODY, else the GitHub event at GITHUB_EVENT_PATH) must
+# carry a "Shared implementation searched: <paths>" line naming at least one searched path (a token
+# with a '/'). Exit 1 without it. The only exemption is a PR opened by dependabot[bot] (env
+# PR_AUTHOR), whose body is generated; no label or other body line relaxes it.
+if [[ "${1:-}" == "--require-shared-search" ]]; then
+  body="${PR_BODY:-}"
+  if [[ -z "$body" && -n "${GITHUB_EVENT_PATH:-}" && -f "${GITHUB_EVENT_PATH}" ]] && command -v jq >/dev/null 2>&1; then
+    body="$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH")"
+  fi
+  if [[ "${PR_AUTHOR:-}" == "dependabot[bot]" ]]; then
+    echo "agents-policy-check: dependabot PR, generated body - shared-search line not required"
+    exit 0
+  fi
+  searched="$(printf '%s\n' "$body" | tr -d '\r' | sed -n 's/^[[:space:]]*Shared implementation searched:[[:space:]]*\(.*[^[:space:]]\)[[:space:]]*$/\1/p' | head -n 1)"
+  if [[ -n "$searched" && "$searched" != *"<paths>"* && "$searched" == */* ]]; then
+    echo "agents-policy-check: Shared implementation searched: $searched"
+    exit 0
+  fi
+  echo "::error title=Shared implementation searched::PR description is missing a 'Shared implementation searched: <paths>' line"
+  cat <<'MSG'
+agents-policy-check: FAILED - the PR description has no "Shared implementation searched:" line.
+  Owner rule (AGENTS.md, "No unshared frontend or logic"): before adding code, search sharedLogic/
+  and sharedUI/ for an existing implementation and reuse it. Add one line to the PR description:
+    Shared implementation searched: sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/<area>/, sharedLogic/src/commonMain/kotlin/com/letta/mobile/<area>/
+  naming the shared paths you searched (at least one path with a '/'), then re-run this job.
+MSG
+  exit 1
+fi
 DIFF_BASE=""
 if [[ "${1:-}" == "--diff-base" ]]; then
   [[ -n "${2:-}" ]] || { echo "agents-policy-check: --diff-base requires a ref" >&2; exit 2; }

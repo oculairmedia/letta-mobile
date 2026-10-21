@@ -149,14 +149,14 @@ opening a PR.**
 
 `main` is protected; PRs must pass all of:
 
-- `test` — module unit tests, policy scripts, and on PRs additive module tests for each changed module tree (`:sharedUI:jvmTest`, `:desktop:test`, `:designsystem`, `:feature-chat`, `:cli`, `:plugin-*`, …; the mapping is [`scripts/ci/changed-gradle-modules.sh`](scripts/ci/changed-gradle-modules.sh))
+- `test` — module unit tests, policy scripts, the parity guardrails, `web-wasm`, and additive module tests (`:sharedUI:jvmTest`, `:desktop:test`, `:designsystem`, `:feature-chat`, `:cli`, `:plugin-*`, …): all of them on every main push, and on PRs those of each changed module and every module depending on it ([`scripts/ci/changed-gradle-modules.sh`](scripts/ci/changed-gradle-modules.sh))
 - `build-apk-pass` — Android APK build (stable aggregator of the `build-apk` matrix)
 - `detekt` — `./gradlew detekt -Parchitecture.strict=true` against each module's `detekt-baseline.xml`; any finding outside a baseline fails, including in files the PR did not touch
-- `shared-multiplatform` — bounded `:sharedLogic:jvmTest` (12 min), wrapper/CLI verification, and host-native and wasmJs *compiles* (main + test) for `:sharedLogic` and `:sharedUI`; no browser tests (`:web:wasmJsBrowserTest` runs in the non-required `web-wasm` job). Exact tasks: [`.github/workflows/android.yml`](.github/workflows/android.yml)
+- `shared-multiplatform` — bounded `:sharedLogic:jvmTest` (12 min), wrapper/CLI verification, and host-native and wasmJs *compiles* (main + test) for `:sharedLogic` and `:sharedUI`; no browser tests (`:web:wasmJsBrowserTest` runs in `web-wasm`, which the required `test` aggregates). Exact tasks: [`.github/workflows/android.yml`](.github/workflows/android.yml)
 
 Coverage uploads run on `main` via `codecov.yml`, not as a required PR check.
 `perf-gate` (emulator startup macrobenchmark) is **not** a PR gate: it runs nightly, on pushes to `main`, and on PRs that edit the perf gate itself; other PRs run only the cheap `perf-scripts` self-test ([`docs/performance/perf-gate.md`](docs/performance/perf-gate.md)).
-**Not required, but honest** (red means a new problem): `Platform UI gate` (new platform `@Composable` files), `main module tests` (main pushes: `:sharedUI:jvmTest :desktop:test`).
+The platform UI and parity guardrails run inside the required `test` check (no unshared frontend or logic; see `AGENTS.md`).
 **Advisory only** (findings never fail): CodeScene Code Health Review, `Advisory AGENTS.md policy`, `row goldens (advisory)`. Full table: "CI map" in [`AGENTS.md`](AGENTS.md).
 
 ## Releases

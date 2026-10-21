@@ -6,25 +6,19 @@
 # roots below. Every such file must be listed in the allowlist, and listed
 # legacy files may not grow. sharedUI/ and sharedLogic/ are never scanned.
 #
-# Stdout: SEVERITY|RULE|PATH|message, then a summary line.
-#   PUI001 error  new platform UI file not in the allowlist. Never overridden: a new
-#                 platform UI file is exactly what the ratchet exists to stop.
-#   PUI002 warn   allowlisted file grew beyond maxLines (+5 slack for legacy-pending).
-#                 A warning for now; it becomes an error once the legacy files settle.
-#   PUI003 warn   allowlisted file is gone or no longer has @Composable (ratchet down)
-#   PUI004 error  PR adds or raises an allowlist line (needs Platform-UI-Reason:)
-# A "Platform-UI-Reason: <why>" line in the PR body (env PR_BODY, or the GitHub
-# event at GITHUB_EVENT_PATH) or env PLATFORM_UI_REASON locally downgrades PUI004
-# only: it is the reviewed justification for growing the allowlist. The only way
-# past PUI001 is an allowlist line (PUI004) carrying that reason.
+# Stdout: SEVERITY|RULE|PATH|message, then a summary line. Every rule is an error and there is
+# no override (letta-mobile-ewtaq): no PR-body line, label or environment variable relaxes it.
+#   PUI001  platform UI file not in the allowlist: build it in sharedUI instead.
+#   PUI002  allowlisted file grew beyond maxLines (+5 slack for legacy-pending).
+#   PUI003  allowlisted file is gone or no longer has @Composable: delete its line.
+# The allowlist itself only shrinks: scripts/ci/baseline-ratchet-guard.py rejects a PR that adds
+# or raises a line (scripts/ci/ratchet-baselines.txt).
 #
-# Usage: platform-ui-gate.sh [--diff-base REF] [--enforce] [--update]
-#                            [--root DIR] [--allowlist FILE]
-#   --diff-base REF  PR mode: PUI001/PUI002 only for files changed vs REF...HEAD,
-#                    PUI004 compares the allowlist with REF.
-#   --enforce        exit 1 when any error remains (S20). Without it: exit 0.
+# Usage: platform-ui-gate.sh [--enforce] [--update] [--root DIR] [--allowlist FILE]
+#   --enforce        exit 1 when any error remains. Without it: exit 0.
 #   --update         rewrite the allowlist from the current tree (keeps kinds,
-#                    records current line counts, drops stale lines).
+#                    records current line counts, drops stale lines). The ratchet
+#                    guard rejects any line this adds or raises.
 # Allowlist line: "<repo-relative path> <maxLines> <kind>", '#' comments.
 # kind: container | platform-service | dev-harness | legacy-pending(<bead>)
 set -euo pipefail
@@ -32,14 +26,12 @@ export LC_ALL=C
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ALLOWLIST=""
-DIFF_BASE=""
 ENFORCE=0
 UPDATE=0
 LEGACY_SLACK=5
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --diff-base) [[ -n "${2:-}" ]] || { echo "platform-ui-gate: --diff-base requires a ref" >&2; exit 2; }; DIFF_BASE="$2"; shift 2 ;;
     --enforce) ENFORCE=1; shift ;;
     --update) UPDATE=1; shift ;;
     --root) ROOT="$(cd "$2" && pwd)"; shift 2 ;;
@@ -104,8 +96,8 @@ if ((UPDATE)); then
     echo "#   bash scripts/ci/platform-ui-gate.sh --update"
     echo "# One line per platform UI file: <path> <maxLines> <kind>."
     echo "# kind: container | platform-service | dev-harness | legacy-pending(<bead>)"
-    echo "# Each hard-cut slice deletes its lines; adding or raising a line needs a"
-    echo "# 'Platform-UI-Reason:' line in the PR body."
+    echo "# Each hard-cut slice deletes its lines. Shrink-only: scripts/ci/baseline-ratchet-guard.py"
+    echo "# rejects a PR that adds or raises a line, and there is no override."
     for path in "${!CURRENT[@]}"; do
       kind="$(default_kind "$path")"
       [[ -n "${LISTED[$path]+x}" ]] && kind="${LISTED[$path]#* }"
@@ -118,47 +110,18 @@ if ((UPDATE)); then
   exit 0
 fi
 
-# --- override reason ---------------------------------------------------------
-REASON="${PLATFORM_UI_REASON:-}"
-BODY="${PR_BODY:-}"
-if [[ -z "$BODY" && -n "${GITHUB_EVENT_PATH:-}" && -f "${GITHUB_EVENT_PATH}" ]] && command -v jq >/dev/null 2>&1; then
-  BODY="$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" 2>/dev/null || true)"
-fi
-if [[ -z "$REASON" && -n "$BODY" ]]; then
-  REASON="$(printf '%s\n' "$BODY" | tr -d '\r' | sed -n 's/^[[:space:]]*Platform-UI-Reason:[[:space:]]*\(.*[^[:space:]]\)[[:space:]]*$/\1/p' | head -n 1)"
-fi
-
-# --- diff scope --------------------------------------------------------------
-declare -A CHANGED=()
-if [[ -n "$DIFF_BASE" ]]; then
-  if ! changed="$(git -C "$ROOT" diff --name-only --diff-filter=ACMR "${DIFF_BASE}...HEAD" -- 'android-compose/')"; then
-    echo "platform-ui-gate: failed to diff '$DIFF_BASE...HEAD'" >&2
-    exit 2
-  fi
-  while IFS= read -r f; do [[ -n "$f" ]] && CHANGED["$f"]=1; done <<<"$changed"
-fi
-in_scope() { [[ -z "$DIFF_BASE" || -n "${CHANGED[$1]+x}" ]]; }
-
 OUT="$(mktemp)"
 trap 'rm -f "$OUT"' EXIT
 errors=0
-emit_warning() { # rule path message
-  echo "WARN|$1|$2|$3" >>"$OUT"
-}
-emit_error() { # rule path message; only PUI004 honours Platform-UI-Reason
-  if [[ -n "$REASON" && "$1" == PUI004 ]]; then
-    echo "WARN|$1|$2|$3 (overridden by Platform-UI-Reason: $REASON)" >>"$OUT"
-  else
-    echo "ERROR|$1|$2|$3" >>"$OUT"
-    errors=$((errors + 1))
-  fi
+emit_error() { # rule path message
+  echo "ERROR|$1|$2|$3" >>"$OUT"
+  errors=$((errors + 1))
 }
 
 for path in "${!CURRENT[@]}"; do
-  in_scope "$path" || continue
   lines="${CURRENT[$path]}"
   if [[ -z "${LISTED[$path]+x}" ]]; then
-    emit_error PUI001 "$path" "new platform UI file (@Composable) not in $ALLOWLIST_REL - build it in sharedUI and compose the shared primitives"
+    emit_error PUI001 "$path" "platform UI file (@Composable) not in $ALLOWLIST_REL - move it to sharedUI/commonMain and bind it from the platform; the allowlist only shrinks"
     continue
   fi
   max="${LISTED[$path]%% *}"
@@ -166,35 +129,17 @@ for path in "${!CURRENT[@]}"; do
   limit="$max"
   [[ "$kind" == legacy-pending* ]] && limit=$((max + LEGACY_SLACK))
   if ((lines > limit)); then
-    emit_warning PUI002 "$path" "$kind file grew to $lines lines (allowlisted $max, limit $limit) - move the new UI to sharedUI"
+    emit_error PUI002 "$path" "$kind file grew to $lines lines (allowlisted $max, limit $limit) - move the new UI to sharedUI/commonMain; caps only shrink"
   fi
 done
 
 for path in "${!LISTED[@]}"; do
   if [[ ! -f "$ROOT/$path" ]]; then
-    echo "WARN|PUI003|$path|allowlisted file no longer exists - delete its allowlist line" >>"$OUT"
+    emit_error PUI003 "$path" "allowlisted file no longer exists - delete its line from $ALLOWLIST_REL"
   elif [[ -z "${CURRENT[$path]+x}" ]]; then
-    echo "WARN|PUI003|$path|allowlisted file no longer has @Composable - delete its allowlist line" >>"$OUT"
+    emit_error PUI003 "$path" "allowlisted file no longer has @Composable - delete its line from $ALLOWLIST_REL"
   fi
 done
-
-if [[ -n "$DIFF_BASE" ]]; then
-  declare -A BASE_LISTED=()
-  if base_text="$(git -C "$ROOT" show "${DIFF_BASE}:${ALLOWLIST_REL}" 2>/dev/null)"; then
-    while read -r path max _; do BASE_LISTED["$path"]="$max"; done < <(parse_allowlist <<<"$base_text")
-    for path in "${!LISTED[@]}"; do
-      max="${LISTED[$path]%% *}"
-      if [[ -z "${BASE_LISTED[$path]+x}" ]]; then
-        emit_error PUI004 "$path" "allowlist line added"
-      else
-        base_max="${BASE_LISTED[$path]}"
-        if ((max > base_max)); then
-          emit_error PUI004 "$path" "allowlist maxLines raised $base_max -> $max"
-        fi
-      fi
-    done
-  fi
-fi
 
 sort -u "$OUT"
 legacy=0
@@ -204,7 +149,6 @@ for path in "${!CURRENT[@]}"; do
   case "${LISTED[$path]#* }" in legacy-pending*) legacy=$((legacy + 1)) ;; *) containers=$((containers + 1)) ;; esac
 done
 echo "platform UI files: ${#CURRENT[@]} (legacy-pending $legacy, containers $containers)"
-[[ -n "$REASON" ]] && echo "Platform-UI-Reason: $REASON"
 echo "platform-ui-gate: $errors error(s)" >&2
 if ((ENFORCE && errors > 0)); then
   exit 1

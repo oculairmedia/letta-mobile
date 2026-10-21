@@ -69,23 +69,39 @@ required_test_job="$(
        active { print }' "$android_workflow"
 )"
 assert_contains "$required_test_job" 'name: test'
-assert_contains "$required_test_job" 'needs: [test, api-docs, api-contract-windows]'
+# letta-mobile-l8lcn: web tests are part of the required set too.
+assert_contains "$required_test_job" 'needs: [test, api-docs, api-contract-windows, web-wasm]'
 assert_contains "$required_test_job" 'if: always()'
 assert_contains "$required_test_job" 'TEST_RESULT: ${{ needs.test.result }}'
 assert_contains "$required_test_job" 'DOCS_RESULT: ${{ needs.api-docs.result }}'
 assert_contains "$required_test_job" 'WINDOWS_API_RESULT: ${{ needs.api-contract-windows.result }}'
+assert_contains "$required_test_job" 'WEB_RESULT: ${{ needs.web-wasm.result }}'
 required_test_script="$(sed -n '/run: |/,$p' <<<"$required_test_job" | tail -n +2)"
 for test_result in success failure cancelled skipped; do
   for docs_result in success failure cancelled skipped; do
     for windows_api_result in success failure cancelled skipped; do
-    if TEST_RESULT="$test_result" DOCS_RESULT="$docs_result" WINDOWS_API_RESULT="$windows_api_result" bash -e -c "$required_test_script"; then
-      [[ "$test_result/$docs_result/$windows_api_result" == success/success/success ]] || fail "required test accepted $test_result/$docs_result/$windows_api_result"
-    else
-      [[ "$test_result/$docs_result/$windows_api_result" != success/success/success ]] || fail "required test rejected successful jobs"
-    fi
+      for web_result in success failure skipped; do
+        combo="$test_result/$docs_result/$windows_api_result/$web_result"
+        if TEST_RESULT="$test_result" DOCS_RESULT="$docs_result" WINDOWS_API_RESULT="$windows_api_result"           WEB_RESULT="$web_result" bash -e -c "$required_test_script"; then
+          [[ "$combo" == success/success/success/success ]] || fail "required test accepted $combo"
+        else
+          [[ "$combo" != success/success/success/success ]] || fail "required test rejected successful jobs"
+        fi
+      done
     done
   done
 done
+# letta-mobile-ewtaq: the parity guardrails run in the REQUIRED test job, never advisory.
+assert_contains "$test_job" 'python3 scripts/ci/parity_gates.py'
+assert_contains "$test_job" 'bash scripts/ci/platform-ui-gate.sh --enforce'
+assert_contains "$test_job" 'python3 scripts/ci/baseline-ratchet-guard.py --diff-base "$BASE_SHA"'
+assert_contains "$test_job" 'bash scripts/ci/agents-policy-check.sh --require-shared-search'
+assert_contains "$test_job" 'test_parity_gates.py'
+assert_contains "$test_job" 'scripts/tests/platform-ui-gate-test.sh'
+assert_not_contains "$test_job" 'continue-on-error'
+# letta-mobile-l8lcn: every push to main runs the full additive test set.
+assert_contains "$test_job" 'changed-gradle-modules.sh --all'
+
 assert_contains "$test_job" ':app:compileSideloadDebugKotlin'
 assert_not_contains "$test_job" ':app:compileRootDebugKotlin'
 assert_not_contains "$test_job" ':app:compilePlayDebugKotlin'
@@ -212,27 +228,13 @@ assert_contains "$detekt_job" 'needs: [test, shared-multiplatform, build-apk-pas
 # gate measures once (no automatic rerun) and the Qodana workflow stays gone.
 assert_contains "$detekt_job" '-Parchitecture.strict=true'
 assert_not_contains "$detekt_job" 'continue-on-error'
-main_module_job="$(
-  awk '
-    /^  main-module-tests:$/ { in_job = 1; next }
-    in_job && /^  [[:alnum:]_-]+:$/ { exit }
-    in_job { print }
-  ' "$android_workflow"
-)"
-assert_contains "$main_module_job" "if: github.event_name != 'pull_request'"
-assert_contains "$main_module_job" './gradlew :sharedUI:jvmTest :desktop:test'
+# letta-mobile-l8lcn: the push-only main-module-tests job is gone; the test job runs the
+# full set on push instead, so no module's tests depend on its own files changing.
+assert_not_contains "$(cat "$android_workflow")" 'main-module-tests:'
 assert_not_contains "$perf_workflow" 'attempt 2'
 assert_not_contains "$perf_workflow" '--retryable-single-startup-exit-code'
 [[ ! -e "$SOURCE_ROOT/.github/workflows/qodana_code_quality.yml" ]] || fail "Qodana workflow is back; see letta-mobile-by4vm.32"
-platform_ui_job="$(
-  awk '
-    /^  platform-ui-gate:$/ { in_job = 1; next }
-    in_job && /^  [[:alnum:]_-]+:$/ { exit }
-    in_job { print }
-  ' "$SOURCE_ROOT/.github/workflows/agents-policy.yml"
-)"
-assert_contains "$platform_ui_job" '--enforce'
-assert_not_contains "$platform_ui_job" 'continue-on-error'
+assert_not_contains "$(cat "$SOURCE_ROOT/.github/workflows/agents-policy.yml")" 'platform-ui-gate:'
 
 build_apk_pass_job="$(
   awk '
@@ -350,6 +352,28 @@ touch "$repo/android-compose/core/data/src/Entity.kt"
 git -C "$repo" add . && git -C "$repo" commit -qm "touch shared Room data"
 actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" HEAD~1)"
 assert_eq "$actual" ":core:android-data:testDebugUnitTest :core:data:jvmTest"
+
+# letta-mobile-l8lcn: dependency-aware. A sharedLogic change runs the tests of every module that
+# depends on it, transitively (sharedUI via its project() edge, desktop and feature-chat via sharedUI).
+mkdir -p "$repo/android-compose/sharedUI" "$repo/android-compose/desktop" "$repo/android-compose/feature-chat" \
+  "$repo/android-compose/sharedLogic/src"
+echo 'dependencies { api(project(":sharedLogic")) }' >"$repo/android-compose/sharedUI/build.gradle.kts"
+echo 'dependencies { implementation(project(":sharedUI")) }' >"$repo/android-compose/desktop/build.gradle.kts"
+echo 'dependencies { implementation(project(":sharedUI")) }' >"$repo/android-compose/feature-chat/build.gradle.kts"
+echo 'plugins { }' >"$repo/android-compose/sharedLogic/build.gradle.kts"
+git -C "$repo" add . && git -C "$repo" commit -qm "module graph"
+touch "$repo/android-compose/sharedLogic/src/Turn.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm "touch sharedLogic"
+actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" HEAD~1)"
+assert_eq "$actual" ":feature-chat:testDebugUnitTest :sharedUI:jvmTest :desktop:test"
+# A version-catalog change can affect any module: everything runs.
+mkdir -p "$repo/android-compose/gradle"
+touch "$repo/android-compose/gradle/libs.versions.toml"
+git -C "$repo" add . && git -C "$repo" commit -qm "touch catalog"
+actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" HEAD~1)"
+assert_eq "$actual" "$(bash "$repo/scripts/ci/changed-gradle-modules.sh" --all)"
+assert_contains "$actual" ":feature-chat:testDebugUnitTest"
+assert_contains "$actual" ":plugin-api-testkit:jvmTest"
 
 repo="$TMP/policy"
 new_repo "$repo"

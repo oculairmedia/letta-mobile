@@ -25,7 +25,6 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -67,7 +66,7 @@ import kotlinx.coroutines.flow.drop
 @Composable
 fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspaceHost, modifier: Modifier = Modifier) {
     ReleaseCachesUnderPressure()
-    val drawer = host.drawer ?: remember { ShellWorkspaceDrawer() }
+    val drawer = host.drawer
     ProvideShortcutHub {
         Surface(
             modifier = modifier.fillMaxSize().testTag(LettaShellWorkspaceTags.WORKSPACE),

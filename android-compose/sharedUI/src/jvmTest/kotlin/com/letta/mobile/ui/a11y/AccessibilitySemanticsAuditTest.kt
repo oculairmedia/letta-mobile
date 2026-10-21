@@ -56,6 +56,8 @@ import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceSlots
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceState
 import com.letta.mobile.ui.shell.workspace.ShellSidebarControl
 import com.letta.mobile.ui.shell.workspace.ShellWindowChrome
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceDrawer
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceEvents
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigation
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigationActions
@@ -216,7 +218,14 @@ private fun AccessibilityAuditFixture() {
     val workspaceHost = LettaShellWorkspaceHost(
         actions = ShellWorkspaceNavigationActions(),
         chrome = ShellWindowChrome.Inline,
-        slots = LettaShellWorkspaceSlots(main = { modifier -> AccessibilityAuditMainColumn(modifier) }),
+        slots = LettaShellWorkspaceSlots(
+            main = { modifier -> AccessibilityAuditMainColumn(modifier) },
+            agentCard = {},
+            sidePane = {},
+            overlays = {},
+        ),
+        drawer = ShellWorkspaceDrawer(),
+        events = ShellWorkspaceEvents(),
     )
     LettaShellWorkspace(
         state = workspaceState,

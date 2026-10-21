@@ -42,12 +42,18 @@ private fun workspaceState(title: String = "Window title", forceCompact: Boolean
 
 private fun workspaceHost(
     chrome: ShellWindowChrome = ShellWindowChrome.Inline,
-    drawer: ShellWorkspaceDrawer? = null,
+    drawer: ShellWorkspaceDrawer = ShellWorkspaceDrawer(),
 ) = LettaShellWorkspaceHost(
     actions = ShellWorkspaceNavigationActions(),
-    slots = LettaShellWorkspaceSlots(main = { modifier -> Text("The page", modifier.testTag(PageTag)) }),
+    slots = LettaShellWorkspaceSlots(
+        main = { modifier -> Text("The page", modifier.testTag(PageTag)) },
+        agentCard = {},
+        sidePane = {},
+        overlays = {},
+    ),
     chrome = chrome,
     drawer = drawer,
+    events = ShellWorkspaceEvents(),
 )
 
 /** letta-mobile-ckmub.17.4: the one workspace desktop and web mount, wide and compact. */

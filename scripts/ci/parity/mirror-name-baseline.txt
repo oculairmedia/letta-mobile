@@ -1,0 +1,23 @@
+# Mirrored platform types (letta-mobile-ewtaq). Shrink-only: a Desktop*/Web*/Android*/Wasm* type may
+# not mirror a shared type it does not implement, nor another platform's type unless both implement
+# one shared contract. Delete a line when the type is gone or implements the shared contract;
+# scripts/ci/baseline-ratchet-guard.py rejects any added line. Seeded from main on 2026-10-21.
+AndroidCanonicalTimelineRuntime mirrors platform DesktopCanonicalTimelineRuntime
+AndroidMemoryPressure mirrors shared MemoryPressure
+AndroidSettingsActions mirrors platform DesktopSettingsActions
+AndroidSettingsInputs mirrors platform DesktopSettingsInputs
+DesktopAgentId mirrors shared AgentId
+DesktopApprovalSubmission mirrors shared ApprovalSubmission
+DesktopCanonicalTimelineRuntime mirrors platform AndroidCanonicalTimelineRuntime
+DesktopChatActions mirrors shared ChatActions
+DesktopChatConnectionState mirrors shared ChatConnectionState
+DesktopChatGateway mirrors shared ChatGateway
+DesktopConversationSummary mirrors shared ConversationSummary
+DesktopIrohBlockApi mirrors shared IrohBlockApi
+DesktopIrohSlashCommandApi mirrors shared IrohSlashCommandApi
+DesktopQuickQueryActions mirrors shared QuickQueryActions
+DesktopRunId mirrors shared RunId
+DesktopRuntimeEventSource mirrors shared RuntimeEventSource
+DesktopSettingsActions mirrors platform AndroidSettingsActions
+DesktopSettingsInputs mirrors platform AndroidSettingsInputs
+WebBackend mirrors shared Backend

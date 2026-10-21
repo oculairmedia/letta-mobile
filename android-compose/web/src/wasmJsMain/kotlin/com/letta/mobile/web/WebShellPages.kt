@@ -47,6 +47,7 @@ import com.letta.mobile.ui.shell.workspace.ShellChatDestination
 import com.letta.mobile.ui.shell.workspace.ShellChatPage
 import com.letta.mobile.ui.shell.workspace.ShellChatWaiting
 import com.letta.mobile.ui.shell.workspace.ShellChatWaitingPage
+import com.letta.mobile.ui.shell.workspace.ShellWindowChrome
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceEvents
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceLayout
@@ -101,10 +102,13 @@ internal fun webWorkspace(shell: WebShell, page: WebPageInputs, header: ShellWor
                         BackendConnectionStatusRow(page.connection)
                     }
                 },
+                // The browser has no background-task roster yet (parity-exemptions.txt).
+                sidePane = {},
                 overlays = {
                     ShellWorkspaceOverlays(workspace.overlays, webOverlayData(shell), webOverlayActions(shell))
                 },
             ),
+            chrome = ShellWindowChrome.Inline,
             drawer = shell.drawer,
             events = ShellWorkspaceEvents(
                 onWidthChanged = { shell.layout.dispatch(ShellLayoutEvent.WindowWidthChanged(it)) },
