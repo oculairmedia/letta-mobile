@@ -8,6 +8,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -19,12 +21,22 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
+/** The name the tests give the host's blocking context, to see where preparation ran. */
+private const val BLOCKING = "blocking-io"
+
 /**
  * letta-mobile-by4vm.110.4: the shared loopback App Server host with a fake launcher — the launch
  * contract, leases, readiness, and the crash supervision it took over from the desktop
  * (letta-mobile-bzvro.3 F03, .4 F04).
  */
 class LocalAppServerHostTest {
+    @Test
+    fun launchPreparationRunsInTheBlockingContextNotTheCallers() = hosted { f ->
+        f.host.acquire()
+
+        assertEquals(listOf<String?>(BLOCKING), f.preparedIn)
+    }
+
     @Test
     fun launchRunsLoopbackServerWithCapabilityTokenAndLeaseCarriesIt() = hosted { f ->
         val lease = f.host.acquire()
@@ -497,6 +509,7 @@ class LocalAppServerHostTest {
         var refuseStarts: String? = null
         var failNextPreparation: String? = null
         var preparations = 0
+        val preparedIn = mutableListOf<String?>()
         var readyAfterPolls = 1
         var readyzPolls = 0
         private var tokens = 0
@@ -514,6 +527,7 @@ class LocalAppServerHostTest {
             },
             launch = {
                 preparations += 1
+                preparedIn += currentCoroutineContext()[CoroutineName]?.name
                 failNextPreparation?.let { failNextPreparation = null; error(it) }
                 LocalAppServerLaunch(
                     command = listOf("node", "letta.js"),
@@ -528,6 +542,7 @@ class LocalAppServerHostTest {
             readyTimeoutMs = 2_000,
             clockMs = { scope.testScheduler.currentTime },
             newToken = { "token-${++tokens}" },
+            blockingContext = CoroutineName(BLOCKING),
         )
 
         private fun nextProcess(): FakeProcess {

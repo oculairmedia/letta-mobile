@@ -472,6 +472,7 @@ class DesktopAppServerChatGatewayTest {
                 { calls += "shutdown" },
                 { calls += "close" },
             ),
+            teardown = { it.run() },
         )
         val gw = gateway(FakeTurnEngine { flowOf() }, transportResources = resources)
 

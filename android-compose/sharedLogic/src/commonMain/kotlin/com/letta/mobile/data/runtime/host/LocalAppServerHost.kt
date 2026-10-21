@@ -8,6 +8,8 @@ import com.letta.mobile.data.runtime.supervisor.RuntimeHealth
 import com.letta.mobile.data.runtime.supervisor.StderrRing
 import com.letta.mobile.data.transport.TerminalConnectionFailure
 import kotlin.concurrent.Volatile
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.atomicfu.atomic
@@ -30,6 +32,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** One owner's claim on the local App Server: where to dial it and the bearer token it requires. */
@@ -84,6 +87,9 @@ class LocalAppServerStoppedException :
  * Lifecycle lines (`[lifecycle] …`: launch, preparation time, listen line, readyz, exits, refusals)
  * go to [logLine] with the server's output, so a platform can keep them past its log buffer.
  *
+ * Blocking work: the platform's launch preparation and the process spawn run in [blockingContext]
+ * (a platform's IO dispatcher), never on the caller's thread, which may be a UI thread.
+ *
  * Locking: [lifecycle] serialises starting and stopping the server; [lock] guards the crash
  * bookkeeping and is never held while waiting on [lifecycle].
  */
@@ -98,6 +104,7 @@ class LocalAppServerHost(
     private val readyTimeoutMs: Long = DEFAULT_READY_TIMEOUT_MS,
     private val clockMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     private val newToken: () -> String = ::newCapabilityToken,
+    private val blockingContext: CoroutineContext = EmptyCoroutineContext,
 ) : AutoCloseable {
     private class RunningServer(val process: LocalAppServerProcess, val serverUrl: String, val bearerToken: String) {
         @Volatile
@@ -328,16 +335,16 @@ class LocalAppServerHost(
     private suspend fun prepareLaunch(): PreparedLocalAppServerLaunch {
         val began = clockMs()
         lifecycleLine("launch requested (singleLaunch=$singleLaunch)")
-        val spec = runCatching { launch() }
+        val spec = runCatching { withContext(blockingContext) { launch() } }
             .onFailure { e -> lifecycleLine("launch preparation failed after ${since(began)} ms, nothing started: ${e.message}") }
             .getOrThrow()
         lifecycleLine("launch prepared in ${since(began)} ms (runtime assets, bridges)")
         return preparedLocalAppServerLaunch(spec, newToken())
     }
 
-    private fun startProcess(prepared: PreparedLocalAppServerLaunch): LocalAppServerProcess {
+    private suspend fun startProcess(prepared: PreparedLocalAppServerLaunch): LocalAppServerProcess {
         lifecycleLine("node starting: ${prepared.launch.command.joinToString(" ")}")
-        return runCatching { launcher.start(prepared.launch, prepared.tokenFile, prepared.token) }
+        return runCatching { withContext(blockingContext) { launcher.start(prepared.launch, prepared.tokenFile, prepared.token) } }
             .onFailure { e -> lifecycleLine("node start refused: ${e.message}") }
             .getOrThrow()
     }
