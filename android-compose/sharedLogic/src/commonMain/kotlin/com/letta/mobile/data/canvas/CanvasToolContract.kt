@@ -226,8 +226,9 @@ object CanvasToolContract {
     val composeTools: List<CanvasToolDefinition> = listOf(compose, composeGuide)
 
     /**
-     * The tools offered to agents. [exportSvg] is not among them until it renders the real canvas: a
-     * tool that always fails only costs an agent turns (see ExternalToolRegistry.factoryDefault).
+     * The tools offered to agents. [exportSvg] remains unadvertised: its portable drawing renderer
+     * does not yet render Cascade notes, plugin elements, curved connectors or resolve image assets.
+     * Direct calls reject unsupported content rather than silently exporting an incomplete board.
      */
     // Only advertise preview when a mobile renderer bridge is actually connected.
     val all: List<CanvasToolDefinition> = listOf(create, getScene, getLayout, replaceScene, applyOps, list) + composeTools

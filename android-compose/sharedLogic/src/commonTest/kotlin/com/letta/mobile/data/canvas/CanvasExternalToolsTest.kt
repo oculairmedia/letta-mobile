@@ -313,11 +313,15 @@ class CanvasExternalToolsTest {
         )
         store.upsert(doc1)
 
-        // Not offered, and plain about it when called anyway: no plausible empty SVG (qsq7v).
+        // Corrupt scenes must never turn into plausible empty SVGs.
         val exportSvgTool = CanvasExportSvgTool(store, sessions)
         val svgResult = exportSvgTool.invoke(buildJsonObject { put("canvas_id", "canvas-svg-1") }, agentId = "agent-1")
         assertIs<ExternalToolResult.Error>(svgResult)
-        assertTrue(svgResult.error.contains("not implemented"))
+        assertTrue(svgResult.error.contains("Failed to export SVG"))
+        store.upsert(doc1.copy(sceneJson = """{"bgColor":"#ffffffff","elements":[]}"""))
+        val exported = exportSvgTool.invoke(buildJsonObject { put("canvas_id", "canvas-svg-1") }, agentId = "agent-1")
+        assertIs<ExternalToolResult.Success>(exported)
+        assertTrue(exported.content.startsWith("<svg"))
 
         val listTool = CanvasListTool(store, sessions)
         val listResult = listTool.invoke(buildJsonObject { put("conversation_id", "conv-list-1") }, agentId = "agent-1")
