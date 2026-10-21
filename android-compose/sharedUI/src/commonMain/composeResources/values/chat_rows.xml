@@ -180,6 +180,9 @@
     <string name="rows_show_transcript">Show transcript</string>
     <string name="rows_hide_transcript">Hide transcript</string>
     <string name="rows_transcript">Transcript: %1$s</string>
+    <!-- letta-mobile-2a7yv: a background command report, sectioned like a tool card. -->
+    <string name="rows_copy_transcript_path">Copy transcript path</string>
+    <string name="rows_task_id">Task %1$s</string>
 
     <!-- letta-mobile-bglj6.13: the canvas.compose card on the message that narrates it. -->
     <string name="rows_canvas_untitled">Board update</string>

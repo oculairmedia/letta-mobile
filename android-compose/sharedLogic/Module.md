@@ -73,7 +73,7 @@ Conversation fork, edit-and-resend and rerun orchestration. The branch controlle
 
 # Package com.letta.mobile.data.chat.display
 
-Client-side chat display preferences, font-scale policy and Markdown transcript export. Presentation changes do not rewrite the server conversation. Keep server transcript mutation outside display preferences and exports; bind font persistence through [ChatFontScaleStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.display/-chat-font-scale-store/index.html) and supply transcript inputs through [TranscriptInput](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.display/-transcript-input/index.html).
+Client-side chat display preferences, font-scale policy, Markdown transcript export, and how a background task notification is classified and its command report split into sections. Presentation changes do not rewrite the server conversation. Keep server transcript mutation outside display preferences and exports; bind font persistence through [ChatFontScaleStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.display/-chat-font-scale-store/index.html) and supply transcript inputs through [TranscriptInput](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.display/-transcript-input/index.html).
 
 # Package com.letta.mobile.data.chat.projection
 

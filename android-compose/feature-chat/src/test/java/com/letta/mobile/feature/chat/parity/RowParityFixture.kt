@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.parity
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UiSubagentNotification
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -133,6 +134,23 @@ internal object RowParityFixture {
         isError = true,
     )
 
+    /** letta-mobile-2a7yv: a background Bash shell that failed: its report waits behind the disclosure. */
+    val commandNotification = UiMessage(
+        id = "n1",
+        role = "assistant",
+        content = "<task-notification>",
+        timestamp = "2026-10-11T16:05:10Z",
+        subagentNotification = UiSubagentNotification(
+            status = "failed",
+            summary = "Background command \"Inspect journal rows\" failed",
+            result = "\$ python3 scripts/journal.py\n\nExit code: 1\n\n[stderr]\nKeyError: 'id'",
+            usage = "duration_ms: 11926",
+            transcriptUri = "/tmp/letta/bash_54.log",
+            taskId = "bash_54",
+            durationMs = 11_926,
+        ),
+    )
+
     /** A prompt sent mid-run and not yet acknowledged: the queued local row. */
     val queued = UiMessage(
         id = "q1",
@@ -219,6 +237,7 @@ internal data class ParityRow(
             ParityRow("approval", "Approval card", listOf(f.approval)),
             ParityRow("error", "Error frame", listOf(f.error)),
             ParityRow("queued", "Queued (pending) user prompt", listOf(f.queued)),
+            ParityRow("command-notification", "Background command report (ChatRowSubagent)", listOf(f.commandNotification)),
             ParityRow("thinking", "Thinking row (no mascot)", listOf(f.thinkingPrompt), ParityLayout.THINKING),
             ParityRow("thinking-mascot", "Thinking row with mascot seat", listOf(f.thinkingPrompt), ParityLayout.THINKING_MASCOT),
             ParityRow("timeline", "Whole fixture timeline", f.timeline),
