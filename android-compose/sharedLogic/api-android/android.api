@@ -5105,7 +5105,6 @@ public final class com/letta/mobile/data/canvas/CanvasToolContract {
 	public static final field COMPOSE_GUIDE Ljava/lang/String;
 	public static final field CREATE Ljava/lang/String;
 	public static final field EXPORT_SVG Ljava/lang/String;
-	public static final field EXPORT_SVG_NOT_IMPLEMENTED Ljava/lang/String;
 	public static final field GET_LAYOUT Ljava/lang/String;
 	public static final field GET_SCENE Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/data/canvas/CanvasToolContract;

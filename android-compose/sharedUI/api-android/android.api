@@ -541,7 +541,7 @@ public final class com/letta/mobile/ui/canvas/CanvasTableBlock {
 }
 
 public final class com/letta/mobile/ui/canvas/CanvasWorkspaceKt {
-	public static final fun CanvasWorkspace-S1kTVRY (Landroidx/compose/ui/Modifier;Lio/ak1/drawbox/presentation/viewmodel/DrawBoxController;Lcom/letta/mobile/data/canvas/CanvasSession;Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;Ljava/lang/String;Lcom/letta/mobile/data/canvas/CanvasPresenceTransport;Lcom/letta/mobile/data/storage/AssetStore;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;ZLkotlin/jvm/functions/Function2;Lcom/letta/mobile/ui/canvas/CanvasLayout;ZFLcom/letta/mobile/ui/canvas/CanvasCameraRequest;Landroidx/compose/runtime/Composer;III)V
+	public static final fun CanvasWorkspace-ZqFPiAU (Landroidx/compose/ui/Modifier;Lio/ak1/drawbox/presentation/viewmodel/DrawBoxController;Lcom/letta/mobile/data/canvas/CanvasSession;Lcom/letta/mobile/data/canvas/CanvasSessionRegistry;Ljava/lang/String;Lcom/letta/mobile/data/canvas/CanvasPresenceTransport;Lcom/letta/mobile/data/storage/AssetStore;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;ZLkotlin/jvm/functions/Function2;Lcom/letta/mobile/ui/canvas/CanvasLayout;ZFLcom/letta/mobile/ui/canvas/CanvasCameraRequest;Landroidx/compose/runtime/Composer;III)V
 }
 
 public final class com/letta/mobile/ui/canvas/ComposableSingletons$CanvasHistoryDialogKt {

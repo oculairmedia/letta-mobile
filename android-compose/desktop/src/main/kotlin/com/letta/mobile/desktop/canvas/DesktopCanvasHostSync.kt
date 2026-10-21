@@ -30,18 +30,20 @@ import kotlinx.coroutines.SupervisorJob
  */
 internal object DesktopNotebookCanvasStore {
     private val directory: Path = defaultDesktopStateDirectory().resolve("notebooks").resolve("documents")
-    val notebooks: NotebookLocalStore by lazy {
+    /** This installation's stable peer identity: the notebook replica's, and the board cursor's. */
+    val peerId: String by lazy {
         Files.createDirectories(directory)
         val peerFile = directory.parent.resolve("peer-id")
-        val peerId = try {
+        val id = try {
             Files.writeString(peerFile, UUID.randomUUID().toString(), StandardOpenOption.CREATE_NEW)
             Files.readString(peerFile).trim()
         } catch (_: java.nio.file.FileAlreadyExistsException) {
             Files.readString(peerFile).trim()
         }
-        require(peerId.isNotBlank()) { "Empty desktop notebook peer ID" }
-        NotebookLocalStore(directory, peerId)
+        require(id.isNotBlank()) { "Empty desktop notebook peer ID" }
+        id
     }
+    val notebooks: NotebookLocalStore by lazy { NotebookLocalStore(directory, peerId) }
     val documents: NotebookCanvasDocumentStore by lazy { NotebookCanvasDocumentStore(notebooks) }
 }
 
@@ -75,4 +77,10 @@ object DesktopCanvasHostSync {
 
     val syncTransport: CanvasSyncTransport get() = relay
     val presenceTransport: CanvasPresenceTransport get() = relay
+
+    /** The board cursor's peer ID, shared with this installation's notebook replica. */
+    val localPeerId: String get() = DesktopNotebookCanvasStore.peerId
+
+    /** The name peers see beside this user's cursor: the signed-in operating-system account. */
+    val localPeerName: String? get() = System.getProperty("user.name")?.takeIf { it.isNotBlank() }
 }

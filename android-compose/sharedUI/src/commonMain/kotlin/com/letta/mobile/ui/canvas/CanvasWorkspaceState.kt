@@ -50,10 +50,10 @@ internal class CanvasWorkspaceHost(
     val initialJson: String?,
     val presenceTransport: CanvasPresenceTransport?,
     val assets: AssetStore?,
-    val currentPeerId: String?,
+    /** How this device appears on the board to its peers; null when the host names no peer. */
+    val localPeer: CanvasPresence?,
     val callbacks: CanvasWorkspaceCallbacks,
     val chrome: CanvasWorkspaceChromeOptions,
-    val cameraRequest: CanvasCameraRequest?,
 )
 
 /** What the board hands back to its host. */
@@ -71,6 +71,8 @@ internal class CanvasWorkspaceChromeOptions(
     val layout: CanvasLayout,
     val longPressDrawsSelectionBox: Boolean,
     val chromeTopInset: Dp,
+    /** Where something outside the board asks the camera to go; null when nothing outside steers it. */
+    val cameraRequest: CanvasCameraRequest?,
 )
 
 /**

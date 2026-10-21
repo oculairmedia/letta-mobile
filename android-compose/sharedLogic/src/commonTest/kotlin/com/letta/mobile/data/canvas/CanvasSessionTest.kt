@@ -3,6 +3,7 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.model.CanvasActorId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,6 +13,54 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CanvasSessionTest {
+
+    @Test
+    fun restoreUsesExactlyOneLamport() = runTest {
+        val log = InMemoryCanvasOpLog()
+        val session = CanvasSession.create(
+            store = InMemoryCanvasDocumentStore(),
+            options = CanvasCreateOptions(title = "Clock", initialSceneJson = """{"elements":[]}""", opLog = log),
+        )
+        val checkpoint = session.checkpoints.value.single()
+        val edits = session.applyLocalScene("""{"elements":[{"id":"a","type":"rect"}]}""")
+        val before = edits.maxOf { it.lamport }
+        session.restoreCheckpoint(checkpoint.checkpointId)
+        val restored = log.getOps(session.canvasId, before).single()
+        assertEquals(before + 1, restored.lamport)
+        assertTrue(restored.opId.startsWith("restore-${restored.lamport}-"))
+    }
+
+    @Test
+    fun concurrentLocalScenesHaveDistinctLamports() = runTest {
+        val blocked = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val backing = InMemoryCanvasOpLog()
+        val log = object : CanvasOpLog by backing {
+            override suspend fun append(canvasId: CanvasId, op: CanvasOp) {
+                if (!blocked.isCompleted) {
+                    blocked.complete(Unit)
+                    release.await()
+                }
+                backing.append(canvasId, op)
+            }
+        }
+        val session = CanvasSession.create(
+            store = InMemoryCanvasDocumentStore(),
+            options = CanvasCreateOptions(title = "Concurrent", initialSceneJson = """{"elements":[]}""", opLog = log),
+        )
+        val first = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            session.applyLocalScene("""{"elements":[{"id":"first","type":"rect"}]}""")
+        }
+        blocked.await()
+        val second = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            session.applyLocalScene("""{"elements":[{"id":"second","type":"rect"}]}""")
+        }
+        release.complete(Unit)
+        val edits = first.await() + second.await()
+        assertEquals(edits.size, edits.map { it.lamport }.toSet().size)
+        // Fail on reverting the outer lock: the second diff must see and remove the first scene.
+        assertEquals("first", edits.filterIsInstance<CanvasOp.RemoveElementOp>().single().elementId)
+    }
 
     @Test
     fun revisionIncrementsOnSave() = runTest {

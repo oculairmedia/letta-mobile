@@ -100,6 +100,8 @@ private fun CanvasSidePane(session: CanvasSession, actions: DesktopMainContentAc
             session = session,
             presenceTransport = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.presenceTransport,
             assets = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.assets,
+            currentPeerId = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.localPeerId,
+            currentPeerName = com.letta.mobile.desktop.canvas.DesktopCanvasHostSync.localPeerName,
             onNavigateBack = actions.onCloseCanvas,
             onShareToChat = actions.onShareCanvasToChat,
             // No right button on a finger: holding one on open board is how it picks several.

@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.canvas.CanvasPresence
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
@@ -46,6 +47,8 @@ fun CanvasWorkspace(
      */
     assets: com.letta.mobile.data.storage.AssetStore? = null,
     currentPeerId: String? = null,
+    /** This user's name beside their cursor on peers' boards; [currentPeerId] stands in when it is absent. */
+    currentPeerName: String? = null,
     onNavigateBack: (() -> Unit)? = null,
     onExportJson: ((String) -> Unit)? = null,
     onExportSvg: ((String) -> Unit)? = null,
@@ -82,10 +85,14 @@ fun CanvasWorkspace(
         initialJson = initialJson,
         presenceTransport = presenceTransport,
         assets = assets,
-        currentPeerId = currentPeerId,
+        // Without a name, peers see the stable peer ID itself.
+        localPeer = currentPeerId?.let { peer ->
+            CanvasPresence(peer, currentPeerName ?: peer, canvasPeerColor(peer.hashCode()), cursorX = 0f, cursorY = 0f)
+        },
         callbacks = CanvasWorkspaceCallbacks(onNavigateBack, onExportJson, onExportSvg, onShareToChat),
-        chrome = CanvasWorkspaceChromeOptions(showTitle, headerTrailing, layout, longPressDrawsSelectionBox, chromeTopInset),
-        cameraRequest = cameraRequest,
+        chrome = CanvasWorkspaceChromeOptions(
+            showTitle, headerTrailing, layout, longPressDrawsSelectionBox, chromeTopInset, cameraRequest,
+        ),
     )
     CanvasWorkspaceBoard(host, modifier)
 }
