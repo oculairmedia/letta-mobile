@@ -15,6 +15,7 @@ import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.PLUGIN_ID
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.place
 import com.letta.mobile.data.plugin.host.ProcessDriverFixture.Companion.SECRET
 import com.letta.mobile.data.plugin.host.ProcessDriverFixture.Companion.call
+import com.letta.mobile.data.plugin.host.process.ProcessDriverOptions
 import com.letta.mobile.data.plugin.view.FakeViewHost
 import com.letta.mobile.data.plugin.view.FakeViewPort
 import com.letta.mobile.data.plugin.view.FakeViewTransport
@@ -36,16 +37,6 @@ import com.letta.mobile.plugin.api.ActionResult
 import com.letta.mobile.plugin.api.ElementQuery
 import com.letta.mobile.plugin.api.PluginEmit
 import com.letta.mobile.util.Telemetry
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
@@ -58,6 +49,16 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * The plugin trust minimum (epic letta-mobile-cdgpr, letta-mobile-cdgpr.10): one test per guarantee,

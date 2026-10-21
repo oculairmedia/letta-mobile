@@ -3,15 +3,17 @@ package com.letta.mobile.cli.commands
 import com.letta.mobile.data.canvas.HostCanvasBackend
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.plugin.host.LateBoundPluginKinds
+import com.letta.mobile.data.plugin.host.PluginDriverProviders
 import com.letta.mobile.data.plugin.host.PluginHostConfig
 import com.letta.mobile.data.plugin.host.PluginHostEvent
 import com.letta.mobile.data.plugin.host.PluginHostEvents
 import com.letta.mobile.data.plugin.host.PluginHostRuntime
-import com.letta.mobile.data.plugin.host.ProcessDriverOptions
+import com.letta.mobile.data.plugin.host.process.ProcessDriverOptions
+import com.letta.mobile.data.plugin.host.process.ProcessPluginDriverProvider
 import com.letta.mobile.data.storage.AssetStore
 import com.letta.mobile.plugin.api.HostInfo
-import kotlinx.coroutines.CoroutineScope
 import java.nio.file.Path
+import kotlinx.coroutines.CoroutineScope
 
 /** The serve-iroh plugin flags (letta-mobile-cdgpr.6): `--plugins=on|off` and `--plugins-dir`. */
 internal data class PluginHostFlags(val mode: String = ON, val dir: String? = null) {
@@ -49,7 +51,8 @@ internal suspend fun startPluginHost(
     }
     val root = flags.root()
     val hostInfo = HostInfo("letta-iroh-wrapper", PluginHostRuntime::class.java.`package`?.implementationVersion ?: "dev")
-    val runtime = PluginHostRuntime(PluginHostConfig(root, canvas.backend, canvas.assets, ProcessDriverOptions(hostInfo)), scope)
+    val providers = PluginDriverProviders(listOf(ProcessPluginDriverProvider(ProcessDriverOptions(hostInfo))))
+    val runtime = PluginHostRuntime(PluginHostConfig(root, canvas.backend, canvas.assets, providers), scope)
     canvas.kinds.target = runtime.kinds
     registry.addSource(runtime.toolSource)
     runtime.start()

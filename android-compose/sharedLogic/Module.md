@@ -285,6 +285,12 @@ Plugin catalog ports and management-page state. Controllers expose inspection an
 
 JVM host-side plugin lifecycle, process drivers, placement, quotas and telemetry. Launch/environment policy and capability checks apply at the host boundary rather than executing plugins inside product UI. Keep product rendering outside JVM plugin lifecycle management; bind execution through [PluginDriver](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin.host/-plugin-driver/index.html), confinement through [ProcessConfinementSource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin.host/-process-confinement-source/index.html) and canvas access through [PluginCanvasAccess](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin.host/-plugin-canvas-access/index.html).
 
+Runtime-provider metadata validation, immutable capture and runtime/contract selection live in commonMain, exercised by commonTest without importing an executor. The JVM `PluginDriverProviders` adapter supplies an explicit inventory to this shared selector; missing or ambiguous matches fault the plugin before construction. `PluginLaunchSpec` carries JVM package/settings/consent inputs without choosing an executor. Distribution assembly supplies providers; the host has no default executor.
+
+# Package com.letta.mobile.data.plugin.host.process
+
+JVM subprocess execution of LCP plugins, selected explicitly through `ProcessPluginDriverProvider`. `ProcessDriverOptions` owns launch confinement, caps, deadlines, health checks and restart policy; `ProcessPluginDriver` preserves guarded host calls and secret-scrubbed output. Keep executor selection outside this package and product features outside process lifecycle. This binding does not provide browser, service or JAR execution.
+
 # Package com.letta.mobile.data.plugin.remote
 
 JVM/Android admin-RPC adapters for plugin catalogs and live views. Operations follow advertised host support and report unavailability instead of opening an alternate connection silently. Keep independent fallback connections outside remote adapters; bind the existing admin connection through [PluginAdminLink](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin.remote/-plugin-admin-link/index.html) and uploads through [PluginPackageUploader](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.plugin.remote/-plugin-package-uploader/index.html).
