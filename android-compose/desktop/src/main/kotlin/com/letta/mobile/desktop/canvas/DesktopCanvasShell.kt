@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasDocumentStore
+import com.letta.mobile.data.canvas.library.CanvasLibraryController
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.desktop.OpenDesktopCanvasParams
@@ -23,7 +24,7 @@ import kotlinx.coroutines.CoroutineScope
  */
 internal class DesktopCanvasShell(
     val store: CanvasDocumentStore,
-    val library: DesktopCanvasLibrary,
+    val library: CanvasLibraryController,
     private val scope: CoroutineScope,
     sessionState: MutableState<CanvasSession?>,
 ) {

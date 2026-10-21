@@ -8,13 +8,11 @@ import com.letta.mobile.data.canvas.library.CanvasLibraryController
 import kotlinx.coroutines.CoroutineScope
 
 /** Desktop supplies storage and sync bindings; library state and failure policy are shared. */
-internal typealias DesktopCanvasLibrary = CanvasLibraryController
-
 @Composable
 internal fun rememberDesktopCanvasLibrary(
     store: CanvasDocumentStore,
     scope: CoroutineScope,
-): DesktopCanvasLibrary = remember(store, scope) {
+): CanvasLibraryController = remember(store, scope) {
     CanvasLibraryController(
         store,
         scope,
