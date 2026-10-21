@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.canvas
 
+import com.letta.mobile.ui.canvas.presence.CanvasPresencePeerId
 import com.letta.mobile.ui.canvas.presence.LocalPresenceTarget
 import com.letta.mobile.ui.canvas.presence.canvasLocalPresence
 import com.letta.mobile.data.canvas.CanvasPresence
@@ -100,9 +101,9 @@ private fun CanvasBoard.localPresenceTarget(): LocalPresenceTarget? {
     val transport = host.presenceTransport ?: return null
     val canvasId = session?.canvasId ?: return null
     val peerId = host.currentPeerId ?: return null
-    return LocalPresenceTarget(peerId) { update ->
+    return LocalPresenceTarget(CanvasPresencePeerId(peerId)) { update ->
         transport.updatePresence(canvasId, CanvasPresence(
-            peerId = update.identity.peerId,
+            peerId = update.identity.peerId.value,
             displayName = update.identity.displayName,
             colorHex = update.identity.colorHex,
             cursorX = update.cursor.position.x,

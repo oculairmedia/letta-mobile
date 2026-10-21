@@ -38,9 +38,9 @@ class CanvasLocalPresenceTest {
         override fun observePresence(canvasId: CanvasId): Flow<List<CanvasPresence>> = flowOf(emptyList())
     }
 
-    private fun target(transport: CanvasPresenceTransport) = LocalPresenceTarget("local-peer") { update ->
+    private fun target(transport: CanvasPresenceTransport) = LocalPresenceTarget(CanvasPresencePeerId("local-peer")) { update ->
         transport.updatePresence(CanvasId("board"), CanvasPresence(
-            update.identity.peerId, update.identity.displayName, update.identity.colorHex,
+            update.identity.peerId.value, update.identity.displayName, update.identity.colorHex,
             update.cursor.position.x, update.cursor.position.y, update.lastActiveEpochMs, update.cursor.active,
         ))
     }
@@ -61,7 +61,7 @@ class CanvasLocalPresenceTest {
             }
         }
         departCanvasPresence(target(transport), LocalPeerPresence(
-            PresenceIdentity.forPeer("peer"), LocalCursorPosition(Offset.Zero, active = true),
+            PresenceIdentity.forPeer(CanvasPresencePeerId("peer")), LocalCursorPosition(Offset.Zero, active = true),
         ))
         assertEquals(500L, testScheduler.currentTime)
     }
@@ -74,7 +74,7 @@ class CanvasLocalPresenceTest {
             }
         }
         departCanvasPresence(target(transport), LocalPeerPresence(
-            PresenceIdentity.forPeer("peer"), LocalCursorPosition(Offset.Zero, active = true),
+            PresenceIdentity.forPeer(CanvasPresencePeerId("peer")), LocalCursorPosition(Offset.Zero, active = true),
         ))
     }
 
