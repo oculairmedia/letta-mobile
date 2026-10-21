@@ -92,10 +92,22 @@ class Baseline:
         return {self.key(line): (_cap(line) if self.counted else 0, line.partition("|")[2].strip()) for line in self.lines()}
 
     def prune(self, stale: set[str]) -> None:
-        text = self.path.read_text(encoding="utf-8").splitlines()
+        target = _baseline_target(self.path)
+        text = target.read_text(encoding="utf-8").splitlines()
         header = [line for line in text if line.startswith("#")]
         keep = [line for line in self.lines() if self.key(line) not in stale]
-        self.path.write_text("\n".join(header + keep) + "\n", encoding="utf-8")
+        target.write_text("\n".join(header + keep) + "\n", encoding="utf-8")
+
+
+BASELINE_NAMES = frozenset({"parity-exemptions.txt", "platform-code-baseline.txt", "mirror-name-baseline.txt"})
+
+
+def _baseline_target(path: Path) -> Path:
+    """Only the gates' own baselines under scripts/ci/parity/ are ever rewritten."""
+    resolved = path.resolve()
+    if resolved.name not in BASELINE_NAMES or resolved.parent.name != BASELINE_DIR.name:
+        raise ValueError(f"refusing to rewrite '{path}': not a parity baseline")
+    return resolved.parent / resolved.name
 
 
 def _cap(line: str) -> int:

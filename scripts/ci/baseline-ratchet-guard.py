@@ -18,6 +18,7 @@ Exit status: 0 clean, 1 a baseline moved the wrong way, 2 usage or git error.
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -87,13 +88,36 @@ def compare(kind: str, name: str, base: list[str], head: list[str]) -> list[str]
     return COMPARE[kind](name, base, head)
 
 
-def git_show(root: Path, ref: str, path: str) -> str | None:
-    result = subprocess.run(["git", "-C", str(root), "show", f"{ref}:{path}"], capture_output=True, text=True, encoding="utf-8")
+_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/@{}^~-]*")
+_SHA = re.compile(r"[0-9a-f]{40}")
+_REPO_PATH = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_./-]*")
+
+
+def safe_path(path: str) -> str:
+    """A repo-relative path from the config: no option-like, absolute or parent-escaping names."""
+    if not _REPO_PATH.fullmatch(path) or ".." in path.split("/"):
+        raise ValueError(f"unsafe baseline path '{path}'")
+    return path
+
+
+def resolve_commit(root: Path, ref: str) -> str | None:
+    """The full SHA [ref] names, or None; only a SHA is ever passed on to git afterwards."""
+    if not _REF.fullmatch(ref):
+        return None
+    result = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--verify", "-q", "--end-of-options", f"{ref}^{{commit}}"],
+        capture_output=True, text=True, encoding="utf-8",
+    )
+    sha = result.stdout.strip()
+    return sha if result.returncode == 0 and _SHA.fullmatch(sha) else None
+
+
+def git_show(root: Path, sha: str, path: str) -> str | None:
+    if not _SHA.fullmatch(sha):
+        raise ValueError(f"not a commit sha: '{sha}'")
+    spec = f"{sha}:{safe_path(path)}"
+    result = subprocess.run(["git", "-C", str(root), "show", "--end-of-options", spec], capture_output=True, text=True, encoding="utf-8")
     return result.stdout if result.returncode == 0 else None
-
-
-def is_commit(root: Path, ref: str) -> bool:
-    return subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", "-q", f"{ref}^{{commit}}"], capture_output=True).returncode == 0
 
 
 def dropped_ratchets(config_name: str, base_config: dict[str, str], config: dict[str, str]) -> list[str]:
@@ -107,7 +131,7 @@ def dropped_ratchets(config_name: str, base_config: dict[str, str], config: dict
 
 
 def baseline_drift(root: Path, ref: str, path: str, kind: str) -> list[str]:
-    current = root / path
+    current = root / safe_path(path)
     if not current.is_file():
         return [f"{path}: listed in the ratchet config but missing - restore it"]
     base_text = git_show(root, ref, path)
@@ -147,11 +171,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", default=DEFAULT_CONFIG)
     args = parser.parse_args(argv)
     root = args.root.resolve()
-    if not is_commit(root, args.diff_base):
+    base = resolve_commit(root, args.diff_base)
+    if base is None:
         print(f"baseline-ratchet-guard: base '{args.diff_base}' is not a commit", file=sys.stderr)
         return 2
     try:
-        problems, count = problems_for(root, args.diff_base, args.config)
+        problems, count = problems_for(root, base, safe_path(args.config))
     except ValueError as error:
         print(f"baseline-ratchet-guard: {error}", file=sys.stderr)
         return 2

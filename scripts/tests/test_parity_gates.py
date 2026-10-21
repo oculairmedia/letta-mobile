@@ -111,6 +111,17 @@ class ParityGateTest(unittest.TestCase):
         self.assertEqual(1, status)
         self.assertIn("STALE EXEMPTION", out)
 
+    def test_prune_deletes_only_stale_exemptions(self):
+        web = self.repo.root / "android-compose/web/src/wasmJsMain/kotlin/Bind.kt"
+        web.write_text(FixtureRepo.binding(card="null"), encoding="utf-8")
+        exemptions = self.repo.root / "scripts/ci/parity/parity-exemptions.txt"
+        exemptions.write_text(
+            "# h\nandroid PanelSlots.card | gone (letta-mobile-x)\nweb PanelSlots.card | no card (letta-mobile-x)\n", encoding="utf-8"
+        )
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(0, gates.main(["parity", "--root", str(self.repo.root), "--prune"]))
+        self.assertEqual("# h\nweb PanelSlots.card | no card (letta-mobile-x)\n", exemptions.read_text(encoding="utf-8"))
+
     def test_platform_logic_file_fails_and_a_binding_passes(self):
         self.assertEqual(0, self.repo.run("platform-code")[0])
         write(self.repo.root, "android-compose/desktop/src/main/kotlin/Logic.kt",
@@ -194,6 +205,10 @@ class RatchetGuardTest(unittest.TestCase):
         self.assertIn("c.txt: line added: p3 1", out)
         self.assertIn("g.txt: line removed or changed: Contract", out)
         self.assertIn("never add", out)
+
+    def test_an_option_like_base_is_rejected(self):
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(2, guard.main(["--diff-base=--output=x", "--root", str(self.root)]))
 
     def test_dropping_a_ratchet_fails_and_a_new_one_is_seeded(self):
         write(self.root, "scripts/ci/ratchet-baselines.txt", "set s.txt\ncount c.txt\ncount new.txt\n")
