@@ -715,6 +715,18 @@ jobs:
           ./gradlew :web:wasmJsBrowserDistribution :web:wasmJsBrowserTest
           "-Pkotlin.daemon.jvmargs=-Xmx8g -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
 
+      # letta-mobile-hv54v: what a visitor downloads, per group, against
+      # android-compose/web/bundle-budget.json (ceilings only come down).
+      - name: Check web bundle budget
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s ../scripts/ci -p 'test_web_bundle_budget.py'
+          status=0
+          python3 ../scripts/ci/web-bundle-budget.py web/build/dist/wasmJs/productionExecutable \
+            --summary-md build/web-bundle-budget.md || status=$?
+          cat build/web-bundle-budget.md >> "$GITHUB_STEP_SUMMARY" || true
+          exit "$status"
+
       - name: Locate WASM distribution
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         id: wasm-dist

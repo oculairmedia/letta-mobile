@@ -7,6 +7,17 @@ description = "Iroh Wasm P2P client bridge for Letta Web"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+# letta-mobile-hv54v: the browser downloads and compiles this module on every first connect, so the
+# release build is optimised for size. Whole-program LTO in one codegen unit lets the linker drop
+# what iroh's default build keeps, "s" trades a little peak speed (the transport waits on the
+# network, not the CPU) for smaller code, and stripping drops the 1.2 MiB name section that only a
+# debugger reads. 5.15 MB raw / 1.54 MB gzip -> 2.91 MB / 1.07 MB (android-compose/web/bundle-budget.json).
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = "symbols"
+
 [dependencies]
 # Must match the wasm-bindgen-cli version installed by CI.
 wasm-bindgen = "=0.2.127"
