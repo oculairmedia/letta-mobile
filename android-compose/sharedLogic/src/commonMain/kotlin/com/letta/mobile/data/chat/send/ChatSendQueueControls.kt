@@ -1,12 +1,16 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.WsChatBridge
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * What a chat screen can see and do with the send queue. Every host (Android,
@@ -41,5 +45,29 @@ internal class CoordinatorQueueTurns(
 
     override fun abortTurn(conversationId: QueueConversationId): Boolean = bridge.cancel(conversationId.value)
 
-    override suspend fun dispatch(item: QueuedChatSend): Boolean = dispatchQueued(item)
+    override suspend fun dispatch(item: QueuedChatSend, clearComposer: Boolean): Boolean = dispatchQueued(item)
+
+    /** Connection readiness belongs to the same bridge adapter used for queue ownership. */
+    suspend fun ensureConnected(config: LettaConfig, clientVersion: () -> String): Boolean {
+        if (bridge.isConnected()) return true
+        runCatching {
+            bridge.connect(
+                baseShimUrl = config.serverUrl,
+                token = config.accessToken.orEmpty(),
+                deviceId = "android-letta-mobile",
+                clientVersion = clientVersion(),
+            )
+        }.onFailure { error ->
+            Telemetry.error("AdminChatVM", "ws.connect.failed", error)
+            return false
+        }
+        return withTimeoutOrNull(CONNECT_WAIT_MS.milliseconds) {
+            bridge.awaitConnected()
+            true
+        } ?: false
+    }
+
+    private companion object {
+        const val CONNECT_WAIT_MS = 1_500L
+    }
 }

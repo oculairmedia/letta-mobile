@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.runCurrent
@@ -215,6 +216,35 @@ class ChatSendCoordinatorConversationSwitchTest {
         assertEquals(listOf("conv-a"), transport.sentConversationIds, "the send proceeds over the transport")
     }
 
+    @Test
+    fun connectionFailureAndTimeoutLeaveComposerAndQueueUntouched() = runTest {
+        for (failure in listOf(IllegalStateException("connection failed"), null)) {
+            val transport = RecordingChannelTransport(connected = false).apply { connectFailure = failure }
+            val failures = mutableListOf<String>()
+            var clears = 0
+            var minted = 0
+            val coordinator = ChatSendCoordinator(
+                scope = backgroundScope, agentId = AGENT_ID,
+                activeConfig = { LettaConfig("shim", LettaConfig.Mode.SELF_HOSTED, "http://localhost:8291", "token") },
+                wsChatBridge = WsChatBridge(transport), timelineRepository = RecordingTimelineWriter(),
+                conversationRepository = FakeConversationRepository(), ui = CapturingUiSink(failures),
+                clearComposerAfterSend = { clears++ }, activeConversationId = { "conv-a" },
+                setActiveConversationId = {}, startTimelineObserver = {},
+                clientVersion = { "test" }, otidGenerator = { "otid-${++minted}" },
+            )
+            val send = coordinator.send("hello")
+            runCurrent()
+            advanceTimeBy(1_501)
+            runCurrent()
+            send.join()
+            assertEquals(listOf("Chat channel is not connected"), failures)
+            assertEquals(emptyList(), transport.sentConversationIds)
+            assertEquals(0, clears)
+            assertEquals(0, minted)
+            assertEquals(emptyMap(), coordinator.sendQueue.state.value)
+        }
+    }
+
     private class CapturingUiSink(private val failures: MutableList<String>) : ChatSendUiSink {
         override fun currentError(): String? = null
         override fun isStreaming(): Boolean = false
@@ -249,13 +279,16 @@ class ChatSendCoordinatorConversationSwitchTest {
         override fun onDisconnectFailure(error: String) = Unit
     }
 
-    private class RecordingChannelTransport : IChannelTransport {
+    private class RecordingChannelTransport(connected: Boolean = true) : IChannelTransport {
+        var connectFailure: Exception? = null
         override val state: StateFlow<ChannelTransportState> =
-            MutableStateFlow(ChannelTransportState.Connected("server", "session", "device"))
+            MutableStateFlow(if (connected) ChannelTransportState.Connected("server", "session", "device") else ChannelTransportState.Idle)
         override val events = MutableSharedFlow<ServerFrame>()
         override val frameEvents = MutableSharedFlow<TransportFrameEvent>()
         val sentConversationIds = mutableListOf<String>()
-        override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) = Unit
+        override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) {
+            connectFailure?.let { throw it }
+        }
         override fun send(agentId: String, conversationId: String, text: String, otid: String?, contentParts: JsonArray?, startNewConversation: Boolean): Boolean {
             sentConversationIds += conversationId
             return true
