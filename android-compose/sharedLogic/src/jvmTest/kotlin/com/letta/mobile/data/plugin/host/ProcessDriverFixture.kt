@@ -95,7 +95,7 @@ class ProcessDriverFixture(
             publisher = "letta",
             contract = PluginContract(1),
             runtime = PluginRuntime.Process(
-                command = "java",
+                command = if (File.separatorChar == '\\') "java.exe" else "java",
                 args = listOf("-Xshare:auto", "-XX:TieredStopAtLevel=1", "-XX:+UseSerialGC", "-Xmx64m", "-cp", classpath, FakeLcpPlugin::class.java.name, "--mode=$mode"),
                 env = env,
             ),
