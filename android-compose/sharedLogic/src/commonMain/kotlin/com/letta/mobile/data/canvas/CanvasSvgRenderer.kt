@@ -21,12 +21,12 @@ private const val SVG_PADDING = 20f
 private const val LINE_HEIGHT = 1.25f
 
 /** A text element's SVG anchor for its board alignment; anything else starts at the left. */
-private val TEXT_ANCHORS = mapOf("CENTER" to "middle", "RIGHT" to "end")
+private val TEXT_ANCHORS = mapOf<String?, String>("CENTER" to "middle", "RIGHT" to "end")
 
 /** How far across the wrap width each anchor sits. */
-private val ANCHOR_SHARE = mapOf("middle" to 0.5f, "end" to 1f)
+private val ANCHOR_SHARE = mapOf("start" to 0f, "middle" to 0.5f, "end" to 1f)
 
-private val FONT_FAMILIES = mapOf("serif" to "serif", "mono" to "monospace")
+private val FONT_FAMILIES = mapOf<String?, String>("serif" to "serif", "mono" to "monospace")
 
 /** One drawn element: its SVG markup and its world-space extent, rotation included. */
 private typealias SvgDrawing = Pair<String, CanvasPreviewRect>
@@ -152,12 +152,13 @@ private fun svgTextBlock(e: JsonObject, at: ConnectPoint): String {
     val size = e.number("fontSize") ?: 24f
     val label = e.need("type") == "Shape"
     val color = (if (label) e.text("textColor") else null) ?: e.need("strokeColor")
-    val anchor = if (label) "middle" else TEXT_ANCHORS[e.text("alignment")] ?: "start"
-    val x = if (label) at.x else at.x + (e.number("wrapWidth") ?: 320f) * (ANCHOR_SHARE[anchor] ?: 0f)
+    val anchor = if (label) "middle" else TEXT_ANCHORS.getOrElse(e.text("alignment")) { "start" }
+    val x = if (label) at.x else at.x + (e.number("wrapWidth") ?: 320f) * ANCHOR_SHARE.getValue(anchor)
     val lines = e.need("text").split('\n').mapIndexed { index, line ->
-        """<tspan x="$x" dy="${if (index == 0) 0f else size * LINE_HEIGHT}">${line.xml()}</tspan>"""
+        // Every line after the first steps down one line height.
+        """<tspan x="$x" dy="${size * LINE_HEIGHT * index.coerceAtMost(1)}">${line.xml()}</tspan>"""
     }.joinToString("")
-    val family = FONT_FAMILIES[e.text("fontFamilyKey")] ?: "sans-serif"
+    val family = FONT_FAMILIES.getOrElse(e.text("fontFamilyKey")) { "sans-serif" }
     return """<text x="$x" y="${at.y}" font-size="$size" font-family="$family" """ +
         """text-anchor="$anchor" fill="${color.xml()}" opacity="${e.number("opacity") ?: 1f}">$lines</text>"""
 }
