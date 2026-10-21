@@ -36,7 +36,7 @@ class ChatSendQueueControls internal constructor(
 internal class CoordinatorQueueTurns(
     private val lock: Mutex,
     private val bridge: WsChatBridge,
-    private val dispatchQueued: suspend (QueuedChatSend) -> Boolean,
+    private val dispatchSend: suspend (QueuedChatSend, Boolean) -> Boolean,
 ) : QueuedSendTurns {
     override suspend fun <T> serialized(block: suspend () -> T): T = lock.withLock { block() }
 
@@ -45,7 +45,7 @@ internal class CoordinatorQueueTurns(
 
     override fun abortTurn(conversationId: QueueConversationId): Boolean = bridge.cancel(conversationId.value)
 
-    override suspend fun dispatch(item: QueuedChatSend, clearComposer: Boolean): Boolean = dispatchQueued(item)
+    override suspend fun dispatch(item: QueuedChatSend, clearComposer: Boolean): Boolean = dispatchSend(item, clearComposer)
 
     /** Connection readiness belongs to the same bridge adapter used for queue ownership. */
     suspend fun ensureConnected(config: LettaConfig, clientVersion: () -> String): Boolean {

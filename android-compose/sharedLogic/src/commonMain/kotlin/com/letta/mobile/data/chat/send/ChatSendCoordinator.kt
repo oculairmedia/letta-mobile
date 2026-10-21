@@ -26,9 +26,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withTimeoutOrNull
 
-import kotlin.time.Duration.Companion.milliseconds
 /**
  * Platform-neutral SEND orchestration for the frame-channel (Iroh) send
  * path, extracted from Android's `WsChatSendCoordinator`
@@ -87,10 +85,11 @@ class ChatSendCoordinator(
     // letta-mobile-1n5py: messages sent while their conversation is busy wait here, unbounded,
     // and run in order once the turn ahead ends. See [QueuedSendDriver].
     private val queuedSends = ChatSendQueue()
+    private val queueTurns = CoordinatorQueueTurns(turnStateMutex, wsChatBridge, ::dispatchPendingSend)
     private val queueDriver = QueuedSendDriver(
         scope,
         queuedSends,
-        CoordinatorQueueTurns(turnStateMutex, wsChatBridge) { dispatchPendingSend(it, clearComposer = false) },
+        queueTurns,
     )
 
     private val serverQueueMarks = ServerQueueMarks(
@@ -328,7 +327,7 @@ class ChatSendCoordinator(
         startTimelineObserver(conversationId)
 
         Telemetry.event("IrohTrace", "coordinator.ensureConnected.begin", "conversationId" to conversationId)
-        val connected = ensureConnected(config)
+        val connected = queueTurns.ensureConnected(config, clientVersion)
         Telemetry.event("IrohTrace", "coordinator.ensureConnected.done", "conversationId" to conversationId, "connected" to connected)
         if (!connected) {
             ui.onSendFailed("Chat channel is not connected")
@@ -344,14 +343,14 @@ class ChatSendCoordinator(
         )
         // letta-mobile-1n5py: never jump messages already waiting, and never fail a send because
         // a turn is running: queue it behind that turn instead.
-        val accepted = !queuedSends.hasItems(pending.conversationId) && dispatchPendingSend(pending, clearComposer = true)
-        if (!accepted) enqueueBusySend(pending)
+        val queuePosition = queueDriver.submitLocked(pending)
+        if (queuePosition != null) reportQueuedSend(pending, queuePosition)
         timer.stop(
             "accepted" to true,
             "conversationId" to conversationId,
             "otid" to pending.id.value,
             "attachments" to attachments.size,
-            "queued" to !accepted,
+            "queued" to (queuePosition != null),
         )
     }
 
@@ -373,11 +372,7 @@ class ChatSendCoordinator(
 
     fun cancel(): Boolean {
         val conversationId = activeConversationId() ?: turnRegistry.lastActiveConversationId ?: return false
-        val accepted = wsChatBridge.cancel(conversationId)
-        // letta-mobile-1n5py: a Stop holds what is queued (the App Server parks its own queue on
-        // abort too) instead of running it or throwing it away.
-        if (accepted) queueDriver.onStopped(QueueConversationId(conversationId))
-        return accepted
+        return queueDriver.stop(QueueConversationId(conversationId))
     }
 
     private suspend fun dispatchPendingSend(
@@ -392,8 +387,8 @@ class ChatSendCoordinator(
             "clearComposer" to clearComposer,
         )
         val state = stateFor(pending.conversationId.value)
-        val accepted = state.identity.acceptSend(
-            conversationId = pending.conversationId.value,
+        val accepted = state.acceptSend(
+            pending = pending,
             send = {
                 wsChatBridge.send(
                     agentId = agentId,
@@ -405,10 +400,6 @@ class ChatSendCoordinator(
                 )
             },
             onAccepted = {
-                state.otid = pending.id.value
-                state.inFlightSend = pending
-                state.localConversationId = pending.conversationId.value.takeIf { it.isNotBlank() }
-                state.reachedTerminal = false
                 pending.conversationId.value.takeIf { it.isNotBlank() }?.let { turnRegistry.lastActiveConversationId = it }
             },
         )
@@ -435,8 +426,7 @@ class ChatSendCoordinator(
         return true
     }
 
-    private suspend fun enqueueBusySend(pending: QueuedChatSend) {
-        val position = queueDriver.enqueueLocked(pending)
+    private fun reportQueuedSend(pending: QueuedChatSend, position: Int) {
         clearComposerAfterSend()
         ui.onSendQueued(pending.conversationId.value)
         Telemetry.event(
@@ -447,24 +437,6 @@ class ChatSendCoordinator(
         )
     }
 
-    private suspend fun ensureConnected(config: LettaConfig): Boolean {
-        if (wsChatBridge.isConnected()) return true
-        runCatching {
-            wsChatBridge.connect(
-                baseShimUrl = config.serverUrl,
-                token = config.accessToken.orEmpty(),
-                deviceId = "android-letta-mobile",
-                clientVersion = clientVersion(),
-            )
-        }.onFailure { error ->
-            Telemetry.error("AdminChatVM", "ws.connect.failed", error)
-            return false
-        }
-        return withTimeoutOrNull(CONNECT_WAIT_MS.milliseconds) {
-            wsChatBridge.awaitConnected()
-            true
-        } ?: false
-    }
 
     suspend fun handleEvent(event: WsTimelineEvent) = contained(event::class.simpleName) {
         turnStateMutex.withLock { handleEventLocked(event) }
@@ -1201,7 +1173,6 @@ class ChatSendCoordinator(
     }
 
     internal companion object {
-        private const val CONNECT_WAIT_MS = 1_500L
         private const val MAX_ACTIVE_ASSISTANT_RUN_IDS = 8
 
         internal var postSendReconcileDelaysMs = longArrayOf(750L, 2_500L, 6_000L)
