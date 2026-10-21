@@ -1,9 +1,9 @@
 package com.letta.mobile.data.mapper
 
-import com.letta.mobile.data.chat.projection.extractSubagentDispatch
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.data.model.extractSubagentDispatch
 
 internal fun AppMessage.mapUnmatchedToolReturn(
     foldedApprovals: Map<String, FoldedToolApproval>,

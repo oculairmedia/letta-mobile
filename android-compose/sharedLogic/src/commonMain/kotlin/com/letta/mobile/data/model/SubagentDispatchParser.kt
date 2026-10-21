@@ -1,6 +1,5 @@
-package com.letta.mobile.data.chat.projection
+package com.letta.mobile.data.model
 
-import com.letta.mobile.data.model.UiSubagentDispatch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

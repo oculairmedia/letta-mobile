@@ -219,7 +219,6 @@
     "com.letta.mobile.data.local -> com.letta.mobile.data.timeline",
     "com.letta.mobile.data.local -> com.letta.mobile.data.timeline.snapshot",
     "com.letta.mobile.data.local -> com.letta.mobile.runtime",
-    "com.letta.mobile.data.mapper -> com.letta.mobile.data.chat.projection",
     "com.letta.mobile.data.mapper -> com.letta.mobile.data.model",
     "com.letta.mobile.data.memory -> com.letta.mobile.data.backend",
     "com.letta.mobile.data.memory -> com.letta.mobile.data.channel",

@@ -20,6 +20,108 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ControllerSubagentRegistrySourceTest {
+    private fun stream(agent: String, conversation: String, raw: String) = AppServerInboundFrame.StreamDelta(
+        runtime = AppServerRuntimeScope(agentId = agent, conversationId = conversation),
+        eventSeq = 1, emittedAt = "t", idempotencyKey = raw,
+        delta = kotlinx.serialization.json.Json.parseToJsonElement(raw),
+    )
+
+    private suspend fun kotlinx.coroutines.CoroutineScope.deliverThroughSubscription(
+        source: ControllerSubagentRegistrySource,
+        frame: AppServerInboundFrame.StreamDelta,
+    ) {
+        val events = kotlinx.coroutines.flow.flowOf(
+            com.letta.mobile.data.transport.appserver.AppServerReceivedFrame(
+                channel = com.letta.mobile.data.transport.appserver.AppServerChannel.Stream,
+                frame = frame, raw = buildJsonObject {},
+            ),
+        )
+        source.start(this, events).join()
+    }
+
+    @Test
+    fun dispatchReceiptAndNotificationCompleteOnlyMatchingParentAndSurviveReplay() = runTest {
+        val store = InMemorySubagentRegistryStore()
+        val source = ControllerSubagentRegistrySource(DurableSubagentRegistry(store))
+        val dispatch = """{
+            "message_type":"tool_call_message",
+            "tool_call":{"name":"Agent","tool_call_id":"call-7",
+            "arguments":{"description":"Inspect README for test setup","subagent_type":"general-purpose"}}
+        }"""
+        // Same labelled receipt shape as exact-tool-turns.json, with distinct task and tool ids.
+        val receiptBody = "Task running in background with task ID: task_12\n" +
+            "Agent ID: agent-local-child\nOutput file: /tmp/task_12.log\n\n" +
+            "A <task-notification> message will be delivered with the result."
+        val receipt = buildJsonObject {
+            put("message_type", "tool_return_message")
+            put("tool_call_id", "call-7")
+            put("tool_return", receiptBody)
+        }.toString()
+        val notification = """{
+            "message_type":"user_message","content":[{"type":"text",
+            "text":"<task-notification><task-id>task_12</task-id><status>completed</status><summary>Done</summary>
+            <usage>duration_ms: 15800</usage></task-notification>"}]
+        }""".replace("\n", "")
+        for ((agent, conversation) in listOf("parent" to "local-conv-672", "other" to "local-conv-672", "parent" to "default")) {
+            source.ingestFromSource(
+                conversation, agent,
+                listOf(SubagentEntry(toolCallId = "call-7", status = SubagentStatus.RUNNING)),
+                SubagentChipSource.CONTROLLER_NATIVE,
+            )
+            source.ingest(stream(agent, conversation, dispatch))
+            source.ingest(stream(agent, conversation, receipt))
+        }
+        deliverThroughSubscription(source, stream("parent", "local-conv-672", notification))
+        val completed = source.registry.record("local-conv-672", "parent", "call-7")!!
+        assertEquals(SubagentChipState.COMPLETED, completed.state)
+        assertEquals(15_800L, completed.toEntry().durationMs)
+        assertEquals(SubagentChipState.RUNNING, source.registry.record("local-conv-672", "other", "call-7")!!.state)
+        assertEquals(SubagentChipState.RUNNING, source.registry.record("default", "parent", "call-7")!!.state)
+        source.ingest(stream("parent", "local-conv-672", dispatch))
+        source.ingest(stream("parent", "local-conv-672", receipt))
+        source.ingest(
+            AppServerInboundFrame.UpdateSubagentState(
+                runtime = AppServerRuntimeScope(agentId = "parent", conversationId = "local-conv-672"),
+                eventSeq = 2, emittedAt = "late", idempotencyKey = "late-running",
+                subagents = listOf(buildJsonObject {
+                    put("tool_call_id", "call-7")
+                    put("status", "running")
+                    put("tool_call_count", 9)
+                }),
+            ),
+        )
+        val restarted = ControllerSubagentRegistrySource(DurableSubagentRegistry(store))
+        assertEquals(SubagentChipState.COMPLETED, restarted.registry.record("local-conv-672", "parent", "call-7")!!.state)
+        val roster = com.letta.mobile.data.subagents.projectSubagentRoster(
+            listOf(completed.toEntry()), now = 9_999_999L,
+        )
+        assertEquals(0, roster.runningCount)
+        assertEquals(15_800L, roster.finished.single().elapsedMs)
+    }
+
+    @Test
+    fun streamDispatchNeedsCorrelatedTaskIdentityBeforeNotificationCanCompleteIt() = runTest {
+        val source = ControllerSubagentRegistrySource()
+        source.ingest(stream("parent", "conversation", """{
+            "message_type":"tool_call_message",
+            "tool_call":{"name":"Agent","tool_call_id":"call-7","arguments":{"description":"Read files"}}
+        }"""))
+        fun notification(task: String) = stream("parent", "conversation", buildJsonObject {
+            put("message_type", "user_message")
+            put("content", "<task-notification><task-id>$task</task-id><status>completed</status></task-notification>")
+        }.toString())
+        source.ingest(notification("call-7"))
+        assertEquals(SubagentStatus.RUNNING, source.list("conversation", true).single().status)
+        source.ingest(stream("parent", "conversation", """{
+            "message_type":"tool_return_message","tool_call_id":"call-7",
+            "tool_return":{"task_id":"task_12","agent_id":"child","conversation_id":"default"}
+        }"""))
+        source.ingest(notification("task_other"))
+        assertEquals(SubagentStatus.RUNNING, source.list("conversation", true).single().status)
+        source.ingest(notification("task_12"))
+        assertEquals(SubagentStatus.COMPLETED, source.list("conversation", true).single().status)
+    }
+
     @Test
     fun updateSubagentStateHydratesConversationScopedList() = runTest {
         val source = ControllerSubagentRegistrySource()
@@ -164,13 +266,9 @@ class ControllerSubagentRegistrySourceTest {
         assertEquals(SubagentStatus.FAILED, failed.status)
     }
 
-    /**
-     * lgns8.22.8: a chip absent from the newest authoritative snapshot is
-     * RECONCILED to orphaned, not deleted. Before this bead it was removed
-     * outright, which is how a live worker's chip could silently vanish.
-     */
+    /** Missing snapshots do not prove that a background worker ended. */
     @Test
-    fun laterUpdateSubagentStateOrphansPriorSnapshotIdentitiesInsteadOfDeletingThem() = runTest {
+    fun laterUpdateSubagentStateRetainsMissingRunningTasks() = runTest {
         val source = ControllerSubagentRegistrySource()
         source.ingest(
             AppServerInboundFrame.UpdateSubagentState(
@@ -202,12 +300,12 @@ class ControllerSubagentRegistrySourceTest {
             ),
         )
 
-        assertEquals(listOf("tool/new"), source.list("conv-a", includeTerminal = false).map { it.toolCallId })
+        assertEquals(setOf("sa-old", "tool/new"), source.list("conv-a", includeTerminal = false).map { it.toolCallId }.toSet())
         val all = source.list("conv-a", includeTerminal = true)
         assertEquals(setOf("sa-old", "tool/new"), all.map { it.toolCallId }.toSet())
-        assertEquals(SubagentStatus.CANCELLED, all.single { it.toolCallId == "sa-old" }.status)
+        assertEquals(SubagentStatus.RUNNING, all.single { it.toolCallId == "sa-old" }.status)
         assertEquals(
-            SubagentChipState.ORPHANED,
+            SubagentChipState.RUNNING,
             source.registry.record("conv-a", "agent-1", "sa-old")?.state,
         )
     }

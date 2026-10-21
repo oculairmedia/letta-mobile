@@ -8836,14 +8836,6 @@ public final class com/letta/mobile/data/chat/projection/StepDotIcon : java/lang
 	public static fun values ()[Lcom/letta/mobile/data/chat/projection/StepDotIcon;
 }
 
-public final class com/letta/mobile/data/chat/projection/SubagentDispatchParserKt {
-	public static final fun extractSubagentDispatch (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/model/UiSubagentDispatch;
-}
-
-public final class com/letta/mobile/data/chat/projection/SubagentNotificationParserKt {
-	public static final fun extractSubagentNotification (Ljava/lang/String;)Lcom/letta/mobile/data/model/UiSubagentNotification;
-}
-
 public final class com/letta/mobile/data/chat/projection/TaskNotificationPresentationKt {
 	public static final fun activityLabel (Lcom/letta/mobile/data/model/UiSubagentNotification;)Ljava/lang/String;
 }
@@ -26770,6 +26762,10 @@ public final class com/letta/mobile/data/model/SubagentActivitySnapshot$Companio
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/letta/mobile/data/model/SubagentDispatchParserKt {
+	public static final fun extractSubagentDispatch (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/model/UiSubagentDispatch;
+}
+
 public final class com/letta/mobile/data/model/SubagentEntry {
 	public static final field Companion Lcom/letta/mobile/data/model/SubagentEntry$Companion;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/model/SubagentActivitySnapshot;Lcom/letta/mobile/data/model/SubagentTodoProgressWire;Ljava/lang/Long;JLjava/lang/String;Ljava/lang/Integer;Ljava/lang/Long;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Boolean;)V
@@ -26862,6 +26858,10 @@ public final class com/letta/mobile/data/model/SubagentKind$Companion {
 
 public final class com/letta/mobile/data/model/SubagentKindKt {
 	public static final fun isBackgroundSubagent (Lcom/letta/mobile/data/model/SubagentEntry;)Z
+}
+
+public final class com/letta/mobile/data/model/SubagentNotificationParserKt {
+	public static final fun extractSubagentNotification (Ljava/lang/String;)Lcom/letta/mobile/data/model/UiSubagentNotification;
 }
 
 public final class com/letta/mobile/data/model/SubagentParentIdentity {

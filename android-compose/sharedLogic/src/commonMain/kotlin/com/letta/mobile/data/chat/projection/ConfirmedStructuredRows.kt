@@ -2,6 +2,7 @@ package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiSubagentNotification
+import com.letta.mobile.data.model.extractSubagentNotification
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineMessageType
 

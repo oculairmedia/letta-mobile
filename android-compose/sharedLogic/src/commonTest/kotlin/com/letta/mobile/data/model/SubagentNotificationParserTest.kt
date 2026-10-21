@@ -1,4 +1,4 @@
-package com.letta.mobile.data.chat.projection
+package com.letta.mobile.data.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

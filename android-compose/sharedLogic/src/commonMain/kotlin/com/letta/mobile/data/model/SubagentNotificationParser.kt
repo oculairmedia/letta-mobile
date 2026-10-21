@@ -1,6 +1,4 @@
-package com.letta.mobile.data.chat.projection
-
-import com.letta.mobile.data.model.UiSubagentNotification
+package com.letta.mobile.data.model
 
 fun extractSubagentNotification(raw: String): UiSubagentNotification? {
     if (raw.indexOf("<task-notification", ignoreCase = true) < 0) return null
