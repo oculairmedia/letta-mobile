@@ -1,0 +1,36 @@
+{
+  "comment": [
+    "Letta Web production bundle budget, checked by scripts/ci/web-bundle-budget.py in the web-wasm job (letta-mobile-hv54v).",
+    "Ceilings are gzip bytes (level 9) of what a visitor downloads: the page's wasm and script before the first frame, the Iroh transport on the first connect, the mascot runtime and file when it shows.",
+    "Each ceiling sits about 3% above the size measured when it was set (Iroh 5%, since local and CI Rust toolchains differ by about 1%). Ceilings only come down: lower one when a change shrinks its group; never raise one to make a build pass."
+  ],
+  "groups": {
+    "kotlin-app-and-skiko-wasm": {
+      "include": ["*.wasm"],
+      "ceiling_gzip_bytes": 7900000,
+      "measured_gzip_bytes": 7672607,
+      "notes": "The Kotlin/Wasm app (16.1 MiB raw) and the Skiko runtime (8.2 MiB raw), main at 101433a40."
+    },
+    "app-js": {
+      "include": ["letta-web.js"],
+      "ceiling_gzip_bytes": 132000,
+      "measured_gzip_bytes": 127963
+    },
+    "iroh-transport": {
+      "include": ["iroh/*.wasm", "iroh/*.js"],
+      "ceiling_gzip_bytes": 1125000,
+      "measured_gzip_bytes": 1069928,
+      "notes": "After the size-optimised release profile in native/iroh-wasm/Cargo.toml (was 1,543,306 gzip / 5,145,817 raw; now 2,913,966 raw)."
+    },
+    "rive-runtime": {
+      "include": ["rive/rive.wasm"],
+      "ceiling_gzip_bytes": 830000,
+      "measured_gzip_bytes": 803847
+    },
+    "mascot": {
+      "include": ["mascot/*.riv"],
+      "ceiling_gzip_bytes": 34000,
+      "measured_gzip_bytes": 32867
+    }
+  }
+}
