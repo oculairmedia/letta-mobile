@@ -25,8 +25,12 @@ import androidx.compose.ui.platform.LocalContext
 import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_attach_not_an_image
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.size
+import io.github.vinceglb.filekit.source
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.io.buffered
 import org.jetbrains.compose.resources.getString
 
 /**
@@ -85,8 +89,13 @@ private fun Uri.asImageSource(resolver: ContentResolver): ComposerImageSource = 
         val stream = checkNotNull(resolver.openInputStream(this@asImageSource)) {
             getString(Res.string.composer_attach_not_an_image)
         }
-        stream.use { readAtMost(ImageIngressPolicy.MAX_SOURCE_BYTES, it::read) } ?: imageTooLarge()
+        stream.use { readImageSource(knownSize = null, read = it::read) }
     }
+}
+
+/** The picked file streamed and capped through [readImageSource], refused first by its size. */
+internal actual suspend fun PlatformFile.readImageBytes(): ByteArray = withContext(Dispatchers.IO) {
+    source().buffered().use { file -> readImageSource(knownSize = size()) { buffer -> file.readAtMostTo(buffer) } }
 }
 
 private const val ImageMimeTypes = "image/*"

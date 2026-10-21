@@ -1,7 +1,9 @@
 package com.letta.mobile.ui.chat.surface.composer
 
 import com.letta.mobile.data.attachment.AttachmentLimits
+import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.data.model.MessageContentPart
+import io.github.vinceglb.filekit.PlatformFile
 import java.awt.Color
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
@@ -11,12 +13,13 @@ import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 
-/** letta-mobile-k5nbq.7/.15: paste/drop bytes are read capped, then use the picker's encode path. */
+/** letta-mobile-k5nbq.7/.15/.18: paste/drop bytes are read capped, then use the picker's encode path. */
 class ComposerImageIngressTest {
     @Test
     fun aSourceWithinTheCapIsReadWhole() {
@@ -29,6 +32,38 @@ class ComposerImageIngressTest {
         val stream = ByteArrayInputStream(ByteArray(1_000_000))
         assertNull(readAtMost(100_000, stream::read))
         assertTrue(stream.available() > 0, "reading stops once the cap is passed")
+    }
+
+    @Test
+    fun aSourceWhoseKnownSizePassesTheCapIsRefusedUnread() = runBlocking {
+        var reads = 0
+        val error = assertFailsWith<IllegalArgumentException> {
+            readImageSource(ImageIngressPolicy.MAX_SOURCE_BYTES + 1L) { reads += 1; -1 }
+        }
+        assertEquals("larger than 25 MB", error.message)
+        assertEquals(0, reads, "refused by its size, before any read")
+    }
+
+    @Test
+    fun aSourceThatGrowsPastTheCapIsRefusedWhileReading() = runBlocking {
+        val stream = ByteArrayInputStream(ByteArray(ImageIngressPolicy.MAX_SOURCE_BYTES + 1))
+        assertFailsWith<IllegalArgumentException> { readImageSource(knownSize = 10, read = stream::read) }
+        val small = ByteArray(1_000) { it.toByte() }
+        assertContentEquals(small, readImageSource(knownSize = null, read = ByteArrayInputStream(small)::read))
+    }
+
+    @Test
+    fun aPickedFilePastTheCapIsRefusedLikePasteAndDrop() = runBlocking {
+        val file = java.io.File.createTempFile("picked-huge", ".png")
+        try {
+            java.io.RandomAccessFile(file, "rw").use { it.setLength(ImageIngressPolicy.MAX_SOURCE_BYTES + 1L) }
+            val error = assertFailsWith<IllegalArgumentException> { PlatformFile(file).readImageBytes() }
+            assertEquals("larger than 25 MB", error.message)
+            file.writeBytes(byteArrayOf(1, 2, 3))
+            assertContentEquals(byteArrayOf(1, 2, 3), PlatformFile(file).readImageBytes())
+        } finally {
+            file.delete()
+        }
     }
 
     @Test

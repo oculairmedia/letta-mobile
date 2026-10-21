@@ -3,6 +3,7 @@ package com.letta.mobile.desktop
 import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
+import com.letta.mobile.ui.chat.surface.composer.composerAttachFailedMessage
 import java.awt.Component
 import java.awt.Container
 import java.awt.Window
@@ -16,6 +17,7 @@ import java.awt.event.KeyEvent
 import java.awt.event.WindowEvent
 import java.awt.image.BufferedImage
 import java.io.File
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -27,11 +29,13 @@ internal data class DesktopImageIngressSink(
     val onImage: (MessageContentPart.Image) -> Unit,
     val onError: (String) -> Unit,
 ) {
-    fun launchLoad(block: suspend DesktopImageAttachmentLoader.() -> MessageContentPart.Image) {
+    /** Attaches the loaded image, or reports the composer's shared "Could not attach that image" error. */
+    fun launchLoad(block: suspend DesktopImageAttachmentLoader.() -> MessageContentPart.Image?) {
         scope.launch {
-            runCatching { loader.block() }
-                .onSuccess(onImage)
-                .onFailure { onError(it.message ?: it::class.simpleName ?: "Could not attach image") }
+            val result = runCatching { loader.block() }
+            result.exceptionOrNull()?.let { if (it is CancellationException) throw it }
+            val image = result.getOrNull()
+            if (image != null) onImage(image) else onError(composerAttachFailedMessage(result.exceptionOrNull()?.message))
         }
     }
 }
