@@ -37,8 +37,9 @@ import kotlin.test.assertEquals
 
 /**
  * The drawer pictures an agent one way (letta-mobile-c3np7.5.8 device report: the panel's hero was
- * a different shape from the agent's orb). On a phone there is no transport layer, so the hero is
- * drawn in place and must follow the same live-or-still rule as the rail orb and every avatar.
+ * a different shape from the agent's orb). Drawn in place, the hero must follow the same
+ * live-or-still rule as the rail orb and every avatar; MascotSeatRuleLayerUiTest pins the same
+ * rule for the phone's transport layer (letta-mobile-te3n1.8).
  */
 class ShellDrawerMascotTest {
     private val turned = MascotIdentity(MascotShape.HEXAGON, argb = 0xFFF08A3C.toInt(), rotationDegrees = 45)

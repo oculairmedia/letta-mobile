@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.ui.mascot.MascotTransportLayer
 import com.letta.mobile.ui.mascot.ProvideMascotShell
 import com.letta.mobile.ui.notify.LocalAttentionPrefs
 import com.letta.mobile.ui.runtime.LocalAgentDefaults
@@ -117,13 +118,17 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Surface(modifier = debugRootPointerObserver(), color = MaterialTheme.colorScheme.background) {
                             OverlayHostRoot(overlays) {
-                                val navController = rememberNavController()
-                                AdaptiveScaffold(navController = navController) {
-                                    AppNavGraph(
-                                        navController = navController,
-                                        notificationTarget = launchTarget.value,
-                                        onNotificationTargetConsumed = { launchTarget.value = null },
-                                    )
+                                // Every seated mascot draws here, over the app, and hops between
+                                // seats (letta-mobile-te3n1.8); overlays stay above it.
+                                MascotTransportLayer {
+                                    val navController = rememberNavController()
+                                    AdaptiveScaffold(navController = navController) {
+                                        AppNavGraph(
+                                            navController = navController,
+                                            notificationTarget = launchTarget.value,
+                                            onNotificationTargetConsumed = { launchTarget.value = null },
+                                        )
+                                    }
                                 }
                             }
                         }

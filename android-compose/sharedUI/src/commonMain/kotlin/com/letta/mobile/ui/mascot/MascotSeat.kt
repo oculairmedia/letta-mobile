@@ -170,9 +170,10 @@ fun MascotSeat(
     /** Whether a drag starting now goes to [onDrag]; one it turns down is left to what is under it. */
     dragEnabled: () -> Boolean = { true },
     /**
-     * Without a transport layer, whether the seat draws the live scene or the agent's still
-     * ([MascotInPlace]); a seat that pictures an agent at rest, as the agent panel's hero does,
-     * passes [mascotAtWork] so it shows what every avatar of the agent shows. A layer draws live.
+     * Whether the seat pictures the agent live or as its still ([MascotInPlace]); a seat that
+     * pictures an agent at rest, as the agent panel's hero does, passes [mascotAtWork] so it shows
+     * what every avatar of the agent shows. Drawn in place, or by a layer that
+     * [MascotTransport.followsSeatRule] (Android); any other layer draws live.
      */
     live: Boolean = true,
     empty: @Composable (MascotSeatVacancy) -> Unit,
@@ -194,8 +195,8 @@ fun MascotSeat(
     // The box's own width: a layer scale outside it shows in [bounds] but not here.
     var layoutWidth by remember { mutableFloatStateOf(0f) }
     val seatKey = key?.takeIf { presence != SeatPresence.NoMascot }
-    LaunchedEffect(transport, seatKey, bounds, layoutWidth, overscale, identity) {
-        transport.publishSeat(seatKey, bounds) { MascotSeatInfo(it, overscale, identity, handlers, layoutWidth) }
+    LaunchedEffect(transport, seatKey, bounds, layoutWidth, overscale, identity, live) {
+        transport.publishSeat(seatKey, bounds) { MascotSeatInfo(it, overscale, identity, handlers, layoutWidth, live) }
     }
     Box(
         modifier = modifier.requiredSize(size).onGloballyPositioned {
