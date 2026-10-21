@@ -17,7 +17,10 @@ _SPEC.loader.exec_module(budget_gate)
 class WebBundleBudgetTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
+        self.root = Path(self.tmp.name).resolve()
+        # The gate only reads and writes inside its working directory, as CI runs it.
+        self.previous_cwd = os.getcwd()
+        os.chdir(self.root)
         self.dist = self.root / "dist"
         (self.dist / "iroh").mkdir(parents=True)
         # Incompressible bytes, so gzip cannot shrink them below the ceilings used here.
@@ -26,6 +29,7 @@ class WebBundleBudgetTest(unittest.TestCase):
         (self.dist / "index.html").write_text("<html></html>")
 
     def tearDown(self):
+        os.chdir(self.previous_cwd)
         self.tmp.cleanup()
 
     def run_gate(self, groups):
@@ -51,6 +55,11 @@ class WebBundleBudgetTest(unittest.TestCase):
     def test_root_pattern_does_not_count_nested_files(self):
         sizes = budget_gate.measure(self.dist, {"groups": {"app": {"include": ["*.wasm"], "ceiling_gzip_bytes": 1}}})
         self.assertEqual(sizes[0].files, ("abc123.wasm",))
+
+    def test_paths_outside_the_working_directory_are_refused(self):
+        os.chdir(self.dist)
+        with self.assertRaises(SystemExit):
+            budget_gate.main([str(self.dist), "--budget", str(self.root / "budget.json")])
 
     def test_a_group_that_matches_nothing_fails_closed(self):
         with self.assertRaises(SystemExit):

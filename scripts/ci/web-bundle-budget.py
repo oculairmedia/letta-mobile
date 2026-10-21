@@ -82,6 +82,15 @@ def render_markdown(sizes: list[GroupSize]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def confined(path: Path) -> Path:
+    """The path, resolved, provided it stays inside the working directory (the build tree)."""
+    root = Path.cwd().resolve()
+    resolved = path.resolve()
+    if not resolved.is_relative_to(root):
+        raise SystemExit(f"{path} is outside the working directory {root}")
+    return resolved
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("dist", type=Path)
@@ -89,13 +98,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--summary-md", type=Path)
     args = parser.parse_args(argv)
 
-    budget = json.loads(args.budget.read_text(encoding="utf-8"))
-    sizes = measure(args.dist, budget)
+    budget = json.loads(confined(args.budget).read_text(encoding="utf-8"))
+    sizes = measure(confined(args.dist), budget)
     report = render_markdown(sizes)
     print(report)
     if args.summary_md:
-        args.summary_md.parent.mkdir(parents=True, exist_ok=True)
-        args.summary_md.write_text(report, encoding="utf-8")
+        summary = confined(args.summary_md)
+        summary.parent.mkdir(parents=True, exist_ok=True)
+        summary.write_text(report, encoding="utf-8")
 
     over = [s for s in sizes if s.over_budget]
     for s in over:
