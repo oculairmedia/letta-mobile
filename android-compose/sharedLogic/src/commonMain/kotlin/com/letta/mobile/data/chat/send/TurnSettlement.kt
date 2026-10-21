@@ -3,6 +3,7 @@ package com.letta.mobile.data.chat.send
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ErrorMessage
+import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.runtime.TurnFailureNotice
 import com.letta.mobile.data.runtime.terminalReasonKind
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
@@ -363,5 +364,5 @@ internal class TurnSettlement(
         )
     }
 
-    private val defaultConversationId: String get() = "conv-default-$agentId"
+    private val defaultConversationId: String get() = IdFormats.defaultConversationIdFor(agent.value)
 }
