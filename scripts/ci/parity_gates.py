@@ -23,9 +23,8 @@ rejects any line added or raised there):
                  implementing one shared contract of that name.
 
 Usage: parity_gates.py [parity|platform-code|mirror-names|all] [--root DIR] [--print-actual]
-                       [--prune]
   --print-actual  print what the tree has now, in baseline format (no reasons), and exit 0.
-  --prune         delete stale baseline lines (the only rewrite the tool does: it never adds).
+The tool never writes a baseline: delete stale lines by hand (each failure names them).
 Exit status: 0 clean, 1 violations, 2 usage error.
 """
 from __future__ import annotations
@@ -90,24 +89,6 @@ class Baseline:
 
     def entries(self) -> dict[str, tuple[int, str]]:
         return {self.key(line): (_cap(line) if self.counted else 0, line.partition("|")[2].strip()) for line in self.lines()}
-
-    def prune(self, stale: set[str]) -> None:
-        target = _baseline_target(self.path)
-        text = target.read_text(encoding="utf-8").splitlines()
-        header = [line for line in text if line.startswith("#")]
-        keep = [line for line in self.lines() if self.key(line) not in stale]
-        target.write_text("\n".join(header + keep) + "\n", encoding="utf-8")
-
-
-BASELINE_NAMES = frozenset({"parity-exemptions.txt", "platform-code-baseline.txt", "mirror-name-baseline.txt"})
-
-
-def _baseline_target(path: Path) -> Path:
-    """Only the gates' own baselines under scripts/ci/parity/ are ever rewritten."""
-    resolved = path.resolve()
-    if resolved.name not in BASELINE_NAMES or resolved.parent.name != BASELINE_DIR.name:
-        raise ValueError(f"refusing to rewrite '{path}': not a parity baseline")
-    return resolved.parent / resolved.name
 
 
 def _cap(line: str) -> int:
@@ -242,7 +223,7 @@ def parity_actual(repo: Path) -> dict[str, int]:
 PARITY = Messages(
     new="NEW PARITY GAP: {key} is unbound (a core contract not constructed, or a slot left null/empty/false/default)",
     grew="",
-    stale="STALE EXEMPTION (now bound - delete the line, or run with --prune): {key}",
+    stale="STALE EXEMPTION (now bound - delete the line): {key}",
 )
 
 
@@ -339,7 +320,7 @@ def platform_code_actual(repo: Path) -> dict[str, int]:
 PLATFORM_CODE = Messages(
     new="NEW PLATFORM LOGIC FILE: {key} ({count} lines) is not a pure binding",
     grew="PLATFORM LOGIC GREW: {key} has {count} lines, cap {cap} (+{slack} slack)",
-    stale="STALE (file gone or now a pure binding - delete the line, or run with --prune): {key}",
+    stale="STALE (file gone or now a pure binding - delete the line): {key}",
 )
 
 
@@ -383,7 +364,7 @@ def mirror_actual(repo: Path) -> dict[str, int]:
 MIRROR = Messages(
     new="NEW MIRRORED TYPE: {key}",
     grew="",
-    stale="STALE (renamed or now implements the shared type - delete the line, or run with --prune): {key}",
+    stale="STALE (renamed or now implements the shared type - delete the line): {key}",
 )
 
 
@@ -399,12 +380,9 @@ class Gate:
     reasoned: bool = False
     slack: int = 0
 
-    def check(self, repo: Path, prune: bool) -> list[str]:
+    def check(self, repo: Path) -> list[str]:
         baseline = Baseline(repo / BASELINE_DIR / self.baseline, self.counted, self.reasoned)
         problems, stale = drift(self.actual(repo), baseline, self.slack, self.messages)
-        if prune and stale:
-            baseline.prune(stale)
-            return problems
         return problems + [self.messages.stale.format(key=key) for key in sorted(stale)]
 
 
@@ -459,7 +437,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("gate", nargs="?", default="all", choices=[*GATES, "all"])
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument("--print-actual", action="store_true")
-    parser.add_argument("--prune", action="store_true")
     args = parser.parse_args(argv)
     repo = args.root.resolve()
     names = list(GATES) if args.gate == "all" else [args.gate]
@@ -467,7 +444,7 @@ def main(argv: list[str] | None = None) -> int:
         for name in names:
             print_actual(name, repo)
         return 0
-    results = [report(name, GATES[name].check(repo, args.prune)) for name in names]
+    results = [report(name, GATES[name].check(repo)) for name in names]
     return 0 if all(results) else 1
 
 

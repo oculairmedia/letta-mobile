@@ -111,17 +111,6 @@ class ParityGateTest(unittest.TestCase):
         self.assertEqual(1, status)
         self.assertIn("STALE EXEMPTION", out)
 
-    def test_prune_deletes_only_stale_exemptions(self):
-        web = self.repo.root / "android-compose/web/src/wasmJsMain/kotlin/Bind.kt"
-        web.write_text(FixtureRepo.binding(card="null"), encoding="utf-8")
-        exemptions = self.repo.root / "scripts/ci/parity/parity-exemptions.txt"
-        exemptions.write_text(
-            "# h\nandroid PanelSlots.card | gone (letta-mobile-x)\nweb PanelSlots.card | no card (letta-mobile-x)\n", encoding="utf-8"
-        )
-        with redirect_stdout(io.StringIO()):
-            self.assertEqual(0, gates.main(["parity", "--root", str(self.repo.root), "--prune"]))
-        self.assertEqual("# h\nweb PanelSlots.card | no card (letta-mobile-x)\n", exemptions.read_text(encoding="utf-8"))
-
     def test_platform_logic_file_fails_and_a_binding_passes(self):
         self.assertEqual(0, self.repo.run("platform-code")[0])
         write(self.repo.root, "android-compose/desktop/src/main/kotlin/Logic.kt",
