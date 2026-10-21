@@ -104,6 +104,7 @@ internal object ChatRowTestTags {
     /** An inter-agent prompt's provenance header, inside its bubble. */
     const val PROMPT_PROVENANCE = "chat-user-prompt-provenance"
     const val AGENT_TEXT = "chat-agent-text"
+    const val AGENT_TEXT_ACTIONS = "chat-agent-text-actions"
     const val REASONING_TOGGLE = "chat-reasoning-toggle"
     /** The reasoning row's [RunStatusGlyph]: the run's spinner while it streams, a check once it settles. */
     const val REASONING_GLYPH = "chat-reasoning-glyph"

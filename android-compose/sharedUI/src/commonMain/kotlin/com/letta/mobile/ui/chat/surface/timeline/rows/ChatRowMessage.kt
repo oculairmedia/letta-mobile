@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
@@ -313,6 +314,7 @@ internal fun AgentText(params: AgentTextParams) {
     }
     val hoverSource = remember { MutableInteractionSource() }
     val hovered by hoverSource.collectIsHoveredAsState()
+    val pointer = !touchStyle()
     Box(modifier = Modifier.agentTextRoot(hoverSource, params.isStreaming)) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = ChatRowSpacing.bubblePaddingVertical),
@@ -327,30 +329,47 @@ internal fun AgentText(params: AgentTextParams) {
                     isStreaming = params.isStreaming,
                 )
             }
-            params.deliveryTimestamp?.let { DeliveryTime(it) }
-        }
-        // The bubble inset centres the action on the first line of text.
-        Surface(
-            modifier = Modifier.align(Alignment.TopEnd),
-            shape = CircleShape,
-            color = if (hovered) {
-                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = ChatRowAlpha.hoverSurface)
+            if (pointer) {
+                // letta-mobile-zrode: where a pointer hovers, the actions take their own reserved
+                // line under the text (beside the delivery time). Drawn over the first line they
+                // hid its words; reserved, showing them never moves the text either.
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    params.deliveryTimestamp?.let { DeliveryTime(it) }
+                    Spacer(Modifier.weight(1f))
+                    AgentTextActions(params, hovered)
+                }
             } else {
-                Color.Transparent
-            },
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        ) {
-            Row {
-                params.onFork?.let { fork -> ForkIconButton(visible = hovered, onClick = fork) }
-                CopyIconButton(
-                    CopyAction(
-                        text = params.text,
-                        contentDescription = stringResource(Res.string.rows_copy_response),
-                        emphasized = hovered,
-                        visible = hovered,
-                    ),
-                )
+                params.deliveryTimestamp?.let { DeliveryTime(it) }
             }
+        }
+        // Touch never hovers, so its hidden action keeps its old seat over the first line.
+        if (!pointer) AgentTextActions(params, hovered, Modifier.align(Alignment.TopEnd))
+    }
+}
+
+/** Fork and Copy for a reply, shown while it is hovered. */
+@Composable
+private fun AgentTextActions(params: AgentTextParams, hovered: Boolean, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.testTag(ChatRowTestTags.AGENT_TEXT_ACTIONS),
+        shape = CircleShape,
+        color = if (hovered) {
+            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = ChatRowAlpha.hoverSurface)
+        } else {
+            Color.Transparent
+        },
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    ) {
+        Row {
+            params.onFork?.let { fork -> ForkIconButton(visible = hovered, onClick = fork) }
+            CopyIconButton(
+                CopyAction(
+                    text = params.text,
+                    contentDescription = stringResource(Res.string.rows_copy_response),
+                    emphasized = hovered,
+                    visible = hovered,
+                ),
+            )
         }
     }
 }
