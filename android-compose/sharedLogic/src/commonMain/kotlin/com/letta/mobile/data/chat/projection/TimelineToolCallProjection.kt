@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.model.UiToolResultTruncation
+import com.letta.mobile.data.model.extractSubagentDispatch
 import com.letta.mobile.data.timeline.TimelineEvent
 
 private fun com.letta.mobile.data.model.ToolCall.toSubagentDispatch(result: String?): UiSubagentDispatch? =

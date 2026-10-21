@@ -225,6 +225,8 @@ Inter-agent delivery routing and structured provenance. Stable sender/recipient 
 
 # Package com.letta.mobile.data.model
 
+Shared dispatch and task-notification wire parsers live here so controller ingestion and chat projection consume the same interpretation without depending on each other.
+
 Shared models for agents, conversations, messages, models, tools and related resources, with normalization/compatibility helpers. A model's existence does not imply that every backend serves that resource. Keep network access and storage effects outside resource values; repository adapters map backend data to models such as [LettaMessage](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.model/-letta-message/index.html) and bind recency persistence through [RecentModelsPersistence](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.model/-recent-models-persistence/index.html).
 
 # Package com.letta.mobile.data.model.provider

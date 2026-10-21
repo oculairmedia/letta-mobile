@@ -23,10 +23,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import com.letta.mobile.data.chat.projection.extractSubagentNotification
 import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiSubagentNotification
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.data.model.extractSubagentNotification
 import com.letta.mobile.data.subagents.SubagentIdentity
 import com.letta.mobile.data.subagents.subagentIdentityOf
 import com.letta.mobile.sharedui.resources.Res
@@ -54,10 +54,10 @@ import com.letta.mobile.sharedui.resources.rows_view_conversation
 import com.letta.mobile.ui.chat.subagents.ExternalAgentBadge
 import com.letta.mobile.ui.components.ChevronEmphasis
 import com.letta.mobile.ui.components.DisclosureChevron
-import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
+import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.StringResource

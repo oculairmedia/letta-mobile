@@ -1,6 +1,5 @@
 package com.letta.mobile.data.mapper
 
-import com.letta.mobile.data.chat.projection.extractSubagentDispatch
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.UiApprovalDecision
@@ -11,6 +10,7 @@ import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.data.model.extractSubagentDispatch
 
 internal val generatedUiToolNames = setOf(
     "render_summary_card",

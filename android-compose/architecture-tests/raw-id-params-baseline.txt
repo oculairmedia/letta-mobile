@@ -54,7 +54,6 @@ sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/branch/PendingCompo
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/ChatRenderModelBuilder.kt 5
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/MessageGrouping.kt 5
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/RunActivityProjection.kt 1
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/SubagentDispatchParser.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/TimelineEventToUiMessage.kt 3
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/ToolTimelineProjection.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/runtime/ApprovalSubmittingGateway.kt 4
@@ -123,6 +122,7 @@ sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/messaging/AgentMessagePr
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/messaging/AgentMessageProvenanceProjection.kt 3
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/messaging/IrohAgentMessageRouter.kt 4
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/ModelCatalogNormalizer.kt 4
+sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/SubagentDispatchParser.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/modelvalidation/ModelHandleValidator.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/notify/AttentionGate.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/notify/AttentionPrefs.kt 3

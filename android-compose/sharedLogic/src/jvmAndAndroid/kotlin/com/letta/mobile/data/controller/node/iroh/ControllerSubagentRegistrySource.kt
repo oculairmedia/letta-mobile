@@ -1,17 +1,15 @@
 package com.letta.mobile.data.controller.node.iroh
 
-import com.letta.mobile.data.chat.projection.extractSubagentDispatch
-import com.letta.mobile.data.chat.projection.extractSubagentNotification
 import com.letta.mobile.data.model.AppServerSubagentSnapshotAdapter
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentParentIdentity
 import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.data.model.UiSubagentNotification
+import com.letta.mobile.data.model.extractSubagentDispatch
+import com.letta.mobile.data.model.extractSubagentNotification
 import com.letta.mobile.data.subagents.DurableSubagentRegistry
 import com.letta.mobile.data.subagents.SubagentChipObservation
+import com.letta.mobile.data.subagents.SubagentChipRecord
 import com.letta.mobile.data.subagents.SubagentChipSource
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
@@ -19,7 +17,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 /**
  * Subagent registry projected from App Server runtime snapshots and parent
@@ -177,12 +179,18 @@ class ControllerSubagentRegistrySource(
             val matches = registry.replaySnapshot(frame.runtime.conversationId).filter { record ->
                 record.agentId == frame.runtime.agentId &&
                     (notification.taskId != null || notification.toolCallId != null) &&
-                    (notification.taskId == null || notification.taskId == record.taskId) &&
-                    (notification.toolCallId == null || notification.toolCallId == record.toolCallId) &&
-                    (notification.subagentAgentId == null || notification.subagentAgentId == record.subagentAgentId)
+                    notification.matchesDispatch(record)
             }
             val entry = matches.singleOrNull()?.toEntry() ?: return null
             return entry.copy(status = status, durationMs = notification.durationMs ?: entry.durationMs)
+        }
+
+        /** Every supplied identity must match its own namespace on the same dispatch. */
+        private fun UiSubagentNotification.matchesDispatch(record: SubagentChipRecord): Boolean {
+            if (taskId != null && taskId != record.taskId) return false
+            if (toolCallId != null && toolCallId != record.toolCallId) return false
+            if (subagentAgentId != null && subagentAgentId != record.subagentAgentId) return false
+            return true
         }
 
         private fun JsonObject.scalar(key: String): String? =
