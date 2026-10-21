@@ -108,6 +108,9 @@ class CanvasLocalPresenceTest {
         onNodeWithTag("board").performMouseInput { exit() }
         mainClock.advanceTimeBy(150)
         runOnIdle { assertFalse(transport.updates.last().second.isActive) }
+        onNodeWithTag("board").performMouseInput { moveTo(Offset(50f, 80f)) }
+        mainClock.advanceTimeBy(150)
+        runOnIdle { assertTrue(transport.updates.last().second.isActive) }
         onNodeWithTag("board").performClick()
         runOnIdle {
             assertEquals(1, clicks)
