@@ -61,7 +61,7 @@ class ChatSendCoordinator(
     private val timelineRepository: TimelineExternalTransportWriter,
     private val conversationRepository: IConversationRepository,
     private val ui: ChatSendUiSink,
-    private val clearComposerAfterSend: () -> Unit,
+    clearComposerAfterSend: () -> Unit,
     private val activeConversationId: () -> String?,
     private val setActiveConversationId: (String) -> Unit,
     private val startTimelineObserver: (String) -> Unit,
@@ -123,7 +123,7 @@ class ChatSendCoordinator(
     init {
         scope.launch {
             wsChatBridge.redialWhileTurnActive.collect { event ->
-                contained("RedialWhileTurnActive") { handleRedialWhileTurnActive(event) }
+                contained("RedialWhileTurnActive") { turnStateMutex.withLock { handleRedialWhileTurnActiveLocked(event) } }
             }
         }
     }
@@ -149,7 +149,8 @@ class ChatSendCoordinator(
         }
     }
 
-    private fun liveTailStateOrForward(event: WsTimelineEvent, tail: TurnTail): ConversationTurnState? {
+    /** Live state a stop/usage tail may mutate, after recording it; a retired turn's tail is only forwarded. */
+    private fun liveTailState(event: WsTimelineEvent, tail: TurnTail): ConversationTurnState? {
         val state = if (!tail.turnId.isNullOrBlank()) {
             turnRegistry.resolveStateByTurn(tail)
         } else {
@@ -158,9 +159,11 @@ class ChatSendCoordinator(
         }
         when {
             state == null -> reportUnmatchedFrame(event, tail)
-            !turnRegistry.isRetiredTurn(state, tail) &&
-                !state.isRetiredRun(tail) -> return state
-            else -> forwardRetiredTurnTail(runtimeEventBatcher, event, tail, state.localConversationId ?: state.conversationId)
+            !state.isRetiredTurn(tail) && !state.isRetiredRun(tail) -> {
+                runtimeEventBatcher.enqueue(event, state.ownerConversationId)
+                return state
+            }
+            else -> forwardRetiredTurnTail(runtimeEventBatcher, event, tail, state.ownerConversationId)
         }
         return null
     }
@@ -215,16 +218,8 @@ class ChatSendCoordinator(
         // (and so attaches) before its turn's first frame can arrive.
         eventSubscription.claimForSend()
         return scope.launch {
-            sendInternal(text, attachments, targetConversationId)
+            turnStateMutex.withLock { sendInternalLocked(text, attachments, targetConversationId) }
         }
-    }
-
-    private suspend fun sendInternal(
-        text: String,
-        attachments: List<MessageContentPart.Image>,
-        targetConversationId: String?,
-    ) = turnStateMutex.withLock {
-        sendInternalLocked(text, attachments, targetConversationId)
     }
 
     private suspend fun sendInternalLocked(
@@ -316,20 +311,14 @@ class ChatSendCoordinator(
         )
     }
 
-    private fun showConversation(
-        conversation: ConversationId,
-        expectedSelection: ConversationId? = conversation,
-    ) {
+    private fun showConversation(conversation: ConversationId, expectedSelection: ConversationId? = conversation) {
         if (!foreground.owns(expectedSelection)) {
             foreground.suppressed(conversation, "selectConversation")
             return
         }
         setActiveConversationId(conversation.value)
-        if (foreground.owns(conversation)) {
-            startTimelineObserver(conversation.value)
-        } else {
-            foreground.suppressed(conversation, "startTimelineObserver")
-        }
+        // Selection publication can re-enter host code that switches again; recheck before observing.
+        if (foreground.accepts(conversation, "startTimelineObserver")) startTimelineObserver(conversation.value)
     }
 
     private fun validatedActiveConfig(conversation: ConversationId?): LettaConfig? {
@@ -445,19 +434,14 @@ class ChatSendCoordinator(
     }
 
     private suspend fun handleStopReason(event: WsTimelineEvent.StopReason) {
-        val state = liveTailStateOrForward(event, TurnTail(event.turnId, event.runId)) ?: return
-        val effectiveConversationId = state.localConversationId ?: state.conversationId
-        runtimeEventBatcher.enqueue(event, effectiveConversationId)
+        val state = liveTailState(event, TurnTail(event.turnId, event.runId)) ?: return
         if (ignoreForeignTurnStop(state, event)) return
         recordStopReasonForTurn(state, event)
         settlement.markTurnVisuallyComplete(state, reason = "stopReason")
-
     }
 
     private fun recordUsage(event: WsTimelineEvent.UsageStatistics) {
-        val state = liveTailStateOrForward(event, TurnTail(event.turnId, event.runId)) ?: return
-        val effectiveConversationId = state.localConversationId ?: state.conversationId
-        runtimeEventBatcher.enqueue(event, effectiveConversationId)
+        val state = liveTailState(event, TurnTail(event.turnId, event.runId)) ?: return
         // lcp-cv3 §end-of-turn ordering: usage_statistics is first-wins
         // on the shim. Multi-step turns may produce per-step usage; the
         // run-level record reflects the first. Drop subsequent ones.
@@ -468,7 +452,7 @@ class ChatSendCoordinator(
             )
         } else {
             state.usageRecorded = true
-            foreground.usage(ConversationId(effectiveConversationId), event)
+            foreground.usage(ConversationId(state.ownerConversationId), event)
             Telemetry.event(
                 "AdminChatVM", "ws.usage",
                 "prompt" to event.promptTokens,
@@ -478,7 +462,6 @@ class ChatSendCoordinator(
                 "runId" to event.runId,
             )
         }
-
     }
 
     private suspend fun handleSubscribeDone(event: WsTimelineEvent.SubscribeDone) {
@@ -491,7 +474,6 @@ class ChatSendCoordinator(
                 reason = "subscribeDone", recordEvent = false,
             ))
         }
-
     }
 
     private suspend fun handleDisconnect(event: WsTimelineEvent.Disconnected) {
@@ -505,22 +487,20 @@ class ChatSendCoordinator(
             return
         }
         failActiveTurnForDisconnect(event)
-
     }
 
     private fun messageDeduplicationScope(event: WsTimelineEvent): String? {
         val delta = event as? WsTimelineEvent.MessageDelta ?: return null
-        val named = delta.conversationId?.let(::ConversationId)
-        return turnRegistry.resolveConversationId(named)?.value ?: named?.value
-            ?: turnRegistry.lastActiveConversationId ?: activeConversationId()
+        return namedOrLastActive(delta.conversationId) ?: activeConversationId()
     }
 
-    private fun recordRunStateOnly(event: WsTimelineEvent.RunActivity) {
-        val named = event.conversationId?.let(::ConversationId)
-        runtimeEventBatcher.enqueue(
-            event, turnRegistry.resolveConversationId(named)?.value ?: named?.value ?: turnRegistry.lastActiveConversationId,
-        )
-    }
+    private fun recordRunStateOnly(event: WsTimelineEvent.RunActivity) =
+        runtimeEventBatcher.enqueue(event, namedOrLastActive(event.conversationId))
+
+    /** A frame's own (alias-resolved) conversation, else the conversation this chat last sent on. */
+    private fun namedOrLastActive(named: String?): String? = named?.let(::ConversationId)
+        ?.let { turnRegistry.resolveConversationId(it)?.value ?: it.value }
+        ?: turnRegistry.lastActiveConversationId
 
     private suspend fun handleMessageDelta(event: WsTimelineEvent.MessageDelta) {
         serverQueueMarks.onOwnTurnFrame(event)
@@ -541,7 +521,7 @@ class ChatSendCoordinator(
     private suspend fun handleTurnDoneFrame(event: WsTimelineEvent.TurnDone) {
         val owner = turnRegistry.resolveTerminal(event)
         val stale = owner == null ||
-            turnRegistry.isRetiredTurn(owner, TurnTail(event.turnId, event.runId)) ||
+            owner.isRetiredTurn(TurnTail(event.turnId, event.runId)) ||
             !owner.identity.acceptsTerminal(event.turnId)
         if (stale) {
             if (owner == null) reportUnmatchedFrame(event, TurnTail(event.turnId, event.runId))
@@ -555,10 +535,6 @@ class ChatSendCoordinator(
 
     private suspend fun handleErrorFrame(event: WsTimelineEvent.Error) {
         if (!incoming.error(event)) reportUnmatchedFrame(event, TurnTail(event.turnId, event.runId))
-    }
-
-    private suspend fun handleRedialWhileTurnActive(event: RedialWhileTurnActive) = turnStateMutex.withLock {
-        handleRedialWhileTurnActiveLocked(event)
     }
 
     private suspend fun handleRedialWhileTurnActiveLocked(event: RedialWhileTurnActive) {
@@ -605,17 +581,12 @@ class ChatSendCoordinator(
 
     private suspend fun handleTurnStarted(event: WsTimelineEvent.TurnStarted) {
         val state = incoming.started(event, scope) ?: return
-        val conversation = ConversationId(state.localConversationId ?: state.conversationId)
+        val conversation = ConversationId(state.ownerConversationId)
         showConversation(conversation)
         foreground.started(conversation)
         incoming.drainBuffered(conversation)
     }
 
-    /**
-     * lcp-cv3: stop_reason is first-wins for telemetry, but intermediate stops
-     * (requires_approval) may still be followed by a completed main-reply stop —
-     * upgrade so Failed-after-delivered suppression uses the right signal.
-     */
     /**
      *  (codex review P1): a stop_reason from a DIFFERENT
      * turn (fanout/replay) must not count as this turn's main-reply completion
@@ -638,6 +609,11 @@ class ChatSendCoordinator(
         return true
     }
 
+    /**
+     * lcp-cv3: stop_reason is first-wins for telemetry, but intermediate stops
+     * (requires_approval) may still be followed by a completed main-reply stop —
+     * upgrade so Failed-after-delivered suppression uses the right signal.
+     */
     private fun recordStopReasonForTurn(
         state: ConversationTurnState,
         event: WsTimelineEvent.StopReason,
@@ -675,8 +651,7 @@ class ChatSendCoordinator(
     }
 
     private suspend fun finishActiveTurn(state: ConversationTurnState, request: TurnSettlementRequest) {
-        val conversationId = (state.localConversationId ?: state.conversationId).takeIf { it.isNotBlank() }
-            ?: IdFormats.defaultConversationIdFor(agentId)
+        val conversationId = state.ownerConversationId.takeIf { it.isNotBlank() } ?: IdFormats.defaultConversationIdFor(agentId)
         val writes = settlement.finish(
             state, request,
             if (request.event.status is BridgeTurnStatus.Cancelled) serverQueueMarks.cancelledTerminalNotice(state.inFlightSend) else null,
@@ -758,8 +733,6 @@ class ChatSendCoordinator(
     }
 
     internal companion object {
-
         internal var postSendReconcileDelaysMs = longArrayOf(750L, 2_500L, 6_000L)
     }
-
 }

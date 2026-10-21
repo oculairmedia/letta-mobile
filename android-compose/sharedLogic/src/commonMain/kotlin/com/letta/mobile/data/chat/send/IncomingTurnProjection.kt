@@ -6,6 +6,7 @@ import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.timeline.api.TimelineIngestSources
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -39,15 +40,8 @@ internal class IncomingTurnProjection(
             preConversationMessageDeltas.addLast(event)
             return null
         }
-        val conversationId = resolution.conversation.value
-        runtimeEventBatcher.enqueue(event, conversationId)
         val retiredTail = resolution.retired
-        val resolvedFrame = turnRegistry.resolveConversationId(event.conversationId?.let(::ConversationId))
-        resolution.state?.recordAssistantEvidence(event, resolvedFrame)
-        timelineRepository.ingestExternalTransportMessage(
-            agentId, conversationId, event.message,
-            source = TimelineIngestSources.coordinator(retiredTail),
-        )
+        project(event, resolution.conversation, resolution.state, TimelineIngestSources.coordinator(retiredTail))
         if (retiredTail) {
             // A reply's last deltas can reach us after its terminal (Iroh emits them behind
             // turn_finished). The timeline folds them into the finished turn, but the turn is over:
@@ -56,7 +50,7 @@ internal class IncomingTurnProjection(
                 "AdminChatVM", "ws.event.retiredTurnTailDelta",
                 "turnId" to event.turnId,
                 "messageType" to event.message.messageType,
-                "conversationId" to conversationId,
+                "conversationId" to resolution.conversation.value,
             )
             return null
         }
@@ -65,7 +59,7 @@ internal class IncomingTurnProjection(
 
     suspend fun started(event: WsTimelineEvent.TurnStarted, scope: CoroutineScope): ConversationTurnState? {
         val state = turnRegistry.resolveStateForTurnStarted(event)
-        val effectiveConversationId = state.localConversationId ?: state.conversationId
+        val effectiveConversationId = state.ownerConversationId
         if (state.advanceStartedIdentity(event)) return null
         // dir4k (z5vfy PR-3): optimistic-local / OTID settlement. A new
         // turn is starting while a PREVIOUS turn's optimistic-local user
@@ -78,10 +72,9 @@ internal class IncomingTurnProjection(
         // PR2: only THIS conversation's unsettled otid is settled here. The old
         // global read settled (and then dropped) another conversation's live send.
         state.otid?.let { staleOtid ->
-            val staleLocalConv = state.localConversationId ?: effectiveConversationId
             scope.launch {
                 runCatching {
-                    timelineRepository.markExternalTransportLocalSent(agentId, staleLocalConv, staleOtid)
+                    timelineRepository.markExternalTransportLocalSent(agentId, effectiveConversationId, staleOtid)
                 }
             }
             Telemetry.event(
@@ -104,17 +97,23 @@ internal class IncomingTurnProjection(
     }
 
     suspend fun drainBuffered(conversation: ConversationId) {
-        val conversationId = conversation.value
         val state = turnRegistry.peekState(conversation)
         while (true) {
             val delta = preConversationMessageDeltas.removeFirstOrNull() ?: return
-            runtimeEventBatcher.enqueue(delta, conversationId)
-            val resolvedFrame = turnRegistry.resolveConversationId(delta.conversationId?.let(::ConversationId))
-            state?.recordAssistantEvidence(delta, resolvedFrame)
-            timelineRepository.ingestExternalTransportMessage(
-                agentId, conversationId, delta.message, source = "coordinator.preConversationDrain",
-            )
+            project(delta, conversation, state, source = "coordinator.preConversationDrain")
         }
+    }
+
+    /** Record runtime audit and delivery evidence, then write the frame to its owning timeline. */
+    private suspend fun project(
+        delta: WsTimelineEvent.MessageDelta,
+        conversation: ConversationId,
+        state: ConversationTurnState?,
+        source: String,
+    ) {
+        runtimeEventBatcher.enqueue(delta, conversation.value)
+        state?.recordAssistantEvidence(delta, turnRegistry.resolveConversationId(delta.conversationId?.let(::ConversationId)))
+        timelineRepository.ingestExternalTransportMessage(agentId, conversation.value, delta.message, source = source)
     }
 
     suspend fun error(event: WsTimelineEvent.Error): Boolean {
@@ -173,7 +172,7 @@ internal class IncomingTurnProjection(
             )
             foreground.error(conversation, null)
         }.onFailure { failure ->
-            if (failure is kotlinx.coroutines.CancellationException) throw failure
+            if (failure is CancellationException) throw failure
             Telemetry.error(
                 "AdminChatVM", "ws.cursorExpired.repairFailed", failure,
                 "conversationId" to conversation.value,
@@ -183,8 +182,6 @@ internal class IncomingTurnProjection(
     }
 
     fun clearBuffered() = preConversationMessageDeltas.clear()
-
-
 }
 
 private const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"

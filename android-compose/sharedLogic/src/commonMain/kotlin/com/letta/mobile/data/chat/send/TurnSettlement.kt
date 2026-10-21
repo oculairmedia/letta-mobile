@@ -151,8 +151,7 @@ internal class TurnSettlement(
         cancelledNotice: TurnFailureNotice?,
     ): List<Result<Unit>> {
         val event = request.event
-        val conversationId = (state.localConversationId ?: state.conversationId).takeIf { it.isNotBlank() }
-            ?: defaultConversationId
+        val conversationId = state.ownerConversationId.takeIf { it.isNotBlank() } ?: defaultConversationId
         val outcome = TurnTerminalPolicy.decide(TurnTerminalEvidence.from(state), request, cancelledNotice)
         val terminalWrites = runCatching { writeTerminal(state, request, outcome, ConversationId(conversationId)) }
         val stopReason = state.stopReason
@@ -176,12 +175,10 @@ internal class TurnSettlement(
         outcome: TurnTerminalOutcome,
         conversation: ConversationId,
     ) {
+        val tail = TurnTail(request.event.turnId, request.event.runId)
         if (outcome.cleanupFragments) {
             cleanupAbandonedAssistantFragmentsSafely(
-                conversation = conversation,
-                tail = TurnTail(request.event.turnId, request.event.runId),
-                reason = "turn_done_${request.event.status}",
-                candidateRunIds = activeCleanupCandidateRunIds(state, TurnTail(request.event.turnId, request.event.runId)),
+                conversation, tail, "turn_done_${request.event.status}", activeCleanupCandidateRunIds(state, tail),
             )
         }
         if (request.recordEvent) {
@@ -198,7 +195,7 @@ internal class TurnSettlement(
             )
         }
         outcome.notice?.let { notice ->
-            appendTurnFailureNotice(conversation, TurnTail(request.event.turnId, request.event.runId), notice)
+            appendTurnFailureNotice(conversation, tail, notice)
         }
     }
 
@@ -238,12 +235,8 @@ internal class TurnSettlement(
             val localSettlement = runCatching { settlePendingSend(state, conversationId, outcome.deadTurn) }
             val foregroundPresence = runCatching {
                 // Evaluate after suspension: the user may have selected a different conversation.
-                if (foreground.owns(conversationId)) {
-                    ui.onTurnFinished(
-                        TurnTerminalPolicy.nextError(TurnTerminalEvidence.from(state), status, outcome.notice, ui.currentError()),
-                    )
-                } else {
-                    foreground.suppressed(conversationId, "onTurnFinished")
+                foreground.turnFinished(conversationId) {
+                    TurnTerminalPolicy.nextError(TurnTerminalEvidence.from(state), status, outcome.notice, ui.currentError())
                 }
             }
             // Unconditional: an earlier turn's dangling card may need its cancelled sweep restored.
@@ -289,20 +282,10 @@ internal class TurnSettlement(
         timelineRepository.markExternalTransportLocalFailed(agentId, localConversationId, otid)
     }
 
-    private suspend fun cleanupDisconnectedTurnFragments(
-        state: ConversationTurnState,
-        conversation: ConversationId,
-    ) {
-        val conversationId = conversation.value
-        val cleanupRunId = state.runId
-        val cleanupTurnId = state.turnId
-        if (listOf(state.otid, cleanupRunId, cleanupTurnId).all { it == null }) return
-        cleanupAbandonedAssistantFragmentsSafely(
-            conversation = ConversationId(conversationId),
-            tail = TurnTail(cleanupTurnId, cleanupRunId),
-            reason = "disconnect",
-            candidateRunIds = activeCleanupCandidateRunIds(state, TurnTail(cleanupTurnId, cleanupRunId)),
-        )
+    private suspend fun cleanupDisconnectedTurnFragments(state: ConversationTurnState, conversation: ConversationId) {
+        if (listOf(state.otid, state.runId, state.turnId).all { it == null }) return
+        val tail = TurnTail(state.turnId, state.runId)
+        cleanupAbandonedAssistantFragmentsSafely(conversation, tail, "disconnect", activeCleanupCandidateRunIds(state, tail))
     }
 
     /**
@@ -321,7 +304,7 @@ internal class TurnSettlement(
     }
 
     suspend fun markTurnVisuallyComplete(state: ConversationTurnState, reason: String) {
-        val conversationId = (state.localConversationId ?: state.conversationId).takeIf { it.isNotBlank() }
+        val conversationId = state.ownerConversationId.takeIf { it.isNotBlank() }
             ?: foreground.visibleConversation?.value
             ?: defaultConversationId
         state.otid?.let { otid ->

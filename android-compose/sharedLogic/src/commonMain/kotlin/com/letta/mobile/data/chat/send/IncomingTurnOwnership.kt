@@ -29,7 +29,7 @@ internal fun ConversationTurnRegistry.resolveDelta(
     val retired = peekState(conversation)?.isRetiredDelta(event) == true
     val state = if (shouldAdoptPassiveDelta(event, boundState, retired)) {
         stateFor(conversation).also {
-            if (it.adoptPassiveDelta(event)) lastActiveConversationId = it.localConversationId ?: it.conversationId
+            if (it.adoptPassiveDelta(event)) lastActiveConversationId = it.ownerConversationId
         }
     } else {
         peekState(conversation)
@@ -56,7 +56,7 @@ private fun ConversationTurnRegistry.namedDeltaConversation(
 ): ConversationId {
     val resolved = resolveConversationId(named) ?: named
     val owner = boundState ?: ownedDeltaState(TurnTail(event.turnId, null), resolved) ?: peekState(resolved)
-    return owner?.let { ConversationId(it.localConversationId ?: it.conversationId) } ?: resolved
+    return owner?.let { ConversationId(it.ownerConversationId) } ?: resolved
 }
 
 /** Only legacy untagged frames may use this chat's active send or visible fallback. */
@@ -66,9 +66,9 @@ private fun ConversationTurnRegistry.legacyDeltaConversation(
     visibleConversation: ConversationId?,
 ): ConversationId? {
     val owner = boundState ?: event.turnId?.let { turn ->
-        resolveStateByTurn(TurnTail(turn, null))?.takeUnless { isRetiredTurn(it, TurnTail(turn, null)) }
+        resolveStateByTurn(TurnTail(turn, null))?.takeUnless { it.isRetiredTurn(TurnTail(turn, null)) }
     }
-    return owner?.let { ConversationId(it.localConversationId ?: it.conversationId) }
+    return owner?.let { ConversationId(it.ownerConversationId) }
         ?: lastActiveConversationId?.let(::ConversationId)
         ?: visibleConversation
 }
@@ -82,11 +82,6 @@ private fun ConversationTurnRegistry.ownedDeltaState(tail: TurnTail, conversatio
     return awaitingIdentity.singleOrNull {
         conversation.value in listOf(it.conversationId, it.localConversationId)
     }
-}
-
-internal fun ConversationTurnRegistry.isRetiredTurn(state: ConversationTurnState, tail: TurnTail): Boolean {
-    val turn = tail.turnId?.takeIf { it.isNotBlank() } ?: return false
-    return state.turnId != turn && state.identity.isFenced(turn)
 }
 
 /** Error frames can create state only for this coordinator's visible conversation. */

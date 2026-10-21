@@ -83,7 +83,7 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
         serverConversationId: ConversationId,
         tail: TurnTail,
     ): ConversationId? {
-        val originatingConv = ConversationId(localConversationId ?: conversationId)
+        val originatingConv = ConversationId(ownerConversationId)
         val serverConv = serverConversationId
         if (serverConv == originatingConv) return null
         conversationAliases.remove(serverConv)
@@ -266,8 +266,6 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
         if (states.any { identityOf(it) != null }) return null
         return fallbackState()
     }
-
-
 }
 
 private const val MAX_SETTLED_OTIDS = 16

@@ -9,11 +9,11 @@ import com.letta.mobile.util.Telemetry
 /** Incoming identity and delivery transitions on the existing conversation state, under the lifecycle mutex. */
 /** Advance identity first; same-turn run promotion preserves the existing delivery evidence. */
 internal fun ConversationTurnState.advanceStartedIdentity(event: WsTimelineEvent.TurnStarted): Boolean {
-    val transition = identity.turnStarted(localConversationId ?: conversationId, event.turnId, event.runId)
+    val transition = identity.turnStarted(ownerConversationId, event.turnId, event.runId)
     if (transition !is TurnIdentityTransition.SameTurn || event.turnId != turnId) return false
     Telemetry.event(
         "AdminChatVM", "ws.turnStarted.runPromoted",
-        "conversationId" to (localConversationId ?: conversationId),
+        "conversationId" to ownerConversationId,
         "turnId" to event.turnId,
         "previousRunId" to (runId ?: ""),
         "runId" to event.runId,
@@ -71,7 +71,7 @@ private fun ConversationTurnState.frameConversationMatchesActive(
     resolvedFrame: ConversationId?,
 ): Boolean {
     val tagged = event.conversationId ?: return true
-    val target = localConversationId ?: conversationId
+    val target = ownerConversationId
     return tagged == target || tagged == serverConversationId || resolvedFrame?.value == target
 }
 
@@ -85,11 +85,17 @@ internal fun ConversationTurnState.bufferError(event: WsTimelineEvent.Error) {
 
 private const val MAX_ACTIVE_ASSISTANT_RUN_IDS = 8
 
-/** A retired tail cannot relight live presence or passively adopt live identity. */
-internal fun ConversationTurnState.isRetiredDelta(event: WsTimelineEvent.MessageDelta): Boolean {
-    val turn = event.turnId?.takeIf { it.isNotBlank() }
-    if (turn != null) return turnId != turn && identity.isFenced(turn)
-    val run = event.message.runId?.takeIf { it.isNotBlank() } ?: return false
-    return run != runId && run in settledRunIds
+/**
+ * True when [tail] names a turn this conversation already settled. Such a frame is history: only
+ * the TurnDone stale path still wants it; stop/usage/error frames must not mutate a cleared entry.
+ */
+internal fun ConversationTurnState.isRetiredTurn(tail: TurnTail): Boolean {
+    val turn = tail.turnId?.takeIf { it.isNotBlank() } ?: return false
+    return turnId != turn && identity.isFenced(turn)
 }
 
+/** A retired tail cannot relight live presence or passively adopt live identity. A frame without a
+ * turn id still names its run; a settled run that is not the live one is a finished turn's tail. */
+internal fun ConversationTurnState.isRetiredDelta(event: WsTimelineEvent.MessageDelta): Boolean =
+    if (!event.turnId.isNullOrBlank()) isRetiredTurn(TurnTail(event.turnId, null))
+    else isRetiredRun(TurnTail(null, event.message.runId))

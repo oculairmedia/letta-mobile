@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.transport.WsTimelineEvent
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,6 +16,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonPrimitive
 
 /** Foreground UI follows the current selection; timeline ownership follows the frame. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -49,6 +51,40 @@ internal class ChatSendCoordinatorForegroundRoutingTest : ChatSendCoordinatorCon
         assertTrue(observedConversations.isEmpty())
         assertTrue(transport.sentConversationIds.isEmpty())
         assertEquals(0, composerClears)
+    }
+
+    @Test
+    fun preparationFailureAfterSelectionSwitchStaysOffTheNewSelection() = runTest(UnconfinedTestDispatcher()) {
+        val ui = RecordingUiSink(error = "B error")
+        var visible: String? = CONV_A
+        val transport = FakeChannelTransport(mutableListOf())
+        prepareConversation = { visible = CONV_B; error("prepare failed") }
+        val coordinator = coordinator(
+            timeline = RecordingTimelineWriter(), ui = ui, transport = transport, scope = backgroundScope,
+        ) { visible }
+        coordinator.send("send A").join()
+        assertEquals("B error", ui.currentError())
+        assertTrue(selectedConversations.isEmpty())
+        assertTrue(transport.sentConversationIds.isEmpty())
+    }
+
+    @Test
+    fun backgroundDeltaIngestsWithoutLightingForegroundPresence() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink(error = "B error")
+        val coordinator = coordinator(
+            timeline = timeline, ui = ui, transport = FakeChannelTransport(mutableListOf()), scope = backgroundScope,
+        ) { CONV_B }
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                message = AssistantMessage(id = "msg-a", contentRaw = JsonPrimitive("A reply"), runId = "run-a"),
+                conversationId = CONV_A,
+                turnId = "turn-a",
+            ),
+        )
+        assertEquals(listOf("msg-a"), timeline.ingestedMessages.map { it.id })
+        assertEquals("B error", ui.currentError())
+        assertFalse(ui.isStreaming())
     }
 
     @Test

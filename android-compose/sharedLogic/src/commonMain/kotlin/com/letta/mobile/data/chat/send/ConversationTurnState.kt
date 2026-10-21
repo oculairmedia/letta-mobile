@@ -21,6 +21,9 @@ internal class ConversationTurnState(val conversationId: String) {
     @Volatile var localConversationId: String? = null
     @Volatile var serverConversationId: String? = null
 
+    /** The conversation this state reports to: the originating local id once a send bound it. */
+    val ownerConversationId: String get() = localConversationId ?: conversationId
+
     // letta-mobile-i8iw: lcp-cv3 contract — stop_reason and usage_statistics
     // are first-wins per turn on the shim. We capture once and drop later
     // duplicates defensively (drop with telemetry rather than overwriting).
@@ -104,7 +107,7 @@ internal class ConversationTurnState(val conversationId: String) {
     }
 
     private fun bindObservedTurn(turn: String, run: String) {
-        identity.turnStarted(localConversationId ?: conversationId, turn, run)
+        identity.turnStarted(ownerConversationId, turn, run)
         turnId = turn
     }
 

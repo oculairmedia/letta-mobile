@@ -24,6 +24,11 @@ internal class ConversationChatUi(
         if (accepts(conversation, "onTurnVisuallyComplete")) sink.onTurnVisuallyComplete()
     }
 
+    /** The terminal's error is computed only for a conversation still visible after its writes. */
+    fun turnFinished(conversation: ConversationId, error: () -> String?) {
+        if (accepts(conversation, "onTurnFinished")) sink.onTurnFinished(error())
+    }
+
     fun started(conversation: ConversationId) {
         if (accepts(conversation, "onTurnStarted")) sink.onTurnStarted(conversation.value)
     }
@@ -64,11 +69,11 @@ internal class ConversationChatUi(
     /** Disconnect is global; only its held presence is conversation-owned. */
     fun transientDisconnect(states: List<ConversationTurnState>) {
         sink.onTransientDisconnect(states.any { state ->
-            state.otid != null && owns(ConversationId(state.localConversationId ?: state.conversationId))
+            state.otid != null && owns(ConversationId(state.ownerConversationId))
         })
     }
 
-    private fun accepts(conversation: ConversationId?, callback: String): Boolean {
+    fun accepts(conversation: ConversationId?, callback: String): Boolean {
         if (owns(conversation)) return true
         suppressed(conversation, callback)
         return false
