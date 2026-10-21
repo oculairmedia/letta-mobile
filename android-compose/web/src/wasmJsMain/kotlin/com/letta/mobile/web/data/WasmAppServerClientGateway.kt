@@ -13,7 +13,11 @@ import com.letta.mobile.data.subagents.SubagentView
 import com.letta.mobile.data.session.graph.HostSessionBinding
 import com.letta.mobile.data.memory.memfs.AppServerMemfsSource
 import com.letta.mobile.data.memory.memfs.MemfsSource
+import com.letta.mobile.data.model.isIrohBackendUrl
+import com.letta.mobile.data.repository.appserver.AppServerLocalAdminGateway
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
+import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
 import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
 import com.letta.mobile.data.session.graph.HostSessionGraphFactory
 import com.letta.mobile.data.session.graph.HostSessionGraphProvider
@@ -157,20 +161,23 @@ class WasmAppServerClientGateway(
         val conversationId = session.ensureConversation(agent.id.value, ::nextRequestId)
         val transport = timelineTransport(session, agent.id)
         val target = TimelineChatTarget(agentId = agent.id.value, agentName = agent.name, conversationId = conversationId)
-        val admin = session.appServerAdmin
         return WebChatBinding(
             target = target,
             transport = transport,
             controls = webRunControls(AppServerRunControls(session.engine), target),
             chips = TimelineChipSources(
-                models = TimelineModelSource(
-                    backend = ConversationModelBackend.of(admin),
-                    conversation = { admin.getConversation(it.value) },
-                    agentModel = agent.model,
-                ),
+                models = webModelSource(irohChatGateway(), session.appServerAdmin, agent.model, modelControl.catalog),
                 permissionModes = session.permissionModes,
             ),
         )
+    }
+
+    /** The shared Iroh chat gateway over the live session's channel, or null when the session is not Iroh. */
+    private fun irohChatGateway(): IrohAdminRpcChatGateway? {
+        val binding = nextBinding ?: return null
+        val config = binding.config ?: return null
+        if (!isIrohBackendUrl(config.serverUrl)) return null
+        return IrohAdminRpcChatGateway(sessionGraphProvider.current.channelTransport, deviceLabel = WEB_BACKEND_ID)
     }
 
     /**
@@ -257,6 +264,31 @@ internal fun unservedStatus(config: LettaConfig): BackendConnectionStatus? = whe
     config.serverUrl.isBlank() -> BackendConnectionStatus.Unconfigured
     !webSessionCapabilities(config).supports(SessionRoute.AGENTS) -> BackendConnectionStatus.Failed(NO_BROWSER_ROUTE)
     else -> null
+}
+
+/**
+ * Where a chat lists and switches models. An Iroh host's control channel answers no native
+ * `list_models` / `conversation_update`, so there the chat goes through the shared Iroh chat gateway
+ * ([iroh]: `model.list`, and `model.update` with the effort [catalog] advertises), as desktop does;
+ * a ws:// App Server keeps its own commands ([admin]).
+ */
+internal fun webModelSource(
+    iroh: IrohAdminRpcChatGateway?,
+    admin: AppServerLocalAdminGateway,
+    agentModel: String?,
+    catalog: ModelCatalogRepository,
+): TimelineModelSource {
+    val gateway = iroh ?: return TimelineModelSource(
+        backend = ConversationModelBackend.of(admin),
+        conversation = { admin.getConversation(it.value) },
+        agentModel = agentModel,
+    )
+    return TimelineModelSource(
+        backend = checkNotNull(ConversationModelBackend.of(gateway)),
+        conversation = { gateway.getConversation(it.value) },
+        agentModel = agentModel,
+        catalog = catalog,
+    )
 }
 
 /** The page's stop and approval answers, scoped to [target]'s conversation. */

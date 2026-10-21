@@ -64013,9 +64013,11 @@ public final class com/letta/mobile/ui/chat/session/TimelineLocalState {
 }
 
 public final class com/letta/mobile/ui/chat/session/TimelineModelSource {
-	public fun <init> (Lcom/letta/mobile/ui/chat/session/ConversationModelBackend;Lkotlin/jvm/functions/Function2;Ljava/lang/String;)V
+	public fun <init> (Lcom/letta/mobile/ui/chat/session/ConversationModelBackend;Lkotlin/jvm/functions/Function2;Ljava/lang/String;Lcom/letta/mobile/data/repository/modelcontrol/ModelCatalogRepository;)V
+	public synthetic fun <init> (Lcom/letta/mobile/ui/chat/session/ConversationModelBackend;Lkotlin/jvm/functions/Function2;Ljava/lang/String;Lcom/letta/mobile/data/repository/modelcontrol/ModelCatalogRepository;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getAgentModel ()Ljava/lang/String;
 	public final fun getBackend ()Lcom/letta/mobile/ui/chat/session/ConversationModelBackend;
+	public final fun getCatalog ()Lcom/letta/mobile/data/repository/modelcontrol/ModelCatalogRepository;
 	public final fun getConversation ()Lkotlin/jvm/functions/Function2;
 }
 

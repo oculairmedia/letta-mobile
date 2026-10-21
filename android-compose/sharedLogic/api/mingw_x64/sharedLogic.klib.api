@@ -60505,12 +60505,14 @@ final class com.letta.mobile.ui.chat.session/TimelineLocalState { // com.letta.m
 }
 
 final class com.letta.mobile.ui.chat.session/TimelineModelSource { // com.letta.mobile.ui.chat.session/TimelineModelSource|null[0]
-    constructor <init>(com.letta.mobile.ui.chat.session/ConversationModelBackend, kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/Conversation>, kotlin/String?) // com.letta.mobile.ui.chat.session/TimelineModelSource.<init>|<init>(com.letta.mobile.ui.chat.session.ConversationModelBackend;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.model.ConversationId,com.letta.mobile.data.model.Conversation>;kotlin.String?){}[0]
+    constructor <init>(com.letta.mobile.ui.chat.session/ConversationModelBackend, kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/Conversation>, kotlin/String?, com.letta.mobile.data.repository.modelcontrol/ModelCatalogRepository? = ...) // com.letta.mobile.ui.chat.session/TimelineModelSource.<init>|<init>(com.letta.mobile.ui.chat.session.ConversationModelBackend;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.model.ConversationId,com.letta.mobile.data.model.Conversation>;kotlin.String?;com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository?){}[0]
 
     final val agentModel // com.letta.mobile.ui.chat.session/TimelineModelSource.agentModel|{}agentModel[0]
         final fun <get-agentModel>(): kotlin/String? // com.letta.mobile.ui.chat.session/TimelineModelSource.agentModel.<get-agentModel>|<get-agentModel>(){}[0]
     final val backend // com.letta.mobile.ui.chat.session/TimelineModelSource.backend|{}backend[0]
         final fun <get-backend>(): com.letta.mobile.ui.chat.session/ConversationModelBackend // com.letta.mobile.ui.chat.session/TimelineModelSource.backend.<get-backend>|<get-backend>(){}[0]
+    final val catalog // com.letta.mobile.ui.chat.session/TimelineModelSource.catalog|{}catalog[0]
+        final fun <get-catalog>(): com.letta.mobile.data.repository.modelcontrol/ModelCatalogRepository? // com.letta.mobile.ui.chat.session/TimelineModelSource.catalog.<get-catalog>|<get-catalog>(){}[0]
     final val conversation // com.letta.mobile.ui.chat.session/TimelineModelSource.conversation|{}conversation[0]
         final fun <get-conversation>(): kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/Conversation> // com.letta.mobile.ui.chat.session/TimelineModelSource.conversation.<get-conversation>|<get-conversation>(){}[0]
 }
