@@ -116,7 +116,7 @@ private fun PlatformFile.asImageSource(): ComposerImageSource = { readImageBytes
 
 /**
  * A picked file's bytes, refused past [com.letta.mobile.data.attachment.ImageIngressPolicy.MAX_SOURCE_BYTES]
- * like paste and drop (letta-mobile-k5nbq.18): read capped through [readImageSource] where the
+ * like paste and drop: read capped through [readImageSource] where the
  * platform streams the file, by its size before reading where it cannot (the browser).
  */
 internal expect suspend fun PlatformFile.readImageBytes(): ByteArray

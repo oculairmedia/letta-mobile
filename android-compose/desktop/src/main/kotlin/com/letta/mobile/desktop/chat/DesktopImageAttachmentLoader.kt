@@ -16,7 +16,7 @@ import kotlinx.coroutines.withContext
  * Desktop paste/drop still reads AWT images; encoding is the shared composer path
  * (letta-mobile-k5nbq.7) so Android paste and the picker share the same downscale and byte cap.
  * Null when not an image. A dropped or pasted file is refused by its size before it is read, and read capped, at the shared
- * ImageIngressPolicy.MAX_SOURCE_BYTES (letta-mobile-k5nbq.18).
+ * ImageIngressPolicy.MAX_SOURCE_BYTES.
  */
 class DesktopImageAttachmentLoader(
     private val limits: AttachmentLimits = AttachmentLimits.Default,
