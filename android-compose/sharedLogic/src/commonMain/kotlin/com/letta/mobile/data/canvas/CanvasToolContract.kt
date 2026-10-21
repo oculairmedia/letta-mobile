@@ -47,15 +47,6 @@ object CanvasToolContract {
     /** The upper bound on [compose]'s description: the format itself is [composeGuide]'s answer. */
     const val COMPOSE_DESCRIPTION_MAX_CHARS = 700
 
-    /**
-     * What export_svg answers until a real exporter runs where the tools do.
-     * It used to return a constant empty SVG, which an agent took for the canvas's true content.
-     * The tool is not offered ([all] leaves it out); a call that names it anyway is told plainly.
-     */
-    const val EXPORT_SVG_NOT_IMPLEMENTED =
-        "canvas_export_svg is not implemented yet: nothing renders a canvas to SVG where the tools run. " +
-            "Use canvas_get_scene to read the canvas."
-
     /** How every canvas-reading tool is told which canvas: optional, defaulting to the conversation's. */
     const val CANVAS_ID_DESCRIPTION = "Omit to use this conversation's canvas (made on first use); name one from canvas_list only to reach another."
 
@@ -227,8 +218,8 @@ object CanvasToolContract {
 
     /**
      * The tools offered to agents. [exportSvg] remains unadvertised: its portable drawing renderer
-     * rejects text/labels without font measurement, background patterns, Cascade notes, plugin elements,
-     * curved connectors and unresolved image assets.
+     * does not yet render background patterns, Cascade notes, plugin elements, curved connectors or
+     * resolve image assets.
      * Direct calls reject unsupported content rather than silently exporting an incomplete board.
      */
     // Only advertise preview when a mobile renderer bridge is actually connected.

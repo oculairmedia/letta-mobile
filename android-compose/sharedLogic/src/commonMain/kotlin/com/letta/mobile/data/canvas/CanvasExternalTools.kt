@@ -1,6 +1,5 @@
 package com.letta.mobile.data.canvas
 
-import com.letta.mobile.data.canvas.export.CanvasSvgRenderer
 import com.letta.mobile.data.canvas.compose.ComposeErrorCode
 import com.letta.mobile.data.canvas.compose.ComposePublishException
 import com.letta.mobile.data.canvas.compose.ComposeTarget
@@ -508,13 +507,7 @@ class CanvasExportSvgTool(
         runWithContext(agentId, "Failed to export SVG") { context ->
             when (val lookup = findCanvasDocument(context, input)) {
                 is CanvasLookupResult.Error -> lookup.result
-                is CanvasLookupResult.Found -> ExternalToolResult.Success(
-                    CanvasSvgRenderer.render(lookup.doc.sceneJson) { scene ->
-                        val checked = CanvasSceneValidator.scene(CanvasOpProjector.stripMetadataForDrawBox(scene))
-                        require(checked is CanvasSceneCheck.Valid) { (checked as CanvasSceneCheck.Invalid).message }
-                        checked.json
-                    },
-                )
+                is CanvasLookupResult.Found -> ExternalToolResult.Success(renderCanvasSvg(lookup.doc.sceneJson))
             }
         }
 

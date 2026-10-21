@@ -51,10 +51,19 @@ internal class CanvasWorkspaceHost(
     val presenceTransport: CanvasPresenceTransport?,
     val assets: AssetStore?,
     val currentPeerId: String?,
+    val currentPeerName: String?,
     val callbacks: CanvasWorkspaceCallbacks,
     val chrome: CanvasWorkspaceChromeOptions,
     val cameraRequest: CanvasCameraRequest?,
-)
+) {
+    /** How this device appears on the board to its peers; null (nothing published) without a named peer identity. */
+    val localPeer: CanvasPresence? = currentPeerId?.let { peer ->
+        currentPeerName?.let { name ->
+            val color = CANVAS_PEER_COLORS[(peer.hashCode().toUInt() % CANVAS_PEER_COLORS.size.toUInt()).toInt()]
+            CanvasPresence(peerId = peer, displayName = name, colorHex = color, cursorX = 0f, cursorY = 0f)
+        }
+    }
+}
 
 /** What the board hands back to its host. */
 internal class CanvasWorkspaceCallbacks(

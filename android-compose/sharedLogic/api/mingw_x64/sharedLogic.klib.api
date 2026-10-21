@@ -63631,8 +63631,6 @@ final object com.letta.mobile.data.canvas/CanvasToolContract { // com.letta.mobi
         final fun <get-CREATE>(): kotlin/String // com.letta.mobile.data.canvas/CanvasToolContract.CREATE.<get-CREATE>|<get-CREATE>(){}[0]
     final const val EXPORT_SVG // com.letta.mobile.data.canvas/CanvasToolContract.EXPORT_SVG|{}EXPORT_SVG[0]
         final fun <get-EXPORT_SVG>(): kotlin/String // com.letta.mobile.data.canvas/CanvasToolContract.EXPORT_SVG.<get-EXPORT_SVG>|<get-EXPORT_SVG>(){}[0]
-    final const val EXPORT_SVG_NOT_IMPLEMENTED // com.letta.mobile.data.canvas/CanvasToolContract.EXPORT_SVG_NOT_IMPLEMENTED|{}EXPORT_SVG_NOT_IMPLEMENTED[0]
-        final fun <get-EXPORT_SVG_NOT_IMPLEMENTED>(): kotlin/String // com.letta.mobile.data.canvas/CanvasToolContract.EXPORT_SVG_NOT_IMPLEMENTED.<get-EXPORT_SVG_NOT_IMPLEMENTED>|<get-EXPORT_SVG_NOT_IMPLEMENTED>(){}[0]
     final const val GET_LAYOUT // com.letta.mobile.data.canvas/CanvasToolContract.GET_LAYOUT|{}GET_LAYOUT[0]
         final fun <get-GET_LAYOUT>(): kotlin/String // com.letta.mobile.data.canvas/CanvasToolContract.GET_LAYOUT.<get-GET_LAYOUT>|<get-GET_LAYOUT>(){}[0]
     final const val GET_SCENE // com.letta.mobile.data.canvas/CanvasToolContract.GET_SCENE|{}GET_SCENE[0]

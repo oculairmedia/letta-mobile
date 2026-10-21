@@ -46,6 +46,8 @@ fun CanvasWorkspace(
      */
     assets: com.letta.mobile.data.storage.AssetStore? = null,
     currentPeerId: String? = null,
+    /** This user's name as peers see it beside their cursor; with [currentPeerId], publishes local presence. */
+    currentPeerName: String? = null,
     onNavigateBack: (() -> Unit)? = null,
     onExportJson: ((String) -> Unit)? = null,
     onExportSvg: ((String) -> Unit)? = null,
@@ -83,6 +85,7 @@ fun CanvasWorkspace(
         presenceTransport = presenceTransport,
         assets = assets,
         currentPeerId = currentPeerId,
+        currentPeerName = currentPeerName,
         callbacks = CanvasWorkspaceCallbacks(onNavigateBack, onExportJson, onExportSvg, onShareToChat),
         chrome = CanvasWorkspaceChromeOptions(showTitle, headerTrailing, layout, longPressDrawsSelectionBox, chromeTopInset),
         cameraRequest = cameraRequest,

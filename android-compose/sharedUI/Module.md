@@ -32,10 +32,6 @@ Interactive canvas layers, gestures, cameras, selection, notes, formatting and s
 
 Canvas-library status presented through the shared overlay host. `CanvasLibraryNotice` keeps storage failures visible, offers reload-only retry, and withdraws the notice after recovery. Hosts supply the shared library controller; keep persistence and retry policy in sharedLogic rather than the composable.
 
-# Package com.letta.mobile.ui.canvas.presence
-
-Local peer presence for a canvas board. The board publishes the local pointer as `CanvasPresence` in world coordinates, on movement and a heartbeat, without consuming input, and sends a bounded best-effort departure when it leaves. Hosts supply the presence transport and peer identity; transport delivery and expiry belong to sharedLogic.
-
 # Package com.letta.mobile.ui.canvas.plugin
 
 Plugin element renderers, fallback cards and live-view host contracts. Extend through PluginElementRenderers and PluginViewHost composition locals; plugin execution, capability enforcement and sandbox setup belong to the runtime/host, not fallback rendering.

@@ -1,41 +1,30 @@
-package com.letta.mobile.data.canvas.export
+package com.letta.mobile.data.canvas
 
-import com.letta.mobile.data.canvas.CanvasSceneSchema
-import com.letta.mobile.data.canvas.CanvasOpProjector
-import com.letta.mobile.data.canvas.CanvasSceneCheck
-import com.letta.mobile.data.canvas.CanvasSceneValidator
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CanvasSvgRendererTest {
-    private fun prepare(scene: String): String {
-        val checked = CanvasSceneValidator.scene(CanvasOpProjector.stripMetadataForDrawBox(scene))
-        require(checked is CanvasSceneCheck.Valid) { (checked as CanvasSceneCheck.Invalid).message }
-        return checked.json
-    }
-
-    private fun render(scene: String, prepareDrawing: (String) -> String = ::prepare): String =
-        CanvasSvgRenderer.render(scene, prepareDrawing)
-
     private fun scene(vararg elements: JsonObject): String = JsonObject(mapOf(
         "bgColor" to JsonPrimitive("#eceff1ff"), "elements" to JsonArray(elements.toList()),
     )).toString()
 
     @Test
-    fun rendersSupportedDrawingKindsWithBackgroundAndPaddedBounds() {
+    fun rendersEveryDrawingKindWithBackgroundAndPaddedBounds() {
         val image = JsonObject(CanvasSceneSchema.image.example + mapOf(
             "imageData" to JsonPrimitive("iVBORw0KGgo="),
             "imageMediaType" to JsonPrimitive("image/png"),
         ))
-        val shape = JsonObject(CanvasSceneSchema.shape.example - "text")
-        val svg = render(scene(shape, CanvasSceneSchema.path.example, image))
+        val svg = renderCanvasSvg(scene(CanvasSceneSchema.shape.example,
+            CanvasSceneSchema.text.example, CanvasSceneSchema.path.example, image))
         assertTrue(svg.contains("viewBox=\""))
         assertEquals(2, Regex("<rect ").findAll(svg).count())
+        assertEquals(2, Regex("<text ").findAll(svg).count())
         assertEquals(2, Regex("<line ").findAll(svg).count())
         assertEquals(1, Regex("<image ").findAll(svg).count())
         assertTrue(svg.contains("fill=\"#eceff1ff\""))
@@ -48,34 +37,29 @@ class CanvasSvgRendererTest {
             {"id":"idea-tri","type":"Shape","zIndex":1,"points":["210.0,542.0","490.0,762.0"],"strokeColor":"#f39c12ff","strokeWidth":5.0,"shapeType":"TRIANGLE","fillColor":"#fce9c4ff","cornerRadius":12.0},
             {"id":"plan-rect","type":"Shape","zIndex":1,"points":["568.0,560.0","868.0,740.0"],"strokeColor":"#16a085ff","strokeWidth":5.0,"shapeType":"RECTANGLE","fillColor":"#d1f2ebff","cornerRadius":24.0}
         ]}"""
-        val svg = render(sample)
+        val svg = renderCanvasSvg(sample)
         assertEquals(1, Regex("<polygon ").findAll(svg).count())
         assertEquals(2, Regex("<rect ").findAll(svg).count())
         assertTrue(svg.contains("width=\"300.0\""))
     }
 
     @Test
-    fun rejectsTextRatherThanGuessingWrappingOrRotationBounds() {
+    fun escapesTextAndStripsSynchronizationMetadata() {
         val text = JsonObject(CanvasSceneSchema.text.example + mapOf(
-            "text" to JsonPrimitive("A long line whose wrapping cannot be measured without the board fonts"),
-            "wrapWidth" to JsonPrimitive(20), "rotation" to JsonPrimitive(45),
+            "text" to JsonPrimitive("<tag> & \"quoted\" 'words'"),
+            "_actorId" to JsonPrimitive("secret-actor"),
+            "_lamport" to JsonPrimitive(42),
         ))
-        val error = assertFailsWith<IllegalStateException> { render(scene(text)) }
-        assertTrue(error.message.orEmpty().contains("text wrapping"))
-        assertFailsWith<IllegalArgumentException> { render(scene(CanvasSceneSchema.shape.example)) }
+        val svg = renderCanvasSvg(scene(text))
+        assertTrue(svg.contains("&lt;tag&gt; &amp; &quot;quoted&quot; &apos;words&apos;"))
+        assertFalse(svg.contains("secret-actor"))
+        assertFalse(svg.contains("_lamport"))
     }
 
     @Test
-    fun rejectsPatternsBeforeStrippingRootMetadata() {
+    fun rejectsBackgroundPatternsThatMetadataStrippingWouldDrop() {
         val patterned = """{"elements":[],"_bgPattern":{"kind":"grid","spacing":24,"color":"#112233ff"}}"""
-        var prepared = false
-        assertFailsWith<IllegalArgumentException> {
-            render(patterned) {
-                prepared = true
-                scene()
-            }
-        }
-        assertEquals(false, prepared, "Pattern support must be checked before metadata is stripped")
+        assertFailsWith<IllegalArgumentException> { renderCanvasSvg(patterned) }
     }
 
     @Test
@@ -83,7 +67,7 @@ class CanvasSvgRendererTest {
         val path = JsonObject(CanvasSceneSchema.path.example + mapOf(
             "alpha" to JsonPrimitive(0.4), "strokeColor" to JsonPrimitive("#123456ff"),
         ))
-        val svg = render(scene(path))
+        val svg = renderCanvasSvg(scene(path))
         assertEquals(1, Regex("opacity=").findAll(svg).count())
         assertTrue(svg.contains("<g opacity=\"0.4\">"))
         assertEquals(2, Regex("stroke=\"#123456\"").findAll(svg).count())
@@ -93,7 +77,7 @@ class CanvasSvgRendererTest {
     fun rejectsCorruptOrUnsupportedScenesInsteadOfExportingBlankSvg() {
         for (input in listOf("not JSON", "{}", """{"elements":[{"type":"alien"}]}""",
             """{"elements":[],"_documents":[{"id":"note"}]}""")) {
-            assertFailsWith<IllegalArgumentException> { render(input) }
+            assertFailsWith<IllegalArgumentException> { renderCanvasSvg(input) }
         }
     }
 }
