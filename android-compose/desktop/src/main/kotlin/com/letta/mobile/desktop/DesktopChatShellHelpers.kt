@@ -282,7 +282,8 @@ private val PaletteAdminDestinations = listOf(DesktopDestination.Runs, DesktopDe
 @Composable
 internal fun rememberDesktopSearchSources(context: DesktopShellContext, conversations: List<DesktopConversationSummary>, focus: DesktopAgentFocus): UnifiedSearchSources {
     val chat = context.core.chatController
-    val canvases by context.core.canvasShell.library.documents.collectAsState()
+    val canvasLibrary by context.core.canvasShell.library.state.collectAsState()
+    val canvases = canvasLibrary.documents
     val messages = rememberConversationMessageIndex(conversations, chat.conversationManagement.messageReader)
     val workPlayMode = context.navigator.workPlayMode
     val destinations = remember(workPlayMode) { buildPaletteDestinations(workPlayMode) }

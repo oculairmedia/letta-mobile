@@ -51,6 +51,10 @@ Persisted layout preferences for canvas-attached chat bubbles. These describe us
 
 The versioned semantic canvas composer: validation, Markdown conversion, geometry reservation, placement, compilation and receipts. It converts content-oriented requests into canvas operations; renderers draw and fit the resulting content. Keep pixel rendering outside semantic composition; extend accepted requests through [CanvasComposeContract](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas.compose/-canvas-compose-contract/index.html) and compile them with [CanvasComposeCompiler](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas.compose/-canvas-compose-compiler/index.html).
 
+# Package com.letta.mobile.data.canvas.library
+
+Canvas library state and operations shared by hosts. `CanvasLibraryController` retains loaded boards when storage fails, reports a retryable error and serializes library operations; `CanvasLibraryState` is its observable content and loading state. Hosts supply storage, archive and synchronization bindings and present the error. Keep windowing and platform storage construction outside this package; retries reload state rather than repeating mutations.
+
 # Package com.letta.mobile.data.canvas.plugin
 
 Plugin element schemas, kind catalogs and property checks within canvas scenes. Clients can preserve, edit and show fallback elements without loading plugin implementation code. Keep plugin execution outside element interpretation; provide installed kind metadata through [PluginKindCatalog](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas.plugin/-plugin-kind-catalog/index.html) while retaining fallback representations for unknown kinds.

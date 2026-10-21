@@ -158,7 +158,6 @@
     <ID>SwallowedException:DesktopCanvasArchiveStore.kt$DesktopCanvasArchiveStore$e: IOException</ID>
     <ID>SwallowedException:DesktopCanvasDocumentStore.kt$DesktopCanvasDocumentStore$e: IOException</ID>
     <ID>SwallowedException:DesktopCanvasDocumentStore.kt$DesktopCanvasDocumentStore$unreadable: Exception</ID>
-    <ID>SwallowedException:DesktopCanvasLibrary.kt$DesktopCanvasLibrary$e: java.io.IOException</ID>
     <ID>SwallowedException:DesktopDirectorySync.kt$rejected: AccessDeniedException</ID>
     <ID>SwallowedException:DesktopLocalRuntimeProviderStore.kt$DesktopLocalRuntimeProviderStore$unsupported: java.nio.file.AtomicMoveNotSupportedException</ID>
     <ID>ThrowingExceptionsWithoutMessageOrCause:JcefPluginViewHost.kt$JcefViewSlot$IllegalStateException()</ID>

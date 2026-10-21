@@ -154,6 +154,7 @@ private fun desktopWorkspaceSlots(context: DesktopShellContext, frame: DesktopSh
     agentCard = { DesktopAgentContextCard(context, frame) },
     sidePane = { DesktopShellBackgroundTasks(context, frame) },
     overlays = {
+        com.letta.mobile.ui.canvas.library.CanvasLibraryNotice(context.core.canvasShell.library)
         DesktopShellOverlays(context, frame)
         DesktopSwingShortcuts()
     },
@@ -187,6 +188,7 @@ private fun rememberDesktopSidebarInputs(context: DesktopShellContext, frame: De
     val chatController = context.core.chatController
     val management = chatController.conversationManagement
     val canvasShell = context.core.canvasShell
+    val canvasLibraryState = canvasShell.library.state.collectAsState().value
     return DesktopSidebarInputs(
         marks = DesktopSidebarMarks(
             deletingIds = chatController.deletingConversationIds.collectAsState().value,
@@ -195,8 +197,8 @@ private fun rememberDesktopSidebarInputs(context: DesktopShellContext, frame: De
             settledIds = management.marks.settled.collectAsState().value,
             markers = management.marks.markers.collectAsState().value,
         ),
-        canvases = canvasShell.library.documents.collectAsState().value,
-        archivedCanvasIds = canvasShell.library.archived.collectAsState().value,
+        canvases = canvasLibraryState.documents,
+        archivedCanvasIds = canvasLibraryState.archived,
         activeCanvasId = canvasShell.activeSession?.canvasId,
         chatOptions = desktopChatOptionsState(
             display = management.marks.displayOptions.collectAsState().value,
