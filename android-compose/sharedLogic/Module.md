@@ -51,6 +51,10 @@ Persisted layout preferences for canvas-attached chat bubbles. These describe us
 
 The versioned semantic canvas composer: validation, Markdown conversion, geometry reservation, placement, compilation and receipts. It converts content-oriented requests into canvas operations; renderers draw and fit the resulting content. Keep pixel rendering outside semantic composition; extend accepted requests through [CanvasComposeContract](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas.compose/-canvas-compose-contract/index.html) and compile them with [CanvasComposeCompiler](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas.compose/-canvas-compose-compiler/index.html).
 
+# Package com.letta.mobile.data.canvas.export
+
+Portable canvas export. `CanvasSvgRenderer` turns a stored drawing scene into SVG for the `canvas.export_svg` tool. Content the export cannot reproduce faithfully (notes, plugin elements, curved connectors, referenced image assets, background patterns, text that needs board wrapping) is rejected with an error rather than silently omitted. Keep board rendering in sharedUI; this package reads scene JSON only.
+
 # Package com.letta.mobile.data.canvas.library
 
 Canvas library state and operations shared by hosts. `CanvasLibraryController` retains loaded boards when storage fails, reports a retryable error and serializes library operations; `CanvasLibraryState` is its observable content and loading state. Hosts supply storage, archive and synchronization bindings and present the error. Keep windowing and platform storage construction outside this package; retries reload state rather than repeating mutations.
