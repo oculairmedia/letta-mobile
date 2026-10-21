@@ -1,5 +1,7 @@
 # Chat send decomposition evidence
 
+**Status:** Reviewed implementation evidence; source-audited 2026-10-21. Acceptance ratchet validation and PR CI remain pending for handoff.
+
 Implementation source: `70d1a0c684e6a74aed3b68df61c8311b504de665`. Original source: `b090c766bee52e8aa176249446df6ad73f7af702`. This records the shared `commonMain/data/chat/send` production family, recursively, including every new collaborator. Ownership and extension rules live in `sharedLogic/Module.md` and the owning source KDoc.
 
 | Measurement | Original | Routing implementation |
