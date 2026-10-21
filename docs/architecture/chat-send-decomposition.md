@@ -2,7 +2,7 @@
 
 **Status:** Reviewed implementation evidence; source-audited and ratchet-validated 2026-10-21. PR CI and post-merge main evidence are tracked in Beads (`letta-mobile-gjcbd.7`).
 
-Implementation source: `b860a7f686d30e951c316e6bfc51a5c8a9a33dc4` (final #2148 head). Original source: `b090c766bee52e8aa176249446df6ad73f7af702`. This records the shared `commonMain/data/chat/send` production family, recursively, including every new collaborator. Ownership and extension rules live in `sharedLogic/Module.md` and the owning source KDoc.
+Implementation source: `b860a7f686d30e951c316e6bfc51a5c8a9a33dc4` (final #2148 head; its `data/chat/send` production files are byte-identical to the #2148 squash on main, `ff12c7599`). Original source: `b090c766bee52e8aa176249446df6ad73f7af702`. This records the shared `commonMain/data/chat/send` production family, recursively, including every new collaborator. Ownership and extension rules live in `sharedLogic/Module.md` and the owning source KDoc.
 
 | Measurement | Original | Final implementation |
 | --- | ---: | ---: |
