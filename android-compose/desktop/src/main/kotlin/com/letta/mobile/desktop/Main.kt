@@ -168,6 +168,7 @@ private fun runDesktopApplication(
                         state = rememberWindowState(width = 1280.dp, height = 820.dp),
                         header = headerChrome,
                     ) {
+                        DesktopAotTrainingExit { exitProcess(0) }
                         LaunchedEffect(Unit) {
                             activationHandler.attach(window)
                             window.minimumSize = Dimension(960, 640)
