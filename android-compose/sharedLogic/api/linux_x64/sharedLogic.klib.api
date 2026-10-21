@@ -56274,8 +56274,12 @@ final class com.letta.mobile.data.tools/ToolLibraryState { // com.letta.mobile.d
 }
 
 final class com.letta.mobile.data.transport.api/AppServerClientChannel : com.letta.mobile.data.transport.api/NoOpChannelTransport { // com.letta.mobile.data.transport.api/AppServerClientChannel|null[0]
-    constructor <init>(com.letta.mobile.data.transport.appserver/AppServerClient, kotlinx.coroutines/CoroutineScope) // com.letta.mobile.data.transport.api/AppServerClientChannel.<init>|<init>(com.letta.mobile.data.transport.appserver.AppServerClient;kotlinx.coroutines.CoroutineScope){}[0]
+    constructor <init>(com.letta.mobile.data.transport.appserver/AppServerClient, kotlinx.coroutines/CoroutineScope, kotlin.collections/Set<kotlin/String> = ...) // com.letta.mobile.data.transport.api/AppServerClientChannel.<init>|<init>(com.letta.mobile.data.transport.appserver.AppServerClient;kotlinx.coroutines.CoroutineScope;kotlin.collections.Set<kotlin.String>){}[0]
 
+    final val events // com.letta.mobile.data.transport.api/AppServerClientChannel.events|{}events[0]
+        final fun <get-events>(): kotlinx.coroutines.flow/SharedFlow<com.letta.mobile.data.transport/ServerFrame> // com.letta.mobile.data.transport.api/AppServerClientChannel.events.<get-events>|<get-events>(){}[0]
+    final val hostCapabilities // com.letta.mobile.data.transport.api/AppServerClientChannel.hostCapabilities|{}hostCapabilities[0]
+        final fun <get-hostCapabilities>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.transport.api/AppServerClientChannel.hostCapabilities.<get-hostCapabilities>|<get-hostCapabilities>(){}[0]
     final val state // com.letta.mobile.data.transport.api/AppServerClientChannel.state|{}state[0]
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.transport/ChannelTransportState> // com.letta.mobile.data.transport.api/AppServerClientChannel.state.<get-state>|<get-state>(){}[0]
 

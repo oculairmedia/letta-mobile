@@ -15,7 +15,11 @@ import com.letta.mobile.data.memory.memfs.AppServerMemfsSource
 import com.letta.mobile.data.memory.memfs.MemfsSource
 import com.letta.mobile.data.model.isIrohBackendUrl
 import com.letta.mobile.data.repository.appserver.AppServerLocalAdminGateway
+import com.letta.mobile.data.chat.approval.SettingsApprovalOutboxStore
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
+import com.letta.mobile.data.runtime.IrohApprovalControls
+import com.letta.mobile.data.runtime.PermissionModeSettings
+import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
 import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
@@ -54,7 +58,15 @@ import kotlin.random.Random
 
 class WasmAppServerClientGateway(
     private val scope: CoroutineScope,
+    /** The browser's settings store: the permission-mode choices and the approval outbox live there. */
+    private val settings: SecureSettingsStore,
 ) {
+    /**
+     * letta-mobile-ckmub.17.25: the composer's mode choices and the Settings default mode, kept in the
+     * browser's storage so a reload keeps them, over ws:// and Iroh alike.
+     */
+    val permissionModeSettings: PermissionModeSettings = PermissionModeSettings(settings)
+
     private val httpClient = HttpClient(Js) { install(WebSockets) }
     private val mutableState = MutableStateFlow<BackendConnectionStatus>(BackendConnectionStatus.Unconfigured)
     private val liveSession = MutableStateFlow<WasmAppServerSession?>(null)
@@ -112,7 +124,7 @@ class WasmAppServerClientGateway(
         mutableState.value = BackendConnectionStatus.Connecting
         return try {
             close()
-            val session = connectWasmAppServerSession(config, scope, httpClient, ::nextRequestId)
+            val session = connectWasmAppServerSession(config, scope, httpClient, permissionModeSettings.modes, ::nextRequestId)
             activeSession = session
             val auth = bounded(REQUEST_TIMEOUT_MS, "App Server authentication timed out") {
                 session.client.auth(
@@ -125,7 +137,8 @@ class WasmAppServerClientGateway(
             }
             check(auth.success) { auth.error ?: "App Server authentication failed" }
 
-            val graph = openGraph(config, session)
+            val graph = openGraph(config, session, auth.capabilities.orEmpty().toSet())
+            if (isIrohBackendUrl(config.serverUrl)) session.bindIrohChat(irohChatGateway())
             bounded(REQUEST_TIMEOUT_MS, "Agent list timed out") { graph.agentRepository.refreshAgents() }
             mutableState.value = BackendConnectionStatus.Connected(session.label)
             mutableCanvasRelay.value = session.canvasRelay
@@ -164,20 +177,33 @@ class WasmAppServerClientGateway(
         return WebChatBinding(
             target = target,
             transport = transport,
-            controls = webRunControls(AppServerRunControls(session.engine), target),
+            controls = webRunControls(AppServerRunControls(session.engine), session.irohChat, target),
+            hostApprovals = session.irohChat,
             chips = TimelineChipSources(
-                models = webModelSource(irohChatGateway(), session.appServerAdmin, agent.model, modelControl.catalog),
+                models = webModelSource(session.irohChat, session.appServerAdmin, agent.model, modelControl.catalog),
                 permissionModes = session.permissionModes,
             ),
         )
     }
 
-    /** The shared Iroh chat gateway over the live session's channel, or null when the session is not Iroh. */
-    private fun irohChatGateway(): IrohAdminRpcChatGateway? {
-        val binding = nextBinding ?: return null
-        val config = binding.config ?: return null
-        if (!isIrohBackendUrl(config.serverUrl)) return null
-        return IrohAdminRpcChatGateway(sessionGraphProvider.current.channelTransport, deviceLabel = WEB_BACKEND_ID)
+    /**
+     * The shared Iroh chat gateway over the live session's channel, as desktop binds it: its models
+     * (`model.list` / `model.update`), and through the shared [IrohApprovalControls] the host's parked
+     * approvals (`pending_approvals`, replayed when the chat hydrates), `approval.submit` answers
+     * through the durable outbox, and the mode chip over `permission_mode.get/set`.
+     */
+    private fun irohChatGateway(): IrohAdminRpcChatGateway {
+        val channel = sessionGraphProvider.current.channelTransport
+        return IrohAdminRpcChatGateway(
+            channel,
+            deviceLabel = WEB_BACKEND_ID,
+            approvalControls = IrohApprovalControls(
+                scope = scope,
+                transport = channel,
+                registry = permissionModeSettings.modes,
+                outboxStore = SettingsApprovalOutboxStore(settings),
+            ),
+        )
     }
 
     /**
@@ -221,8 +247,12 @@ class WasmAppServerClientGateway(
     }
 
     /** The shared session graph over [session], replacing the previous connection's. */
-    private fun openGraph(config: LettaConfig, session: WasmAppServerSession): SharedSessionRepositoryGraph {
-        nextBinding = webSessionBinding(config, session.client, scope)
+    private fun openGraph(
+        config: LettaConfig,
+        session: WasmAppServerSession,
+        hostCapabilities: Set<String>,
+    ): SharedSessionRepositoryGraph {
+        nextBinding = webSessionBinding(config, session.client, scope, hostCapabilities)
         return sessionGraphProvider.rebuild()
     }
 
@@ -291,20 +321,33 @@ internal fun webModelSource(
     )
 }
 
-/** The page's stop and approval answers, scoped to [target]'s conversation. */
-private fun webRunControls(controls: AppServerRunControls, target: TimelineChatTarget) = TimelineChatRunControls(
+/**
+ * The page's stop and approval answers, scoped to [target]'s conversation. Over an Iroh host the
+ * answer goes to the host that parked the request ([iroh]'s `approval.submit`); over ws:// to this
+ * session's turn engine.
+ */
+private fun webRunControls(
+    controls: AppServerRunControls,
+    iroh: IrohAdminRpcChatGateway?,
+    target: TimelineChatTarget,
+) = TimelineChatRunControls(
     stopRun = { controls.stop(AgentId(target.agentId), ConversationId(target.conversationId)) },
     answerApproval = { answer ->
-        controls.answer(
-            AppServerApprovalAnswer(
-                agentId = target.agentId,
-                conversationId = target.conversationId,
-                requestId = answer.requestId,
-                toolCallId = answer.toolCallIds.firstOrNull(),
-                approve = answer.approve,
-                reason = answer.reason,
-            ),
-        )
+        val toolCallId = answer.toolCallIds.firstOrNull()
+        if (iroh != null) {
+            iroh.submitApproval(target.agentId, target.conversationId, answer.requestId, toolCallId, answer.approve, answer.reason)
+        } else {
+            controls.answer(
+                AppServerApprovalAnswer(
+                    agentId = target.agentId,
+                    conversationId = target.conversationId,
+                    requestId = answer.requestId,
+                    toolCallId = toolCallId,
+                    approve = answer.approve,
+                    reason = answer.reason,
+                ),
+            )
+        }
     },
 )
 

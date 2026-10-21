@@ -5,6 +5,10 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId as DataConversationId
 import com.letta.mobile.data.repository.appserver.AppServerLocalAdminGateway
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
+import com.letta.mobile.data.runtime.IrohApprovalControls
+import com.letta.mobile.data.runtime.PermissionModeRpc
+import com.letta.mobile.data.runtime.PermissionModeSettings
+import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelChange
 import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
@@ -24,7 +28,9 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -122,12 +128,41 @@ class WasmAppServerSessionTest {
         assertFalse(source.backend.supportsReasoningEffort)
     }
 
+    @Test
+    fun `over iroh the mode chip is the host's, and a closed session lets the gateway go`() = runTest {
+        val transport = FakeTransport()
+        val client = DefaultAppServerClient(transport)
+        val router = AppServerRuntimeEventRouter()
+        val session = WasmAppServerSession(
+            link = WasmAppServerLink(client, transport.isConnected, failureReason = { null }, label = "test", close = {}),
+            services = WasmAppServerServices(
+                engine = AppServerTurnEngine(client = client, eventRouter = router),
+                router = router,
+                appServerAdmin = AppServerLocalAdminGateway(client) { operation -> "test-$operation" },
+            ),
+            scope = this,
+        )
+        assertNull(session.permissionModes, "no mode chip until the host's gateway is bound")
+
+        val host = RecordingHost(setOf(PermissionModeRpc.CAPABILITY))
+        val gateway = IrohAdminRpcChatGateway(
+            host,
+            approvalControls = IrohApprovalControls(backgroundScope, host, PermissionModeSettings(InMemorySecureSettingsStore()).modes),
+        )
+        session.bindIrohChat(gateway)
+
+        assertSame(gateway, session.permissionModes)
+        assertNotNull(gateway.permissionModes, "the host advertises the mode relay")
+        session.close()
+        assertNull(session.irohChat)
+    }
+
     private fun nativeAdmin() = AppServerLocalAdminGateway(DefaultAppServerClient(FakeTransport())) { operation -> "test-$operation" }
 
     private val unexpectedRpc = AdminRpcInvoker { method, _ -> error("unexpected $method") }
 
     /** An Iroh host's admin_rpc: it answers the model and conversation methods and records each call. */
-    private class RecordingHost : NoOpChannelTransport() {
+    private class RecordingHost(override val hostCapabilities: Set<String> = emptySet()) : NoOpChannelTransport() {
         val methods = mutableListOf<String>()
 
         override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {

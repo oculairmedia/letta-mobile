@@ -10,10 +10,10 @@ import com.letta.mobile.data.model.IrohServerAddress
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.isIrohBackendUrl
 import com.letta.mobile.data.repository.appserver.AppServerLocalAdminGateway
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.DurableTurnDelivery
 import com.letta.mobile.data.runtime.PermissionModeRegistry
-import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.runtime.permissionGovernedTurnStackSpec
 import com.letta.mobile.data.runtime.attachTurnStack
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
@@ -29,7 +29,6 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withTimeout
@@ -57,7 +56,28 @@ internal class WasmAppServerSession(
     val engine: AppServerTurnEngine = services.engine
     val router: AppServerRuntimeEventRouter = services.router
     val appServerAdmin: AppServerLocalAdminGateway = services.appServerAdmin
-    val permissionModes: PermissionModeGateway? = services.permissionModes
+    private val turnStackModes: PermissionModeGateway? = services.permissionModes
+
+    /**
+     * An Iroh host's shared chat gateway over this session's channel, with the host's approval relay,
+     * answers and mode chip ([bindIrohChat]); null over ws:// and before the session authenticated.
+     */
+    var irohChat: IrohAdminRpcChatGateway? = null
+        private set
+
+    /** The composer's mode chip: the Iroh host's over Iroh, this session's own turn stack over ws://. */
+    val permissionModes: PermissionModeGateway? get() = irohChat ?: turnStackModes
+
+    fun bindIrohChat(gateway: IrohAdminRpcChatGateway) {
+        irohChat?.close()
+        irohChat = gateway
+    }
+
+    private fun releaseIrohChat() {
+        // A queued answer stays in the durable outbox; the next session's gateway sends it.
+        irohChat?.close()
+        irohChat = null
+    }
 
     val conversationByAgent = mutableMapOf<String, String>()
     private val conversationInFlight = mutableMapOf<String, Deferred<String>>()
@@ -118,6 +138,7 @@ internal class WasmAppServerSession(
 
     suspend fun close() {
         withContext(NonCancellable) {
+            releaseIrohChat()
             router.detach()
             conversationInFlight.values.forEach { it.cancel() }
             conversationInFlight.clear()
@@ -128,6 +149,7 @@ internal class WasmAppServerSession(
 
     internal suspend fun onTransportDisconnected() {
         withContext(NonCancellable) {
+            releaseIrohChat()
             router.detach()
             conversationInFlight.values.forEach { it.cancel() }
             conversationInFlight.clear()
@@ -154,7 +176,7 @@ internal class WasmAppServerServices(
     val router: AppServerRuntimeEventRouter,
     /** The session's own App Server reads and writes (models, a conversation's record), as desktop's gateway makes them. */
     val appServerAdmin: AppServerLocalAdminGateway,
-    /** letta-mobile-ckmub.17.2: the composer's mode chip; null over Iroh, whose host sets its own mode (as on desktop). */
+    /** letta-mobile-ckmub.17.2: the composer's mode chip over ws://; over Iroh the host's gateway carries it. */
     val permissionModes: PermissionModeGateway? = null,
 )
 
@@ -162,13 +184,14 @@ internal suspend fun connectWasmAppServerSession(
     config: LettaConfig,
     scope: CoroutineScope,
     httpClient: HttpClient,
+    modes: PermissionModeRegistry,
     nextRequestId: (String) -> String,
 ): WasmAppServerSession {
     val iroh = isIrohBackendUrl(config.serverUrl)
     val link = if (iroh) openIrohLink(config, scope) else openWebSocketLink(config, httpClient, scope)
     val router = AppServerRuntimeEventRouter()
     try {
-        val services = attachServices(link, router, scope, TurnStackOptions(governModes = !iroh, nextRequestId))
+        val services = attachServices(link, router, scope, TurnStackOptions(modes.takeIf { !iroh }, nextRequestId))
         return WasmAppServerSession(link, services, scope)
     } catch (error: Throwable) {
         withContext(NonCancellable) {
@@ -222,8 +245,11 @@ private suspend fun openWebSocketLink(config: LettaConfig, httpClient: HttpClien
     )
 }
 
-/** How a session's turn stack is built: [governModes] gives the composer a mode chip (ws:// only, as on desktop). */
-private class TurnStackOptions(val governModes: Boolean, val nextRequestId: (String) -> String)
+/**
+ * How a session's turn stack is built: [modes] (the persisted registry; ws:// only, as on desktop)
+ * governs its turns and gives the composer a mode chip.
+ */
+private class TurnStackOptions(val modes: PermissionModeRegistry?, val nextRequestId: (String) -> String)
 
 /** The turn stack over [link], routed by [router]. */
 private fun attachServices(
@@ -233,8 +259,7 @@ private fun attachServices(
     options: TurnStackOptions,
 ): WasmAppServerServices {
     val nextRequestId = options.nextRequestId
-    // Per tab: the web has no settings store for the choices yet (letta-mobile-ckmub.17.7).
-    val modes = PermissionModeRegistry(MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE)).takeIf { options.governModes }
+    val modes = options.modes
     val engine = router.attachTurnStack(
         link.client,
         scope,

@@ -34,8 +34,8 @@ import kotlinx.coroutines.ensureActive
 
 /** The page's long-lived bindings: the App Server gateway, the browser's storage and the backend it reaches. */
 internal class WebApp(scope: CoroutineScope) {
-    val gateway = WasmAppServerClientGateway(scope)
     val storage = WebStorage()
+    val gateway = WasmAppServerClientGateway(scope, storage.settings)
     val settingsStore = WebSettingsStore(storage.settings)
     val backend = WebBackend(settingsStore.load())
     val services = WebPageServices(gateway, storage.settings)

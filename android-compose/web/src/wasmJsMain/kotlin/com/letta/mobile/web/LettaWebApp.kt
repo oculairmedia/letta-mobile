@@ -68,7 +68,7 @@ fun LettaWebApp() {
     val controllers = rememberShellLibraryControllers(app.gateway.sessionGraphProvider, app.services.sources, scope)
     ShellHomeFleetEffect(controllers.home, ShellHomeFleet(conversations = emptyList(), roster = backend.agents.value))
     val onRosterChanged: () -> Unit = { scope.launch { backend.reloadRoster(graph, workspace) } }
-    val settings = webSettingsServices(backend.config, app.settingsStore)
+    val settings = webSettingsServices(backend.config, app.settingsStore, app.gateway.permissionModeSettings)
     val page = WebPageInputs(chat, connection, app.canvas, settings, WebPagesSession(graph, controllers, app.services, onRosterChanged))
     val header = rememberShellWorkspaceHeader(ShellWorkspaceHeaderBinding(shell.navigator, layout, webSearch(shell, page), shell.chat::tab))
     CompositionLocalProvider(LocalHighContrastPreference provides highContrastPreference) {

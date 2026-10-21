@@ -16,8 +16,13 @@ import kotlinx.coroutines.CoroutineScope
  * holds one App Server session, reached over ws:// or an Iroh host's relay: a ws:// host serves
  * agents and memory over it directly, an Iroh host serves the admin set over its `admin_rpc`.
  */
-internal fun webSessionBinding(config: LettaConfig, client: AppServerClient, scope: CoroutineScope): HostSessionBinding {
-    val channel = AppServerClientChannel(client, scope)
+internal fun webSessionBinding(
+    config: LettaConfig,
+    client: AppServerClient,
+    scope: CoroutineScope,
+    hostCapabilities: Set<String> = emptySet(),
+): HostSessionBinding {
+    val channel = AppServerClientChannel(client, scope, hostCapabilities)
     val directory = IrohAdminRpcAgentDirectory(channel)
     return HostSessionBinding(
         platform = SessionPlatform.WEB,
