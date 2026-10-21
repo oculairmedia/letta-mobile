@@ -70,6 +70,9 @@ internal fun boardInsertActions(board: CanvasBoard): BoardInsertActions {
 internal fun Modifier.canvasBoardInput(board: CanvasBoard): Modifier {
     val ui = board.ui
     return this
+        .canvasLocalPresence(board.host.presenceTransport, board.session?.canvasId, board.host.currentPeerId) {
+            board.controller.state.value.viewport.screenToWorld(it)
+        }
         .focusRequester(ui.boardFocus)
         .focusable()
         .onKeyEvent { board.onBoardKey(it) }
@@ -121,7 +124,10 @@ internal fun BoxScope.CanvasBoardLayers(board: CanvasBoard) {
     CanvasBoardPlugins(board)
     // Presence layer (Card I3.5)
     PresenceLayer(
-        presences = board.flows.sharing.presences.value,
+        presences = board.flows.sharing.presences.value.map { presence ->
+            val screen = board.state.viewport.worldToScreen(Offset(presence.cursorX, presence.cursorY))
+            presence.copy(cursorX = screen.x, cursorY = screen.y)
+        },
         currentPeerId = board.host.currentPeerId,
     )
     CanvasBoardDocumentEffects(board)
