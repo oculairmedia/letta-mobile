@@ -508,7 +508,13 @@ class CanvasExportSvgTool(
         runWithContext(agentId, "Failed to export SVG") { context ->
             when (val lookup = findCanvasDocument(context, input)) {
                 is CanvasLookupResult.Error -> lookup.result
-                is CanvasLookupResult.Found -> ExternalToolResult.Success(CanvasSvgRenderer.render(lookup.doc.sceneJson))
+                is CanvasLookupResult.Found -> ExternalToolResult.Success(
+                    CanvasSvgRenderer.render(lookup.doc.sceneJson) { scene ->
+                        val checked = CanvasSceneValidator.scene(CanvasOpProjector.stripMetadataForDrawBox(scene))
+                        require(checked is CanvasSceneCheck.Valid) { (checked as CanvasSceneCheck.Invalid).message }
+                        checked.json
+                    },
+                )
             }
         }
 

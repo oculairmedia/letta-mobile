@@ -9,9 +9,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
-import com.letta.mobile.data.canvas.CanvasPresence
-import com.letta.mobile.data.canvas.CanvasPresenceTransport
-import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -26,6 +23,24 @@ private val PEER_COLORS = listOf("#2196F3", "#9C27B0", "#00897B", "#EF6C00", "#C
 
 internal data class LocalCursorPosition(val position: Offset, val active: Boolean)
 
+internal data class PresenceIdentity(val peerId: String, val displayName: String, val colorHex: String) {
+    companion object {
+        fun forPeer(id: String): PresenceIdentity {
+            val index = (id.hashCode().toUInt() % PEER_COLORS.size.toUInt()).toInt()
+            return PresenceIdentity(id, "Peer ${id.take(8)}", PEER_COLORS[index])
+        }
+    }
+}
+
+internal data class LocalPeerPresence(
+    val identity: PresenceIdentity,
+    val cursor: LocalCursorPosition,
+    val lastActiveEpochMs: Long = Clock.System.now().toEpochMilliseconds(),
+)
+
+/** The board binds its session/transport here; pointer observation does not depend on board models. */
+internal class LocalPresenceTarget(val peerId: String, val publish: suspend (LocalPeerPresence) -> Unit)
+
 internal class LocalCursor {
     var current: LocalCursorPosition? = null
         private set
@@ -37,19 +52,6 @@ internal class LocalCursor {
         }
         if (position != null) current = LocalCursorPosition(position, active = true)
     }
-}
-
-private data class PresencePeer(val id: String) {
-    private val color = PEER_COLORS[(id.hashCode().toUInt() % PEER_COLORS.size.toUInt()).toInt()]
-    fun presence(cursor: LocalCursorPosition): CanvasPresence = CanvasPresence(
-        peerId = id,
-        displayName = "Peer ${id.take(8)}",
-        colorHex = color,
-        cursorX = cursor.position.x,
-        cursorY = cursor.position.y,
-        lastActiveEpochMs = Clock.System.now().toEpochMilliseconds(),
-        isActive = cursor.active,
-    )
 }
 
 private class PresenceHeartbeat {
@@ -65,15 +67,11 @@ private class PresenceHeartbeat {
     }
 }
 
-internal suspend fun departCanvasPresence(
-    transport: CanvasPresenceTransport,
-    canvasId: CanvasId,
-    presence: CanvasPresence,
-) {
+internal suspend fun departCanvasPresence(target: LocalPresenceTarget, presence: LocalPeerPresence) {
     withContext(NonCancellable) {
         try {
             withTimeoutOrNull(DEPARTURE_TIMEOUT_MS) {
-                transport.updatePresence(canvasId, presence.copy(isActive = false))
+                target.publish(presence.copy(cursor = presence.cursor.copy(active = false)))
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -83,41 +81,28 @@ internal suspend fun departCanvasPresence(
     }
 }
 
-private suspend fun publishPresence(
-    transport: CanvasPresenceTransport,
-    canvasId: CanvasId,
-    peer: PresencePeer,
-    cursor: LocalCursor,
-) {
+private suspend fun publishPresence(target: LocalPresenceTarget, cursor: LocalCursor) {
     val heartbeat = PresenceHeartbeat()
+    val identity = PresenceIdentity.forPeer(target.peerId)
     try {
         while (true) {
             delay(POINTER_PERIOD_MS)
             val current = cursor.current ?: continue
-            if (heartbeat.due(current)) transport.updatePresence(canvasId, peer.presence(current))
+            if (heartbeat.due(current)) target.publish(LocalPeerPresence(identity, current))
         }
     } finally {
         val inactive = LocalCursorPosition(cursor.current?.position ?: Offset.Zero, active = false)
-        departCanvasPresence(transport, canvasId, peer.presence(inactive))
+        departCanvasPresence(target, LocalPeerPresence(identity, inactive))
     }
 }
 
 /** Observes Initial-pass input without taking any event from the board or its notes. */
 @Composable
-internal fun Modifier.canvasLocalPresence(
-    transport: CanvasPresenceTransport?,
-    canvasId: CanvasId?,
-    peerId: String?,
-    screenToWorld: (Offset) -> Offset,
-): Modifier {
-    val liveTransport = transport ?: return this
-    val liveCanvas = canvasId ?: return this
-    val livePeer = peerId ?: return this
-    val cursor = remember(liveTransport, liveCanvas, livePeer) { LocalCursor() }
+internal fun Modifier.canvasLocalPresence(target: LocalPresenceTarget?, screenToWorld: (Offset) -> Offset): Modifier {
+    val liveTarget = target ?: return this
+    val cursor = remember(liveTarget) { LocalCursor() }
     val toWorld = rememberUpdatedState(screenToWorld)
-    LaunchedEffect(cursor) {
-        publishPresence(liveTransport, liveCanvas, PresencePeer(livePeer), cursor)
-    }
+    LaunchedEffect(cursor) { publishPresence(liveTarget, cursor) }
     return pointerInput(cursor) {
         awaitPointerEventScope {
             while (true) {

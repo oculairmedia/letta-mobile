@@ -1,9 +1,5 @@
 package com.letta.mobile.data.canvas.export
 
-import com.letta.mobile.data.canvas.CanvasOpProjector
-import com.letta.mobile.data.canvas.CanvasSceneCheck
-import com.letta.mobile.data.canvas.CanvasSceneValidator
-
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -22,7 +18,7 @@ import kotlin.math.sqrt
 internal object CanvasSvgRenderer {
     private const val PADDING = 20.0
 
-    fun render(sceneJson: String): String {
+    fun render(sceneJson: String, prepareDrawing: (String) -> String = { it }): String {
         val original = Json.parseToJsonElement(sceneJson).jsonObject
         require(original["elements"] is JsonArray) { "Scene has no elements array" }
         for (key in listOf("_documents", "_pluginElements")) {
@@ -31,15 +27,9 @@ internal object CanvasSvgRenderer {
                 "SVG export does not support $key yet"
             }
         }
-        require(CanvasOpProjector.backgroundPatternOf(sceneJson) == null) {
-            "SVG export does not support background patterns"
-        }
-        val clean = CanvasOpProjector.stripMetadataForDrawBox(sceneJson)
-        val checked = CanvasSceneValidator.scene(clean)
-        require(checked is CanvasSceneCheck.Valid) {
-            (checked as CanvasSceneCheck.Invalid).message
-        }
-        val root = Json.parseToJsonElement(checked.json).jsonObject
+        require(original["_bgPattern"] == null) { "SVG export does not support background patterns" }
+        // The owning tool supplies schema validation and metadata stripping after capability checks.
+        val root = Json.parseToJsonElement(prepareDrawing(sceneJson)).jsonObject
         val elements = (root["elements"] as JsonArray).map { it.jsonObject }.sortedBy { it.number("zIndex", 0.0) }
         val rendered = elements.map(::element)
         val bounds = rendered.map { it.bounds }
@@ -61,14 +51,15 @@ ${rendered.joinToString("\n") { it.svg }}
     private data class Drawing(val svg: String, val bounds: Bounds)
 
     private fun element(e: JsonObject): Drawing {
-        val points = (e["points"] as JsonArray).map { point(it.jsonPrimitive.content) }
+        val rawPoints = e["points"] as? JsonArray ?: throw IllegalArgumentException("Missing points array")
+        val points = rawPoints.map { point(it.jsonPrimitive.content) }
         val type = e.string("type")
         val drawing = when (type) {
             "Shape" -> shape(e, points)
             "Text" -> error("SVG export cannot measure text wrapping; text elements are unsupported")
             "Path" -> path(e)
             "Image" -> image(e, points)
-            else -> error("Unsupported SVG element: $type")
+            else -> throw IllegalArgumentException("Unsupported SVG element: $type")
         }
         val rotation = e.number("rotation", 0.0)
         if (rotation == 0.0) return drawing

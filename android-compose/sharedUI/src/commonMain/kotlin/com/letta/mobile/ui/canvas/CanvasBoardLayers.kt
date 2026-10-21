@@ -1,6 +1,8 @@
 package com.letta.mobile.ui.canvas
 
+import com.letta.mobile.ui.canvas.presence.LocalPresenceTarget
 import com.letta.mobile.ui.canvas.presence.canvasLocalPresence
+import com.letta.mobile.data.canvas.CanvasPresence
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -70,8 +72,9 @@ internal fun boardInsertActions(board: CanvasBoard): BoardInsertActions {
 @Composable
 internal fun Modifier.canvasBoardInput(board: CanvasBoard): Modifier {
     val ui = board.ui
+    val target = remember(board.host.presenceTransport, board.session, board.host.currentPeerId) { board.localPresenceTarget() }
     return this
-        .canvasLocalPresence(board.host.presenceTransport, board.session?.canvasId, board.host.currentPeerId) {
+        .canvasLocalPresence(target) {
             board.controller.state.value.viewport.screenToWorld(it)
         }
         .focusRequester(ui.boardFocus)
@@ -89,6 +92,23 @@ internal fun Modifier.canvasBoardInput(board: CanvasBoard): Modifier {
                 }
             }
         }
+}
+
+private fun CanvasBoard.localPresenceTarget(): LocalPresenceTarget? {
+    val transport = host.presenceTransport ?: return null
+    val canvasId = session?.canvasId ?: return null
+    val peerId = host.currentPeerId ?: return null
+    return LocalPresenceTarget(peerId) { update ->
+        transport.updatePresence(canvasId, CanvasPresence(
+            peerId = update.identity.peerId,
+            displayName = update.identity.displayName,
+            colorHex = update.identity.colorHex,
+            cursorX = update.cursor.position.x,
+            cursorY = update.cursor.position.y,
+            lastActiveEpochMs = update.lastActiveEpochMs,
+            isActive = update.cursor.active,
+        ))
+    }
 }
 
 private fun CanvasBoard.trackBoardPosition(coordinates: LayoutCoordinates) {

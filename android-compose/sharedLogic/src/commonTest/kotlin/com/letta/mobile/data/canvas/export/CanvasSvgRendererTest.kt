@@ -56,7 +56,14 @@ class CanvasSvgRendererTest {
     @Test
     fun rejectsPatternsBeforeStrippingRootMetadata() {
         val patterned = """{"elements":[],"_bgPattern":{"kind":"grid","spacing":24,"color":"#112233ff"}}"""
-        assertFailsWith<IllegalArgumentException> { CanvasSvgRenderer.render(patterned) }
+        var prepared = false
+        assertFailsWith<IllegalArgumentException> {
+            CanvasSvgRenderer.render(patterned) {
+                prepared = true
+                scene()
+            }
+        }
+        assertEquals(false, prepared, "Pattern support must be checked before metadata is stripped")
     }
 
     @Test

@@ -38,6 +38,13 @@ class CanvasLocalPresenceTest {
         override fun observePresence(canvasId: CanvasId): Flow<List<CanvasPresence>> = flowOf(emptyList())
     }
 
+    private fun target(transport: CanvasPresenceTransport) = LocalPresenceTarget("local-peer") { update ->
+        transport.updatePresence(CanvasId("board"), CanvasPresence(
+            update.identity.peerId, update.identity.displayName, update.identity.colorHex,
+            update.cursor.position.x, update.cursor.position.y, update.lastActiveEpochMs, update.cursor.active,
+        ))
+    }
+
     @Test
     fun exitWithoutChangesStillMarksTheCursorInactive() {
         val cursor = LocalCursor()
@@ -53,7 +60,9 @@ class CanvasLocalPresenceTest {
                 awaitCancellation()
             }
         }
-        departCanvasPresence(transport, CanvasId("board"), CanvasPresence("peer", "Peer", "#123456", 0f, 0f))
+        departCanvasPresence(target(transport), LocalPeerPresence(
+            PresenceIdentity.forPeer("peer"), LocalCursorPosition(Offset.Zero, active = true),
+        ))
         assertEquals(500L, testScheduler.currentTime)
     }
 
@@ -64,7 +73,9 @@ class CanvasLocalPresenceTest {
                 error("Transport is already closed")
             }
         }
-        departCanvasPresence(transport, CanvasId("board"), CanvasPresence("peer", "Peer", "#123456", 0f, 0f))
+        departCanvasPresence(target(transport), LocalPeerPresence(
+            PresenceIdentity.forPeer("peer"), LocalCursorPosition(Offset.Zero, active = true),
+        ))
     }
 
     @Test
@@ -76,7 +87,7 @@ class CanvasLocalPresenceTest {
         setContent {
             if (mounted) {
                 Box(Modifier.size(200.dp).testTag("board")
-                    .canvasLocalPresence(transport, canvasId, "local-peer") { (it - Offset(10f, 20f)) / 2f }
+                    .canvasLocalPresence(target(transport)) { (it - Offset(10f, 20f)) / 2f }
                     .clickable { clicks++ })
             }
         }
