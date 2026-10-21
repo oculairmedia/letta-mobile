@@ -57,7 +57,7 @@ fun main(args: Array<String>) {
         { if (Platform.Current == Platform.Windows) com.letta.mobile.desktop.touch.DesktopWindowsTouchKeyboard },
     ).start()
     // Packaging's AOT-cache training launch exits itself once startup has settled.
-    DesktopAotTrainingExit().install()
+    com.letta.mobile.desktop.startup.DesktopAotTrainingExit().install()
     initializeDesktopLifecycleMainThread()
     // Kotzilla observability — must run before any UI composition so the SDK
     // captures the full session including startup. Android target boots via

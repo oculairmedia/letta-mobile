@@ -1,5 +1,6 @@
-package com.letta.mobile.desktop
+package com.letta.mobile.desktop.startup
 
+import java.awt.event.WindowEvent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -21,10 +22,11 @@ class DesktopAotTrainingExitTest {
     fun aTrainingRunExitsOnceStartupHasSettledAfterItsFirstWindow() {
         val training = trainingExit(training = true)
 
-        training.onWindowOpened()
-        training.onWindowOpened()
+        training.onWindowEvent(WindowEvent.WINDOW_ACTIVATED)
+        training.onWindowEvent(WindowEvent.WINDOW_OPENED)
+        training.onWindowEvent(WindowEvent.WINDOW_OPENED)
 
-        assertEquals(listOf(AOT_TRAINING_SETTLE_MS), scheduled, "one exit, after the settle time")
+        assertEquals(listOf(DesktopAotTrainingExit.SETTLE_MS), scheduled, "one exit, after the settle time")
         assertEquals(1, exits)
     }
 
@@ -33,7 +35,7 @@ class DesktopAotTrainingExitTest {
         val normal = trainingExit(training = false)
 
         normal.install()
-        normal.onWindowOpened()
+        normal.onWindowEvent(WindowEvent.WINDOW_OPENED)
 
         assertTrue(scheduled.isEmpty())
         assertEquals(0, exits)
