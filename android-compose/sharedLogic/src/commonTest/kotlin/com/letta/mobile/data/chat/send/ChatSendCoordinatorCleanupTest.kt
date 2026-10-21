@@ -1073,6 +1073,63 @@ class ChatSendCoordinatorCleanupTest {
     }
 
     /**
+     * letta-mobile-zrode: the frame order of the 2026-10-21 12:19 provider failure (desktop over
+     * Iroh, local-conv-517). The turn bound run local-run-98, the engine retried as local-run-102,
+     * and that one failure reached the coordinator as three error/terminal pairs: the server's own,
+     * then the run-lifecycle copy with no turn id, then the copy under the old run. Each re-emitted
+     * pair settled the cleared state again, so the failure showed as two rows, and the trailing
+     * error waited in the state to fail the next turn.
+     */
+    @Test
+    fun oneFailureReEmittedWithoutItsTurnRendersOnceAndLeavesTheNextTurnClean() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true, true)))
+        val copy = TurnFailureNotices.GENERIC_MESSAGE
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "local-run-98"))
+        coordinator.handleEvent(WsTimelineEvent.Error("app_server_error", "litellm.BadRequestError", "conv-1", "turn-1", "local-run-102"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "local-run-102", BridgeTurnStatus.Failed))
+        coordinator.handleEvent(WsTimelineEvent.Error("other", copy, conversationId = null, turnId = null, runId = "local-run-102"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("", "local-run-102", BridgeTurnStatus.Failed))
+        coordinator.handleEvent(WsTimelineEvent.Error("other", copy, conversationId = null, turnId = "turn-1", runId = "local-run-98"))
+        advanceUntilIdle()
+
+        val rows = timeline.ingestedMessages.filterIsInstance<ErrorMessage>()
+        assertEquals(listOf("turn-failed-turn-1-local-run-102"), rows.map { it.id }, "one failure, one row")
+
+        coordinator.send("again").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-2", AGENT_ID, "conv-1", "local-run-103"))
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                AssistantMessage(id = "a-2", contentRaw = JsonPrimitive("Done."), runId = "local-run-103"),
+                conversationId = "conv-1",
+            ),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-2", "local-run-103", BridgeTurnStatus.Completed))
+        advanceUntilIdle()
+
+        assertEquals(1, timeline.ingestedMessages.filterIsInstance<ErrorMessage>().size)
+        assertEquals(null, ui.currentError(), "the successful turn clears the failure")
+    }
+
+    /** A failed terminal that names no turn this idle coordinator owns is another conversation's. */
+    @Test
+    fun unownedFailedTerminalWritesNoNotice() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val coordinator = coordinator(timeline, RecordingUiSink(), FakeChannelTransport(mutableListOf(true)))
+
+        coordinator.handleEvent(
+            WsTimelineEvent.Error("other", TurnFailureNotices.GENERIC_MESSAGE, conversationId = null, turnId = null, runId = "local-run-102"),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("", "local-run-102", BridgeTurnStatus.Failed))
+        advanceUntilIdle()
+
+        assertEquals(emptyList(), timeline.ingestedMessages.filterIsInstance<ErrorMessage>())
+    }
+
+    /**
      * A timeline fence rejecting one frame used to escape the frame dispatcher and kill the app -
      * three of the five crashes in one day's device log. The turn must absorb it and keep running.
      */

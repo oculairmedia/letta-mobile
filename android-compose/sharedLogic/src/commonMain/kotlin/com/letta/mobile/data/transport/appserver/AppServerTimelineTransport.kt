@@ -264,7 +264,7 @@ internal class AppServerSendTurn(private val ids: AppServerTurnIds) {
         val runId = draft.runId?.value ?: ids.fallbackRunId
         return listOf(
             ErrorMessage(
-                id = "turn-failed-$runId",
+                id = TurnFailureNotices.noticeId(runId),
                 contentRaw = JsonPrimitive(notice.message),
                 code = notice.kind,
                 runId = runId,

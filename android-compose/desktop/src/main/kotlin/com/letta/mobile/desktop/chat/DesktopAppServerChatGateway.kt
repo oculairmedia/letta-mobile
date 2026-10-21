@@ -336,7 +336,7 @@ class DesktopAppServerChatGateway internal constructor(
                         ) ?: return@collect
                         emit(
                             ErrorMessage(
-                                id = "turn-failed-${draft.runId?.value ?: turnId.value}",
+                                id = TurnFailureNotices.noticeId(draft.runId?.value ?: turnId.value),
                                 contentRaw = JsonPrimitive(notice.message),
                                 code = notice.kind,
                                 runId = draft.runId?.value ?: syntheticRunId.value,

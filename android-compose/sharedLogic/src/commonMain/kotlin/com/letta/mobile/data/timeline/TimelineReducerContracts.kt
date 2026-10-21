@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.runtime.TurnFailureNotices
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentListOf
@@ -352,13 +353,13 @@ fun reduceProductionMutation(state: TimelineReducerState, mutation: TimelineMuta
     is TimelineMutation.LifecycleReset -> changedIfNeeded(state, state.copy(lifecycleEpoch = mutation.epoch))
 }
 
-private const val TURN_FAILURE_NOTICE_ID_PREFIX = "turn-failed-"
+/** A client-written turn-failure notice row, which a later clean terminal retires. */
+internal fun TimelineEvent.Confirmed.isTurnFailureNotice(): Boolean =
+    messageType == TimelineMessageType.ERROR && TurnFailureNotices.isNoticeId(serverId)
 
 private fun reduceTurnFailureNoticeRetirement(state: TimelineReducerState): TimelineReduction {
     val retained = state.timeline.events.filterNot { event ->
-        val confirmed = event as? TimelineEvent.Confirmed
-        confirmed?.messageType == TimelineMessageType.ERROR &&
-            confirmed.serverId.startsWith(TURN_FAILURE_NOTICE_ID_PREFIX)
+        (event as? TimelineEvent.Confirmed)?.isTurnFailureNotice() == true
     }.toTimelinePersistentList()
     if (retained.size == state.timeline.events.size) return unchanged(state)
     val timeline = state.timeline.copy(

@@ -687,6 +687,18 @@ class CanonicalTimelineEngine(
         count
     }
 
+    /**
+     * letta-mobile-zrode: a clean terminal supersedes the failure notices of earlier turns, as the
+     * in-memory reducer's RetireTurnFailureNotices does. A notice is client-written and never
+     * becomes a durable row, so it lives only in a settled overlay, which therefore never drained:
+     * the notice stayed under every later reply. Retiring drops it from the settled overlays.
+     */
+    internal suspend fun retireTurnFailureNotices(selection: TimelineEngineSelection) = mutex.withLock {
+        if (selection !== mutablePublication.value.selection) return@withLock
+        mutableSettling.value = mutableSettling.value.map { it.withoutTurnFailureNotices() }
+        mutableLive.value?.takeIf { it.settlementRevision != null }?.let { mutableLive.value = it.withoutTurnFailureNotices() }
+    }
+
     suspend fun advanceToolSweep(selection: TimelineEngineSelection): Long = mutex.withLock {
         check(selection === mutablePublication.value.selection)
         val (sweepGeneration, revision) = store.transaction(selection.scope) {

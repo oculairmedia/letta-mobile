@@ -208,7 +208,7 @@ class CanonicalLateTailSettlementTest {
 }
 
 /** Serves the same recent page to every reconcile; every other route is unused. */
-private class StaticPageTransport(
+internal class StaticPageTransport(
     private val records: () -> List<TimelineRemoteRecord>,
 ) : TimelineTransport by EmptyTimelineTransport {
     override suspend fun listConversationMessagePage(

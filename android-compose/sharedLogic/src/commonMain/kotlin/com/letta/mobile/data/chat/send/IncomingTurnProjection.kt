@@ -123,6 +123,10 @@ internal class IncomingTurnProjection(
         // foreign failure from poisoning another conversation's turn.
         val state = turnRegistry.resolveError(event, foreground.visibleConversation) ?: return false
         if (!state.acceptsError(event)) return true
+        // letta-mobile-zrode: an error for a turn or run this conversation already settled is that
+        // turn's history. Buffering it would fail whichever turn comes next.
+        val tail = TurnTail(event.turnId, event.runId)
+        if (state.isRetiredTurn(tail) || state.isRetiredRun(tail)) return true
         runtimeEventBatcher.enqueue(event, state.conversationId)
         // lcp-axv: stash the error and wait for the immediately-following TurnDone
         // to flip the UI. Surfacing the error here would race with TurnDone and

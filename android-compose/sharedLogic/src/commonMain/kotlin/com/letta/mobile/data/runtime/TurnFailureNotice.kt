@@ -50,6 +50,18 @@ object TurnFailureNotices {
     const val CANCELLED_MESSAGE: String = "Previous response cancelled."
 
     /**
+     * Id prefix of every failure-notice row a client writes into the timeline. A later clean
+     * terminal retires the rows carrying it (letta-mobile-3lltr, letta-mobile-zrode).
+     */
+    private const val NOTICE_ID_PREFIX: String = "turn-failed-"
+
+    /** The failure-notice row id for [key] (a turn and/or run identity). */
+    fun noticeId(key: String): String = NOTICE_ID_PREFIX + key
+
+    /** Whether [id] names a failure-notice row rather than a server-emitted error. */
+    fun isNoticeId(id: String?): Boolean = id?.startsWith(NOTICE_ID_PREFIX) == true
+
+    /**
      * Stop reasons that mean the main assistant reply finished successfully
      * enough that a later Failed terminal is trailing aux work, not a dead turn.
      * Intermediate stops like `requires_approval` and terminal `error` do NOT

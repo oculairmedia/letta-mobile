@@ -645,7 +645,7 @@ class IrohAdminRpcChatGateway(
             }
             emit(
                 ErrorMessage(
-                    id = "turn-failed-${turnId?.value ?: conversationId.value}",
+                    id = TurnFailureNotices.noticeId(turnId?.value ?: conversationId.value),
                     contentRaw = JsonPrimitive(notice.message),
                     code = notice.kind,
                 ),

@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.runtime.TurnFailureNotice
+import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.runtime.terminalReasonKind
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.BridgeTurnStatus
@@ -56,12 +57,14 @@ internal class TurnSettlement(
         // globally unique. Key the row by (turn, run) so a later failure that
         // reuses the run number still renders instead of merging into the old
         // row; a replayed terminal for the SAME turn still dedupes.
-        val id = "turn-failed-" + when {
-            stableTurnId != null && stableRunId != null -> "$stableTurnId-$stableRunId"
-            stableTurnId != null -> stableTurnId
-            stableRunId != null -> stableRunId
-            else -> "unknown"
-        }
+        val id = TurnFailureNotices.noticeId(
+            when {
+                stableTurnId != null && stableRunId != null -> "$stableTurnId-$stableRunId"
+                stableTurnId != null -> stableTurnId
+                stableRunId != null -> stableRunId
+                else -> "unknown"
+            },
+        )
         runCatching {
             timelineRepository.ingestExternalTransportMessage(
                 agentId = agentId,
@@ -242,6 +245,10 @@ internal class TurnSettlement(
                 timelineRepository.turnEnded(agentId, conversationId.value, clean = status is BridgeTurnStatus.Completed)
             }
             state.reachedTerminal = true
+            // letta-mobile-zrode: the terminal may name a run the state never bound (a retried
+            // run, or a terminal re-emitted without its turn id). Fence it too, or that re-emitted
+            // terminal settles the cleared state a second time and writes a second failure row.
+            state.retainSettledRun(request.event.runId)
             ownership.clear(state, reason = "turnFinished")
             val transportPresence = runCatching { timelineRepository.clearExternalTransportActive(conversationId.value) }
             listOf(localSettlement, foregroundPresence, toolSweep, transportPresence)

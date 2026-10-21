@@ -199,6 +199,12 @@ data class TimelineLivePublication(
     val settlementRevision: Long? = null,
     val aliases: Map<String, TimelineMessageId> = emptyMap(),
 ) {
+    /** This overlay without its turn-failure notices, which a later clean terminal retired. */
+    internal fun withoutTurnFailureNotices(): TimelineLivePublication {
+        val kept = block.events.filterNot { it.isTurnFailureNotice() }
+        return if (kept.size == block.events.size) this else copy(block = block.copy(events = kept))
+    }
+
     private fun isEventResident(
         event: TimelineEvent.Confirmed,
         presented: Map<TimelineMessageId, Long>,
