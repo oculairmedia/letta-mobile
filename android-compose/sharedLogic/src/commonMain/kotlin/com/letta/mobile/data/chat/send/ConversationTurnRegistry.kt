@@ -231,8 +231,8 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
      * When some other conversation already owns an identified turn and nothing
      * matches, the frame is foreign: return null so the caller drops it.
      */
-    fun resolveStateByTurnId(turnId: String?): ConversationTurnState? {
-        val key = turnId?.takeIf { it.isNotBlank() } ?: return fallbackState()
+    fun resolveStateByTurn(tail: TurnTail): ConversationTurnState? {
+        val key = tail.turnId?.takeIf { it.isNotBlank() } ?: return fallbackState()
         val states = statesSnapshot
         states.firstOrNull { it.turnId == key }?.let { return it }
         states.firstOrNull { it.identity.isFenced(key) }?.let { return it }
@@ -248,8 +248,8 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
      * for such a frame, so it resolves to null (dropped) rather than to its
      * settled owner.
      */
-    fun resolveStateByRunId(runId: String?): ConversationTurnState? {
-        val key = runId?.takeIf { it.isNotBlank() } ?: return fallbackState()
+    fun resolveStateByRun(tail: TurnTail): ConversationTurnState? {
+        val key = tail.runId?.takeIf { it.isNotBlank() } ?: return fallbackState()
         val states = statesSnapshot
         states.firstOrNull { it.runId == key }?.let { return it }
         if (states.any { key in it.settledRunIds }) return null

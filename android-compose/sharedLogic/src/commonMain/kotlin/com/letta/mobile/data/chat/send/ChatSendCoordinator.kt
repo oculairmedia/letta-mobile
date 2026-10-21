@@ -199,9 +199,9 @@ class ChatSendCoordinator(
     /** Live state a stop/usage tail may mutate; a retired turn's tail is only forwarded ([forwardRetiredTurnTail]). */
     private fun liveTailStateOrForward(event: WsTimelineEvent, tail: TurnTail): ConversationTurnState? {
         val state = if (!tail.turnId.isNullOrBlank()) {
-            turnRegistry.resolveStateByTurnId(tail.turnId)
+            turnRegistry.resolveStateByTurn(tail)
         } else {
-            turnRegistry.resolveStateByRunId(tail.runId)
+            turnRegistry.resolveStateByRun(tail)
                 ?: turnRegistry.statesSnapshot.firstOrNull { tail.runId in it.settledRunIds }
         }
         when {
@@ -560,7 +560,7 @@ class ChatSendCoordinator(
             is WsTimelineEvent.SubscribeDone -> {
                 // SubscribeDone carries a run id only; resolve the owning
                 // conversation from it before finalizing anything.
-                val state = turnRegistry.resolveStateByRunId(event.runId)
+                val state = turnRegistry.resolveStateByRun(TurnTail(null, event.runId))
                 if (state != null && (state.otid != null || ui.isStreaming())) {
                     finishActiveTurn(
                         state = state,
@@ -636,7 +636,9 @@ class ChatSendCoordinator(
         // No conversation on the frame: legacy WS frames only (Iroh always stamps agent, conversation
         // and turn). The WS contract attributes these to this chat's own send or open conversation,
         // pinned by WsChatSendCoordinatorTest (replay, live stream, pre-conversation buffering).
-        val state = boundState ?: event.turnId?.let { id -> turnRegistry.resolveStateByTurnId(id)?.takeUnless { isRetiredTurn(it, id) } }
+        val state = boundState ?: event.turnId?.let { id ->
+            turnRegistry.resolveStateByTurn(TurnTail(id, null))?.takeUnless { isRetiredTurn(it, id) }
+        }
         return state?.let { it.localConversationId ?: it.conversationId }
             ?: turnRegistry.lastActiveConversationId
             ?: activeConversationId()
@@ -645,7 +647,7 @@ class ChatSendCoordinator(
     /**
      * The state that owns [turnId] for a frame that names [frameConversationId]: an exact live turn,
      * a turn this conversation already fenced, or this conversation's own send still awaiting its
-     * `TurnStarted`. Unlike [resolveStateByTurnId] it never falls back to a state for whatever
+     * `TurnStarted`. Unlike [ConversationTurnRegistry.resolveStateByTurn] it never falls back to a state for whatever
      * conversation is active, and a state for another conversation never claims the frame.
      */
     private fun ownedStateForTurn(turnId: String?, frameConversationId: String): ConversationTurnState? {
@@ -738,14 +740,14 @@ class ChatSendCoordinator(
     }
 
     private fun resolveTurnDoneOwner(event: WsTimelineEvent.TurnDone): ConversationTurnState? {
-        if (event.turnId.isBlank()) return turnRegistry.resolveStateByRunId(event.runId)
+        if (event.turnId.isBlank()) return turnRegistry.resolveStateByRun(TurnTail(null, event.runId))
         val states = turnRegistry.statesSnapshot
         val runMatch = states.firstOrNull { it.canAdoptTerminal(event) }
         val turnAlreadyKnown = states.any { s -> s.turnId == event.turnId || s.identity.isFenced(event.turnId) }
         if (runMatch != null && !turnAlreadyKnown) {
             return runMatch
         }
-        return turnRegistry.resolveStateByTurnId(event.turnId)
+        return turnRegistry.resolveStateByTurn(TurnTail(event.turnId, event.runId))
     }
 
     /**
@@ -1619,7 +1621,7 @@ class ChatSendCoordinator(
      */
     private fun resolveStateForError(event: WsTimelineEvent.Error): ConversationTurnState? {
         val named = event.conversationId?.takeIf { it.isNotBlank() }
-            ?: return turnRegistry.resolveStateByTurnId(event.turnId)
+            ?: return turnRegistry.resolveStateByTurn(TurnTail(event.turnId, event.runId))
         val resolved = resolveConversationId(named) ?: named
         peekState(resolved)?.let { return it }
         if (resolved == activeConversationId()) return stateFor(resolved)

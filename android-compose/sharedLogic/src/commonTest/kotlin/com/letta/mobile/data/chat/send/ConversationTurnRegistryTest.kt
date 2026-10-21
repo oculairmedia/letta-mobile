@@ -163,9 +163,9 @@ class ConversationTurnRegistryTest {
         retired.runId = null
         awaiting("new", "new-otid")
 
-        assertSame(retired, registry.resolveStateByTurnId("old-turn"))
+        assertSame(retired, registry.resolveStateByTurn(TurnTail("old-turn", null)))
         assertTrue(retired.identity.isFenced("old-turn"))
-        assertNull(registry.resolveStateByRunId("old-run"))
+        assertNull(registry.resolveStateByRun(TurnTail(null, "old-run")))
         assertNull(registry.peekState(ConversationId("new"))?.turnId)
     }
 
@@ -179,24 +179,28 @@ class ConversationTurnRegistryTest {
         live.turnId = "shared-turn"
         live.runId = "shared-run"
 
-        assertSame(live, registry.resolveStateByTurnId("shared-turn"))
-        assertSame(live, registry.resolveStateByRunId("shared-run"))
+        assertSame(live, registry.resolveStateByTurn(TurnTail("shared-turn", null)))
+        assertSame(live, registry.resolveStateByRun(TurnTail(null, "shared-run")))
     }
 
     @Test
     fun ambiguousAwaitingSendsWithoutRecentOwnerDoNotAdoptForeignTerminal() {
         awaiting("first", "first-otid")
         awaiting("second", "second-otid")
-        assertNull(registry.resolveStateByTurnId("unknown-turn"))
-        assertNull(registry.resolveStateByRunId("unknown-run"))
+        assertNull(registry.resolveStateByTurn(TurnTail("unknown-turn", null)))
+        assertNull(registry.resolveStateByRun(TurnTail(null, "unknown-run")))
         assertNull(registry.fallbackState())
     }
 
     @Test
     fun unknownPassiveTerminalMaterializesVisibleFallbackOnlyWhenRegistryIsEmpty() {
-        val fallback = registry.resolveStateByTurnId("unknown-turn")
+        val fallback = registry.resolveStateByTurn(TurnTail("unknown-turn", null))
         assertEquals("visible", fallback?.conversationId)
         assertFalse(fallback!!.isTracking)
+        listOf(null, "", " ").forEach { missing ->
+            assertSame(fallback, registry.resolveStateByTurn(TurnTail(missing, "ignored-run")))
+            assertSame(fallback, registry.resolveStateByRun(TurnTail("ignored-turn", missing)))
+        }
         registry.stateFor(ConversationId("other"))
         assertNull(registry.fallbackState())
         registry.lastActiveConversationId = "other"
