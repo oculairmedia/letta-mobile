@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.canvas.CanvasPresence
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
@@ -84,7 +85,10 @@ fun CanvasWorkspace(
         initialJson = initialJson,
         presenceTransport = presenceTransport,
         assets = assets,
-        localPeer = currentPeerId?.let { localCanvasPeer(it, currentPeerName) },
+        // Without a name, peers see the stable peer ID itself.
+        localPeer = currentPeerId?.let { peer ->
+            CanvasPresence(peer, currentPeerName ?: peer, canvasPeerColor(peer.hashCode()), cursorX = 0f, cursorY = 0f)
+        },
         callbacks = CanvasWorkspaceCallbacks(onNavigateBack, onExportJson, onExportSvg, onShareToChat),
         chrome = CanvasWorkspaceChromeOptions(showTitle, headerTrailing, layout, longPressDrawsSelectionBox, chromeTopInset),
         cameraRequest = cameraRequest,
