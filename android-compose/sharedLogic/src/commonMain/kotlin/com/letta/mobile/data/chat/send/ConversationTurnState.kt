@@ -125,6 +125,9 @@ internal class ConversationTurnState(val conversationId: String) {
         absorbBufferedError(orphan)
         deliveredAssistantContent = deliveredAssistantContent || orphan.deliveredAssistantContent
         activeAssistantMessageRunIds.addAll(orphan.activeAssistantMessageRunIds)
+        val adoptedTurn = turnId
+        val adoptedRun = runId
+        if (adoptedTurn != null && adoptedRun != null) bindObservedTurn(adoptedTurn, adoptedRun)
     }
 
     private fun absorbBufferedError(orphan: ConversationTurnState) {
