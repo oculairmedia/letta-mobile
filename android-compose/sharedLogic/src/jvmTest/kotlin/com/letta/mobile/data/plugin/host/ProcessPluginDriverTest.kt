@@ -5,6 +5,9 @@ import com.letta.mobile.data.plugin.wire.LcpCallException
 import com.letta.mobile.data.plugin.wire.LcpErrorCode
 import com.letta.mobile.plugin.api.ActionResult
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -96,8 +99,18 @@ class ProcessPluginDriverTest {
         "hang-health",
         { it.copy(healthInterval = 200.milliseconds, healthTimeout = 300.milliseconds) },
     ) { fixture ->
+        // Capture the transient first restart at emission, even when its consumer is delayed.
+        val firstRestart = async(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
+            assertIs<PluginDriverState.Restarting>(fixture.awaitState { it is PluginDriverState.Restarting || it.terminal })
+        }
+        val secondRestart = async(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
+            assertIs<PluginDriverState.Restarting>(
+                fixture.awaitState { (it is PluginDriverState.Restarting && it.attempt == 2) || it.terminal },
+            )
+        }
         fixture.driver.start()
-        val restarting = assertIs<PluginDriverState.Restarting>(fixture.awaitState { it is PluginDriverState.Restarting })
+        assertEquals(2, secondRestart.await().attempt)
+        val restarting = firstRestart.await()
         assertTrue("health check failed" in restarting.reason, restarting.reason)
         assertEquals(1, restarting.attempt)
     }

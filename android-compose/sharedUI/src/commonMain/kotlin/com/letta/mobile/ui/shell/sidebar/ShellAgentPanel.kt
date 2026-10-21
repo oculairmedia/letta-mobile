@@ -204,7 +204,7 @@ private fun ShellAgentIdentity(agent: ShellPanelAgent, onEditAgent: () -> Unit) 
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
         // The seat is empty while the character stands elsewhere; an agent with no mascot keeps its orb.
-        // Drawn in place (a phone has no transport layer) it follows the avatar's live-or-still rule,
+        // On a phone (the layer honours each seat's rule) it follows the avatar's live-or-still rule,
         // so the hero is the same picture of the agent as its rail orb, chip and list row.
         MascotSeat(
             agentId = agent.agentId,

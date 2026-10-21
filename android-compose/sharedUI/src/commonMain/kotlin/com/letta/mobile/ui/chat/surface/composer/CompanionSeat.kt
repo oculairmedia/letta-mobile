@@ -33,6 +33,7 @@ import com.letta.mobile.avatar.core.MascotBodyTune
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAvailable
+import com.letta.mobile.ui.input.pointerInputPassThrough
 import com.letta.mobile.ui.theme.ChatMascotDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.math.roundToInt
@@ -155,7 +156,7 @@ internal fun CompanionSeatOverlay(
     val placement = remember(anchors, glide) { SeatPlacement(anchors, glide) }
     placement.animate = animate
     // Where the seat answers nothing (over the Touch chat head) the character must not take what
-    // lands on it: with no transport layer (Android) the seat draws the live mascot itself, and its
+    // lands on it: with no transport layer the seat draws the live mascot itself, and its
     // renderer's pointer filter, though it consumes nothing, is a hit that ends the page's hit test
     // here, so the head under it never saw its drag, tap or long press (letta-mobile-bglj6.1).
     val takesInput = onClick != null || onEdit != null || onDockDrag != null

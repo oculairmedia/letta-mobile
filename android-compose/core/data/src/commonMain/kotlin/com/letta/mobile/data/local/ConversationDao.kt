@@ -13,10 +13,8 @@ private const val CONVERSATION_COLUMNS =
         "inContextMessageIdsJson, isolatedBlockIdsJson, cachedAtEpochMs, model, contextWindowLimit, modelEffort, " +
         "lastMessageAtEpochMs, updatedAtEpochMs, createdAtEpochMs"
 
-private const val REFRESH_STATE_COLUMNS = "agentId, lastRefreshAtMillis"
-
 /**
- * letta-mobile-by4vm.19: newest activity first, on epoch millis rather than the ISO strings. A
+ * Newest activity first, on epoch millis rather than the ISO strings. A
  * conversation with no parseable timestamp sorts last (not by id); `id` only breaks exact ties so
  * the order is stable.
  */
@@ -24,7 +22,7 @@ private const val CONVERSATION_RECENCY_ORDER =
     "COALESCE(lastMessageAtEpochMs, updatedAtEpochMs, createdAtEpochMs, 0) DESC, id"
 
 @Dao
-interface ConversationDao {
+interface ConversationDao : ConversationRefreshDao {
     @Query(
         """
         SELECT $CONVERSATION_COLUMNS FROM conversations
@@ -71,18 +69,6 @@ interface ConversationDao {
 
     @Query("DELETE FROM conversations")
     suspend fun deleteAll()
-
-    @Query("DELETE FROM conversation_refresh_state")
-    suspend fun deleteAllRefreshStates()
-
-    @Query("SELECT $REFRESH_STATE_COLUMNS FROM conversation_refresh_state WHERE agentId = :agentId LIMIT 1")
-    suspend fun getRefreshState(agentId: String): ConversationRefreshEntity?
-
-    @Query("SELECT $REFRESH_STATE_COLUMNS FROM conversation_refresh_state")
-    suspend fun getAllRefreshStatesOnce(): List<ConversationRefreshEntity>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertRefreshState(state: ConversationRefreshEntity)
 
     @Transaction
     suspend fun replaceForAgent(agentId: String, conversations: List<ConversationEntity>, refreshedAtMillis: Long) {

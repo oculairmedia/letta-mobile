@@ -1,7 +1,7 @@
 package com.letta.mobile.data.local
 
-import org.junit.Assert.assertEquals
-import org.junit.Test
+import kotlin.test.assertEquals
+import kotlin.test.Test
 
 class StringParsingExtensionsTest {
     @Test

@@ -116,6 +116,10 @@ Dreaming settings/history presentation with host-specific availability hints. Dr
 
 Composition-local access to shared haptics contracts. Hosts provide LocalHaptics with a shared Haptics implementation; hardware access and permission handling stay outside common UI.
 
+# Package com.letta.mobile.ui.input
+
+Pointer-input plumbing shared by overlays: a layer drawn over other controls (the mascot transport layer, the composer's companion seat) passes the touches it does not answer on to what is under it. No platform input APIs.
+
 # Package com.letta.mobile.ui.home
 
 Small fleet-activity chart components. Consume FleetBarSpark with supplied samples and colors; collecting fleet events and aggregating history stay upstream.

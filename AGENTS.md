@@ -78,6 +78,11 @@ Documentation ownership and lifecycle conventions: [docs/README.md](docs/README.
 
 ## Module map (where work belongs)
 
+`android-compose/core/data/` owns shared Android/JVM Room entities, DAO contracts and model
+conversions. `core/android-data/` re-exports them and retains database construction, migrations
+and Android bindings during extraction. Do not depend on Room from `sharedLogic` or `sharedUI`;
+browser persistence continues through their portable storage contracts.
+
 | Area | Module path | Put logic here | Host binding only |
 | --- | --- | --- | --- |
 | Shared domain / transport / timeline | `android-compose/sharedLogic/` | repositories, reducers, mappers, RPC, caching | — |

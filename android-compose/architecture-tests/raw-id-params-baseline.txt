@@ -4,8 +4,6 @@
 # falls, though lowering the line locks the gain in. See docs/architecture/typed-ids-and-id-ratchets.md.
 core/android-data/src/main/java/com/letta/mobile/data/capability/CapabilityRepository.kt 2
 core/android-data/src/main/java/com/letta/mobile/data/channel/CurrentConversationTracker.kt 1
-core/android-data/src/main/java/com/letta/mobile/data/local/CanvasOpDao.kt 7
-core/android-data/src/main/java/com/letta/mobile/data/local/ConversationDao.kt 8
 core/android-data/src/main/java/com/letta/mobile/data/local/RoomAllConversationsLocalCache.kt 1
 core/android-data/src/main/java/com/letta/mobile/data/local/RoomTimelineBoundedStore.kt 2
 core/android-data/src/main/java/com/letta/mobile/data/local/TimelineOwnershipAuthority.kt 2
@@ -29,6 +27,9 @@ core/android-data/src/main/java/com/letta/mobile/data/session/SessionScopedSubag
 core/android-data/src/main/java/com/letta/mobile/data/session/SessionScopedToolRepository.kt 1
 core/android-data/src/main/java/com/letta/mobile/data/session/TimelineFrameCollectorOverflowReconciler.kt 1
 core/android-data/src/main/java/com/letta/mobile/data/timeline/IrohAdminRpcTimelineTransport.kt 4
+core/data/src/commonMain/kotlin/com/letta/mobile/data/local/CanvasOpDao.kt 7
+core/data/src/commonMain/kotlin/com/letta/mobile/data/local/ConversationDao.kt 7
+core/data/src/commonMain/kotlin/com/letta/mobile/data/local/ConversationRefreshDao.kt 1
 core/ids/src/commonMain/kotlin/com/letta/mobile/data/model/IdFormats.kt 1
 core/runtime/src/commonMain/kotlin/com/letta/mobile/runtime/RuntimeProjection.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/PendingToolApprovalRegistry.kt 2

@@ -67,6 +67,7 @@ android {
 }
 
 dependencies {
+    api(project(":core:data"))
     api(project(":sharedLogic"))
 
     implementation(libs.hilt.android)

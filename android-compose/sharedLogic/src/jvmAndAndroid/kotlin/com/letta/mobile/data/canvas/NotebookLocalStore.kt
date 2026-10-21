@@ -457,6 +457,7 @@ class NotebookLocalStore(
         stopPolling()
         poller.shutdownNow()
         repo.close()
+        health.settleCompactions()
         health.close()
     }
 

@@ -5,11 +5,20 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.assertFailsWith
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import org.automerge.AmValue
+import org.automerge.ChangeHash
+import org.automerge.ObjectId
+import org.automerge.repo.Repo
+import org.automerge.repo.Storage
+import org.automerge.repo.StorageKey
 
 class NotebookLocalStoreTest {
     private fun projectedNote(title: String, body: String) =
@@ -233,5 +242,71 @@ class NotebookLocalStoreTest {
             assertEquals(NotebookProjectionResult.CONFLICT, store.reconcile(id))
             assertTrue(assertNotNull(store.read(id)).markdown.startsWith("Local "))
         }
+    }
+
+    /** Holds the repository's first snapshot write open, written but unacknowledged, until [release]. */
+    private class FirstSnapshotGate {
+        private val held = AtomicBoolean()
+        val written = CountDownLatch(1)
+        val release = CompletableFuture<Void>()
+
+        fun wrap(storage: Storage): Storage = object : Storage by storage {
+            override fun put(key: StorageKey, value: ByteArray): CompletableFuture<Void> {
+                val put = storage.put(key, value)
+                if (key.parts.getOrNull(1) != "snapshot" || !held.compareAndSet(false, true)) return put
+                return put.thenCompose { written.countDown(); release }
+            }
+        }
+    }
+
+    /**
+     * The repository deletes the chunks a compaction supersedes on its next save, and a snapshot
+     * acknowledged while it is stopping gets none: the store's size then depended on when it
+     * closed (letta-mobile-u8zni). Closing still leaves one snapshot, with every change in it.
+     */
+    @Test
+    fun aCompactionAcknowledgedWhileClosingStillLeavesOneSnapshotWithAllHistory() {
+        val directory = Files.createTempDirectory("notebook-compaction-close-")
+        val gate = FirstSnapshotGate()
+        val store = NotebookLocalStore(directory, "compaction-peer", storage = gate::wrap)
+        val id = store.create("Compaction")
+        var halfway = emptyArray<ChangeHash>()
+        repeat(EDITS) { i ->
+            store.insertMarkdown(id, 0, "$i,")
+            if (i == EDITS / 2) halfway = assertNotNull(store.open(id)).withDocument { it.heads }.get(5, TimeUnit.SECONDS)
+        }
+        assertTrue(gate.written.await(5, TimeUnit.SECONDS), "the repository compacted")
+        // Stop, and let every document actor take the stop before the snapshot is acknowledged.
+        store.repo.stop()
+        val runtime = Repo::class.java.getDeclaredField("runtime").apply { isAccessible = true }.get(store.repo)
+        val hub = runtime.javaClass.getDeclaredField("hubExecutor").apply { isAccessible = true }.get(runtime) as ExecutorService
+        hub.submit {}.get(5, TimeUnit.SECONDS)
+        gate.release.complete(null)
+        store.close()
+
+        val chunks = Files.walk(directory).use { files ->
+            files.iterator().asSequence()
+                .filter { Files.isRegularFile(it) && it.parent.fileName.toString() in setOf("snapshot", "incremental") }
+                .toList()
+        }
+        assertEquals(1, chunks.size, "chunks left on disk after close")
+        val expected = (EDITS - 1 downTo 0).joinToString("") { "$it," }
+        NotebookLocalStore(directory, "compaction-peer").use { reopened ->
+            assertEquals(expected, assertNotNull(reopened.read(id)).markdown)
+            val earlier = assertNotNull(reopened.open(id)).withDocument { document ->
+                val fork = document.fork(halfway)
+                try {
+                    fork.text((fork.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id).orElseThrow()
+                } finally {
+                    fork.free()
+                }
+            }.get(5, TimeUnit.SECONDS)
+            assertEquals((EDITS / 2 downTo 0).joinToString("") { "$it," }, earlier)
+        }
+    }
+
+    private companion object {
+        /** Enough edits that the repository compacts (past ten chunks) and keeps writing after. */
+        const val EDITS = 40
     }
 }
