@@ -6,16 +6,35 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 
 /** Foreground UI follows the current selection; timeline ownership follows the frame. */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class ChatSendCoordinatorForegroundRoutingTest : ChatSendCoordinatorConversationFixture() {
+    @Test
+    fun blankInitialSelectionReceivesPreparationFailureBeforeAdoption() = runTest(UnconfinedTestDispatcher()) {
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(mutableListOf())
+        val coordinator = coordinator(
+            timeline = RecordingTimelineWriter(), ui = ui, transport = transport, scope = backgroundScope,
+            prepareConversation = { error("prepare failed") },
+        ) { "" }
+        coordinator.send("first message").join()
+        assertEquals("Conversation is not ready: prepare failed", ui.currentError())
+        assertTrue(selectedConversations.isEmpty())
+        assertTrue(observedConversations.isEmpty())
+        assertTrue(transport.sentConversationIds.isEmpty())
+        assertEquals(0, composerClears)
+    }
+
     @Test
     fun blankInitialSelectionAdoptsCreatedConversationBeforePublishingSend() = runTest(UnconfinedTestDispatcher()) {
         val ui = RecordingUiSink()
@@ -176,14 +195,16 @@ internal class ChatSendCoordinatorForegroundRoutingTest : ChatSendCoordinatorCon
             timeline = RecordingTimelineWriter(),
             ui = ui,
             transport = transport,
-            scope = backgroundScope,
+            scope = CoroutineScope(backgroundScope.coroutineContext + StandardTestDispatcher(testScheduler)),
         ) { visible }
         val switched = backgroundScope.launch {
             coordinator.sendQueue.state.first { queues -> queues.values.any { !it.isEmpty } }
             visible = CONV_B
             ui.onError("B error")
         }
-        coordinator.send("queue A").join()
+        val send = coordinator.send("queue A")
+        runCurrent()
+        send.join()
         switched.join()
         assertEquals(0, composerClears)
         assertEquals("B error", ui.currentError())

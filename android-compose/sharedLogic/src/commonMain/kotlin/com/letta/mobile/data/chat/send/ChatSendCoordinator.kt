@@ -276,7 +276,10 @@ class ChatSendCoordinator(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            foreground.sendFailed(ConversationId(conversationId), "Conversation is not ready: ${failure.message ?: "unknown"}")
+            foreground.sendFailed(
+                targetConversationId?.let(::ConversationId),
+                "Conversation is not ready: ${failure.message ?: "unknown"}",
+            )
             timer.stop("accepted" to false, "reason" to "conversation_not_ready")
             return
         }

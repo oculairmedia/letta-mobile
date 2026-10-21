@@ -562,7 +562,7 @@ internal class ChatSendCoordinatorConcurrentConversationsTest : ChatSendCoordina
         )
         coordinator.handleEvent(userEcho)
 
-        // 2. TurnStarted arrives on CONV_SERVER. Its resolved foreground owner is still CONV_A.
+        // 2. The echo already adopted this turn; its same-turn start must not restart observation.
         val beforeStart = selectedConversations.size to observedConversations.size
         coordinator.handleEvent(
             WsTimelineEvent.TurnStarted(
@@ -573,7 +573,7 @@ internal class ChatSendCoordinatorConcurrentConversationsTest : ChatSendCoordina
         )
 
         val adopted = selectedConversations.drop(beforeStart.first) to observedConversations.drop(beforeStart.second)
-        assertEquals(listOf(CONV_A) to listOf(CONV_A), adopted)
+        assertEquals(emptyList<String>() to emptyList<String>(), adopted)
 
         // 3. Assistant reply arrives on CONV_SERVER
         val assistantDelta = WsTimelineEvent.MessageDelta(
@@ -821,6 +821,7 @@ internal abstract class ChatSendCoordinatorConversationFixture {
         recordRuntimeEvents: suspend (List<ScopedRuntimeEvent>) -> Unit = { events ->
             events.forEach { event -> recordRuntimeEvent(event.event, event.conversationId) }
         },
+        prepareConversation: suspend (String) -> Unit = {},
         activeConversationId: () -> String?,
     ) = ChatSendCoordinator(
         scope = scope,
@@ -837,6 +838,7 @@ internal abstract class ChatSendCoordinatorConversationFixture {
         clientVersion = { "test" },
         otidGenerator = { "otid-${++otid}" },
         recordRuntimeEvents = recordRuntimeEvents,
+        prepareConversation = prepareConversation,
     )
 
     protected class RecordingUiSink(
