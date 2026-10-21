@@ -53,7 +53,7 @@ fun main(args: Array<String>) {
     DesktopCrashReporter.installGlobalHandler()
     // Settings, vault, notebook store, runtime discovery and native bridges, read while the window
     // and its graphics device are being created rather than inside the first composition.
-    DesktopStartupPrewarm.start()
+    prewarmDesktopStartup()
     initializeDesktopLifecycleMainThread()
     // Kotzilla observability — must run before any UI composition so the SDK
     // captures the full session including startup. Android target boots via

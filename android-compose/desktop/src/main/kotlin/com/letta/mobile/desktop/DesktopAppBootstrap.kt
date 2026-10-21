@@ -39,9 +39,9 @@ internal data class DesktopConfigBootstrap(
 internal fun rememberDesktopConfigBootstrap(): DesktopConfigBootstrap {
     // Sensitive settings (access token) are vault-encrypted at rest: DPAPI on Windows,
     // keyfile-AES-GCM elsewhere. Read once per process, usually already off the EDT by
-    // DesktopStartupPrewarm; the config store's construction read is the first active config.
-    val secureSettingsStore = remember { DesktopStartupSettings.secureSettingsStore }
-    val configStore = remember(secureSettingsStore) { DesktopStartupSettings.configStore }
+    // prewarmDesktopStartup; the config store's construction read is the first active config.
+    val secureSettingsStore = remember { desktopSecureSettingsStore }
+    val configStore = remember(secureSettingsStore) { desktopConfigStore }
     var activeConfig by remember { mutableStateOf(configStore.activeConfig.value ?: configStore.load()) }
     val irohAgentDirectorySlot = remember { mutableStateOf<IrohAdminRpcAgentDirectory?>(null) }
     val channelTransportSlot = remember { mutableStateOf<IChannelTransport?>(null) }
