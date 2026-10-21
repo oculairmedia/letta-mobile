@@ -688,7 +688,7 @@ class CanonicalTimelineEngine(
     }
 
     /**
-     * letta-mobile-zrode: a clean terminal supersedes the failure notices of earlier turns, as the
+     * A clean terminal supersedes the failure notices of earlier turns, as the
      * in-memory reducer's RetireTurnFailureNotices does. A notice is client-written and never
      * becomes a durable row, so it lives only in a settled overlay, which therefore never drained:
      * the notice stayed under every later reply. Retiring drops it from the settled overlays.

@@ -3,7 +3,6 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolReturnMessage
-import com.letta.mobile.data.runtime.TurnFailureNotices
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentListOf
@@ -355,7 +354,7 @@ fun reduceProductionMutation(state: TimelineReducerState, mutation: TimelineMuta
 
 /** A client-written turn-failure notice row, which a later clean terminal retires. */
 internal fun TimelineEvent.Confirmed.isTurnFailureNotice(): Boolean =
-    messageType == TimelineMessageType.ERROR && TurnFailureNotices.isNoticeId(serverId)
+    messageType == TimelineMessageType.ERROR && TurnFailureNoticeIds.isNotice(serverId)
 
 private fun reduceTurnFailureNoticeRetirement(state: TimelineReducerState): TimelineReduction {
     val retained = state.timeline.events.filterNot { event ->

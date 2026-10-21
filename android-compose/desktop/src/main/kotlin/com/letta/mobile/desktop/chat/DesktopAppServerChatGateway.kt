@@ -65,6 +65,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import com.letta.mobile.data.chat.runtime.ConnectionStatusGateway
+import com.letta.mobile.data.timeline.TurnFailureNoticeIds
 import com.letta.mobile.data.transport.ChannelTransportState
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.first
@@ -336,7 +337,7 @@ class DesktopAppServerChatGateway internal constructor(
                         ) ?: return@collect
                         emit(
                             ErrorMessage(
-                                id = TurnFailureNotices.noticeId(draft.runId?.value ?: turnId.value),
+                                id = TurnFailureNoticeIds.of(draft.runId?.value ?: turnId.value),
                                 contentRaw = JsonPrimitive(notice.message),
                                 code = notice.kind,
                                 runId = draft.runId?.value ?: syntheticRunId.value,

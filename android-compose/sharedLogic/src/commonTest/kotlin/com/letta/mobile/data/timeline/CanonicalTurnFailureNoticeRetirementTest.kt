@@ -25,7 +25,7 @@ class CanonicalTurnFailureNoticeRetirementTest {
     private fun at(second: Int) = "2026-10-21T12:19:${second.toString().padStart(2, '0')}Z"
 
     private fun notice(key: String, second: Int) = ErrorMessage(
-        id = TurnFailureNotices.noticeId(key),
+        id = TurnFailureNoticeIds.of(key),
         contentRaw = JsonPrimitive(TurnFailureNotices.GENERIC_MESSAGE),
         code = "other",
         date = at(second),
@@ -52,14 +52,14 @@ class CanonicalTurnFailureNoticeRetirementTest {
         val screen = assertNotNull(coordinator.attach(owner))
         val engine = owner.session.engine
         fun overlayNotices(): List<String> = (engine.settling.value + listOfNotNull(engine.live.value))
-            .flatMap { it.block.events }.map { it.serverId }.filter(TurnFailureNotices::isNoticeId)
+            .flatMap { it.block.events }.map { it.serverId }.filter(TurnFailureNoticeIds::isNotice)
 
         writer.turn(
             "local-run-102", clean = false,
             UserMessage(id = "u-1", contentRaw = JsonPrimitive("hi"), date = at(1)),
             notice("turn-local-run-102", 2),
         )
-        assertEquals(listOf(TurnFailureNotices.noticeId("turn-local-run-102")), overlayNotices())
+        assertEquals(listOf(TurnFailureNoticeIds.of("turn-local-run-102")), overlayNotices())
 
         writer.turn(
             "local-run-103", clean = true,
@@ -73,7 +73,7 @@ class CanonicalTurnFailureNoticeRetirementTest {
             UserMessage(id = "u-3", contentRaw = JsonPrimitive("once more"), date = at(5)),
             notice("turn-local-run-104", 6),
         )
-        assertEquals(listOf(TurnFailureNotices.noticeId("turn-local-run-104")), overlayNotices())
+        assertEquals(listOf(TurnFailureNoticeIds.of("turn-local-run-104")), overlayNotices())
         coordinator.detach(screen)
     }
 }
