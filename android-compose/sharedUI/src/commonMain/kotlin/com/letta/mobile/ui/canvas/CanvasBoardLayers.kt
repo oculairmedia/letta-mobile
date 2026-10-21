@@ -72,7 +72,9 @@ internal fun boardInsertActions(board: CanvasBoard): BoardInsertActions {
 @Composable
 internal fun Modifier.canvasBoardInput(board: CanvasBoard): Modifier {
     val ui = board.ui
-    val target = remember(board.host.presenceTransport, board.session, board.host.currentPeerId) { board.localPresenceTarget() }
+    val target = remember(board.host.presenceTransport, board.session, board.host.currentPeerId) {
+        board.localPresenceTarget()
+    }
     return this
         .canvasLocalPresence(target) {
             board.controller.state.value.viewport.screenToWorld(it)
