@@ -426,6 +426,109 @@ class ChatSendCoordinatorCleanupTest {
     }
 
     @Test
+    fun terminalTracePlacesForegroundFinishBetweenLocalSettlementAndToolSweep() = runTest(UnconfinedTestDispatcher()) {
+        val trace = mutableListOf<String>()
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink(terminalTrace = trace)
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)))
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        timeline.beforeSettlementWrite = { trace += it.name }
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed, lossy = true))
+        assertEquals(listOf("CLEANUP", "RECONCILE", "NOTICE", "LOCAL_MARK", "UI_FINISH", "TURN_ENDED", "CLEAR_ACTIVE"), trace)
+        assertFalse(ui.isStreaming())
+    }
+
+    @Test
+    fun completedTerminalTraceSkipsFailureCleanupAndNotice() = runTest(UnconfinedTestDispatcher()) {
+        assertTerminalTrace(BridgeTurnStatus.Completed, false,
+            listOf("RECONCILE", "LOCAL_MARK", "UI_FINISH", "TURN_ENDED", "CLEAR_ACTIVE"))
+    }
+
+    @Test
+    fun deliveredFailureTracePreservesReplyAndSettlesLocalAsSent() = runTest(UnconfinedTestDispatcher()) {
+        assertTerminalTrace(BridgeTurnStatus.Failed, true,
+            listOf("RECONCILE", "LOCAL_MARK", "UI_FINISH", "TURN_ENDED", "CLEAR_ACTIVE"))
+    }
+
+    @Test
+    fun cancelledTerminalTraceKeepsNoticeAndCleanupBeforeRetirement() = runTest(UnconfinedTestDispatcher()) {
+        assertTerminalTrace(BridgeTurnStatus.Cancelled, false,
+            listOf("CLEANUP", "RECONCILE", "NOTICE", "LOCAL_MARK", "UI_FINISH", "TURN_ENDED", "CLEAR_ACTIVE"))
+    }
+
+    private suspend fun assertTerminalTrace(status: BridgeTurnStatus, delivered: Boolean, expected: List<String>) {
+        val trace = mutableListOf<String>()
+        val timeline = RecordingTimelineWriter(terminalTrace = trace)
+        val ui = RecordingUiSink(terminalTrace = trace)
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)))
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        if (delivered) {
+            coordinator.handleEvent(WsTimelineEvent.MessageDelta(
+                AssistantMessage(id = "reply", contentRaw = JsonPrimitive("OK"), runId = "run-1"),
+            ))
+        }
+        trace.clear()
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", status, lossy = true))
+        assertEquals(expected, trace)
+        assertTrue(timeline.failedLocals.isEmpty())
+        assertFalse(ui.isStreaming())
+    }
+
+    @Test
+    fun pendingDrainBeginsAfterTerminalPresenceIsCleared() = runTest(UnconfinedTestDispatcher()) {
+        val trace = mutableListOf<String>()
+        val timeline = RecordingTimelineWriter(terminalTrace = trace)
+        val ui = RecordingUiSink(terminalTrace = trace)
+        val transport = FakeChannelTransport(mutableListOf(true, false, true))
+        val coordinator = coordinator(timeline, ui, transport)
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        transport.activeChatTurn = true
+        coordinator.send("queued").join()
+        transport.activeChatTurn = false
+        transport.sendObserver = { trace += "SEND:$it" }
+        trace.clear()
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Completed))
+        assertEquals(listOf("LOCAL_MARK", "UI_FINISH", "TURN_ENDED", "CLEAR_ACTIVE", "SEND:queued"), trace)
+        assertTrue(coordinator.sendQueue.state.value.isEmpty())
+    }
+
+    @Test
+    fun disconnectTraceRetainsItsDistinctAbnormalOrdering() = runTest(UnconfinedTestDispatcher()) {
+        val trace = mutableListOf<String>()
+        val timeline = RecordingTimelineWriter(terminalTrace = trace)
+        val ui = RecordingUiSink(terminalTrace = trace)
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)))
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        trace.clear()
+        coordinator.handleEvent(WsTimelineEvent.Disconnected(1006, "gone"))
+        assertEquals(listOf("LOCAL_MARK", "CLEANUP", "CLEAR_ACTIVE", "TURN_ENDED", "UI_DISCONNECT"), trace)
+        assertFalse(ui.isStreaming())
+    }
+
+    @Test
+    fun selectionChangedDuringReconcileSuppressesTerminalUiOnly() = runTest(UnconfinedTestDispatcher()) {
+        var visible = "conv-1"
+        val trace = mutableListOf<String>()
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink(terminalTrace = trace)
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)), { visible })
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        timeline.beforeSettlementWrite = {
+            if (it == SettlementWrite.RECONCILE) visible = "conv-2"
+        }
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Completed, lossy = true))
+        assertTrue(trace.isEmpty())
+        assertFalse("conv-1" in timeline.activeConversations)
+        assertTrue(ui.isStreaming())
+        assertEquals("conv-1", timeline.clearedActiveConversations.last())
+    }
+
+    @Test
     fun failedSyntheticTerminalUsesObservedAssistantRunCandidatesExactlyOnce() = runTest(UnconfinedTestDispatcher()) {
         val timeline = RecordingTimelineWriter()
         val coordinator = coordinator(timeline = timeline, ui = RecordingUiSink(), transport = FakeChannelTransport(mutableListOf(true)), activeConversationId = { "conv-1" })
@@ -1159,6 +1262,7 @@ class ChatSendCoordinatorCleanupTest {
         private var error: String? = null,
         private var isStreaming: Boolean = false,
         private var isAgentTyping: Boolean = false,
+        private val terminalTrace: MutableList<String> = mutableListOf(),
     ) : ChatSendUiSink {
         val transientDisconnects = mutableListOf<Boolean>()
         var visualCompletions = 0
@@ -1172,21 +1276,33 @@ class ChatSendCoordinatorCleanupTest {
         override fun onTurnStarted(conversationId: String) { error = null; isStreaming = true; isAgentTyping = true }
         override fun onMessageDelta(conversationId: String) { error = null; isStreaming = true; isAgentTyping = true }
         override fun onUsage(promptTokens: Int, completionTokens: Int, totalTokens: Int) = Unit
-        override fun onTurnFinished(error: String?) { this.error = error; isStreaming = false; isAgentTyping = false }
+        override fun onTurnFinished(error: String?) {
+            terminalTrace += "UI_FINISH"
+            this.error = error
+            isStreaming = false
+            isAgentTyping = false
+        }
         override fun onTurnVisuallyComplete() { visualCompletions++; isStreaming = false; isAgentTyping = false }
         override fun onTransientDisconnect(hasActiveSend: Boolean) { transientDisconnects += hasActiveSend; error = null; isStreaming = hasActiveSend; isAgentTyping = hasActiveSend }
-        override fun onDisconnectFailure(error: String) { this.error = error; isStreaming = false; isAgentTyping = false }
+        override fun onDisconnectFailure(error: String) {
+            terminalTrace += "UI_DISCONNECT"
+            this.error = error
+            isStreaming = false
+            isAgentTyping = false
+        }
     }
 
     private class RecordingTimelineWriter(
         private val cleanupFailure: Throwable? = null,
         private val ingestFailure: Throwable? = null,
+        private val terminalTrace: MutableList<String> = mutableListOf(),
     ) : TimelineExternalTransportWriter {
         var beforeSettlementWrite: suspend (SettlementWrite) -> Unit = {}
         val settlementWrites = mutableListOf<SettlementWrite>()
         val activeConversations = mutableSetOf<String>()
         private suspend fun settlementWrite(write: SettlementWrite) {
             settlementWrites += write
+            terminalTrace += write.name
             beforeSettlementWrite(write)
         }
         var reconcileOutcome: RecentMessagesReconcileOutcome = RecentMessagesReconcileOutcome.Applied(0)
@@ -1254,10 +1370,23 @@ class ChatSendCoordinatorCleanupTest {
             activeChatTurn || conversationId in activeChatTurnConversations
         override val hasAnyActiveChatTurn: Boolean
             get() = activeChatTurn || activeChatTurnConversations.isNotEmpty()
+        var sendObserver: (String) -> Unit = {}
         val sentTexts = mutableListOf<String>()
         val sentConversationIds = mutableListOf<String>()
         override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) = Unit
-        override fun send(agentId: String, conversationId: String, text: String, otid: String?, contentParts: JsonArray?, startNewConversation: Boolean): Boolean { sentTexts += text; sentConversationIds += conversationId; return sendResults.removeFirstOrNull() ?: true }
+        override fun send(
+            agentId: String,
+            conversationId: String,
+            text: String,
+            otid: String?,
+            contentParts: JsonArray?,
+            startNewConversation: Boolean,
+        ): Boolean {
+            sendObserver(text)
+            sentTexts += text
+            sentConversationIds += conversationId
+            return sendResults.removeFirstOrNull() ?: true
+        }
         override fun cancel(conversationId: String): Boolean = true
         override fun bye(): Boolean = true
         override suspend fun disconnect() = Unit
