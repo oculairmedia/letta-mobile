@@ -1947,6 +1947,10 @@ public final class com/letta/mobile/ui/chat/surface/composer/ComposerAgentMentio
 	public static final field ROW Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/chat/surface/composer/ComposerImageIngressKt {
+	public static final fun readImageSource (Ljava/lang/Long;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public final class com/letta/mobile/ui/chat/surface/composer/ComposerImagePickerKt {
 	public static final fun encodeAttachment ([BLcom/letta/mobile/data/attachment/AttachmentLimits;)Lcom/letta/mobile/data/model/MessageContentPart$Image;
 	public static synthetic fun encodeAttachment$default ([BLcom/letta/mobile/data/attachment/AttachmentLimits;ILjava/lang/Object;)Lcom/letta/mobile/data/model/MessageContentPart$Image;

@@ -43,6 +43,17 @@ internal fun readAtMost(limit: Int, read: (ByteArray) -> Int): ByteArray? {
     return out
 }
 
+/**
+ * A pasted or dropped image's bytes, read in chunks through [read]. Refused with the shared
+ * "larger than N MB" reason when its [knownSize] (a file's size, when the platform has one) already
+ * passes [ImageIngressPolicy.MAX_SOURCE_BYTES], before a byte is read, or as soon as the bytes read
+ * pass it (a source that grew, or one with no known size).
+ */
+suspend fun readImageSource(knownSize: Long?, read: (ByteArray) -> Int): ByteArray {
+    if (knownSize != null && knownSize > ImageIngressPolicy.MAX_SOURCE_BYTES) imageTooLarge()
+    return readAtMost(ImageIngressPolicy.MAX_SOURCE_BYTES, read) ?: imageTooLarge()
+}
+
 /** Refuses a pasted or dropped image larger than [ImageIngressPolicy.MAX_SOURCE_BYTES]. */
 internal suspend fun imageTooLarge(): Nothing =
     throw IllegalArgumentException(getString(Res.string.composer_attach_too_large, ImageIngressPolicy.MAX_SOURCE_BYTES / BytesPerMib))

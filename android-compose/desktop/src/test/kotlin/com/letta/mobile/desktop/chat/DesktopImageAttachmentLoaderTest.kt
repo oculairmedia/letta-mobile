@@ -1,14 +1,17 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.attachment.AttachmentLimits
+import com.letta.mobile.data.attachment.ImageIngressPolicy
 import java.awt.Color
 import java.awt.image.BufferedImage
+import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.util.Base64
 import javax.imageio.ImageIO
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class DesktopImageAttachmentLoaderTest {
@@ -38,5 +41,18 @@ class DesktopImageAttachmentLoaderTest {
         assertEquals("image/jpeg", image.mediaType)
         assertTrue(bytes.size <= limits.maxRawBytesPerImage)
         assertEquals(32, maxOf(decoded.width, decoded.height))
+    }
+
+    @Test
+    fun aFileOverTheSharedSourceCapIsRefusedBeforeDecode() = runTest {
+        // letta-mobile-k5nbq.18: sparse, so the test never writes 25 MB.
+        val path = Files.createTempFile("desktop-attachment-huge", ".png")
+        try {
+            RandomAccessFile(path.toFile(), "rw").use { it.setLength(ImageIngressPolicy.MAX_SOURCE_BYTES + 1L) }
+            val error = assertFailsWith<IllegalArgumentException> { DesktopImageAttachmentLoader().load(path) }
+            assertEquals("larger than 25 MB", error.message)
+        } finally {
+            Files.deleteIfExists(path)
+        }
     }
 }

@@ -85,7 +85,7 @@ private fun Uri.asImageSource(resolver: ContentResolver): ComposerImageSource = 
         val stream = checkNotNull(resolver.openInputStream(this@asImageSource)) {
             getString(Res.string.composer_attach_not_an_image)
         }
-        stream.use { readAtMost(ImageIngressPolicy.MAX_SOURCE_BYTES, it::read) } ?: imageTooLarge()
+        stream.use { readImageSource(knownSize = null, read = it::read) }
     }
 }
 
