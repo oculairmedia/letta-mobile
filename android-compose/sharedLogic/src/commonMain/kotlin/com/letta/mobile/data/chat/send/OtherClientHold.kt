@@ -86,12 +86,10 @@ internal class OtherClientHold(
         repeat(attempt) { waitMs = (waitMs * 2).coerceAtMost(backoff.maxMs) }
         return waitMs.coerceAtMost(backoff.maxMs)
     }
-
-    private companion object {
-        const val INITIAL_RETRY_MS = 2_000L
-        const val MAX_RETRY_MS = 30_000L
-    }
 }
+
+private const val INITIAL_RETRY_MS = 2_000L
+private const val MAX_RETRY_MS = 30_000L
 
 /**
  * Keeps the "queued on server" mark of a sent message. The App Server parks
