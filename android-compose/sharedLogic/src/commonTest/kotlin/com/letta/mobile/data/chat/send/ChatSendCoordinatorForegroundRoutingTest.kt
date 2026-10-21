@@ -23,9 +23,9 @@ internal class ChatSendCoordinatorForegroundRoutingTest : ChatSendCoordinatorCon
     fun blankInitialSelectionReceivesPreparationFailureBeforeAdoption() = runTest(UnconfinedTestDispatcher()) {
         val ui = RecordingUiSink()
         val transport = FakeChannelTransport(mutableListOf())
+        prepareConversation = { error("prepare failed") }
         val coordinator = coordinator(
             timeline = RecordingTimelineWriter(), ui = ui, transport = transport, scope = backgroundScope,
-            prepareConversation = { error("prepare failed") },
         ) { "" }
         coordinator.send("first message").join()
         assertEquals("Conversation is not ready: prepare failed", ui.currentError())

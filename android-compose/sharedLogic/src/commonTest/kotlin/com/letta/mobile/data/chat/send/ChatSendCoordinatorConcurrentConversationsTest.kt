@@ -811,6 +811,7 @@ internal abstract class ChatSendCoordinatorConversationFixture {
     protected val selectedConversations = mutableListOf<String>()
     protected val observedConversations = mutableListOf<String>()
     protected var composerClears = 0
+    protected var prepareConversation: suspend (String) -> Unit = {}
 
     protected fun coordinator(
         timeline: RecordingTimelineWriter,
@@ -821,7 +822,6 @@ internal abstract class ChatSendCoordinatorConversationFixture {
         recordRuntimeEvents: suspend (List<ScopedRuntimeEvent>) -> Unit = { events ->
             events.forEach { event -> recordRuntimeEvent(event.event, event.conversationId) }
         },
-        prepareConversation: suspend (String) -> Unit = {},
         activeConversationId: () -> String?,
     ) = ChatSendCoordinator(
         scope = scope,
