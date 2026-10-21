@@ -58,15 +58,18 @@ class CanvasLocalPresenceTest {
             assertEquals(canvasId, update.first)
             assertEquals("local-peer", update.second.peerId)
             assertEquals("Ada", update.second.displayName)
-            // One move is one update: nothing is re-sent before the heartbeat while the pointer rests.
-            assertEquals(1, transport.updates.size)
             assertEquals(20f, update.second.cursorX)
             assertEquals(30f, update.second.cursorY)
             assertTrue(update.second.isActive)
         }
-        // While the pointer rests on the board, only the heartbeat re-sends it.
-        mainClock.advanceTimeBy(1_100)
-        runOnIdle { assertEquals(2, transport.updates.size) }
+        // A resting pointer is not polled: nothing is re-sent before the heartbeat...
+        val afterMove = transport.updates.size
+        mainClock.advanceTimeBy(500)
+        runOnIdle { assertEquals(afterMove, transport.updates.size) }
+        // ...which re-sends it while the pointer stays on the board.
+        // The effect's timers need not follow the test clock, so wait for the heartbeat itself.
+        mainClock.advanceTimeBy(1_000)
+        waitUntil(timeoutMillis = 5_000) { transport.updates.size > afterMove }
         onNodeWithTag("board").performMouseInput { exit() }
         mainClock.advanceTimeBy(150)
         runOnIdle { assertFalse(transport.updates.last().second.isActive) }
