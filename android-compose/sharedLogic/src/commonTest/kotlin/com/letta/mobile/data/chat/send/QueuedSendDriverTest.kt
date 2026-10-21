@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.sync.Mutex
@@ -224,10 +225,67 @@ class QueuedSendDriverTest {
         assertEquals(listOf("a"), rig.turns.dispatched)
     }
 
+    @Test
+    fun immediateSubmissionAndDeferredHeadKeepDistinctComposerSemantics() = runTest {
+        val rig = rig(busy = false)
+        val first = QueuedChatSend(QueuedSendId("first"), CONV, "first")
+        val second = QueuedChatSend(QueuedSendId("second"), CONV, "second")
+        rig.turns.serialized { assertEquals(null, rig.driver.submitLocked(first)) }
+        rig.turns.accept = false
+        rig.turns.serialized { assertEquals(1, rig.driver.submitLocked(second)) }
+        assertEquals(listOf("first"), rig.turns.dispatched)
+        rig.turns.accept = true
+        rig.finishTurn()
+        assertEquals(listOf("first", "second"), rig.turns.dispatched)
+        assertEquals(listOf(true, false), rig.turns.composerClears)
+    }
+
+    @Test
+    fun newSubmissionCannotPassADeclinedHead() = runTest {
+        val rig = rig(busy = false)
+        rig.turns.accept = false
+        rig.enqueue("head")
+        rig.turns.accept = true
+        val next = QueuedChatSend(QueuedSendId("next"), CONV, "next")
+        rig.turns.serialized { assertEquals(2, rig.driver.submitLocked(next)) }
+        assertEquals(listOf("head"), rig.turns.dispatched)
+        assertEquals(listOf("next"), rig.queuedTexts())
+        rig.finishTurn()
+        assertEquals(listOf("head", "next"), rig.turns.dispatched)
+    }
+
+    @Test
+    fun stopPausesOnlyWhenTheTransportAcceptsIt() = runTest {
+        val rig = rig(busy = true)
+        rig.enqueue("head")
+        rig.turns.busy = false
+        assertFalse(rig.driver.stop(CONV))
+        assertFalse(rig.queue.isPaused(CONV))
+        rig.turns.busy = true
+        assertTrue(rig.driver.stop(CONV))
+        assertTrue(rig.queue.isPaused(CONV))
+        rig.finishTurn()
+        assertTrue(rig.turns.dispatched.isEmpty())
+    }
+
+    @Test
+    fun cancelledScopeLeavesDeclinedHeadEligibleWithoutRetrying() = runTest {
+        val rig = rig(busy = false)
+        rig.turns.accept = false
+        rig.enqueue("head")
+        backgroundScope.cancel()
+        rig.turns.accept = true
+        advanceTimeBy(RETRY_DELAY_MS * 3)
+        runCurrent()
+        assertTrue(rig.turns.dispatched.isEmpty())
+        assertEquals(listOf("head"), rig.queuedTexts())
+    }
+
     private class ScriptedTurns(var busy: Boolean) : QueuedSendTurns {
         private val lock = Mutex()
         var accept = true
         val dispatched = mutableListOf<String>()
+        val composerClears = mutableListOf<Boolean>()
         val aborted = mutableListOf<QueueConversationId>()
 
         override suspend fun <T> serialized(block: suspend () -> T): T = lock.withLock { block() }
@@ -236,9 +294,10 @@ class QueuedSendDriverTest {
             aborted += conversationId
             return busy
         }
-        override suspend fun dispatch(item: QueuedChatSend): Boolean {
+        override suspend fun dispatch(item: QueuedChatSend, clearComposer: Boolean): Boolean {
             if (!accept) return false
             dispatched += item.text
+            composerClears += clearComposer
             busy = true
             return true
         }

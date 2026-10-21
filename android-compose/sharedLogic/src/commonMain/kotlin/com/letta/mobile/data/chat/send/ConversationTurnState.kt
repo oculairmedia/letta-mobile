@@ -57,6 +57,19 @@ internal class ConversationTurnState(val conversationId: String) {
      */
     val settledRunIds = linkedSetOf<String>()
 
+    /** Publish accepted-send fields under the same identity lock as the transport decision.
+     * The caller holds the coordinator lifecycle mutex; [onAccepted] may publish its volatile
+     * last-active pointer but must not acquire the registry index lock (index -> identity order).
+     */
+    fun acceptSend(pending: QueuedChatSend, send: () -> Boolean, onAccepted: () -> Unit): Boolean =
+        identity.acceptSend(pending.conversationId.value, send) {
+            otid = pending.id.value
+            inFlightSend = pending
+            localConversationId = pending.conversationId.value.takeIf { it.isNotBlank() }
+            reachedTerminal = false
+            onAccepted()
+        }
+
     fun retainSettledRun() {
         val key = runId?.takeIf { it.isNotBlank() } ?: return
         settledRunIds += key

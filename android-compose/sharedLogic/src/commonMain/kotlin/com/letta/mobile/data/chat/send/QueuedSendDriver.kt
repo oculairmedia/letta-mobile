@@ -21,7 +21,7 @@ internal interface QueuedSendTurns {
     fun abortTurn(conversationId: QueueConversationId): Boolean
 
     /** Dispatches [item] as a new turn (optimistic row included); false when not accepted. Locked. */
-    suspend fun dispatch(item: QueuedChatSend): Boolean
+    suspend fun dispatch(item: QueuedChatSend, clearComposer: Boolean = false): Boolean
 }
 
 /** The queue transitions [QueuedSendDriver] reports. */
@@ -62,6 +62,21 @@ internal class QueuedSendDriver(
     private val drains = HashMap<QueueConversationId, Job>()
     private val otherClientHold = OtherClientHold(scope, otherClientBackoff) { conversationId ->
         turns.serialized { releaseOtherClientHoldLocked(conversationId) }
+    }
+
+    /**
+     * One user submission under the lifecycle lock: never pass a waiting head. A null position
+     * means immediate acceptance; otherwise the existing queue owns the send and its retries.
+     */
+    suspend fun submitLocked(item: QueuedChatSend): Int? =
+        if (!queue.hasItems(item.conversationId) && turns.dispatch(item, clearComposer = true)) null
+        else enqueueLocked(item)
+
+    /** A synchronous user Stop; pause the queue only when the transport accepts the abort. */
+    fun stop(conversationId: QueueConversationId): Boolean {
+        val accepted = turns.abortTurn(conversationId)
+        if (accepted) onStopped(conversationId)
+        return accepted
     }
 
     /** Queues [item] (caller holds the turn lock); returns its 1-based position. */
