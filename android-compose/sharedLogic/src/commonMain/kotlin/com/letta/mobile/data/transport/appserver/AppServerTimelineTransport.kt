@@ -14,7 +14,7 @@ import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransport
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
-import com.letta.mobile.data.timeline.TurnFailureNoticeIds
+import com.letta.mobile.data.timeline.turnFailureNoticeId
 import com.letta.mobile.data.transport.WsFrameMapper
 import com.letta.mobile.data.transport.iroh.RuntimeEventServerFrameMapper
 import com.letta.mobile.runtime.BackendId
@@ -265,7 +265,7 @@ internal class AppServerSendTurn(private val ids: AppServerTurnIds) {
         val runId = draft.runId?.value ?: ids.fallbackRunId
         return listOf(
             ErrorMessage(
-                id = TurnFailureNoticeIds.of(runId),
+                id = turnFailureNoticeId(runId),
                 contentRaw = JsonPrimitive(notice.message),
                 code = notice.kind,
                 runId = runId,

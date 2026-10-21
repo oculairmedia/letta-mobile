@@ -352,9 +352,20 @@ fun reduceProductionMutation(state: TimelineReducerState, mutation: TimelineMuta
     is TimelineMutation.LifecycleReset -> changedIfNeeded(state, state.copy(lifecycleEpoch = mutation.epoch))
 }
 
+private const val TURN_FAILURE_NOTICE_ID_PREFIX = "turn-failed-"
+
+/**
+ * The id of the failure-notice row a client writes when a turn dies, for [key] (a turn and/or run
+ * identity). Every writer mints it here, so a later clean terminal can retire them all.
+ */
+fun turnFailureNoticeId(key: String): String = TURN_FAILURE_NOTICE_ID_PREFIX + key
+
+/** Whether [id] names a client-written failure notice rather than a server-emitted error. */
+fun isTurnFailureNoticeId(id: String?): Boolean = id?.startsWith(TURN_FAILURE_NOTICE_ID_PREFIX) == true
+
 /** A client-written turn-failure notice row, which a later clean terminal retires. */
 internal fun TimelineEvent.Confirmed.isTurnFailureNotice(): Boolean =
-    messageType == TimelineMessageType.ERROR && TurnFailureNoticeIds.isNotice(serverId)
+    messageType == TimelineMessageType.ERROR && isTurnFailureNoticeId(serverId)
 
 private fun reduceTurnFailureNoticeRetirement(state: TimelineReducerState): TimelineReduction {
     val retained = state.timeline.events.filterNot { event ->

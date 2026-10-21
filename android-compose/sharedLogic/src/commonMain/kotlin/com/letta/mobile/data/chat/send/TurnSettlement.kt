@@ -6,7 +6,7 @@ import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.runtime.TurnFailureNotice
 import com.letta.mobile.data.runtime.terminalReasonKind
-import com.letta.mobile.data.timeline.TurnFailureNoticeIds
+import com.letta.mobile.data.timeline.turnFailureNoticeId
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -57,7 +57,7 @@ internal class TurnSettlement(
         // globally unique. Key the row by (turn, run) so a later failure that
         // reuses the run number still renders instead of merging into the old
         // row; a replayed terminal for the SAME turn still dedupes.
-        val id = TurnFailureNoticeIds.of(
+        val id = turnFailureNoticeId(
             when {
                 stableTurnId != null && stableRunId != null -> "$stableTurnId-$stableRunId"
                 stableTurnId != null -> stableTurnId
