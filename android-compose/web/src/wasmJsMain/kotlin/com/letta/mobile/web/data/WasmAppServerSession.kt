@@ -138,15 +138,12 @@ internal class WasmAppServerSession(
 
     suspend fun close() {
         withContext(NonCancellable) {
-            releaseIrohChat()
-            router.detach()
-            conversationInFlight.values.forEach { it.cancel() }
-            conversationInFlight.clear()
-            conversationByAgent.clear()
+            onTransportDisconnected()
             link.close()
         }
     }
 
+    /** Lets go of everything this session holds over its link; [close] also ends the link. */
     internal suspend fun onTransportDisconnected() {
         withContext(NonCancellable) {
             releaseIrohChat()
