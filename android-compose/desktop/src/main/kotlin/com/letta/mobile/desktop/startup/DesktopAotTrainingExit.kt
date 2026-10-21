@@ -30,8 +30,8 @@ internal class DesktopAotTrainingExit(
 
     /** The first window to open starts the settle time; later windows change nothing. */
     internal fun onWindowEvent(id: Int) {
-        if (id != WindowEvent.WINDOW_OPENED || !training || !armed.compareAndSet(false, true)) return
-        schedule(SETTLE_MS, exit)
+        val firstWindowOfTraining = training && id == WindowEvent.WINDOW_OPENED
+        if (firstWindowOfTraining && armed.compareAndSet(false, true)) schedule(SETTLE_MS, exit)
     }
 
     companion object {
