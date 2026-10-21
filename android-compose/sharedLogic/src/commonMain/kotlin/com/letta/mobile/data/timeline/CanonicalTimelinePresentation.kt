@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.plus
+import kotlinx.datetime.Instant
 
 /** Presentation-only lifetime shared by Android and Desktop. Closing never retires the writer. */
 class CanonicalTimelinePresentation private constructor(
@@ -325,7 +326,7 @@ class CanonicalTimelinePresentation private constructor(
             record.key.identity,
             record.revision,
             ChatRenderItem.Single(
-                UiMessage(record.key.identity.value, "assistant", "", timestamp = ""),
+                UiMessage(record.key.identity.value, "assistant", "", timestamp = record.key.ledgerTimestamp()),
                 GroupPosition.None, keyOverride = replacementKey(record.key.identity),
             ),
             TimelineBodyReference(
@@ -362,3 +363,10 @@ class CanonicalTimelinePresentation private constructor(
         }
     }
 }
+
+/**
+ * letta-mobile-ivsx0: a deferred row is never decoded, but its ledger order is the message time,
+ * so it still dates itself. Blank, it reset the day divider and the next row opened "Today" again.
+ */
+private fun TimelinePageKey.ledgerTimestamp(): String =
+    if (order > 0) Instant.fromEpochMilliseconds(order).toString() else ""

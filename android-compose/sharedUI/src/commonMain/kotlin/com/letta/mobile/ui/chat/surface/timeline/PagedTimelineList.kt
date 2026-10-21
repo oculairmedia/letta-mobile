@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -41,6 +42,7 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_history_error
 import com.letta.mobile.sharedui.resources.timeline_missing_target
 import com.letta.mobile.sharedui.resources.timeline_retry_history
+import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.surface.timeline.rows.isUserRole
 import com.letta.mobile.ui.mascot.MascotLoading
 import com.letta.mobile.ui.theme.ChatTimelineDimens
@@ -318,17 +320,24 @@ private fun LazyItemScope.PagedSlot(scope: PagedRowsScope, index: Int, offset: I
     }
 }
 
-/** A body too large to decode inline pages in on demand, above its (blanked) row. */
+/**
+ * A body too large to decode inline pages in on demand. letta-mobile-ivsx0: it is a row of the
+ * chat column like any other (its day divider first, then its card, centred to the column width);
+ * its placeholder item has no content, so drawing it too only added an empty band.
+ */
 @Composable
 private fun DeferredSettledRow(scope: PagedRowsScope, row: CanonicalTimelinePresentation.Row, index: Int, modifier: Modifier) {
     val presentation = scope.params.presentation
-    Column(modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        pagedBoundaryDate(row.item, scope.rows.itemAt(index + 1))?.let { date -> DayDividerRow(date, scope.today) }
         TimelineDeferredBody(
             rowKey = row.identity.value,
             read = { field, offset -> presentation.readTextWindow(row, field, offset, Dispatchers.Default) },
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.md),
+            modifier = Modifier
+                .widthIn(max = ChatColumnMaxWidth)
+                .fillMaxWidth()
+                .padding(top = timelineLeadingSpace(row.item)),
         )
-        PagedRow(row.item, scope.rows.itemAt(index + 1), scope, Modifier)
     }
 }
 
