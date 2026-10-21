@@ -1,14 +1,15 @@
 """Small Kotlin source reader shared by the parity guardrails (letta-mobile-ewtaq).
 
-It is deliberately not a parser: it knows enough Kotlin lexing (comments, strings with
-templates, char literals, nested brackets) to find primary constructors, constructor calls and
-top-level declarations in production sources without compiling them.
+It is deliberately not a parser: a tokenizer that knows Kotlin comments (nested), strings (with
+templates), char literals and brackets is enough to find primary constructors, constructor calls
+and top-level declarations in production sources without compiling them.
 """
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Iterator
 
 ANDROID_COMPOSE = "android-compose"
 TEST_SOURCE_SETS = {"test", "androidTest", "wasmJsTest", "jvmTest", "commonTest", "androidUnitTest", "testFixtures"}
@@ -35,20 +36,22 @@ SHARED_MODULES = [
 ]
 
 
+def _is_production_set(source_set: Path) -> bool:
+    return source_set.is_dir() and source_set.name not in TEST_SOURCE_SETS and not source_set.name.endswith("Test")
+
+
+def _module_sources(module: Path) -> list[Path]:
+    src = module / "src"
+    if not src.is_dir():
+        return []
+    sets = sorted(p for p in src.iterdir() if _is_production_set(p))
+    return [f for source_set in sets for f in sorted(source_set.rglob("*.kt")) if "/build/" not in f.as_posix()]
+
+
 def production_files(repo: Path, module_globs: list[str]) -> list[Path]:
     """Every production .kt file under the modules (test source sets and build outputs excluded)."""
     root = repo / ANDROID_COMPOSE
-    files: list[Path] = []
-    for pattern in module_globs:
-        for module in sorted(root.glob(pattern)):
-            src = module / "src"
-            if not src.is_dir():
-                continue
-            for source_set in sorted(p for p in src.iterdir() if p.is_dir()):
-                if source_set.name in TEST_SOURCE_SETS or source_set.name.endswith("Test"):
-                    continue
-                files.extend(sorted(source_set.rglob("*.kt")))
-    return [f for f in files if "/build/" not in f.as_posix()]
+    return [f for pattern in module_globs for module in sorted(root.glob(pattern)) for f in _module_sources(module)]
 
 
 def platform_files(repo: Path) -> dict[str, list[Path]]:
@@ -63,146 +66,124 @@ def rel(repo: Path, path: Path) -> str:
     return path.relative_to(repo).as_posix()
 
 
-# --- lexing --------------------------------------------------------------------------------
-
-def _skip_string(text: str, i: int) -> int:
-    """i points at the opening quote; returns the index just past the closing quote."""
-    raw = text.startswith('"""', i)
-    i += 3 if raw else 1
-    n = len(text)
-    while i < n:
-        if raw and text.startswith('"""', i):
-            i += 3
-            while i < n and text[i] == '"':  # """ followed by extra quotes
-                i += 1
-            return i
-        c = text[i]
-        if not raw and c == "\\":
-            i += 2
-            continue
-        if not raw and c == '"':
-            return i + 1
-        if c == "\n" and not raw:
-            return i + 1  # unterminated: stop at the line end
-        if c == "$" and i + 1 < n and text[i + 1] == "{":
-            i = _skip_balanced(text, i + 1, "{", "}")
-            continue
-        i += 1
-    return n
+def read(path: Path) -> str:
+    return path.read_text(encoding="utf-8", errors="replace")
 
 
-def _skip_char(text: str, i: int) -> int:
-    j = i + 1
-    if j < len(text) and text[j] == "\\":
-        j += 2
-    else:
-        j += 1
-    end = text.find("'", j)
-    return len(text) if end < 0 else end + 1
+# --- tokens ---------------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class Token:
+    kind: str  # code | open | close | angle-open | angle-close | string | char | comment
+    start: int
+    end: int
 
 
-def _skip_comment(text: str, i: int) -> int:
-    if text.startswith("//", i):
-        end = text.find("\n", i)
-        return len(text) if end < 0 else end
-    # block comments nest in Kotlin
-    depth = 0
-    n = len(text)
-    while i < n:
-        if text.startswith("/*", i):
-            depth += 1
-            i += 2
-        elif text.startswith("*/", i):
-            depth -= 1
-            i += 2
-            if depth == 0:
-                return i
+_MASTER = re.compile(
+    r"(?P<comment>//[^\n]*)|(?P<block>/\*)|(?P<string>\"\"\"|\")|(?P<char>'(?:\\.|[^'\\\n])*'?)"
+    r"|(?P<open>[(\[{])|(?P<close>[)\]}])|(?P<code>->|<=|>=|[<>]|[^/\"'()\[\]{}<>]+|/)"
+)
+_STRING_STOPS = {True: re.compile(r'"""|\$\{'), False: re.compile(r'\\.|"|\n|\$\{')}
+_BLOCK_STOPS = re.compile(r"/\*|\*/")
+
+
+def _string_end(text: str, start: int) -> int:
+    """[start] is the opening quote; the index just past the closing one (templates skipped)."""
+    raw = text.startswith('"""', start)
+    stops = _STRING_STOPS[raw]
+    i = start + (3 if raw else 1)
+    while (m := stops.search(text, i)) is not None:
+        stop = m.group(0)
+        if stop == "${":
+            i = balanced_end(text, m.end() - 1)
+        elif stop.startswith("\\"):
+            i = m.end()
         else:
-            i += 1
-    return n
+            return m.end()
+    return len(text)
 
 
-def _skip_balanced(text: str, i: int, open_c: str, close_c: str) -> int:
-    """i points at open_c; returns the index just past its matching close_c."""
+def _block_comment_end(text: str, start: int) -> int:
     depth = 0
-    n = len(text)
-    while i < n:
-        c = text[i]
-        if c == '"':
-            i = _skip_string(text, i)
-            continue
-        if c == "'":
-            i = _skip_char(text, i)
-            continue
-        if c == "/" and i + 1 < n and text[i + 1] in "/*":
-            i = _skip_comment(text, i)
-            continue
-        if c in "([{":
-            depth += 1
-        elif c in ")]}":
-            depth -= 1
-            if depth == 0:
-                return i + 1
-        i += 1
-    return n
+    for m in _BLOCK_STOPS.finditer(text, start):
+        depth += 1 if m.group(0) == "/*" else -1
+        if depth == 0:
+            return m.end()
+    return len(text)
+
+
+def _code_kind(lexeme: str) -> str:
+    return {"<": "angle-open", ">": "angle-close"}.get(lexeme, "code")
+
+
+def tokens(text: str, start: int = 0) -> Iterator[Token]:
+    i = start
+    while i < len(text):
+        m = _MASTER.match(text, i)
+        kind = m.lastgroup
+        end = m.end()
+        if kind == "string":
+            end = _string_end(text, i)
+        elif kind == "block":
+            kind, end = "comment", _block_comment_end(text, i)
+        elif kind == "code":
+            kind = _code_kind(m.group(0))
+        yield Token(kind, i, end)
+        i = end
+
+
+def balanced_end(text: str, open_idx: int) -> int:
+    """[open_idx] is an opening bracket; the index just past its matching close."""
+    depth = 0
+    for token in tokens(text, open_idx):
+        depth += {"open": 1, "close": -1}.get(token.kind, 0)
+        if depth == 0:
+            return token.end
+    return len(text)
 
 
 def strip_comments(text: str) -> str:
-    """Comments replaced by spaces (newlines kept), strings kept verbatim."""
-    out: list[str] = []
-    i = 0
-    n = len(text)
-    while i < n:
-        c = text[i]
-        if c == '"':
-            j = _skip_string(text, i)
-            out.append(text[i:j])
-            i = j
-        elif c == "'":
-            j = _skip_char(text, i)
-            out.append(text[i:j])
-            i = j
-        elif c == "/" and i + 1 < n and text[i + 1] in "/*":
-            j = _skip_comment(text, i)
-            out.append("".join("\n" if ch == "\n" else " " for ch in text[i:j]))
-            i = j
-        else:
-            out.append(c)
-            i += 1
+    """Comments replaced by blanks (newlines kept); strings kept verbatim."""
+    return "".join(_blank(text[t.start : t.end]) if t.kind == "comment" else text[t.start : t.end] for t in tokens(text))
+
+
+def _blank(chunk: str) -> str:
+    return re.sub(r"[^\n]", " ", chunk)
+
+
+def without_bodies(text: str) -> str:
+    """[text] (comments already stripped) with everything inside braces blanked: its top level."""
+    out = []
+    depth = 0
+    for token in tokens(text):
+        chunk = text[token.start : token.end]
+        depth -= 1 if chunk == "}" else 0
+        out.append(chunk if depth == 0 else _blank(chunk))
+        depth += 1 if chunk == "{" else 0
     return "".join(out)
 
 
+_BRACKET_STEP = {"open": 1, "close": -1}
+_ANGLE_STEP = {"angle-open": 1, "angle-close": -1}
+
+
+def _separators(chunk: str, sep: str) -> list[int]:
+    if sep == "=":
+        return [m.start() for m in re.finditer(r"(?<![=!<>])=(?!=)", chunk)]
+    return [i for i, c in enumerate(chunk) if c == sep]
+
+
 def split_top_level(text: str, sep: str = ",") -> list[str]:
-    parts: list[str] = []
-    depth = 0
-    angle = 0
-    start = 0
-    i = 0
-    n = len(text)
-    while i < n:
-        c = text[i]
-        if c == '"':
-            i = _skip_string(text, i)
-            continue
-        if c == "'":
-            i = _skip_char(text, i)
-            continue
-        if c in "([{":
-            depth += 1
-        elif c in ")]}":
-            depth -= 1
-        elif c == "<" and depth == 0 and i + 1 < n and text[i + 1] not in "=":
-            angle += 1
-        elif c == ">" and depth == 0 and angle > 0 and text[i - 1] != "-":
-            angle -= 1
-        elif c == sep and depth == 0 and angle == 0:
-            parts.append(text[start:i])
-            start = i + 1
-        i += 1
-    tail = text[start:]
-    if tail.strip():
-        parts.append(tail)
-    return [p.strip() for p in parts if p.strip()]
+    """[text] split at [sep] outside brackets, strings and type arguments."""
+    cuts = []
+    depth = angle = 0
+    for token in tokens(text):
+        depth += _BRACKET_STEP.get(token.kind, 0)
+        angle = max(0, angle + _ANGLE_STEP.get(token.kind, 0) * (depth == 0))
+        if depth == angle == 0 and token.kind == "code":
+            cuts += [token.start + offset for offset in _separators(text[token.start : token.end], sep)]
+    bounds = zip([-1, *cuts], [*cuts, len(text)])
+    return [part for part in (text[a + 1 : b].strip() for a, b in bounds) if part]
 
 
 # --- declarations ---------------------------------------------------------------------------
@@ -222,83 +203,52 @@ class SharedClass:
 
 
 _CLASS_HEAD = re.compile(
-    r"(?m)^(?P<indent>[ \t]*)(?P<mods>(?:@[\w.]+(?:\([^)]*\))?\s+|(?:public|internal|private|protected|data|value|"
+    r"(?m)^[ \t]*(?P<mods>(?:@[\w.]+(?:\([^)]*\))?\s+|(?:public|internal|private|protected|data|value|"
     r"open|abstract|sealed|inner|annotation|enum|expect|actual|final)\s+)*)class\s+(?P<name>[A-Z]\w*)"
+    r"\s*(?:<[^(){}]*?>)?"
 )
+_NOT_CONSTRUCTIBLE = re.compile(r"\b(private|internal|annotation|enum|sealed|abstract)\b")
+_PRIMARY_CTOR = re.compile(r"\s*(?:@[\w.]+(?:\([^)]*\))?\s*)*(?P<vis>(?:public|internal|private|protected)\s+)?(?:constructor\s*)?\(")
+_HIDDEN_CTOR = {"internal", "private", "protected"}
 _PARAM_MODS = re.compile(r"^(?:@[\w.]+(?:\([^)]*\))?\s*|(?:override|private|internal|public|protected|val|var|vararg|crossinline|noinline)\s+)*")
 
 
+def parse_param(raw: str) -> Param | None:
+    body = _PARAM_MODS.sub("", raw.strip())
+    pieces = split_top_level(body, "=")
+    head = pieces[0] if pieces else body
+    if ":" not in head:
+        return None
+    name, type_ = head.split(":", 1)
+    return Param(name.strip().strip("`"), " ".join(type_.split()), len(pieces) > 1)
+
+
 def parse_params(param_text: str) -> list[Param]:
-    params = []
-    for raw in split_top_level(param_text):
-        body = _PARAM_MODS.sub("", raw.strip())
-        head = body
-        has_default = False
-        # first top-level '=' splits name:type from the default
-        eq = _top_level_index(body, "=")
-        if eq >= 0:
-            head = body[:eq]
-            has_default = True
-        if ":" not in head:
-            continue
-        name, type_ = head.split(":", 1)
-        params.append(Param(name.strip().strip("`"), " ".join(type_.split()), has_default))
-    return params
+    return [p for p in map(parse_param, split_top_level(param_text)) if p is not None]
 
 
-def _top_level_index(text: str, char: str) -> int:
-    depth = 0
-    i = 0
-    n = len(text)
-    while i < n:
-        c = text[i]
-        if c == '"':
-            i = _skip_string(text, i)
-            continue
-        if c in "([{<":
-            depth += 1
-        elif c in ")]}>":
-            if not (c == ">" and i > 0 and text[i - 1] == "-"):
-                depth -= 1
-        elif c == char and depth == 0 and text[i + 1 : i + 2] != "=" and text[i - 1 : i] not in "!<>=":
-            return i
-        i += 1
-    return -1
+def _primary_constructor(text: str, after_name: int) -> list[Param] | None:
+    ctor = _PRIMARY_CTOR.match(text, after_name)
+    if ctor is None or (ctor.group("vis") or "").strip() in _HIDDEN_CTOR:
+        return None
+    open_idx = ctor.end() - 1
+    return parse_params(text[open_idx + 1 : balanced_end(text, open_idx) - 1])
+
+
+def classes_in(text: str) -> Iterator[tuple[str, list[Param]]]:
+    """(name, primary constructor params) of each constructible class in [text]."""
+    for m in _CLASS_HEAD.finditer(text):
+        params = None if _NOT_CONSTRUCTIBLE.search(m.group("mods")) else _primary_constructor(text, m.end())
+        if params is not None:
+            yield m.group("name"), params
 
 
 def shared_classes(repo: Path, files: list[Path]) -> dict[str, list[SharedClass]]:
     """Public top-level and nested classes with a primary constructor, by simple name."""
     found: dict[str, list[SharedClass]] = {}
     for path in files:
-        text = strip_comments(path.read_text(encoding="utf-8", errors="replace"))
-        for m in _CLASS_HEAD.finditer(text):
-            mods = m.group("mods")
-            if re.search(r"\b(private|internal|annotation|enum|sealed|abstract)\b", mods):
-                continue
-            i = m.end()
-            # skip type parameters
-            while i < len(text) and text[i] in " \t":
-                i += 1
-            if i < len(text) and text[i] == "<":
-                depth = 0
-                while i < len(text):
-                    if text[i] == "<":
-                        depth += 1
-                    elif text[i] == ">":
-                        depth -= 1
-                        if depth == 0:
-                            i += 1
-                            break
-                    i += 1
-            ctor = re.match(r"\s*(?:@[\w.]+(?:\([^)]*\))?\s*)*(?:(?:public|internal|private|protected)\s+)?(?:constructor\s*)?\(", text[i:])
-            if not ctor:
-                continue
-            if re.search(r"(?:internal|private|protected)\s+constructor", ctor.group(0)):
-                continue
-            open_idx = i + ctor.end() - 1
-            close_idx = _skip_balanced(text, open_idx, "(", ")")
-            params = parse_params(text[open_idx + 1 : close_idx - 1])
-            found.setdefault(m.group("name"), []).append(SharedClass(m.group("name"), rel(repo, path), params))
+        for name, params in classes_in(strip_comments(read(path))):
+            found.setdefault(name, []).append(SharedClass(name, rel(repo, path), params))
     return found
 
 
@@ -311,45 +261,70 @@ class Call:
     trailing_lambda: str | None
 
 
+_NAMED_ARG = re.compile(r"^([A-Za-z_]\w*)\s*=(?!=)\s*(.*)$", re.S)
+_DECLARATION_BEFORE = re.compile(r"\b(class|fun|interface|object|typealias|import)\s+$|::$")
+_TRAILING_LAMBDA = re.compile(r"[ \t]*\{")
+
+
+def _arguments(text: str, open_idx: int, close_idx: int) -> tuple[dict[str, str], list[str]]:
+    args = split_top_level(text[open_idx + 1 : close_idx - 1])
+    matches = [(arg, _NAMED_ARG.match(arg)) for arg in args]
+    named = {m.group(1): m.group(2).strip() for _, m in matches if m}
+    return named, [arg for arg, m in matches if not m]
+
+
+def _trailing_lambda(text: str, close_idx: int) -> str | None:
+    m = _TRAILING_LAMBDA.match(text, close_idx)
+    return None if m is None else text[m.end() - 1 : balanced_end(text, m.end() - 1)]
+
+
+def _call_pattern(names: set[str]) -> re.Pattern[str]:
+    return re.compile(r"(?<![\w.$])(" + "|".join(sorted(map(re.escape, names))) + r")\s*(?:<[^()]*?>)?\s*\(")
+
+
+def _call_at(repo: Path, path: Path, text: str, m: re.Match[str]) -> Call:
+    open_idx = m.end() - 1
+    close_idx = balanced_end(text, open_idx)
+    named, positional = _arguments(text, open_idx, close_idx)
+    line = text.count("\n", 0, m.start()) + 1
+    return Call(rel(repo, path), line, named, positional, _trailing_lambda(text, close_idx))
+
+
 def constructor_calls(repo: Path, path: Path, names: set[str]) -> list[tuple[str, Call]]:
     """`Name(...)` calls of any of [names] in [path] (declarations excluded)."""
-    text = strip_comments(path.read_text(encoding="utf-8", errors="replace"))
+    text = strip_comments(read(path))
     if not any(n in text for n in names):
         return []
-    pattern = re.compile(r"(?<![\w.$])(" + "|".join(sorted(map(re.escape, names))) + r")\s*(?:<[^()]*?>)?\s*\(")
-    out = []
-    for m in pattern.finditer(text):
-        before = text[max(0, m.start() - 40) : m.start()]
-        if re.search(r"\b(class|fun|interface|object|typealias|import)\s+$", before) or before.rstrip().endswith("::"):
-            continue
-        open_idx = m.end() - 1
-        close_idx = _skip_balanced(text, open_idx, "(", ")")
-        args = split_top_level(text[open_idx + 1 : close_idx - 1])
-        named: dict[str, str] = {}
-        positional: list[str] = []
-        for arg in args:
-            nm = re.match(r"^([A-Za-z_]\w*)\s*=(?!=)\s*(.*)$", arg, re.S)
-            if nm:
-                named[nm.group(1)] = nm.group(2).strip()
-            else:
-                positional.append(arg)
-        trailing = None
-        rest = text[close_idx:]
-        tm = re.match(r"[ \t]*\{", rest)
-        if tm:
-            lam_open = close_idx + tm.end() - 1
-            trailing = text[lam_open : _skip_balanced(text, lam_open, "{", "}")]
-        line = text.count("\n", 0, m.start()) + 1
-        out.append((m.group(1), Call(rel(repo, path), line, named, positional, trailing)))
-    return out
+    return [
+        (m.group(1), _call_at(repo, path, text, m))
+        for m in _call_pattern(names).finditer(text)
+        if not _DECLARATION_BEFORE.search(text[max(0, m.start() - 40) : m.start()])
+    ]
 
 
 _TYPE_DECL = re.compile(
     r"(?m)^[ \t]*(?:@[\w.]+(?:\([^)]*\))?\s+)*(?:(?:public|internal|private|protected|data|value|open|abstract|sealed|inner|"
     r"annotation|enum|expect|actual|final|fun|external)\s+)*(?:class|interface|object|typealias)\s+([A-Z]\w*)"
 )
+_HEADER_GAP = re.compile(r"\s*(?:<[^{(:]*?>)?\s*(?:@[\w.]+\s*)*(?:(?:public|internal|private|protected)\s+)?(?:constructor\s*)?")
+_COLON = re.compile(r"\s*:")
 
 
 def declared_type_names(path: Path) -> list[str]:
-    text = strip_comments(path.read_text(encoding="utf-8", errors="replace"))
-    return _TYPE_DECL.findall(text)
+    return _TYPE_DECL.findall(strip_comments(read(path)))
+
+
+def supertypes(text: str, after_name: int) -> list[str]:
+    """Simple or qualified names after a class header's ':' (its constructor skipped)."""
+    i = _HEADER_GAP.match(text, after_name).end()
+    if text.startswith("(", i):
+        i = balanced_end(text, i)
+    colon = _COLON.match(text, i)
+    if colon is None:
+        return []
+    header = re.split(r"\{|\n\s*\n|\swhere\s", text[colon.end() : colon.end() + 600], maxsplit=1)[0]
+    return [name for name in map(_supertype_name, split_top_level(header)) if name]
+
+
+def _supertype_name(part: str) -> str:
+    return re.split(r"[(<]|\sby\s", part, maxsplit=1)[0].strip()

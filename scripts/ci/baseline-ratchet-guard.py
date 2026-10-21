@@ -21,9 +21,9 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
+from typing import Callable
 
 DEFAULT_CONFIG = "scripts/ci/ratchet-baselines.txt"
-KINDS = ("set", "count", "grow-only")
 FIX = {
     "set": "Fix the code instead (bind the slot, implement the shared type, move it to sharedLogic/sharedUI); never add a line.",
     "count": "Fix the code instead (move the logic to sharedLogic/sharedUI, delete the duplicate); never add or raise a line.",
@@ -35,53 +35,109 @@ def entries(text: str) -> list[str]:
     return [line.rstrip() for line in text.splitlines() if line.strip() and not line.lstrip().startswith("#")]
 
 
+def _config_row(line: str) -> tuple[str, str]:
+    parts = line.split()
+    if len(parts) != 2 or parts[0] not in FIX:
+        raise ValueError(f"malformed ratchet config line: '{line}' (want '<{'|'.join(FIX)}> <path>')")
+    return parts[1], parts[0]
+
+
 def parse_config(text: str) -> dict[str, str]:
-    config = {}
-    for line in entries(text):
-        parts = line.split()
-        if len(parts) != 2 or parts[0] not in KINDS:
-            raise ValueError(f"malformed ratchet config line: '{line}' (want '<{'|'.join(KINDS)}> <path>')")
-        config[parts[1]] = parts[0]
-    return config
+    """{baseline path: kind}."""
+    return dict(map(_config_row, entries(text)))
 
 
-def set_keys(lines: list[str]) -> set[str]:
-    return {" ".join(line.partition("|")[0].split()) for line in lines}
+def _set_key(line: str) -> str:
+    return " ".join(line.partition("|")[0].split())
 
 
-def counts(lines: list[str], name: str) -> dict[str, int]:
-    out = {}
-    for line in lines:
-        parts = line.split()
-        if len(parts) < 2 or not parts[1].lstrip("-").isdigit():
-            raise ValueError(f"{name}: malformed count line '{line}' (want '<key> <n> ...')")
-        out[parts[0]] = int(parts[1])
-    return out
+def _count_row(line: str, name: str) -> tuple[str, int]:
+    parts = line.split()
+    if len(parts) < 2 or not parts[1].lstrip("-").isdigit():
+        raise ValueError(f"{name}: malformed count line '{line}' (want '<key> <n> ...')")
+    return parts[0], int(parts[1])
+
+
+def _compare_set(name: str, base: list[str], head: list[str]) -> list[str]:
+    added = set(map(_set_key, head)) - set(map(_set_key, base))
+    return [f"{name}: line added: {key}" for key in sorted(added)]
+
+
+def _compare_count(name: str, base: list[str], head: list[str]) -> list[str]:
+    before = dict(_count_row(line, name) for line in base)
+    after = dict(_count_row(line, name) for line in head)
+    added = [f"{name}: line added: {key} {n}" for key, n in sorted(after.items()) if key not in before]
+    raised = [f"{name}: raised {key} {before[key]} -> {n}" for key, n in sorted(after.items()) if n > before.get(key, n)]
+    return added + raised
+
+
+def _compare_grow_only(name: str, base: list[str], head: list[str]) -> list[str]:
+    kept = {" ".join(line.split()) for line in head}
+    return [f"{name}: line removed or changed: {line.strip()}" for line in base if " ".join(line.split()) not in kept]
+
+
+COMPARE: dict[str, Callable[[str, list[str], list[str]], list[str]]] = {
+    "set": _compare_set,
+    "count": _compare_count,
+    "grow-only": _compare_grow_only,
+}
 
 
 def compare(kind: str, name: str, base: list[str], head: list[str]) -> list[str]:
-    problems = []
-    if kind == "set":
-        for key in sorted(set_keys(head) - set_keys(base)):
-            problems.append(f"{name}: line added: {key}")
-    elif kind == "count":
-        base_counts, head_counts = counts(base, name), counts(head, name)
-        for key, n in sorted(head_counts.items()):
-            if key not in base_counts:
-                problems.append(f"{name}: line added: {key} {n}")
-            elif n > base_counts[key]:
-                problems.append(f"{name}: raised {key} {base_counts[key]} -> {n}")
-    else:
-        normalized_head = {" ".join(line.split()) for line in head}
-        for line in base:
-            if " ".join(line.split()) not in normalized_head:
-                problems.append(f"{name}: line removed or changed: {line.strip()}")
-    return problems
+    return COMPARE[kind](name, base, head)
 
 
 def git_show(root: Path, ref: str, path: str) -> str | None:
     result = subprocess.run(["git", "-C", str(root), "show", f"{ref}:{path}"], capture_output=True, text=True, encoding="utf-8")
     return result.stdout if result.returncode == 0 else None
+
+
+def is_commit(root: Path, ref: str) -> bool:
+    return subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", "-q", f"{ref}^{{commit}}"], capture_output=True).returncode == 0
+
+
+def dropped_ratchets(config_name: str, base_config: dict[str, str], config: dict[str, str]) -> list[str]:
+    dropped = [f"{config_name}: ratchet dropped: {kind} {path} - restore it ({FIX['grow-only']})" for path, kind in sorted(base_config.items()) if path not in config]
+    changed = [
+        f"{config_name}: ratchet kind changed for {path}: {kind} -> {config[path]}"
+        for path, kind in sorted(base_config.items())
+        if config.get(path, kind) != kind
+    ]
+    return dropped + changed
+
+
+def baseline_drift(root: Path, ref: str, path: str, kind: str) -> list[str]:
+    current = root / path
+    if not current.is_file():
+        return [f"{path}: listed in the ratchet config but missing - restore it"]
+    base_text = git_show(root, ref, path)
+    if base_text is None:
+        print(f"baseline-ratchet-guard: {path} is seeded by this change ({kind})")
+        return []
+    found = compare(kind, path, entries(base_text), entries(current.read_text(encoding="utf-8")))
+    return [f"{p}\n      -> {FIX[kind]}" for p in found]
+
+
+def problems_for(root: Path, ref: str, config_name: str) -> tuple[list[str], int]:
+    config = parse_config((root / config_name).read_text(encoding="utf-8"))
+    base_config = parse_config(git_show(root, ref, config_name) or "")
+    problems = dropped_ratchets(config_name, base_config, config)
+    for path, kind in sorted(config.items()):
+        if path in base_config:
+            problems += baseline_drift(root, ref, path, kind)
+        else:
+            print(f"baseline-ratchet-guard: {path} is seeded by this change ({kind})")
+    return problems, len(config)
+
+
+def report(problems: list[str], count: int, ref: str) -> int:
+    if not problems:
+        print(f"baseline-ratchet-guard: ok ({count} baseline(s) vs {ref})")
+        return 0
+    print(f"::error title=baseline-ratchet-guard::{len(problems)} baseline line(s) moved the wrong way vs {ref}")
+    print("baseline-ratchet-guard: FAILED - these baselines only shrink (there is no override):")
+    print("\n".join(f"  {p}" for p in problems))
+    return 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -91,41 +147,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", default=DEFAULT_CONFIG)
     args = parser.parse_args(argv)
     root = args.root.resolve()
-    if subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", "-q", f"{args.diff_base}^{{commit}}"], capture_output=True).returncode:
+    if not is_commit(root, args.diff_base):
         print(f"baseline-ratchet-guard: base '{args.diff_base}' is not a commit", file=sys.stderr)
         return 2
     try:
-        config = parse_config((root / args.config).read_text(encoding="utf-8"))
-        base_config_text = git_show(root, args.diff_base, args.config)
-        base_config = parse_config(base_config_text) if base_config_text is not None else {}
-        problems = []
-        for path, kind in sorted(base_config.items()):
-            if path not in config:
-                problems.append(f"{args.config}: ratchet dropped: {kind} {path} - restore it ({FIX['grow-only']})")
-            elif config[path] != kind:
-                problems.append(f"{args.config}: ratchet kind changed for {path}: {kind} -> {config[path]}")
-        for path, kind in sorted(config.items()):
-            current = root / path
-            if not current.is_file():
-                problems.append(f"{path}: listed in {args.config} but missing - restore it")
-                continue
-            base_text = git_show(root, args.diff_base, path) if path in base_config else None
-            if base_text is None:
-                print(f"baseline-ratchet-guard: {path} is seeded by this change ({kind})")
-                continue
-            found = compare(kind, path, entries(base_text), entries(current.read_text(encoding="utf-8")))
-            problems += [f"{p}\n      -> {FIX[kind]}" for p in found]
+        problems, count = problems_for(root, args.diff_base, args.config)
     except ValueError as error:
         print(f"baseline-ratchet-guard: {error}", file=sys.stderr)
         return 2
-    if problems:
-        print(f"::error title=baseline-ratchet-guard::{len(problems)} baseline line(s) moved the wrong way vs {args.diff_base}")
-        print("baseline-ratchet-guard: FAILED - these baselines only shrink (there is no override):")
-        for p in problems:
-            print(f"  {p}")
-        return 1
-    print(f"baseline-ratchet-guard: ok ({len(config)} baseline(s) vs {args.diff_base})")
-    return 0
+    return report(problems, count, args.diff_base)
 
 
 if __name__ == "__main__":

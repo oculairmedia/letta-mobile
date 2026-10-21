@@ -86,16 +86,15 @@ class ParityGateTest(unittest.TestCase):
         app.write_text(FixtureRepo.binding(card="UnavailableCard()").replace(", pane = { Pane() }", ""), encoding="utf-8")
         status, out = self.repo.run("parity")
         self.assertEqual(1, status)
-        for gap in ("web leaves this slot unbound: PanelSlots.card", "web leaves this slot unbound: PanelSlots.pane",
-                    "android leaves this slot unbound: PanelSlots.card", "android leaves this slot unbound: PanelSlots.pane"):
-            self.assertIn(gap, out)
+        for gap in ("web PanelSlots.card", "web PanelSlots.pane", "android PanelSlots.card", "android PanelSlots.pane"):
+            self.assertIn(f"NEW PARITY GAP: {gap} is unbound", out)
         self.assertIn("Bind the slot on that platform", out)
 
     def test_a_platform_that_never_constructs_a_core_contract_fails(self):
         (self.repo.root / "android-compose/app/src/main/java/Bind.kt").write_text("package x\n", encoding="utf-8")
         status, out = self.repo.run("parity")
         self.assertEqual(1, status)
-        self.assertIn("android does not construct the core contract: ShellHost", out)
+        self.assertIn("NEW PARITY GAP: android ShellHost is unbound", out)
 
     def test_an_exemption_needs_a_bead_and_a_bound_slot_makes_it_stale(self):
         web = self.repo.root / "android-compose/web/src/wasmJsMain/kotlin/Bind.kt"

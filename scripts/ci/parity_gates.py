@@ -35,15 +35,13 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kotlin_source_scan as k  # noqa: E402
 
 BASELINE_DIR = Path("scripts/ci/parity")
 CONTRACTS_FILE = BASELINE_DIR / "parity-contracts.txt"
-PARITY_FILE = BASELINE_DIR / "parity-exemptions.txt"
-PLATFORM_CODE_FILE = BASELINE_DIR / "platform-code-baseline.txt"
-MIRROR_FILE = BASELINE_DIR / "mirror-name-baseline.txt"
 PLATFORM_CODE_SLACK = 5
 PLATFORMS = list(k.PLATFORM_MODULES)
 
@@ -62,392 +60,366 @@ OS_PACKAGES = (
 LOGIC_CONTAINERS = ("androidx.lifecycle.ViewModel", "androidx.lifecycle.AndroidViewModel")
 BEAD_REF = re.compile(r"\bletta-mobile-[a-z0-9]+(?:\.[0-9]+)*")
 PLATFORM_PREFIX = re.compile(r"^(Desktop|Web|Android|Wasm)([A-Z]\w*)$")
-
-HOW_TO_FIX = {
-    "parity": (
-        "Bind the slot on that platform with a real implementation (the shared controller, port or page),\n"
-        "or, if the shared default is wrong, make the param required in sharedUI/sharedLogic so every platform\n"
-        "must bind it. Do not add an exemption: scripts/ci/parity/parity-exemptions.txt only shrinks."
-    ),
-    "platform-code": (
-        "Move the logic to sharedLogic/commonMain (or the UI to sharedUI/commonMain) and keep only the OS/browser\n"
-        "binding here: a class that implements a shared interface/expect, an `actual`, an `external`, or a DI module.\n"
-        "scripts/ci/parity/platform-code-baseline.txt only shrinks; a listed file may not grow past its cap + 5."
-    ),
-    "mirror-names": (
-        "Do not mirror shared or other-platform types. Use the shared type, or make the platform type implement\n"
-        "the shared contract of that name (DesktopFoo : Foo). Two platforms needing the same thing means it\n"
-        "belongs in sharedLogic/sharedUI. scripts/ci/parity/mirror-name-baseline.txt only shrinks."
-    ),
-}
+_TOP_DECL = re.compile(
+    r"(?m)^(?P<mods>(?:@[\w.]+(?:\([^)\n]*\))?[ \t]*\n?[ \t]*|(?:public|internal|private|protected|data|value|open|abstract|sealed|"
+    r"inner|annotation|enum|expect|actual|final|external|const|inline|suspend|operator|infix|tailrec|override|lateinit)[ \t]+)*)"
+    r"(?P<kind>class|interface|object|typealias|fun|val|var)\b(?P<rest>[^\n]*)"
+)
+_DECLARED_NAME = re.compile(r"\s+\w+")
+_TYPE_HEAD = re.compile(r"\b(?:class|interface|object|typealias)\s+([A-Z]\w*)")
 
 
-# --- baselines ------------------------------------------------------------------------------
+# --- baselines: one shrink-only comparison for every gate ------------------------------------
 
-def read_lines(path: Path) -> list[str]:
-    if not path.is_file():
-        return []
-    return [line.rstrip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip() and not line.lstrip().startswith("#")]
+@dataclass(frozen=True)
+class Baseline:
+    """A baseline file: `<key> [<cap>] [| reason]` lines under a `#` header."""
+
+    path: Path
+    counted: bool = False
+    reasoned: bool = False
+
+    def lines(self) -> list[str]:
+        if not self.path.is_file():
+            return []
+        return [line.rstrip() for line in self.path.read_text(encoding="utf-8").splitlines() if line.strip() and not line.startswith("#")]
+
+    def key(self, line: str) -> str:
+        head = line.partition("|")[0].split()
+        return " ".join(head[:1] if self.counted else head)
+
+    def entries(self) -> dict[str, tuple[int, str]]:
+        return {self.key(line): (_cap(line) if self.counted else 0, line.partition("|")[2].strip()) for line in self.lines()}
+
+    def prune(self, stale: set[str]) -> None:
+        text = self.path.read_text(encoding="utf-8").splitlines()
+        header = [line for line in text if line.startswith("#")]
+        keep = [line for line in self.lines() if self.key(line) not in stale]
+        self.path.write_text("\n".join(header + keep) + "\n", encoding="utf-8")
 
 
-def header_lines(path: Path) -> list[str]:
-    if not path.is_file():
-        return []
-    out = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.startswith("#"):
-            out.append(line)
-        else:
-            break
-    return out
+def _cap(line: str) -> int:
+    return int(line.split()[1])
 
 
-def keyed(lines: list[str]) -> dict[str, str]:
-    """`key | reason` lines -> {key: reason}."""
-    out = {}
-    for line in lines:
-        key, _, reason = line.partition("|")
-        out[" ".join(key.split())] = reason.strip()
-    return out
+@dataclass(frozen=True)
+class Messages:
+    new: str
+    grew: str
+    stale: str
 
 
-def rewrite(path: Path, keep: list[str]) -> None:
-    path.write_text("\n".join(header_lines(path) + keep) + "\n", encoding="utf-8")
+def _grown(actual: dict[str, int], known: dict[str, tuple[int, str]], slack: int) -> dict[str, int]:
+    return {key: count for key, count in actual.items() if count > known.get(key, (count, ""))[0] + slack}
+
+
+def _unexplained(known: dict[str, tuple[int, str]]) -> list[str]:
+    return [
+        f"EXEMPTION WITHOUT A REASON AND BEAD: '{key}' - every entry is '<platform> <Contract>[.<param>] | "
+        "<reason naming the letta-mobile-<id> bead that removes it>'"
+        for key, (_, why) in known.items()
+        if not BEAD_REF.search(why)
+    ]
+
+
+def _unsorted(baseline: Baseline) -> list[str]:
+    keys = [baseline.key(line) for line in baseline.lines()]
+    ordered = keys == sorted(set(keys))
+    return [] if ordered else [f"{baseline.path.name} must be sorted with one entry per line"]
+
+
+def drift(actual: dict[str, int], baseline: Baseline, slack: int, messages: Messages) -> tuple[list[str], set[str]]:
+    """(problems, stale keys) of [actual] against [baseline]; counts above cap + [slack] grew."""
+    known = baseline.entries()
+    problems = [messages.new.format(key=key, count=count) for key, count in actual.items() if key not in known]
+    if baseline.counted:
+        grown = _grown(actual, known, slack)
+        problems += [messages.grew.format(key=key, count=count, cap=known[key][0], slack=slack) for key, count in grown.items()]
+    if baseline.reasoned:
+        problems += _unexplained(known)
+    return problems + _unsorted(baseline), set(known) - set(actual)
 
 
 # --- parity ---------------------------------------------------------------------------------
-
-@dataclass
-class Contract:
-    name: str
-    params: list[k.Param]
-
 
 def unbound(value: str) -> bool:
     value = value.strip()
     return bool(_UNBOUND_VALUE.match(value) or _UNBOUND_HEAD.match(value))
 
 
-def parse_contract_list(lines: list[str]) -> dict[str, list[str]]:
+def core_contracts(repo: Path) -> dict[str, list[str]]:
     """parity-contracts.txt: `<Contract> [shared builder names...]`."""
-    out = {}
-    for line in lines:
-        parts = line.split()
-        out[parts[0]] = parts[1:]
-    return out
+    rows = [line.split() for line in Baseline(repo / CONTRACTS_FILE).lines()]
+    return {row[0]: row[1:] for row in rows}
 
 
-def parity_actual(repo: Path) -> list[str]:
-    shared = k.shared_classes(repo, k.shared_files(repo))
-    core = parse_contract_list(read_lines(repo / CONTRACTS_FILE))
-    candidates = {name for name in shared if CONTRACT_SUFFIX.search(name)} | set(core)
-    candidates = {c for c in candidates if c in shared and len(shared[c]) == 1}
-    files = k.platform_files(repo)
-    sites: dict[str, dict[str, list[k.Call]]] = {}
-    texts: dict[str, str] = {}
-    for platform, paths in files.items():
-        chunks = []
-        for path in paths:
-            chunks.append(k.strip_comments(path.read_text(encoding="utf-8", errors="replace")))
-            for name, call in k.constructor_calls(repo, path, candidates):
-                sites.setdefault(name, {}).setdefault(platform, []).append(call)
-        texts[platform] = "\n".join(chunks)
-
-    violations = []
-    for contract in sorted(set(sites) | set(core)):
-        params = shared[contract][0].params if contract in shared else []
-        for platform in PLATFORMS:
-            calls = sites.get(contract, {}).get(platform)
-            if not calls:
-                if contract in core and not any(
-                    re.search(r"(?<![\w])" + re.escape(builder) + r"\b", texts[platform]) for builder in core[contract]
-                ):
-                    violations.append(f"{platform} {contract}")
-                continue
-            for index, param in enumerate(params):
-                if not any(_binds(call, index, param, len(params)) for call in calls):
-                    violations.append(f"{platform} {contract}.{param.name}")
-    return sorted(set(violations))
+def _bound_value(call: k.Call, index: int, param: k.Param, count: int) -> str | None:
+    positional = call.positional[index] if index < len(call.positional) else None
+    trailing = call.trailing_lambda if index == count - 1 else None
+    return call.named.get(param.name, positional or trailing)
 
 
 def _binds(call: k.Call, index: int, param: k.Param, count: int) -> bool:
-    value = call.named.get(param.name)
-    if value is None and index < len(call.positional):
-        value = call.positional[index]
-    if value is None and index == count - 1 and call.trailing_lambda is not None:
-        value = call.trailing_lambda
+    value = _bound_value(call, index, param, count)
     return value is not None and not unbound(value)
 
 
-def check_parity(repo: Path, prune: bool, print_actual: bool) -> list[str]:
-    actual = parity_actual(repo)
-    if print_actual:
-        print("\n".join(actual))
-        return []
-    lines = read_lines(repo / PARITY_FILE)
-    exempt = keyed(lines)
-    problems = []
-    for key, reason in exempt.items():
-        if not reason or not BEAD_REF.search(reason):
-            problems.append(
-                f"EXEMPTION WITHOUT A REASON AND BEAD: '{key}' - every entry is "
-                "'<platform> <Contract>[.<param>] | <reason naming the letta-mobile-<id> bead that removes it>'"
-            )
-    for v in actual:
-        if v not in exempt:
-            platform, _, slot = v.partition(" ")
-            what = "does not construct the core contract" if "." not in slot else "leaves this slot unbound"
-            problems.append(f"NEW PARITY GAP: {platform} {what}: {slot}")
-    stale = [key for key in exempt if key not in set(actual)]
-    if prune and stale:
-        rewrite(repo / PARITY_FILE, [line for line in lines if " ".join(line.partition("|")[0].split()) not in stale])
-    elif stale:
-        problems += [f"STALE EXEMPTION (now bound - delete the line, or run with --prune): {key}" for key in stale]
-    keys = [" ".join(line.partition("|")[0].split()) for line in lines]
-    if keys != sorted(keys) or len(set(keys)) != len(keys):
-        problems.append(f"{PARITY_FILE} must be sorted with one entry per line")
-    return problems
+@dataclass
+class PlatformSources:
+    calls: dict[str, list[k.Call]]
+    text: str
+
+    def uses(self, builder: str) -> bool:
+        return re.search(r"(?<![\w])" + re.escape(builder) + r"\b", self.text) is not None
+
+
+def _platform_sources(repo: Path, paths: list[Path], candidates: set[str]) -> PlatformSources:
+    calls: dict[str, list[k.Call]] = {}
+    for path in paths:
+        for name, call in k.constructor_calls(repo, path, candidates):
+            calls.setdefault(name, []).append(call)
+    return PlatformSources(calls, "\n".join(k.strip_comments(k.read(path)) for path in paths))
+
+
+def _contract_gaps(contract: str, params: list[k.Param], platform: str, sources: PlatformSources, builders: list[str] | None) -> list[str]:
+    calls = sources.calls.get(contract)
+    if not calls:
+        missing = builders is not None and not any(map(sources.uses, builders))
+        return [f"{platform} {contract}"] if missing else []
+    return [
+        f"{platform} {contract}.{param.name}"
+        for index, param in enumerate(params)
+        if not any(_binds(call, index, param, len(params)) for call in calls)
+    ]
+
+
+def parity_actual(repo: Path) -> dict[str, int]:
+    shared = k.shared_classes(repo, k.shared_files(repo))
+    core = core_contracts(repo)
+    candidates = {name for name, found in shared.items() if len(found) == 1 and (CONTRACT_SUFFIX.search(name) or name in core)}
+    platforms = {platform: _platform_sources(repo, paths, candidates) for platform, paths in k.platform_files(repo).items()}
+    contracts = sorted(candidates & ({name for p in platforms.values() for name in p.calls} | set(core)))
+    return {
+        gap: 1
+        for contract in contracts
+        for platform, sources in platforms.items()
+        for gap in _contract_gaps(contract, shared[contract][0].params, platform, sources, core.get(contract))
+    }
+
+
+PARITY = Messages(
+    new="NEW PARITY GAP: {key} is unbound (a core contract not constructed, or a slot left null/empty/false/default)",
+    grew="",
+    stale="STALE EXEMPTION (now bound - delete the line, or run with --prune): {key}",
+)
 
 
 # --- platform code --------------------------------------------------------------------------
 
-_TOP_DECL = re.compile(
-    r"(?m)^(?P<mods>(?:@[\w.]+(?:\([^)\n]*\))?[ \t]*\n?[ \t]*|(?:public|internal|private|protected|data|value|open|abstract|sealed|"
-    r"inner|annotation|enum|expect|actual|final|external|const|inline|suspend|operator|infix|tailrec|override|lateinit|fun)[ \t]+)*)"
-    r"(?P<kind>class|interface|object|typealias|fun|val|var)\b(?P<rest>[^\n]*)"
-)
+@dataclass(frozen=True)
+class SharedIndex:
+    fqns: frozenset[str]
 
-
-def _imports(text: str) -> tuple[dict[str, str], list[str], str]:
-    exact = {}
-    wildcard = []
-    for m in re.finditer(r"(?m)^import\s+([\w.]+)(?:\s+as\s+(\w+))?", text):
-        fqn, alias = m.group(1), m.group(2)
-        if fqn.endswith(".*"):
-            wildcard.append(fqn[:-2])
-        else:
-            exact[alias or fqn.rsplit(".", 1)[-1]] = fqn
-    pkg = re.search(r"(?m)^package\s+([\w.]+)", text)
-    return exact, wildcard, pkg.group(1) if pkg else ""
-
-
-def shared_index(repo: Path) -> tuple[set[str], set[str]]:
-    """(FQNs of shared types, packages that hold them)."""
-    fqns, packages = set(), set()
-    for path in k.shared_files(repo):
-        text = k.strip_comments(path.read_text(encoding="utf-8", errors="replace"))
-        pkg = re.search(r"(?m)^package\s+([\w.]+)", text)
-        package = pkg.group(1) if pkg else ""
-        packages.add(package)
-        for name in k.declared_type_names(path):
-            fqns.add(f"{package}.{name}")
-    return fqns, packages
-
-
-def _supertypes(header_rest: str, text: str, start: int) -> list[str]:
-    """Simple names after the class header's ':' (constructor params skipped)."""
-    i = start
-    n = len(text)
-    # skip name and type params, then the primary constructor
-    m = re.match(r"\s*\w+\s*(<[^{(:]*?>)?\s*(?:@[\w.]+\s*)*(?:(?:public|internal|private|protected)\s+)?(?:constructor\s*)?", text[i:])
-    if m:
-        i += m.end()
-    if i < n and text[i] == "(":
-        i = k._skip_balanced(text, i, "(", ")")
-    rest = text[i : i + 600]
-    colon = re.match(r"\s*:", rest)
-    if not colon:
-        return []
-    body = rest[colon.end():]
-    end = len(body)
-    for stop in ("{", "\n\n", " where "):
-        pos = body.find(stop)
-        if pos >= 0:
-            end = min(end, pos)
-    names = []
-    for part in k.split_top_level(body[:end]):
-        part = re.sub(r"\(.*$", "", part, flags=re.S)
-        part = re.sub(r"<.*$", "", part, flags=re.S)
-        part = part.split(" by ")[0].strip()
-        if part:
-            names.append(part)
-    return names
-
-
-def _resolves_to_binding_target(name: str, imports, shared_fqns: set[str]) -> bool:
-    """Whether a supertype is a shared type (sharedLogic/sharedUI/core/...) or an OS/framework type."""
-    exact, wildcard, package = imports
-    head = name.split(".")[0]
-    if head and head[0].islower():  # written fully qualified
-        fqns = [name]
-    elif head in exact:
-        fqns = [exact[head] + name[len(head):]]
-    else:
-        fqns = [f"{p}.{name}" for p in wildcard] + [f"{package}.{name}"]
-        if any(p.startswith(OS_PACKAGES) for p in wildcard):
-            return True
-    for fqn in fqns:
-        if fqn in LOGIC_CONTAINERS:
-            return False
-        if fqn.startswith(OS_PACKAGES):
-            return True
-        # a nested shared type: its outer type is indexed
+    def is_shared(self, fqn: str) -> bool:
         parts = fqn.split(".")
-        for end in range(len(parts), 1, -1):
-            if ".".join(parts[:end]) in shared_fqns:
-                return True
-    return False
+        return any(".".join(parts[:end]) in self.fqns for end in range(len(parts), 1, -1))
 
 
-def is_pure_binding(text: str, shared_fqns: set[str], shared_packages: set[str]) -> bool:
-    clean = k.strip_comments(text)
-    imports = _imports(clean)
-    found_any = False
-    depth_map = _depth_map(clean)
-    for m in _TOP_DECL.finditer(clean):
-        if depth_map[m.start("kind")] != 0:
-            continue
-        found_any = True
-        mods, kind, rest = m.group("mods"), m.group("kind"), m.group("rest")
-        if re.search(r"\b(actual|external)\b", mods):
-            continue
-        if kind == "fun" and re.match(r"\s*main\s*\(", rest):
-            continue
-        if kind in ("class", "object") and re.search(r"@(dagger\.)?Module\b", mods):
-            continue
-        if kind in ("class", "object"):
-            supers = _supertypes(rest, clean, m.end("kind"))
-            if supers and any(_resolves_to_binding_target(s, imports, shared_fqns) for s in supers):
-                continue
+def shared_index(repo: Path) -> SharedIndex:
+    fqns = set()
+    for path in k.shared_files(repo):
+        package = _package(k.strip_comments(k.read(path)))
+        fqns.update(f"{package}.{name}" for name in k.declared_type_names(path))
+    return SharedIndex(frozenset(fqns))
+
+
+def _package(text: str) -> str:
+    m = re.search(r"(?m)^package\s+([\w.]+)", text)
+    return m.group(1) if m else ""
+
+
+@dataclass(frozen=True)
+class Imports:
+    exact: dict[str, str]
+    wildcard: list[str]
+    package: str
+
+    def candidates(self, name: str) -> list[str]:
+        head = name.split(".")[0]
+        if head[:1].islower():
+            return [name]  # written fully qualified
+        if head in self.exact:
+            return [self.exact[head] + name[len(head):]]
+        return [f"{p}.{name}" for p in self.wildcard] + [f"{self.package}.{name}"]
+
+
+def imports_of(text: str) -> Imports:
+    rows = re.findall(r"(?m)^import\s+([\w.]+(?:\.\*)?)(?:\s+as\s+(\w+))?", text)
+    exact = {alias or fqn.rsplit(".", 1)[-1]: fqn for fqn, alias in rows if not fqn.endswith(".*")}
+    return Imports(exact, [fqn[:-2] for fqn, _ in rows if fqn.endswith(".*")], _package(text))
+
+
+def _binding_target(fqn: str, index: SharedIndex) -> bool:
+    if fqn in LOGIC_CONTAINERS:
         return False
-    return found_any
+    return fqn.startswith(OS_PACKAGES) or index.is_shared(fqn)
 
 
-def _depth_map(text: str) -> list[int]:
-    """Brace depth at each index (strings and comments already handled by strip_comments' caller)."""
-    depth = 0
-    out = [0] * (len(text) + 1)
-    i = 0
-    n = len(text)
-    while i < n:
-        c = text[i]
-        if c == '"':
-            j = k._skip_string(text, i)
-            for x in range(i, min(j, n)):
-                out[x] = depth
-            i = j
-            continue
-        if c == "'":
-            j = k._skip_char(text, i)
-            for x in range(i, min(j, n)):
-                out[x] = depth
-            i = j
-            continue
-        out[i] = depth
-        if c == "{":
-            depth += 1
-        elif c == "}":
-            depth -= 1
-        i += 1
-    return out
+def binds_supertype(name: str, imports: Imports, index: SharedIndex) -> bool:
+    """Whether a supertype is a shared type (sharedLogic/sharedUI/core/...) or an OS/framework type."""
+    os_wildcard = any(p.startswith(OS_PACKAGES) for p in imports.wildcard) and name.split(".")[0] not in imports.exact
+    return os_wildcard or any(_binding_target(fqn, index) for fqn in imports.candidates(name))
+
+
+def _always_binding(mods: str, kind: str, rest: str) -> bool:
+    """`actual`/`external` declarations, `fun main`, and DI modules bind by construction."""
+    if re.search(r"\b(actual|external)\b", mods) or re.search(r"@(dagger\.)?Module\b", mods):
+        return True
+    return kind == "fun" and re.match(r"\s*main\s*\(", rest) is not None
+
+
+def _is_binding_declaration(m: re.Match[str], top: str, imports: Imports, index: SharedIndex) -> bool:
+    if _always_binding(m.group("mods"), m.group("kind"), m.group("rest")):
+        return True
+    name = _DECLARED_NAME.match(top, m.end("kind")) if m.group("kind") in ("class", "object") else None
+    return name is not None and any(binds_supertype(s, imports, index) for s in k.supertypes(top, name.end()))
+
+
+def is_pure_binding(text: str, index: SharedIndex) -> bool:
+    clean = k.strip_comments(text)
+    top = k.without_bodies(clean)
+    imports = imports_of(clean)
+    declarations = list(_TOP_DECL.finditer(top))
+    return bool(declarations) and all(_is_binding_declaration(m, top, imports, index) for m in declarations)
 
 
 def platform_code_actual(repo: Path) -> dict[str, int]:
-    shared_fqns, shared_packages = shared_index(repo)
-    out = {}
-    for paths in k.platform_files(repo).values():
-        for path in paths:
-            text = path.read_text(encoding="utf-8", errors="replace")
-            if "@Composable" in text:
-                continue  # platform-ui-gate.sh owns these
-            if not is_pure_binding(text, shared_fqns, shared_packages):
-                out[k.rel(repo, path)] = len(text.splitlines())
-    return out
+    index = shared_index(repo)
+    texts = {path: k.read(path) for paths in k.platform_files(repo).values() for path in paths}
+    return {
+        k.rel(repo, path): len(text.splitlines())
+        for path, text in texts.items()
+        # @Composable files are platform-ui-gate.sh's.
+        if "@Composable" not in text and not is_pure_binding(text, index)
+    }
 
 
-def check_platform_code(repo: Path, prune: bool, print_actual: bool) -> list[str]:
-    actual = platform_code_actual(repo)
-    if print_actual:
-        print("\n".join(f"{p} {n}" for p, n in sorted(actual.items())))
-        return []
-    lines = read_lines(repo / PLATFORM_CODE_FILE)
-    caps = {}
-    for line in lines:
-        path, _, cap = line.partition(" ")
-        caps[path] = int(cap.split()[0])
-    problems = []
-    for path, count in sorted(actual.items()):
-        if path not in caps:
-            problems.append(f"NEW PLATFORM LOGIC FILE: {path} ({count} lines) is not a pure binding")
-        elif count > caps[path] + PLATFORM_CODE_SLACK:
-            problems.append(f"PLATFORM LOGIC GREW: {path} has {count} lines, cap {caps[path]} (+{PLATFORM_CODE_SLACK} slack)")
-    stale = [p for p in caps if p not in actual]
-    if prune and stale:
-        rewrite(repo / PLATFORM_CODE_FILE, [line for line in lines if line.partition(" ")[0] not in stale])
-    elif stale:
-        problems += [f"STALE (file gone or now a pure binding - delete the line, or run with --prune): {p}" for p in stale]
-    paths = [line.partition(" ")[0] for line in lines]
-    if paths != sorted(paths) or len(set(paths)) != len(paths):
-        problems.append(f"{PLATFORM_CODE_FILE} must be sorted with one entry per line")
-    return problems
+PLATFORM_CODE = Messages(
+    new="NEW PLATFORM LOGIC FILE: {key} ({count} lines) is not a pure binding",
+    grew="PLATFORM LOGIC GREW: {key} has {count} lines, cap {cap} (+{slack} slack)",
+    stale="STALE (file gone or now a pure binding - delete the line, or run with --prune): {key}",
+)
 
 
 # --- mirror names ---------------------------------------------------------------------------
 
-def mirror_actual(repo: Path) -> list[str]:
-    shared_names = set()
-    for path in k.shared_files(repo):
-        shared_names.update(k.declared_type_names(path))
-    platform_types: dict[str, dict[str, set[str]]] = {}  # platform -> name -> supertypes
-    for platform, paths in k.platform_files(repo).items():
+def _platform_types(path: Path) -> dict[str, set[str]]:
+    """Platform-prefixed types declared in [path], with their supertypes' simple names."""
+    clean = k.strip_comments(k.read(path))
+    return {
+        m.group(1): {s.split(".")[-1] for s in k.supertypes(clean, m.end())}
+        for m in _TYPE_HEAD.finditer(clean)
+        if PLATFORM_PREFIX.match(m.group(1))
+    }
+
+
+def _rest(name: str) -> str:
+    return PLATFORM_PREFIX.match(name).group(2)
+
+
+def _shared_mirrors(name: str, supers: set[str], shared_names: set[str]) -> list[str]:
+    rest = _rest(name)
+    return [f"{name} mirrors shared {s}" for s in (rest, "Shared" + rest, "Common" + rest) if s in shared_names and s not in supers]
+
+
+def _platform_mirrors(name: str, types: dict[str, set[str]], shared_names: set[str]) -> list[str]:
+    twins = [other for other in types if other != name and _rest(other) == _rest(name)]
+    return [f"{name} mirrors platform {other}" for other in twins if not types[name] & types[other] & shared_names]
+
+
+def mirror_actual(repo: Path) -> dict[str, int]:
+    shared_names = {name for path in k.shared_files(repo) for name in k.declared_type_names(path)}
+    types: dict[str, set[str]] = {}
+    for paths in k.platform_files(repo).values():
         for path in paths:
-            clean = k.strip_comments(path.read_text(encoding="utf-8", errors="replace"))
-            for m in re.finditer(r"\b(?:class|interface|object|typealias)\s+([A-Z]\w*)", clean):
-                name = m.group(1)
-                if not PLATFORM_PREFIX.match(name):
-                    continue
-                supers = {s.split(".")[-1] for s in _supertypes("", clean, m.end(0) - len(name))}
-                platform_types.setdefault(platform, {}).setdefault(name, set()).update(supers)
-    by_rest: dict[str, set[str]] = {}
-    for platform, types in platform_types.items():
-        for name in types:
-            by_rest.setdefault(PLATFORM_PREFIX.match(name).group(2), set()).add(name)
-    found = set()
-    for platform, types in platform_types.items():
-        for name, supers in types.items():
-            rest = PLATFORM_PREFIX.match(name).group(2)
-            for shared in (rest, "Shared" + rest, "Common" + rest):
-                if shared in shared_names and shared not in supers:
-                    found.add(f"{name} mirrors shared {shared}")
-            for other in sorted(by_rest[rest] - {name}):
-                other_supers = next(t[other] for t in platform_types.values() if other in t)
-                common = {s for s in supers & other_supers if s in shared_names}
-                if not common:
-                    found.add(f"{name} mirrors platform {other}")
-    return sorted(found)
+            for name, supers in _platform_types(path).items():
+                types.setdefault(name, set()).update(supers)
+    found = [m for name, supers in types.items() for m in _shared_mirrors(name, supers, shared_names) + _platform_mirrors(name, types, shared_names)]
+    return dict.fromkeys(sorted(found), 1)
 
 
-def check_mirror_names(repo: Path, prune: bool, print_actual: bool) -> list[str]:
-    actual = mirror_actual(repo)
-    if print_actual:
-        print("\n".join(actual))
-        return []
-    lines = read_lines(repo / MIRROR_FILE)
-    known = [" ".join(line.split()) for line in lines]
-    problems = [f"NEW MIRRORED TYPE: {entry}" for entry in actual if entry not in known]
-    stale = [entry for entry in known if entry not in actual]
-    if prune and stale:
-        rewrite(repo / MIRROR_FILE, [line for line in lines if " ".join(line.split()) not in stale])
-    elif stale:
-        problems += [f"STALE (renamed or now implements the shared type - delete the line, or run with --prune): {e}" for e in stale]
-    if known != sorted(known) or len(set(known)) != len(known):
-        problems.append(f"{MIRROR_FILE} must be sorted with one entry per line")
-    return problems
+MIRROR = Messages(
+    new="NEW MIRRORED TYPE: {key}",
+    grew="",
+    stale="STALE (renamed or now implements the shared type - delete the line, or run with --prune): {key}",
+)
 
 
-# --- main -----------------------------------------------------------------------------------
+# --- gates ----------------------------------------------------------------------------------
 
-GATES = {"parity": check_parity, "platform-code": check_platform_code, "mirror-names": check_mirror_names}
+@dataclass(frozen=True)
+class Gate:
+    actual: Callable[[Path], dict[str, int]]
+    baseline: str
+    messages: Messages
+    how_to_fix: str
+    counted: bool = False
+    reasoned: bool = False
+    slack: int = 0
+
+    def check(self, repo: Path, prune: bool) -> list[str]:
+        baseline = Baseline(repo / BASELINE_DIR / self.baseline, self.counted, self.reasoned)
+        problems, stale = drift(self.actual(repo), baseline, self.slack, self.messages)
+        if prune and stale:
+            baseline.prune(stale)
+            return problems
+        return problems + [self.messages.stale.format(key=key) for key in sorted(stale)]
+
+
+GATES = {
+    "parity": Gate(
+        parity_actual, "parity-exemptions.txt", PARITY, reasoned=True,
+        how_to_fix=(
+            "Bind the slot on that platform with a real implementation (the shared controller, port or page),\n"
+            "or, if the shared default is wrong, make the param required in sharedUI/sharedLogic so every platform\n"
+            "must bind it. Never stub it. Do not add an exemption: scripts/ci/parity/parity-exemptions.txt only shrinks."
+        ),
+    ),
+    "platform-code": Gate(
+        platform_code_actual, "platform-code-baseline.txt", PLATFORM_CODE, counted=True, slack=PLATFORM_CODE_SLACK,
+        how_to_fix=(
+            "Move the logic to sharedLogic/commonMain (or the UI to sharedUI/commonMain) and keep only the OS/browser\n"
+            "binding here: a class that implements a shared interface/expect, an `actual`, an `external`, or a DI module.\n"
+            "scripts/ci/parity/platform-code-baseline.txt only shrinks; a listed file may not grow past its cap + 5."
+        ),
+    ),
+    "mirror-names": Gate(
+        mirror_actual, "mirror-name-baseline.txt", MIRROR,
+        how_to_fix=(
+            "Do not mirror shared or other-platform types. Use the shared type, or make the platform type implement\n"
+            "the shared contract of that name (DesktopFoo : Foo). Two platforms needing the same thing means it\n"
+            "belongs in sharedLogic/sharedUI. scripts/ci/parity/mirror-name-baseline.txt only shrinks."
+        ),
+    ),
+}
+
+
+def print_actual(name: str, repo: Path) -> None:
+    gate = GATES[name]
+    rows = gate.actual(repo)
+    print("\n".join(f"{key} {count}" if gate.counted else key for key, count in sorted(rows.items())))
+
+
+def report(name: str, problems: list[str]) -> bool:
+    if not problems:
+        print(f"parity-gates {name}: ok")
+        return True
+    print(f"::error title=parity-gates {name}::{len(problems)} problem(s); see the log")
+    print(f"parity-gates {name}: FAILED")
+    print("\n".join(f"  {p}" for p in problems))
+    print("  What to do:")
+    print("\n".join(f"    {line}" for line in GATES[name].how_to_fix.splitlines()))
+    return False
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -458,23 +430,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--prune", action="store_true")
     args = parser.parse_args(argv)
     repo = args.root.resolve()
-    failed = False
-    for name in GATES if args.gate == "all" else [args.gate]:
-        problems = GATES[name](repo, args.prune, args.print_actual)
-        if args.print_actual:
-            continue
-        if problems:
-            failed = True
-            print(f"::error title=parity-gates {name}::{len(problems)} problem(s); see the log")
-            print(f"parity-gates {name}: FAILED")
-            for p in problems:
-                print(f"  {p}")
-            print("  What to do:")
-            for line in HOW_TO_FIX[name].splitlines():
-                print(f"    {line}")
-        else:
-            print(f"parity-gates {name}: ok")
-    return 1 if failed else 0
+    names = list(GATES) if args.gate == "all" else [args.gate]
+    if args.print_actual:
+        for name in names:
+            print_actual(name, repo)
+        return 0
+    results = [report(name, GATES[name].check(repo, args.prune)) for name in names]
+    return 0 if all(results) else 1
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ package com.letta.mobile.architecture
 
 import net.sourceforge.pmd.cpd.CPDConfiguration
 import net.sourceforge.pmd.cpd.CpdAnalysis
+import net.sourceforge.pmd.cpd.Match
 import net.sourceforge.pmd.lang.LanguageRegistry
 import java.nio.file.Files
 import java.nio.file.Path
@@ -44,35 +45,33 @@ internal object DuplicateCodeScan {
         return ""
     }
 
+    /** One copy of a clone: its file, its module and how many lines it spans. */
+    private data class Copy(val file: String, val module: String, val lines: Int)
+
+    private fun copiesOf(repositoryRoot: Path, match: Match): List<Copy> = match.markSet.map { mark ->
+        val location = mark.location
+        val path = Path.of(location.fileId.absolutePath)
+        Copy(repositoryRoot.relativize(path).invariantSeparatorsPathString, moduleOf(repositoryRoot, path), location.endLine - location.startLine + 1)
+    }
+
+    /** Every pair of a clone's copies that sit in different modules, as (`<fileA>|<fileB>`, lines). */
+    private fun crossModulePairs(copies: List<Copy>): List<Pair<String, Int>> = copies.flatMapIndexed { i, first ->
+        copies.drop(i + 1)
+            .filter { second -> second.module != first.module }
+            .map { second -> listOf(first.file, second.file).sorted().joinToString("|") to minOf(first.lines, second.lines) }
+    }
+
     /** `<fileA>|<fileB>` -> lines duplicated between two files in different modules. */
     fun crossModuleDuplicates(repositoryRoot: Path, sources: List<Path>, minimumTokens: Int = MINIMUM_TOKENS): Map<String, Int> {
         val config = CPDConfiguration().apply {
             minimumTileSize = minimumTokens
             setOnlyRecognizeLanguage(LanguageRegistry.CPD.getLanguageById("kotlin"))
             inputPathList = sources
-            isSkipDuplicates = false
         }
-        val pairs = sortedMapOf<String, Int>()
+        val pairs = mutableListOf<Pair<String, Int>>()
         CpdAnalysis.create(config).use { analysis ->
-            analysis.performAnalysis { report ->
-                for (match in report.matches) {
-                    val marks = match.markSet.map { mark ->
-                        val location = mark.location
-                        val path = Path.of(location.fileId.absolutePath)
-                        Triple(repositoryRoot.relativize(path).invariantSeparatorsPathString, moduleOf(repositoryRoot, path), location.endLine - location.startLine + 1)
-                    }
-                    for (i in marks.indices) {
-                        for (j in i + 1 until marks.size) {
-                            val (a, moduleA, linesA) = marks[i]
-                            val (b, moduleB, linesB) = marks[j]
-                            if (moduleA == moduleB) continue
-                            val key = listOf(a, b).sorted().joinToString("|")
-                            pairs[key] = (pairs[key] ?: 0) + minOf(linesA, linesB)
-                        }
-                    }
-                }
-            }
+            analysis.performAnalysis { report -> report.matches.forEach { pairs += crossModulePairs(copiesOf(repositoryRoot, it)) } }
         }
-        return pairs
+        return pairs.groupingBy { it.first }.fold(0) { total, pair -> total + pair.second }.toSortedMap()
     }
 }
