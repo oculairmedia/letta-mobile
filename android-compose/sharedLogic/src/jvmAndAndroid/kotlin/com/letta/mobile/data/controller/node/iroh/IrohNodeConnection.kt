@@ -312,16 +312,7 @@ class IrohNodeConnection(
             // associate it HERE, where remoteEndpointId + selfViewer are in
             // scope. When a connection hydrates conversation X via message.list,
             // register it as a viewer of X (de-scoping any prior conversation).
-            onMethodObserved = { method, params ->
-                if (method == "message.list") {
-                    val conversationId = params
-                        ?.get("conversation_id")
-                        ?.let { (it as? JsonPrimitive)?.contentOrNull }
-                    if (!conversationId.isNullOrEmpty()) {
-                        registerAsViewer(conversationId)
-                    }
-                }
-            },
+            onMethodObserved = ::observeAdminMethod,
         )
         server.serveAcceptLoop { connection.acceptBi().asAdminRpcBiStream() }
     }
@@ -377,14 +368,28 @@ class IrohNodeConnection(
             )
             return """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"forbidden","capability":"$requiredCapability"}"""
         }
+        val params = obj["params"]?.jsonObject
+        // A client whose admin_rpc rides the control channel (the browser over iroh-wasm) hydrates
+        // through here, so it becomes the conversation's viewer the same way.
+        observeAdminMethod(method, params)
         return adminRpcRouter.dispatch(
             AdminRpcInvocation(
                 requestId = requestId,
                 method = method,
-                params = obj["params"]?.jsonObject,
+                params = params,
                 context = currentAdminRpcRequestContext(),
             ),
         )
+    }
+
+    /**
+     * The OBSERVER signal: a connection that hydrates conversation X with `message.list`
+     * becomes X's viewer (de-scoping any prior conversation), on either admin_rpc path.
+     */
+    private suspend fun observeAdminMethod(method: String, params: JsonObject?) {
+        if (method != "message.list") return
+        val conversationId = params?.get("conversation_id")?.let { (it as? JsonPrimitive)?.contentOrNull }
+        if (!conversationId.isNullOrEmpty()) registerAsViewer(conversationId)
     }
 
     /** Control-channel sync frame — kept out of [handleControlFrame] for complexity. */

@@ -53092,8 +53092,11 @@ public final class com/letta/mobile/data/transport/WsTimelineEvent$UsageStatisti
 }
 
 public final class com/letta/mobile/data/transport/api/AppServerClientChannel : com/letta/mobile/data/transport/api/NoOpChannelTransport {
-	public fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lkotlinx/coroutines/CoroutineScope;)V
+	public fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lkotlinx/coroutines/CoroutineScope;Ljava/util/Set;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/transport/appserver/AppServerClient;Lkotlinx/coroutines/CoroutineScope;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun adminRpc (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getEvents ()Lkotlinx/coroutines/flow/SharedFlow;
+	public fun getHostCapabilities ()Ljava/util/Set;
 	public fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 }
 

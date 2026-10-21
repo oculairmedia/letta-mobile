@@ -1,9 +1,12 @@
 package com.letta.mobile.web.chat
 
+import com.letta.mobile.data.chat.approval.ChatApprovalAnswerer
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.data.timeline.TimelineTransport
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatActions
+import com.letta.mobile.ui.chat.session.ChatApprovalStateSource
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
@@ -25,6 +28,11 @@ class WebChatBinding(
     val controls: TimelineChatRunControls,
     /** letta-mobile-ckmub.17.2: the composer's model and permission-mode chips; null shows neither. */
     val chips: TimelineChipSources? = null,
+    /**
+     * letta-mobile-ckmub.17.25: an Iroh host's parked approvals and queued answers (its shared chat
+     * gateway); null keeps the port's own in-flight tracking only.
+     */
+    val hostApprovals: IrohAdminRpcChatGateway? = null,
 )
 
 /**
@@ -54,7 +62,8 @@ class WebChatSessionPort(
         session = TimelineSyncLoopSession(loop),
         target = binding.target,
         scope = scope,
-        options = TimelineChatSessionOptions(controls = binding.controls).withChips(scope, binding.target, binding.chips),
+        options = TimelineChatSessionOptions(controls = binding.controls, approvals = hostApprovalState(binding, scope))
+            .withChips(scope, binding.target, binding.chips),
     )
 
     /** The conversation this port serves; the canvas docked under the page is that conversation's board. */
@@ -70,5 +79,11 @@ class WebChatSessionPort(
 
     private companion object {
         const val LOG_TAG = "WebChat"
+
+        /** The host's outbox and parked requests, mirrored for as long as [scope] (the chat) lives. */
+        fun hostApprovalState(binding: WebChatBinding, scope: CoroutineScope): ChatApprovalStateSource? {
+            val host = binding.hostApprovals ?: return null
+            return ChatApprovalAnswerer(scope).apply { bind(host.queuedApprovalRequestIds, host.pendingApprovalDetails) }
+        }
     }
 }
