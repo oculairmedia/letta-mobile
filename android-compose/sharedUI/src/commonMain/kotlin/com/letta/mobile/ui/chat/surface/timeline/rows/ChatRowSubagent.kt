@@ -330,7 +330,7 @@ private fun NotificationBody(model: NotificationModel, expanded: Boolean, action
     }
     NotificationActionRow(model, expanded, actions)
     if (expanded && model.hasDetails()) {
-        model.report?.let { NotificationReport(report = it, model = model) }
+        if (model.report != null) NotificationReport(model)
         NotificationFooter(notification)
     }
 }
@@ -375,11 +375,11 @@ private fun NotificationFooter(notification: UiSubagentNotification) {
  * is the agent's own prose and keeps the markdown paint.
  */
 @Composable
-private fun NotificationReport(report: String, model: NotificationModel) {
+private fun NotificationReport(model: NotificationModel) {
     if (model.notification.isCommand()) {
-        CommandReport(report, failed = model.isFailure)
+        CommandReport(model)
     } else {
-        SharedMarkdownText(text = report)
+        SharedMarkdownText(text = model.report.orEmpty())
     }
 }
 
@@ -389,32 +389,38 @@ private fun NotificationReport(report: String, model: NotificationModel) {
  * stderr takes the error inset whatever the exit code, so a traceback never reads as output.
  */
 @Composable
-private fun CommandReport(report: String, failed: Boolean) {
-    val parsed = remember(report) { parseBackgroundCommandReport(report) }
+private fun CommandReport(model: NotificationModel) {
+    val parsed = remember(model.report) { parseBackgroundCommandReport(model.report.orEmpty()) }
     Column(
         modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.COMMAND_REPORT),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         parsed.command?.let { command ->
-            ReportLabel(stringResource(Res.string.rows_activity_command))
+            ReportLabel(stream = null)
             ToolOutputBlock(stringResource(Res.string.rows_tool_argument_line, command))
         }
         parsed.detail?.let { detail ->
             Text(
                 text = detail,
                 style = MaterialTheme.typography.labelSmall,
-                color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (model.isFailure) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         parsed.streams.forEach { stream ->
-            ReportLabel(stream.label?.replace(" - ", " · ") ?: stringResource(Res.string.rows_tool_output))
+            ReportLabel(stream)
             ToolOutputBlock(stream.text, isError = stream.kind == CommandStream.Kind.Stderr)
         }
     }
 }
 
+/** A section's heading: "Command" for the command ([stream] null), else the tail's own header. */
 @Composable
-private fun ReportLabel(text: String) {
+private fun ReportLabel(stream: CommandStream?) {
+    val text = when {
+        stream == null -> stringResource(Res.string.rows_activity_command)
+        stream.label != null -> stream.label.replace(" - ", " · ")
+        else -> stringResource(Res.string.rows_tool_output)
+    }
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,

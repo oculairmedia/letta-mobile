@@ -43,10 +43,8 @@ class CommandReportMonospaceTest {
     fun aBackgroundBashReportIsSectionedLikeAToolCard() = runComposeUiTest {
         val painted = mutableListOf<String>()
         show(
-            notification(
-                taskId = "bash_54",
-                result = "$ python3 - <<'PY'\nimport json\nPY\n\nExit code: 0\n\n" +
-                    "[stdout - last 2 of 9 lines]\n{\"id\":1}\n{\"id\":2}\n\n[stderr]\nTraceback (most recent call last):",
+            notification(taskId = "bash_54", result = "$ python3 - <<'PY'\nimport json\nPY\n\nExit code: 0\n\n" +
+                    "[stdout - last 2 of 9 lines]\n{\"id\":1}\n{\"id\":2}\n\n[stderr]\nTraceback (most recent call last):").copy(
                 usage = "duration_ms: 11926",
                 durationMs = 11_926,
                 transcriptUri = "/tmp/letta/bash_54.log",
@@ -98,18 +96,14 @@ class CommandReportMonospaceTest {
         taskId: String,
         subagentAgentId: String? = null,
         result: String = "$ $SHELL_LINE\n\n[stdout]\n$STDOUT_LINE",
-        usage: String? = null,
-        durationMs: Long? = null,
-        transcriptUri: String? = null,
-    ) = UiSubagentNotification(
+    ) =UiSubagentNotification(
         status = "completed",
         summary = SUMMARY,
         result = result,
-        usage = usage,
-        transcriptUri = transcriptUri,
+        usage = null,
+        transcriptUri = null,
         taskId = taskId,
         subagentAgentId = subagentAgentId,
-        durationMs = durationMs,
     )
 
     private companion object {
