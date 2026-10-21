@@ -5,11 +5,11 @@ import androidx.room.PrimaryKey
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import kotlinx.collections.immutable.toImmutableList
+import com.letta.mobile.data.serialization.LettaJson
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
 @Entity(tableName = "agents")
@@ -43,7 +43,7 @@ data class AgentEntity(
     )
 
     companion object {
-        private val json = Json { ignoreUnknownKeys = true }
+        private val json = LettaJson.persisted
         private val tagListSerializer = ListSerializer(String.serializer())
         private val metadataSerializer = MapSerializer(String.serializer(), JsonElement.serializer())
 

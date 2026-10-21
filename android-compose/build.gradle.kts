@@ -270,6 +270,7 @@ subprojects {
 dependencies {
     kover(project(":app"))
     kover(project(":core:android-data"))
+    kover(project(":core:data"))
     kover(project(":sharedLogic"))
     kover(project(":sharedUI"))
     kover(project(":plugin-view"))

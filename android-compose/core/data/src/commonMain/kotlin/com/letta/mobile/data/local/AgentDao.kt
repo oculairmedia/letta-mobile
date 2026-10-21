@@ -6,12 +6,16 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
+private const val AGENT_COLUMNS =
+    "id, name, description, model, embedding, agentType, enableSleeptime, createdAt, updatedAt, " +
+        "tagsJson, metadataJson, toolCount, blockCount"
+
 @Dao
 interface AgentDao {
-    @Query("SELECT * FROM agents ORDER BY name ASC")
+    @Query("SELECT $AGENT_COLUMNS FROM agents ORDER BY name ASC")
     fun getAll(): Flow<List<AgentEntity>>
 
-    @Query("SELECT * FROM agents ORDER BY name ASC")
+    @Query("SELECT $AGENT_COLUMNS FROM agents ORDER BY name ASC")
     suspend fun getAllOnce(): List<AgentEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

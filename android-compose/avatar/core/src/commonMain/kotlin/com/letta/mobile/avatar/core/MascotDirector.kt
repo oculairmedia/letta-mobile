@@ -57,7 +57,7 @@ class MascotDirector(
         val listenSmoothingSeconds: Float = 0.35f,
         /** te3n1.2: the host never plays two blinks closer than this (a head-turn blink and a reaction's). */
         val blinkMinGapSeconds: Float = 0.25f,
-        /** te3n1.2: how long the eyes lead toward the next seat before the body hops there. */
+        /** te3n1.2: how long the eyes hold the next seat once a hop toward it starts (the body never waits on them, te3n1.11). */
         val seatLeadSeconds: Float = 0.45f,
     ) {
         /** How long [reaction] waits before it may fire again; completions never wait. */
@@ -225,17 +225,14 @@ class MascotDirector(
     }
 
     /**
-     * A seat hand-off is about to start (te3n1.2): the eyes go to [toward] (gaze units from where the
-     * mascot stands now) for [seatLeadSeconds] before the body hops; the host waits that long. Under
-     * reduced motion the hop snaps and there is no lead.
+     * A seat hand-off starts (te3n1.2): the eyes go to [toward] (gaze units from where the mascot
+     * stood) and hold it for [Config.seatLeadSeconds] while the body hops - the host does not wait
+     * on them (te3n1.11). Under reduced motion the hop snaps and the look holds.
      */
     fun leadGaze(toward: GazePoint) {
         if (signals.reduceMotion) return
         gaze.lead(toward, config.seatLeadSeconds)
     }
-
-    /** How long a hop waits on [leadGaze]: zero under reduced motion. */
-    val seatLeadSeconds: Float get() = if (signals.reduceMotion) 0f else config.seatLeadSeconds
 
     /** Advance state, gaze, listening and reactions by [deltaSeconds]; returns the rewritten [frame]. */
     fun tick(deltaSeconds: Float): MascotFrame {

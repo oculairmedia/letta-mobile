@@ -67,8 +67,7 @@ class MascotHopUiTest {
         val destinationWidth = nodeWidth()
         val centers = mutableListOf(from)
         val compositionsAtTakeOff = stage.shell.transport.transportedCompositions
-        // te3n1.2: the eyes lead for a beat first, then the body flies.
-        repeat(LEAD_FRAMES + FLIGHT_FRAMES) {
+        repeat(FLIGHT_FRAMES) {
             mainClock.advanceTimeByFrame()
             centers += character().center
             assertEquals(destinationWidth, nodeWidth(), "the renderer keeps the destination size")
@@ -93,7 +92,7 @@ class MascotHopUiTest {
         stage.shell.transport.transportTo(AGENT, MascotStage.AGENT_PANE_HERO)
         var moved = false
         val start = character().center
-        repeat(LEAD_FRAMES + FLIGHT_FRAMES / 2) {
+        repeat(FLIGHT_FRAMES / 2) {
             mainClock.advanceTimeByFrame()
             val shown = character()
             if (shown.center != start) moved = true
@@ -105,18 +104,20 @@ class MascotHopUiTest {
     }
 
     @Test
-    fun theEyesLeadToTheNextSeatBeforeTheBodyHops() = runComposeUiTest {
+    fun aContextSwitchHopsAtOnceWithTheEyesOnTheNextSeat() = runComposeUiTest {
         val host = CachingMascotHost()
         val stage = stage(reducedMotion = false, host = host)
-        val from = character().center
+        val rest = character()
+        // te3n1.11: the hop begins on the frames that commit the switch - no lead, no debounce. Its
+        // first beat is the body's own crouch (MascotBodyTune.anticipationSeconds), then it travels.
         stage.shell.transport.transportTo(AGENT, MascotStage.AGENT_PANE_HERO)
-        repeat(LEAD_FRAMES - 4) { mainClock.advanceTimeByFrame() }
-        assertEquals(from, character().center, "the body waits on the eyes")
+        repeat(NO_LEAD_FRAMES) { mainClock.advanceTimeByFrame() }
+        assertTrue(character() != rest, "already crouching into the hop")
+        repeat(CROUCH_FRAMES) { mainClock.advanceTimeByFrame() }
+        assertTrue((character().center - rest.center).getDistance() > 1f, "and on its way")
         val gaze = assertNotNull(host.made["mascot-focus-0"], "the slot's scene").lastGaze
-        // The hero seat is up and to the right of the companion.
-        assertTrue(gaze.lookX > 0.1f && gaze.lookY < 0f, "the eyes are already on the next seat: $gaze")
-        repeat(FLIGHT_FRAMES / 2) { mainClock.advanceTimeByFrame() }
-        assertTrue((character().center - from).getDistance() > 1f, "then it hops")
+        // The hero seat is up and to the right of the companion (te3n1.2).
+        assertTrue(gaze.lookX > 0.1f && gaze.lookY < 0f, "the eyes are on the next seat: $gaze")
     }
 
     @Test
@@ -165,8 +166,11 @@ class MascotHopUiTest {
         const val SETTLE_MILLIS = 2_000L
         const val FLIGHT_FRAMES = 60
 
-        /** MascotDirector.Config.seatLeadSeconds (0.45 s) in 16 ms frames, rounded up. */
-        const val LEAD_FRAMES = 29
+        /** The switch's own frame, the one the hop is woken on and the first it moves on. */
+        const val NO_LEAD_FRAMES = 3
+
+        /** MascotBodyTune.anticipationSeconds (0.07 s) in 16 ms frames, rounded up. */
+        const val CROUCH_FRAMES = 5
         const val FRAME_MILLIS = 16L
         const val SEAT_FRAMES = 3
     }

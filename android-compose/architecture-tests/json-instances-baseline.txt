@@ -40,9 +40,6 @@ android-compose/cli/src/main/java/com/letta/mobile/cli/commands/TwoClientProbeRe
 android-compose/cli/src/main/java/com/letta/mobile/cli/probe/ProbeStubStore.kt
 android-compose/cli/src/main/java/com/letta/mobile/cli/runtime/CliRuntime.kt
 android-compose/cli/src/main/java/com/letta/mobile/cli/runtime/ReplayInteractiveShell.kt
-android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/AgentEntity.kt
-android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/CanvasOpEntity.kt
-android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/ConversationEntity.kt
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/RoomRuntimeEventOutbox.kt
 # wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true isLenient=true
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/repository/IrohAdminRpcSlashCommandSource.kt

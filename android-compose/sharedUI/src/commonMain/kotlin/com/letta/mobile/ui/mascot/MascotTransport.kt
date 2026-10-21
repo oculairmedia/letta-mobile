@@ -52,7 +52,6 @@ import com.letta.mobile.avatar.core.MascotEvent
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.avatar.core.MascotVector
 import com.letta.mobile.data.model.AgentId
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import com.letta.mobile.ui.haptics.LocalHaptics
@@ -383,16 +382,14 @@ private fun TransportedMascot(
         launch { flight.enter(reducedMotion, landed) }
         launch { flight.drive(reducedMotion, landed) }
         val motion = HopMotion(reducedMotion, density.density)
-        // te3n1.2: each hop crouches at once and takes off after the eyes have led to the next seat.
-        var takeOff: Job? = null
+        // Each hop takes off on the frame its stage changes (te3n1.11: no lead before it), the eyes
+        // turning to the next seat as the body goes (te3n1.2).
         snapshotFlow { currentAgent.let { agent -> transport.activeStage(agent)?.let { MascotTransport.SeatKey(agent, it) } } }
             .distinctUntilChanged()
             .collect { next ->
                 if (next == null) return@collect
-                takeOff?.cancel()
                 val hop = transport.beginHop(flight, next, motion)
-                takeOff = hop?.let { launch { flight.takeOff(it, currentDirector, motion.density) } }
-                if (hop == null) flight.wakeIfMoving()
+                if (hop != null) flight.takeOff(hop, currentDirector, motion.density) else flight.wakeIfMoving()
             }
     }
     // The renderer's node keeps the DESTINATION size for the whole flight and the change of size
@@ -450,8 +447,8 @@ private fun SeatedCharacter(seated: SeatedMascot, boxSize: Dp, sceneKey: String,
  * Starts [flight]'s hop to the seat [next] (the agent the slot shows now, at its active stage),
  * from wherever it is drawn this frame; nothing when that stage is the one already shown. The
  * slot's first stage is no hop: the character enters there ([MascotTransport.Flight.enter]).
- * Returns the hop when one started: the body is set crouching at its origin and the caller wakes
- * it ([takeOff]) once the eyes have led; null when it snapped or nothing moved.
+ * Returns the hop when one started: the body is set moving from its origin and the caller wakes
+ * it at once ([takeOff]); null when it snapped or nothing moved.
  */
 private fun MascotTransport.beginHop(flight: MascotTransport.Flight, next: MascotTransport.SeatKey, motion: HopMotion): HopTakeOff? {
     if (next.stage == flight.shownStage) return null

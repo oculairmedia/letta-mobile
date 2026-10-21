@@ -102,9 +102,11 @@ class AutomergeIrohRepoProtocolTest {
             store.create("Moved").also { id ->
                 store.insertMarkdown(id, 0, "Kept")
                 repeat(20) { round ->
+                    // Distinct random values: a repeated one compresses away, and the history must stay over budget.
+                    val random = kotlin.random.Random(round)
                     store.open(id)!!.withDocument { document ->
                         document.startTransaction().use { tx ->
-                            tx.set(ObjectId.ROOT, "scratch", (0 until 500).joinToString(",") { "${kotlin.random.Random(round).nextLong()}" })
+                            tx.set(ObjectId.ROOT, "scratch", (0 until 500).joinToString(",") { "${random.nextLong()}" })
                             tx.commit()
                         }
                     }.get(5, TimeUnit.SECONDS)

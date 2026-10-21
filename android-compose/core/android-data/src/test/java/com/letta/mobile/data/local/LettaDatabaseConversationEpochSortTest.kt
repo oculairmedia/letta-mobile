@@ -39,16 +39,16 @@ class LettaDatabaseConversationEpochSortTest {
 
     @Test
     fun `parser accepts Z and offset forms any fraction precision naive and space separated values`() {
-        assertEquals(1_767_261_600_000L, ConversationTimestamps.epochMillisOrNull("2026-01-01T10:00:00Z"))
-        assertEquals(1_767_261_600_000L, ConversationTimestamps.epochMillisOrNull("2026-01-01T10:00:00+00:00"))
-        assertEquals(1_767_254_400_000L, ConversationTimestamps.epochMillisOrNull("2026-01-01T10:00:00+02:00"))
-        assertEquals(1_767_261_600_500L, ConversationTimestamps.epochMillisOrNull("2026-01-01T10:00:00.5Z"))
-        assertEquals(1_767_259_800_123L, ConversationTimestamps.epochMillisOrNull("2026-01-01T09:30:00.123456+00:00"))
-        assertEquals(1_767_261_600_000L, ConversationTimestamps.epochMillisOrNull("2026-01-01T10:00:00"))
-        assertEquals(1_767_261_600_000L, ConversationTimestamps.epochMillisOrNull("2026-01-01 10:00:00+00:00"))
-        assertNull(ConversationTimestamps.epochMillisOrNull("not a timestamp"))
-        assertNull(ConversationTimestamps.epochMillisOrNull("  "))
-        assertNull(ConversationTimestamps.epochMillisOrNull(null))
+        assertEquals(1_767_261_600_000L, ConversationRecency.epochMillisOrNull("2026-01-01T10:00:00Z"))
+        assertEquals(1_767_261_600_000L, ConversationRecency.epochMillisOrNull("2026-01-01T10:00:00+00:00"))
+        assertEquals(1_767_254_400_000L, ConversationRecency.epochMillisOrNull("2026-01-01T10:00:00+02:00"))
+        assertEquals(1_767_261_600_500L, ConversationRecency.epochMillisOrNull("2026-01-01T10:00:00.5Z"))
+        assertEquals(1_767_259_800_123L, ConversationRecency.epochMillisOrNull("2026-01-01T09:30:00.123456+00:00"))
+        assertEquals(1_767_261_600_000L, ConversationRecency.epochMillisOrNull("2026-01-01T10:00:00"))
+        assertEquals(1_767_261_600_000L, ConversationRecency.epochMillisOrNull("2026-01-01 10:00:00+00:00"))
+        assertNull(ConversationRecency.epochMillisOrNull("not a timestamp"))
+        assertNull(ConversationRecency.epochMillisOrNull("  "))
+        assertNull(ConversationRecency.epochMillisOrNull(null))
     }
 
     @Test
