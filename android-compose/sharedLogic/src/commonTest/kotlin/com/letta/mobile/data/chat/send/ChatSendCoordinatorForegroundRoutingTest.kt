@@ -20,6 +20,22 @@ import kotlinx.coroutines.test.runTest
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class ChatSendCoordinatorForegroundRoutingTest : ChatSendCoordinatorConversationFixture() {
     @Test
+    fun observerDoesNotFollowSelectionChangedReentrantlyDuringAdoption() = runTest(UnconfinedTestDispatcher()) {
+        val ui = RecordingUiSink()
+        var visible: String? = CONV_A
+        onSelection = { visible = CONV_B }
+        val coordinator = coordinator(
+            timeline = RecordingTimelineWriter(), ui = ui,
+            transport = FakeChannelTransport(mutableListOf()), scope = backgroundScope,
+        ) { visible }
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-a", AGENT_ID, CONV_A, "run-a"))
+        assertEquals(listOf(CONV_A), selectedConversations)
+        assertEquals(CONV_B, visible)
+        assertTrue(observedConversations.isEmpty())
+        assertFalse(ui.isStreaming())
+    }
+
+    @Test
     fun blankInitialSelectionReceivesPreparationFailureBeforeAdoption() = runTest(UnconfinedTestDispatcher()) {
         val ui = RecordingUiSink()
         val transport = FakeChannelTransport(mutableListOf())

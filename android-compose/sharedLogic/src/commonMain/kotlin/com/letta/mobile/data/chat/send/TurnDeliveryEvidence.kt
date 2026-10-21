@@ -30,7 +30,7 @@ internal fun ConversationTurnState.recordStarted(event: WsTimelineEvent.TurnStar
     resetDeliveryEvidence()
 }
 
-/** Historical/replayed content never widens this turn's delivery or cleanup evidence. */
+/** Replayed content never widens this turn's delivery or cleanup evidence. */
 internal fun ConversationTurnState.recordAssistantEvidence(
     event: WsTimelineEvent.MessageDelta,
     resolvedFrame: ConversationId?,
@@ -85,7 +85,7 @@ internal fun ConversationTurnState.bufferError(event: WsTimelineEvent.Error) {
 
 private const val MAX_ACTIVE_ASSISTANT_RUN_IDS = 8
 
-/** A historical tail cannot relight live presence or widen cleanup evidence. */
+/** A retired tail cannot relight live presence or passively adopt live identity. */
 internal fun ConversationTurnState.isRetiredDelta(event: WsTimelineEvent.MessageDelta): Boolean {
     val turn = event.turnId?.takeIf { it.isNotBlank() }
     if (turn != null) return turnId != turn && identity.isFenced(turn)

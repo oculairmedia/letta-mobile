@@ -325,7 +325,11 @@ class ChatSendCoordinator(
             return
         }
         setActiveConversationId(conversation.value)
-        startTimelineObserver(conversation.value)
+        if (foreground.owns(conversation)) {
+            startTimelineObserver(conversation.value)
+        } else {
+            foreground.suppressed(conversation, "startTimelineObserver")
+        }
     }
 
     private fun validatedActiveConfig(conversation: ConversationId?): LettaConfig? {

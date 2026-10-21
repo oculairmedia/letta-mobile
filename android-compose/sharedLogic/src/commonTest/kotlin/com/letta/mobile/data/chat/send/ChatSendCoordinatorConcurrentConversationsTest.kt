@@ -810,6 +810,7 @@ internal class ChatSendCoordinatorConcurrentConversationsTest : ChatSendCoordina
 internal abstract class ChatSendCoordinatorConversationFixture {
     protected val selectedConversations = mutableListOf<String>()
     protected val observedConversations = mutableListOf<String>()
+    protected var onSelection: (String) -> Unit = {}
     protected var composerClears = 0
     protected var prepareConversation: suspend (String) -> Unit = {}
 
@@ -833,7 +834,7 @@ internal abstract class ChatSendCoordinatorConversationFixture {
         ui = ui,
         clearComposerAfterSend = { composerClears++ },
         activeConversationId = activeConversationId,
-        setActiveConversationId = { selectedConversations += it },
+        setActiveConversationId = { selectedConversations += it; onSelection(it) },
         startTimelineObserver = { observedConversations += it },
         clientVersion = { "test" },
         otidGenerator = { "otid-${++otid}" },
