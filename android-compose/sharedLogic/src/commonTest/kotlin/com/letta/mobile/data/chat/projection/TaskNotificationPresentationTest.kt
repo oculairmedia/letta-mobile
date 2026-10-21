@@ -11,9 +11,11 @@ class TaskNotificationPresentationTest {
             status = "completed", summary = null, result = null, usage = null,
             transcriptUri = null, taskId = task, subagentAgentId = agent,
         )
-        assertEquals("Command", notification("exec_73").activityLabel())
-        assertEquals("Task", notification("task_11").activityLabel())
-        assertEquals("Task", notification(null).activityLabel())
-        assertEquals("Subagent", notification("task_11", "agent-worker").activityLabel())
+        assertEquals(TaskActivity.Command, notification("exec_73").activity())
+        // letta-mobile-2a7yv: a background Bash shell is a command too.
+        assertEquals(TaskActivity.Command, notification("bash_54").activity())
+        assertEquals(TaskActivity.Task, notification("task_11").activity())
+        assertEquals(TaskActivity.Task, notification(null).activity())
+        assertEquals(TaskActivity.Subagent, notification("task_11", "agent-worker").activity())
     }
 }
