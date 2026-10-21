@@ -63,7 +63,7 @@ sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/runtime/ChatSession
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/runtime/PinnedConversations.kt 5
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/runtime/SharedChatSessionResolver.kt 8
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/BridgeEventDeduplicator.kt 1
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendCoordinator.kt 2
+sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendCoordinator.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendCoordinatorAttachment.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendUiSink.kt 4
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/PostSendReconciler.kt 3

@@ -4,7 +4,7 @@
     "health": "Default cs review scores; null denotes unscorable code, never a fabricated 10.0.",
     "codeSceneLoc": "Exact Git bytes, isolated temp-repository LOC-warning=1 parser probe; customized probe scores excluded; non-scorable files remain unmeasured.",
     "pins": "Implementation source before documentation-only acceptance edits; no production metric/configuration gate was changed.",
-    "cli": "cs 1.0.41, build 341169b662167b7a7f07c2ecc06fb560ef96c71a, Windows amd64; local default reviews, not cloud scores."
+    "cli": "cs version 1.0.41 (341169b662167b7a7f07c2ecc06fb560ef96c71a) Built on Windows Server 2025 amd64 at 2026-09-10; local default reviews, not cloud scores."
   },
   "refs": {
     "b090c766bee52e8aa176249446df6ad73f7af702": {
@@ -331,7 +331,7 @@
       "physicalTotal": 3278,
       "fileCount": 15
     },
-    "70d1a0c684e6a74aed3b68df61c8311b504de665": {
+    "1e5359c83cd608e7f54bb429ec17d25ec8083b89": {
       "files": [
         {
           "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/BridgeEventDeduplicator.kt",
@@ -347,13 +347,13 @@
         },
         {
           "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendCoordinator.kt",
-          "physicalLines": 765,
+          "physicalLines": 738,
           "score": 9.3,
           "codeSceneProbe": {
             "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendCoordinator.kt",
-            "sourceSha256": "8da628df355405cb2a0ff9a87ce185876583b406fcfcc4a0d76c6b1f9ead3a24",
-            "physicalLines": 765,
-            "codeSceneLoc": 498
+            "sourceSha256": "68374da8cd7948526fe33b49e06063be8ddde4471727296e88e06e85f7591727",
+            "physicalLines": 738,
+            "codeSceneLoc": 473
           },
           "findings": [
             {
@@ -362,8 +362,8 @@
                 {
                   "title": "sendInternalLocked",
                   "details": "cc = 10",
-                  "start-line": 230,
-                  "end-line": 317,
+                  "start-line": 225,
+                  "end-line": 312,
                   "url": ""
                 }
               ],
@@ -373,10 +373,10 @@
               "category": "Complex Conditional",
               "functions": [
                 {
-                  "title": "handleRedialWhileTurnActiveLocked:569",
+                  "title": "handleRedialWhileTurnActiveLocked:545",
                   "details": "2 complex conditional expressions",
-                  "start-line": 569,
-                  "end-line": 569,
+                  "start-line": 545,
+                  "end-line": 545,
                   "url": ""
                 }
               ],
@@ -434,61 +434,61 @@
         },
         {
           "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ConversationChatUi.kt",
-          "physicalLines": 85,
+          "physicalLines": 90,
           "score": 10.0,
           "codeSceneProbe": {
             "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ConversationChatUi.kt",
-            "sourceSha256": "b49e1a0d2ba7c367779d936fe825028e7f9d889fdab205589019bb9510098937",
-            "physicalLines": 85,
-            "codeSceneLoc": 54
+            "sourceSha256": "e4ae79669e5cd8972252a3c361555490f06a927e653d17d8c651888f65e7277d",
+            "physicalLines": 90,
+            "codeSceneLoc": 57
           },
           "findings": []
         },
         {
           "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ConversationTurnRegistry.kt",
-          "physicalLines": 275,
+          "physicalLines": 273,
           "score": 10.0,
           "codeSceneProbe": {
             "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ConversationTurnRegistry.kt",
-            "sourceSha256": "f229b7619ed5e2417f3d17a0f2ae046794d949fd18a096f58dc04851e31ce96f",
-            "physicalLines": 275,
+            "sourceSha256": "7bce5c0b4b2ac51e7131350cdbcd831ff7f9328afc93ea6aee257c519b9efd2c",
+            "physicalLines": 273,
             "codeSceneLoc": 118
           },
           "findings": []
         },
         {
           "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ConversationTurnState.kt",
-          "physicalLines": 185,
+          "physicalLines": 188,
           "score": 10.0,
           "codeSceneProbe": {
             "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ConversationTurnState.kt",
-            "sourceSha256": "fbe98b856b560ddb7336ec55be81453246e9e87437a30cf449bf694bd224d1cd",
-            "physicalLines": 185,
+            "sourceSha256": "82d8628cb6bbcbaedaa8fe1e3727f4e108d385e30f3f47893e477fe0dce054b2",
+            "physicalLines": 188,
             "codeSceneLoc": 95
           },
           "findings": []
         },
         {
           "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/IncomingTurnOwnership.kt",
-          "physicalLines": 102,
+          "physicalLines": 97,
           "score": 10.0,
           "codeSceneProbe": {
             "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/IncomingTurnOwnership.kt",
-            "sourceSha256": "48692e665fcf170940e85b0d3c780054ce56cc836744d3c45b45947c2079aae7",
-            "physicalLines": 102,
-            "codeSceneLoc": 77
+            "sourceSha256": "48ad26d4cbccc77fda26508b49d0e5b14ad82347be44ceb8bca57037ea49c0c0",
+            "physicalLines": 97,
+            "codeSceneLoc": 73
           },
           "findings": []
         },
         {
           "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/IncomingTurnProjection.kt",
-          "physicalLines": 190,
+          "physicalLines": 187,
           "score": 10.0,
           "codeSceneProbe": {
             "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/IncomingTurnProjection.kt",
-            "sourceSha256": "a71ce546574fc753937bd8fec7abf70c3c9e006ab36ee4982ea50161b849634c",
-            "physicalLines": 190,
-            "codeSceneLoc": 130
+            "sourceSha256": "a363cc9df69df7cc91436d637dfb33a88c3b4f34d4db81ee68c5371e4bc8bea6",
+            "physicalLines": 187,
+            "codeSceneLoc": 126
           },
           "findings": []
         },
@@ -578,12 +578,12 @@
         },
         {
           "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnDeliveryEvidence.kt",
-          "physicalLines": 95,
+          "physicalLines": 101,
           "score": 10.0,
           "codeSceneProbe": {
             "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnDeliveryEvidence.kt",
-            "sourceSha256": "2568a03b36df44f545ff85dc1d090317f55506759c0e5ccc20aeefff3a956c65",
-            "physicalLines": 95,
+            "sourceSha256": "e796bcd36684434ec8a3532277df1841a13929aee5a7bf6847867cc8fa70cf59",
+            "physicalLines": 101,
             "codeSceneLoc": 66
           },
           "findings": []
@@ -607,13 +607,13 @@
         },
         {
           "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnSettlement.kt",
-          "physicalLines": 392,
+          "physicalLines": 373,
           "score": 10.0,
           "codeSceneProbe": {
             "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnSettlement.kt",
-            "sourceSha256": "4b798a0e0a7f0f70871057b588736da40ca3c51ad90ec79c924baec0f72ada34",
-            "physicalLines": 392,
-            "codeSceneLoc": 301
+            "sourceSha256": "e3cdd2183e622cbf6abc988a71fab372ec196addd880ff69f5251cd71eb23f71",
+            "physicalLines": 373,
+            "codeSceneLoc": 282
           },
           "findings": []
         },
@@ -642,7 +642,7 @@
           "findings": []
         }
       ],
-      "physicalTotal": 3485,
+      "physicalTotal": 3443,
       "fileCount": 23
     }
   }
