@@ -331,7 +331,7 @@
       "physicalTotal": 3278,
       "fileCount": 15
     },
-    "1e5359c83cd608e7f54bb429ec17d25ec8083b89": {
+    "b860a7f686d30e951c316e6bfc51a5c8a9a33dc4": {
       "files": [
         {
           "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/BridgeEventDeduplicator.kt",
@@ -506,12 +506,12 @@
         },
         {
           "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/OtherClientHold.kt",
-          "physicalLines": 141,
+          "physicalLines": 139,
           "score": 10.0,
           "codeSceneProbe": {
             "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/OtherClientHold.kt",
-            "sourceSha256": "f4763740a4dccceeeb7bfffa159989bff05f5ecbbd965d915c2cce85a77a1738",
-            "physicalLines": 141,
+            "sourceSha256": "ad4db9847dc8ff70bdb0e44a3e94ea492f40a820e38e0ef961270b74c4162772",
+            "physicalLines": 139,
             "codeSceneLoc": 52
           },
           "findings": []
@@ -642,7 +642,7 @@
           "findings": []
         }
       ],
-      "physicalTotal": 3443,
+      "physicalTotal": 3441,
       "fileCount": 23
     }
   }
