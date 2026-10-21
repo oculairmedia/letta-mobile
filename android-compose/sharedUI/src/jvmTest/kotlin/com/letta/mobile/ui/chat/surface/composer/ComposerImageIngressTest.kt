@@ -3,6 +3,7 @@ package com.letta.mobile.ui.chat.surface.composer
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.data.model.MessageContentPart
+import io.github.vinceglb.filekit.PlatformFile
 import java.awt.Color
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
@@ -49,6 +50,20 @@ class ComposerImageIngressTest {
         assertFailsWith<IllegalArgumentException> { readImageSource(knownSize = 10, read = stream::read) }
         val small = ByteArray(1_000) { it.toByte() }
         assertContentEquals(small, readImageSource(knownSize = null, read = ByteArrayInputStream(small)::read))
+    }
+
+    @Test
+    fun aPickedFilePastTheCapIsRefusedLikePasteAndDrop() = runBlocking {
+        val file = java.io.File.createTempFile("picked-huge", ".png")
+        try {
+            java.io.RandomAccessFile(file, "rw").use { it.setLength(ImageIngressPolicy.MAX_SOURCE_BYTES + 1L) }
+            val error = assertFailsWith<IllegalArgumentException> { PlatformFile(file).readImageBytes() }
+            assertEquals("larger than 25 MB", error.message)
+            file.writeBytes(byteArrayOf(1, 2, 3))
+            assertContentEquals(byteArrayOf(1, 2, 3), PlatformFile(file).readImageBytes())
+        } finally {
+            file.delete()
+        }
     }
 
     @Test

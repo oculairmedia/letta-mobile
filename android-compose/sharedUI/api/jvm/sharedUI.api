@@ -1952,6 +1952,7 @@ public final class com/letta/mobile/ui/chat/surface/composer/ComposerImageIngres
 }
 
 public final class com/letta/mobile/ui/chat/surface/composer/ComposerImagePickerKt {
+	public static final fun composerAttachFailedMessage (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static final fun encodeAttachment ([BLcom/letta/mobile/data/attachment/AttachmentLimits;)Lcom/letta/mobile/data/model/MessageContentPart$Image;
 	public static synthetic fun encodeAttachment$default ([BLcom/letta/mobile/data/attachment/AttachmentLimits;ILjava/lang/Object;)Lcom/letta/mobile/data/model/MessageContentPart$Image;
 }

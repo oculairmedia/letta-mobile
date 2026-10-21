@@ -50,8 +50,13 @@ internal fun readAtMost(limit: Int, read: (ByteArray) -> Int): ByteArray? {
  * pass it (a source that grew, or one with no known size).
  */
 suspend fun readImageSource(knownSize: Long?, read: (ByteArray) -> Int): ByteArray {
-    if (knownSize != null && knownSize > ImageIngressPolicy.MAX_SOURCE_BYTES) imageTooLarge()
+    refuseOversizedImage(knownSize)
     return readAtMost(ImageIngressPolicy.MAX_SOURCE_BYTES, read) ?: imageTooLarge()
+}
+
+/** Refuses an image whose reported [size] already passes [ImageIngressPolicy.MAX_SOURCE_BYTES]. */
+internal suspend fun refuseOversizedImage(size: Long?) {
+    if (size != null && size > ImageIngressPolicy.MAX_SOURCE_BYTES) imageTooLarge()
 }
 
 /** Refuses a pasted or dropped image larger than [ImageIngressPolicy.MAX_SOURCE_BYTES]. */

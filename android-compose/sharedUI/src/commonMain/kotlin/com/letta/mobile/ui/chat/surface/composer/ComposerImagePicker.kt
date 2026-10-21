@@ -17,7 +17,6 @@ import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
-import io.github.vinceglb.filekit.readBytes
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -113,7 +112,14 @@ internal fun rememberComposerImagePicker(
 
 private const val MinPickerItems = 2
 
-private fun PlatformFile.asImageSource(): ComposerImageSource = { readBytes() }
+private fun PlatformFile.asImageSource(): ComposerImageSource = { readImageBytes() }
+
+/**
+ * A picked file's bytes, refused past [com.letta.mobile.data.attachment.ImageIngressPolicy.MAX_SOURCE_BYTES]
+ * like paste and drop (letta-mobile-k5nbq.18): read capped through [readImageSource] where the
+ * platform streams the file, by its size before reading where it cannot (the browser).
+ */
+internal expect suspend fun PlatformFile.readImageBytes(): ByteArray
 
 /**
  * [target] fixes the room (as it was when the person picked); results and errors go to [latest],
@@ -143,10 +149,16 @@ private suspend fun attachOne(
     if (image != null) {
         latest().onPicked(image)
     } else {
-        val reason = result.exceptionOrNull()?.message ?: getString(Res.string.composer_attach_not_an_image)
-        latest().onError(getString(Res.string.composer_attach_failed, reason))
+        latest().onError(composerAttachFailedMessage(result.exceptionOrNull()?.message))
     }
 }
+
+/**
+ * The composer's "Could not attach that image: <reason>" error for every ingress (picker, paste,
+ * drop); a null [reason] reads as "not an image".
+ */
+suspend fun composerAttachFailedMessage(reason: String?): String =
+    getString(Res.string.composer_attach_failed, reason ?: getString(Res.string.composer_attach_not_an_image))
 
 /** [bytes] as an attachment, or null when they are not an image the platform decodes. */
 @OptIn(ExperimentalEncodingApi::class)

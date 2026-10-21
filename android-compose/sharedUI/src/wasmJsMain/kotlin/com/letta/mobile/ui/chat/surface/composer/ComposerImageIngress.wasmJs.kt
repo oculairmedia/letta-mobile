@@ -9,6 +9,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import com.letta.mobile.data.attachment.ImageIngressPolicy
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.readBytes
+import io.github.vinceglb.filekit.size
 import kotlin.js.Promise
 import kotlinx.coroutines.await
 import org.khronos.webgl.ArrayBuffer
@@ -46,8 +49,14 @@ private class ComposerFocus {
 }
 
 private fun BrowserImageFile.asImageSource(): ComposerImageSource = {
-    if (size > ImageIngressPolicy.MAX_SOURCE_BYTES) imageTooLarge()
+    refuseOversizedImage(size.toLong())
     arrayBuffer().await().toByteArray()
+}
+
+/** The browser hands over no stream: a picked file is refused by its reported size before it is read. */
+internal actual suspend fun PlatformFile.readImageBytes(): ByteArray {
+    refuseOversizedImage(size())
+    return readBytes()
 }
 
 private fun ArrayBuffer.toByteArray(): ByteArray {
