@@ -98,17 +98,15 @@ internal class TurnSettlement(
         candidateRunIds: Set<String> = emptySet(),
     ) {
         val conversationId = conversation.value
-        val runId = tail.runId
-        val turnId = tail.turnId
         runCatching {
             val removed = timelineRepository.cleanupAbandonedAssistantFragments(
-                agentId, conversationId, runId, turnId, reason, candidateRunIds,
+                agentId, conversationId, tail.runId, tail.turnId, reason, candidateRunIds,
             )
             Telemetry.event(
                 "AdminChatVM", "cleanupAbandonedAssistantFragments.completed",
                 "conversationId" to conversationId,
-                "runId" to (runId ?: ""),
-                "turnId" to (turnId ?: ""),
+                "runId" to (tail.runId ?: ""),
+                "turnId" to (tail.turnId ?: ""),
                 "candidateRunIds" to candidateRunIds.joinToString(","),
                 "removedCount" to removed,
                 "reason" to reason,
@@ -118,8 +116,8 @@ internal class TurnSettlement(
             Telemetry.error(
                 "AdminChatVM", "cleanupAbandonedAssistantFragments.failed", error,
                 "conversationId" to conversationId,
-                "runId" to (runId ?: ""),
-                "turnId" to (turnId ?: ""),
+                "runId" to (tail.runId ?: ""),
+                "turnId" to (tail.turnId ?: ""),
                 "reason" to reason,
             )
         }
