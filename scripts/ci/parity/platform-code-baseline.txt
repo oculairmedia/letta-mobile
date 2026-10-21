@@ -184,7 +184,7 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/Des
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/RiveDesktopBridge.kt 285
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/canvas/DesktopCanvasHostSync.kt 78
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopAppServerChatAdapter.kt 106
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopAppServerChatGateway.kt 575
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopAppServerChatGateway.kt 585
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopAppServerChatGatewayBuilder.kt 363
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopAppServerConnectionProbe.kt 55
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopChatApprovalCoordinator.kt 128
