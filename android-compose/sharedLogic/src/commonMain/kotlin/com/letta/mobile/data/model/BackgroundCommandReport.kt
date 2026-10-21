@@ -68,5 +68,11 @@ private val SESSION_LINE = Regex("""(?m)^Session ID: \S+$""")
 
 /** letta-code's completion details, each its own paragraph after the command. */
 private val DETAIL_LINE = Regex(
-    """(?m)\n\n(Exit code: -?\d+|Terminated by signal before exiting|Output file write failed.*|Error: .*|Command timed out after \d+ms)$""",
+    listOf(
+        """Exit code: -?\d+""",
+        "Terminated by signal before exiting",
+        "Output file write failed.*",
+        "Error: .*",
+        """Command timed out after \d+ms""",
+    ).joinToString("|", prefix = "(?m)\n\n(", postfix = ")$"),
 )

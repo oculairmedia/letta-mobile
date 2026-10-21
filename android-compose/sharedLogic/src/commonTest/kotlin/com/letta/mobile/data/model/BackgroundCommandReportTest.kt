@@ -6,7 +6,8 @@ import kotlin.test.assertNull
 
 /** letta-mobile-2a7yv: a background shell's report, split as letta-code wrote it. */
 class BackgroundCommandReportTest {
-    private val heredoc = "python3 - \"\$J\" <<'PY'\nimport json, sys\n\nfor line in open(sys.argv[1]):\n    print(json.loads(line)['id'])\nPY"
+    private val heredoc = "python3 - \"\$J\" <<'PY'\nimport json, sys\n\n" +
+        "for line in open(sys.argv[1]):\n    print(json.loads(line)['id'])\nPY"
 
     @Test
     fun aBashReportKeepsItsMultiLineCommandDetailAndBothTails() {

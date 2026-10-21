@@ -416,9 +416,10 @@ private fun CommandReport(model: NotificationModel) {
 /** A section's heading: "Command" for the command ([stream] null), else the tail's own header. */
 @Composable
 private fun ReportLabel(stream: CommandStream?) {
+    val header = stream?.label
     val text = when {
         stream == null -> stringResource(Res.string.rows_activity_command)
-        stream.label != null -> stream.label.replace(" - ", " · ")
+        header != null -> header.replace(" - ", " · ")
         else -> stringResource(Res.string.rows_tool_output)
     }
     Text(

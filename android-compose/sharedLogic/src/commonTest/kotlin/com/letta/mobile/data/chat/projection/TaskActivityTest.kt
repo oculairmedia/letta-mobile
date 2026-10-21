@@ -4,7 +4,7 @@ import com.letta.mobile.data.model.UiSubagentNotification
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class TaskNotificationPresentationTest {
+class TaskActivityTest {
     @Test
     fun commandsAndUnknownTasksAreNotInventedSubagents() {
         fun notification(task: String?, agent: String? = null) = UiSubagentNotification(
