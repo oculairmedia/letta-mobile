@@ -1,4 +1,8 @@
-package com.letta.mobile.data.canvas
+package com.letta.mobile.data.canvas.export
+
+import com.letta.mobile.data.canvas.CanvasOpProjector
+import com.letta.mobile.data.canvas.CanvasSceneCheck
+import com.letta.mobile.data.canvas.CanvasSceneValidator
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -26,6 +30,9 @@ internal object CanvasSvgRenderer {
             require(content == null || content.toString() in listOf("[]", "{}", "null")) {
                 "SVG export does not support $key yet"
             }
+        }
+        require(CanvasOpProjector.backgroundPatternOf(sceneJson) == null) {
+            "SVG export does not support background patterns"
         }
         val clean = CanvasOpProjector.stripMetadataForDrawBox(sceneJson)
         val checked = CanvasSceneValidator.scene(clean)
@@ -58,7 +65,7 @@ ${rendered.joinToString("\n") { it.svg }}
         val type = e.string("type")
         val drawing = when (type) {
             "Shape" -> shape(e, points)
-            "Text" -> text(e)
+            "Text" -> error("SVG export cannot measure text wrapping; text elements are unsupported")
             "Path" -> path(e)
             "Image" -> image(e, points)
             else -> error("Unsupported SVG element: $type")
@@ -115,50 +122,39 @@ ${rendered.joinToString("\n") { it.svg }}
             }
             else -> error("Unsupported SVG shape: $kind")
         }
-        val label = e.string("text", "")
-        val labelSvg = if (label.isEmpty()) "" else {
-            textBlock(e, Point(b.x, b.y), label, "middle", e.string("textColor", e.string("strokeColor")))
+        require(e.string("text", "").isEmpty()) {
+            "SVG export cannot measure text wrapping; shape labels are unsupported"
         }
-        return Drawing(body + labelSvg, b)
+        return Drawing(body, b)
     }
 
-    private fun text(e: JsonObject): Drawing {
-        val start = point(e.string("textTopLeft"))
-        val size = e.number("fontSize", 24.0)
-        val width = e.number("wrapWidth", 320.0)
-        val words = e.string("text")
-        val anchor = when (e.string("alignment", "LEFT")) { "CENTER" -> "middle"; "RIGHT" -> "end"; else -> "start" }
-        val x = start.x + when (anchor) { "middle" -> width / 2; "end" -> width; else -> 0.0 }
-        val height = words.split('\n').size * size * 1.25
-        return Drawing(textBlock(e, Point(x, start.y + size), words, anchor, e.string("strokeColor")),
-            Bounds(start.x, start.y, start.x + width, start.y + height))
-    }
-
-    private fun textBlock(e: JsonObject, at: Point, words: String, anchor: String, color: String): String {
-        val size = e.number("fontSize", 24.0)
-        val lines = words.split('\n').mapIndexed { index, line ->
-            """<tspan x="${at.x}" dy="${if (index == 0) 0.0 else size * 1.25}">${xml(line)}</tspan>"""
-        }.joinToString("")
-        val family = when (e.string("fontFamilyKey", "sans")) { "serif" -> "serif"; "mono" -> "monospace"; else -> "sans-serif" }
-        return """<text x="${at.x}" y="${at.y}" font-size="$size" font-family="$family" """ +
-            """text-anchor="$anchor" fill="${xml(color)}" opacity="${e.number("opacity", 1.0)}">$lines</text>"""
+    private data class StrokeSample(val position: Point, val width: Double) {
+        companion object {
+            fun parse(value: String): StrokeSample {
+                val fields = value.split(',').map(String::toDouble)
+                return StrokeSample(Point(fields[0], fields[1]), fields[2])
+            }
+        }
     }
 
     private fun path(e: JsonObject): Drawing {
-        val samples = (e["samples"] as JsonArray).map { it.jsonPrimitive.content.split(',').map(String::toDouble) }
+        val samples = (e["samples"] as JsonArray).map { StrokeSample.parse(it.jsonPrimitive.content) }
         require(samples.isNotEmpty()) { "Cannot export an empty path" }
-        val positions = samples.map { Point(it[0], it[1]) }
+        // Composite the stroke once: overlapping round caps must not darken translucent joints.
+        val color = e.string("strokeColor")
+        val opaque = color.take(7)
+        val colorAlpha = color.takeIf { it.length == 9 }?.takeLast(2)?.toInt(16)?.div(255.0) ?: 1.0
         val svg = samples.zipWithNext().joinToString("") { (a, b) ->
-            val width = (a[2] + b[2]) / 2
-            """<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${xml(e.string("strokeColor"))}" """ +
-                """stroke-width="$width" stroke-linecap="round" opacity="${e.number("alpha", 1.0)}"${dash(e, width)}/>"""
+            val width = (a.width + b.width) / 2
+            """<line x1="${a.position.x}" y1="${a.position.y}" x2="${b.position.x}" y2="${b.position.y}" """ +
+                """stroke="$opaque" stroke-width="$width" stroke-linecap="round"${dash(e, width)}/>"""
         }
         val content = if (samples.size == 1) {
             val sample = samples.single()
-            """<circle cx="${sample[0]}" cy="${sample[1]}" r="${sample[2] / 2}" """ +
-                """fill="${xml(e.string("strokeColor"))}" opacity="${e.number("alpha", 1.0)}"/>"""
+            """<circle cx="${sample.position.x}" cy="${sample.position.y}" r="${sample.width / 2}" fill="$opaque"/>"""
         } else svg
-        return Drawing(content, bounds(positions, samples.maxOf { it[2] } / 2))
+        val group = """<g opacity="${e.number("alpha", 1.0) * colorAlpha}">$content</g>"""
+        return Drawing(group, bounds(samples.map { it.position }, samples.maxOf { it.width } / 2))
     }
 
     private fun image(e: JsonObject, points: List<Point>): Drawing {

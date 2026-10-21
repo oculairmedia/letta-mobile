@@ -227,7 +227,8 @@ object CanvasToolContract {
 
     /**
      * The tools offered to agents. [exportSvg] remains unadvertised: its portable drawing renderer
-     * does not yet render Cascade notes, plugin elements, curved connectors or resolve image assets.
+     * rejects text/labels without font measurement, background patterns, Cascade notes, plugin elements,
+     * curved connectors and unresolved image assets.
      * Direct calls reject unsupported content rather than silently exporting an incomplete board.
      */
     // Only advertise preview when a mobile renderer bridge is actually connected.

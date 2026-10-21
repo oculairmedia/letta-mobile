@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.canvas
 
+import com.letta.mobile.ui.canvas.presence.canvasLocalPresence
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.WindowInsets

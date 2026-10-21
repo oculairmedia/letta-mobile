@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.canvas.export.CanvasSvgRenderer
 import com.letta.mobile.data.canvas.compose.ComposeErrorCode
 import com.letta.mobile.data.canvas.compose.ComposePublishException
 import com.letta.mobile.data.canvas.compose.ComposeTarget

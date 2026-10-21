@@ -1,6 +1,6 @@
-@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 
-package com.letta.mobile.ui.canvas
+package com.letta.mobile.ui.canvas.presence
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -19,8 +20,10 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasPresence
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.model.CanvasId
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -33,6 +36,35 @@ class CanvasLocalPresenceTest {
             updates += canvasId to presence
         }
         override fun observePresence(canvasId: CanvasId): Flow<List<CanvasPresence>> = flowOf(emptyList())
+    }
+
+    @Test
+    fun exitWithoutChangesStillMarksTheCursorInactive() {
+        val cursor = LocalCursor()
+        cursor.observe(PointerEventType.Move, Offset(4f, 8f))
+        cursor.observe(PointerEventType.Exit, null)
+        assertEquals(LocalCursorPosition(Offset(4f, 8f), false), cursor.current)
+    }
+
+    @Test
+    fun stalledDepartureHasABoundedLifetime() = runTest {
+        val transport = object : CanvasPresenceTransport by RecordingTransport() {
+            override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence) {
+                awaitCancellation()
+            }
+        }
+        departCanvasPresence(transport, CanvasId("board"), CanvasPresence("peer", "Peer", "#123456", 0f, 0f))
+        assertEquals(500L, testScheduler.currentTime)
+    }
+
+    @Test
+    fun failedDepartureDoesNotCrashDisposal() = runTest {
+        val transport = object : CanvasPresenceTransport by RecordingTransport() {
+            override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence) {
+                error("Transport is already closed")
+            }
+        }
+        departCanvasPresence(transport, CanvasId("board"), CanvasPresence("peer", "Peer", "#123456", 0f, 0f))
     }
 
     @Test
@@ -58,6 +90,12 @@ class CanvasLocalPresenceTest {
             assertEquals(30f, update.second.cursorY)
             assertTrue(update.second.isActive)
         }
+        val beforeHeartbeat = transport.updates.size
+        mainClock.advanceTimeBy(1_100)
+        runOnIdle { assertTrue(transport.updates.size > beforeHeartbeat) }
+        onNodeWithTag("board").performMouseInput { exit() }
+        mainClock.advanceTimeBy(150)
+        runOnIdle { assertFalse(transport.updates.last().second.isActive) }
         onNodeWithTag("board").performClick()
         runOnIdle {
             assertEquals(1, clicks)
