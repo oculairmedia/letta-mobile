@@ -97,11 +97,17 @@ class CanvasLocalPresenceTest {
         runOnIdle { assertTrue(transport.updates.isEmpty()) }
     }
 
-    private suspend fun departUsing(update: suspend () -> Unit) {
+    /** Departs through a transport answering with [update]; returns the departures it was asked to send. */
+    private suspend fun departUsing(update: suspend () -> Unit): List<CanvasPresence> {
+        val attempts = mutableListOf<CanvasPresence>()
         val transport = object : CanvasPresenceTransport by RecordingTransport() {
-            override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence) = update()
+            override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence) {
+                attempts += presence
+                update()
+            }
         }
         departCanvasPresence(transport, CanvasId("board"), CanvasPresence("peer", "Ada", "#2196F3", 0f, 0f))
+        return attempts
     }
 
     @Test
@@ -112,6 +118,7 @@ class CanvasLocalPresenceTest {
 
     @Test
     fun failedDepartureDoesNotCrashDisposal() = runTest {
-        departUsing { error("Transport is already closed") }
+        val attempts = departUsing { error("Transport is already closed") }
+        assertFalse(attempts.single().isActive)
     }
 }
