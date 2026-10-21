@@ -103,7 +103,7 @@ internal class DesktopGitProbe(private val inputs: DesktopGitProbeInputs) {
             DesktopGitPlatform.WINDOWS -> listOfNotNull(
                 System.getenv("ProgramFiles")?.let { File(it, "Git/cmd") },
                 System.getenv("LOCALAPPDATA")?.let { File(it, "Programs/Git/cmd") },
-                portableGitCmdDirectory(),
+                installedPortableGitCmdDirectory(),
             )
             DesktopGitPlatform.MAC -> listOf(
                 File("/Library/Developer/CommandLineTools/usr/bin"),
@@ -125,7 +125,7 @@ internal class DesktopGitEnvironmentMonitor(
     private val probe: () -> DesktopGitStatus,
     private val runtimeActive: () -> Boolean,
     private val restartRuntime: () -> Unit,
-    private val applyPathDirectory: (File?) -> Unit,
+    private val applyPathDirectory: (File?) -> Unit = { DesktopRuntimeLaunchPreference.extraPathDirectory = it },
 ) {
     private val _status = MutableStateFlow<DesktopGitStatus>(DesktopGitStatus.Unknown)
     val status: StateFlow<DesktopGitStatus> = _status.asStateFlow()
@@ -143,6 +143,15 @@ internal class DesktopGitEnvironmentMonitor(
     /** Git just became usable from a directory the running child cannot see yet. */
     private fun needsRestart(previous: DesktopGitStatus, offPath: File?): Boolean =
         offPath != null && previous !is DesktopGitStatus.Available && runtimeActive()
+
+    /**
+     * letta-mobile-k5nbq.8: installs the pinned MinGit, then rechecks, which puts its `cmd` on the
+     * next spawn's PATH and restarts a running child once.
+     */
+    fun installPortableGit(installer: PortableGitInstaller): DesktopGitStatus {
+        installer.install()
+        return refresh()
+    }
 
     /** Re-checks every [intervalMs] while git is not available, so an install is noticed without a click. */
     suspend fun watchUntilAvailable(intervalMs: Long = DEFAULT_WATCH_INTERVAL_MS) {
