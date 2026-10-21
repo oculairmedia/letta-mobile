@@ -184,7 +184,7 @@ internal class IncomingTurnProjection(
 
     fun clearBuffered() = preConversationMessageDeltas.clear()
 
-    private companion object {
-        const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"
-    }
+
 }
+
+private const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"

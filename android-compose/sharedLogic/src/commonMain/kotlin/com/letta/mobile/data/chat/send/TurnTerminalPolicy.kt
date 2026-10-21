@@ -107,3 +107,16 @@ internal data class TurnTerminalOutcome(
     val deadTurn: Boolean,
     val cleanupFragments: Boolean,
 )
+
+/** A terminal may adopt an unidentified turn only through existing run ownership. */
+internal fun ConversationTurnRegistry.resolveTerminal(event: WsTimelineEvent.TurnDone): ConversationTurnState? {
+    if (event.turnId.isBlank()) return resolveStateByRun(TurnTail(null, event.runId))
+    val states = statesSnapshot
+    val runMatch = states.firstOrNull { it.canAdoptTerminal(event) }
+    val turnAlreadyKnown = states.any { s -> s.turnId == event.turnId || s.identity.isFenced(event.turnId) }
+    if (runMatch != null && !turnAlreadyKnown) {
+        return runMatch
+    }
+    return resolveStateByTurn(TurnTail(event.turnId, event.runId))
+}
+

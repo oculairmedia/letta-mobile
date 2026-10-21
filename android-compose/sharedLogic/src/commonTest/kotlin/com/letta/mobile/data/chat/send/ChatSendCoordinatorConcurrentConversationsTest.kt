@@ -563,21 +563,17 @@ internal class ChatSendCoordinatorConcurrentConversationsTest : ChatSendCoordina
         coordinator.handleEvent(userEcho)
 
         // 2. TurnStarted arrives on CONV_SERVER. Its resolved foreground owner is still CONV_A.
-        val selectionsBeforeStart = selectedConversations.size
-        val observersBeforeStart = observedConversations.size
+        val beforeStart = selectedConversations.size to observedConversations.size
         coordinator.handleEvent(
             WsTimelineEvent.TurnStarted(
-                turnId = "turn-server-1",
-                agentId = AGENT_ID,
+                turnId = "turn-server-1", agentId = AGENT_ID,
                 conversationId = CONV_SERVER,
                 runId = "run-server-1",
             ),
         )
 
-        assertEquals(selectionsBeforeStart + 1, selectedConversations.size)
-        assertEquals(CONV_A, selectedConversations.last())
-        assertEquals(observersBeforeStart + 1, observedConversations.size)
-        assertEquals(CONV_A, observedConversations.last())
+        val adopted = selectedConversations.drop(beforeStart.first) to observedConversations.drop(beforeStart.second)
+        assertEquals(listOf(CONV_A) to listOf(CONV_A), adopted)
 
         // 3. Assistant reply arrives on CONV_SERVER
         val assistantDelta = WsTimelineEvent.MessageDelta(

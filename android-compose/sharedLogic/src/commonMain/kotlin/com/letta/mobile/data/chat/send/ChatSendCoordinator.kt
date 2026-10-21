@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
@@ -60,7 +61,7 @@ class ChatSendCoordinator(
     private val timelineRepository: TimelineExternalTransportWriter,
     private val conversationRepository: IConversationRepository,
     private val ui: ChatSendUiSink,
-    clearComposerAfterSend: () -> Unit,
+    private val clearComposerAfterSend: () -> Unit,
     private val activeConversationId: () -> String?,
     private val setActiveConversationId: (String) -> Unit,
     private val startTimelineObserver: (String) -> Unit,
@@ -262,7 +263,10 @@ class ChatSendCoordinator(
             }.getOrElse { err ->
                 if (err is CancellationException) throw err
                 Telemetry.error("AdminChatVM", "ws.send.createConversationFailed", err)
-                foreground.sendFailed(targetConversationId?.let(::ConversationId), "Failed to create a new conversation: ${err.message ?: "unknown"}")
+                foreground.sendFailed(
+                    targetConversationId?.let(::ConversationId),
+                    "Failed to create a new conversation: ${err.message ?: "unknown"}",
+                )
                 timer.stop("accepted" to false, "reason" to "create_failed")
                 return
             }
@@ -279,7 +283,7 @@ class ChatSendCoordinator(
         turnRegistry.stateFor(ConversationId(conversationId))
         reportCrossConversationSend(ConversationId(conversationId))
         turnRegistry.lastActiveConversationId = conversationId
-        showConversation(ConversationId(conversationId))
+        showConversation(ConversationId(conversationId), targetConversationId?.let(::ConversationId))
 
         Telemetry.event("IrohTrace", "coordinator.ensureConnected.begin", "conversationId" to conversationId)
         val connected = queueTurns.ensureConnected(config, clientVersion)
@@ -309,8 +313,11 @@ class ChatSendCoordinator(
         )
     }
 
-    private fun showConversation(conversation: ConversationId) {
-        if (!foreground.owns(conversation)) {
+    private fun showConversation(
+        conversation: ConversationId,
+        expectedSelection: ConversationId? = conversation,
+    ) {
+        if (!foreground.owns(expectedSelection)) {
             foreground.suppressed(conversation, "selectConversation")
             return
         }
@@ -503,7 +510,9 @@ class ChatSendCoordinator(
 
     private fun recordRunStateOnly(event: WsTimelineEvent.RunActivity) {
         val named = event.conversationId?.let(::ConversationId)
-        runtimeEventBatcher.enqueue(event, turnRegistry.resolveConversationId(named)?.value ?: named?.value ?: turnRegistry.lastActiveConversationId)
+        runtimeEventBatcher.enqueue(
+            event, turnRegistry.resolveConversationId(named)?.value ?: named?.value ?: turnRegistry.lastActiveConversationId,
+        )
     }
 
     private suspend fun handleMessageDelta(event: WsTimelineEvent.MessageDelta) {

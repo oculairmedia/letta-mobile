@@ -17,6 +17,24 @@ import kotlinx.coroutines.test.runTest
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class ChatSendCoordinatorForegroundRoutingTest : ChatSendCoordinatorConversationFixture() {
     @Test
+    fun blankInitialSelectionAdoptsCreatedConversationBeforePublishingSend() = runTest(UnconfinedTestDispatcher()) {
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(mutableListOf())
+        val coordinator = coordinator(
+            timeline = RecordingTimelineWriter(),
+            ui = ui,
+            transport = transport,
+            scope = backgroundScope,
+        ) { selectedConversations.lastOrNull() ?: "" }
+        coordinator.send("first message")
+        assertEquals(listOf("conv-created"), selectedConversations)
+        assertEquals(listOf("conv-created"), observedConversations)
+        assertEquals(listOf("conv-created"), transport.sentConversationIds)
+        assertEquals(1, composerClears)
+        assertTrue(ui.isStreaming())
+    }
+
+    @Test
     fun backgroundUsageDoesNotReplaceForegroundCounters() = runTest(UnconfinedTestDispatcher()) {
         val ui = RecordingUiSink()
         var visible: String? = CONV_A

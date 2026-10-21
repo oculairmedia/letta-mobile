@@ -320,15 +320,6 @@ internal class TurnSettlement(
         runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = false) }
     }
 
-    private fun activeCleanupCandidateRunIds(
-        state: ConversationTurnState,
-        primary: TurnTail,
-    ): Set<String> = buildSet {
-        primary.runId?.takeIf { it.isNotBlank() }?.let(::add)
-        state.runId?.takeIf { it.isNotBlank() }?.let(::add)
-        state.activeAssistantMessageRunIds.mapNotNullTo(this) { it.takeIf(String::isNotBlank) }
-    }
-
     suspend fun markTurnVisuallyComplete(state: ConversationTurnState, reason: String) {
         val conversationId = (state.localConversationId ?: state.conversationId).takeIf { it.isNotBlank() }
             ?: foreground.visibleConversation?.value
@@ -389,4 +380,13 @@ internal class TurnSettlement(
     }
 
     private val defaultConversationId: String get() = IdFormats.defaultConversationIdFor(agent.value)
+}
+
+private fun activeCleanupCandidateRunIds(
+    state: ConversationTurnState,
+    primary: TurnTail,
+): Set<String> = buildSet {
+    primary.runId?.takeIf { it.isNotBlank() }?.let(::add)
+    state.runId?.takeIf { it.isNotBlank() }?.let(::add)
+    state.activeAssistantMessageRunIds.mapNotNullTo(this) { it.takeIf(String::isNotBlank) }
 }
