@@ -4,6 +4,7 @@ import com.letta.mobile.data.chat.runtime.PermissionModeGateway
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
@@ -28,6 +29,8 @@ class TimelineModelSource(
     val conversation: suspend (ConversationId) -> Conversation,
     /** The agent's model, shown while the conversation names none. */
     val agentModel: String?,
+    /** The host catalog whose rows name each model's reasoning efforts (the effort chip); null leaves it off. */
+    val catalog: ModelCatalogRepository? = null,
 )
 
 /** The sources of a one-conversation host's model and permission-mode chips. */
@@ -64,6 +67,7 @@ internal fun timelineConversationModels(
     val host = TargetConversationModelHost(conversation, AgentId(target.agentId), source.backend)
     return ConversationModels(scope, host).also { models ->
         models.load(source.backend)
+        models.bindCatalog(source.catalog, scope)
         scope.launch {
             readRecordedConversation(source, conversation)?.let { models.picks.seedFromHost(listOf(it)) }
             models.showModel(conversation, source.agentModel)

@@ -2,7 +2,16 @@ package com.letta.mobile.web.data
 
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId as DataConversationId
 import com.letta.mobile.data.repository.appserver.AppServerLocalAdminGateway
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
+import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelChange
+import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
+import com.letta.mobile.data.repository.modelcontrol.ModelHandle
+import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
+import com.letta.mobile.data.transport.api.NoOpChannelTransport
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
@@ -12,6 +21,7 @@ import com.letta.mobile.runtime.ConversationId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
@@ -25,6 +35,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.coroutines.withTimeout
 
 class WasmAppServerSessionTest {
@@ -87,6 +98,47 @@ class WasmAppServerSessionTest {
     fun `request ids do not collide after a page reload`() {
         assertNotEquals(webRequestId("page-a", "message", 9), webRequestId("page-b", "message", 9))
         assertEquals("web-page-b-message-9", webRequestId("page-b", "message", 9))
+    }
+
+    @Test
+    fun `over iroh the chat lists and switches models through the shared gateway's admin rpc`() = runTest {
+        val host = RecordingHost()
+        val source = webModelSource(IrohAdminRpcChatGateway(host), nativeAdmin(), null, ModelCatalogRepository(unexpectedRpc))
+
+        source.backend.listModels()
+        source.backend.switchModel(
+            ConversationModelChange(DataConversationId("conv-1"), ModelHandle("openai/gpt-sol"), ReasoningEffortChoice.Named("high")),
+        )
+
+        assertTrue(source.backend.supportsReasoningEffort, "the effort chip shows over an Iroh host")
+        assertTrue("model.list" in host.methods && "model.update" in host.methods)
+        assertEquals("openai/gpt-sol", source.conversation(DataConversationId("conv-1")).model)
+    }
+
+    @Test
+    fun `a websocket chat keeps the app server's own model commands`() = runTest {
+        val source = webModelSource(null, nativeAdmin(), null, ModelCatalogRepository(unexpectedRpc))
+
+        assertFalse(source.backend.supportsReasoningEffort)
+    }
+
+    private fun nativeAdmin() = AppServerLocalAdminGateway(DefaultAppServerClient(FakeTransport())) { operation -> "test-$operation" }
+
+    private val unexpectedRpc = AdminRpcInvoker { method, _ -> error("unexpected $method") }
+
+    /** An Iroh host's admin_rpc: it answers the model and conversation methods and records each call. */
+    private class RecordingHost : NoOpChannelTransport() {
+        val methods = mutableListOf<String>()
+
+        override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
+            methods += method
+            val result = when (method) {
+                "model.list" -> """[{"id":"openai/gpt-sol","handle":"openai/gpt-sol","label":"Sol"}]"""
+                "conversation.get" -> """{"id":"conv-1","agent_id":"agent-1","model":"openai/gpt-sol"}"""
+                else -> "{}"
+            }
+            return AppServerInboundFrame.AdminRpcResponse(requestId = method, success = true, result = Json.parseToJsonElement(result))
+        }
     }
 
     private class FakeTransport : AppServerTransport {
