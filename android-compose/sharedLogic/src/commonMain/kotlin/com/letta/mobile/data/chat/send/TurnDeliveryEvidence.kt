@@ -75,8 +75,13 @@ private fun ConversationTurnState.frameConversationMatchesActive(
     return tagged == target || tagged == serverConversationId || resolvedFrame?.value == target
 }
 
-internal fun ConversationTurnState.acceptsError(event: WsTimelineEvent.Error): Boolean =
-    event.turnId == null || turnId == null || event.turnId == turnId
+/** letta-mobile-zrode: an error for a turn or run this conversation already settled is that turn's
+ * history; buffering it would fail whichever turn comes next. */
+internal fun ConversationTurnState.acceptsError(event: WsTimelineEvent.Error): Boolean {
+    val tail = TurnTail(event.turnId, event.runId)
+    if (isRetiredTurn(tail) || isRetiredRun(tail)) return false
+    return event.turnId == null || turnId == null || event.turnId == turnId
+}
 
 internal fun ConversationTurnState.bufferError(event: WsTimelineEvent.Error) {
     bufferedErrorMessage = event.message.ifBlank { event.code }

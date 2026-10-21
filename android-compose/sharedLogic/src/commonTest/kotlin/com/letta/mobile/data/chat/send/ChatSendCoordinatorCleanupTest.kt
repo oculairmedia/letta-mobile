@@ -1121,7 +1121,9 @@ class ChatSendCoordinatorCleanupTest {
         val coordinator = coordinator(timeline, RecordingUiSink(), FakeChannelTransport(mutableListOf(true)))
 
         coordinator.handleEvent(
-            WsTimelineEvent.Error("other", TurnFailureNotices.GENERIC_MESSAGE, conversationId = null, turnId = null, runId = "local-run-102"),
+            WsTimelineEvent.Error(
+                "other", TurnFailureNotices.GENERIC_MESSAGE, conversationId = null, turnId = null, runId = "local-run-102",
+            ),
         )
         coordinator.handleEvent(WsTimelineEvent.TurnDone("", "local-run-102", BridgeTurnStatus.Failed))
         advanceUntilIdle()
