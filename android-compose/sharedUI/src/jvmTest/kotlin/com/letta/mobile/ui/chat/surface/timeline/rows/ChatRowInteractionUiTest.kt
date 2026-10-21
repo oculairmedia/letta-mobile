@@ -92,6 +92,24 @@ class ChatRowInteractionUiTest {
         assertTrue(bounds.height >= with(density) { 36.dp.toPx() })
     }
 
+    /** letta-mobile-zrode: the hover actions (fork, copy) hid the words under them on desktop. */
+    @Test
+    fun pointerReplyActionsSitBelowTheTextNeverOverIt() = runComposeUiTest {
+        val text = "The cache keeps the newest page resident, which goes a long way."
+        setContent {
+            MaterialTheme {
+                CompositionLocalProvider(LocalChatPlatformStyle provides ChatPlatformStyle.Pointer) {
+                    AgentText(AgentTextParams(text = text, isError = false, onFork = {}))
+                }
+            }
+        }
+        waitUntil(timeoutMillis = 5_000L) { onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+
+        val textBounds = onNodeWithText(text).fetchSemanticsNode().boundsInRoot
+        val actions = onNodeWithTag(ChatRowTestTags.AGENT_TEXT_ACTIONS).fetchSemanticsNode().boundsInRoot
+        assertTrue(actions.top >= textBounds.bottom, "actions $actions overlap the text $textBounds")
+    }
+
     @Test
     fun userPromptCopyActionStaysDiscoverableWhenHiddenByHoverGating() = runComposeUiTest {
         setContent {
