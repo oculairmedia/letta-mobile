@@ -26,32 +26,22 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Platform-neutral SEND orchestration for the frame-channel (Iroh) send
- * path, extracted from Android's `WsChatSendCoordinator`
- * so desktop can reuse the exact same logic instead of reimplementing a thinner
- * send path.
+ * Shared frame-channel send composition and lifecycle serialization for Android and Desktop.
  *
- * What lives here (pure orchestration, no Compose / Dagger / Android):
- *   - optimistic user-bubble construction via [TimelineExternalTransportWriter]
- *   - otid generation + reconciliation (mark-sent / mark-failed / reconcile)
- *   - the unbounded busy-send queue ([QueuedSendDriver])
- *   - turn-state transitions (active otid/turn id, first-wins stop_reason +
- *     usage guards, buffered-error-until-TurnDone ordering)
- *   - the [WsTimelineEvent] state machine, including the strict
- *     foreign-agent gate and pre-conversation delta buffering
+ * This owner sequences send, event and redial entry points under one lifecycle mutex. The existing
+ * [ConversationTurnRegistry] indexes conversation identity and aliases; [ConversationTurnState]
+ * retains each turn's evidence and replay fences. [IncomingTurnProjection] applies incoming writes,
+ * [QueuedSendDriver] schedules queued sends, and [TurnSettlement] applies ordered terminal effects.
+ * Displaced decisions belong with those collaborators rather than being repeated here.
  *
- * What is injected via seams (per-platform):
- *   - [ui]: UI-state mutations (Android maps these onto its Compose
- *     `ChatUiState`; desktop onto its own container)
- *   - [recordRuntimeEvent]: runtime-event recording (the
- *     `WsTimelineEvent.toRuntimeEventDrafts` mapper + sink live in the
- *     Android `core:data` layer today)
- *   - [otidGenerator]: opaque-transaction-id minting (Android uses a UUID)
- *   - [clientVersion]: connection handshake metadata
- *   - [scope]: the coroutine scope hosting the event collector + send launch
+ * Lock order is lifecycle mutex -> registry index lock -> per-turn identity lock. Index/identity
+ * critical sections do not suspend or call presentation callbacks. Collaborators use this caller's
+ * [scope]; none creates an independently racing lifecycle scope or a second ownership index.
  *
- * Behavioral parity with the Android coordinator is the contract; the Android
- * `WsChatSendCoordinator` delegates to this class verbatim.
+ * Extend events through the existing subscription, agent and generation gates before projection.
+ * [ConversationChatUi] rechecks visible ownership at effects after suspension or reentrant callbacks;
+ * global disconnect callbacks retain global semantics. Hosts bind [ui], timeline/transport writers,
+ * [recordRuntimeEvents], [otidGenerator] and [clientVersion] without duplicating shared policy.
  */
 class ChatSendCoordinator(
     private val scope: CoroutineScope,

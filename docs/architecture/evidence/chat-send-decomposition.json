@@ -1,0 +1,649 @@
+{
+  "method": {
+    "physical": "Exact Git source lines, all recursive commonMain/data/chat/send production Kotlin files.",
+    "health": "Default cs review scores; null denotes unscorable code, never a fabricated 10.0.",
+    "codeSceneLoc": "Exact Git bytes, isolated temp-repository LOC-warning=1 parser probe; customized probe scores excluded; non-scorable files remain unmeasured.",
+    "pins": "Implementation source before documentation-only acceptance edits; no production metric/configuration gate was changed.",
+    "cli": "cs version 1.0.41 (341169b662167b7a7f07c2ecc06fb560ef96c71a) Built on Windows Server 2025 amd64 at 2026-09-10; local default reviews, not cloud scores."
+  },
+  "refs": {
+    "b090c766bee52e8aa176249446df6ad73f7af702": {
+      "files": [
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/BridgeEventDeduplicator.kt",
+          "physicalLines": 109,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/BridgeEventDeduplicator.kt",
+            "sourceSha256": "a32947878fc5d611301d2fbf0304a2f3fc9538924eed445bb24e322dda0099f1",
+            "physicalLines": 109,
+            "codeSceneLoc": 49
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendCoordinator.kt",
+          "physicalLines": 1925,
+          "score": 5.58,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendCoordinator.kt",
+            "sourceSha256": "ba25edc8ec4edf410db4c6823ed1c523ba4d10668a0b53cee9fc909aeeeae104",
+            "physicalLines": 1925,
+            "codeSceneLoc": 1285
+          },
+          "findings": [
+            {
+              "category": "Lines of Code in a Single File",
+              "indication": 2
+            },
+            {
+              "category": "Overall Code Complexity",
+              "indication": 2
+            },
+            {
+              "category": "Complex Method",
+              "functions": [
+                {
+                  "title": "handleEventLocked",
+                  "details": "cc = 20",
+                  "start-line": 747,
+                  "end-line": 838,
+                  "url": ""
+                },
+                {
+                  "title": "finishActiveTurn",
+                  "details": "cc = 15",
+                  "start-line": 1504,
+                  "end-line": 1608,
+                  "url": ""
+                },
+                {
+                  "title": "handleTurnDoneFrame",
+                  "details": "cc = 14",
+                  "start-line": 1003,
+                  "end-line": 1039,
+                  "url": ""
+                },
+                {
+                  "title": "deltaConversationId",
+                  "details": "cc = 11",
+                  "start-line": 861,
+                  "end-line": 886,
+                  "url": ""
+                },
+                {
+                  "title": "sendInternalLocked",
+                  "details": "cc = 11",
+                  "start-line": 548,
+                  "end-line": 630,
+                  "url": ""
+                },
+                {
+                  "title": "ConversationTurnState.rebindToServerConversationLocked",
+                  "details": "cc = 10",
+                  "start-line": 256,
+                  "end-line": 282,
+                  "url": ""
+                },
+                {
+                  "title": "repairExpiredCursor",
+                  "details": "cc = 9",
+                  "start-line": 1071,
+                  "end-line": 1099,
+                  "url": ""
+                },
+                {
+                  "title": "handleErrorFrame",
+                  "details": "cc = 9",
+                  "start-line": 1041,
+                  "end-line": 1068,
+                  "url": ""
+                }
+              ],
+              "indication": 2
+            },
+            {
+              "category": "Complex Conditional",
+              "functions": [
+                {
+                  "title": "handleEventLocked:807",
+                  "details": "2 complex conditional expressions",
+                  "start-line": 807,
+                  "end-line": 807,
+                  "url": ""
+                },
+                {
+                  "title": "handleErrorFrame:1053",
+                  "details": "2 complex conditional expressions",
+                  "start-line": 1053,
+                  "end-line": 1053,
+                  "url": ""
+                },
+                {
+                  "title": "handleRedialWhileTurnActiveLocked:1110",
+                  "details": "2 complex conditional expressions",
+                  "start-line": 1110,
+                  "end-line": 1110,
+                  "url": ""
+                },
+                {
+                  "title": "cleanupDisconnectedTurnFragments:1779",
+                  "details": "2 complex conditional expressions",
+                  "start-line": 1779,
+                  "end-line": 1779,
+                  "url": ""
+                }
+              ],
+              "indication": 2
+            },
+            {
+              "category": "Excess Number of Function Arguments",
+              "functions": [
+                {
+                  "title": "cleanupAbandonedAssistantFragmentsSafely",
+                  "details": "Arguments = 5",
+                  "start-line": 1367,
+                  "end-line": 1398,
+                  "url": ""
+                },
+                {
+                  "title": "finishActiveTurn",
+                  "details": "Arguments = 8",
+                  "start-line": 1504,
+                  "end-line": 1608,
+                  "url": ""
+                }
+              ],
+              "indication": 2
+            },
+            {
+              "category": "Primitive Obsession",
+              "indication": 2
+            },
+            {
+              "category": "String Heavy Function Arguments",
+              "indication": 2
+            }
+          ]
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendCoordinatorAttachment.kt",
+          "physicalLines": 59,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendCoordinatorAttachment.kt",
+            "sourceSha256": "40cf10b4d837b121cad1c07867e31ecf87bb5e38d5b162c4ffb7f9998f602714",
+            "physicalLines": 59,
+            "codeSceneLoc": 23
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendQueue.kt",
+          "physicalLines": 199,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendQueue.kt",
+            "sourceSha256": "823be2bc5688ccec171db3858fbf2b8fba50fe4f1720196eae1d3615831acd9b",
+            "physicalLines": 199,
+            "codeSceneLoc": 80
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendQueueControls.kt",
+          "physicalLines": 45,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendQueueControls.kt",
+            "sourceSha256": "d4fa466056e738156ba7651a3d1f035d4a67d44489c1fd8d5b2041daa17cfcf1",
+            "physicalLines": 45,
+            "codeSceneLoc": 8
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendUiSink.kt",
+          "physicalLines": 71,
+          "score": null,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendUiSink.kt",
+            "sourceSha256": "0468b2364376801f311ae296e92e2ca5815539c9277a2c7296521d0473db4749",
+            "physicalLines": 71,
+            "codeSceneLoc": null
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ConversationTurnState.kt",
+          "physicalLines": 169,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ConversationTurnState.kt",
+            "sourceSha256": "743abf3f474a5756f4387d3d29ed274182f647366f9c3231bf52b0515d33bbd0",
+            "physicalLines": 169,
+            "codeSceneLoc": 90
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/LettaWireJson.kt",
+          "physicalLines": 13,
+          "score": null,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/LettaWireJson.kt",
+            "sourceSha256": "b553eeef90298675beab065a40f4e40a52e275b57e8a018e11b7c70293af21b8",
+            "physicalLines": 13,
+            "codeSceneLoc": null
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/OtherClientHold.kt",
+          "physicalLines": 141,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/OtherClientHold.kt",
+            "sourceSha256": "f4763740a4dccceeeb7bfffa159989bff05f5ecbbd965d915c2cce85a77a1738",
+            "physicalLines": 141,
+            "codeSceneLoc": 52
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/OutboundMessageCreate.kt",
+          "physicalLines": 50,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/OutboundMessageCreate.kt",
+            "sourceSha256": "46da479ee44fedd97e9842449934e53573aad3956f39cc21404d9ee38f5e6645",
+            "physicalLines": 50,
+            "codeSceneLoc": 19
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/PostSendReconciler.kt",
+          "physicalLines": 75,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/PostSendReconciler.kt",
+            "sourceSha256": "78e7d7ca95743e678c3155a45966db24adb46d121f76d782293d80a8a98b3133",
+            "physicalLines": 75,
+            "codeSceneLoc": 47
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/QueuedSendDriver.kt",
+          "physicalLines": 194,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/QueuedSendDriver.kt",
+            "sourceSha256": "260e7c07e3eeb4f9a2587da9d99ea28451824e8d47c8c642ff316c97d0ee73a9",
+            "physicalLines": 194,
+            "codeSceneLoc": 89
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/RetiredTurnTail.kt",
+          "physicalLines": 30,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/RetiredTurnTail.kt",
+            "sourceSha256": "6880a9beccd02396c2693e33789ff1a0889131794424001ef58c586e87caab68",
+            "physicalLines": 30,
+            "codeSceneLoc": 15
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/RuntimeEventBatcher.kt",
+          "physicalLines": 79,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/RuntimeEventBatcher.kt",
+            "sourceSha256": "2d6f23dc2defeb08ef042c9ead6ef8b601fef40eb1e180f4bbd6f3191742ec89",
+            "physicalLines": 79,
+            "codeSceneLoc": 45
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnIdentityLifecycle.kt",
+          "physicalLines": 119,
+          "score": 9.68,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnIdentityLifecycle.kt",
+            "sourceSha256": "a041366a1987cb490b50067ef91c34610067aa6c0ee6e634ee76aefdeccd2ffa",
+            "physicalLines": 119,
+            "codeSceneLoc": 18
+          },
+          "findings": [
+            {
+              "category": "String Heavy Function Arguments",
+              "indication": 2
+            }
+          ]
+        }
+      ],
+      "physicalTotal": 3278,
+      "fileCount": 15
+    },
+    "b860a7f686d30e951c316e6bfc51a5c8a9a33dc4": {
+      "files": [
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/BridgeEventDeduplicator.kt",
+          "physicalLines": 109,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/BridgeEventDeduplicator.kt",
+            "sourceSha256": "a32947878fc5d611301d2fbf0304a2f3fc9538924eed445bb24e322dda0099f1",
+            "physicalLines": 109,
+            "codeSceneLoc": 49
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendCoordinator.kt",
+          "physicalLines": 738,
+          "score": 9.3,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendCoordinator.kt",
+            "sourceSha256": "68374da8cd7948526fe33b49e06063be8ddde4471727296e88e06e85f7591727",
+            "physicalLines": 738,
+            "codeSceneLoc": 473
+          },
+          "findings": [
+            {
+              "category": "Complex Method",
+              "functions": [
+                {
+                  "title": "sendInternalLocked",
+                  "details": "cc = 10",
+                  "start-line": 225,
+                  "end-line": 312,
+                  "url": ""
+                }
+              ],
+              "indication": 2
+            },
+            {
+              "category": "Complex Conditional",
+              "functions": [
+                {
+                  "title": "handleRedialWhileTurnActiveLocked:545",
+                  "details": "2 complex conditional expressions",
+                  "start-line": 545,
+                  "end-line": 545,
+                  "url": ""
+                }
+              ],
+              "indication": 2
+            }
+          ]
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendCoordinatorAttachment.kt",
+          "physicalLines": 59,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendCoordinatorAttachment.kt",
+            "sourceSha256": "40cf10b4d837b121cad1c07867e31ecf87bb5e38d5b162c4ffb7f9998f602714",
+            "physicalLines": 59,
+            "codeSceneLoc": 23
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendQueue.kt",
+          "physicalLines": 199,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendQueue.kt",
+            "sourceSha256": "9041c9f389ff91e686078a57d1d5b9c610da9658b621979726a6b2c331f16036",
+            "physicalLines": 199,
+            "codeSceneLoc": 80
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendQueueControls.kt",
+          "physicalLines": 72,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendQueueControls.kt",
+            "sourceSha256": "0adf586504a21ac1ba8ef8e21dfb1f62c9a8259178987f0a4d1c73be88b44b12",
+            "physicalLines": 72,
+            "codeSceneLoc": 26
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendUiSink.kt",
+          "physicalLines": 71,
+          "score": null,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendUiSink.kt",
+            "sourceSha256": "0468b2364376801f311ae296e92e2ca5815539c9277a2c7296521d0473db4749",
+            "physicalLines": 71,
+            "codeSceneLoc": null
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ConversationChatUi.kt",
+          "physicalLines": 90,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ConversationChatUi.kt",
+            "sourceSha256": "e4ae79669e5cd8972252a3c361555490f06a927e653d17d8c651888f65e7277d",
+            "physicalLines": 90,
+            "codeSceneLoc": 57
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ConversationTurnRegistry.kt",
+          "physicalLines": 273,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ConversationTurnRegistry.kt",
+            "sourceSha256": "7bce5c0b4b2ac51e7131350cdbcd831ff7f9328afc93ea6aee257c519b9efd2c",
+            "physicalLines": 273,
+            "codeSceneLoc": 118
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ConversationTurnState.kt",
+          "physicalLines": 188,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ConversationTurnState.kt",
+            "sourceSha256": "82d8628cb6bbcbaedaa8fe1e3727f4e108d385e30f3f47893e477fe0dce054b2",
+            "physicalLines": 188,
+            "codeSceneLoc": 95
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/IncomingTurnOwnership.kt",
+          "physicalLines": 97,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/IncomingTurnOwnership.kt",
+            "sourceSha256": "48ad26d4cbccc77fda26508b49d0e5b14ad82347be44ceb8bca57037ea49c0c0",
+            "physicalLines": 97,
+            "codeSceneLoc": 73
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/IncomingTurnProjection.kt",
+          "physicalLines": 187,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/IncomingTurnProjection.kt",
+            "sourceSha256": "a363cc9df69df7cc91436d637dfb33a88c3b4f34d4db81ee68c5371e4bc8bea6",
+            "physicalLines": 187,
+            "codeSceneLoc": 126
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/LettaWireJson.kt",
+          "physicalLines": 13,
+          "score": null,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/LettaWireJson.kt",
+            "sourceSha256": "b553eeef90298675beab065a40f4e40a52e275b57e8a018e11b7c70293af21b8",
+            "physicalLines": 13,
+            "codeSceneLoc": null
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/OtherClientHold.kt",
+          "physicalLines": 139,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/OtherClientHold.kt",
+            "sourceSha256": "ad4db9847dc8ff70bdb0e44a3e94ea492f40a820e38e0ef961270b74c4162772",
+            "physicalLines": 139,
+            "codeSceneLoc": 52
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/OutboundMessageCreate.kt",
+          "physicalLines": 50,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/OutboundMessageCreate.kt",
+            "sourceSha256": "46da479ee44fedd97e9842449934e53573aad3956f39cc21404d9ee38f5e6645",
+            "physicalLines": 50,
+            "codeSceneLoc": 19
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/PostSendReconciler.kt",
+          "physicalLines": 75,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/PostSendReconciler.kt",
+            "sourceSha256": "78e7d7ca95743e678c3155a45966db24adb46d121f76d782293d80a8a98b3133",
+            "physicalLines": 75,
+            "codeSceneLoc": 47
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/QueuedSendDriver.kt",
+          "physicalLines": 209,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/QueuedSendDriver.kt",
+            "sourceSha256": "e8719ee96bdde61fafdc700eaea4bb3bea5640881809b8cdd28c2076eee74837",
+            "physicalLines": 209,
+            "codeSceneLoc": 100
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/RetiredTurnTail.kt",
+          "physicalLines": 30,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/RetiredTurnTail.kt",
+            "sourceSha256": "6880a9beccd02396c2693e33789ff1a0889131794424001ef58c586e87caab68",
+            "physicalLines": 30,
+            "codeSceneLoc": 15
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/RuntimeEventBatcher.kt",
+          "physicalLines": 79,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/RuntimeEventBatcher.kt",
+            "sourceSha256": "2d6f23dc2defeb08ef042c9ead6ef8b601fef40eb1e180f4bbd6f3191742ec89",
+            "physicalLines": 79,
+            "codeSceneLoc": 45
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnDeliveryEvidence.kt",
+          "physicalLines": 101,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnDeliveryEvidence.kt",
+            "sourceSha256": "e796bcd36684434ec8a3532277df1841a13929aee5a7bf6847867cc8fa70cf59",
+            "physicalLines": 101,
+            "codeSceneLoc": 66
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnIdentityLifecycle.kt",
+          "physicalLines": 119,
+          "score": 9.68,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnIdentityLifecycle.kt",
+            "sourceSha256": "a041366a1987cb490b50067ef91c34610067aa6c0ee6e634ee76aefdeccd2ffa",
+            "physicalLines": 119,
+            "codeSceneLoc": 18
+          },
+          "findings": [
+            {
+              "category": "String Heavy Function Arguments",
+              "indication": 2
+            }
+          ]
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnSettlement.kt",
+          "physicalLines": 373,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnSettlement.kt",
+            "sourceSha256": "e3cdd2183e622cbf6abc988a71fab372ec196addd880ff69f5251cd71eb23f71",
+            "physicalLines": 373,
+            "codeSceneLoc": 282
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnSettlementOwnership.kt",
+          "physicalLines": 48,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnSettlementOwnership.kt",
+            "sourceSha256": "717f213efefdf94ff57149bc5d91693b06007ddee1134fb756bd057812bdd9ca",
+            "physicalLines": 48,
+            "codeSceneLoc": 26
+          },
+          "findings": []
+        },
+        {
+          "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnTerminalPolicy.kt",
+          "physicalLines": 122,
+          "score": 10.0,
+          "codeSceneProbe": {
+            "path": "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/TurnTerminalPolicy.kt",
+            "sourceSha256": "65c23661e0d9f52852175abc32704fdea0dabbeae22108c3210284a23e415438",
+            "physicalLines": 122,
+            "codeSceneLoc": 67
+          },
+          "findings": []
+        }
+      ],
+      "physicalTotal": 3441,
+      "fileCount": 23
+    }
+  }
+}

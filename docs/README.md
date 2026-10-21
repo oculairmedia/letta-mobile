@@ -96,6 +96,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [App Server v2 and Meridian State Audit Specification](architecture/app-server-v2-audit-spec.md)
 - [Canonical JSON configurations](architecture/canonical-json.md)
 - [Chat transport and timeline boundary regression harness](architecture/chat-boundary-regression-harness.md)
+- [Chat send decomposition evidence](architecture/chat-send-decomposition.md)
 - [Letta Mobile Architecture Diagrams](architecture/diagrams.md)
 - [Distributed agent fabric foundation](architecture/distributed-agent-fabric-foundation.md)
 - [Embed Letta Code as on-device runtime - integration design](architecture/embed-letta-code-integration.md)
