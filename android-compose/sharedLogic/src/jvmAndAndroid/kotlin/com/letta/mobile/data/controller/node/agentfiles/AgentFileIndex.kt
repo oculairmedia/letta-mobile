@@ -24,6 +24,8 @@ internal class AgentFileIndex(
     private val json: Json,
     private val isHidden: (JsonObject) -> Boolean,
     private val maxEntries: Int = DEFAULT_MAX_ENTRIES,
+    /** Told once each time the number of agent files crosses above [maxEntries]: what is past it is not seen. */
+    private val onOverCap: (found: Int, max: Int) -> Unit = { _, _ -> },
 ) {
     /** One readable agent record on disk. */
     class Entry(val file: File, val id: String, val mtimeMs: Long, val hidden: Boolean)
@@ -37,6 +39,7 @@ internal class AgentFileIndex(
         val files = agentsDir.listFiles { f -> f.isFile && f.name.endsWith(SUFFIX) } ?: return emptyList()
         val stamped = files.mapNotNull { file -> stamp(file) }
         val newest = if (stamped.size > maxEntries) stamped.sortedByDescending { it.mtimeMs }.take(maxEntries) else stamped
+        noteCap(stamped.size)
         val live = newest.mapTo(HashSet(newest.size)) { it.file.name }
         derived.keys.retainAll(live)
         return newest
@@ -48,6 +51,15 @@ internal class AgentFileIndex(
             }
             .sortedByDescending { it.mtimeMs }
     }
+
+    /** Reports once per crossing that records beyond the cap are not seen: counts and hidden sets then leave the oldest out. */
+    private fun noteCap(found: Int) {
+        val over = found > maxEntries
+        if (over && !capWarned) onOverCap(found, maxEntries)
+        capWarned = over
+    }
+
+    @Volatile private var capWarned = false
 
     private class Stamp(val file: File, val mtimeMs: Long, val sizeBytes: Long)
 

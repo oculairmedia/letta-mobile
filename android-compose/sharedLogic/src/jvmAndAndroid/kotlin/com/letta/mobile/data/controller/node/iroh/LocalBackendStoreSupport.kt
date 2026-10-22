@@ -32,7 +32,12 @@ internal class LocalBackendStoreSupport(
     val json = Json { ignoreUnknownKeys = true }
 
     /** The agent records on disk, shared so every admin read sees one bounded, change-aware view. */
-    val agentIndex = AgentFileIndex(File(baseDir, "agents"), json, isHidden = JsonObject::isHiddenAgentRecord)
+    val agentIndex = AgentFileIndex(
+        File(baseDir, "agents"),
+        json,
+        isHidden = JsonObject::isHiddenAgentRecord,
+        onOverCap = ::reportAgentFilesOverCap,
+    )
 
     // letta-mobile-by4vm.21: key naming and the base64url codec live in [LocalBackendLayout].
     fun conversationKey(conversationId: String, agentId: String): String =

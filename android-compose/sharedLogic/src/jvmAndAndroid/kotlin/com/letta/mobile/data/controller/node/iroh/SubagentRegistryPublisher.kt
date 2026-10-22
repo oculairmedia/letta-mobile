@@ -36,8 +36,10 @@ fun interface SubagentPushTarget {
  * latest state and an older snapshot can never overtake a newer one. For the
  * same reason the queue holds each (agent, conversation) once however many
  * times it changes before it is sent, and never more than [MAX_PENDING_KEYS]
- * of them: past that the oldest waiting key is dropped (its viewers get the
- * next change's snapshot, which is the full current state).
+ * of them. Past that the oldest waiting key is dropped and a warning names it:
+ * snapshots are per conversation, so that conversation's viewers hear nothing
+ * until it next changes (a viewer that starts watching is replayed its
+ * snapshot, [replayTo]).
  */
 class SubagentRegistryPublisher(
     scope: CoroutineScope,
@@ -62,8 +64,12 @@ class SubagentRegistryPublisher(
     override fun onConversationChanged(key: SubagentConversationKey) {
         synchronized(pending) {
             if (key !in pending && pending.size >= MAX_PENDING_KEYS) {
-                pending.remove(pending.first())
-                Telemetry.event("SubagentPush", "pending_overflow", "max" to MAX_PENDING_KEYS, level = Telemetry.Level.WARN)
+                val dropped = pending.first().also { pending.remove(it) }
+                Telemetry.event(
+                    "SubagentPush", "pending_overflow",
+                    "max" to MAX_PENDING_KEYS, "droppedConversationId" to dropped.conversationId,
+                    level = Telemetry.Level.WARN,
+                )
             }
             pending.add(key)
         }
@@ -134,7 +140,7 @@ class SubagentRegistryPublisher(
         const val REASON_REPLAY = "replay"
 
         /** The most distinct (agent, conversation) changes waiting to be sent at once. */
-        const val MAX_PENDING_KEYS: Int = 1024
+        internal const val MAX_PENDING_KEYS: Int = 1024
         private val FRAME_JSON = Json { encodeDefaults = true }
     }
 }

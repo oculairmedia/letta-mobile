@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.node.agentfiles.AgentFileIndex
+import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -46,6 +47,12 @@ internal class LocalBackendAgentReader(
             emptyList()
         } else {
             val end = (from + (limit?.coerceAtLeast(0) ?: MAX_PROJECTED_AGENTS)).coerceAtMost(entries.size)
+            if (limit == null && end < entries.size) {
+                Telemetry.event(
+                    "LocalBackendAgents", "unpaged_list_truncated",
+                    "agents" to entries.size, "max" to MAX_PROJECTED_AGENTS, level = Telemetry.Level.WARN,
+                )
+            }
             entries.subList(from, end)
         }
         buildJsonArray {

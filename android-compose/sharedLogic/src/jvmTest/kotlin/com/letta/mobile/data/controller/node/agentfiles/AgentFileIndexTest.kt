@@ -108,6 +108,18 @@ class AgentFileIndexTest {
     }
 
     @Test
+    fun crossingTheCapIsReportedOncePerCrossingNotPerScan() {
+        val root = store()
+        (1..5).forEach { root.agent("a$it", mtimeMs = it * 1_000L) }
+        val reports = mutableListOf<Pair<Int, Int>>()
+        val index = AgentFileIndex(File(root, "agents"), json, isHidden = ::isHidden, maxEntries = 3) { found, max -> reports += found to max }
+
+        repeat(3) { index.entries() }
+
+        assertEquals(listOf(5 to 3), reports)
+    }
+
+    @Test
     fun aMissingDirectoryIsAnEmptyIndex() {
         val root = Files.createTempDirectory("no-agents").toFile()
 

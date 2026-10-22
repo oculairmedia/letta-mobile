@@ -7,6 +7,7 @@ import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ServerFrameSerializer
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -86,8 +87,12 @@ class SubagentRegistryPublisherTest {
         val published = CopyOnWriteArrayList<String>()
         val publisher = SubagentRegistryPublisher(backgroundScope, source, clock = { Instant.ofEpochMilli(nowMs) })
         val total = SubagentRegistryPublisher.MAX_PENDING_KEYS + 5
+        Telemetry.clear()
         // Nothing runs the sender until runCurrent, so every key queues first.
         (1..total).forEach { publisher.onConversationChanged(SubagentConversationKey(AGENT, "c$it")) }
+        // Read before the sender runs: its thousand "published" lines would push these out of the telemetry ring.
+        val overflows = Telemetry.snapshot().filter { it.tag == "SubagentPush" && it.name == "pending_overflow" }
+        assertEquals(setOf("c1", "c2", "c3", "c4", "c5"), overflows.map { it.attrs["droppedConversationId"] }.toSet())
         publisher.attach { conversationId, _ -> published += conversationId; 1 }
         runCurrent()
 
