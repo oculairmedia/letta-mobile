@@ -119,7 +119,6 @@ android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/tooloutp
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/ToolArgumentsNormalizer.kt
 # wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true isLenient=true
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/iroh/IrohStreamDeltaServerFrameMapper.kt
-android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/workspace/WorkspaceFileViewerController.kt
 android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/canvas/FileCanvasDeliveryStore.kt
 # wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
 android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/AdminRpcRouter.kt
@@ -167,5 +166,4 @@ android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/trans
 android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/canvas/FileCanvasOpLog.kt
 android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/canvas/FileCanvasRelayStore.kt
 android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/canvas/FileHostCanvasDirectory.kt
-android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/timeline/rows/ChatRowToolLabels.kt
 android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/shell/pages/skills/SkillsToolDetail.kt

@@ -1,10 +1,10 @@
-package com.letta.mobile.data.chat.projection.meridian
+package com.letta.mobile.data.chat.tools.shell
 
 /**
  * One simple command of a shell script, as [ShellScript.scan] reads it: its words with quotes
  * removed, and where its stdin comes from.
  */
-internal data class ShellCommand(
+data class ShellCommand(
     val words: List<String>,
     /** The body of its heredoc (`<<'EOF'`) or here-string (`<<<`), when it has one. */
     val stdin: String? = null,
@@ -21,7 +21,7 @@ internal data class ShellCommand(
  * find a `meridian …` invocation and its stdin, and it never throws: an unterminated quote yields
  * null, an unterminated heredoc takes the rest of the script.
  */
-internal object ShellScript {
+object ShellScript {
     fun scan(script: String): List<ShellCommand>? = Scanner(script).run()
 }
 

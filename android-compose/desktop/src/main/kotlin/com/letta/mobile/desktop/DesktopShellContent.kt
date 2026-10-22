@@ -48,17 +48,21 @@ import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigation
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigationActions
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlayData
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.shell.pages.plugins.ProvidePluginToolPresenters
 import com.letta.mobile.ui.context.FocusedAgentContextCard
 
 /**
  * Plugin elements render live through the shared plugin-view renderer on the JCEF host
  * (letta-mobile-cdgpr.3), as on Android. The host's enabled plugins and view transport come from
  * the shared model (letta-mobile-cdgpr.8). With live views off on this device, every element is its
- * card. The browser is only started when a live view first shows.
+ * card. The browser is only started when a live view first shows. The same plugins' tool and command
+ * presenters draw their tools' steps in the chat.
  */
 @Composable
 private fun ShellPluginViews(pluginViews: PluginViewsModel?, content: @Composable () -> Unit) {
-    ProvidePluginViews(pluginViews, rememberJcefPluginViewHost(), canvasId = "", platform = ViewPlatform.DESKTOP, content = content)
+    ProvidePluginToolPresenters(pluginViews) {
+        ProvidePluginViews(pluginViews, rememberJcefPluginViewHost(), canvasId = "", platform = ViewPlatform.DESKTOP, content = content)
+    }
 }
 
 /**

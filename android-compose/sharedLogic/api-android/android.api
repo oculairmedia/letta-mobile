@@ -10527,6 +10527,626 @@ public final class com/letta/mobile/data/chat/send/ServerQueueBlocker : java/lan
 	public static fun values ()[Lcom/letta/mobile/data/chat/send/ServerQueueBlocker;
 }
 
+public final class com/letta/mobile/data/chat/tools/CommandMatch {
+	public fun <init> (Lcom/letta/mobile/data/chat/tools/CommandPresenter;Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;)V
+	public final fun getCommand ()Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;
+	public final fun getPresenter ()Lcom/letta/mobile/data/chat/tools/CommandPresenter;
+}
+
+public final class com/letta/mobile/data/chat/tools/CommandMatcher {
+	public fun <init> (Ljava/lang/String;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/util/List;)Lcom/letta/mobile/data/chat/tools/CommandMatcher;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/CommandMatcher;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/CommandMatcher;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProgram ()Ljava/lang/String;
+	public final fun getSubcommands ()Ljava/util/List;
+	public fun hashCode ()I
+	public final fun specificity (Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;)Ljava/lang/Integer;
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/chat/tools/CommandPresenter {
+	public abstract fun getId ()Ljava/lang/String;
+	public abstract fun getMatcher ()Lcom/letta/mobile/data/chat/tools/CommandMatcher;
+	public abstract fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public abstract fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+}
+
+public final class com/letta/mobile/data/chat/tools/CommandPresenterKt {
+	public static final fun shellCommandInset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+}
+
+public final class com/letta/mobile/data/chat/tools/CommandPresenterRegistry {
+	public static final field Companion Lcom/letta/mobile/data/chat/tools/CommandPresenterRegistry$Companion;
+	public final fun contribute (Ljava/lang/String;Ljava/util/Map;)Lcom/letta/mobile/data/chat/tools/CommandPresenterRegistry;
+	public final fun find (Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/CommandMatch;
+	public final fun getIds ()Ljava/util/List;
+	public final fun register (Lcom/letta/mobile/data/chat/tools/CommandPresenter;)Lcom/letta/mobile/data/chat/tools/CommandPresenterRegistry;
+}
+
+public final class com/letta/mobile/data/chat/tools/CommandPresenterRegistry$Companion {
+	public final fun getEmpty ()Lcom/letta/mobile/data/chat/tools/CommandPresenterRegistry;
+}
+
+public final class com/letta/mobile/data/chat/tools/CommandPresenterSpec {
+	public static final field Companion Lcom/letta/mobile/data/chat/tools/CommandPresenterSpec$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/chat/tools/ToolVerb;Lcom/letta/mobile/data/chat/tools/CommandPreviewSpec;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/chat/tools/ToolVerb;Lcom/letta/mobile/data/chat/tools/CommandPreviewSpec;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public final fun component4 ()Lcom/letta/mobile/data/chat/tools/CommandPreviewSpec;
+	public final fun copy (Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/chat/tools/ToolVerb;Lcom/letta/mobile/data/chat/tools/CommandPreviewSpec;)Lcom/letta/mobile/data/chat/tools/CommandPresenterSpec;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/CommandPresenterSpec;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/chat/tools/ToolVerb;Lcom/letta/mobile/data/chat/tools/CommandPreviewSpec;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/CommandPresenterSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPreview ()Lcom/letta/mobile/data/chat/tools/CommandPreviewSpec;
+	public final fun getProgram ()Ljava/lang/String;
+	public final fun getSubcommands ()Ljava/util/List;
+	public final fun getVerb ()Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/chat/tools/CommandPresenterSpec$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/CommandPresenterSpec$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/chat/tools/CommandPresenterSpec;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/chat/tools/CommandPresenterSpec;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/chat/tools/CommandPresenterSpec$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/chat/tools/CommandPreviewSpec {
+	public static final field Companion Lcom/letta/mobile/data/chat/tools/CommandPreviewSpec$Companion;
+	public fun <init> (Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;Ljava/lang/String;)V
+	public final fun component1 ()Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/CommandPreviewSpec;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/CommandPreviewSpec;Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/CommandPreviewSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFlag ()Ljava/lang/String;
+	public final fun getKind ()Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/chat/tools/CommandPreviewSpec$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/CommandPreviewSpec$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/chat/tools/CommandPreviewSpec;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/chat/tools/CommandPreviewSpec;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/chat/tools/CommandPreviewSpec$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/chat/tools/GenericToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/GenericToolPresenter;
+	public static final field RAW_ARGUMENTS Ljava/lang/String;
+	public final fun argumentsInset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public fun getId ()Ljava/lang/String;
+	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/ToolMatcher;
+	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+}
+
+public final class com/letta/mobile/data/chat/tools/SpecCommandPresenter : com/letta/mobile/data/chat/tools/CommandPresenter {
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/chat/tools/CommandPresenterSpec;)V
+	public fun getId ()Ljava/lang/String;
+	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/CommandMatcher;
+	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+}
+
+public final class com/letta/mobile/data/chat/tools/SpecToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/chat/tools/ToolPresenterSpec;)V
+	public fun getId ()Ljava/lang/String;
+	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/ToolMatcher;
+	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolArgumentField {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolArgumentField;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolArgumentField;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolArgumentField;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolArguments {
+	public static final field EXIT_SCAN_CHARS I
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/ToolArguments;
+	public final fun exitFailure (Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolFailure;
+	public final fun fields (Lkotlinx/serialization/json/JsonObject;)Ljava/util/List;
+	public final fun firstLine (Ljava/lang/String;)Ljava/lang/String;
+	public final fun isMemoryTool (Ljava/lang/String;)Z
+	public final fun pathPreview (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;)Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget;
+	public final fun primary (Ljava/lang/String;)Ljava/lang/String;
+	public final fun target (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolCallFacts {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun getArguments ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getRawArguments ()Ljava/lang/String;
+	public final fun getResult ()Ljava/lang/String;
+	public final fun int (Ljava/lang/String;)Ljava/lang/Integer;
+	public final fun string (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolFailure {
+	public fun <init> (Ljava/lang/Integer;)V
+	public final fun component1 ()Ljava/lang/Integer;
+	public final fun copy (Ljava/lang/Integer;)Lcom/letta/mobile/data/chat/tools/ToolFailure;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolFailure;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolFailure;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExitCode ()Ljava/lang/Integer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/chat/tools/ToolInset {
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolInset$Arguments : com/letta/mobile/data/chat/tools/ToolInset {
+	public fun <init> (Ljava/util/List;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolInset$Arguments;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolInset$Arguments;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolInset$Arguments;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFields ()Ljava/util/List;
+	public final fun getResult ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolInset$BeforeAfter : com/letta/mobile/data/chat/tools/ToolInset {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolInset$BeforeAfter;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolInset$BeforeAfter;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolInset$BeforeAfter;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAfter ()Ljava/lang/String;
+	public final fun getBefore ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolInset$Command : com/letta/mobile/data/chat/tools/ToolInset {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)Lcom/letta/mobile/data/chat/tools/ToolInset$Command;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolInset$Command;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolInset$Command;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCommand ()Ljava/lang/String;
+	public final fun getOutput ()Ljava/util/List;
+	public final fun getWorkingDirectory ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolInset$Diff : com/letta/mobile/data/chat/tools/ToolInset {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolInset$Diff;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolInset$Diff;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolInset$Diff;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getUnified ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolInset$Text : com/letta/mobile/data/chat/tools/ToolInset {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolInset$Text;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolInset$Text;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolInset$Text;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolInsetKind : java/lang/Enum {
+	public static final field Arguments Lcom/letta/mobile/data/chat/tools/ToolInsetKind;
+	public static final field BeforeAfter Lcom/letta/mobile/data/chat/tools/ToolInsetKind;
+	public static final field Command Lcom/letta/mobile/data/chat/tools/ToolInsetKind;
+	public static final field Companion Lcom/letta/mobile/data/chat/tools/ToolInsetKind$Companion;
+	public static final field Diff Lcom/letta/mobile/data/chat/tools/ToolInsetKind;
+	public static final field Text Lcom/letta/mobile/data/chat/tools/ToolInsetKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolInsetKind;
+	public static fun values ()[Lcom/letta/mobile/data/chat/tools/ToolInsetKind;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolInsetKind$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolInsetSpec {
+	public static final field Companion Lcom/letta/mobile/data/chat/tools/ToolInsetSpec$Companion;
+	public fun <init> (Lcom/letta/mobile/data/chat/tools/ToolInsetKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/chat/tools/ToolInsetKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/chat/tools/ToolInsetKind;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/data/chat/tools/ToolInsetKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolInsetSpec;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolInsetSpec;Lcom/letta/mobile/data/chat/tools/ToolInsetKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolInsetSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAfter ()Ljava/lang/String;
+	public final fun getBefore ()Ljava/lang/String;
+	public final fun getCommand ()Ljava/lang/String;
+	public final fun getCwd ()Ljava/lang/String;
+	public final fun getKind ()Lcom/letta/mobile/data/chat/tools/ToolInsetKind;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/chat/tools/ToolInsetSpec$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/ToolInsetSpec$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/chat/tools/ToolInsetSpec;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/chat/tools/ToolInsetSpec;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolInsetSpec$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolMatcher {
+	public fun <init> (Ljava/util/List;Ljava/util/Set;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/Set;
+	public final fun copy (Ljava/util/List;Ljava/util/Set;)Lcom/letta/mobile/data/chat/tools/ToolMatcher;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolMatcher;Ljava/util/List;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolMatcher;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNames ()Ljava/util/List;
+	public final fun getRequiredArgs ()Ljava/util/Set;
+	public fun hashCode ()I
+	public final fun specificity (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;)Ljava/lang/Integer;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolOutputStream {
+	public fun <init> (Lcom/letta/mobile/data/chat/tools/ToolOutputStream$Kind;Ljava/lang/String;)V
+	public final fun component1 ()Lcom/letta/mobile/data/chat/tools/ToolOutputStream$Kind;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/data/chat/tools/ToolOutputStream$Kind;Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolOutputStream;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolOutputStream;Lcom/letta/mobile/data/chat/tools/ToolOutputStream$Kind;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolOutputStream;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKind ()Lcom/letta/mobile/data/chat/tools/ToolOutputStream$Kind;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolOutputStream$Kind : java/lang/Enum {
+	public static final field Output Lcom/letta/mobile/data/chat/tools/ToolOutputStream$Kind;
+	public static final field Stderr Lcom/letta/mobile/data/chat/tools/ToolOutputStream$Kind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolOutputStream$Kind;
+	public static fun values ()[Lcom/letta/mobile/data/chat/tools/ToolOutputStream$Kind;
+}
+
+public abstract interface class com/letta/mobile/data/chat/tools/ToolPresenter {
+	public abstract fun getId ()Ljava/lang/String;
+	public abstract fun getMatcher ()Lcom/letta/mobile/data/chat/tools/ToolMatcher;
+	public abstract fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public abstract fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolPresenterRegistry {
+	public static final field Companion Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry$Companion;
+	public final fun contribute (Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;)Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;
+	public static synthetic fun contribute$default (Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;
+	public final fun getCommands ()Lcom/letta/mobile/data/chat/tools/CommandPresenterRegistry;
+	public final fun getIds ()Ljava/util/List;
+	public final fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public final fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+	public final fun presenterFor (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;)Lcom/letta/mobile/data/chat/tools/ToolPresenter;
+	public final fun register (Lcom/letta/mobile/data/chat/tools/CommandPresenter;)Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;
+	public final fun register (Lcom/letta/mobile/data/chat/tools/ToolPresenter;)Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolPresenterRegistry$Companion {
+	public final fun getEmpty ()Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolPresenterScope {
+	public fun <init> (Lcom/letta/mobile/data/chat/tools/CommandPresenterRegistry;)V
+	public final fun getCommands ()Lcom/letta/mobile/data/chat/tools/CommandPresenterRegistry;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolPresenterSpec {
+	public static final field Companion Lcom/letta/mobile/data/chat/tools/ToolPresenterSpec$Companion;
+	public fun <init> (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/chat/tools/ToolVerb;Ljava/lang/String;Lcom/letta/mobile/data/chat/tools/ToolInsetSpec;Lcom/letta/mobile/data/chat/tools/ToolPreviewSpec;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/chat/tools/ToolVerb;Ljava/lang/String;Lcom/letta/mobile/data/chat/tools/ToolInsetSpec;Lcom/letta/mobile/data/chat/tools/ToolPreviewSpec;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Lcom/letta/mobile/data/chat/tools/ToolInsetSpec;
+	public final fun component6 ()Lcom/letta/mobile/data/chat/tools/ToolPreviewSpec;
+	public final fun copy (Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/chat/tools/ToolVerb;Ljava/lang/String;Lcom/letta/mobile/data/chat/tools/ToolInsetSpec;Lcom/letta/mobile/data/chat/tools/ToolPreviewSpec;)Lcom/letta/mobile/data/chat/tools/ToolPresenterSpec;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolPresenterSpec;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/chat/tools/ToolVerb;Ljava/lang/String;Lcom/letta/mobile/data/chat/tools/ToolInsetSpec;Lcom/letta/mobile/data/chat/tools/ToolPreviewSpec;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolPresenterSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getInset ()Lcom/letta/mobile/data/chat/tools/ToolInsetSpec;
+	public final fun getPreview ()Lcom/letta/mobile/data/chat/tools/ToolPreviewSpec;
+	public final fun getRequiredArgs ()Ljava/util/List;
+	public final fun getTarget ()Ljava/lang/String;
+	public final fun getTools ()Ljava/util/List;
+	public final fun getVerb ()Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/chat/tools/ToolPresenterSpec$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/ToolPresenterSpec$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/chat/tools/ToolPresenterSpec;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/chat/tools/ToolPresenterSpec;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolPresenterSpec$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolPresenterSpecKt {
+	public static final fun target (Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;Ljava/lang/String;Lkotlin/ranges/IntRange;)Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget;
+	public static synthetic fun target$default (Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;Ljava/lang/String;Lkotlin/ranges/IntRange;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolPreviewKind : java/lang/Enum {
+	public static final field Companion Lcom/letta/mobile/data/chat/tools/ToolPreviewKind$Companion;
+	public static final field File Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;
+	public static final field Memory Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;
+	public static final field Subagent Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;
+	public static final field Task Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;
+	public static fun values ()[Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolPreviewKind$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolPreviewSpec {
+	public static final field Companion Lcom/letta/mobile/data/chat/tools/ToolPreviewSpec$Companion;
+	public fun <init> (Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolPreviewSpec;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolPreviewSpec;Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolPreviewSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArg ()Ljava/lang/String;
+	public final fun getKind ()Lcom/letta/mobile/data/chat/tools/ToolPreviewKind;
+	public final fun getLineCount ()Ljava/lang/String;
+	public final fun getStartLine ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/letta/mobile/data/chat/tools/ToolPreviewSpec$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/ToolPreviewSpec$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/letta/mobile/data/chat/tools/ToolPreviewSpec;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/letta/mobile/data/chat/tools/ToolPreviewSpec;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolPreviewSpec$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/letta/mobile/data/chat/tools/ToolPreviewTarget {
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolPreviewTarget$File : com/letta/mobile/data/chat/tools/ToolPreviewTarget {
+	public fun <init> (Ljava/lang/String;Lkotlin/ranges/IntRange;)V
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/ranges/IntRange;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lkotlin/ranges/IntRange;
+	public final fun copy (Ljava/lang/String;Lkotlin/ranges/IntRange;)Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$File;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$File;Ljava/lang/String;Lkotlin/ranges/IntRange;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$File;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLines ()Lkotlin/ranges/IntRange;
+	public final fun getPath ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolPreviewTarget$Memory : com/letta/mobile/data/chat/tools/ToolPreviewTarget {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$Memory;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$Memory;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$Memory;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPath ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolPreviewTarget$Subagent : com/letta/mobile/data/chat/tools/ToolPreviewTarget {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$Subagent;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$Subagent;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$Subagent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgentId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolPreviewTarget$TaskOutput : com/letta/mobile/data/chat/tools/ToolPreviewTarget {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$TaskOutput;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$TaskOutput;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$TaskOutput;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTaskId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolStepLine {
+	public fun <init> (Lcom/letta/mobile/data/chat/tools/ToolVerb;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/chat/tools/ToolFailure;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/chat/tools/ToolVerb;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/chat/tools/ToolFailure;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Lcom/letta/mobile/data/chat/tools/ToolFailure;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/data/chat/tools/ToolVerb;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/chat/tools/ToolFailure;Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolStepLine;Lcom/letta/mobile/data/chat/tools/ToolVerb;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/chat/tools/ToolFailure;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFailure ()Lcom/letta/mobile/data/chat/tools/ToolFailure;
+	public final fun getPresenterId ()Ljava/lang/String;
+	public final fun getPreviews ()Ljava/util/List;
+	public final fun getSubject ()Ljava/lang/String;
+	public final fun getTarget ()Ljava/lang/String;
+	public final fun getVerb ()Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolVerb : java/lang/Enum {
+	public static final field Called Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field Companion Lcom/letta/mobile/data/chat/tools/ToolVerb$Companion;
+	public static final field Delegated Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field Edited Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field Fetched Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field Ran Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field Read Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field Searched Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field Wrote Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static fun values ()[Lcom/letta/mobile/data/chat/tools/ToolVerb;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolVerb$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/letta/mobile/data/chat/tools/bundled/BashToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/BashToolPresenter;
+	public fun getId ()Ljava/lang/String;
+	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/ToolMatcher;
+	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+}
+
+public final class com/letta/mobile/data/chat/tools/bundled/BundledToolPresenters {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/BundledToolPresenters;
+	public final fun getRegistry ()Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;
+}
+
+public final class com/letta/mobile/data/chat/tools/shell/ShellCommand {
+	public fun <init> (Ljava/util/List;Ljava/lang/String;ZZ)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun copy (Ljava/util/List;Ljava/lang/String;ZZ)Lcom/letta/mobile/data/chat/tools/shell/ShellCommand;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/shell/ShellCommand;Ljava/util/List;Ljava/lang/String;ZZILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/shell/ShellCommand;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPiped ()Z
+	public final fun getStdin ()Ljava/lang/String;
+	public final fun getStdinFromFile ()Z
+	public final fun getWords ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/shell/ShellCommandLine {
+	public fun <init> (Ljava/util/List;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun flag (Ljava/lang/String;)Ljava/lang/String;
+	public final fun getArgs ()Ljava/util/List;
+	public final fun getProgram ()Ljava/lang/String;
+	public final fun getStdin ()Ljava/lang/String;
+	public final fun getWords ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/shell/ShellScript {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/shell/ShellScript;
+	public final fun scan (Ljava/lang/String;)Ljava/util/List;
+}
+
+public final class com/letta/mobile/data/chat/tools/shell/ShellTools {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/shell/ShellTools;
+	public final fun argvScript (Ljava/util/List;)Ljava/lang/String;
+	public final fun commandsOf (Ljava/lang/String;)Ljava/util/List;
+	public final fun getNAMES ()Ljava/util/Set;
+	public final fun getWORKDIR_KEYS ()Ljava/util/List;
+	public final fun isShellTool (Ljava/lang/String;)Z
+	public final fun scriptOf (Lkotlinx/serialization/json/JsonObject;)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/shell/ShellToolsKt {
+	public static final fun argvWords (Ljava/util/List;)Ljava/util/List;
+	public static final fun asShellScript (Ljava/util/List;)Ljava/lang/String;
+	public static final fun isShellProgram (Ljava/lang/String;)Z
+	public static final fun isShellScriptFlag (Ljava/lang/String;)Z
+	public static final fun programWords (Lcom/letta/mobile/data/chat/tools/shell/ShellCommand;)Ljava/util/List;
+	public static final fun shellQuoted (Ljava/lang/String;)Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/commands/AgentSlashCommand {
 	public static final field Companion Lcom/letta/mobile/data/commands/AgentSlashCommand$Companion;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V
@@ -32066,14 +32686,16 @@ public final class com/letta/mobile/data/plugin/PluginKinds {
 
 public final class com/letta/mobile/data/plugin/PluginManifest {
 	public static final field Companion Lcom/letta/mobile/data/plugin/PluginManifest$Companion;
-	public fun <init> (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/plugin/PluginContract;Lcom/letta/mobile/data/plugin/PluginRuntime;Ljava/util/Map;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/plugin/PluginNet;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;)V
-	public synthetic fun <init> (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/plugin/PluginContract;Lcom/letta/mobile/data/plugin/PluginRuntime;Ljava/util/Map;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/plugin/PluginNet;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/plugin/PluginContract;Lcom/letta/mobile/data/plugin/PluginRuntime;Ljava/util/Map;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/plugin/PluginNet;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;)V
+	public synthetic fun <init> (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/plugin/PluginContract;Lcom/letta/mobile/data/plugin/PluginRuntime;Ljava/util/Map;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/plugin/PluginNet;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()I
 	public final fun component10 ()Ljava/util/List;
 	public final fun component11 ()Lcom/letta/mobile/data/plugin/PluginNet;
 	public final fun component12 ()Ljava/util/Map;
 	public final fun component13 ()Ljava/util/Map;
 	public final fun component14 ()Ljava/util/Map;
+	public final fun component15 ()Ljava/util/Map;
+	public final fun component16 ()Ljava/util/Map;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
@@ -32082,12 +32704,13 @@ public final class com/letta/mobile/data/plugin/PluginManifest {
 	public final fun component7 ()Lcom/letta/mobile/data/plugin/PluginRuntime;
 	public final fun component8 ()Ljava/util/Map;
 	public final fun component9 ()Ljava/util/List;
-	public final fun copy (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/plugin/PluginContract;Lcom/letta/mobile/data/plugin/PluginRuntime;Ljava/util/Map;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/plugin/PluginNet;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;)Lcom/letta/mobile/data/plugin/PluginManifest;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/plugin/PluginManifest;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/plugin/PluginContract;Lcom/letta/mobile/data/plugin/PluginRuntime;Ljava/util/Map;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/plugin/PluginNet;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/plugin/PluginManifest;
+	public final fun copy (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/plugin/PluginContract;Lcom/letta/mobile/data/plugin/PluginRuntime;Ljava/util/Map;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/plugin/PluginNet;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;)Lcom/letta/mobile/data/plugin/PluginManifest;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/plugin/PluginManifest;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/plugin/PluginContract;Lcom/letta/mobile/data/plugin/PluginRuntime;Ljava/util/Map;Ljava/util/List;Ljava/util/List;Lcom/letta/mobile/data/plugin/PluginNet;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/plugin/PluginManifest;
 	public final fun elementType (Ljava/lang/String;)Ljava/lang/String;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getActions ()Ljava/util/Map;
 	public final fun getCapabilities ()Ljava/util/List;
+	public final fun getCommandPresenters ()Ljava/util/Map;
 	public final fun getContract ()Lcom/letta/mobile/data/plugin/PluginContract;
 	public final fun getElements ()Ljava/util/Map;
 	public final fun getId ()Ljava/lang/String;
@@ -32101,6 +32724,7 @@ public final class com/letta/mobile/data/plugin/PluginManifest {
 	public final fun getRuntime ()Lcom/letta/mobile/data/plugin/PluginRuntime;
 	public final fun getSecrets ()Ljava/util/List;
 	public final fun getSettings ()Ljava/util/Map;
+	public final fun getToolPresenters ()Ljava/util/Map;
 	public final fun getVersion ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -32139,6 +32763,7 @@ public final class com/letta/mobile/data/plugin/PluginManifestProblem : java/lan
 	public static final field BAD_SETTING Lcom/letta/mobile/data/plugin/PluginManifestProblem;
 	public static final field BAD_TEMPLATE Lcom/letta/mobile/data/plugin/PluginManifestProblem;
 	public static final field BAD_TOOL_NAME Lcom/letta/mobile/data/plugin/PluginManifestProblem;
+	public static final field BAD_TOOL_PRESENTER Lcom/letta/mobile/data/plugin/PluginManifestProblem;
 	public static final field CAPABILITY_MISSING Lcom/letta/mobile/data/plugin/PluginManifestProblem;
 	public static final field DUPLICATE Lcom/letta/mobile/data/plugin/PluginManifestProblem;
 	public static final field MISSING_DESCRIPTION Lcom/letta/mobile/data/plugin/PluginManifestProblem;
@@ -33040,6 +33665,10 @@ public final class com/letta/mobile/data/plugin/PluginToolDefinition {
 	public final fun getPluginId ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/plugin/PluginToolPresentersKt {
+	public static final fun contributedBy (Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;Ljava/util/List;)Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;
 }
 
 public abstract interface class com/letta/mobile/data/plugin/PluginTransition {
@@ -60166,12 +60795,6 @@ public final class com/letta/mobile/data/workspace/MentionSearch {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/letta/mobile/data/workspace/ToolFileTargets {
-	public static final field INSTANCE Lcom/letta/mobile/data/workspace/ToolFileTargets;
-	public final fun isMemoryTool (Ljava/lang/String;)Z
-	public final fun pathOf (Ljava/lang/String;)Ljava/lang/String;
-}
-
 public abstract interface class com/letta/mobile/data/workspace/WorkspaceFileContent {
 	public abstract fun getPath ()Ljava/lang/String;
 }
@@ -61387,40 +62010,6 @@ public final class com/letta/mobile/ui/chat/render/TimelineProjection {
 
 public final class com/letta/mobile/ui/chat/render/ToolCallTemplateKt {
 	public static final fun buildToolCallTemplate (Lcom/letta/mobile/data/model/Tool;)Ljava/lang/String;
-}
-
-public final class com/letta/mobile/ui/chat/render/ToolDisplayInfo {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component3 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/ui/chat/render/ToolDisplayInfo;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/chat/render/ToolDisplayInfo;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/ui/chat/render/ToolDisplayInfo;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getDetailLine ()Ljava/lang/String;
-	public final fun getEmoji ()Ljava/lang/String;
-	public final fun getLabel ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/ui/chat/render/ToolDisplayRegistry {
-	public static final field Companion Lcom/letta/mobile/ui/chat/render/ToolDisplayRegistry$Companion;
-	public fun <init> ()V
-	public final fun resolve (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/ui/chat/render/ToolDisplayInfo;
-	public static synthetic fun resolve$default (Lcom/letta/mobile/ui/chat/render/ToolDisplayRegistry;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/ui/chat/render/ToolDisplayInfo;
-}
-
-public final class com/letta/mobile/ui/chat/render/ToolDisplayRegistry$Companion {
-	public final fun resolve (Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/ui/chat/render/ToolDisplayInfo;
-	public static synthetic fun resolve$default (Lcom/letta/mobile/ui/chat/render/ToolDisplayRegistry$Companion;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/ui/chat/render/ToolDisplayInfo;
-}
-
-public final class com/letta/mobile/ui/chat/render/ToolEmojis {
-	public static final field DEFAULT Ljava/lang/String;
-	public static final field INSTANCE Lcom/letta/mobile/ui/chat/render/ToolEmojis;
-	public final fun forTool (Ljava/lang/String;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/ui/chat/render/ToolOutputConstantsKt {

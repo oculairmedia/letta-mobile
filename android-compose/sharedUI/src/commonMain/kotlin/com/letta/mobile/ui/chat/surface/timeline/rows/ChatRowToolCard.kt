@@ -28,6 +28,7 @@ import com.letta.mobile.avatar.core.AttentionKey
 import com.letta.mobile.avatar.core.AttentionKind
 import com.letta.mobile.data.chat.projection.ToolTimelineState
 import com.letta.mobile.data.chat.projection.classifyToolCallState
+import com.letta.mobile.data.chat.tools.ToolArguments
 import com.letta.mobile.data.messaging.AgentMessageDeliveryState
 import com.letta.mobile.data.messaging.compactLabel
 import com.letta.mobile.data.messaging.displayLabel
@@ -47,6 +48,7 @@ import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.mascot.mascotAttention
+import com.letta.mobile.ui.chat.tools.title
 import com.letta.mobile.ui.shell.pages.workspace.ToolCallFileLink
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatRowSpacing
@@ -166,12 +168,11 @@ private fun toolStepRowSpec(view: ToolCardView, callbacks: ChatRowCallbacks): Ru
             glyphLabel = stateLabel,
         )
     }
-    // stepLabel parses the arguments JSON; remembered so a streamed token does not re-parse
-    // every visible step.
-    val label = remember(toolCall) { toolCall.stepLabel() }
-    val preview = label.target.ifBlank { toolCall.stepSummary() }
+    // The presenter's line, remembered so a streamed token does not re-read every visible step.
+    val line = rememberToolStepLine(toolCall)
+    val preview = line.target.ifBlank { toolCall.stepSummary() }
     return RunStepRowSpec(
-        title = toolCall.name,
+        title = line.title(),
         subtitle = preview.takeIf { it.isNotBlank() },
         tone = view.state.glyphTone(),
         glyphLabel = toolStateLabel(view.state),
@@ -208,7 +209,7 @@ private fun ToolCardBody(view: ToolCardView, isError: Boolean, callbacks: ChatRo
             )
         }
         toolCall.arguments.takeIf { it.isNotBlank() }?.let { ToolCommandBlock(it) }
-        ToolCallFileLink(toolCall.arguments, toolName = toolCall.name)
+        rememberToolStepLine(toolCall).previews.firstOrNull()?.let { ToolCallFileLink(it) }
         toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolResultSection(view, it, isError, callbacks) }
         ToolGeneratedImages(toolCall, callbacks)
         ToolExecutionFooter(toolCall)
@@ -218,14 +219,14 @@ private fun ToolCardBody(view: ToolCardView, isError: Boolean, callbacks: ChatRo
 /** An open step's command ("$ echo hello"), in the shared monospace [ToolOutputBlock]. */
 @Composable
 private fun ToolCommandBlock(arguments: String) {
-    val primary = remember(arguments) { primaryToolArgument(arguments) }
+    val primary = remember(arguments) { ToolArguments.primary(arguments) }
     ToolOutputBlock(stringResource(Res.string.rows_tool_argument_line, primary))
 }
 
 /** A call's primary argument, monospace ("$ echo hello"): the Touch approval card's body. */
 @Composable
 internal fun ToolArgumentLine(arguments: String) {
-    val primary = remember(arguments) { primaryToolArgument(arguments) }
+    val primary = remember(arguments) { ToolArguments.primary(arguments) }
     SelectionContainer {
         Text(
             text = stringResource(Res.string.rows_tool_argument_line, primary),

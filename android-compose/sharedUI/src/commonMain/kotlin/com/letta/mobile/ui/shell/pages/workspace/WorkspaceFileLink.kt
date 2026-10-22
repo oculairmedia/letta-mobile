@@ -8,12 +8,11 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
-import com.letta.mobile.data.workspace.ToolFileTargets
+import com.letta.mobile.data.chat.tools.ToolPreviewTarget
 import com.letta.mobile.data.workspace.WorkspaceFileOpener
 import com.letta.mobile.data.workspace.WorkspacePaths
 
@@ -29,15 +28,19 @@ object WorkspaceFileLinkTags {
 }
 
 /**
- * The file a tool call worked on, as a chip that opens it in the viewer; nothing when the call
- * names no file or the host provides no [LocalWorkspaceFileOpener].
+ * What a tool step's chip opens, as a chip; nothing when the host provides no
+ * [LocalWorkspaceFileOpener] or the target is not a file or memory entry it can show.
  */
 @Composable
-fun ToolCallFileLink(arguments: String, modifier: Modifier = Modifier, toolName: String = "") {
+fun ToolCallFileLink(target: ToolPreviewTarget, modifier: Modifier = Modifier) {
     val opener = LocalWorkspaceFileOpener.current ?: return
-    val path = remember(arguments) { ToolFileTargets.pathOf(arguments) } ?: return
+    val (path, memory) = when (target) {
+        is ToolPreviewTarget.File -> target.path to false
+        is ToolPreviewTarget.Memory -> target.path to true
+        is ToolPreviewTarget.Subagent, is ToolPreviewTarget.TaskOutput -> return
+    }
     AssistChip(
-        onClick = { opener.open(path, memoryTool = ToolFileTargets.isMemoryTool(toolName)) },
+        onClick = { opener.open(path, memoryTool = memory) },
         label = { Text(WorkspacePaths.fileName(path), maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingIcon = {
             Icon(Icons.Outlined.Description, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize))

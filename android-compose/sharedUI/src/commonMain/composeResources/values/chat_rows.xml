@@ -99,13 +99,15 @@
     <string name="rows_tool_outcome_warning">Warning</string>
     <string name="rows_tool_status_running">Running</string>
     <string name="rows_tool_executing">Executing %1$s…</string>
-    <string name="rows_tool_step_label">%1$s  %2$s</string>
+    <string name="rows_tool_step_label">%1$s %2$s</string>
     <string name="rows_tool_verb_ran">Ran</string>
     <string name="rows_tool_verb_read">Read</string>
     <string name="rows_tool_verb_wrote">Wrote</string>
     <string name="rows_tool_verb_edited">Edited</string>
     <string name="rows_tool_verb_searched">Searched</string>
     <string name="rows_tool_verb_fetched">Fetched</string>
+    <string name="rows_tool_verb_delegated">Delegated</string>
+    <string name="rows_tool_verb_called">Called</string>
     <string name="rows_tool_output_truncated">Showing %1$d of %2$d lines · Copy includes all output</string>
     <string name="rows_tool_output_scroll_hint">Tool output. Use left and right arrow keys to scroll horizontally.</string>
     <string name="rows_tool_result_preview">Showing a preview · loading the full output…</string>

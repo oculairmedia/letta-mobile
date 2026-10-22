@@ -56,6 +56,10 @@ Compose chat geometry, bubble styling, streaming reveal and tool syntax highligh
 
 Subagent activity bars, roster/detail panes and dual-conversation views. OpenSubagentConversation, dual-view bindings and the todo-sheet opener connect navigation; discovery and lifecycle authority stay with the supplied subagent/session state.
 
+# Package com.letta.mobile.ui.chat.tools
+
+The tool presenters the timeline draws steps with, provided per window through LocalToolPresenters: the bundled ones, plus what enabled plugins' manifests contribute when a host wraps its chat in ProvidePluginToolPresenters (ui.shell.pages.plugins). Rows draw a step line's title from here and never name a tool.
+
 # Package com.letta.mobile.ui.chat.surface
 
 The shared chat/canvas surface in docked, collapsed and full-chat presentations. ChatSurface configuration and host/session bindings are the assembly seams; transport, conversation persistence and native back handling must remain in their owning layers.

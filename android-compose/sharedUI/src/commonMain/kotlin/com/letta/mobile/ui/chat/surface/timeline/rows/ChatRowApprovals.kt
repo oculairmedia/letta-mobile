@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Terminal
 import com.letta.mobile.data.chat.projection.requiresUserInput
+import com.letta.mobile.data.chat.tools.ToolArguments
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.AskUserQuestionItem
 import com.letta.mobile.data.model.UiApprovalRequest
@@ -332,7 +333,7 @@ private fun ApprovalBody() {
 private fun ApprovalToolCallLine(toolCall: UiApprovalToolCall) {
     Text(text = toolCall.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
     if (toolCall.arguments.isNotBlank()) {
-        val primary = remember(toolCall.arguments) { primaryToolArgument(toolCall.arguments) }
+        val primary = remember(toolCall.arguments) { ToolArguments.primary(toolCall.arguments) }
         CodeBlock(primary)
     }
 }

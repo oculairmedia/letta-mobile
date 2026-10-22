@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin
 
+import com.letta.mobile.data.chat.tools.ToolInsetKind
 import com.letta.mobile.data.schema.SchemaProblem
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -23,6 +24,7 @@ enum class PluginManifestProblem {
     UNDECLARED_REFERENCE,
     SECRET_IN_URL,
     BAD_SETTING,
+    BAD_TOOL_PRESENTER,
 
     ;
 
@@ -77,7 +79,8 @@ object PluginManifestRules {
 
     fun check(manifest: PluginManifest): List<SchemaProblem> =
         contract(manifest) + capabilities(manifest) + net(manifest) + settings(manifest) + secrets(manifest) +
-            actions(manifest) + PluginRuntimeRules.check(manifest) + PluginContentRules.check(manifest)
+            actions(manifest) + PluginRuntimeRules.check(manifest) + PluginContentRules.check(manifest) +
+            toolPresenters(manifest)
 
     private fun contract(manifest: PluginManifest): List<SchemaProblem> = listOfNotNull(
         PluginManifestProblem.UNSUPPORTED_CONTRACT.at(
@@ -135,6 +138,22 @@ object PluginManifestRules {
             PluginManifestProblem.BAD_INPUT_SCHEMA.at(at / "input" / "type", "an action's input is an object schema: \"type\": \"object\"")
                 .takeIf { (action.input["type"] as? JsonPrimitive)?.content != "object" },
         ) + duplicates(action.visibility, at / "visibility")
+    }
+
+
+    /** Each tool presenter's inset names the arguments its kind reads, and its tools are listed once. */
+    private fun toolPresenters(manifest: PluginManifest): List<SchemaProblem> = manifest.toolPresenters.flatMap { (name, spec) ->
+        val at = ROOT / "toolPresenters" / name
+        val inset = spec.inset
+        val missing = when (inset?.kind) {
+            ToolInsetKind.Command -> (at / "inset" / "command" to "a command inset names the argument holding the command")
+                .takeIf { inset?.command == null }
+            ToolInsetKind.BeforeAfter -> (at / "inset" / "before" to "a before_after inset names its before or after argument")
+                .takeIf { inset?.before == null && inset?.after == null }
+            else -> null
+        }
+        listOfNotNull(missing?.let { (pointer, message) -> PluginManifestProblem.BAD_TOOL_PRESENTER.at(pointer, message) }) +
+            duplicates(spec.tools, at / "tools")
     }
 }
 

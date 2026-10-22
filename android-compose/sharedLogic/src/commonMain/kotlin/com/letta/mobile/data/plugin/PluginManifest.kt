@@ -1,5 +1,7 @@
 package com.letta.mobile.data.plugin
 
+import com.letta.mobile.data.chat.tools.CommandPresenterSpec
+import com.letta.mobile.data.chat.tools.ToolPresenterSpec
 import com.letta.mobile.data.model.PluginId
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -32,6 +34,10 @@ data class PluginManifest(
     val elements: Map<String, PluginElementKind> = emptyMap(),
     val actions: Map<String, PluginAction> = emptyMap(),
     val pages: Map<String, PluginPage> = emptyMap(),
+    /** How the tools it knows read in the timeline (its own actions, a server's custom tools), by presenter name. */
+    val toolPresenters: Map<String, ToolPresenterSpec> = emptyMap(),
+    /** How the CLI commands it knows read when a shell tool runs them, by presenter name. */
+    val commandPresenters: Map<String, CommandPresenterSpec> = emptyMap(),
 ) {
     /** [id] typed: what the registry, its commands and the kind catalog are keyed by. */
     val pluginId: PluginId get() = PluginId(id)

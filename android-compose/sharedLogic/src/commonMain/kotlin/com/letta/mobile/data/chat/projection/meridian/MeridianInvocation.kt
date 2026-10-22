@@ -1,5 +1,10 @@
 package com.letta.mobile.data.chat.projection.meridian
 
+import com.letta.mobile.data.chat.tools.shell.ShellCommand
+import com.letta.mobile.data.chat.tools.shell.ShellScript
+import com.letta.mobile.data.chat.tools.shell.isShellProgram
+import com.letta.mobile.data.chat.tools.shell.isShellScriptFlag
+import com.letta.mobile.data.chat.tools.shell.programWords
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -73,10 +78,6 @@ internal class MeridianInvocation private constructor(
     }
 }
 
-/** The command's words from its program on: `NAME=value`, `env`, `exec`, … dropped. */
-private fun ShellCommand.programWords(): List<String> = words.dropWhile { it.isPrefixWord() }
-
-private fun String.isPrefixWord(): Boolean = ENV_ASSIGNMENT.matches(this) || this in PREFIX_PROGRAMS
 
 /** This command's stdin: its own heredoc or here-string, else what [before] pipes into it. */
 private fun ShellCommand.stdinAfter(before: ShellCommand?): String? = when {
@@ -100,5 +101,3 @@ private const val MAX_WRAP_DEPTH = 2
 private const val HELP = "help"
 private val HELP_FLAGS = setOf("--help", "-h")
 private val ECHO_FLAGS = setOf("-n", "-e", "-E", "-ne", "-en")
-private val PREFIX_PROGRAMS = setOf("env", "exec", "command", "time", "nohup")
-private val ENV_ASSIGNMENT = Regex("""[A-Za-z_][A-Za-z0-9_]*=[\s\S]*""")

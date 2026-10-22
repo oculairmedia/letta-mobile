@@ -9,9 +9,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 /** The read-only file viewer: which file is open and what it holds. */
 @Immutable
@@ -103,23 +100,6 @@ class WorkspaceFileViewerController(
                 val message = (error as? WorkspaceFileException)?.message ?: "The file could not be read."
                 stateFlow.update { WorkspaceFileViewerReducer.failed(it, path, message) }
             }
-        }
-    }
-}
-
-/** The file a tool call works on, read from its arguments (`file_path`, `path`, …), or null. */
-object ToolFileTargets {
-    /** Letta's memory tools (`memory`, `memory_insert`, `core_memory_append`…): their paths are MemFS paths. */
-    fun isMemoryTool(toolName: String): Boolean = toolName.lowercase().let { it == "memory" || it.startsWith("memory_") || it.endsWith("_memory") || "core_memory" in it }
-
-    private val PATH_KEYS = listOf("file_path", "filePath", "notebook_path", "target_file", "path")
-    private val json = Json { ignoreUnknownKeys = true }
-
-    fun pathOf(arguments: String): String? {
-        if (arguments.isBlank()) return null
-        val obj = runCatching { json.parseToJsonElement(arguments) as? JsonObject }.getOrNull() ?: return null
-        return PATH_KEYS.firstNotNullOfOrNull { key ->
-            (obj[key] as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim()?.takeIf { it.isNotEmpty() && '\n' !in it }
         }
     }
 }

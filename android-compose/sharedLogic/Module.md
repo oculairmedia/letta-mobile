@@ -109,6 +109,18 @@ Lock order is coordinator lifecycle mutex, registry index lock, then per-turn id
 
 Retention remains unchanged: registry aliases are capped at 64, settled OTIDs at 16, settled-run and assistant-run evidence sets at 8, deduplication at 512 and tracked conversation states have a soft cap 32. The existing pre-conversation delta deque, runtime audit channel, client send queue and turn-fence history retain their existing unbounded policies; this extraction does not add a new retention policy.
 
+# Package com.letta.mobile.data.chat.tools
+
+The tool presenter plugin contract: how a tool call reads as a timeline step on every host. A presenter claims calls by tool name (exact or globbed) and argument shape, and gives a cheap step line (verb, target, preview targets, failure) and an inset built only when the step opens. Shell tools hand each command they run to a second-level command presenter registry keyed on the program and its subcommands. Bundled presenters and the ones a plugin's manifest contributes register through the same calls; keep painting in `sharedUI`; register through [ToolPresenterRegistry](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools/-tool-presenter-registry/index.html) and implement [ToolPresenter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools/-tool-presenter/index.html) or [CommandPresenter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools/-command-presenter/index.html).
+
+# Package com.letta.mobile.data.chat.tools.bundled
+
+The presenters every host ships, one unit per tool or CLI, registered into [BundledToolPresenters](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.bundled/-bundled-tool-presenters/index.html) through the same registry calls a plugin's contributions use. Keep each presenter to its own tool and leave rendering to `sharedUI`; start a new one from [BashToolPresenter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.bundled/-bash-tool-presenter/index.html).
+
+# Package com.letta.mobile.data.chat.tools.shell
+
+A lenient reader of the shell scripts agents pass to their shell tools: quotes, separators, heredocs and `bash -lc` wrappers, never expanding or throwing. Tool presenters and the meridian recogniser read shell calls through it so they agree on what ran; read a call's script with [ShellTools](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.shell/-shell-tools/index.html) and its commands as [ShellCommandLine](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.shell/-shell-command-line/index.html).
+
 # Package com.letta.mobile.data.commands
 
 Slash-command contracts and commands answered by the client itself. Navigation/local actions remain distinct from commands requiring active backend support. Keep arbitrary shell execution outside slash-command discovery; provide backend command capabilities through [SlashCommandsApi](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.commands/-slash-commands-api/index.html) and client commands through [ClientSlashCommands](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.commands/-client-slash-commands/index.html).
