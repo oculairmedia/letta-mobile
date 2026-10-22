@@ -9,11 +9,11 @@ import kotlinx.serialization.json.JsonElement
  * A host's conversation list, read row by row. A row this client cannot represent (the host's
  * agent-free conversations carry `agent_id: null`, which [Conversation] cannot hold) is skipped
  * rather than failing the whole list, so one odd row never leaves every conversation unlisted;
- * [onSkipped] hears how many rows were left out, how many stayed and why the first was refused. A payload that is not a list still fails as a whole.
+ * [onSkipped] hears what was left out: how many rows, how many stayed and why the first was refused. A payload that is not a list still fails as a whole.
  */
 internal fun Json.decodeConversationList(
     payload: JsonElement,
-    onSkipped: (skipped: Int, kept: Int, firstError: String?) -> Unit = { _, _, _ -> },
+    onSkipped: (String) -> Unit = {},
 ): List<Conversation> {
     if (payload !is JsonArray) return decodeFromJsonElement(ListSerializer(Conversation.serializer()), payload)
     var skipped = 0
@@ -26,6 +26,6 @@ internal fun Json.decodeConversationList(
             }
             .getOrNull()
     }
-    if (skipped > 0) onSkipped(skipped, rows.size, firstError)
+    if (skipped > 0) onSkipped("skipped=$skipped kept=${rows.size} firstError=${firstError.orEmpty()}")
     return rows
 }

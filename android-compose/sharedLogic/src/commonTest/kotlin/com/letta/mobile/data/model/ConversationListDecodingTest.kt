@@ -32,12 +32,11 @@ class ConversationListDecodingTest {
 
     @Test
     fun theSkippedRowsAreReportedOnce() {
-        val reports = mutableListOf<Pair<Int, Int>>()
-        json.decodeConversationList(JsonArray(listOf(row("c1", "a1"), row("c2", null), row("c3", null)))) { skipped, kept, _ ->
-            reports += skipped to kept
-        }
+        val reports = mutableListOf<String>()
+        json.decodeConversationList(JsonArray(listOf(row("c1", "a1"), row("c2", null), row("c3", null)))) { reports += it }
 
-        assertEquals(listOf(2 to 1), reports)
+        assertEquals(1, reports.size)
+        assertTrue(reports.single().startsWith("skipped=2 kept=1 "), reports.single())
     }
 
     @Test
