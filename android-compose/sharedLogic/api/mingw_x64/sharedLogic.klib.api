@@ -3551,10 +3551,6 @@ abstract fun interface com.letta.mobile.data.chat.branch/BranchOpener { // com.l
     abstract suspend fun open(com.letta.mobile.data.chat.branch/BranchOutcome) // com.letta.mobile.data.chat.branch/BranchOpener.open|open(com.letta.mobile.data.chat.branch.BranchOutcome){}[0]
 }
 
-abstract fun interface com.letta.mobile.data.chat.conversations/AgentConversationReader { // com.letta.mobile.data.chat.conversations/AgentConversationReader|null[0]
-    abstract suspend fun read(com.letta.mobile.data.chat.runtime/AgentConversationPage): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.chat.conversations/AgentConversationReader.read|read(com.letta.mobile.data.chat.runtime.AgentConversationPage){}[0]
-}
-
 abstract fun interface com.letta.mobile.data.context.estimate/TokenEstimator { // com.letta.mobile.data.context.estimate/TokenEstimator|null[0]
     abstract fun tokensForChars(kotlin/Long): kotlin/Int // com.letta.mobile.data.context.estimate/TokenEstimator.tokensForChars|tokensForChars(kotlin.Long){}[0]
 }
@@ -3784,6 +3780,10 @@ abstract fun interface com.letta.mobile.ui.chat.session/SubagentViewSessions { /
 
 abstract fun interface com.letta.mobile.ui.haptics/Haptics { // com.letta.mobile.ui.haptics/Haptics|null[0]
     abstract fun play(com.letta.mobile.ui.haptics/LettaHapticCue) // com.letta.mobile.ui.haptics/Haptics.play|play(com.letta.mobile.ui.haptics.LettaHapticCue){}[0]
+}
+
+abstract fun interface com.letta.mobile.util/AgentConversationReader { // com.letta.mobile.util/AgentConversationReader|null[0]
+    abstract suspend fun read(com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId?, kotlin/Int): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.util/AgentConversationReader.read|read(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.ConversationId?;kotlin.Int){}[0]
 }
 
 abstract interface <#A: com.letta.mobile.data.document/DocumentOp, #B: kotlin/Any?> com.letta.mobile.data.document/DocumentReducer { // com.letta.mobile.data.document/DocumentReducer|null[0]
@@ -22977,6 +22977,12 @@ final class <#A: kotlin/Any?> com.letta.mobile.ui.chat.session/DerivedStateFlow 
     final suspend fun collect(kotlinx.coroutines.flow/FlowCollector<#A>): kotlin/Nothing // com.letta.mobile.ui.chat.session/DerivedStateFlow.collect|collect(kotlinx.coroutines.flow.FlowCollector<1:0>){}[0]
 }
 
+final class <#A: kotlin/Any?> com.letta.mobile.util/ReadThroughConversationFleets { // com.letta.mobile.util/ReadThroughConversationFleets|null[0]
+    constructor <init>(kotlin/Function1<#A, com.letta.mobile.util/AgentConversationReader>) // com.letta.mobile.util/ReadThroughConversationFleets.<init>|<init>(kotlin.Function1<1:0,com.letta.mobile.util.AgentConversationReader>){}[0]
+
+    final fun fleetFor(#A): com.letta.mobile.util/AgentConversationFleet // com.letta.mobile.util/ReadThroughConversationFleets.fleetFor|fleetFor(1:0){}[0]
+}
+
 final class com.letta.mobile.data.a2ui/A2uiAction { // com.letta.mobile.data.a2ui/A2uiAction|null[0]
     constructor <init>(kotlin/String, kotlin/String, kotlinx.serialization.json/JsonObject = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlinx.serialization.json/JsonObject = ..., com.letta.mobile.data.a2ui/A2uiActionOrigin = ...) // com.letta.mobile.data.a2ui/A2uiAction.<init>|<init>(kotlin.String;kotlin.String;kotlinx.serialization.json.JsonObject;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlinx.serialization.json.JsonObject;com.letta.mobile.data.a2ui.A2uiActionOrigin){}[0]
 
@@ -28087,44 +28093,6 @@ final class com.letta.mobile.data.chat.branch/PendingDraft { // com.letta.mobile
     final fun toString(): kotlin/String // com.letta.mobile.data.chat.branch/PendingDraft.toString|toString(){}[0]
 }
 
-final class com.letta.mobile.data.chat.conversations/AgentConversationFleet { // com.letta.mobile.data.chat.conversations/AgentConversationFleet|null[0]
-    constructor <init>(com.letta.mobile.data.chat.conversations/AgentConversationReader, com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging = ...) // com.letta.mobile.data.chat.conversations/AgentConversationFleet.<init>|<init>(com.letta.mobile.data.chat.conversations.AgentConversationReader;com.letta.mobile.data.chat.conversations.AgentConversationFleetPaging){}[0]
-
-    final val conversations // com.letta.mobile.data.chat.conversations/AgentConversationFleet.conversations|{}conversations[0]
-        final fun <get-conversations>(): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.chat.conversations/AgentConversationFleet.conversations.<get-conversations>|<get-conversations>(){}[0]
-    final val hasMore // com.letta.mobile.data.chat.conversations/AgentConversationFleet.hasMore|{}hasMore[0]
-        final fun <get-hasMore>(): kotlin/Boolean // com.letta.mobile.data.chat.conversations/AgentConversationFleet.hasMore.<get-hasMore>|<get-hasMore>(){}[0]
-
-    final suspend fun loadMore(): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.chat.conversations/AgentConversationFleet.loadMore|loadMore(){}[0]
-    final suspend fun refresh(kotlin.collections/List<com.letta.mobile.data.model/Agent>): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.chat.conversations/AgentConversationFleet.refresh|refresh(kotlin.collections.List<com.letta.mobile.data.model.Agent>){}[0]
-}
-
-final class com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging { // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging|null[0]
-    constructor <init>(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ...) // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int){}[0]
-
-    final val eagerPagesPerAgent // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.eagerPagesPerAgent|{}eagerPagesPerAgent[0]
-        final fun <get-eagerPagesPerAgent>(): kotlin/Int // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.eagerPagesPerAgent.<get-eagerPagesPerAgent>|<get-eagerPagesPerAgent>(){}[0]
-    final val pageSize // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.pageSize|{}pageSize[0]
-        final fun <get-pageSize>(): kotlin/Int // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.pageSize.<get-pageSize>|<get-pageSize>(){}[0]
-    final val parallelism // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.parallelism|{}parallelism[0]
-        final fun <get-parallelism>(): kotlin/Int // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.parallelism.<get-parallelism>|<get-parallelism>(){}[0]
-
-    final fun component1(): kotlin/Int // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.component1|component1(){}[0]
-    final fun component2(): kotlin/Int // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.component2|component2(){}[0]
-    final fun component3(): kotlin/Int // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.component3|component3(){}[0]
-    final fun copy(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ...): com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.copy|copy(kotlin.Int;kotlin.Int;kotlin.Int){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.toString|toString(){}[0]
-
-    final object Companion { // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.Companion|null[0]
-        final const val DEFAULT_PARALLELISM // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.Companion.DEFAULT_PARALLELISM|{}DEFAULT_PARALLELISM[0]
-            final fun <get-DEFAULT_PARALLELISM>(): kotlin/Int // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.Companion.DEFAULT_PARALLELISM.<get-DEFAULT_PARALLELISM>|<get-DEFAULT_PARALLELISM>(){}[0]
-        final const val READ_THROUGH_PAGES // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.Companion.READ_THROUGH_PAGES|{}READ_THROUGH_PAGES[0]
-            final fun <get-READ_THROUGH_PAGES>(): kotlin/Int // com.letta.mobile.data.chat.conversations/AgentConversationFleetPaging.Companion.READ_THROUGH_PAGES.<get-READ_THROUGH_PAGES>|<get-READ_THROUGH_PAGES>(){}[0]
-    }
-}
-
 final class com.letta.mobile.data.chat.conversations/ClientCommandRoutes { // com.letta.mobile.data.chat.conversations/ClientCommandRoutes|null[0]
     constructor <init>(kotlin/Function0<kotlin/Unit>? = ..., kotlin/Function0<kotlin/Unit>? = ..., kotlin/Function0<kotlin/Unit>? = ..., kotlin/Function0<kotlin/Unit>? = ..., kotlin/Function0<kotlin/Unit>? = ..., kotlin/Function0<kotlin/Unit>? = ..., kotlin/Function0<kotlin/Unit>? = ..., kotlin/Function0<kotlin/Unit>? = ...) // com.letta.mobile.data.chat.conversations/ClientCommandRoutes.<init>|<init>(kotlin.Function0<kotlin.Unit>?;kotlin.Function0<kotlin.Unit>?;kotlin.Function0<kotlin.Unit>?;kotlin.Function0<kotlin.Unit>?;kotlin.Function0<kotlin.Unit>?;kotlin.Function0<kotlin.Unit>?;kotlin.Function0<kotlin.Unit>?;kotlin.Function0<kotlin.Unit>?){}[0]
 
@@ -28915,13 +28883,6 @@ final class com.letta.mobile.data.chat.runtime/AgentConversationPage { // com.le
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.runtime/AgentConversationPage.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.runtime/AgentConversationPage.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.chat.runtime/AgentConversationPage.toString|toString(){}[0]
-
-    final object Companion { // com.letta.mobile.data.chat.runtime/AgentConversationPage.Companion|null[0]
-        final const val ARCHIVE_STATUS_ALL // com.letta.mobile.data.chat.runtime/AgentConversationPage.Companion.ARCHIVE_STATUS_ALL|{}ARCHIVE_STATUS_ALL[0]
-            final fun <get-ARCHIVE_STATUS_ALL>(): kotlin/String // com.letta.mobile.data.chat.runtime/AgentConversationPage.Companion.ARCHIVE_STATUS_ALL.<get-ARCHIVE_STATUS_ALL>|<get-ARCHIVE_STATUS_ALL>(){}[0]
-        final const val DEFAULT_LIMIT // com.letta.mobile.data.chat.runtime/AgentConversationPage.Companion.DEFAULT_LIMIT|{}DEFAULT_LIMIT[0]
-            final fun <get-DEFAULT_LIMIT>(): kotlin/Int // com.letta.mobile.data.chat.runtime/AgentConversationPage.Companion.DEFAULT_LIMIT.<get-DEFAULT_LIMIT>|<get-DEFAULT_LIMIT>(){}[0]
-    }
 }
 
 final class com.letta.mobile.data.chat.runtime/AlwaysAllowAnswer { // com.letta.mobile.data.chat.runtime/AlwaysAllowAnswer|null[0]
@@ -49542,7 +49503,7 @@ final class com.letta.mobile.data.repository/IrohAdminRpcConversationListSource 
     final suspend fun deleteConversation(com.letta.mobile.data.model/ConversationId) // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.deleteConversation|deleteConversation(com.letta.mobile.data.model.ConversationId){}[0]
     final suspend fun forkConversation(com.letta.mobile.data.chat.branch/ConversationForkRequest): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.forkConversation|forkConversation(com.letta.mobile.data.chat.branch.ConversationForkRequest){}[0]
     final suspend fun getConversation(com.letta.mobile.data.model/ConversationId): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.getConversation|getConversation(com.letta.mobile.data.model.ConversationId){}[0]
-    final suspend fun listAgentConversations(com.letta.mobile.data.chat.runtime/AgentConversationPage): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.listAgentConversations|listAgentConversations(com.letta.mobile.data.chat.runtime.AgentConversationPage){}[0]
+    final suspend fun listAgentConversations(com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId?, kotlin/Int): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.listAgentConversations|listAgentConversations(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.ConversationId?;kotlin.Int){}[0]
     final suspend fun listConversations(com.letta.mobile.data.model/AgentId): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.listConversations|listConversations(com.letta.mobile.data.model.AgentId){}[0]
     final suspend fun listConversationsForAgent(com.letta.mobile.data.model/AgentId, kotlin/Int? = ...): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.listConversationsForAgent|listConversationsForAgent(com.letta.mobile.data.model.AgentId;kotlin.Int?){}[0]
     final suspend fun setConversationArchived(com.letta.mobile.data.model/ConversationId, kotlin/Boolean): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.setConversationArchived|setConversationArchived(com.letta.mobile.data.model.ConversationId;kotlin.Boolean){}[0]
@@ -61239,6 +61200,37 @@ final class com.letta.mobile.ui.theme/LettaThemePresetTokens { // com.letta.mobi
     final fun toString(): kotlin/String // com.letta.mobile.ui.theme/LettaThemePresetTokens.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.util/AgentConversationFleet { // com.letta.mobile.util/AgentConversationFleet|null[0]
+    constructor <init>(com.letta.mobile.util/AgentConversationReader, com.letta.mobile.util/AgentConversationFleetPaging = ..., kotlin/Function2<com.letta.mobile.data.model/AgentId, kotlin/Throwable, kotlin/Unit> = ...) // com.letta.mobile.util/AgentConversationFleet.<init>|<init>(com.letta.mobile.util.AgentConversationReader;com.letta.mobile.util.AgentConversationFleetPaging;kotlin.Function2<com.letta.mobile.data.model.AgentId,kotlin.Throwable,kotlin.Unit>){}[0]
+
+    final val conversations // com.letta.mobile.util/AgentConversationFleet.conversations|{}conversations[0]
+        final fun <get-conversations>(): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.util/AgentConversationFleet.conversations.<get-conversations>|<get-conversations>(){}[0]
+    final val hasMore // com.letta.mobile.util/AgentConversationFleet.hasMore|{}hasMore[0]
+        final fun <get-hasMore>(): kotlin/Boolean // com.letta.mobile.util/AgentConversationFleet.hasMore.<get-hasMore>|<get-hasMore>(){}[0]
+
+    final suspend fun loadMore(): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.util/AgentConversationFleet.loadMore|loadMore(){}[0]
+    final suspend fun refresh(kotlin.collections/List<com.letta.mobile.data.model/Agent>): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.util/AgentConversationFleet.refresh|refresh(kotlin.collections.List<com.letta.mobile.data.model.Agent>){}[0]
+}
+
+final class com.letta.mobile.util/AgentConversationFleetPaging { // com.letta.mobile.util/AgentConversationFleetPaging|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ...) // com.letta.mobile.util/AgentConversationFleetPaging.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+
+    final val eagerPagesPerAgent // com.letta.mobile.util/AgentConversationFleetPaging.eagerPagesPerAgent|{}eagerPagesPerAgent[0]
+        final fun <get-eagerPagesPerAgent>(): kotlin/Int // com.letta.mobile.util/AgentConversationFleetPaging.eagerPagesPerAgent.<get-eagerPagesPerAgent>|<get-eagerPagesPerAgent>(){}[0]
+    final val pageSize // com.letta.mobile.util/AgentConversationFleetPaging.pageSize|{}pageSize[0]
+        final fun <get-pageSize>(): kotlin/Int // com.letta.mobile.util/AgentConversationFleetPaging.pageSize.<get-pageSize>|<get-pageSize>(){}[0]
+    final val parallelism // com.letta.mobile.util/AgentConversationFleetPaging.parallelism|{}parallelism[0]
+        final fun <get-parallelism>(): kotlin/Int // com.letta.mobile.util/AgentConversationFleetPaging.parallelism.<get-parallelism>|<get-parallelism>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.util/AgentConversationFleetPaging.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // com.letta.mobile.util/AgentConversationFleetPaging.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // com.letta.mobile.util/AgentConversationFleetPaging.component3|component3(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ...): com.letta.mobile.util/AgentConversationFleetPaging // com.letta.mobile.util/AgentConversationFleetPaging.copy|copy(kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.util/AgentConversationFleetPaging.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.util/AgentConversationFleetPaging.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.util/AgentConversationFleetPaging.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.util/TelemetryContext { // com.letta.mobile.util/TelemetryContext|null[0]
     constructor <init>() // com.letta.mobile.util/TelemetryContext.<init>|<init>(){}[0]
 
@@ -66809,6 +66801,10 @@ final const val com.letta.mobile.ui.chat.render/ToolOutputMaxRenderedChars // co
     final fun <get-ToolOutputMaxRenderedChars>(): kotlin/Int // com.letta.mobile.ui.chat.render/ToolOutputMaxRenderedChars.<get-ToolOutputMaxRenderedChars>|<get-ToolOutputMaxRenderedChars>(){}[0]
 final const val com.letta.mobile.ui.chat.render/ToolOutputMaxRenderedLines // com.letta.mobile.ui.chat.render/ToolOutputMaxRenderedLines|{}ToolOutputMaxRenderedLines[0]
     final fun <get-ToolOutputMaxRenderedLines>(): kotlin/Int // com.letta.mobile.ui.chat.render/ToolOutputMaxRenderedLines.<get-ToolOutputMaxRenderedLines>|<get-ToolOutputMaxRenderedLines>(){}[0]
+final const val com.letta.mobile.util/AGENT_CONVERSATION_PAGE_SIZE // com.letta.mobile.util/AGENT_CONVERSATION_PAGE_SIZE|{}AGENT_CONVERSATION_PAGE_SIZE[0]
+    final fun <get-AGENT_CONVERSATION_PAGE_SIZE>(): kotlin/Int // com.letta.mobile.util/AGENT_CONVERSATION_PAGE_SIZE.<get-AGENT_CONVERSATION_PAGE_SIZE>|<get-AGENT_CONVERSATION_PAGE_SIZE>(){}[0]
+final const val com.letta.mobile.util/READ_THROUGH_PAGES // com.letta.mobile.util/READ_THROUGH_PAGES|{}READ_THROUGH_PAGES[0]
+    final fun <get-READ_THROUGH_PAGES>(): kotlin/Int // com.letta.mobile.util/READ_THROUGH_PAGES.<get-READ_THROUGH_PAGES>|<get-READ_THROUGH_PAGES>(){}[0]
 
 final val com.letta.mobile.data.a2ui/A2UI_DEFAULT_SUPPORTED_CATALOGS // com.letta.mobile.data.a2ui/A2UI_DEFAULT_SUPPORTED_CATALOGS|{}A2UI_DEFAULT_SUPPORTED_CATALOGS[0]
     final fun <get-A2UI_DEFAULT_SUPPORTED_CATALOGS>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.a2ui/A2UI_DEFAULT_SUPPORTED_CATALOGS.<get-A2UI_DEFAULT_SUPPORTED_CATALOGS>|<get-A2UI_DEFAULT_SUPPORTED_CATALOGS>(){}[0]
@@ -66897,6 +66893,7 @@ final fun (com.letta.mobile.data.canvas/CanvasRelayLink).com.letta.mobile.data.c
 final fun (com.letta.mobile.data.chat.projection/ToolTimelineState).com.letta.mobile.data.chat.projection/toWireStatus(): kotlin/String? // com.letta.mobile.data.chat.projection/toWireStatus|toWireStatus@com.letta.mobile.data.chat.projection.ToolTimelineState(){}[0]
 final fun (com.letta.mobile.data.chat.runtime/ChatComposerError).com.letta.mobile.ui.chat.session/message(com.letta.mobile.data.attachment/AttachmentLimits): kotlin/String // com.letta.mobile.ui.chat.session/message|message@com.letta.mobile.data.chat.runtime.ChatComposerError(com.letta.mobile.data.attachment.AttachmentLimits){}[0]
 final fun (com.letta.mobile.data.chat.runtime/ChatConnectionState).com.letta.mobile.ui.chat.render/toConversationState(kotlin/String?, kotlin/String?): com.letta.mobile.ui.chat.render/ConversationState // com.letta.mobile.ui.chat.render/toConversationState|toConversationState@com.letta.mobile.data.chat.runtime.ChatConnectionState(kotlin.String?;kotlin.String?){}[0]
+final fun (com.letta.mobile.data.chat.runtime/ChatConversationStore).com.letta.mobile.data.chat.runtime/agentConversationReader(): com.letta.mobile.util/AgentConversationReader // com.letta.mobile.data.chat.runtime/agentConversationReader|agentConversationReader@com.letta.mobile.data.chat.runtime.ChatConversationStore(){}[0]
 final fun (com.letta.mobile.data.chat.runtime/ChatConversationSummary).com.letta.mobile.data.chat.runtime/displayTitle(kotlin/Int = ...): kotlin/String // com.letta.mobile.data.chat.runtime/displayTitle|displayTitle@com.letta.mobile.data.chat.runtime.ChatConversationSummary(kotlin.Int){}[0]
 final fun (com.letta.mobile.data.chat.runtime/ChatConversationSummary).com.letta.mobile.data.chat.runtime/persistedTitleCandidate(kotlin/String, kotlin/Int = ...): kotlin/String? // com.letta.mobile.data.chat.runtime/persistedTitleCandidate|persistedTitleCandidate@com.letta.mobile.data.chat.runtime.ChatConversationSummary(kotlin.String;kotlin.Int){}[0]
 final fun (com.letta.mobile.data.chat.runtime/ChatGateway).com.letta.mobile.data.chat.branch/branchBackendOrNull(): com.letta.mobile.data.chat.branch/BranchBackend? // com.letta.mobile.data.chat.branch/branchBackendOrNull|branchBackendOrNull@com.letta.mobile.data.chat.runtime.ChatGateway(){}[0]

@@ -8376,42 +8376,6 @@ public final class com/letta/mobile/data/chat/branch/PendingDraft {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/letta/mobile/data/chat/conversations/AgentConversationFleet {
-	public fun <init> (Lcom/letta/mobile/data/chat/conversations/AgentConversationReader;Lcom/letta/mobile/data/chat/conversations/AgentConversationFleetPaging;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/chat/conversations/AgentConversationReader;Lcom/letta/mobile/data/chat/conversations/AgentConversationFleetPaging;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getConversations ()Ljava/util/List;
-	public final fun getHasMore ()Z
-	public final fun loadMore (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun refresh (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
-public final class com/letta/mobile/data/chat/conversations/AgentConversationFleetPaging {
-	public static final field Companion Lcom/letta/mobile/data/chat/conversations/AgentConversationFleetPaging$Companion;
-	public static final field DEFAULT_PARALLELISM I
-	public static final field READ_THROUGH_PAGES I
-	public fun <init> ()V
-	public fun <init> (III)V
-	public synthetic fun <init> (IIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()I
-	public final fun component2 ()I
-	public final fun component3 ()I
-	public final fun copy (III)Lcom/letta/mobile/data/chat/conversations/AgentConversationFleetPaging;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/conversations/AgentConversationFleetPaging;IIIILjava/lang/Object;)Lcom/letta/mobile/data/chat/conversations/AgentConversationFleetPaging;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getEagerPagesPerAgent ()I
-	public final fun getPageSize ()I
-	public final fun getParallelism ()I
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/data/chat/conversations/AgentConversationFleetPaging$Companion {
-}
-
-public abstract interface class com/letta/mobile/data/chat/conversations/AgentConversationReader {
-	public abstract fun read (Lcom/letta/mobile/data/chat/runtime/AgentConversationPage;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
 public final class com/letta/mobile/data/chat/conversations/ClientCommandRoutes {
 	public fun <init> ()V
 	public fun <init> (Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;)V
@@ -9429,9 +9393,6 @@ public final class com/letta/mobile/data/chat/runtime/ActiveRunStatusKt {
 }
 
 public final class com/letta/mobile/data/chat/runtime/AgentConversationPage {
-	public static final field ARCHIVE_STATUS_ALL Ljava/lang/String;
-	public static final field Companion Lcom/letta/mobile/data/chat/runtime/AgentConversationPage$Companion;
-	public static final field DEFAULT_LIMIT I
 	public synthetic fun <init> (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public synthetic fun <init> (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1-zqmzO_A ()Ljava/lang/String;
@@ -9447,9 +9408,6 @@ public final class com/letta/mobile/data/chat/runtime/AgentConversationPage {
 	public final fun getLimit ()I
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/data/chat/runtime/AgentConversationPage$Companion {
 }
 
 public final class com/letta/mobile/data/chat/runtime/AlwaysAllowAnswer {
@@ -9720,6 +9678,10 @@ public final class com/letta/mobile/data/chat/runtime/ChatRuntimeContractsKt {
 	public static synthetic fun toChatConversationSummaries$default (Ljava/lang/Iterable;Ljava/util/Map;ILjava/lang/Object;)Ljava/util/List;
 	public static final fun toChatConversationSummary (Lcom/letta/mobile/data/model/Conversation;Ljava/util/Map;)Lcom/letta/mobile/data/chat/runtime/ChatConversationSummary;
 	public static synthetic fun toChatConversationSummary$default (Lcom/letta/mobile/data/model/Conversation;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/runtime/ChatConversationSummary;
+}
+
+public final class com/letta/mobile/data/chat/runtime/ChatRuntimeIoContractsKt {
+	public static final fun agentConversationReader (Lcom/letta/mobile/data/chat/runtime/ChatConversationStore;)Lcom/letta/mobile/util/AgentConversationReader;
 }
 
 public abstract interface class com/letta/mobile/data/chat/runtime/ChatScreenStatus {
@@ -35763,7 +35725,7 @@ public final class com/letta/mobile/data/repository/IrohAdminRpcConversationList
 	public final fun forkConversation (Lcom/letta/mobile/data/chat/branch/ConversationForkRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun getConversation-1iDlvEA (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun getRecompiler ()Lcom/letta/mobile/data/chat/recompile/IrohConversationRecompileClient;
-	public final fun listAgentConversations (Lcom/letta/mobile/data/chat/runtime/AgentConversationPage;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun listAgentConversations-a2BnSRI (Ljava/lang/String;Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun listConversations-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun listConversationsForAgent-mT_9V4Y (Ljava/lang/String;Ljava/lang/Integer;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun listConversationsForAgent-mT_9V4Y$default (Lcom/letta/mobile/data/repository/IrohAdminRpcConversationListSource;Ljava/lang/String;Ljava/lang/Integer;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
@@ -63388,6 +63350,41 @@ public final class com/letta/mobile/ui/theme/LettaThemeTokens {
 	public final fun preset (Lcom/letta/mobile/data/model/ThemePreset;)Lcom/letta/mobile/ui/theme/LettaThemePresetTokens;
 }
 
+public final class com/letta/mobile/util/AgentConversationFleet {
+	public fun <init> (Lcom/letta/mobile/util/AgentConversationReader;Lcom/letta/mobile/util/AgentConversationFleetPaging;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/letta/mobile/util/AgentConversationReader;Lcom/letta/mobile/util/AgentConversationFleetPaging;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getConversations ()Ljava/util/List;
+	public final fun getHasMore ()Z
+	public final fun loadMore (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun refresh (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/util/AgentConversationFleetKt {
+	public static final field AGENT_CONVERSATION_PAGE_SIZE I
+	public static final field READ_THROUGH_PAGES I
+}
+
+public final class com/letta/mobile/util/AgentConversationFleetPaging {
+	public fun <init> ()V
+	public fun <init> (III)V
+	public synthetic fun <init> (IIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun copy (III)Lcom/letta/mobile/util/AgentConversationFleetPaging;
+	public static synthetic fun copy$default (Lcom/letta/mobile/util/AgentConversationFleetPaging;IIIILjava/lang/Object;)Lcom/letta/mobile/util/AgentConversationFleetPaging;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEagerPagesPerAgent ()I
+	public final fun getPageSize ()I
+	public final fun getParallelism ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/util/AgentConversationReader {
+	public abstract fun read-a2BnSRI (Ljava/lang/String;Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public final class com/letta/mobile/util/BackendUrlTelemetryKt {
 	public static final fun backendUrlTelemetryDescriptor (Ljava/lang/String;)Ljava/lang/String;
 }
@@ -63413,6 +63410,11 @@ public final class com/letta/mobile/util/FormatHelpers {
 public final class com/letta/mobile/util/InputDiagnostics {
 	public static final field INSTANCE Lcom/letta/mobile/util/InputDiagnostics;
 	public final fun getEnabled ()Lcom/letta/mobile/util/TelemetryFlag;
+}
+
+public final class com/letta/mobile/util/ReadThroughConversationFleets {
+	public fun <init> (Lkotlin/jvm/functions/Function1;)V
+	public final fun fleetFor (Ljava/lang/Object;)Lcom/letta/mobile/util/AgentConversationFleet;
 }
 
 public final class com/letta/mobile/util/RelativeTimeFormatterKt {
