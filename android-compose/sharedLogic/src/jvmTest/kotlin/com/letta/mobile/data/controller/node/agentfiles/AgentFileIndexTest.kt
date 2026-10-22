@@ -78,6 +78,21 @@ class AgentFileIndexTest {
     }
 
     @Test
+    fun theSignatureMovesWhenACoveredAgentsCompanionChanges() {
+        val root = store()
+        root.agent("a", mtimeMs = 1_000)
+        val companion = File(root, "a.companion").apply { writeText("v1") }
+        val index = index(root)
+        fun signature() = index.signature { id -> File(root, "$id.companion") }
+        val first = signature()
+        assertEquals(first, signature())
+
+        companion.writeText("v2-longer")
+
+        assertTrue(first != signature(), "a companion rewrite must move the signature")
+    }
+
+    @Test
     fun hiddenAgentsAreFlaggedByTheirTagOrTheirHiddenField() {
         val root = store()
         root.agent("plain", mtimeMs = 1_000)

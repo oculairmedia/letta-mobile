@@ -59,8 +59,14 @@ open class LocalBackendAdminStore(
     /** See [LocalBackendAgentReader.countAgents]. */
     fun countAgents(): Int? = agentReader.countAgents()
 
-    /** A value that changes whenever an agent file is added, removed or rewritten; null when unreadable. */
-    open fun agentFilesSignature(): Long? = runCatching { support.agentIndex.signature() }.getOrNull()
+    /**
+     * A value that changes whenever what the App Server serves for an agent can have changed on disk:
+     * its agent file, or its default conversation's `conversation.json` (the App Server takes the
+     * agent's message ids, last run time and so its roster order from there). Null when unreadable.
+     */
+    open fun agentFilesSignature(): Long? = runCatching {
+        support.agentIndex.signature { agentId -> support.defaultConversationFile(agentId) }
+    }.getOrNull()
 
     /** See [LocalBackendAgentReader.hiddenAgentIds]. */
     open fun hiddenAgentIds(): Set<String>? = agentReader.hiddenAgentIds()

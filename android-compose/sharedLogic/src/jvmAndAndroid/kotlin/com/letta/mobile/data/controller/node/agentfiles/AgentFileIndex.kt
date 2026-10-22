@@ -56,10 +56,7 @@ internal class AgentFileIndex(
         derived.keys.retainAll(live)
         val entries = newest
             .mapNotNull { stamp ->
-                // A null from parse (the read failed) leaves nothing cached, so the next scan retries.
-                val info = derived.compute(stamp.file.name) { _, known ->
-                    known?.takeIf { it.modified == stamp.modified && it.sizeBytes == stamp.sizeBytes } ?: parse(stamp)
-                }
+                val info = derive(stamp)
                 info?.id?.let { id -> Entry(stamp.file, id, stamp.mtimeMs, info.hidden) }
             }
             .sortedByDescending { it.mtimeMs }
@@ -67,15 +64,31 @@ internal class AgentFileIndex(
     }
 
     /**
-     * A value that changes whenever an agent file is added, removed or rewritten (name, modified time
-     * at full precision, size), from one listing and one attribute read per file and no parsing.
-     * Null when the directory cannot be listed.
+     * A value that changes whenever an agent file is added, removed or rewritten (path, modified time
+     * at full precision, size), or a [companion] file of a covered agent is. A companion is another
+     * file the agent's served state is built from (the App Server takes an agent's message ids and
+     * last run time from its default conversation). One attribute read per file; a record is parsed
+     * only when it changed, to learn its id. Null when the directory cannot be listed.
      */
-    fun signature(): Long? {
+    fun signature(companion: (agentId: String) -> File? = { null }): Long? {
         val files = agentsDir.listFiles { f -> f.isFile && f.name.endsWith(SUFFIX) } ?: return null
-        // A sum of per-file mixes, so the listing order does not matter.
-        return files.fold(files.size.toLong()) { sum, file -> sum + (stamp(file)?.mix() ?: 0L) }
+        val stamped = files.mapNotNull { file -> stamp(file) }
+        val covered = if (stamped.size > maxEntries) stamped.sortedByDescending { it.mtimeMs }.take(maxEntries) else stamped
+        // Sums of per-file mixes, so the listing order does not matter.
+        val agents = stamped.fold(stamped.size.toLong()) { sum, stamp -> sum + stamp.mix() }
+        val companions = covered.fold(0L) { sum, stamp ->
+            val file = derive(stamp)?.id?.let(companion)
+            sum + (file?.let(::stamp)?.mix() ?: 0L)
+        }
+        return agents * MIX_PRIME + companions
     }
+
+    /** The record's derived fields, parsed only when its stamp changed; null when it could not be read. */
+    private fun derive(stamp: Stamp): Derived? =
+        // A null from parse (the read failed) leaves nothing cached, so the next call retries.
+        derived.compute(stamp.file.name) { _, known ->
+            known?.takeIf { it.modified == stamp.modified && it.sizeBytes == stamp.sizeBytes } ?: parse(stamp)
+        }
 
     /** Reports once per crossing that records beyond the cap are not seen: counts and hidden sets then leave the oldest out. */
     private fun noteCap(found: Int) {
@@ -90,7 +103,7 @@ internal class AgentFileIndex(
         val mtimeMs: Long get() = modified.toMillis()
 
         fun mix(): Long {
-            var h = file.name.hashCode().toLong()
+            var h = file.path.hashCode().toLong()
             h = h * MIX_PRIME + modified.to(TimeUnit.NANOSECONDS)
             h = h * MIX_PRIME + sizeBytes
             h = (h xor (h ushr 33)) * MIX_MULTIPLIER

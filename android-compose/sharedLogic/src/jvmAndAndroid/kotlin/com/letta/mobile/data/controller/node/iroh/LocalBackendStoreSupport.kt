@@ -157,3 +157,7 @@ internal fun LocalBackendStoreSupport.storedAgentId(conversationId: Conversation
     File(dir, "conversation.json").takeIf { it.isFile }?.readText()
         ?.let { json.parseToJsonElement(it).jsonObject["agent_id"]?.jsonPrimitive?.contentOrNullSafe() }
 }.getOrNull()
+
+/** Where the App Server keeps [agentId]'s default conversation record. */
+internal fun LocalBackendStoreSupport.defaultConversationFile(agentId: String): File =
+    File(File(File(baseDir, "conversations"), b64UrlEncode(conversationKey("default", agentId))), "conversation.json")

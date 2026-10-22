@@ -59,10 +59,14 @@ object AgentAdminHandlers {
                 // limit/offset contract for both clients. With a roster cache
                 // the whole roster is fetched once and every page sliced from it.
                 val pageSize = limit ?: DEFAULT_AGENT_LIST_LIMIT
+                val window = (offset + pageSize).coerceAtMost(MAX_AGENT_LIST_FETCH)
                 val agents = if (roster != null) {
-                    roster.roster { fetchAgents(c, MAX_AGENT_LIST_FETCH) }
+                    roster.roster(
+                        fetchAll = { fetchAgents(c, MAX_AGENT_LIST_FETCH) },
+                        fetchWindow = { fetchAgents(c, window) },
+                    )
                 } else {
-                    fetchAgents(c, (offset + pageSize).coerceAtMost(MAX_AGENT_LIST_FETCH))
+                    fetchAgents(c, window)
                 } ?: return@require null
                 val page = pageOf(agents, offset, pageSize)
                 tiers.agentMetadata?.overlayAll(page) ?: page

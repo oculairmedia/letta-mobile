@@ -14,16 +14,17 @@ class AgentRosterCacheTest {
     private var signature: Long? = 1L
     private var nowMs = 0L
     private var fetches = 0
+    private var windowFetches = 0
 
     private fun roster(vararg ids: String) = JsonArray(ids.map { JsonPrimitive(it) })
 
     private fun cache(maxAgeMs: Long = 30_000L, onTooLarge: (Int) -> Unit = {}) =
         AgentRosterCache(signature = { signature }, maxAgeMs = maxAgeMs, clock = { nowMs }, onTooLarge = onTooLarge)
 
-    private suspend fun AgentRosterCache.read(result: JsonArray? = roster("a")): JsonArray? = roster {
-        fetches++
-        result
-    }
+    private suspend fun AgentRosterCache.read(result: JsonArray? = roster("a")): JsonArray? = roster(
+        fetchAll = { fetches++; result },
+        fetchWindow = { windowFetches++; roster("window") },
+    )
 
     @Test
     fun anUnchangedStoreIsServedFromOneFetch() = runTest {
@@ -69,7 +70,7 @@ class AgentRosterCacheTest {
     fun aFetchRunningWhenInvalidatedIsServedButNotHeld() = runTest {
         val cache = cache()
         val release = CompletableDeferred<Unit>()
-        val stale = async { cache.roster { fetches++; release.await(); roster("before-write") } }
+        val stale = async { cache.roster({ fetches++; release.await(); roster("before-write") }, { roster("window") }) }
         yield()
         cache.invalidate()
         release.complete(Unit)
@@ -83,8 +84,8 @@ class AgentRosterCacheTest {
     fun concurrentMissesShareOneFetch() = runTest {
         val cache = cache()
         val release = CompletableDeferred<Unit>()
-        val first = async { cache.roster { fetches++; release.await(); roster("a") } }
-        val second = async { cache.roster { fetches++; roster("never") } }
+        val first = async { cache.roster({ fetches++; release.await(); roster("a") }, { roster("window") }) }
+        val second = async { cache.roster({ fetches++; roster("never") }, { roster("window") }) }
         yield()
         release.complete(Unit)
 
@@ -104,23 +105,29 @@ class AgentRosterCacheTest {
     }
 
     @Test
-    fun withoutASignatureEveryReadFetches() = runTest {
+    fun withoutASignatureEveryReadFetchesOnlyTheWindow() = runTest {
         signature = null
         val cache = cache()
-        repeat(3) { cache.read() }
+        repeat(3) { assertEquals(roster("window"), cache.read()) }
 
-        assertEquals(3, fetches)
+        assertEquals(0, fetches)
+        assertEquals(3, windowFetches)
     }
 
     @Test
-    fun aRosterPastTheCapIsServedButNotHeld() = runTest {
+    fun aRosterPastTheCapFallsBackToWindowFetchesUntilTheStoreChanges() = runTest {
         val reports = mutableListOf<Int>()
         val cache = cache(onTooLarge = { reports += it })
         val big = JsonArray(List(AgentRosterCache.MAX_AGENTS + 1) { JsonPrimitive(it) })
-        cache.read(big)
-        cache.read(big)
 
-        assertEquals(2, fetches)
-        assertEquals(listOf(big.size, big.size), reports)
+        assertEquals(big, cache.read(big))
+        assertEquals(roster("window"), cache.read(big))
+        signature = 2L
+        cache.read(roster("a"))
+        cache.read(roster("a"))
+
+        assertEquals(listOf(big.size), reports)
+        assertEquals(2, fetches, "one too-large fetch, then one full fetch after the change")
+        assertEquals(1, windowFetches)
     }
 }

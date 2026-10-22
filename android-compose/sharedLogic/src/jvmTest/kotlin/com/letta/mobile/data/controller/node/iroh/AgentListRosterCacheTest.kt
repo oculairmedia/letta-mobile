@@ -46,5 +46,11 @@ class AgentListRosterCacheTest {
         LocalBackendFixtureStore.writeAgent(root, "agent-new", name = "New")
         dispatch(r, "agent.list", mapOf("limit" to "2"))
         assertEquals(3, listCalls(), "an agent file changed on disk refetches")
+
+        // The App Server takes message ids and last run time from the default conversation.
+        val conversation = java.io.File(LocalBackendFixtureStore.conversationDir(root, "agent-new").apply { mkdirs() }, "conversation.json")
+        conversation.writeText("""{"id":"default","agent_id":"agent-new","last_message_at":"2026-10-22T00:00:00Z"}""")
+        dispatch(r, "agent.list", mapOf("limit" to "2"))
+        assertEquals(4, listCalls(), "a default conversation change refetches")
     }
 }
