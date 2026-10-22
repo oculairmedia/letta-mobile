@@ -16,6 +16,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppServerListModelsAdapter
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.decodeConversationList
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -52,8 +53,9 @@ class AppServerLocalAdminGateway(
                 },
             ),
         )
-        return Payload(response.success, response.error, response.conversations)
-            .decodeList(Operation.ConversationList, Conversation.serializer())
+        return AppServerProtocol.json.decodeConversationList(
+            Payload(response.success, response.error, response.conversations).requireValue(Operation.ConversationList),
+        )
     }
 
     suspend fun getConversation(conversation: ConversationId): Conversation {
