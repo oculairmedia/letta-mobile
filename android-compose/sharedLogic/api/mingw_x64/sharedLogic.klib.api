@@ -48754,27 +48754,6 @@ final class com.letta.mobile.data.repository.modelcontrol/ModelControlSession { 
     final fun pickerSource(): com.letta.mobile.data.repository.modelcontrol/ModelPickerSource // com.letta.mobile.data.repository.modelcontrol/ModelControlSession.pickerSource|pickerSource(){}[0]
 }
 
-final class com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu { // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu|null[0]
-    constructor <init>(com.letta.mobile.data.repository.modelcontrol/ThinkingToggle?, kotlin.collections/List<kotlin/String>, kotlin/String?) // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.<init>|<init>(com.letta.mobile.data.repository.modelcontrol.ThinkingToggle?;kotlin.collections.List<kotlin.String>;kotlin.String?){}[0]
-
-    final val current // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.current|{}current[0]
-        final fun <get-current>(): kotlin/String? // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.current.<get-current>|<get-current>(){}[0]
-    final val isEmpty // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.isEmpty|{}isEmpty[0]
-        final fun <get-isEmpty>(): kotlin/Boolean // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.isEmpty.<get-isEmpty>|<get-isEmpty>(){}[0]
-    final val levels // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.levels|{}levels[0]
-        final fun <get-levels>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.levels.<get-levels>|<get-levels>(){}[0]
-    final val thinking // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.thinking|{}thinking[0]
-        final fun <get-thinking>(): com.letta.mobile.data.repository.modelcontrol/ThinkingToggle? // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.thinking.<get-thinking>|<get-thinking>(){}[0]
-
-    final fun component1(): com.letta.mobile.data.repository.modelcontrol/ThinkingToggle? // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.component1|component1(){}[0]
-    final fun component2(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.component2|component2(){}[0]
-    final fun component3(): kotlin/String? // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.component3|component3(){}[0]
-    final fun copy(com.letta.mobile.data.repository.modelcontrol/ThinkingToggle? = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ...): com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.copy|copy(com.letta.mobile.data.repository.modelcontrol.ThinkingToggle?;kotlin.collections.List<kotlin.String>;kotlin.String?){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu.toString|toString(){}[0]
-}
-
 final class com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding { // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding|null[0]
     constructor <init>(com.letta.mobile.data.repository.modelcontrol/ModelPickerSource, kotlin/Function1<com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry, kotlin/Unit>, kotlin/Function2<com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry, kotlin/String?, kotlin/Unit>?, kotlin/Function1<kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.repository.modelcontrol/ProviderManagementController>?, kotlin/Function0<kotlin/Unit>?, kotlin.coroutines/SuspendFunction0<kotlin/Unit>) // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.<init>|<init>(com.letta.mobile.data.repository.modelcontrol.ModelPickerSource;kotlin.Function1<com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry,kotlin.Unit>;kotlin.Function2<com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry,kotlin.String?,kotlin.Unit>?;kotlin.Function1<kotlinx.coroutines.CoroutineScope,com.letta.mobile.data.repository.modelcontrol.ProviderManagementController>?;kotlin.Function0<kotlin.Unit>?;kotlin.coroutines.SuspendFunction0<kotlin.Unit>){}[0]
 
@@ -49279,22 +49258,6 @@ final class com.letta.mobile.data.repository.modelcontrol/ReasoningEffortStops {
     final object Companion { // com.letta.mobile.data.repository.modelcontrol/ReasoningEffortStops.Companion|null[0]
         final fun of(kotlin.collections/List<kotlin/String>): com.letta.mobile.data.repository.modelcontrol/ReasoningEffortStops? // com.letta.mobile.data.repository.modelcontrol/ReasoningEffortStops.Companion.of|of(kotlin.collections.List<kotlin.String>){}[0]
     }
-}
-
-final class com.letta.mobile.data.repository.modelcontrol/ThinkingToggle { // com.letta.mobile.data.repository.modelcontrol/ThinkingToggle|null[0]
-    constructor <init>(kotlin/Boolean, kotlin/String?) // com.letta.mobile.data.repository.modelcontrol/ThinkingToggle.<init>|<init>(kotlin.Boolean;kotlin.String?){}[0]
-
-    final val on // com.letta.mobile.data.repository.modelcontrol/ThinkingToggle.on|{}on[0]
-        final fun <get-on>(): kotlin/Boolean // com.letta.mobile.data.repository.modelcontrol/ThinkingToggle.on.<get-on>|<get-on>(){}[0]
-    final val toggledEffort // com.letta.mobile.data.repository.modelcontrol/ThinkingToggle.toggledEffort|{}toggledEffort[0]
-        final fun <get-toggledEffort>(): kotlin/String? // com.letta.mobile.data.repository.modelcontrol/ThinkingToggle.toggledEffort.<get-toggledEffort>|<get-toggledEffort>(){}[0]
-
-    final fun component1(): kotlin/Boolean // com.letta.mobile.data.repository.modelcontrol/ThinkingToggle.component1|component1(){}[0]
-    final fun component2(): kotlin/String? // com.letta.mobile.data.repository.modelcontrol/ThinkingToggle.component2|component2(){}[0]
-    final fun copy(kotlin/Boolean = ..., kotlin/String? = ...): com.letta.mobile.data.repository.modelcontrol/ThinkingToggle // com.letta.mobile.data.repository.modelcontrol/ThinkingToggle.copy|copy(kotlin.Boolean;kotlin.String?){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.repository.modelcontrol/ThinkingToggle.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.repository.modelcontrol/ThinkingToggle.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.repository.modelcontrol/ThinkingToggle.toString|toString(){}[0]
 }
 
 final class com.letta.mobile.data.repository.modelcontrol/VisibleSection { // com.letta.mobile.data.repository.modelcontrol/VisibleSection|null[0]
@@ -66781,8 +66744,6 @@ final const val com.letta.mobile.data.repository.api/LIST_ROSTER_MAX_AGE_MS // c
     final fun <get-LIST_ROSTER_MAX_AGE_MS>(): kotlin/Long // com.letta.mobile.data.repository.api/LIST_ROSTER_MAX_AGE_MS.<get-LIST_ROSTER_MAX_AGE_MS>|<get-LIST_ROSTER_MAX_AGE_MS>(){}[0]
 final const val com.letta.mobile.data.repository.modelcontrol/PROVIDER_FIELD_BASE_URL // com.letta.mobile.data.repository.modelcontrol/PROVIDER_FIELD_BASE_URL|{}PROVIDER_FIELD_BASE_URL[0]
     final fun <get-PROVIDER_FIELD_BASE_URL>(): kotlin/String // com.letta.mobile.data.repository.modelcontrol/PROVIDER_FIELD_BASE_URL.<get-PROVIDER_FIELD_BASE_URL>|<get-PROVIDER_FIELD_BASE_URL>(){}[0]
-final const val com.letta.mobile.data.repository.modelcontrol/THINKING_OFF_EFFORT // com.letta.mobile.data.repository.modelcontrol/THINKING_OFF_EFFORT|{}THINKING_OFF_EFFORT[0]
-    final fun <get-THINKING_OFF_EFFORT>(): kotlin/String // com.letta.mobile.data.repository.modelcontrol/THINKING_OFF_EFFORT.<get-THINKING_OFF_EFFORT>|<get-THINKING_OFF_EFFORT>(){}[0]
 final const val com.letta.mobile.data.runtime/LOCAL_RUNTIME_PROVIDER_NAME // com.letta.mobile.data.runtime/LOCAL_RUNTIME_PROVIDER_NAME|{}LOCAL_RUNTIME_PROVIDER_NAME[0]
     final fun <get-LOCAL_RUNTIME_PROVIDER_NAME>(): kotlin/String // com.letta.mobile.data.runtime/LOCAL_RUNTIME_PROVIDER_NAME.<get-LOCAL_RUNTIME_PROVIDER_NAME>|<get-LOCAL_RUNTIME_PROVIDER_NAME>(){}[0]
 final const val com.letta.mobile.data.runtime/SESSION_RECONNECT_GRACE_MS // com.letta.mobile.data.runtime/SESSION_RECONNECT_GRACE_MS|{}SESSION_RECONNECT_GRACE_MS[0]
@@ -67010,7 +66971,6 @@ final fun (com.letta.mobile.data.plugin/PluginOrigin).com.letta.mobile.data.plug
 final fun (com.letta.mobile.data.repository.api/ISettingsRepository).com.letta.mobile.data.repository/activeBackendUsesChannel(): kotlin/Boolean // com.letta.mobile.data.repository/activeBackendUsesChannel|activeBackendUsesChannel@com.letta.mobile.data.repository.api.ISettingsRepository(){}[0]
 final fun (com.letta.mobile.data.repository.modelcontrol/ConnectableProvider).com.letta.mobile.data.repository.modelcontrol/connectMethodOn(kotlin/Boolean): com.letta.mobile.data.repository.modelcontrol/ProviderConnectMethod // com.letta.mobile.data.repository.modelcontrol/connectMethodOn|connectMethodOn@com.letta.mobile.data.repository.modelcontrol.ConnectableProvider(kotlin.Boolean){}[0]
 final fun (com.letta.mobile.data.repository.modelcontrol/ConversationModelChoices).com.letta.mobile.data.context/windowTokensFor(kotlin/String?, com.letta.mobile.data.model/Agent?, kotlin.collections/List<com.letta.mobile.data.model/LlmModel>): kotlin/Int? // com.letta.mobile.data.context/windowTokensFor|windowTokensFor@com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices(kotlin.String?;com.letta.mobile.data.model.Agent?;kotlin.collections.List<com.letta.mobile.data.model.LlmModel>){}[0]
-final fun (com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry).com.letta.mobile.data.repository.modelcontrol/effortMenu(kotlin/String?): com.letta.mobile.data.repository.modelcontrol/ModelEffortMenu // com.letta.mobile.data.repository.modelcontrol/effortMenu|effortMenu@com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry(kotlin.String?){}[0]
 final fun (com.letta.mobile.data.runtime/AgentDefaultsRepository).com.letta.mobile.data.runtime/cwd(com.letta.mobile.data.model/AgentId): kotlin/String? // com.letta.mobile.data.runtime/cwd|cwd@com.letta.mobile.data.runtime.AgentDefaultsRepository(com.letta.mobile.data.model.AgentId){}[0]
 final fun (com.letta.mobile.data.runtime/AppServerTurnEngine).com.letta.mobile.data.runtime/cachedApprovalDecisionFor(com.letta.mobile.data.transport.appserver/AppServerInboundFrame.ControlRequest): com.letta.mobile.data.controller.fanout/ApprovalDecisionCache.CachedDecision? // com.letta.mobile.data.runtime/cachedApprovalDecisionFor|cachedApprovalDecisionFor@com.letta.mobile.data.runtime.AppServerTurnEngine(com.letta.mobile.data.transport.appserver.AppServerInboundFrame.ControlRequest){}[0]
 final fun (com.letta.mobile.data.runtime/AppServerTurnEngine).com.letta.mobile.data.runtime/releaseUserInputGateUnlessRejected(com.letta.mobile.data.controller/ApprovalSubmitResult, kotlin/String?, kotlin/String?) // com.letta.mobile.data.runtime/releaseUserInputGateUnlessRejected|releaseUserInputGateUnlessRejected@com.letta.mobile.data.runtime.AppServerTurnEngine(com.letta.mobile.data.controller.ApprovalSubmitResult;kotlin.String?;kotlin.String?){}[0]
@@ -67174,7 +67134,6 @@ final fun com.letta.mobile.data.repository.modelcontrol/chatModelPicker(com.lett
 final fun com.letta.mobile.data.repository.modelcontrol/defaultProviderOAuthHttp(): com.letta.mobile.data.repository.modelcontrol/ProviderOAuthHttp? // com.letta.mobile.data.repository.modelcontrol/defaultProviderOAuthHttp|defaultProviderOAuthHttp(){}[0]
 final fun com.letta.mobile.data.repository.modelcontrol/providerEditForm(com.letta.mobile.data.repository.modelcontrol/ConnectableProvider): com.letta.mobile.data.repository.modelcontrol/ProviderConnectForm // com.letta.mobile.data.repository.modelcontrol/providerEditForm|providerEditForm(com.letta.mobile.data.repository.modelcontrol.ConnectableProvider){}[0]
 final fun com.letta.mobile.data.repository.modelcontrol/reasoningEffortsOf(kotlin.collections/List<com.letta.mobile.data.repository.modelcontrol/CatalogModel>, com.letta.mobile.data.model/LlmModel): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.repository.modelcontrol/reasoningEffortsOf|reasoningEffortsOf(kotlin.collections.List<com.letta.mobile.data.repository.modelcontrol.CatalogModel>;com.letta.mobile.data.model.LlmModel){}[0]
-final fun com.letta.mobile.data.repository.modelcontrol/thinkingToggleOf(kotlin.collections/List<kotlin/String>, kotlin/String?, kotlin/String?): com.letta.mobile.data.repository.modelcontrol/ThinkingToggle? // com.letta.mobile.data.repository.modelcontrol/thinkingToggleOf|thinkingToggleOf(kotlin.collections.List<kotlin.String>;kotlin.String?;kotlin.String?){}[0]
 final fun com.letta.mobile.data.repository/defaultCachedAgentRepositoryScope(): kotlinx.coroutines/CoroutineScope // com.letta.mobile.data.repository/defaultCachedAgentRepositoryScope|defaultCachedAgentRepositoryScope(){}[0]
 final fun com.letta.mobile.data.repository/defaultCachedAllConversationsRepositoryScope(): kotlinx.coroutines/CoroutineScope // com.letta.mobile.data.repository/defaultCachedAllConversationsRepositoryScope|defaultCachedAllConversationsRepositoryScope(){}[0]
 final fun com.letta.mobile.data.repository/defaultCronScope(): kotlinx.coroutines/CoroutineScope // com.letta.mobile.data.repository/defaultCronScope|defaultCronScope(){}[0]

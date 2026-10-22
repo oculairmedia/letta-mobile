@@ -33,7 +33,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectForm
-import com.letta.mobile.data.repository.modelcontrol.effortMenu
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.ProvideLettaHost
 import com.letta.mobile.ui.host.LettaDialogFrame

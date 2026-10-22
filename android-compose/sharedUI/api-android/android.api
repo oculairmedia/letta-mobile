@@ -4788,16 +4788,13 @@ public final class com/letta/mobile/ui/modelcontrol/ModelControlStrings {
 	public static final field SIGN_IN_WAITING Ljava/lang/String;
 	public static final field THINKING Ljava/lang/String;
 	public final fun connectTitle (Ljava/lang/String;)Ljava/lang/String;
+	public final fun effortName (Ljava/lang/String;)Ljava/lang/String;
 	public final fun effortOptionsOf (Ljava/lang/String;)Ljava/lang/String;
 	public final fun noMatch (Ljava/lang/String;)Ljava/lang/String;
 	public final fun removeLabel (Ljava/lang/String;)Ljava/lang/String;
 	public final fun showSecret (Ljava/lang/String;Z)Ljava/lang/String;
 	public final fun shownInPicker (Ljava/lang/String;Z)Ljava/lang/String;
 	public final fun tierLabel (Lcom/letta/mobile/data/repository/modelcontrol/ReasoningTier;)Ljava/lang/String;
-}
-
-public final class com/letta/mobile/ui/modelcontrol/ModelEffortOptionsKt {
-	public static final fun ModelEffortOptions (Lcom/letta/mobile/data/repository/modelcontrol/ModelEffortMenu;ILkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/modelcontrol/ModelEffortTags {
