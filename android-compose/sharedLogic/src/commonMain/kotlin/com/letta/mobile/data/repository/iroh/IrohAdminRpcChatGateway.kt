@@ -21,6 +21,7 @@ import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.decodeConversationList
 import com.letta.mobile.data.model.visibleConversationsInLists
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
@@ -41,6 +42,7 @@ import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.reportSkippedConversationRows
 import io.ktor.http.encodeURLParameter
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -226,7 +228,7 @@ class IrohAdminRpcChatGateway(
                 level = Telemetry.Level.WARN,
             )
         }
-        return json.decodeFromJsonElement(ListSerializer(Conversation.serializer()), result)
+        return json.decodeConversationList(result, ::reportSkippedConversationRows)
             .also { conversations ->
                 conversations.forEach { agentIdByConversation[it.id] = it.agentId }
             }
@@ -261,7 +263,7 @@ class IrohAdminRpcChatGateway(
             return emptyList()
         }
         return runCatching {
-            json.decodeFromJsonElement(ListSerializer(Conversation.serializer()), result)
+            json.decodeConversationList(result, ::reportSkippedConversationRows)
                 .also { conversations ->
                     conversations.forEach { agentIdByConversation[it.id] = it.agentId }
                 }
