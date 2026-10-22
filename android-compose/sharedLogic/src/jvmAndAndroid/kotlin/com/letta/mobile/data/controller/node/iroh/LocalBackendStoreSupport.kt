@@ -150,3 +150,10 @@ internal inline fun JsonElement.nonNullOr(fallback: () -> JsonElement): JsonElem
 internal fun sha256Hex(input: String): String =
     MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(it) }
+
+/** The agent id recorded in a real conversation's `conversation.json`; null when absent or unreadable. */
+internal fun LocalBackendStoreSupport.storedAgentId(conversationId: ConversationId): String? = runCatching {
+    val dir = File(File(baseDir, "conversations"), b64UrlEncode("conversation:${conversationId.value}"))
+    File(dir, "conversation.json").takeIf { it.isFile }?.readText()
+        ?.let { json.parseToJsonElement(it).jsonObject["agent_id"]?.jsonPrimitive?.contentOrNullSafe() }
+}.getOrNull()

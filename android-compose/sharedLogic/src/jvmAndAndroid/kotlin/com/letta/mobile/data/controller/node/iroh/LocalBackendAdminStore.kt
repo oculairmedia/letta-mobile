@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -58,6 +59,9 @@ open class LocalBackendAdminStore(
     /** See [LocalBackendAgentReader.countAgents]. */
     fun countAgents(): Int? = agentReader.countAgents()
 
+    /** A value that changes whenever an agent file is added, removed or rewritten; null when unreadable. */
+    open fun agentFilesSignature(): Long? = runCatching { support.agentIndex.signature() }.getOrNull()
+
     /** See [LocalBackendAgentReader.hiddenAgentIds]. */
     open fun hiddenAgentIds(): Set<String>? = agentReader.hiddenAgentIds()
 
@@ -95,6 +99,10 @@ open class LocalBackendAdminStore(
         limit: Int?,
         offset: Int?,
     ): JsonArray? = conversationReader.listConversationsProjected(agentId, archiveStatus, limit, offset)
+
+    /** The newest [count] messages' ids, types and content, read from the transcript's end; null on error. */
+    fun newestMessageContents(conversationId: ConversationId, count: Int): JsonArray? =
+        messageReader.newestMessageContents(conversationId.value, count)
 
     /** See [LocalBackendMessageReader.listMessagesProjected]. */
     fun listMessagesProjected(

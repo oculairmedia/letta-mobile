@@ -1,11 +1,11 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 
 /** Pagination shape for [LocalBackendMessageReader.listMessagesProjected] (mirrors the shim's message.list query). */
@@ -34,7 +34,7 @@ data class MessagePage(val limit: Int?, val before: String?, val after: String?,
  *     change output for a settled transcript.
  */
 internal class LocalBackendMessageReader(
-    private val support: LocalBackendStoreSupport,
+    internal val support: LocalBackendStoreSupport,
     // Bounded-input guard (audit P3.3 / gn7kr.22): a pathological transcript must
     // degrade gracefully instead of OOMing the whole reader. The caps sit far above
     // any real transcript (the largest known on-disk conversation is ~87 MB), so an
@@ -44,7 +44,7 @@ internal class LocalBackendMessageReader(
     private val maxTranscriptMessages: Int = MAX_TRANSCRIPT_MESSAGES,
 ) {
 
-    private val projection = LocalBackendMessageProjection(support)
+    internal val projection = LocalBackendMessageProjection(support)
 
     /**
      * Port of `GET /v1/conversations/{id}/messages`. Resolves the external
@@ -93,7 +93,7 @@ internal class LocalBackendMessageReader(
     }.getOrNull()
 
     /** Inline only a snapshot-safe budget; references are resolved inside this conversation. */
-    private fun hydrateSmallImages(dir: File, message: JsonObject): JsonObject {
+    internal fun hydrateSmallImages(dir: File, message: JsonObject): JsonObject {
         var remaining = 12 * 1024
         val parts = message["parts"] as? JsonArray ?: return message
         val hydrated = parts.map { element ->
@@ -225,18 +225,16 @@ internal class LocalBackendMessageReader(
      * read conversation.json directly to recover the agent id (no scan). An
      * explicit [agentIdHint] short-circuits the disk read.
      */
-    private fun resolveConversation(externalId: String, agentIdHint: String?): Pair<String, String>? {
+    internal fun resolveConversation(externalId: String, agentIdHint: String?): Pair<String, String>? {
         if (externalId.isEmpty() || externalId == "default") return null
-        val defaultMatch = Regex("^conv-default-(agent-.+)$").find(externalId)
-        if (defaultMatch != null) return "default" to defaultMatch.groupValues[1]
-        if (agentIdHint != null) return externalId to agentIdHint
-        val dir = File(File(support.baseDir, "conversations"), support.b64UrlEncode("conversation:$externalId"))
-        val obj = runCatching {
-            File(dir, "conversation.json").takeIf { it.isFile }?.readText()?.let { support.json.parseToJsonElement(it).jsonObject }
-        }.getOrNull() ?: return null
-        val agentId = obj["agent_id"]?.jsonPrimitive?.contentOrNullSafe() ?: return null
-        return externalId to agentId
+        val defaultAgentId = Regex("^conv-default-(agent-.+)$").find(externalId)?.groupValues?.get(1)
+        return when {
+            defaultAgentId != null -> "default" to defaultAgentId
+            agentIdHint != null -> externalId to agentIdHint
+            else -> support.storedAgentId(ConversationId(externalId))?.let { externalId to it }
+        }
     }
+
 
     /**
      * Port of store.ts loadFilteredMessages pipeline (no cache): read the
@@ -302,7 +300,7 @@ internal class LocalBackendMessageReader(
     }
 
     /** Port of store.ts unwrapSessionEnvelope + normalizeMessage (content->parts). */
-    private fun normalizeMessage(value: JsonObject): JsonObject? {
+    internal fun normalizeMessage(value: JsonObject): JsonObject? {
         val unwrapped = LocalBackendLayout.messageBody(value)
         val parts = unwrapped["parts"]
         val content = unwrapped["content"]
@@ -314,7 +312,7 @@ internal class LocalBackendMessageReader(
     }
 
     /** Port of store.ts isLocalMessage: id string, role string, parts OR content array. */
-    private fun isLocalMessage(m: JsonObject): Boolean {
+    internal fun isLocalMessage(m: JsonObject): Boolean {
         if (m["id"]?.stringOrNull() == null) return false
         if (m["role"]?.stringOrNull() == null) return false
         return m["parts"] is JsonArray || m["content"] is JsonArray

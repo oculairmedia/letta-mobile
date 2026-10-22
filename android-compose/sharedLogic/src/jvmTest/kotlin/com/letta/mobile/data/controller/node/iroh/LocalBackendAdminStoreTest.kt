@@ -338,6 +338,28 @@ class LocalBackendAdminStoreTest {
     }
 
     @Test
+    fun `newest message contents match the full projection for ids types and content`() {
+        val base = tempStore()
+        val key = "conversation:conv-tail"
+        val lines = (1..30).joinToString("\n") { n ->
+            val role = if (n % 3 == 0) "assistant" else "user"
+            """{"type":"message","id":"e$n","message":{"id":"m-$n","role":"$role","content":[{"type":"text","text":"text $n"}]}}"""
+        }
+        writeMessages(base, key, lines)
+        writeConversation(base, key, """{"id":"conv-tail","agent_id":"agent-9"}""")
+        val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
+        fun JsonArray.shape() = map { row ->
+            row.jsonObject.let { Triple(it["id"], it["message_type"], it["content"]) }
+        }
+
+        val full = store.listMessagesProjected("conv-tail", null, MessagePage(8, null, null, "desc"))!!
+        val tail = store.newestMessageContents(com.letta.mobile.data.model.ConversationId("conv-tail"), 8)!!
+
+        assertEquals(full.shape(), tail.shape())
+        assertEquals(8, tail.map { it.jsonObject["id"] }.toSet().size)
+    }
+
+    @Test
     fun `message list refuses bare default and empties an unknown conversation`() {
         val base = tempStore()
         val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")

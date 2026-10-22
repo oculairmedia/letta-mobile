@@ -10,6 +10,7 @@ import java.nio.file.Files
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 /**
  * What the admin reads need to know about every `agents/<id>.json` record without holding or
@@ -65,6 +66,17 @@ internal class AgentFileIndex(
         return Scan(entries, uncovered)
     }
 
+    /**
+     * A value that changes whenever an agent file is added, removed or rewritten (name, modified time
+     * at full precision, size), from one listing and one attribute read per file and no parsing.
+     * Null when the directory cannot be listed.
+     */
+    fun signature(): Long? {
+        val files = agentsDir.listFiles { f -> f.isFile && f.name.endsWith(SUFFIX) } ?: return null
+        // A sum of per-file mixes, so the listing order does not matter.
+        return files.fold(files.size.toLong()) { sum, file -> sum + (stamp(file)?.mix() ?: 0L) }
+    }
+
     /** Reports once per crossing that records beyond the cap are not seen: counts and hidden sets then leave the oldest out. */
     private fun noteCap(found: Int) {
         val over = found > maxEntries
@@ -76,6 +88,14 @@ internal class AgentFileIndex(
 
     private class Stamp(val file: File, val modified: FileTime, val sizeBytes: Long) {
         val mtimeMs: Long get() = modified.toMillis()
+
+        fun mix(): Long {
+            var h = file.name.hashCode().toLong()
+            h = h * MIX_PRIME + modified.to(TimeUnit.NANOSECONDS)
+            h = h * MIX_PRIME + sizeBytes
+            h = (h xor (h ushr 33)) * MIX_MULTIPLIER
+            return h xor (h ushr 29)
+        }
     }
 
     private fun stamp(file: File): Stamp? = runCatching {
@@ -96,5 +116,10 @@ internal class AgentFileIndex(
 
         /** The most agent files one index covers; the live host has a few thousand. */
         const val DEFAULT_MAX_ENTRIES: Int = 20_000
+
+        private const val MIX_PRIME = 1_000_003L
+
+        /** SplitMix64's 0xbf58476d1ce4e5b9, so one changed field flips about half the bits. */
+        private const val MIX_MULTIPLIER = -0x40a7b892e31b1a47L
     }
 }

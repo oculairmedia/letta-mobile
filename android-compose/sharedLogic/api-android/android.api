@@ -14850,6 +14850,7 @@ public class com/letta/mobile/data/controller/node/iroh/LocalBackendAdminStore {
 	public final fun agentContextProjected (Lcom/letta/mobile/data/controller/node/iroh/AgentContextQuery;)Lkotlinx/serialization/json/JsonObject;
 	public final fun agentContextProjected (Ljava/lang/String;Ljava/lang/String;)Lkotlinx/serialization/json/JsonObject;
 	public fun agentExists (Ljava/lang/String;)Z
+	public fun agentFilesSignature ()Ljava/lang/Long;
 	public final fun blockCountProjected ()I
 	public final fun blocksForAgentProjected (Ljava/lang/String;)Lkotlinx/serialization/json/JsonArray;
 	public final fun countAgents ()Ljava/lang/Integer;
@@ -14860,6 +14861,7 @@ public class com/letta/mobile/data/controller/node/iroh/LocalBackendAdminStore {
 	public final fun listBlocksProjected (Ljava/lang/Integer;Ljava/lang/Integer;)Lkotlinx/serialization/json/JsonArray;
 	public final fun listConversationsProjected (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Integer;)Lkotlinx/serialization/json/JsonArray;
 	public final fun listMessagesProjected (Ljava/lang/String;Ljava/lang/String;Lcom/letta/mobile/data/controller/node/iroh/MessagePage;)Lkotlinx/serialization/json/JsonArray;
+	public final fun newestMessageContents-1iDlvEA (Ljava/lang/String;I)Lkotlinx/serialization/json/JsonArray;
 	public final fun runExists (Ljava/lang/String;)Z
 	public final fun transcriptTokens (Lcom/letta/mobile/data/controller/node/iroh/AgentContextQuery;)Ljava/lang/Long;
 }

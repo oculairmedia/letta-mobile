@@ -1585,7 +1585,6 @@
     <ID>ReturnCount:IrohTurnRegistry.kt$IrohActiveTurn$fun promoteRunId(promotion: IrohRunPromotion): Boolean</ID>
     <ID>ReturnCount:LocalBackendConversationReader.kt$LocalBackendConversationReader$private fun parseConversationRecord(d: File, agentId: String?): ConvRecord?</ID>
     <ID>ReturnCount:LocalBackendMessageReader.kt$LocalBackendMessageReader$private fun parseRunRec(dir: File, agentId: String, internalConvId: String): RunRec?</ID>
-    <ID>ReturnCount:LocalBackendMessageReader.kt$LocalBackendMessageReader$private fun resolveConversation(externalId: String, agentIdHint: String?): Pair&lt;String, String&gt;?</ID>
     <ID>ReturnCount:LocalBackendRunReader.kt$LocalBackendRunReader$private fun matches(run: JsonObject, query: RunQuery): Boolean</ID>
     <ID>ReturnCount:MeridianCommandRouter.kt$MeridianCommandRouter$private suspend fun inputSource(command: MeridianCommand, inputFile: String?, stdin: String?): Result&lt;String?&gt;</ID>
     <ID>ReturnCount:MeridianCommandRouter.kt$MeridianCommandRouter$private suspend fun runTool(argv: List&lt;String&gt;, request: MeridianRequest, commands: List&lt;MeridianCommand&gt;): MeridianResponse</ID>
