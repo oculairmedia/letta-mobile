@@ -51,6 +51,11 @@ internal const val LETTA_DESKTOP_APP_NAME = "Letta Desktop"
 fun main(args: Array<String>) {
     applyLinuxHiDpiScale()
     DesktopCrashReporter.installGlobalHandler()
+    com.letta.mobile.desktop.startup.DesktopStartupPrewarm(
+        { desktopConfigStore }, { com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost.appServer },
+        { com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore.documents },
+        { if (Platform.Current == Platform.Windows) com.letta.mobile.desktop.touch.DesktopWindowsTouchKeyboard },
+    ).start()
     initializeDesktopLifecycleMainThread()
     // Kotzilla observability — must run before any UI composition so the SDK
     // captures the full session including startup. Android target boots via

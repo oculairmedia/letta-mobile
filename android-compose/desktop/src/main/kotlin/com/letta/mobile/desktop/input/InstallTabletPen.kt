@@ -1,10 +1,11 @@
 package com.letta.mobile.desktop.input
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
 import com.letta.mobile.ui.canvas.CanvasPenRegistry
 import java.awt.Window
+import kotlinx.coroutines.awaitCancellation
 
 /**
  * Installs the pen on [window] for as long as the composition is alive.
@@ -16,7 +17,7 @@ import java.awt.Window
  * rather than written out at each window: a new window gets the pen by calling one function, and
  * forgetting it is the kind of thing a reviewer can see.
  *
- * The scope belongs to the composition; the JOB belongs to this window. That distinction is the
+ * The effect's scope belongs to this window: the poll loop runs in it. That distinction is the
  * whole point: a remembered scope outlives a window swap, so a loop left running on it keeps
  * posting events into the window it was opened against - a window whose Compose scene has been
  * disposed. Cancelling this window's own job on disposal ends that, without an ad-hoc scope of
@@ -24,14 +25,15 @@ import java.awt.Window
  */
 @Composable
 internal fun InstallTabletPen(window: Window, penRegistry: CanvasPenRegistry) {
-    val scope = rememberCoroutineScope()
-    DisposableEffect(window, penRegistry) {
+    LaunchedEffect(window, penRegistry) {
+        // The Ink bridge costs the EDT ~300 ms: open it after the window's first frame.
+        withFrameNanos { }
         val pen = TabletPen(window, penRegistry)
-        val polling = pen.start(scope)
-        onDispose {
-            // Cancelled BEFORE the handles close: it stops the poll loop and any open that has
-            // not finished, so no handle can be registered after this point and outlive the
-            // window it belongs to.
+        val polling = pen.start(this)
+        try {
+            awaitCancellation()
+        } finally {
+            // Cancelled BEFORE the handles close, so no handle outlives the window it belongs to.
             polling?.cancel()
             pen.stop()
         }
