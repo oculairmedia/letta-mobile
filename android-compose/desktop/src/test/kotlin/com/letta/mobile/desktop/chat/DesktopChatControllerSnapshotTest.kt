@@ -1,4 +1,4 @@
-﻿package com.letta.mobile.desktop.chat
+package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
