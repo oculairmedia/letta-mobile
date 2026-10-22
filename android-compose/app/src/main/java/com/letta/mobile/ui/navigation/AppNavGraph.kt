@@ -209,6 +209,7 @@ private fun androidShellExits(navController: NavHostController) = AndroidShellEx
     settings = SettingsDestinations(
         onSystemAccess = { navController.navigate(SystemAccessRoute) },
         onCanvasDebug = { navController.navigate(CanvasDebugRoute) },
+        onScanToConnect = { navController.navigate(PairingScanRoute) },
     ),
 )
 

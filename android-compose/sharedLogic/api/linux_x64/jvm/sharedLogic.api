@@ -32001,6 +32001,39 @@ public final class com/letta/mobile/data/pairing/SettingsPairedHostStore : com/l
 	public fun saveAndActivate (Lcom/letta/mobile/data/pairing/PairedHost;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
+public final class com/letta/mobile/data/pairing/composition/IrohPairingNetwork : com/letta/mobile/data/pairing/composition/PairingNetwork {
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/transport/iroh/InviteAuthenticator;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/transport/iroh/InviteAuthenticator;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun nodeIdOf ([B)Ljava/lang/String;
+	public fun redeemer (Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/data/pairing/PairingRedeemer;
+}
+
+public final class com/letta/mobile/data/pairing/composition/PairingComposition {
+	public fun <init> (Lcom/letta/mobile/data/pairing/composition/PairingPorts;)V
+	public final fun getAdminRpc ()Lcom/letta/mobile/data/repository/modelcontrol/AdminRpcInvoker;
+	public final fun getQrEncoder ()Lcom/letta/mobile/data/pairing/QrEncoder;
+	public final fun inviteSession (Lcom/letta/mobile/data/repository/modelcontrol/AdminRpcInvoker;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/pairing/PairInviteSession;
+	public final fun joinFlow ()Lcom/letta/mobile/data/pairing/PairingFlow;
+	public final fun nowMs ()J
+	public final fun selfNodeId (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class com/letta/mobile/data/pairing/composition/PairingNetwork {
+	public abstract fun nodeIdOf ([B)Ljava/lang/String;
+	public abstract fun redeemer (Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/data/pairing/PairingRedeemer;
+}
+
+public abstract interface class com/letta/mobile/data/pairing/composition/PairingPorts {
+	public abstract fun getAdminRpc ()Lcom/letta/mobile/data/repository/modelcontrol/AdminRpcInvoker;
+	public abstract fun getDeviceName ()Ljava/lang/String;
+	public abstract fun getHostStore ()Lcom/letta/mobile/data/pairing/PairedHostStore;
+	public abstract fun getNetwork ()Lcom/letta/mobile/data/pairing/composition/PairingNetwork;
+	public abstract fun getQrEncoder ()Lcom/letta/mobile/data/pairing/QrEncoder;
+	public abstract fun loadIdentityKey (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun nowMs ()J
+}
+
 public final class com/letta/mobile/data/platform/HeapPressure {
 	public static final field CRITICAL_RATIO D
 	public static final field INSTANCE Lcom/letta/mobile/data/platform/HeapPressure;

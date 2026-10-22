@@ -17,6 +17,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.subagents.visibleRunningCount
 import com.letta.mobile.desktop.agent.agentEditorHost
+import com.letta.mobile.ui.pairing.composition.installAndPairBindings
 import com.letta.mobile.ui.shell.workspace.ShellCanvasOwner
 import com.letta.mobile.ui.chat.session.ChatHostCommand
 import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
@@ -189,7 +190,10 @@ private fun desktopSettingsInputs(context: DesktopShellContext, frame: DesktopSh
         nucleus = nucleusState,
         localRuntimeProvider = core.localConfig.providerState,
         localBackendDirectory = core.localConfig.directoryState,
-        pairing = com.letta.mobile.desktop.qr.desktopInstallAndPairBindings(context, frame.focus),
+        pairing = installAndPairBindings(
+            com.letta.mobile.desktop.pairing.DesktopPairingPorts(core.bootstrap.applyConfig, core.bootstrap.bootstrapState.pairingRpc),
+            com.letta.mobile.desktop.pairing.DesktopPairingShell(frame.focus.rosterAgents, context.navigator),
+        ),
         localRuntime = core.localConfig.runtime,
     )
 }

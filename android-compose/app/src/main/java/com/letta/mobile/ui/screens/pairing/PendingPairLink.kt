@@ -19,5 +19,8 @@ object PendingPairLink {
         return true
     }
 
+    /** The waiting link, left in place. */
+    fun peek(): String? = pending.get()
+
     fun take(): String? = pending.getAndSet(null)
 }

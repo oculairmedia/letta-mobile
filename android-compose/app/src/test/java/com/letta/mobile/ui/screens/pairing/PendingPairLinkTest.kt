@@ -13,8 +13,10 @@ class PendingPairLinkTest {
     @Test
     fun aPairLinkIsTakenExactlyOnce() {
         assertTrue(PendingPairLink.offer(link))
+        assertEquals("peek leaves the link waiting", link, PendingPairLink.peek())
         assertEquals(link, PendingPairLink.take())
         assertNull(PendingPairLink.take())
+        assertNull(PendingPairLink.peek())
     }
 
     @Test

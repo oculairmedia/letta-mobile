@@ -817,6 +817,17 @@ abstract interface com.letta.mobile.ui.mascot/MascotStillStore { // com.letta.mo
     abstract suspend fun write(kotlin/String, kotlin/ByteArray) // com.letta.mobile.ui.mascot/MascotStillStore.write|write(kotlin.String;kotlin.ByteArray){}[0]
 }
 
+abstract interface com.letta.mobile.ui.pairing.composition/PairingShellPorts { // com.letta.mobile.ui.pairing.composition/PairingShellPorts|null[0]
+    abstract val agents // com.letta.mobile.ui.pairing.composition/PairingShellPorts.agents|{}agents[0]
+        abstract fun <get-agents>(): kotlin.collections/List<com.letta.mobile.ui.pairing/AgentChoice> // com.letta.mobile.ui.pairing.composition/PairingShellPorts.agents.<get-agents>|<get-agents>(){}[0]
+    abstract val pendingLink // com.letta.mobile.ui.pairing.composition/PairingShellPorts.pendingLink|{}pendingLink[0]
+        abstract fun <get-pendingLink>(): kotlin/String? // com.letta.mobile.ui.pairing.composition/PairingShellPorts.pendingLink.<get-pendingLink>|<get-pendingLink>(){}[0]
+
+    abstract fun consumePendingLink() // com.letta.mobile.ui.pairing.composition/PairingShellPorts.consumePendingLink|consumePendingLink(){}[0]
+    abstract fun openChat() // com.letta.mobile.ui.pairing.composition/PairingShellPorts.openChat|openChat(){}[0]
+    abstract fun shareLink(kotlin/String) // com.letta.mobile.ui.pairing.composition/PairingShellPorts.shareLink|shareLink(kotlin.String){}[0]
+}
+
 sealed interface <#A: out kotlin/Any?> com.letta.mobile.ui.components.picker/PickerLine { // com.letta.mobile.ui.components.picker/PickerLine|null[0]
     abstract val key // com.letta.mobile.ui.components.picker/PickerLine.key|{}key[0]
         abstract fun <get-key>(): kotlin/String // com.letta.mobile.ui.components.picker/PickerLine.key.<get-key>|<get-key>(){}[0]
@@ -12354,6 +12365,7 @@ final fun com.letta.mobile.ui.notify/AgentNotificationsSection(com.letta.mobile.
 final fun com.letta.mobile.ui.notify/ApprovalNotificationsSwitch(com.letta.mobile.data.notify/AttentionPrefsRepository, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.notify/ApprovalNotificationsSwitch|ApprovalNotificationsSwitch(com.letta.mobile.data.notify.AttentionPrefsRepository;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.notify/com_letta_mobile_ui_notify_AgentNotificationsStrings$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.notify/com_letta_mobile_ui_notify_AgentNotificationsStrings$stableprop_getter|com_letta_mobile_ui_notify_AgentNotificationsStrings$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.notify/com_letta_mobile_ui_notify_AgentNotificationsTags$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.notify/com_letta_mobile_ui_notify_AgentNotificationsTags$stableprop_getter|com_letta_mobile_ui_notify_AgentNotificationsTags$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.pairing.composition/installAndPairBindings(com.letta.mobile.data.pairing.composition/PairingPorts, com.letta.mobile.ui.pairing.composition/PairingShellPorts): com.letta.mobile.ui.pairing/InstallAndPairBindings // com.letta.mobile.ui.pairing.composition/installAndPairBindings|installAndPairBindings(com.letta.mobile.data.pairing.composition.PairingPorts;com.letta.mobile.ui.pairing.composition.PairingShellPorts){}[0]
 final fun com.letta.mobile.ui.pairing/InstallAndPairCard(com.letta.mobile.ui.pairing/InstallAndPairBindings, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.pairing/InstallAndPairCard|InstallAndPairCard(com.letta.mobile.ui.pairing.InstallAndPairBindings;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.pairing/PairCodeEntry(kotlin/Function1<kotlin/String, kotlin/Unit>, androidx.compose.ui/Modifier?, kotlin/Boolean, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.pairing/PairCodeEntry|PairCodeEntry(kotlin.Function1<kotlin.String,kotlin.Unit>;androidx.compose.ui.Modifier?;kotlin.Boolean;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.pairing/PairDevicePage(com.letta.mobile.ui.pairing/PairDeviceBinding, kotlin/Function0<kotlin/Unit>, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.pairing/PairDevicePage|PairDevicePage(com.letta.mobile.ui.pairing.PairDeviceBinding;kotlin.Function0<kotlin.Unit>;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]

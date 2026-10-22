@@ -1,7 +1,5 @@
 package com.letta.mobile.ui.navigation
 
-import android.content.Context
-import android.content.Intent
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -11,8 +9,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import com.letta.mobile.ui.pairing.PairDeviceBinding
 import com.letta.mobile.ui.pairing.PairDevicePage
-import com.letta.mobile.ui.pairing.PairingStrings
+import com.letta.mobile.ui.screens.pairing.AndroidPairingShell
 import com.letta.mobile.ui.screens.pairing.PairInviteViewModel
+import com.letta.mobile.ui.screens.pairing.PairingViewModel
 import com.letta.mobile.ui.screens.pairing.QrScanScreen
 
 /**
@@ -44,17 +43,12 @@ internal fun NavGraphBuilder.pairingRoutes(navController: NavHostController) {
         popExitTransition = drillInPopExit,
     ) {
         val viewModel: PairInviteViewModel = hiltViewModel()
-        val agents by viewModel.agents.collectAsStateWithLifecycle()
+        val agents by hiltViewModel<PairingViewModel>().agents.collectAsStateWithLifecycle()
         val context = LocalContext.current
         PairDevicePage(
-            binding = PairDeviceBinding(viewModel.session, agents, System::currentTimeMillis) { link -> sharePairLink(context, link) },
+            binding = PairDeviceBinding(viewModel.session, agents, System::currentTimeMillis) { AndroidPairingShell.share(context, it) },
             onNavigateBack = { navController.popBackStack() },
         )
     }
 }
 
-/** The Android share sheet for a pairing link (the user picks the recipient; nothing is sent automatically). */
-private fun sharePairLink(context: Context, link: String) {
-    val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, link)
-    context.startActivity(Intent.createChooser(send, PairingStrings.INVITE_TITLE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-}

@@ -5688,6 +5688,18 @@ public final class com/letta/mobile/ui/pairing/TorchControl {
 	public final fun getOnToggle ()Lkotlin/jvm/functions/Function0;
 }
 
+public abstract interface class com/letta/mobile/ui/pairing/composition/PairingShellPorts {
+	public abstract fun consumePendingLink ()V
+	public abstract fun getAgents ()Ljava/util/List;
+	public abstract fun getPendingLink ()Ljava/lang/String;
+	public abstract fun openChat ()V
+	public abstract fun shareLink (Ljava/lang/String;)V
+}
+
+public final class com/letta/mobile/ui/pairing/composition/PairingShellPortsKt {
+	public static final fun installAndPairBindings (Lcom/letta/mobile/data/pairing/composition/PairingPorts;Lcom/letta/mobile/ui/pairing/composition/PairingShellPorts;)Lcom/letta/mobile/ui/pairing/InstallAndPairBindings;
+}
+
 public final class com/letta/mobile/ui/providers/icons/ProviderBrand : java/lang/Enum {
 	public static final field ANTHROPIC Lcom/letta/mobile/ui/providers/icons/ProviderBrand;
 	public static final field ANT_LING Lcom/letta/mobile/ui/providers/icons/ProviderBrand;

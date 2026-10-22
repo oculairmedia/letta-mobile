@@ -27,6 +27,7 @@ import com.letta.mobile.runtime.local.RotatingLineFile
 import com.letta.mobile.runtime.local.runtimeLifecycleLogFile
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.notify.LocalAttentionPrefs
+import com.letta.mobile.ui.screens.pairing.PairingViewModel
 import com.letta.mobile.ui.settings.BackendSettingsActions
 import com.letta.mobile.ui.settings.SavedBackends
 import com.letta.mobile.ui.settings.SettingsPageServices
@@ -47,6 +48,7 @@ internal fun androidSettingsPage(onBack: () -> Unit, destinations: SettingsDesti
     val config by viewModel.backendConfig.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarDispatcher.current
     val context = LocalContext.current
+    val pairing: PairingViewModel = hiltViewModel()
     val importModel = rememberLocalModelImportLauncher(viewModel, context)
     val inputs = AndroidSettingsInputs(
         viewModel = viewModel,
@@ -59,15 +61,13 @@ internal fun androidSettingsPage(onBack: () -> Unit, destinations: SettingsDesti
     val services = SettingsPageServices(
         backend = BackendSettingsActions(
             onConfigSaved = { saved ->
-                val onSaved = {
-                    snackbar.dispatch(CONFIG_SAVED)
-                    onBack()
-                }
-                viewModel.saveBackend(saved, onSuccess = onSaved, onError = snackbar::dispatch)
+                viewModel.saveBackend(saved, onSuccess = { snackbar.dispatch(CONFIG_SAVED); onBack() }, onError = snackbar::dispatch)
             },
             onTokenCleared = { viewModel.clearToken(snackbar::dispatch) },
             testConnection = viewModel.connectionTester,
+            onScanToConnect = destinations.onScanToConnect,
         ),
+        pairing = pairing.installAndPair(context, pairing.agents.collectAsStateWithLifecycle().value, onOpenChat = onBack),
         appearance = viewModel.appearance,
         chat = viewModel.chat,
         notifications = NotificationSettings(LocalAttentionPrefs.current),
