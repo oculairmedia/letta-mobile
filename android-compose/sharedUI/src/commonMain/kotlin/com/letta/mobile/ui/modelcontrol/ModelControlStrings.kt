@@ -22,6 +22,10 @@ object ModelControlStrings {
     const val CURRENT_MODEL = "Current model"
     const val EFFORT_DEFAULT = "Default"
     const val EFFORT = "Effort"
+    const val OPTIONS = "Options"
+    const val THINKING = "Thinking"
+
+    fun effortOptionsOf(model: String) = "Effort options for $model"
 
     fun noMatch(query: String) = "No models match \"$query\""
 

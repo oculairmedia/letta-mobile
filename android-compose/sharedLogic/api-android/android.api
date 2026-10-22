@@ -38185,6 +38185,28 @@ public final class com/letta/mobile/data/repository/modelcontrol/ModelControlSes
 	public final fun pickerSource ()Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
 }
 
+public final class com/letta/mobile/data/repository/modelcontrol/ModelEffortMenu {
+	public fun <init> (Lcom/letta/mobile/data/repository/modelcontrol/ThinkingToggle;Ljava/util/List;Ljava/lang/String;)V
+	public final fun component1 ()Lcom/letta/mobile/data/repository/modelcontrol/ThinkingToggle;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/data/repository/modelcontrol/ThinkingToggle;Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/repository/modelcontrol/ModelEffortMenu;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/repository/modelcontrol/ModelEffortMenu;Lcom/letta/mobile/data/repository/modelcontrol/ThinkingToggle;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/repository/modelcontrol/ModelEffortMenu;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCurrent ()Ljava/lang/String;
+	public final fun getLevels ()Ljava/util/List;
+	public final fun getThinking ()Lcom/letta/mobile/data/repository/modelcontrol/ThinkingToggle;
+	public fun hashCode ()I
+	public final fun isEmpty ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/repository/modelcontrol/ModelEffortMenuKt {
+	public static final field THINKING_OFF_EFFORT Ljava/lang/String;
+	public static final fun effortMenu (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerEntry;Ljava/lang/String;)Lcom/letta/mobile/data/repository/modelcontrol/ModelEffortMenu;
+	public static final fun thinkingToggleOf (Ljava/util/List;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/repository/modelcontrol/ThinkingToggle;
+}
+
 public final class com/letta/mobile/data/repository/modelcontrol/ModelHandle {
 	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/data/repository/modelcontrol/ModelHandle;
 	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
@@ -38221,6 +38243,9 @@ public final class com/letta/mobile/data/repository/modelcontrol/ModelPickerBind
 	public final fun getPickerOpen ()Z
 	public final fun getSource ()Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
 	public final fun open ()V
+	public final fun rememberedEffort (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerEntry;)Ljava/lang/String;
+	public final fun selectEffort (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerEntry;Ljava/lang/String;)V
+	public final fun selectModel (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerEntry;)V
 }
 
 public final class com/letta/mobile/data/repository/modelcontrol/ModelPickerBindingKt {
@@ -38903,6 +38928,19 @@ public final class com/letta/mobile/data/repository/modelcontrol/SignInFailure :
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/repository/modelcontrol/SignInFailure;
 	public static fun values ()[Lcom/letta/mobile/data/repository/modelcontrol/SignInFailure;
+}
+
+public final class com/letta/mobile/data/repository/modelcontrol/ThinkingToggle {
+	public fun <init> (ZLjava/lang/String;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (ZLjava/lang/String;)Lcom/letta/mobile/data/repository/modelcontrol/ThinkingToggle;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/repository/modelcontrol/ThinkingToggle;ZLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/repository/modelcontrol/ThinkingToggle;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOn ()Z
+	public final fun getToggledEffort ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/repository/modelcontrol/VisibleSection {

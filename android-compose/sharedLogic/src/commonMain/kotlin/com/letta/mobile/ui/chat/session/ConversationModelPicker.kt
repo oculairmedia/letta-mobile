@@ -10,8 +10,8 @@ import kotlinx.coroutines.flow.Flow
 /**
  * The picker of a chat whose models are the shared [ConversationModels] (desktop and the web): the
  * host's admin catalog ([session]) while it answers, else the chat's own list, with [recents] first.
- * A pick switches the open conversation's model (an alias stays an alias), at an effort when a chip
- * names one (none: the provider default).
+ * A pick switches the open conversation's model (an alias stays an alias), at an effort when the row's options
+ * name one (none: the provider default).
  */
 fun conversationModelPicker(
     session: ModelControlSession?,

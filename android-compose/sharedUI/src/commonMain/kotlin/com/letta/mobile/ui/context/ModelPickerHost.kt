@@ -27,8 +27,8 @@ import kotlinx.coroutines.launch
 
 /**
  * The one model picker of every platform, open while [binding] says so. "Search models", the
- * "Recent" group, the models under their providers (with each one's reasoning efforts when the host
- * picks them), "Refresh Models" and "Edit Models…", which gives way to the Models sheet ("Add
+ * "Recent" group, the models under their providers (each one's effort options in a flyout or sheet
+ * when the host picks efforts), "Refresh Models" and "Edit Models…", which gives way to the Models sheet ("Add
  * provider…" goes to the host's Providers page). [selectedValue] marks the current model. A pane is
  * a sheet on a phone and a dialog on a pointer window.
  */
@@ -74,10 +74,11 @@ private fun rememberPickerActions(binding: ModelPickerBinding, controller: Model
     }
     return ModelPickerActions.bind(
         controller = controller,
-        onSelect = { entry: ModelPickerEntry -> once { if (!entry.selected) binding.onModelSelected(entry) } },
+        onSelect = { entry: ModelPickerEntry -> once { if (!entry.selected) binding.selectModel(entry) } },
         onEditModels = binding.editor?.let { binding::editModels },
-        // An effort chip applies even on the current model: it changes the effort.
-        onEffortSelected = binding.onEffortSelected?.let { pick -> { entry, effort -> once { pick(entry, effort) } } },
+        // An effort pick applies even on the current model: it changes the effort.
+        onEffortSelected = binding.onEffortSelected?.let { { entry, effort -> once { binding.selectEffort(entry, effort) } } },
+        rememberedEffort = binding::rememberedEffort,
     )
 }
 

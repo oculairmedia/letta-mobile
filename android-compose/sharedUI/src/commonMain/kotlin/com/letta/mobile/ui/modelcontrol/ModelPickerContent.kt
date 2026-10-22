@@ -13,7 +13,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import com.letta.mobile.data.repository.modelcontrol.effortMenu
+import com.letta.mobile.ui.components.isPointerHost
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -56,8 +70,10 @@ data class ModelPickerActions(
     val onRefresh: () -> Unit,
     /** Opens the Models sheet; null hides "Edit Models…" (a backend without exposure). */
     val onEditModels: (() -> Unit)?,
-    /** Picks a model at a reasoning effort (null = provider default); null shows no effort chips. */
+    /** Picks a model at a reasoning effort (null = provider default); null offers no effort options. */
     val onEffortSelected: ((ModelPickerEntry, String?) -> Unit)? = null,
+    /** The effort last picked for a model in this session, shown in force before its catalog default. */
+    val rememberedEffort: (ModelPickerEntry) -> String? = { null },
     val availableToolsets: List<com.letta.mobile.data.transport.appserver.AppServerToolset> = emptyList(),
     val currentToolset: String? = null,
     val onSelectToolset: ((String) -> Unit)? = null,
@@ -73,6 +89,7 @@ data class ModelPickerActions(
             onSelect: (ModelPickerEntry) -> Unit,
             onEditModels: (() -> Unit)?,
             onEffortSelected: ((ModelPickerEntry, String?) -> Unit)? = null,
+            rememberedEffort: (ModelPickerEntry) -> String? = { null },
         ) = ModelPickerActions(
             onSelect = onSelect,
             onQueryChange = controller::setQuery,
@@ -80,6 +97,7 @@ data class ModelPickerActions(
             onRefresh = controller::refresh,
             onEditModels = onEditModels,
             onEffortSelected = onEffortSelected,
+            rememberedEffort = rememberedEffort,
         )
     }
 }
@@ -143,17 +161,36 @@ fun ColumnScope.ModelPickerContent(
         level = level,
         tags = ModelPickerPickerTags,
     )
+    // The host may hand over new actions on every composition; the open options outlive them.
+    val latest by rememberUpdatedState(actions)
+    val allOptions = remember { EffortOptionsState { entry, effort -> latest.onEffortSelected?.invoke(entry, effort) } }
+    val options = allOptions.takeIf { actions.onEffortSelected != null }
+    val touch = !isPointerHost()
     val callbacks = PickerCallbacks<ModelPickerEntry>(
         onQuery = actions.onQueryChange,
         onPick = { actions.onSelect(it.value) },
         onToggleSection = { section -> groups.firstOrNull { it.key == section.key }?.let(actions.onToggleGroup) },
+        onKey = options?.let { state -> { event, item -> state.onKey(event, item?.let { effortTarget(it, actions) }) } },
     )
     val slots = PickerSlots<ModelPickerEntry>(
-        row = { item, row -> PickerRow(item.value, row, actions) },
+        row = { item, row -> PickerRow(PickerRowModel(item, row, effortTarget(item, actions), options, touch)) },
         footer = { PickerFooterBar(state, actions) },
         sectionLeading = { section -> GroupLogo(section) },
     )
     LettaPickerContent(spec, callbacks, modifier, slots)
+    options?.let { state ->
+        CloseWhenUnhovered(state)
+        val open = state.target
+        if (touch && open != null) EffortOptionsSheet(state, open)
+    }
+}
+
+/** [item]'s effort options, when its model offers any and the host can pick an effort. */
+private fun effortTarget(item: PickerItem<ModelPickerEntry>, actions: ModelPickerActions): EffortTarget? {
+    actions.onEffortSelected ?: return null
+    val entry = item.value
+    val menu = entry.effortMenu(actions.rememberedEffort(entry))
+    return if (menu.isEmpty) null else EffortTarget(item.key, entry, menu)
 }
 
 private fun ModelPickerGroup.toSection(collapsed: Boolean): PickerSection<ModelPickerEntry> = PickerSection(
@@ -198,11 +235,36 @@ private fun PickerFooterBar(state: ModelPickerState, actions: ModelPickerActions
     PickerFooter(state, actions)
 }
 
+/** One row as drawn: the picker's row state, its effort options (null: none) and whether the host is touch. */
+private class PickerRowModel(
+    val item: PickerItem<ModelPickerEntry>,
+    val row: PickerRowState,
+    val effort: EffortTarget?,
+    val options: EffortOptionsState?,
+    val touch: Boolean,
+) {
+    val entry: ModelPickerEntry get() = item.value
+    val optionsOpen: Boolean get() = effort != null && options?.target?.key == effort.key
+
+    /** Touch: what opens the options sheet (the pill and a long-press); null without options or on a pointer. */
+    val openSheet: (() -> Unit)?
+        get() = if (touch && effort != null && options != null) ({ options.open(effort) }) else null
+}
+
+/**
+ * One line: the name, then quietly its effort and context window, and a check on the current model.
+ * A pointer hover opens the effort flyout beside it; on touch a trailing effort pill or a
+ * long-press opens the same options in a sheet.
+ */
 @Composable
-private fun PickerRow(entry: ModelPickerEntry, row: PickerRowState, actions: ModelPickerActions) {
+private fun PickerRow(model: PickerRowModel) {
+    val entry = model.entry
+    val hover = remember { MutableInteractionSource() }
+    FollowRowHover(model, hover)
+    val openSheet = model.openSheet
     val background = when {
         entry.selected -> MaterialTheme.colorScheme.secondaryContainer
-        row.highlighted -> MaterialTheme.colorScheme.surfaceContainerHighest
+        model.row.highlighted || model.optionsOpen -> MaterialTheme.colorScheme.surfaceContainerHighest
         else -> null
     }
     Column(
@@ -210,7 +272,9 @@ private fun PickerRow(entry: ModelPickerEntry, row: PickerRowState, actions: Mod
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
             .then(if (background != null) Modifier.background(background) else Modifier)
-            .selectable(selected = entry.selected, role = Role.RadioButton, onClick = row.onClick)
+            .hoverable(hover)
+            .combinedClickable(role = Role.RadioButton, onClick = model.row.onClick, onLongClick = openSheet)
+            .semantics { selected = entry.selected }
             .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm)
             .testTag("${ModelPickerTags.ROW_PREFIX}${entry.value}"),
     ) {
@@ -228,16 +292,10 @@ private fun PickerRow(entry: ModelPickerEntry, row: PickerRowState, actions: Mod
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                entry.tier?.let { tier ->
-                    Text(
-                        text = ModelControlStrings.tierLabel(tier),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TIER_ALPHA),
-                        maxLines = 1,
-                    )
-                }
-                PickerRowWindow(entry)
+                // The pill names the effort on touch; elsewhere it trails the name.
+                PickerRowDetails(entry, effort = if (openSheet != null) null else model.effort?.menu?.current ?: entry.tier?.effort)
             }
+            openSheet?.let { EffortPill(entry, model.effort?.menu?.current, it) }
             if (entry.selected) {
                 Icon(
                     imageVector = LettaIcons.Check,
@@ -248,12 +306,62 @@ private fun PickerRow(entry: ModelPickerEntry, row: PickerRowState, actions: Mod
             }
         }
         PickerRowOverflow(entry)
-        val onEffort = actions.onEffortSelected
-        if (onEffort != null && entry.efforts.isNotEmpty()) {
-            ReasoningEffortChips(
-                efforts = entry.efforts,
-                onSelect = { effort -> onEffort(entry, effort) },
-                modifier = Modifier.padding(top = LettaDimens.Space.xs),
+        PickerRowFlyout(model)
+    }
+}
+
+/** Pointer: reports the row's hover to its options, which open on it. */
+@Composable
+private fun FollowRowHover(model: PickerRowModel, hover: MutableInteractionSource) {
+    val effort = model.effort ?: return
+    val options = model.options ?: return
+    if (model.touch) return
+    val hovered by hover.collectIsHoveredAsState()
+    LaunchedEffect(hovered, effort) { options.rowHover(effort, hovered) }
+}
+
+/** Pointer: the open options' flyout, anchored to this row. */
+@Composable
+private fun PickerRowFlyout(model: PickerRowModel) {
+    val effort = model.effort ?: return
+    val options = model.options ?: return
+    if (!model.touch && model.optionsOpen) EffortFlyout(options, effort)
+}
+
+/** After the name, quieter than it: the effort in force ("Med") and the context window, dot-separated. */
+@Composable
+private fun PickerRowDetails(entry: ModelPickerEntry, effort: String?) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TIER_ALPHA)
+    effort?.let { Text(effortLabel(it), style = MaterialTheme.typography.bodySmall, color = muted, maxLines = 1) }
+    if (effort != null && entry.contextWindow != null) {
+        Text(DETAIL_SEPARATOR, style = MaterialTheme.typography.bodySmall, color = muted, maxLines = 1)
+    }
+    PickerRowWindow(entry)
+}
+
+private const val DETAIL_SEPARATOR = "·"
+
+/** Touch: the effort in force with a chevron; a tap opens the model's options sheet. */
+@Composable
+private fun EffortPill(entry: ModelPickerEntry, effort: String?, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        modifier = Modifier
+            .semantics { contentDescription = ModelControlStrings.effortOptionsOf(entry.displayName) }
+            .testTag("${ModelEffortTags.PILL_PREFIX}${entry.value}"),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(effortLabel(effort), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(
+                LettaIcons.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(LettaDimens.Control.iconSm),
             )
         }
     }
