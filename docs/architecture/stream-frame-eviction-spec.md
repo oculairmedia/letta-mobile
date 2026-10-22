@@ -36,7 +36,9 @@ requests can fail with `transport disconnected`, and active turns can be
 released without a terminal. The counts below show that not every overflow had a
 matching `activeTurn.releasedWithoutTerminal` event. The preceding
 `fanout.broadcast conversationId=local-conv-190 viewerCount=2` lines and absence
-of `fanout.observer_dropped` establish correlation only. Initiator writes have no
+of `fanout.observer_dropped` establish correlation only. (Those per-delta lines are
+historical: `fanout.broadcast` is now logged once when a conversation's audience
+changes, not once per delta.) Initiator writes have no
 observer timeout or observer-drop telemetry, so those signals do not rule out a
 slow or stalled initiator.
 
