@@ -1,26 +1,14 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_duration_ms
-import com.letta.mobile.sharedui.resources.rows_tool_step_label
-import com.letta.mobile.sharedui.resources.rows_tool_verb_edited
-import com.letta.mobile.sharedui.resources.rows_tool_verb_fetched
-import com.letta.mobile.sharedui.resources.rows_tool_verb_ran
-import com.letta.mobile.sharedui.resources.rows_tool_verb_read
-import com.letta.mobile.sharedui.resources.rows_tool_verb_searched
-import com.letta.mobile.sharedui.resources.rows_tool_verb_wrote
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
-// letta-mobile-bglj6.1: lifted from desktop's DesktopChatToolLabels.kt. The verb and the
-// duration are resource strings now, so the label is a small model resolved in composition.
+// letta-mobile-bglj6.1: lifted from desktop's DesktopChatToolLabels.kt. How a step reads (its verb and
+// target) is the tool presenters' (com.letta.mobile.data.chat.tools); these are the row's own rules.
 
 internal fun isUserRole(role: String): Boolean = role.equals("user", ignoreCase = true)
 
@@ -44,44 +32,6 @@ internal fun UiToolCall.shouldInitiallyExpand(): Boolean =
 internal fun UiToolCall.disclosureKey(): String =
     toolCallId?.takeIf { it.isNotBlank() } ?: "$name:${arguments.hashCode()}"
 
-/** A friendly verb + short target ("Ran ./gradlew …"), resolved to text in composition. */
-@Immutable
-internal data class ToolStepLabel(
-    val verb: ToolStepVerb?,
-    val target: String,
-    val name: String,
-)
-
-internal enum class ToolStepVerb(val resource: StringResource, val needles: List<String>) {
-    Ran(Res.string.rows_tool_verb_ran, listOf("bash", "shell", "command", "exec", "run", "terminal")),
-    Read(Res.string.rows_tool_verb_read, listOf("read", "cat", "view", "open")),
-    Wrote(Res.string.rows_tool_verb_wrote, listOf("write", "create")),
-    Edited(Res.string.rows_tool_verb_edited, listOf("edit", "replace", "apply", "patch")),
-    Searched(Res.string.rows_tool_verb_searched, listOf("search", "grep", "glob", "find", "list")),
-    Fetched(Res.string.rows_tool_verb_fetched, listOf("fetch", "http", "web", "curl", "request")),
-    ;
-
-    companion object {
-        fun forTool(name: String): ToolStepVerb? {
-            val lower = name.lowercase()
-            return entries.firstOrNull { verb -> verb.needles.any { lower.contains(it) } }
-        }
-    }
-}
-
-internal fun UiToolCall.stepLabel(): ToolStepLabel = ToolStepLabel(
-    verb = ToolStepVerb.forTool(name),
-    target = truncateToolTarget(primaryToolArgument(arguments)),
-    name = name,
-)
-
-@Composable
-internal fun ToolStepLabel.text(): String {
-    val verb = verb ?: return name
-    val verbText = stringResource(verb.resource)
-    return if (target.isNotBlank()) stringResource(Res.string.rows_tool_step_label, verbText, target) else verbText
-}
-
 /** Right-aligned step summary: the result's first short line, else the duration. */
 @Composable
 internal fun UiToolCall.stepSummary(): String {
@@ -94,43 +44,6 @@ internal fun UiToolCall.stepSummary(): String {
 }
 
 private const val STEP_SUMMARY_MAX = 28
-private const val TOOL_TARGET_MAX = 52
-
-/**
- * Pulls the human-meaningful payload out of a tool-call arguments JSON object (the shell
- * command, code, query) so the card shows that instead of a raw `{"command":"…"}` dump.
- * Falls back to pretty-printed JSON, then the raw string.
- */
-internal fun primaryToolArgument(arguments: String): String {
-    val obj = runCatching { RowJson.parseToJsonElement(arguments) as? JsonObject }.getOrNull()
-        ?: return arguments
-    return preferredToolArgument(obj)
-        ?: runCatching { PrettyRowJson.encodeToString(JsonObject.serializer(), obj) }.getOrDefault(arguments)
-}
-
-private fun truncateToolTarget(raw: String): String {
-    val target = raw.lineSequence().firstOrNull()?.trim().orEmpty()
-    return if (target.length > TOOL_TARGET_MAX) target.take(TOOL_TARGET_MAX) + "…" else target
-}
-
-private fun preferredToolArgument(obj: JsonObject): String? {
-    for (key in PREFERRED_TOOL_ARGUMENT_KEYS) {
-        val value = obj[key] as? JsonPrimitive ?: continue
-        if (value.isString && value.content.isNotBlank()) return value.content
-    }
-    return null
-}
-
-private val PREFERRED_TOOL_ARGUMENT_KEYS = listOf(
-    "command", "code", "query", "input", "text", "content", "cmd", "script", "expression",
-)
-
-private val RowJson = Json { ignoreUnknownKeys = true }
-
-private val PrettyRowJson = Json {
-    prettyPrint = true
-    prettyPrintIndent = "  "
-}
 
 /** The newest-first-safe "is this streaming" check for one message. */
 internal fun ChatRowContext.isStreaming(message: UiMessage): Boolean =

@@ -2177,6 +2177,16 @@ public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSing
 	public final fun getLambda$-1451332564$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
+public final class com/letta/mobile/ui/chat/tools/ToolPresentersKt {
+	public static final fun ProvidePluginToolPresenters (Lcom/letta/mobile/data/plugin/view/PluginViewsModel;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun ProvideToolPresenters (Ljava/util/List;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun contributedBy (Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;Ljava/util/List;)Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;
+	public static final fun facts (Lcom/letta/mobile/data/model/UiToolCall;)Lcom/letta/mobile/data/chat/tools/ToolCallFacts;
+	public static final fun getLocalToolPresenters ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun rememberToolStepLine (Lcom/letta/mobile/data/model/UiToolCall;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+	public static final fun title (Lcom/letta/mobile/data/chat/tools/ToolStepLine;Landroidx/compose/runtime/Composer;I)Ljava/lang/String;
+}
+
 public final class com/letta/mobile/ui/components/ChevronEmphasis : java/lang/Enum {
 	public static final field Emphasized Lcom/letta/mobile/ui/components/ChevronEmphasis;
 	public static final field Neutral Lcom/letta/mobile/ui/components/ChevronEmphasis;
@@ -8848,7 +8858,7 @@ public final class com/letta/mobile/ui/shell/pages/workspace/ComposableSingleton
 public final class com/letta/mobile/ui/shell/pages/workspace/ComposableSingletons$WorkspaceFileLinkKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/workspace/ComposableSingletons$WorkspaceFileLinkKt;
 	public fun <init> ()V
-	public final fun getLambda$1347054456$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$1119187009$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/shell/pages/workspace/ComposableSingletons$WorkspaceFileViewerKt {
@@ -8905,7 +8915,7 @@ public final class com/letta/mobile/ui/shell/pages/workspace/WorkingDirectoryPic
 }
 
 public final class com/letta/mobile/ui/shell/pages/workspace/WorkspaceFileLinkKt {
-	public static final fun ToolCallFileLink (Ljava/lang/String;Landroidx/compose/ui/Modifier;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)V
+	public static final fun ToolCallFileLink (Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun getLocalWorkspaceFileOpener ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 

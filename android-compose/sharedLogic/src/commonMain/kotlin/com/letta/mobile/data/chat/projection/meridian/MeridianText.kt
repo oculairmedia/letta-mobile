@@ -2,9 +2,7 @@ package com.letta.mobile.data.chat.projection.meridian
 
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 // letta-mobile-jna0o.6: the text helpers the meridian recogniser reads shell scripts and CLI
 // output with. All lenient, none throws.
@@ -22,21 +20,6 @@ private fun String.parseWith(json: Json): JsonObject? = try {
 } catch (e: IllegalArgumentException) {
     null
 }
-
-/** Whether this word names a shell (`bash`, `/bin/sh`, …). */
-internal fun String.isShellProgram(): Boolean = substringAfterLast('/') in SHELLS
-
-/** Whether this word is a shell's run-a-script flag (`-c`, `-lc`, `-ec`). */
-internal fun String.isShellScriptFlag(): Boolean = SCRIPT_FLAG.matches(this)
-
-/** This word single-quoted when it needs it, so an argv re-reads as the same words. */
-internal fun String.shellQuoted(): String = if (SAFE_WORD.matches(this)) this else "'" + replace("'", "'\\''") + "'"
-
-/** An argv's words as one script. */
-internal fun List<String>.asShellScript(): String = joinToString(" ") { it.shellQuoted() }
-
-/** The string elements of a JSON array argv. */
-internal fun List<JsonElement>.argvWords(): List<String> = mapNotNull { (it as? JsonPrimitive)?.content }
 
 /**
  * The first JSON object in this CLI output that starts a line, matched brace for brace (so trailing
@@ -86,8 +69,5 @@ private class BraceMatcher(private val text: String) {
 }
 
 private const val MAX_OBJECT_PROBES = 4
-private val SHELLS = setOf("bash", "sh", "zsh", "dash")
-private val SCRIPT_FLAG = Regex("-[a-z]*c[a-z]*")
-private val SAFE_WORD = Regex("[A-Za-z0-9_./=:,@%+-]+")
 private val LenientJson = Json { isLenient = true }
 private val StrictJson = Json

@@ -1,7 +1,7 @@
 package com.letta.mobile.data.chat.projection.meridian
 
+import com.letta.mobile.data.chat.tools.ShellTools
 import com.letta.mobile.data.model.ToolCall
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -46,9 +46,10 @@ data class MeridianCommandCall(
             return when {
                 name == META_TOOL -> arguments.toJsonObjectOrNull()?.let(::fromMetaTool)
                 // Cheap reject first: most shell calls never mention meridian.
-                name.lowercase() !in SHELL_TOOLS -> null
+                !ShellTools.isShellTool(name) -> null
                 META_TOOL !in arguments -> null
-                else -> arguments.toJsonObjectOrNull()?.let(::shellScript)?.let { MeridianInvocation.find(it) }?.toCall(inputOverride = null)
+                else -> arguments.toJsonObjectOrNull()?.let(ShellTools::scriptOf)
+                    ?.let { MeridianInvocation.find(it) }?.toCall(inputOverride = null)
             }
         }
 
@@ -105,26 +106,5 @@ data class MeridianCommandCall(
 
         /** The router's error codes for a tool that answered with a refusal. */
         private val TOOL_REFUSALS = setOf("refused", "denied")
-
-        /** The script a shell tool runs: `command` / `cmd`, a string or an argv (`["bash","-lc",…]`). */
-        private fun shellScript(args: JsonObject): String? = when (val command = args["command"] ?: args["cmd"]) {
-            is JsonPrimitive -> command.content.takeIf { command.isString }
-            is JsonArray -> argvScript(command.argvWords())
-            else -> null
-        }
-
-        /** An argv's script: the `<script>` of `["bash", "-lc", "<script>"]`, else the words joined. */
-        private fun argvScript(argv: List<String>): String? {
-            if (argv.isEmpty()) return null
-            val shell = argv[0].isShellProgram()
-            val scriptFlag = argv.getOrNull(1)?.isShellScriptFlag() == true
-            return argv.getOrNull(2)?.takeIf { shell && scriptFlag } ?: argv.asShellScript()
-        }
-
-        /** Shell-tool names across runtimes (letta-code `Bash`, Codex-style `exec_command`, …). */
-        private val SHELL_TOOLS = setOf(
-            "bash", "shell", "run_shell_command", "shell_command", "local_shell",
-            "exec_command", "functions.exec_command",
-        )
     }
 }

@@ -149,12 +149,6 @@ class WorkspaceFilesControllersTest {
     }
 
     @Test
-    fun onlyMemoryToolCallsCarryMemoryPaths() {
-        listOf("memory", "memory_insert", "memory_replace", "core_memory_append", "Memory").forEach { assertTrue(ToolFileTargets.isMemoryTool(it), it) }
-        listOf("Read", "Edit", "Write", "read_file", "", "shell").forEach { assertFalse(ToolFileTargets.isMemoryTool(it), it) }
-    }
-
-    @Test
     fun aReadForAFileNoLongerOpenIsDropped() {
         val open = WorkspaceFileViewerReducer.opening("/b.kt")
         assertEquals(open, WorkspaceFileViewerReducer.read(open, WorkspaceFileContent.Text("/a.kt", "x")))
@@ -171,13 +165,5 @@ class WorkspaceFilesControllersTest {
         assertEquals("src/util", WorkspacePaths.folder("src/util/Paths.kt"))
         assertEquals("kt", WorkspacePaths.languageHint("src/Main.KT"))
         assertNull(WorkspacePaths.languageHint("Makefile"))
-    }
-
-    @Test
-    fun toolCallsNameTheirFile() {
-        assertEquals("/repo/a.kt", ToolFileTargets.pathOf("""{"file_path":"/repo/a.kt","old_string":"x"}"""))
-        assertEquals("notes.md", ToolFileTargets.pathOf("""{"path":"notes.md"}"""))
-        assertNull(ToolFileTargets.pathOf("""{"command":"ls"}"""))
-        assertNull(ToolFileTargets.pathOf("not json"))
     }
 }

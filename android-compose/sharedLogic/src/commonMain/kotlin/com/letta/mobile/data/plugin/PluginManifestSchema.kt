@@ -1,7 +1,12 @@
 package com.letta.mobile.data.plugin
 
+import com.letta.mobile.data.chat.tools.ToolInsetKind
+import com.letta.mobile.data.chat.tools.ToolPreviewKind
+import com.letta.mobile.data.chat.tools.ToolVerb
 import com.letta.mobile.data.schema.JsonSchemaCheck
 import com.letta.mobile.data.schema.SchemaProblem
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -97,6 +102,30 @@ object PluginManifestSchema {
         "permissions":${enumArray(PluginCapability.pagePermissions.map { it.wire }, 8)},
         "displayModes":{"type":"array","minItems":1,"maxItems":3,"items":{"enum":["inline","fullscreen","pip"]}}}}"""
 
+    private fun enumOf(descriptor: SerialDescriptor) = """{"enum":[${descriptor.elementNames.joinToString { "\"$it\"" }}]}"""
+
+    private const val ARG_NAME = """{"type":"string","minLength":1,"maxLength":64}"""
+
+    private val toolPresenter = """{"type":"object","additionalProperties":false,"required":["tools"],"properties":{
+        "tools":{"type":"array","minItems":1,"maxItems":32,"items":{"type":"string","minLength":1,"maxLength":64,"pattern":"^[A-Za-z0-9_.*-]+$"}},
+        "requiredArgs":{"type":"array","maxItems":16,"items":$ARG_NAME},
+        "verb":${enumOf(ToolVerb.serializer().descriptor)},
+        "target":$ARG_NAME,
+        "inset":{"type":"object","additionalProperties":false,"required":["kind"],"properties":{
+            "kind":${enumOf(ToolInsetKind.serializer().descriptor)},
+            "command":$ARG_NAME,"cwd":$ARG_NAME,"before":$ARG_NAME,"after":$ARG_NAME,"text":$ARG_NAME}},
+        "preview":{"type":"object","additionalProperties":false,"required":["kind","arg"],"properties":{
+            "kind":${enumOf(ToolPreviewKind.serializer().descriptor)},
+            "arg":$ARG_NAME,"startLine":$ARG_NAME,"lineCount":$ARG_NAME}}}}"""
+
+    private val commandPresenter = """{"type":"object","additionalProperties":false,"required":["program"],"properties":{
+        "program":{"type":"string","minLength":1,"maxLength":64,"pattern":"^[A-Za-z0-9_.-]+$"},
+        "subcommands":{"type":"array","maxItems":4,"items":$ARG_NAME},
+        "verb":${enumOf(ToolVerb.serializer().descriptor)},
+        "preview":{"type":"object","additionalProperties":false,"required":["kind","flag"],"properties":{
+            "kind":${enumOf(ToolPreviewKind.serializer().descriptor)},
+            "flag":$ARG_NAME}}}}"""
+
     private val manifest = """{"type":"object","additionalProperties":false,
         "required":["manifestVersion","id","name","version","publisher","contract","runtime"],"properties":{
         "manifestVersion":{"enum":[1]},
@@ -113,7 +142,9 @@ object PluginManifestSchema {
         "net":{"type":"object","additionalProperties":false,"properties":{"connect":${strings(32)}}},
         "elements":${map(KIND_PATTERN, 32, element)},
         "actions":${map(ACTION_PATTERN, 64, action)},
-        "pages":${map(KIND_PATTERN, 16, page)}}}"""
+        "pages":${map(KIND_PATTERN, 16, page)},
+        "toolPresenters":${map(KIND_PATTERN, 32, toolPresenter)},
+        "commandPresenters":${map(KIND_PATTERN, 32, commandPresenter)}}}"""
 
     /** The whole schema, as a document (for docs and for clients that check before uploading). */
     val schema: JsonObject by lazy { Json.parseToJsonElement(manifest).jsonObject }

@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.chat.tools.ToolPreviewTarget
 import com.letta.mobile.data.workspace.WorkspaceFileContent
 import com.letta.mobile.data.workspace.WorkspaceFileOpener
 import com.letta.mobile.data.workspace.WorkspaceFileViewerActions
@@ -74,7 +75,7 @@ class WorkspaceFileViewerTest {
         setContent {
             MaterialTheme {
                 CompositionLocalProvider(LocalWorkspaceFileOpener provides WorkspaceFileOpener { path, _ -> opened += path }) {
-                    ToolCallFileLink("""{"file_path":"/repo/a.kt"}""")
+                    ToolCallFileLink(ToolPreviewTarget.File("/repo/a.kt"))
                 }
             }
         }
@@ -84,7 +85,7 @@ class WorkspaceFileViewerTest {
 
     @Test
     fun withoutAnOpenerThereIsNoLink() = runComposeUiTest {
-        setContent { MaterialTheme { ToolCallFileLink("""{"file_path":"/repo/a.kt"}""") } }
+        setContent { MaterialTheme { ToolCallFileLink(ToolPreviewTarget.File("/repo/a.kt")) } }
         onNodeWithTag(WorkspaceFileLinkTags.LINK).assertDoesNotExist()
     }
 

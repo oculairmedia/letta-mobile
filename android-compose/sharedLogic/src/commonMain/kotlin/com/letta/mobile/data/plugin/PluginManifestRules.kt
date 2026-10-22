@@ -23,6 +23,7 @@ enum class PluginManifestProblem {
     UNDECLARED_REFERENCE,
     SECRET_IN_URL,
     BAD_SETTING,
+    BAD_TOOL_PRESENTER,
 
     ;
 
@@ -77,7 +78,8 @@ object PluginManifestRules {
 
     fun check(manifest: PluginManifest): List<SchemaProblem> =
         contract(manifest) + capabilities(manifest) + net(manifest) + settings(manifest) + secrets(manifest) +
-            actions(manifest) + PluginRuntimeRules.check(manifest) + PluginContentRules.check(manifest)
+            actions(manifest) + PluginRuntimeRules.check(manifest) + PluginContentRules.check(manifest) +
+            PluginToolPresenterRules.check(manifest)
 
     private fun contract(manifest: PluginManifest): List<SchemaProblem> = listOfNotNull(
         PluginManifestProblem.UNSUPPORTED_CONTRACT.at(

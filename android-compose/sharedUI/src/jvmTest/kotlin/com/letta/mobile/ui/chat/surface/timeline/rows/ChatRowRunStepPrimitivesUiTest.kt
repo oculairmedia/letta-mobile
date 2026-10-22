@@ -102,8 +102,8 @@ class ChatRowRunStepPrimitivesUiTest {
         assertEquals(2, count(hasTestTag(LettaListRowDefaults.TitleTestTag) and under(ChatRowTestTags.RUN_TOOL_STEPS)))
         // Straight under the run's line, no group row between them.
         onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
-        // The tool's name over the command's one-line preview.
-        assertEquals(2, count(hasText("Bash") and under(ChatRowTestTags.TOOL_CARD_TOGGLE)))
+        // The presenter's verb over the command's one-line preview (letta-mobile-2ccpv).
+        assertEquals(2, count(hasText("Ran") and under(ChatRowTestTags.TOOL_CARD_TOGGLE)))
         assertEquals(1, count(hasText("pwd") and under(ChatRowTestTags.TOOL_CARD_TOGGLE)))
     }
 

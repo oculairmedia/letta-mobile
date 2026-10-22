@@ -25,7 +25,9 @@ import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.chat.screen.WorkspaceAgentChat
 import com.letta.mobile.feature.chat.screen.WorkspaceChatHost
+import com.letta.mobile.di.pluginViewsOf
 import com.letta.mobile.ui.chat.subagents.BackgroundTasksSidePane
+import com.letta.mobile.ui.chat.tools.ProvidePluginToolPresenters
 import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.shell.ShellPageContent
@@ -67,7 +69,12 @@ private fun AndroidChatPage(shell: WorkspaceShell, agent: AgentId, modifier: Mod
             initialMessage = opening.firstMessage,
         )
     }
-    Box(modifier) { WorkspaceAgentChat(route, chatHost(shell, opening)) }
+    // The enabled plugins' tool and command presenters draw their tools' steps (letta-mobile-2ccpv).
+    val context = LocalContext.current
+    val plugins = remember(context) { pluginViewsOf(context) }
+    ProvidePluginToolPresenters(plugins) {
+        Box(modifier) { WorkspaceAgentChat(route, chatHost(shell, opening)) }
+    }
 }
 
 private fun chatHost(shell: WorkspaceShell, opening: AndroidShellChatPort.Opening) = WorkspaceChatHost(
