@@ -188,6 +188,10 @@ Settings sections, search, rows and backend-connection presentation. Extend thro
 
 Navigation drawer, page selection and contextual row/undo controls. [ShellPageDeps](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell/-shell-page-deps/index.html), workspace/navigation bindings and drawer actions connect destinations; repository implementations and native shell effects stay outside shared drawer composition.
 
+# Package com.letta.mobile.ui.shell.conversations
+
+A TimelineConversations owner bound to the shared shell: its list in the navigation drawer with the row actions, the workspace kept in step with its selection, and a port per selected conversation. Hosts provide the session's conversation backend and how a port opens; the owner and the drawer stay shared.
+
 # Package com.letta.mobile.ui.shell.header
 
 Shell header, search slot and unified results. Supply [UnifiedSearchSources](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.shell.header/-unified-search-sources/index.html) and search-slot configuration; indexing inputs and navigation effects must come from the owning session/host rather than another repository in the header.

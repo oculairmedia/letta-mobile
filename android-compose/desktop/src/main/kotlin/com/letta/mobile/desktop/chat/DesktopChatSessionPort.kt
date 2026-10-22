@@ -85,7 +85,7 @@ internal class DesktopChatSessionPort(
         sendQueue = controller.sendQueue,
         composerHost = hostInputs,
         onA2uiAction = bindings.onA2uiAction,
-        branching = controller.conversationManagement,
+        branching = controller.conversationManagement.branches,
         recompile = controller.conversationManagement.recompile,
         liveStatus = runLiveStatus(controller.runs, controller.state.map { it.selectedConversationId }),
         attachmentLimits = controller.attachmentLimits,
@@ -117,7 +117,7 @@ internal class DesktopChatSessionPort(
     override val liveStatus: StateFlow<RuntimeLiveStatus> get() = extensions.liveStatus
 
     /** letta-mobile-zxk2n.5: what the Chat options show and hide, for the page's appearance. */
-    val displayOptions: StateFlow<ChatDisplayOptions> = controller.conversationManagement.marks.displayOptions
+    val displayOptions: StateFlow<ChatDisplayOptions> = controller.conversationMarks.displayOptions
 
     override val recompileStatus: StateFlow<RecompileStatus> get() = extensions.recompileStatus
 

@@ -10,7 +10,9 @@ import androidx.compose.runtime.setValue
 import com.letta.mobile.data.agents.RecentAgents
 import com.letta.mobile.data.agents.RecentAgentsCut
 import com.letta.mobile.data.agents.RecentAgentsInput
-import com.letta.mobile.data.commands.ClientSlashCommand
+import com.letta.mobile.data.chat.conversations.ClientCommandRoutes
+import com.letta.mobile.data.chat.conversations.ComposerHostCommandSources
+import com.letta.mobile.data.chat.conversations.composerHostCommands
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.shell.rail.ShellRailActivity
@@ -305,72 +307,42 @@ internal data class BuildComposerCommandsParams(
     val onEditAgent: () -> Unit,
     val onNavigate: (DesktopDestination) -> Unit,
     val onOpenCanvas: (() -> Unit)? = null,
-    /** letta-mobile-zxk2n.5: the surfaces the client-local commands open. */
-    val client: DesktopClientCommandRoutes = DesktopClientCommandRoutes(),
+    /** letta-mobile-zxk2n.5: the surfaces the client-local commands open that are not a page (search, models, rename, new). */
+    val client: ClientCommandRoutes = ClientCommandRoutes(),
 )
 
-/** letta-mobile-zxk2n.5 (G92): where the desktop's client-local `/` commands lead that are not a page. */
-internal data class DesktopClientCommandRoutes(
-    /** `/search`: the command palette (mod+K), which searches chats and agents. */
-    val onSearch: () -> Unit = {},
-    val onOpenModelPicker: () -> Unit = {},
-    val onRenameChat: () -> Unit = {},
-    /** `/new`: the shell's new chat for the focused agent (which pins it when "Pin new chats" is on). */
-    val onNewChat: () -> Unit = {},
+/** The desktop's route for each client-local `/` command: the shell's surfaces in [BuildComposerCommandsParams.client], and its pages. */
+internal fun desktopClientRoutes(params: BuildComposerCommandsParams): ClientCommandRoutes = params.client.copy(
+    memory = { params.onNavigate(DesktopDestination.Memory) },
+    // Skills & Tools is where the desktop lists and merges MCP servers.
+    mcp = { params.onNavigate(DesktopDestination.Agents) },
+    connect = { params.onNavigate(DesktopDestination.Providers) },
+    recompile = params.chatController.conversationManagement::recompileOpenConversation,
 )
 
-/** The desktop's route for each [ClientSlashCommand]. */
-internal fun desktopClientCommand(
-    command: ClientSlashCommand,
-    params: BuildComposerCommandsParams,
-): ChatHostCommand {
-    val controller = params.chatController
-    val client = params.client
-    val run: () -> Unit = when (command) {
-        ClientSlashCommand.Search -> client.onSearch
-        ClientSlashCommand.Memory -> { { params.onNavigate(DesktopDestination.Memory) } }
-        // Skills & Tools is where the desktop lists and merges MCP servers.
-        ClientSlashCommand.Mcp -> { { params.onNavigate(DesktopDestination.Agents) } }
-        ClientSlashCommand.Models -> client.onOpenModelPicker
-        ClientSlashCommand.New -> client.onNewChat
-        ClientSlashCommand.Rename -> client.onRenameChat
-        ClientSlashCommand.Connect -> { { params.onNavigate(DesktopDestination.Providers) } }
-        ClientSlashCommand.Recompile -> controller.conversationManagement::recompileOpenConversation
-    }
-    return ChatHostCommand(command.id, command.description, run = run)
-}
-
-internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<ChatHostCommand> = buildList {
+/** The shared `/` palette ([composerHostCommands]) with the desktop's routes and pages. */
+internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<ChatHostCommand> {
     val onNavigate = params.onNavigate
-    ClientSlashCommand.entries.forEach { add(desktopClientCommand(it, params)) }
-    // letta-mobile-7mys7: letta-code's /fork [name], run by the client (the App Server does not).
-    if (params.chatController.conversationManagement.supportsBranching) {
-        add(
-            ChatHostCommand("fork", "Fork this chat (/fork [name])", fillsComposer = true) {
-                params.chatController.updateComposerText("/fork ")
-            },
-        )
-    }
-    add(ChatHostCommand("agent", "Create a new agent") { params.onCreateAgent() })
-    add(ChatHostCommand("edit", "Edit this agent") { params.onEditAgent() })
-    add(ChatHostCommand("canvas", "Open canvas workspace") { params.onOpenCanvas?.invoke() })
-    add(ChatHostCommand("schedules", "Open schedules") { onNavigate(DesktopDestination.Schedules) })
-    add(ChatHostCommand("skills", "Open skills & tools") { onNavigate(DesktopDestination.Agents) })
-    add(ChatHostCommand("channels", "Open channels") { onNavigate(DesktopDestination.Channels) })
-    add(ChatHostCommand("providers", "Open providers & models") { onNavigate(DesktopDestination.Providers) })
-    add(ChatHostCommand("settings", "Open settings") { onNavigate(DesktopDestination.Settings) })
-    // A server command named like a client command would shadow it (commands are keyed by label).
-    params.agentSlashCommands.filter { ClientSlashCommand.fromId(it.command) == null }.forEach { cmd ->
-        add(
-            ChatHostCommand(
-                label = cmd.command,
-                description = cmd.description.ifBlank {
-                    cmd.skillName?.let { "Skill: $it" } ?: "Slash command"
-                },
-                fillsComposer = true,
-            ) { params.chatController.updateComposerText("/${cmd.command} ") },
-        )
-    }
+    val controller = params.chatController
+    return composerHostCommands(
+        ComposerHostCommandSources(
+            client = desktopClientRoutes(params),
+            fillComposer = controller::updateComposerText,
+            // letta-code's /fork [name], run by the client (the App Server does not).
+            canFork = controller.conversationManagement.supportsBranching,
+            pages = listOf(
+                ChatHostCommand("agent", "Create a new agent") { params.onCreateAgent() },
+                ChatHostCommand("edit", "Edit this agent") { params.onEditAgent() },
+                ChatHostCommand("canvas", "Open canvas workspace") { params.onOpenCanvas?.invoke() },
+                ChatHostCommand("schedules", "Open schedules") { onNavigate(DesktopDestination.Schedules) },
+                ChatHostCommand("skills", "Open skills & tools") { onNavigate(DesktopDestination.Agents) },
+                ChatHostCommand("channels", "Open channels") { onNavigate(DesktopDestination.Channels) },
+                ChatHostCommand("providers", "Open providers & models") { onNavigate(DesktopDestination.Providers) },
+                ChatHostCommand("settings", "Open settings") { onNavigate(DesktopDestination.Settings) },
+            ),
+            server = params.agentSlashCommands,
+        ),
+    )
 }
 
 /** Model/embedding defaults for a new agent, copied from the focused agent. */
@@ -420,7 +392,7 @@ internal data class DesktopComposerCommandsParams(
     val onCanvasSessionChange: (com.letta.mobile.data.canvas.CanvasSession?) -> Unit,
     /** Set while the shared chat page docks the conversation's board: the canvas command shows it. */
     val showDockedCanvas: (() -> Unit)? = null,
-    val client: DesktopClientCommandRoutes = DesktopClientCommandRoutes(),
+    val client: ClientCommandRoutes = ClientCommandRoutes(),
 )
 
 @Composable
@@ -499,7 +471,7 @@ internal fun createDesktopOverlayActions(
         chatModels = params.chatController.models.available,
         reloadChatModels = params.chatController.models::reload,
         onModelSelected = params.chatController.models::select,
-        recentModels = params.chatController.conversationManagement.recentModels,
+        recentModels = params.chatController.conversationMarks.recentModels,
     ),
     onNavigate = params.onSelectDestination,
     onIrohIdentityReset = params.onIrohIdentityReset,

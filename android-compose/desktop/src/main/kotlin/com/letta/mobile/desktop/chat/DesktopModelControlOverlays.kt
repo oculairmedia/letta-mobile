@@ -36,7 +36,7 @@ internal data class DesktopModelControlHost(
     val reloadChatModels: suspend () -> Unit,
     /** The per-conversation switch (`ConversationModels.select`). */
     val onModelSelected: (String) -> Unit,
-    /** letta-mobile-bzvro.18: recently used models, newest first (`DesktopChatController.recentModels`). */
+    /** letta-mobile-bzvro.18: recently used models, newest first (`DesktopConversationMarks.recentModels`). */
     val recentModels: Flow<List<String>> = flowOf(emptyList()),
 ) {
     /** The admin catalog while the host answers it, else the chat's list; both keep the chat's list current. */

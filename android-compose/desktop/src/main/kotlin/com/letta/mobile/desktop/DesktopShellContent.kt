@@ -111,7 +111,7 @@ private fun rememberDesktopShortcuts(context: DesktopShellContext, frame: Deskto
     val layout = context.core.layout.controller
     val management = context.core.chatController.conversationManagement
     val pinned by management.pinnedConversationIds.collectAsState()
-    val settled by management.marks.settled.collectAsState()
+    val settled by context.core.chatController.conversationMarks.settled.collectAsState()
     val conversationIds = remember(frame.lists.agentConversations, pinned, settled) {
         desktopConversationOrder(frame.lists.agentConversations, ConversationListGroups(pinned, settled))
     }
@@ -197,16 +197,16 @@ private fun rememberDesktopSidebarInputs(context: DesktopShellContext, frame: De
             deletingIds = chatController.deletingConversationIds.collectAsState().value,
             pinnedIds = management.pinnedConversationIds.collectAsState().value,
             parentIds = management.conversationParents.collectAsState().value.mapValues { it.value.conversationId },
-            settledIds = management.marks.settled.collectAsState().value,
-            markers = management.marks.markers.collectAsState().value,
+            settledIds = chatController.conversationMarks.settled.collectAsState().value,
+            markers = chatController.conversationMarks.markers.collectAsState().value,
         ),
         canvases = canvasLibraryState.documents,
         archivedCanvasIds = canvasLibraryState.archived,
         activeCanvasId = canvasShell.activeSession?.canvasId,
         chatOptions = desktopChatOptionsState(
-            display = management.marks.displayOptions.collectAsState().value,
+            display = chatController.conversationMarks.displayOptions.collectAsState().value,
             fontScale = LocalDesktopChatFontScale.current,
-            autoPin = management.marks.autoPinNewChats.collectAsState().value,
+            autoPin = chatController.conversationMarks.autoPinNewChats.collectAsState().value,
             hasChat = frame.chatState.selectedConversationId != null,
         ),
     )

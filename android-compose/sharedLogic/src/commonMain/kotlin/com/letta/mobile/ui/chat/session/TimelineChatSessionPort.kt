@@ -225,6 +225,10 @@ class TimelineChatSessionPort(
     internal fun updateRun(transform: (TimelineRunState) -> TimelineRunState) = run.update(transform)
 
     internal fun sendDraft() {
+        if (options.branching?.runBranchCommand(draft.value.state.text) == true) {
+            draft.update { it.withText("") }
+            return
+        }
         val gate = sendGate()
         if (gate.blocked) return
         val sendDraft = ChatComposerPolicy.beginSend(draft.value.state) ?: return

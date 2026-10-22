@@ -121,7 +121,7 @@ internal class DesktopShellChatPort(
      * when "Pin new chats" is on.
      */
     override fun startNewChat(agent: AgentId?) {
-        val marks = controller.conversationManagement.marks
+        val marks = controller.conversationMarks
         agent?.let { controller.createConversationForAgent(it.value, onCreated = marks::onConversationCreated) }
             ?: controller.createConversation()
     }

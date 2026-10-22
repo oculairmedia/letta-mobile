@@ -51,7 +51,7 @@ class ConversationModelBackend(
         /** An App Server session's models, read and switched over its own protocol commands. */
         fun of(admin: AppServerLocalAdminGateway): ConversationModelBackend = ConversationModelBackend(
             list = admin::listLlmModels,
-            setModel = { change -> admin.setConversationModel(change.conversationId.value, change.model.value) },
+            setModel = { change -> admin.setConversationModel(change.conversationId, change.model.value) },
         )
     }
 }

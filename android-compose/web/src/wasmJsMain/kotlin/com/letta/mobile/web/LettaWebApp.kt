@@ -4,11 +4,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import com.letta.mobile.data.model.isIrohBackendUrl
+import com.letta.mobile.data.shell.SessionShellChatPort
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.ui.host.LettaHost
@@ -26,9 +28,7 @@ import com.letta.mobile.ui.shell.workspace.rememberShellWorkspaceHeader
 import com.letta.mobile.ui.theme.HighContrastPreference
 import com.letta.mobile.ui.theme.LocalHighContrastPreference
 import com.letta.mobile.ui.theme.SharedMaterialTheme
-import com.letta.mobile.web.chat.WebChatLoad
-import com.letta.mobile.web.chat.WebChatOpener
-import com.letta.mobile.web.chat.rememberWebChatLoad
+import com.letta.mobile.ui.shell.conversations.rememberShellTimelineChat
 import com.letta.mobile.web.mascot.RiveCanvasRenderer
 import kotlinx.coroutines.launch
 
@@ -47,7 +47,7 @@ fun LettaWebApp() {
     val config = backend.config.value
     val layout = rememberShellLayoutController(config, app.storage.settings)
     val shell = remember(workspace, layout) {
-        WebChatPort(workspace).let { WebShell(ShellWorkspaceNavigator(workspace, it), backend, it, layout) }
+        SessionShellChatPort().let { WebShell(ShellWorkspaceNavigator(workspace, it), backend, it, layout) }
     }
     val connection by app.gateway.state.collectAsState()
     LaunchedEffect(config.serverUrl, config.accessToken, config.mode, backend.rosterRequest.intValue) {
@@ -59,9 +59,8 @@ fun LettaWebApp() {
     val browserRoute = remember(workspace) { BrowserRouteBinding(workspace) }
     DisposableEffect(browserRoute) { onDispose(browserRoute.start()) }
     LaunchedEffect(browserRoute, workspace.route) { browserRoute.publish(workspace.route) }
-    val focusedAgent = backend.agents.value.firstOrNull { it.id == workspace.focusedAgentId }
-    val chat = rememberWebChatLoad(remember(app) { WebChatOpener(app.gateway::openChat) }, focusedAgent, connection)
-    LaunchedEffect(chat) { (chat as? WebChatLoad.Ready)?.let { shell.chat.shown(it.port.target) } }
+    val chat = rememberShellTimelineChat(webTimelineChat(app, shell, connection))
+    SideEffect { shell.chat.owner = chat.owner }
     LaunchedEffect(Unit) { startWebMemoryPressure() }
     // letta-mobile-ckmub.17.5: the shared pages over the live session graph, as desktop binds them.
     val graph by app.gateway.sessionGraphProvider.currentGraph.collectAsState()
@@ -70,7 +69,7 @@ fun LettaWebApp() {
     val onRosterChanged: () -> Unit = { scope.launch { backend.reloadRoster(graph, workspace) } }
     val settings = webSettingsServices(backend.config, app.settingsStore, app.gateway.permissionModeSettings)
     val page = WebPageInputs(chat, connection, app.canvas, settings, WebPagesSession(graph, controllers, app.services, onRosterChanged))
-    val header = rememberShellWorkspaceHeader(ShellWorkspaceHeaderBinding(shell.navigator, layout, webSearch(shell, page), shell.chat::tab))
+    val header = rememberShellWorkspaceHeader(ShellWorkspaceHeaderBinding(shell.navigator, layout, webSearch(shell, page), chat.list::tab))
     CompositionLocalProvider(LocalHighContrastPreference provides highContrastPreference) {
         SharedMaterialTheme {
             ProvideLettaHost(LettaHost.Pointer) {

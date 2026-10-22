@@ -38,7 +38,7 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
                 chatModels = chatController.models.available,
                 reloadChatModels = chatController.models::reload,
                 onModelSelected = chatController.models::select,
-                recentModels = chatController.conversationManagement.recentModels,
+                recentModels = chatController.conversationMarks.recentModels,
             ).pickerSource(),
             attention = core.attentionPrefs,
         )

@@ -6,6 +6,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellRoute
@@ -16,6 +17,7 @@ import com.letta.mobile.data.shell.toShellDestination
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
 import com.letta.mobile.ui.shell.sidebar.ShellPanelAgent
+import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
 import kotlin.time.Instant
 
 /**
@@ -67,7 +69,10 @@ fun SyncShellWorkspace(workspace: ShellWorkspaceState, selection: ShellChatSelec
  * the focused agent heads the panel, the rest are on the rail. With no activity signal to cut a
  * recents strip by, the whole roster shows, scrolling.
  */
-fun ShellWorkspaceState.navDrawerInput(agents: List<Pair<String, String>>): ShellNavDrawerInput {
+fun ShellWorkspaceState.navDrawerInput(
+    agents: List<Pair<String, String>>,
+    conversations: ShellDrawerConversations = ShellDrawerConversations(),
+): ShellNavDrawerInput {
     val focusedIndex = agents.indexOfFirst { it.first == focusedAgentId?.value }
     return ShellNavDrawerInput(
         agent = ShellPanelAgent(
@@ -78,12 +83,20 @@ fun ShellWorkspaceState.navDrawerInput(agents: List<Pair<String, String>>): Shel
         agents = agents,
         recentAgentsPolicy = RecentAgentsPolicy(maxAgents = agents.size.coerceAtLeast(1), fillToCap = true),
         openConversationId = selectedConversationId?.value,
+        conversations = conversations.conversations,
+        archiveFilter = conversations.archiveFilter,
+        pinnedConversationIds = conversations.pinnedIds,
+        conversationParents = conversations.parentIds,
     )
 }
 
 /** The drawer's state for the workspace: Home, Settings and the open section draw selected. */
-fun ShellWorkspaceState.navDrawerState(agents: List<Pair<String, String>>, now: Instant): ShellNavDrawerState {
-    val base = ShellNavDrawerMapping.state(navDrawerInput(agents), now)
+fun ShellWorkspaceState.navDrawerState(
+    agents: List<Pair<String, String>>,
+    now: Instant,
+    conversations: ShellDrawerConversations = ShellDrawerConversations(),
+): ShellNavDrawerState {
+    val base = ShellNavDrawerMapping.state(navDrawerInput(agents, conversations), now)
     val home = page == ShellDestination.Home
     return base.copy(
         rail = base.rail.copy(homeSelected = home, expanded = railExpanded),
@@ -128,3 +141,12 @@ fun ShellWorkspaceNavigator.navDrawerActions(afterNavigate: () -> Unit): ShellNa
         ),
     )
 }
+
+/** The chat's conversations as the drawer lists them: the focused agent's, under the archive filter, with pins and forks. */
+data class ShellDrawerConversations(
+    val conversations: List<Conversation> = emptyList(),
+    val archiveFilter: ShellArchiveFilter = ShellArchiveFilter.Active,
+    val pinnedIds: Set<String> = emptySet(),
+    /** Each fork's source conversation id. */
+    val parentIds: Map<String, String> = emptyMap(),
+)

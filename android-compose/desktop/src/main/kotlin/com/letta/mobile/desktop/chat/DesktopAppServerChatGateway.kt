@@ -2,19 +2,15 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.branch.ConversationForkGateway
 import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
-import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
-import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.runtime.PendingApprovalSource
 import com.letta.mobile.data.chat.runtime.EnginePermissionModes
 import com.letta.mobile.data.chat.runtime.PermissionModeGateway
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
-import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.AssistantMessage
@@ -22,7 +18,6 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.controller.AppServerApprovalDecisions
 import com.letta.mobile.data.controller.ApprovalRejectedException
@@ -30,6 +25,7 @@ import com.letta.mobile.data.controller.ApprovalSubmission
 import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.controller.withSelectedSuggestions
 import com.letta.mobile.data.runtime.approvalIdForSuggestions
+import com.letta.mobile.data.repository.appserver.AppServerConversationAdmin
 import com.letta.mobile.data.repository.appserver.AppServerLocalAdminGateway
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.runtime.AppServerRuntimeEventMapper
@@ -132,17 +128,17 @@ class DesktopAppServerChatGateway internal constructor(
     override val permissionModes: PermissionModeRegistry? = null,
     private val heartbeatIntervalMs: Long = IrohAdminRpcChatGateway.STREAM_HEARTBEAT_INTERVAL_MS,
     private val agentIdResolver: suspend (conversationId: String) -> String = { conversationId ->
-        admin.getConversation(conversationId).agentId.value
+        admin.getConversation(ConversationId(conversationId)).agentId.value
     },
     /** letta-mobile-by4vm.9/.56: the session that reconnects itself (ws:// and iroh://); null for test fakes. */
     private val session: DesktopSelfReconnectingSession? = null,
 ) : DesktopChatGateway,
     ConnectionStatusGateway,
     DesktopReconnectOwningGateway,
-    ChatGatewayExtras,
-    ConversationSummaryGateway,
-    ConversationForkGateway,
-    ConversationRecompileGateway,
+    ChatGatewayExtras by AppServerConversationAdmin(admin),
+    ConversationSummaryGateway by AppServerConversationAdmin(admin),
+    ConversationForkGateway by AppServerConversationAdmin(admin),
+    ConversationRecompileGateway by AppServerConversationAdmin(admin),
     DesktopApprovalSubmitter,
     PendingApprovalSource,
     PermissionModeGateway,
@@ -444,14 +440,14 @@ class DesktopAppServerChatGateway internal constructor(
         limit: Int?,
         after: String?,
         order: String?,
-    ): List<LettaMessage> = admin.listConversationMessages(conversationId.value, limit, after, order)
+    ): List<LettaMessage> = admin.listConversationMessages(conversationId, limit, after, order)
 
     override suspend fun listConversationMessagesBefore(
         conversationId: ConversationId,
         limit: Int,
         before: String,
         order: String,
-    ): List<LettaMessage> = admin.listConversationMessagesBefore(conversationId.value, limit, before, order)
+    ): List<LettaMessage> = admin.listConversationMessagesBefore(conversationId, limit, before, order)
 
     /** The App Server reads messages per conversation; an agent-wide read would fan out, so it is refused. */
     override suspend fun listAgentMessages(
@@ -460,69 +456,48 @@ class DesktopAppServerChatGateway internal constructor(
         order: String?,
         conversationId: ConversationId?,
     ): List<LettaMessage> = admin.listConversationMessages(
-        requireNotNull(conversationId?.value) { "App Server message reads require conversationId?.value" },
+        requireNotNull(conversationId) { "App Server message reads require conversationId" },
         limit,
         after = null,
         order = order,
     )
 
+    /** The shared App Server conversation operations over [admin]; this gateway adds what it remembers of each. */
+    private val conversations = AppServerConversationAdmin(admin)
+
     override suspend fun listConversations(
         limit: Int,
         archiveStatus: String?,
-    ): List<Conversation> = admin.listConversations(limit, archiveStatus)
-        .also { conversations ->
-            conversations.forEach { agentIdByConversation[it.id] = it.agentId }
-        }
+    ): List<Conversation> = conversations.listConversations(limit, archiveStatus).onEach(::remember)
+
+    override suspend fun listConversationsForAgent(agentId: String, limit: Int): List<Conversation> =
+        conversations.listConversationsForAgent(agentId, limit).onEach(::remember)
 
     override suspend fun getConversation(conversationId: String): Conversation =
-        admin.getConversation(conversationId)
-            .also { agentIdByConversation[it.id] = it.agentId }
+        conversations.getConversation(conversationId).also(::remember)
 
     override suspend fun createConversation(agentId: String, summary: String?): Conversation =
-        admin.createConversation(agentId, summary)
-            .also { agentIdByConversation[it.id] = it.agentId }
+        conversations.createConversation(agentId, summary).also(::remember)
 
-    override suspend fun setConversationModel(conversationId: String, model: String): Conversation =
-        admin.setConversationModel(conversationId, model)
+    /** The conversation's agent, for the permission mode it keeps and the turns sent into it. */
+    private fun remember(conversation: Conversation) {
+        agentIdByConversation[conversation.id] = conversation.agentId
+    }
 
-    override suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation =
-        admin.setConversationArchived(conversationId, archived)
-
-    override suspend fun createAgent(params: AgentCreateParams): Agent = admin.createAgent(params)
-
-    override suspend fun listLlmModels(): List<LlmModel> = admin.listLlmModels()
-
-    /**
-     * letta-mobile-bzvro.17: the App Server has no `conversation_delete`, so a delete archives and
-     * hides the conversation; it leaves every list (Archived too) and stays on disk, but the app's
-     * only way back is the undo offered right after.
-     */
+    /** The shared App Server delete (archive and hide); its stored mode goes with it when the agent is known. */
     override suspend fun deleteConversation(conversationId: String) {
-        admin.setConversationRemoved(ConversationId(conversationId), removed = true)
-        // Its stored mode goes with it (when the owning agent is known from an earlier send or read).
+        conversations.deleteConversation(conversationId)
         agentIdByConversation.remove(ConversationId(conversationId))
             ?.let { permissionModes?.forget(AppServerRuntimeScope(it.value, conversationId)) }
     }
 
-    override val deleteBehavior: ConversationDeleteBehavior get() = ConversationDeleteBehavior.RemovesFromLists
+    override val deleteBehavior: ConversationDeleteBehavior get() = conversations.deleteBehavior
 
-    /** The undo of [deleteConversation]: un-hide, and archived again only if it was archived before. */
-    override suspend fun restoreDeletedConversation(conversationId: String, wasArchived: Boolean) {
-        admin.restoreRemovedConversation(ConversationId(conversationId), archived = wasArchived)
-    }
+    override suspend fun restoreDeletedConversation(conversationId: String, wasArchived: Boolean) =
+        conversations.restoreDeletedConversation(conversationId, wasArchived)
 
-    /** letta-mobile-bzvro.17: rename (and the generated title) is the conversation's `summary`. */
-    override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation =
-        admin.renameConversation(update)
-
-    /** letta-mobile-bzvro.15: `conversation_fork` through the App Server. */
     override suspend fun forkConversation(request: ConversationForkRequest): Conversation =
-        admin.forkConversation(request)
-            .also { agentIdByConversation[it.id] = it.agentId }
-
-    /** letta-mobile-zxk2n.5: `/recompile` as `conversation_recompile` through the App Server. */
-    override suspend fun recompileConversation(request: ConversationRecompileRequest) =
-        admin.recompileConversation(request)
+        conversations.forkConversation(request).also(::remember)
 
     override fun close() {
         try {

@@ -17,7 +17,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.desktop.canvas.toCanvasArchiveFilter
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
-import com.letta.mobile.desktop.chat.DesktopBranchOrigin
+import com.letta.mobile.data.chat.conversations.ConversationOrigin
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationMarks
 import com.letta.mobile.desktop.chat.DesktopTranscriptExport
@@ -148,11 +148,14 @@ internal fun desktopSidebarActions(
         },
         onPinConversation = { id, pinned -> management.setPinned(ConversationId(id), pinned) },
         onForkConversation = management.takeIf { it.supportsBranching }?.let { branching ->
-            { id, name -> branching.forkConversation(DesktopBranchOrigin(id, focus.selectedAgentId), name) }
+            { id, name ->
+                val origin = ConversationOrigin(ConversationId(id), focus.selectedAgentId?.let(::AgentId))
+                branching.branches.forkConversation(origin, name)
+            }
         },
         onOpenCanvas = { context.openCanvas(it) },
         onArchiveCanvas = canvasShell.library::setArchived,
-        conversationMarks = management.marks.rowActions(),
+        conversationMarks = chatController.conversationMarks.rowActions(),
         chatOptions = desktopChatOptionsActions(chatController, setFontScale),
     )
 }
@@ -163,7 +166,7 @@ internal fun DesktopConversationMarks.rowActions(): ShellConversationMarkActions
 
 /** What the Chat options dialog changes on the desktop. */
 private fun desktopChatOptionsActions(controller: DesktopChatController, setFontScale: (Float) -> Unit): ShellChatOptionsActions {
-    val marks = controller.conversationManagement.marks
+    val marks = controller.conversationMarks
     return ShellChatOptionsActions(
         onDisplayChange = marks::setDisplayOptions,
         onTextSizeChange = { size -> setFontScale(size.fontScale) },
@@ -173,7 +176,7 @@ private fun desktopChatOptionsActions(controller: DesktopChatController, setFont
 }
 
 private fun downloadTranscript(controller: DesktopChatController) {
-    val options = controller.conversationManagement.marks.displayOptions.value
+    val options = controller.conversationMarks.displayOptions.value
     val transcript = DesktopTranscriptExport.transcriptOf(controller.state.value, options) ?: return
     runCatching { DesktopTranscriptExport.save(transcript) }
         .onFailure { controller.conversationManagement.reportError("Couldn't save the transcript: ${it.message ?: it::class.simpleName}") }

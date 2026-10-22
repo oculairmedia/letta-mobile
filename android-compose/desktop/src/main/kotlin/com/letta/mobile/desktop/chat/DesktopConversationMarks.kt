@@ -4,9 +4,11 @@ import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.runtime.ConversationListPrefs
 import com.letta.mobile.data.chat.runtime.ConversationMarker
 import com.letta.mobile.data.model.ConversationId
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 
 /**
  * letta-mobile-zxk2n.5 (G37, G91): the desktop's binding of the shared client marks: settled chats,
@@ -25,6 +27,9 @@ internal class DesktopConversationMarks(private val prefs: DesktopConversationPr
 
     /** Whether this desktop keeps the marks at all; without them the row menu offers neither. */
     val enabled: Boolean get() = marks != null
+    /** Models switched to most recently (newest first), for the picker; [recordModel] may write the TUI's settings file. */
+    val recentModels: StateFlow<List<String>> = prefs.recentModels?.recent ?: MutableStateFlow(emptyList<String>()).asStateFlow()
+    suspend fun recordModel(model: String) = prefs.recentModels?.let { withContext(Dispatchers.IO) { it.record(model) } } ?: Unit
 
     val markerChoices: List<String> get() = ConversationListPrefs.MARKER_CHOICES
 

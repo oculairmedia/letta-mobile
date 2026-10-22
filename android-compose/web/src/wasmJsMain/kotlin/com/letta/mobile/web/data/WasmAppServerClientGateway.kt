@@ -15,8 +15,10 @@ import com.letta.mobile.data.session.graph.HostSessionBinding
 import com.letta.mobile.data.memory.memfs.AppServerMemfsSource
 import com.letta.mobile.data.memory.memfs.MemfsSource
 import com.letta.mobile.data.model.isIrohBackendUrl
+import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.repository.appserver.AppServerLocalAdminGateway
 import com.letta.mobile.data.chat.approval.SettingsApprovalOutboxStore
+import com.letta.mobile.data.chat.conversations.TimelineConversationChat
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.runtime.IrohApprovalControls
 import com.letta.mobile.data.runtime.PermissionModeSettings
@@ -147,7 +149,12 @@ class WasmAppServerClientGateway(
             check(auth.success) { auth.error ?: "App Server authentication failed" }
 
             val graph = openGraph(config, session, auth.capabilities.orEmpty().toSet())
-            if (isIrohBackendUrl(config.serverUrl)) session.bindIrohChat(irohChatGateway())
+            if (isIrohBackendUrl(config.serverUrl)) {
+                session.bindIrohChat(irohChatGateway())
+            } else {
+                val admin = session.appServerAdmin
+                session.bindConversations(SessionChatGateway(admin, timelineTransport(session) { admin.getConversation(it).agentId }))
+            }
             bounded(REQUEST_TIMEOUT_MS, "Agent list timed out") { graph.agentRepository.refreshAgents() }
             mutableState.value = BackendConnectionStatus.Connected(session.label)
             mutableCanvasRelay.value = session.canvasRelay
@@ -173,23 +180,21 @@ class WasmAppServerClientGateway(
         session?.close()
     }
 
-    /**
-     * letta-mobile-o4ygk.4.5: what the shared chat page needs for [agent]'s conversation on the
-     * live session: the conversation (its most recent one, or a new one), a timeline transport over
-     * the session's turn engine and `admin_rpc`, and the run controls (stop, approvals).
-     */
-    suspend fun openChat(agent: Agent): WebChatBinding {
-        val session = activeSession ?: error("Connect to an App Server first")
-        val conversationId = session.ensureConversation(agent.id.value, ::nextRequestId)
-        val transport = timelineTransport(session, agent.id)
-        val target = TimelineChatTarget(agentId = agent.id.value, agentName = agent.name, conversationId = conversationId)
+    /** The shared conversation owner's gateway: the Iroh host's chat gateway itself, or over ws:// the App Server's own commands. */
+    fun chatGateway(): ChatGateway? = activeSession?.conversations
+
+    /** letta-mobile-o4ygk.4.5: [target]'s chat on the live session (timeline, run controls, chips); null with none. */
+    fun chatBinding(target: TimelineChatTarget, agentModel: String?, conversations: TimelineConversationChat?): WebChatBinding? {
+        val session = activeSession ?: return null
+        val transport = timelineTransport(session) { AgentId(target.agentId) }
         return WebChatBinding(
             target = target,
             transport = transport,
             controls = webRunControls(AppServerRunControls(session.engine), session.irohChat, target),
             hostApprovals = session.irohChat,
+            conversations = conversations,
             chips = TimelineChipSources(
-                models = webModelSource(session.irohChat, session.appServerAdmin, agent.model, modelControl.catalog),
+                models = webModelSource(session.irohChat, session.appServerAdmin, agentModel, modelControl.catalog),
                 permissionModes = session.permissionModes,
             ),
         )
@@ -214,25 +219,24 @@ class WasmAppServerClientGateway(
             ),
         )
     }
-
     /**
      * letta-mobile-zxk2n.8: where a subagent's conversation is read for the chat's dual view, over the
      * live session's socket; null while no App Server is connected.
      */
     fun subagentTimeline(view: SubagentView): SubagentTimelineRoute? {
         val session = activeSession ?: return null
-        return SubagentTimelineRoute(timelineTransport(session, view.agentId), view.conversationId)
+        return SubagentTimelineRoute(timelineTransport(session) { view.agentId }, view.conversationId)
     }
 
-    /** A conversation's timeline over [session]'s socket, for [agent]'s conversations. */
-    private fun timelineTransport(session: WasmAppServerSession, agent: AgentId): AppServerTimelineTransport =
+    /** A conversation's timeline over [session]'s socket; [agentIdFor] names the agent a send goes to. */
+    private fun timelineTransport(session: WasmAppServerSession, agentIdFor: suspend (ConversationId) -> AgentId) =
         AppServerTimelineTransport(
             AppServerTimelineConnection(
                 turnEngine = session.engine,
                 events = session.client.events,
                 isConnected = session.isConnected,
                 admin = { method, params -> session.admin(method.value, params, ::nextRequestId) },
-                agentIdFor = { agent },
+                agentIdFor = agentIdFor,
                 backendId = BackendId(WEB_BACKEND_ID),
             ),
         )
@@ -319,7 +323,7 @@ internal fun webModelSource(
 ): TimelineModelSource {
     val gateway = iroh ?: return TimelineModelSource(
         backend = ConversationModelBackend.of(admin),
-        conversation = { admin.getConversation(it.value) },
+        conversation = { admin.getConversation(it) },
         agentModel = agentModel,
     )
     return TimelineModelSource(

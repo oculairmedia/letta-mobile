@@ -56,7 +56,7 @@ import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlayData
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlays
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceSearch
 import com.letta.mobile.ui.shell.workspace.rememberShellChatPresentation
-import com.letta.mobile.web.chat.WebChatLoad
+import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.web.chat.WebChatSessionPort
 import com.letta.mobile.web.data.WasmAppServerClientGateway
 import kotlin.time.Clock
@@ -81,11 +81,11 @@ internal class WebWorkspace(val state: LettaShellWorkspaceState, val host: Letta
 internal fun webWorkspace(shell: WebShell, page: WebPageInputs, header: ShellWorkspaceHeaderState): WebWorkspace {
     val workspace = shell.workspace
     val roster = shell.backend.roster
-    val navigation = workspace.workspaceNavigation(roster, Clock.System.now())
+    val navigation = workspace.workspaceNavigation(roster, Clock.System.now(), conversations = page.chat.list)
     return WebWorkspace(
         state = LettaShellWorkspaceState(header, navigation, ShellWorkspaceLayout(sidebarVisible = shell.layout.state.isSidebarVisible)),
         host = LettaShellWorkspaceHost(
-            actions = shell.navigator.workspaceNavigationActions(),
+            actions = shell.navigator.workspaceNavigationActions(page.chat.list),
             slots = LettaShellWorkspaceSlots(
                 main = { modifier ->
                     val deps = rememberShellPageDeps(page.session.graph, page.session.controllers, webPageHost(shell, page))
@@ -105,7 +105,7 @@ internal fun webWorkspace(shell: WebShell, page: WebPageInputs, header: ShellWor
                 // The browser has no background-task roster yet (parity-exemptions.txt).
                 sidePane = {},
                 overlays = {
-                    ShellWorkspaceOverlays(workspace.overlays, webOverlayData(shell), webOverlayActions(shell))
+                    ShellWorkspaceOverlays(workspace.overlays, webOverlayData(shell, page), webOverlayActions(shell))
                 },
             ),
             chrome = ShellWindowChrome.Inline,
@@ -118,15 +118,18 @@ internal fun webWorkspace(shell: WebShell, page: WebPageInputs, header: ShellWor
     )
 }
 
-/** The header search and the palette look through the roster (conversations come with letta-mobile-ckmub.17.15). */
+/** The header search and the palette look through the roster and the conversations. */
 internal fun webSearch(shell: WebShell, page: WebPageInputs) =
-    ShellWorkspaceSearch(home = page.session.controllers.home, sources = webSearchSources(shell))
+    ShellWorkspaceSearch(home = page.session.controllers.home, sources = webSearchSources(shell, page))
 
-private fun webSearchSources(shell: WebShell) =
-    UnifiedSearchSources(agents = shell.backend.agents.value, agentId = shell.workspace.focusedAgentId?.value)
+private fun webSearchSources(shell: WebShell, page: WebPageInputs) = UnifiedSearchSources(
+    conversations = page.chat.list.state.conversations.toChatConversationSummaries(shell.backend.roster.toMap()),
+    agents = shell.backend.agents.value,
+    agentId = shell.workspace.focusedAgentId?.value,
+)
 
-private fun webOverlayData(shell: WebShell) = ShellWorkspaceOverlayData(
-    searchSources = webSearchSources(shell),
+private fun webOverlayData(shell: WebShell, page: WebPageInputs) = ShellWorkspaceOverlayData(
+    searchSources = webSearchSources(shell, page),
     railAgents = shell.backend.roster,
     rosterAgents = shell.backend.agents.value,
 )
@@ -145,7 +148,7 @@ private fun webPageHost(shell: WebShell, page: WebPageInputs): ShellPageHost {
         navigator = shell.navigator,
         focus = ShellPageFocus(focused, shell.backend.agents.value.firstOrNull { it.id == focused }?.name),
         pages = ShellHostPages(
-            chat = (page.chat as? WebChatLoad.Ready)?.let { ready -> webChatPage(shell, page, ready) },
+            chat = page.chat.port?.let { port -> webChatPage(shell, page, port) },
             settings = shellSettingsPage(
                 SettingsPageState(shell.backend.config.value, page.connection),
                 page.settings,
@@ -166,9 +169,8 @@ private fun webPageHost(shell: WebShell, page: WebPageInputs): ShellPageHost {
  * letta-mobile-o4ygk.4.5: the conversation is the shared [ShellChatDestination] in the Pointer idiom,
  * on its board in the browser's store. The mascot beside the composer brings the agents back.
  */
-private fun webChatPage(shell: WebShell, page: WebPageInputs, ready: WebChatLoad.Ready) =
+private fun webChatPage(shell: WebShell, page: WebPageInputs, port: WebChatSessionPort) =
     ShellPageContent<ShellDestination> { _, modifier ->
-    val port = ready.port
     val target = port.target
     val agentNames = shell.backend.roster.toMap()
     // letta-mobile-zxk2n.8: subagents open in the dual view; the web has no registry, so a row opens its child's default conversation.
@@ -192,12 +194,11 @@ private fun webChatPage(shell: WebShell, page: WebPageInputs, ready: WebChatLoad
 
 /** A conversation that has not opened: the connection and the way on. */
 private fun webWaitingPage(shell: WebShell, page: WebPageInputs) = ShellPageContent<ShellDestination> { _, modifier ->
-    val chat = page.chat
     ShellChatWaitingPage(
         waiting = ShellChatWaiting(
             connection = page.connection,
-            opening = shell.workspace.page is ShellDestination.Chat && chat == WebChatLoad.Opening,
-            error = (chat as? WebChatLoad.Failed)?.message,
+            opening = shell.workspace.page is ShellDestination.Chat && page.connectedAndOpening(),
+            error = page.chat.list.state.error,
         ),
         actions = BackendConnectionNoticeActions(
             onOpenSettings = { shell.workspace.navigate(ShellDestination.Settings()) },
@@ -218,7 +219,9 @@ private fun webContextSession(shell: WebShell, page: WebPageInputs) = OpenConver
 
 private fun WebChatSessionPort.openConversation() = OpenConversation(target.agentId, target.conversationId, this, models)
 
-private fun WebPageInputs.openConversation(): OpenConversation? = (chat as? WebChatLoad.Ready)?.port?.openConversation()
+private fun WebPageInputs.openConversation(): OpenConversation? = chat.port?.openConversation()
 
 /** Where the dual view reads a subagent's conversation: the gateway's live session. */
 private fun webSubagentViewSessions(page: WebPageInputs) = TimelineSubagentViewSessions(page.session.services.gateway::subagentTimeline)
+
+private fun WebPageInputs.connectedAndOpening() = connection is BackendConnectionStatus.Connected && chat.list.state.opening

@@ -1,6 +1,11 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.attachment.AttachmentLimits
+import com.letta.mobile.data.chat.conversations.ConversationListHost
+import com.letta.mobile.data.chat.conversations.ConversationManagement
+import com.letta.mobile.data.chat.conversations.ConversationManagementPrefs
+import com.letta.mobile.data.chat.conversations.ConversationOrigin
+import com.letta.mobile.data.chat.conversations.OpenedBranch
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatComposerSendDraft
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
@@ -333,7 +338,7 @@ class DesktopChatController(
 
         override fun showModel(update: ConversationModelUpdate) = _state.update { it.withModelUpdate(update) }
 
-        override suspend fun recordModel(model: String) = conversationManagement.recordModel(model)
+        override suspend fun recordModel(model: String) = conversationMarks.recordModel(model)
     }
 
     private val connectionWatcher = DesktopChatConnectionWatcher(
@@ -542,44 +547,26 @@ class DesktopChatController(
     fun deleteConversation(conversationId: String) {
         if (closed) return
         if (conversationId == unsentConversationId) unsentConversationId = null
-        if (conversationId in _deletingConversationIds.value) return
-        scope.launch {
-            val nextGateway = gateway ?: return@launch
-            _deletingConversationIds.update { it + conversationId }
-            val listed = _state.value.conversations.firstOrNull { it.id == conversationId }
-            val startedOn = deletionUndo.backendGeneration
-            try {
-                nextGateway.deleteConversation(conversationId)
-                if (closed) return@launch
-                deletionUndo.offer(conversationId, listed, nextGateway.deleteBehavior, startedOn)
-                val wasSelected = _state.value.selectedConversationId == conversationId
-                _state.update {
-                    it.withRuntimeState(
-                        ChatSessionReducer.conversationDeleted(it.runtimeState, conversationId),
-                    )
-                }
-                if (wasSelected) {
-                    sendJob?.cancel()
-                    if (_thinkingConversationId.value == conversationId) {
-                        _thinkingConversationId.value = null
-                    }
-                    timelineJob?.cancel()
-                    closeActiveLoopAsync()
-                    val runtime = _state.value.runtimeState
-                    val nextSelected = runtime.selectedConversationId
-                    if (nextSelected != null) {
-                        selectRemoteConversation(nextSelected, runtime.selectionGeneration)
-                    }
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (t: Throwable) {
-                val message = t.message ?: t::class.simpleName ?: "Delete failed"
-                _state.update { current -> current.copy(errorMessage = message) }
-            } finally {
-                _deletingConversationIds.update { it - conversationId }
-            }
-        }
+        conversationManagement.delete(ConversationId(conversationId))
+    }
+
+    /** Each delete in flight: the row it removes and the backend it started on, for the undo. */
+    private val pendingDeletes = mutableMapOf<String, Pair<ChatConversationSummary?, Long>>()
+
+    /** The backend deleted [conversationId]: offer the undo, drop the row and, when it was open, move the chat on. */
+    private suspend fun onConversationDeleted(conversationId: String, behavior: ConversationDeleteBehavior) {
+        if (closed) return
+        val (listed, startedOn) = pendingDeletes.remove(conversationId) ?: (null to deletionUndo.backendGeneration)
+        deletionUndo.offer(conversationId, listed, behavior, startedOn)
+        val wasSelected = _state.value.selectedConversationId == conversationId
+        _state.update { it.withRuntimeState(ChatSessionReducer.conversationDeleted(it.runtimeState, conversationId)) }
+        if (!wasSelected) return
+        sendJob?.cancel()
+        if (_thinkingConversationId.value == conversationId) _thinkingConversationId.value = null
+        timelineJob?.cancel()
+        closeActiveLoopAsync()
+        val runtime = _state.value.runtimeState
+        runtime.selectedConversationId?.let { selectRemoteConversation(it, runtime.selectionGeneration) }
     }
 
     /**
@@ -725,57 +712,74 @@ class DesktopChatController(
      */
     fun setConversationArchived(conversationId: String, archived: Boolean) {
         if (closed) return
-        locallyArchivedIds = if (archived) locallyArchivedIds + conversationId else locallyArchivedIds - conversationId
-        persistArchivedConversationIds(locallyArchivedIds)
-        _state.update { current ->
-            val runtime = current.runtimeState
-            current.withRuntimeState(
-                runtime.copy(
-                    conversations = runtime.conversations.map {
-                        if (it.id == conversationId) it.copy(archived = archived) else it
-                    },
-                ),
-            )
-        }
-        scope.launch {
-            runCatching { gatewayExtras?.setConversationArchived(conversationId, archived) }
-        }
+        conversationManagement.setArchived(ConversationId(conversationId), archived)
     }
 
-    /** letta-mobile-bzvro.15-.18: titles, pins, recent models, fork and edit-and-resend. */
-    internal val conversationManagement = DesktopConversationManagement(scope, ListHost(), conversationPrefs)
+    /** The shared row actions on the backend: titles, pins, archive, delete, `/recompile`, fork and edit-and-resend. */
+    internal val conversationManagement =
+        ConversationManagement(scope, ListHost(), ConversationManagementPrefs(conversationPrefs.pins, conversationPrefs.lineage))
 
-    private inner class ListHost : DesktopConversationListHost {
+    /** letta-mobile-zxk2n.5: settled chats, markers, auto-pin and the chat's display options. */
+    internal val conversationMarks = DesktopConversationMarks(conversationPrefs)
+
+    private inner class ListHost : ConversationListHost {
         override val gateway: DesktopChatGateway? get() = this@DesktopChatController.gateway
-        override val pins = conversationPrefs.pins
-        override val lineage = conversationPrefs.lineage
         override val isClosed: Boolean get() = closed
-        override val surface: StateFlow<DesktopChatSurfaceState> get() = state
 
-        override fun origin(): DesktopBranchOrigin? = _state.value.selectedConversation?.let {
-            DesktopBranchOrigin(it.id, it.agentId?.takeIf(String::isNotBlank))
+        override val gatewayChanges get() = state.map { }
+
+        override fun origin(): ConversationOrigin? = _state.value.selectedConversation?.let {
+            ConversationOrigin(ConversationId(it.id), it.agentId?.takeIf(String::isNotBlank)?.let(::AgentId))
         }
 
-        override suspend fun openBranch(branch: DesktopOpenedBranch) {
+        override suspend fun openBranch(branch: OpenedBranch) {
             if (closed) return
+            gateway?.let { inheritWorkingDirectory(it, branch) }
             reloadConversationsAndSelect(preferConversationId = branch.conversation.id.value)
-            applyBranchDraft(branch)
+            applyBranchDraft(branch.draft)
+        }
+
+        override fun showArchived(conversation: ConversationId, archived: Boolean) {
+            val id = conversation.value
+            locallyArchivedIds = if (archived) locallyArchivedIds + id else locallyArchivedIds - id
+            persistArchivedConversationIds(locallyArchivedIds)
+            _state.update { current ->
+                val listed = current.runtimeState.conversations.map { if (it.id == id) it.copy(archived = archived) else it }
+                current.withRuntimeState(current.runtimeState.copy(conversations = listed))
+            }
+        }
+
+        override fun beginDelete(conversation: ConversationId): Boolean {
+            val id = conversation.value
+            if (id in _deletingConversationIds.value) return false
+            _deletingConversationIds.update { it + id }
+            pendingDeletes[id] = _state.value.conversations.firstOrNull { it.id == id } to deletionUndo.backendGeneration
+            return true
+        }
+
+        override suspend fun endDelete(conversation: ConversationId, behavior: ConversationDeleteBehavior?) {
+            try {
+                if (behavior != null) onConversationDeleted(conversation.value, behavior)
+            } finally {
+                pendingDeletes.remove(conversation.value)
+                _deletingConversationIds.update { it - conversation.value }
+            }
         }
 
         override fun showError(message: String) {
             if (!closed) _state.update { it.copy(errorMessage = message) }
         }
 
-        override fun listedTitle(conversationId: ConversationId): String? =
-            _state.value.conversations.firstOrNull { it.id == conversationId.value }?.title
+        override fun listedTitle(conversation: ConversationId): String? =
+            _state.value.conversations.firstOrNull { it.id == conversation.value }?.title
 
         override fun showTitle(
-            conversationId: ConversationId,
+            conversation: ConversationId,
             title: ConversationSummary,
             onlyIf: ConversationSummary?,
         ) = _state.update { current ->
             val conversations = current.conversations.map { item ->
-                val replace = item.id == conversationId.value && (onlyIf == null || item.title == onlyIf.value)
+                val replace = item.id == conversation.value && (onlyIf == null || item.title == onlyIf.value)
                 if (replace) item.copy(title = title.value) else item
             }
             current.withRuntimeState(current.runtimeState.copy(conversations = conversations))
