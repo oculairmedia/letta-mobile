@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import com.letta.mobile.data.model.AgentId
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.BasicFileAttributes
@@ -70,14 +71,14 @@ internal class AgentFileIndex(
      * last run time from its default conversation). One attribute read per file; a record is parsed
      * only when it changed, to learn its id. Null when the directory cannot be listed.
      */
-    fun signature(companion: (agentId: String) -> File? = { null }): Long? {
+    fun signature(companion: (AgentId) -> File? = { null }): Long? {
         val files = agentsDir.listFiles { f -> f.isFile && f.name.endsWith(SUFFIX) } ?: return null
         val stamped = files.mapNotNull { file -> stamp(file) }
         val covered = if (stamped.size > maxEntries) stamped.sortedByDescending { it.mtimeMs }.take(maxEntries) else stamped
         // Sums of per-file mixes, so the listing order does not matter.
         val agents = stamped.fold(stamped.size.toLong()) { sum, stamp -> sum + stamp.mix() }
         val companions = covered.fold(0L) { sum, stamp ->
-            val file = derive(stamp)?.id?.let(companion)
+            val file = derive(stamp)?.id?.let { companion(AgentId(it)) }
             sum + (file?.let(::stamp)?.mix() ?: 0L)
         }
         return agents * MIX_PRIME + companions

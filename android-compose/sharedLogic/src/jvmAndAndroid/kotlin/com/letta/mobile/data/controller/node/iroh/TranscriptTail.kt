@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -15,8 +16,8 @@ import java.io.RandomAccessFile
  * not messages count against a window of twice [count] lines, so fewer can come back. Null on any
  * error.
  */
-internal fun LocalBackendMessageReader.newestMessageContents(conversationId: String, count: Int): JsonArray? = runCatching {
-    val (internalConvId, agentId) = resolveConversation(conversationId, null) ?: return@runCatching JsonArray(emptyList())
+internal fun LocalBackendMessageReader.newestMessageContents(conversationId: ConversationId, count: Int): JsonArray? = runCatching {
+    val (internalConvId, agentId) = resolveConversation(conversationId.value, null) ?: return@runCatching JsonArray(emptyList())
     val dir = File(File(support.baseDir, "conversations"), support.b64UrlEncode(support.conversationKey(internalConvId, agentId)))
     val newest = File(dir, "messages.jsonl").tailLines(maxLines = count * 2, maxBytes = TAIL_MAX_BYTES)
         .mapNotNull { line -> runCatching { support.json.parseToJsonElement(line) }.getOrNull() as? JsonObject }

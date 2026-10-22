@@ -108,7 +108,7 @@ open class LocalBackendAdminStore(
 
     /** The newest [count] messages' ids, types and content, read from the transcript's end; null on error. */
     fun newestMessageContents(conversationId: ConversationId, count: Int): JsonArray? =
-        messageReader.newestMessageContents(conversationId.value, count)
+        messageReader.newestMessageContents(conversationId, count)
 
     /** See [LocalBackendMessageReader.listMessagesProjected]. */
     fun listMessagesProjected(

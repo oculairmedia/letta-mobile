@@ -229,7 +229,7 @@ internal class LocalBackendMessageReader(
         if (externalId.isEmpty() || externalId == "default") return null
         val defaultAgentId = Regex("^conv-default-(agent-.+)$").find(externalId)?.groupValues?.get(1)
         return when {
-            defaultAgentId != null -> "default" to defaultAgentId
+            defaultAgentId != null -> LocalBackendLayout.DEFAULT_CONVERSATION_ID to defaultAgentId
             agentIdHint != null -> externalId to agentIdHint
             else -> support.storedAgentId(ConversationId(externalId))?.let { externalId to it }
         }

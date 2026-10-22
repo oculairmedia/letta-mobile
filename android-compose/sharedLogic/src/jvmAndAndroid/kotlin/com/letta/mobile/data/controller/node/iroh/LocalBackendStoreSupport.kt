@@ -159,5 +159,7 @@ internal fun LocalBackendStoreSupport.storedAgentId(conversationId: Conversation
 }.getOrNull()
 
 /** Where the App Server keeps [agentId]'s default conversation record. */
-internal fun LocalBackendStoreSupport.defaultConversationFile(agentId: String): File =
-    File(File(File(baseDir, "conversations"), b64UrlEncode(conversationKey("default", agentId))), "conversation.json")
+internal fun LocalBackendStoreSupport.defaultConversationFile(agentId: AgentId): File {
+    val key = LocalBackendLayout.conversationKey(ConversationId(LocalBackendLayout.DEFAULT_CONVERSATION_ID), agentId)
+    return File(File(File(baseDir, "conversations"), b64UrlEncode(key)), "conversation.json")
+}
