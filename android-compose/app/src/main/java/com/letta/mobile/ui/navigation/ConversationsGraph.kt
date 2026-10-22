@@ -69,7 +69,7 @@ private fun AndroidChatPage(shell: WorkspaceShell, agent: AgentId, modifier: Mod
             initialMessage = opening.firstMessage,
         )
     }
-    // The enabled plugins' tool and command presenters draw their tools' steps (letta-mobile-2ccpv).
+    // The enabled plugins' tool and command presenters draw their tools' steps.
     val context = LocalContext.current
     val plugins = remember(context) { pluginViewsOf(context) }
     ProvidePluginToolPresenters(plugins) {

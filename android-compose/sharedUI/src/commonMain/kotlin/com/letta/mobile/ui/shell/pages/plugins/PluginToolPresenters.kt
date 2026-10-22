@@ -10,7 +10,7 @@ import com.letta.mobile.ui.chat.tools.LocalToolPresenters
 import com.letta.mobile.ui.chat.tools.ProvideToolPresenters
 
 /**
- * letta-mobile-2ccpv: [content] drawing tool calls with the presenters already provided plus the
+ * [content] drawing tool calls with the presenters already provided plus the
  * tool and command presenters [model]'s enabled plugins declare; as it is when there is no model.
  */
 @Composable

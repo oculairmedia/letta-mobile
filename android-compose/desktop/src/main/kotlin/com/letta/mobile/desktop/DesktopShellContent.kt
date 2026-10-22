@@ -56,7 +56,7 @@ import com.letta.mobile.ui.context.FocusedAgentContextCard
  * (letta-mobile-cdgpr.3), as on Android. The host's enabled plugins and view transport come from
  * the shared model (letta-mobile-cdgpr.8). With live views off on this device, every element is its
  * card. The browser is only started when a live view first shows. The same plugins' tool and command
- * presenters (letta-mobile-2ccpv) draw their tools' steps in the chat.
+ * presenters draw their tools' steps in the chat.
  */
 @Composable
 private fun ShellPluginViews(pluginViews: PluginViewsModel?, content: @Composable () -> Unit) {
