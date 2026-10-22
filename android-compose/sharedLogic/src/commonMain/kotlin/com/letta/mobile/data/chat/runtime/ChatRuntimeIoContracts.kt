@@ -2,7 +2,9 @@ package com.letta.mobile.data.chat.runtime
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.timeline.TimelineTransport
 
@@ -12,19 +14,12 @@ import com.letta.mobile.data.timeline.TimelineTransport
  * just this, and a gateway delegates to it.
  */
 interface ChatConversationStore {
-    suspend fun listConversations(limit: Int = ChatGateway.DEFAULT_CONVERSATION_LIMIT, archiveStatus: String? = null): List<Conversation>
-    // letta-mobile-i9h61.3.2: agent-scoped list (the OTHER agent's
-    // conversations, for tap-to-navigate). Reads via the wrapper's
-    // conversation.list_agent admin_rpc when the Iroh transport is
-    // available; HTTP / appserver gateways without that surface return
-    // emptyList() so the picker falls back cleanly. No pagination —
-    // the recipient's router reads all active conversations at receive
-    // time, and a single 500-cap is well above any practical agent's
-    // count.
-    suspend fun listConversationsForAgent(
-        agentId: String,
-        limit: Int = ChatGateway.DEFAULT_AGENT_CONVERSATION_LIMIT,
-    ): List<Conversation> = emptyList()
+    /**
+     * One page of [AgentConversationPage.agent]'s own conversations, newest first. Lists are read
+     * per agent, never across every agent: a host's newest conversations are mostly agent-free
+     * worker transcripts that would crowd a user's chats out of any cross-agent window.
+     */
+    suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation>
     suspend fun getConversation(conversationId: String): Conversation
     suspend fun deleteConversation(conversationId: String) {
         throw UnsupportedOperationException("deleteConversation is not supported by this gateway")
@@ -44,10 +39,19 @@ interface ChatConversationStore {
 }
 
 /** A backend the chat runs over: its timeline and its conversation records. */
-interface ChatGateway : TimelineTransport, ChatConversationStore {
+interface ChatGateway : TimelineTransport, ChatConversationStore
+
+/** Which page of one agent's conversations to read: [limit] rows after the [after] cursor (none: the newest). */
+data class AgentConversationPage(
+    val agent: AgentId,
+    val limit: Int = DEFAULT_LIMIT,
+    val after: ConversationId? = null,
+    /** Every conversation, active and archived: the lists filter archived rows themselves. */
+    val archiveStatus: String = ARCHIVE_STATUS_ALL,
+) {
     companion object {
-        const val DEFAULT_CONVERSATION_LIMIT = 40
-        const val DEFAULT_AGENT_CONVERSATION_LIMIT = 500
+        const val DEFAULT_LIMIT = 50
+        const val ARCHIVE_STATUS_ALL = "all"
     }
 }
 

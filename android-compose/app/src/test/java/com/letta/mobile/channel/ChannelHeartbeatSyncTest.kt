@@ -1,6 +1,5 @@
 package com.letta.mobile.channel
 
-import androidx.paging.PagingData
 import androidx.work.ListenableWorker
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.model.AgentId
@@ -17,7 +16,6 @@ import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeConversationInspectorMessageRepository
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.TestData
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
@@ -355,10 +353,4 @@ private class FakeAllConversationsRepository(
     override fun handleOptimisticUpdate(conversation: Conversation) = throw UnsupportedOperationException()
     override fun handleOptimisticDelete(conversationId: ConversationId) = throw UnsupportedOperationException()
     override fun loadedCountEstimate(): ConversationCountEstimate? = null
-    override fun getConversationsPaged(
-        agentId: AgentId?,
-        archiveStatus: String?,
-        summarySearch: String?,
-    ): Flow<PagingData<Conversation>> =
-        throw UnsupportedOperationException()
 }

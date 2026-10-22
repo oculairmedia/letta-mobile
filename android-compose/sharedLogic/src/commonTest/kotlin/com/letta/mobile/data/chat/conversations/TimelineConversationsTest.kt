@@ -5,11 +5,13 @@ import com.letta.mobile.data.chat.recompile.ConversationRecompileController
 import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
 import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.chat.recompile.RecompileStatus
+import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.runtime.MapSettingsStore
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
@@ -266,13 +268,13 @@ class TimelineConversationsTest {
     private fun TestScope.owner(gateway: ChatGateway) = TimelineConversations(
         backgroundScope,
         gateway,
-        agentName = { if (it == nora) "Nora" else "Ivo" },
+        listOf(Agent(id = nora, name = "Nora"), Agent(id = ivo, name = "Ivo")),
         ConversationManagementPrefs.from(MapSettingsStore()),
     )
 
-    /** A gateway whose agent-scoped list cannot be read right now. */
+    /** A gateway whose agents' lists cannot be read right now. */
     private class AgentListFails(private val base: ChatGateway) : ChatGateway by base {
-        override suspend fun listConversationsForAgent(agentId: String, limit: Int): List<Conversation> = error("timed out")
+        override suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> = error("timed out")
     }
 
     /** A gateway that recompiles, recording each request. */

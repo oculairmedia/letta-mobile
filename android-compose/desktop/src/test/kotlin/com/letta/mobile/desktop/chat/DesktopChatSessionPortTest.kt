@@ -431,6 +431,7 @@ class DesktopChatSessionPortTest {
         DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = this,
+            rosterProvider = TEST_ROSTER,
             gatewayFactory = { gateway },
         )
 }

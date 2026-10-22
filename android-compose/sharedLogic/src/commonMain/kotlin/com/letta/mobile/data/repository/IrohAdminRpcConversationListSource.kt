@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
+import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.chat.branch.IrohConversationForkRpc
 import com.letta.mobile.data.chat.recompile.IrohConversationRecompileClient
 import com.letta.mobile.data.chat.recompile.asAdminRpcLink
@@ -14,6 +15,7 @@ import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.reportSkippedConversationRows
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -25,24 +27,15 @@ class IrohAdminRpcConversationListSource(
     fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendUsesChannel()
 
-    suspend fun listConversations(
-        agentId: AgentId?,
-        limit: Int? = null,
-        after: String? = null,
-        archiveStatus: String? = null,
-        summarySearch: String? = null,
-        order: String? = null,
-        orderBy: String? = null,
-    ): List<Conversation> {
-        val params = buildJsonObject {
-            agentId?.value?.let { put("agent_id", it) }
-            limit?.let { put("limit", it.toString()) }
-            after?.let { put("after", it) }
-            archiveStatus?.let { put("archive_status", it) }
-            summarySearch?.let { put("summary_search", it) }
-            order?.let { put("order", it) }
-            orderBy?.let { put("order_by", it) }
-        }
+    /** One agent's conversations through the host's `conversation.list` (server default page and archive filter). */
+    suspend fun listConversations(agentId: AgentId): List<Conversation> =
+        conversationList(buildJsonObject { put("agent_id", agentId.value) })
+
+    /** One page of an agent's conversations, newest first, as every conversation list reads them. */
+    suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> =
+        conversationList(page.conversationListParams()).filter { it.agentId == page.agent }
+
+    private suspend fun conversationList(params: JsonObject): List<Conversation> {
         val response = channelTransport.adminRpc(
             method = "conversation.list",
             path = "/v1/conversations",
@@ -146,4 +139,14 @@ class IrohAdminRpcConversationListSource(
         val result = response.result ?: error("Iroh admin_rpc ${call.method} returned no result")
         return json.decodeFromJsonElement(Conversation.serializer(), result)
     }
+}
+
+/** The host's `conversation.list` params for [this] page: the agent, the window and the newest-first order. */
+internal fun AgentConversationPage.conversationListParams(): JsonObject = buildJsonObject {
+    put("agent_id", agent.value)
+    put("limit", limit.toString())
+    after?.let { put("after", it.value) }
+    put("archive_status", archiveStatus)
+    put("order", "desc")
+    put("order_by", "last_message_at")
 }

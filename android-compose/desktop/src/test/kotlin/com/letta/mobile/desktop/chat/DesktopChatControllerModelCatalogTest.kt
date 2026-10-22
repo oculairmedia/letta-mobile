@@ -54,6 +54,7 @@ class DesktopChatControllerModelCatalogTest {
         DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = backgroundScope,
+            rosterProvider = TEST_ROSTER,
             gatewayFactory = { gateway },
         )
 }

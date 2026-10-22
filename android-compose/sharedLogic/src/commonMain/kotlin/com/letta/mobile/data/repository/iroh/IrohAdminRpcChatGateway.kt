@@ -5,6 +5,7 @@ import com.letta.mobile.data.chat.branch.ConversationForkGateway
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.chat.branch.IrohConversationForkRpc
 import com.letta.mobile.data.chat.recompile.asAdminRpcLink
+import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
@@ -23,6 +24,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.decodeConversationList
 import com.letta.mobile.data.model.visibleConversationsInLists
+import com.letta.mobile.data.repository.conversationListParams
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.AppServerListModelsAdapter
@@ -205,18 +207,13 @@ class IrohAdminRpcChatGateway(
     // ChatGateway — admin_rpc reads
     // ------------------------------------------------------------------
 
-    override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> {
-        val body = buildJsonObject {
-            put("limit", limit.toString())
-            archiveStatus?.let { put("archive_status", it) }
-            put("order", "desc")
-            put("order_by", "last_message_at")
-        }.toString()
+    /** The host's `conversation.list` for one agent (the App Server's own list, paged by `after`). */
+    override suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> {
         val result = rpc(
             AdminRpcCall.of(
                 method = AdminRpcMethod("conversation.list"),
                 path = AdminRpcPath("/v1/conversations"),
-                body = AdminRpcBody(body),
+                body = AdminRpcBody(page.conversationListParams().toString()),
             ),
         ) ?: return emptyList()
 
@@ -229,46 +226,11 @@ class IrohAdminRpcChatGateway(
             )
         }
         return json.decodeConversationList(result, ::reportSkippedConversationRows)
+            .filter { it.agentId == page.agent }
             .also { conversations ->
                 conversations.forEach { agentIdByConversation[it.id] = it.agentId }
             }
             .visibleConversationsInLists()
-    }
-
-    override suspend fun listConversationsForAgent(
-        agentId: String,
-        limit: Int,
-    ): List<Conversation> {
-        val body = buildJsonObject {
-            put("agent_id", agentId)
-            put("limit", limit.toString())
-        }.toString()
-        val result = runCatching {
-            rpc(
-                AdminRpcCall.of(
-                    method = AdminRpcMethod("conversation.list_agent"),
-                    path = AdminRpcPath("/v1/conversations/list_agent"),
-                    body = AdminRpcBody(body),
-                ),
-            )
-        }.getOrNull() ?: return emptyList()
-        if (result !is JsonArray) {
-            if (result is JsonObject) {
-                Telemetry.event(
-                    "IrohGate", "conversation_list_agent.unexpected_object_shape",
-                    "keyCount" to result.size,
-                    level = Telemetry.Level.WARN,
-                )
-            }
-            return emptyList()
-        }
-        return runCatching {
-            json.decodeConversationList(result, ::reportSkippedConversationRows)
-                .also { conversations ->
-                    conversations.forEach { agentIdByConversation[it.id] = it.agentId }
-                }
-                .visibleConversationsInLists()
-        }.getOrElse { emptyList() }
     }
 
     override suspend fun getConversation(conversationId: String): Conversation {

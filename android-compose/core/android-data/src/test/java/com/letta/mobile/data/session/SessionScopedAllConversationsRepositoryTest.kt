@@ -54,6 +54,7 @@ class SessionScopedAllConversationsRepositoryTest {
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
+                agentApi = rosterApi()
                 conversationApi = fakeConversationApi
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -90,6 +91,7 @@ class SessionScopedAllConversationsRepositoryTest {
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
+                agentApi = rosterApi()
                 conversationApi = fakeConversationApi
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -125,6 +127,7 @@ class SessionScopedAllConversationsRepositoryTest {
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
+                agentApi = rosterApi()
                 conversationApi = fakeConversationApi
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -158,6 +161,7 @@ class SessionScopedAllConversationsRepositoryTest {
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
+                agentApi = rosterApi()
                 conversationApi = fakeConversationApi
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -189,6 +193,7 @@ class SessionScopedAllConversationsRepositoryTest {
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
+                agentApi = rosterApi()
                 conversationApi = fakeConversationApi
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -220,3 +225,6 @@ class SessionScopedAllConversationsRepositoryTest {
         assertEquals(3, fakeConversationApi.calls.count { it == "listConversations" })
     }
 }
+
+/** fyo4s: the list reads its roster's agents' conversations; every test conversation is TestData's agent's. */
+private fun rosterApi() = FakeAgentApi().apply { agents = mutableListOf(TestData.agent()) }

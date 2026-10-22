@@ -149,10 +149,9 @@ fun rememberTimelineConversations(
     val roster by rememberUpdatedState(agents)
     val owner by produceState<TimelineConversations?>(null, connection) {
         val live = backend().takeIf { connection is BackendConnectionStatus.Connected }
-        value = live?.let {
-            TimelineConversations(this, it, agentName = { agent -> roster.firstOrNull { a -> a.id == agent }?.name.orEmpty() }, prefs)
-        }
+        value = live?.let { TimelineConversations(this, it, roster, prefs) }
     }
+    LaunchedEffect(owner, agents) { owner?.roster = agents }
     return owner
 }
 

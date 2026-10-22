@@ -4,6 +4,7 @@ import com.letta.mobile.data.chat.branch.ConversationForkGateway
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
 import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
+import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.chat.runtime.ChatConversationStore
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
@@ -38,16 +39,17 @@ class AppServerLocalAdminGateway(
     private val client: AppServerClient,
     private val requestId: (String) -> String,
 ) {
-    /** The newest conversations, every agent's or only [agentId]'s (`conversation_list`'s `agent_id` filter). */
-    suspend fun listConversations(limit: Int, archiveStatus: String?, agentId: AgentId? = null): List<Conversation> {
+    /** One page of an agent's own conversations, newest first (`conversation_list`'s `agent_id` filter and `after` cursor). */
+    suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> {
         val response = client.conversationList(
             AppServerCommand.ConversationList(
                 requestId = requestId(Operation.ConversationList.requestName),
                 query = buildJsonObject {
+                    put("agent_id", page.agent.value)
                     // A number: letta-code's local store ignores a string limit and returns 20.
-                    put("limit", limit)
-                    archiveStatus?.let { put("archive_status", it) }
-                    agentId?.let { put("agent_id", it.value) }
+                    put("limit", page.limit)
+                    page.after?.let { put("after", it.value) }
+                    put("archive_status", page.archiveStatus)
                     put("order", "desc")
                     put("order_by", "last_message_at")
                 },
@@ -305,12 +307,9 @@ class AppServerConversationAdmin(private val admin: AppServerLocalAdminGateway) 
     ConversationSummaryGateway,
     ConversationForkGateway,
     ConversationRecompileGateway {
-    override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> =
-        admin.listConversations(limit, archiveStatus)
-
-    /** The agent's own conversations, active and archived; filtered here too, for a store that ignores `agent_id`. */
-    override suspend fun listConversationsForAgent(agentId: String, limit: Int): List<Conversation> =
-        AgentId(agentId).let { agent -> admin.listConversations(limit, ARCHIVE_STATUS_ALL, agent).filter { it.agentId == agent } }
+    /** The agent's own conversations; filtered here too, for a store that ignores `agent_id`. */
+    override suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> =
+        admin.listAgentConversations(page).filter { it.agentId == page.agent }
 
     override suspend fun getConversation(conversationId: String): Conversation = admin.getConversation(ConversationId(conversationId))
 
@@ -348,8 +347,4 @@ class AppServerConversationAdmin(private val admin: AppServerLocalAdminGateway) 
     override suspend fun forkConversation(request: ConversationForkRequest): Conversation = admin.forkConversation(request)
 
     override suspend fun recompileConversation(request: ConversationRecompileRequest) = admin.recompileConversation(request)
-
-    private companion object {
-        const val ARCHIVE_STATUS_ALL = "all"
-    }
 }

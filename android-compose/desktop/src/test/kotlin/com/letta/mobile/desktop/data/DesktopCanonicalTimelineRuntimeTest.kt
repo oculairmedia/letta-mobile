@@ -110,7 +110,11 @@ class DesktopCanonicalTimelineRuntimeTest {
      * transcript the user cannot reply in, and nothing downstream would report that as broken.
      */
     @Test fun installingTheRouteWiresBothHistoryAndSend() = runTest {
-        val controller = DesktopChatController(defaultDesktopBootstrapState(), this)
+        val controller = DesktopChatController(
+            defaultDesktopBootstrapState(),
+            this,
+            rosterProvider = com.letta.mobile.desktop.chat.TEST_ROSTER,
+        )
         try {
             DesktopCanonicalTimelineHost().installOn(controller, install(backgroundScope))
             assertNotNull(controller.canonicalOpen)
@@ -124,7 +128,11 @@ class DesktopCanonicalTimelineRuntimeTest {
 
     /** One coordinator per agent: rebuilding it would discard a turn still in flight. */
     @Test fun eachAgentKeepsOneSendCoordinator() = runTest {
-        val controller = DesktopChatController(defaultDesktopBootstrapState(), this)
+        val controller = DesktopChatController(
+            defaultDesktopBootstrapState(),
+            this,
+            rosterProvider = com.letta.mobile.desktop.chat.TEST_ROSTER,
+        )
         try {
             DesktopCanonicalTimelineHost().installOn(controller, install(backgroundScope))
             val resolve = assertNotNull(controller.canonicalSendFor)

@@ -207,6 +207,7 @@ class DesktopChatControllerUndoDeleteTest {
         DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = backgroundScope,
+            rosterProvider = TEST_ROSTER,
             gatewayFactory = factory,
         )
 }

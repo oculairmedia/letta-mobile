@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
@@ -70,17 +71,21 @@ class IrohAdminRpcChatGatewayTest {
         transport.rpcResponder = { call ->
             assertEquals("conversation.list", call.method)
             assertEquals("/v1/conversations", call.path)
-            ok("""[{"id":"conv-1","agent_id":"agent-1","summary":"hi"}]""")
+            ok(
+                """[{"id":"conv-1","agent_id":"agent-1","summary":"hi"},""" +
+                    """{"id":"conv-w","agent_id":null},{"id":"conv-2","agent_id":"agent-2"}]""",
+            )
         }
         val gateway = IrohAdminRpcChatGateway(transport)
 
-        val conversations = gateway.listConversations(limit = 10, archiveStatus = "active")
+        val conversations = gateway.listAgentConversations(
+            AgentConversationPage(AgentId("agent-1"), limit = 10, after = ConversationId("conv-0")),
+        )
 
-        assertEquals(1, conversations.size)
-        assertEquals("conv-1", conversations.single().id.value)
-        assertEquals("agent-1", conversations.single().agentId.value)
+        assertEquals(listOf("conv-1"), conversations.map { it.id.value }, "only the agent's own rows, no agent-free worker")
         val body = transport.rpcCalls.single().body.orEmpty()
-        assertTrue("archive_status" in body && "\"10\"" in body, "body should carry stringified limit + filter: $body")
+        assertTrue("\"agent_id\":\"agent-1\"" in body, "the read names the agent: $body")
+        assertTrue("\"after\":\"conv-0\"" in body && "\"10\"" in body, "body should carry the cursor + stringified limit: $body")
     }
 
     @Test

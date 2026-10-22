@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.conversations
 
+import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummary
@@ -126,7 +127,7 @@ class ConversationBranchesTest {
 
     /** A gateway with a timeline and no conversation capabilities. */
     private class TimelineOnlyGateway : ChatGateway {
-        override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> = emptyList()
+        override suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> = emptyList()
 
         override suspend fun getConversation(conversationId: String): Conversation = error("unused")
 

@@ -57,6 +57,8 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import com.letta.mobile.data.chat.conversations.AgentConversationFleet
+import com.letta.mobile.data.chat.conversations.AgentConversationFleetPaging
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -83,7 +85,8 @@ class DesktopChatController(
     private val gatewayFactory: suspend () -> DesktopChatGateway = {
         createDefaultDesktopChatGateway(bootstrapState.config)
     },
-    private val agentNamesByIdProvider: suspend (agentIds: Set<String>) -> Map<String, String> = { emptyMap() },
+    /** letta-mobile-fyo4s: the agents whose conversations the list reads (agent by agent) and whose names label them. */
+    private val rosterProvider: suspend () -> List<Agent>,
     private val agentByIdProvider: suspend (agentIds: Set<String>) -> Map<String, Agent> = { emptyMap() },
     // The backend doesn't yet persist a conversation's archived flag, so we keep a
     // local, durable record of archived ids and overlay it on every load. Still
@@ -1077,6 +1080,16 @@ class DesktopChatController(
         }
     }
 
+    /** Each agent's conversations over [forGateway], read through (the list has no "load more"); one per gateway. */
+    private fun conversationFleet(forGateway: DesktopChatGateway): AgentConversationFleet =
+        fleet?.takeIf { it.first === forGateway }?.second
+            ?: AgentConversationFleet(
+                forGateway::listAgentConversations,
+                AgentConversationFleetPaging(eagerPagesPerAgent = AgentConversationFleetPaging.READ_THROUGH_PAGES),
+            ).also { fleet = forGateway to it }
+
+    private var fleet: Pair<DesktopChatGateway, AgentConversationFleet>? = null
+
     private suspend fun reloadConversationsAndSelect(preferConversationId: String?) {
         val nextGateway = gateway ?: return
         val summaries = loadConversationSummaries(nextGateway)
@@ -1092,20 +1105,11 @@ class DesktopChatController(
     }
 
     private suspend fun loadConversationSummaries(nextGateway: DesktopChatGateway): List<ChatConversationSummary> {
-        val conversations = nextGateway.listConversations(archiveStatus = ConversationArchiveFilter.All.apiValue)
+        val roster = rosterProvider()
+        val conversations = conversationFleet(nextGateway).refresh(roster)
         models.picks.seedFromHost(conversations) // dxz5s: host overrides, before any selection reads them
-        val agentIds = conversations.map { it.agentId.value }.filter { it.isNotBlank() }.toSet()
-        // An empty map here silently degrades every conversation label to its
-        // raw `agent-<uuid>`, so the failure must not be invisible.
-        val agentNamesById = runCatching { agentNamesByIdProvider(agentIds) }
-            .onFailure { t ->
-                if (t is CancellationException) throw t
-                Telemetry.error(
-                    "DesktopChat", "agentNames.resolveFailed", t,
-                    "agentIds" to agentIds.size,
-                )
-            }
-            .getOrDefault(emptyMap())
+        // Every listed conversation is a roster agent's, so the roster names them all.
+        val agentNamesById = roster.filter { it.name.isNotBlank() }.associate { it.id.value to it.name }
         return conversations.toChatConversationSummaries(agentNamesById)
             .distinctBy { it.id }
             .map { if (it.id in locallyArchivedIds) it.copy(archived = true) else it }
@@ -1380,9 +1384,9 @@ internal const val CANONICAL_SEND_UNAVAILABLE_MESSAGE = "This conversation canno
 internal const val STOPPING_SEND_BLOCKED_MESSAGE =
     "Stopping the current run — wait for it to finish before sending another message."
 
-/** Conversation-list scope filter, mapped to the `archive_status` query param. */
-enum class ConversationArchiveFilter(val apiValue: String, val label: String) {
-    Active("active", "Active"),
-    Archived("archived", "Archived"),
-    All("all", "All"),
+/** Conversation-list scope filter: which listed rows show (the list reads every row and filters itself). */
+enum class ConversationArchiveFilter(val label: String) {
+    Active("Active"),
+    Archived("Archived"),
+    All("All"),
 }
