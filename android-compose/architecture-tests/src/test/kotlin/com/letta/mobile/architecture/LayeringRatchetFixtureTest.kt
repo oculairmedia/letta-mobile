@@ -27,6 +27,17 @@ class LayeringRatchetFixtureTest {
     }
 
     @Test
+    fun `an import of an undeclared package is not charged to a declared parent`() {
+        // Generated resource accessors live in a package no source file declares.
+        val files = listOf(
+            SourceFileImports("app", listOf("app.ui.Screen")),
+            SourceFileImports("app.ui", listOf("app.generated.resources.Res", "app.generated.resources.title")),
+        )
+
+        assertEquals(setOf("app" to "app.ui"), PackageImportGraph.edges(files))
+    }
+
+    @Test
     fun `ratchet flags new and stale entries`() {
         val drift = RatchetBaseline.drift(listOf("kept", "new"), listOf("gone", "kept"), "x.txt")
 

@@ -29,7 +29,18 @@ internal object PackageImportGraph {
         }.toSet()
     }
 
+    /**
+     * The declared package [importPath] names a member of: what follows the package is a type (and its
+     * nested types or members) or one top-level function or property. An import of an undeclared package
+     * (generated resource accessors, another module) is dropped rather than charged to a declared parent.
+     */
     private fun owningPackage(importPath: String, declared: Set<String>): String? =
         generateSequence(importPath) { path -> path.substringBeforeLast('.', "").ifEmpty { null } }
             .firstOrNull(declared::contains)
+            ?.takeIf { owner -> namesMemberOf(importPath, owner) }
+
+    private fun namesMemberOf(importPath: String, owner: String): Boolean {
+        val member = importPath.removePrefix(owner).removePrefix(".")
+        return member.isEmpty() || member.first().isUpperCase() || '.' !in member
+    }
 }
