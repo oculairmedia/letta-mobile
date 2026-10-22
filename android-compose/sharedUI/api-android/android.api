@@ -2179,7 +2179,9 @@ public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSing
 
 public final class com/letta/mobile/ui/chat/tools/ToolPresentersKt {
 	public static final fun ProvideToolPresenters (Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun ProvideToolStepExpansions (Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 	public static final fun getLocalToolPresenters ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun getLocalToolStepExpansions ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun title (Lcom/letta/mobile/data/chat/tools/ToolStepLine;Landroidx/compose/runtime/Composer;I)Ljava/lang/String;
 }
 
@@ -10495,6 +10497,7 @@ public final class com/letta/mobile/ui/theme/ChatRowDimens {
 	public final fun getPromptGridCellHeight-D9Ej5fM ()F
 	public final fun getThumbnailHeight-D9Ej5fM ()F
 	public final fun getThumbnailWidth-D9Ej5fM ()F
+	public final fun getToolGroupMaxHeight-D9Ej5fM ()F
 	public final fun getToolInsetMaxHeight-D9Ej5fM ()F
 }
 

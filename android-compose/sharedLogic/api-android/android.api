@@ -11035,6 +11035,22 @@ public final class com/letta/mobile/data/chat/tools/ToolPreviewTarget$TaskOutput
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/chat/tools/ToolStepExpansions {
+	public static final field Companion Lcom/letta/mobile/data/chat/tools/ToolStepExpansions$Companion;
+	public static final field DEFAULT_CAPACITY I
+	public static final field KEY Ljava/lang/String;
+	public fun <init> ()V
+	public fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;I)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/storage/SecureSettingsStore;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getToggled ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun isExpanded (Ljava/lang/String;ZLjava/util/List;)Z
+	public static synthetic fun isExpanded$default (Lcom/letta/mobile/data/chat/tools/ToolStepExpansions;Ljava/lang/String;ZLjava/util/List;ILjava/lang/Object;)Z
+	public final fun toggle (Ljava/lang/String;)V
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolStepExpansions$Companion {
+}
+
 public final class com/letta/mobile/data/chat/tools/ToolStepLine {
 	public fun <init> (Lcom/letta/mobile/data/chat/tools/ToolVerb;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/chat/tools/ToolFailure;Ljava/lang/String;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/chat/tools/ToolVerb;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lcom/letta/mobile/data/chat/tools/ToolFailure;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V

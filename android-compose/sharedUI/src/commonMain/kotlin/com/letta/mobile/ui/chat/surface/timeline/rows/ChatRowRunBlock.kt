@@ -115,8 +115,8 @@ internal class RunBlockPlan(
     val messageCount: Int,
     /**
      * The person flipped this run's fold from its default (the page's
-     * collapsedRunIds, a plain toggle set on every owner): a foldable run is folded by default, so a
-     * run in the set is the one the person opened.
+     * collapsedRunIds, a plain toggle set on every owner): a foldable run is open while it works and
+     * folded once it settles, and a run in the set reads the other way.
      */
     val toggledByOwner: Boolean,
     /**
@@ -132,7 +132,7 @@ internal class RunBlockPlan(
     /** A run folds when it has work to tuck under its summary line and nothing holds it open. */
     val foldable: Boolean = runFolds(RunFoldInputs(runId, hasWorkSteps(), RunHold(awaitingApproval)))
 
-    /** Folded by default; the person's toggle opens it. */
+    /** Open while working and folded once settled; the person's toggle flips that. */
     val collapsed: Boolean = isCollapsed()
 
     /** A run that folds always shows its summary line: the line is the only way to its steps. */
@@ -155,7 +155,9 @@ internal class RunBlockPlan(
 
     private fun isCollapsed(): Boolean {
         if (!foldable) return false
-        return !toggledByOwner
+        // Open while it works, folded once it settles; the person's toggle flips that default.
+        val foldedByDefault = !activity.isActive
+        return foldedByDefault != toggledByOwner
     }
 
     private fun isHeaderVisible(): Boolean {

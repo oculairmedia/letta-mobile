@@ -30270,6 +30270,23 @@ final class com.letta.mobile.data.chat.tools/ToolPreviewSpec { // com.letta.mobi
     }
 }
 
+final class com.letta.mobile.data.chat.tools/ToolStepExpansions { // com.letta.mobile.data.chat.tools/ToolStepExpansions|null[0]
+    constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore? = ..., kotlin/Int = ...) // com.letta.mobile.data.chat.tools/ToolStepExpansions.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore?;kotlin.Int){}[0]
+
+    final val toggled // com.letta.mobile.data.chat.tools/ToolStepExpansions.toggled|{}toggled[0]
+        final fun <get-toggled>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<kotlin/String>> // com.letta.mobile.data.chat.tools/ToolStepExpansions.toggled.<get-toggled>|<get-toggled>(){}[0]
+
+    final fun isExpanded(kotlin/String, kotlin/Boolean, kotlin.collections/List<kotlin/String> = ...): kotlin/Boolean // com.letta.mobile.data.chat.tools/ToolStepExpansions.isExpanded|isExpanded(kotlin.String;kotlin.Boolean;kotlin.collections.List<kotlin.String>){}[0]
+    final fun toggle(kotlin/String) // com.letta.mobile.data.chat.tools/ToolStepExpansions.toggle|toggle(kotlin.String){}[0]
+
+    final object Companion { // com.letta.mobile.data.chat.tools/ToolStepExpansions.Companion|null[0]
+        final const val DEFAULT_CAPACITY // com.letta.mobile.data.chat.tools/ToolStepExpansions.Companion.DEFAULT_CAPACITY|{}DEFAULT_CAPACITY[0]
+            final fun <get-DEFAULT_CAPACITY>(): kotlin/Int // com.letta.mobile.data.chat.tools/ToolStepExpansions.Companion.DEFAULT_CAPACITY.<get-DEFAULT_CAPACITY>|<get-DEFAULT_CAPACITY>(){}[0]
+        final const val KEY // com.letta.mobile.data.chat.tools/ToolStepExpansions.Companion.KEY|{}KEY[0]
+            final fun <get-KEY>(): kotlin/String // com.letta.mobile.data.chat.tools/ToolStepExpansions.Companion.KEY.<get-KEY>|<get-KEY>(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.chat.tools/ToolStepLine { // com.letta.mobile.data.chat.tools/ToolStepLine|null[0]
     constructor <init>(com.letta.mobile.data.chat.tools/ToolVerb, kotlin/String? = ..., kotlin/String = ..., kotlin.collections/List<com.letta.mobile.data.chat.tools/ToolPreviewTarget> = ..., com.letta.mobile.data.chat.tools/ToolFailure? = ..., kotlin/String) // com.letta.mobile.data.chat.tools/ToolStepLine.<init>|<init>(com.letta.mobile.data.chat.tools.ToolVerb;kotlin.String?;kotlin.String;kotlin.collections.List<com.letta.mobile.data.chat.tools.ToolPreviewTarget>;com.letta.mobile.data.chat.tools.ToolFailure?;kotlin.String){}[0]
 

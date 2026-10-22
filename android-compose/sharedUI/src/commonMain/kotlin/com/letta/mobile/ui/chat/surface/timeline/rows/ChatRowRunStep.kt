@@ -7,11 +7,15 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -24,20 +28,29 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ToolTimelineState
-import com.letta.mobile.data.chat.projection.parseTimestampEpochMillis
+import com.letta.mobile.data.chat.tools.ToolVerb
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_collapse
 import com.letta.mobile.sharedui.resources.rows_expand
 import com.letta.mobile.sharedui.resources.rows_state_collapsed
 import com.letta.mobile.sharedui.resources.rows_state_expanded
+import com.letta.mobile.sharedui.resources.rows_steps_called
+import com.letta.mobile.sharedui.resources.rows_steps_delegated
+import com.letta.mobile.sharedui.resources.rows_steps_edited
+import com.letta.mobile.sharedui.resources.rows_steps_explored
+import com.letta.mobile.sharedui.resources.rows_steps_fetched
+import com.letta.mobile.sharedui.resources.rows_steps_join
+import com.letta.mobile.sharedui.resources.rows_steps_ran
+import com.letta.mobile.ui.chat.tools.LocalToolPresenters
 import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LettaListRow
 import com.letta.mobile.ui.components.LettaListRowSpec
-import com.letta.mobile.ui.components.LettaSectionLabel
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.ChatRowSpacing
+import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.ImmutableList
 import org.jetbrains.compose.resources.StringResource
@@ -169,10 +182,11 @@ private fun RunStepChevron(disclosure: RunStepDisclosure) {
 }
 
 /**
- * An expanded run's tool calls, listed straight under its summary line: one [ToolStep] step row per
- * call (no group row, no second chevron). Calls of more than one kind get a plain, non-disclosing
- * [LettaSectionLabel] over them ("Ran 3 commands"). A request waiting on the person keeps its
- * approval card under the steps, unchanged.
+ * An expanded run's tool calls, listed straight under its summary line: one [ToolStep] line per
+ * call. Several steps read under a plain, non-disclosing label of what they add up to ("Explored
+ * files, ran commands") and share a bounded viewport that scrolls past
+ * [ChatRowDimens.toolGroupMaxHeight], following its newest step while the run works. A request
+ * waiting on the person keeps its approval card under the steps, unchanged.
  */
 @Composable
 internal fun RunToolSteps(
@@ -186,7 +200,7 @@ internal fun RunToolSteps(
     Column(modifier = modifier.fillMaxWidth()) {
         // Tagged inside: the run's work-step wrapper tags the outer node.
         Column(modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.RUN_TOOL_STEPS)) {
-            if (toolCalls.hasMixedKinds()) RunStepsSubheader(calls)
+            if (toolCalls.size > 1) StepGroupLabel(toolCalls)
             ToolStepList(calls, callbacks)
         }
         // Each request keeps its own slot, so answering one folds its card away (animated) in place.
@@ -198,16 +212,41 @@ internal fun RunToolSteps(
     }
 }
 
-/** More than one tool ran: the steps need a word over them saying what they add up to. */
-private fun List<UiToolCall>.hasMixedKinds(): Boolean = distinctBy { it.name }.size > 1
-
-/** The plain subheader over steps of several kinds: the tool summary's words, never a disclosure. */
+/** The plain label over several steps: what their verbs add up to, never a disclosure. */
 @Composable
-private fun RunStepsSubheader(calls: ToolRunCalls) {
-    val summary = remember(calls) { summarizeToolRun(calls.toolCalls, calls.approvals) }
-    val startedAt = remember(calls.startedAtTimestamp) { calls.startedAtTimestamp?.let(::parseTimestampEpochMillis) }
-    val elapsed by rememberElapsedSeconds(summary.running, startedAt)
-    LettaSectionLabel(toolRunLabel(summary, elapsed), Modifier.testTag(ChatRowTestTags.RUN_STEP_SUBHEADER))
+private fun StepGroupLabel(toolCalls: List<UiToolCall>) {
+    val presenters = LocalToolPresenters.current
+    val activities = remember(toolCalls, presenters) { toolCalls.map { presenters.line(it.facts()).verb.activity() }.distinct() }
+    val phrases = activities.map { stringResource(it.phrase) }
+    val separator = stringResource(Res.string.rows_steps_join, "", "")
+    val label = phrases.joinToString(separator).replaceFirstChar { it.uppercaseChar() }
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .testTag(ChatRowTestTags.RUN_STEP_GROUP_LABEL)
+            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
+    )
+}
+
+/** What a kind of step adds to its group's label; reading and searching are both exploring. */
+private enum class StepActivity(val phrase: StringResource) {
+    Explored(Res.string.rows_steps_explored),
+    Ran(Res.string.rows_steps_ran),
+    Edited(Res.string.rows_steps_edited),
+    Fetched(Res.string.rows_steps_fetched),
+    Delegated(Res.string.rows_steps_delegated),
+    Called(Res.string.rows_steps_called),
+}
+
+private fun ToolVerb.activity(): StepActivity = when (this) {
+    ToolVerb.Read, ToolVerb.Searched -> StepActivity.Explored
+    ToolVerb.Ran -> StepActivity.Ran
+    ToolVerb.Wrote, ToolVerb.Edited -> StepActivity.Edited
+    ToolVerb.Fetched -> StepActivity.Fetched
+    ToolVerb.Delegated -> StepActivity.Delegated
+    ToolVerb.Called -> StepActivity.Called
 }
 
 /**
@@ -219,7 +258,10 @@ private fun RunStepsSubheader(calls: ToolRunCalls) {
 internal fun ToolStepList(calls: ToolRunCalls, callbacks: ChatRowCallbacks, modifier: Modifier = Modifier) {
     val toolCalls: ImmutableList<UiToolCall> = calls.toolCalls
     val states = remember(toolCalls, calls.approvals) { toolCalls.map { call -> call.runState(calls.approvals.requestFor(call), toolCalls) } }
-    Column(modifier = modifier.fillMaxWidth()) {
+    val live = states.any { it == ToolTimelineState.Running }
+    val scroll = rememberTailFollowingScroll(live)
+    val bounded = if (toolCalls.size > 1) Modifier.heightIn(max = ChatRowDimens.toolGroupMaxHeight).verticalScroll(scroll) else Modifier
+    Column(modifier = modifier.fillMaxWidth().then(bounded)) {
         toolCalls.forEachIndexed { index, call ->
             val disclosureKey = call.disclosureKey().ifBlank { "step:$index" }
             key(index, disclosureKey) {

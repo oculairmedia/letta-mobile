@@ -2,11 +2,14 @@ package com.letta.mobile.ui.chat.tools
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.data.chat.tools.ToolPresenterRegistry
+import com.letta.mobile.data.chat.tools.ToolStepExpansions
 import com.letta.mobile.data.chat.tools.ToolStepLine
 import com.letta.mobile.data.chat.tools.ToolVerb
 import com.letta.mobile.data.chat.tools.bundled.BundledToolPresenters
+import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_tool_step_label
 import com.letta.mobile.sharedui.resources.rows_tool_verb_called
@@ -48,3 +51,13 @@ private val ToolVerb.resource: StringResource
         ToolVerb.Delegated -> Res.string.rows_tool_verb_delegated
         ToolVerb.Called -> Res.string.rows_tool_verb_called
     }
+
+/** Which tool steps the person flipped open or closed; null where no host keeps them (each step then keeps its own). */
+val LocalToolStepExpansions = staticCompositionLocalOf<ToolStepExpansions?> { null }
+
+/** [content] remembering tool step expansions in [settings], across reloads. */
+@Composable
+fun ProvideToolStepExpansions(settings: SecureSettingsStore, content: @Composable () -> Unit) {
+    val expansions = remember(settings) { ToolStepExpansions(settings) }
+    CompositionLocalProvider(LocalToolStepExpansions provides expansions, content = content)
+}

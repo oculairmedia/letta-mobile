@@ -77,8 +77,8 @@ class ChatRowRunBlockSummaryUiTest {
         awaitText("Fixed it.")
 
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assert(hasClickAction())
-        onNodeWithText("Worked · ", substring = true, useUnmergedTree = true).assertExists()
-        onNodeWithText("2 tools", substring = true, useUnmergedTree = true).assertExists()
+        onNodeWithText("Worked", substring = true, useUnmergedTree = true).assertExists()
+        onNodeWithText("2 steps", substring = true, useUnmergedTree = true).assertExists()
         assertEquals(1, onAllNodesWithTag(ChatRowTestTags.RUN_GLYPH, useUnmergedTree = true).fetchSemanticsNodes().size)
         // No step rows, so no second line and no second chevron.
         assertEquals(0, onAllNodesWithTag(ChatRowTestTags.RUN_WORK_STEP).fetchSemanticsNodes().size)
