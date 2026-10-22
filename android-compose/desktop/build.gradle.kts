@@ -229,6 +229,7 @@ dependencies {
     implementation(compose.desktop.currentOs)
     implementation(libs.nucleus.application)
     implementation(libs.nucleus.updater.runtime)
+    implementation(libs.nucleus.aot.runtime)
     implementation(libs.nucleus.native.http)
     implementation(libs.nucleus.native.ssl)
     implementation(libs.nucleus.notification.common)
@@ -547,6 +548,11 @@ nucleus.application {
         } else {
             targetFormats(TargetFormat.Exe, TargetFormat.Msi)
         }
+        // Startup is dominated by loading and linking ~180 jars' classes. Packaging launches the
+        // app once in training mode (it exits itself: DesktopAotTraining.kt) and ships the JVM's
+        // AOT cache beside it, so installed launches start with those classes already loaded and
+        // linked. -PnucleusAotCache=false skips the training run for a quicker local package.
+        enableAotCache = providers.gradleProperty("nucleusAotCache").orNull?.toBoolean() ?: true
         packageName = "Meridian Desktop"
         packageVersion = computeDesktopPackageVersion().get()
         description = "Desktop client foundation for the Meridian AI platform."
@@ -878,6 +884,13 @@ tasks.matching { it.name.startsWith("createDistributable") || it.name.startsWith
 // working touch keyboard on Compose Multiplatform).
 afterEvaluate {
     tasks.named<JavaExec>("run") {
+        // Dev launches keep a class-data-sharing archive of what startup loaded: the first run
+        // writes it, later runs map it instead of loading and verifying those classes again. The
+        // JVM rewrites it by itself when the JDK or the jars change.
+        jvmArgs(
+            "-XX:+AutoCreateSharedArchive",
+            "-XX:SharedArchiveFile=${layout.buildDirectory.file("desktop-run.jsa").get().asFile.absolutePath}",
+        )
         if (isWindowsHost) {
             dependsOn(extractDesktopJbr)
             val jbrJava = desktopJbrHome.map { it.file("bin/java.exe") }

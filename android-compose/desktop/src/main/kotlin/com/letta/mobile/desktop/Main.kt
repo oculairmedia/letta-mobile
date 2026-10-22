@@ -56,11 +56,10 @@ fun main(args: Array<String>) {
         { com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore.documents },
         { if (Platform.Current == Platform.Windows) com.letta.mobile.desktop.touch.DesktopWindowsTouchKeyboard },
     ).start()
+    com.letta.mobile.desktop.startup.DesktopAotTrainingExit().install() // packaging's AOT training run exits itself
     initializeDesktopLifecycleMainThread()
-    // Kotzilla observability — must run before any UI composition so the SDK
-    // captures the full session including startup. Android target boots via
-    // ContentProvider; Desktop (and any future WasmJS) call this wrapper
-    // explicitly. See sharedLogic/commonMain/.../KotzillaKmpMonitoring.kt.
+    // Kotzilla observability: before any UI composition, so the SDK captures startup too. Android boots it
+    // via ContentProvider; Desktop (and any future WasmJS) call this wrapper. See KotzillaKmpMonitoring.kt.
     com.letta.mobile.data.observability.startKotzillaMonitoring()
     // Phone preview (`:desktop:runPhone`, docs/development/phone-preview.md): the same app in a
     // phone-sized window. Off unless the launch asks for it; the normal launch below is untouched.
