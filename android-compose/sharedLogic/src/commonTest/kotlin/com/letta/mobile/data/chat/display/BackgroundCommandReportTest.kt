@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.display
 
+import com.letta.mobile.data.chat.tools.ToolOutputStream
 import com.letta.mobile.data.model.UiSubagentNotification
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -55,5 +56,21 @@ class BackgroundCommandReportTest {
             status = "completed", summary = null, result = null, usage = null, transcriptUri = null, taskId = task,
         )
         assertEquals(listOf(true, true, false), listOf("bash_54", "exec_3", "task_1").map { notification(it).isCommand() })
+    }
+
+    @Test
+    fun aReportReadsAsAToolStepsCommandInsetWithStderrKept() {
+        val report = BackgroundCommandReport(
+            command = "make",
+            detail = "Exit code: 2",
+            streams = listOf(CommandStream(CommandStream.Kind.Stdout, null, "ok"), CommandStream(CommandStream.Kind.Stderr, null, "boom")),
+        )
+        val inset = report.toInset()
+        assertEquals("make", inset?.command)
+        assertEquals(
+            listOf(ToolOutputStream(ToolOutputStream.Kind.Output, "ok"), ToolOutputStream(ToolOutputStream.Kind.Stderr, "boom")),
+            inset?.output,
+        )
+        assertNull(BackgroundCommandReport(command = null, detail = null, streams = emptyList()).toInset())
     }
 }

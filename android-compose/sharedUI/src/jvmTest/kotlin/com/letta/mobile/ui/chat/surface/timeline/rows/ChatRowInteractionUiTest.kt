@@ -20,7 +20,6 @@ import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assert
@@ -37,10 +36,9 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
@@ -129,26 +127,25 @@ class ChatRowInteractionUiTest {
     @Test
     fun manualToolDisclosureSurvivesRunningToCompletedRefresh() = runComposeUiTest {
         var tool by mutableStateOf(toolCall(status = "running", result = null))
-        setContent { MaterialTheme { ToolCard(tool, "call-1", rowCallbacks()) } }
+        setContent { MaterialTheme { ToolStep(tool, "call-1", rowCallbacks()) } }
 
-        onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertExists()
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertDoesNotExist()
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
-        onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertDoesNotExist()
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertExists()
         runOnIdle { tool = tool.copy(status = "completed", result = "done") }
-        onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertDoesNotExist()
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertExists()
     }
 
     @Test
-    fun completedToolsStartCollapsedAndFailuresStartExpanded() = runComposeUiTest {
+    fun stepsStartCollapsedAndOnlyAFailureSaysSoOnTheLine() = runComposeUiTest {
         var tool by mutableStateOf(toolCall(status = "completed", result = "done"))
-        setContent { MaterialTheme { ToolCard(tool, tool.status.orEmpty(), rowCallbacks()) } }
+        setContent { MaterialTheme { ToolStep(tool, tool.status.orEmpty(), rowCallbacks()) } }
 
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertDoesNotExist()
-        // ckmub.1.2: a failure reads in the step's leading glyph, not a trailing badge.
-        onNodeWithContentDescription("Failed", useUnmergedTree = true).assertDoesNotExist()
+        onNodeWithTag(ChatRowTestTags.TOOL_STEP_NOTE, useUnmergedTree = true).assertDoesNotExist()
         runOnIdle { tool = toolCall(status = "failed", result = "boom") }
-        onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertExists()
-        onNodeWithContentDescription("Failed", useUnmergedTree = true).assertExists()
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertDoesNotExist()
+        onNodeWithTag(ChatRowTestTags.TOOL_STEP_NOTE, useUnmergedTree = true).assertTextEquals("failed")
     }
 
     @Test
@@ -162,22 +159,9 @@ class ChatRowInteractionUiTest {
             generatedImageAttachments = listOf(UiImageAttachment(base64 = "aaaa", mediaType = "image/png")),
         )
         assertTrue(tool.shouldInitiallyExpand())
-        setContent { MaterialTheme { ToolCard(tool, "img-1", rowCallbacks()) } }
+        setContent { MaterialTheme { ToolStep(tool, "img-1", rowCallbacks()) } }
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertExists()
         onNodeWithTag(ChatRowTestTags.IMAGE_GRID).assertExists()
-    }
-
-    @Test
-    fun truncatedToolOutputExplainsCopyScopeAndSupportsKeyboardScrolling() = runComposeUiTest {
-        val output = (1..41).joinToString("\n") { index -> "line $index ${"x".repeat(120)}" }
-        setContent { MaterialTheme { ToolOutputBlock(output) } }
-
-        onNodeWithText("Showing 40 of 41 lines · Copy includes all output").assertExists()
-        val scrollable = onNodeWithContentDescription(
-            "Tool output. Use left and right arrow keys to scroll horizontally.",
-        )
-        scrollable.performSemanticsAction(SemanticsActions.RequestFocus)
-        scrollable.assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
     }
 
     @Test
@@ -186,7 +170,7 @@ class ChatRowInteractionUiTest {
         val tool = toolCall(status = "completed", result = "preview…").copy(
             resultTruncation = UiToolResultTruncation(messageId = "ret-1", byteLen = 90_000),
         )
-        setContent { MaterialTheme { ToolCard(tool, "call-1", rowCallbacks(actions)) } }
+        setContent { MaterialTheme { ToolStep(tool, "call-1", rowCallbacks(actions)) } }
 
         runOnIdle { assertTrue(actions.expandedTruncations.isEmpty()) }
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()

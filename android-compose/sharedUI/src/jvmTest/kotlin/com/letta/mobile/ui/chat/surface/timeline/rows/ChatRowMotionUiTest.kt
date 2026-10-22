@@ -51,7 +51,7 @@ class ChatRowMotionUiTest {
     private fun ToolCardUnderTest(reducedMotion: Boolean) {
         CompositionLocalProvider(LocalReducedMotion provides reducedMotion) {
             MaterialTheme {
-                Box(Modifier.width(400.dp).testTag(CARD)) { ToolCard(collapsedTool, "call-1", rowCallbacks()) }
+                Box(Modifier.width(400.dp).testTag(CARD)) { ToolStep(collapsedTool, "call-1", rowCallbacks()) }
             }
         }
     }

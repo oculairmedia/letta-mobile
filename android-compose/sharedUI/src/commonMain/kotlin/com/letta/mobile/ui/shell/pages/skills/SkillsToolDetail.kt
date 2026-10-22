@@ -13,8 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import com.letta.mobile.data.chat.tools.ToolInset
 import com.letta.mobile.data.model.Tool
-import com.letta.mobile.ui.chat.surface.timeline.rows.ToolOutputBlock
+import com.letta.mobile.ui.chat.surface.timeline.rows.ToolInsetView
 import com.letta.mobile.ui.components.LettaPill
 import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.ui.theme.LettaDimens
@@ -43,7 +44,7 @@ internal fun ToolDetailPane(tool: Tool, onClose: () -> Unit) {
             }
             toolSource(tool)?.let { (label, text) ->
                 Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                ToolOutputBlock(text)
+                ToolInsetView(ToolInset.Text(text))
             }
             Text(READ_ONLY, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

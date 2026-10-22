@@ -84,10 +84,16 @@ internal object ChatRowTestTags {
     const val FORK_REPLY = "fork-reply"
     const val TOOL_CARD_TOGGLE = "tool-card-toggle"
     const val TOOL_CARD_BODY = "tool-card-body"
-    /** A tool step's leading status glyph: the same [RunStatusGlyph] as the run summary line's. */
+    /** A running tool step's small spinner: the run summary's [RunStatusGlyph] while it works. */
     const val TOOL_STATUS_GLYPH = "tool-status-glyph"
-    const val TOOL_OUTCOME = "tool-outcome"
-    const val TOOL_EXECUTING = "tool-executing"
+    /** A step line's muted note: "exited N" / "failed" in amber, "awaiting approval" while parked. */
+    const val TOOL_STEP_NOTE = "tool-step-note"
+    /** An open command step's `dir $ command` line. */
+    const val TOOL_COMMAND = "tool-command"
+    /** An open step's bounded, scrolling viewport. */
+    const val TOOL_INSET_VIEWPORT = "tool-inset-viewport"
+    /** The note over an output whose first lines the inset left out. */
+    const val TOOL_OUTPUT_TRUNCATED = "tool-output-truncated"
     const val TOOL_OUTPUT = "tool-output"
     const val TOOL_RESULT_PREVIEW = "tool-result-preview"
     const val CANVAS_ARTIFACT = "chat-canvas-artifact"

@@ -26,9 +26,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import com.letta.mobile.data.chat.display.CommandStream
 import com.letta.mobile.data.chat.display.isCommand
 import com.letta.mobile.data.chat.display.parseBackgroundCommandReport
+import com.letta.mobile.data.chat.display.toInset
 import com.letta.mobile.data.chat.display.TaskActivity
 import com.letta.mobile.data.chat.display.activity
 import com.letta.mobile.data.model.UiSubagentDispatch
@@ -59,8 +59,6 @@ import com.letta.mobile.sharedui.resources.rows_status_unknown
 import com.letta.mobile.sharedui.resources.rows_subagent_background
 import com.letta.mobile.sharedui.resources.rows_subagent_dispatched
 import com.letta.mobile.sharedui.resources.rows_task_id
-import com.letta.mobile.sharedui.resources.rows_tool_argument_line
-import com.letta.mobile.sharedui.resources.rows_tool_output
 import com.letta.mobile.sharedui.resources.rows_transcript
 import com.letta.mobile.sharedui.resources.rows_view_conversation
 import com.letta.mobile.ui.chat.subagents.ExternalAgentBadge
@@ -370,8 +368,8 @@ private fun NotificationFooter(notification: UiSubagentNotification) {
 /**
  * A background command's report is its stdout — preformatted text, never
  * prose. Fed through markdown, shell like `T=$(grep …); A=$(cat …)` paired its `$`s into TeX
- * math and column-aligned output ran together into one paragraph, so command reports take the
- * tool-output block (monospace, line-preserving, horizontally scrollable). A subagent's report
+ * math and column-aligned output ran together into one paragraph, so command reports take a tool
+ * step's inset (monospace, line-preserving, wrapped). A subagent's report
  * is the agent's own prose and keeps the markdown paint.
  */
 @Composable
@@ -384,21 +382,18 @@ private fun NotificationReport(model: NotificationModel) {
 }
 
 /**
- * A shell's report in the tool card's own pieces. The command and each output
- * tail get their own [ToolOutputBlock] (monospace, newlines kept, horizontally scrollable), and
- * stderr takes the error inset whatever the exit code, so a traceback never reads as output.
+ * A shell's report as a tool step's own inset ([ToolInsetView]): the command, then each output tail,
+ * stderr in the muted error ink whatever the exit code, so a traceback never reads as output. The
+ * completion detail ("Exit code: 1") reads over it.
  */
 @Composable
 private fun CommandReport(model: NotificationModel) {
     val parsed = remember(model.report) { parseBackgroundCommandReport(model.report.orEmpty()) }
+    val inset = remember(parsed) { parsed.toInset() }
     Column(
         modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.COMMAND_REPORT),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
-        parsed.command?.let { command ->
-            ReportLabel(stream = null)
-            ToolOutputBlock(stringResource(Res.string.rows_tool_argument_line, command))
-        }
         parsed.detail?.let { detail ->
             Text(
                 text = detail,
@@ -406,28 +401,8 @@ private fun CommandReport(model: NotificationModel) {
                 color = if (model.isFailure) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        parsed.streams.forEach { stream ->
-            ReportLabel(stream)
-            ToolOutputBlock(stream.text, isError = stream.kind == CommandStream.Kind.Stderr)
-        }
+        inset?.let { ToolInsetView(it) }
     }
-}
-
-/** A section's heading: "Command" for the command ([stream] null), else the tail's own header. */
-@Composable
-private fun ReportLabel(stream: CommandStream?) {
-    val header = stream?.label
-    val text = when {
-        stream == null -> stringResource(Res.string.rows_activity_command)
-        header != null -> header.replace(" - ", " · ")
-        else -> stringResource(Res.string.rows_tool_output)
-    }
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = LettaDimens.Space.xs),
-    )
 }
 
 @Composable

@@ -1468,8 +1468,6 @@
     <ID>MaxLineLength:ViewMessageValidatorTest.kt$ViewMessageValidatorTest$refused("""{"jsonrpc":"2.0","id":1,"method":"view.displayMode","params":{"mode":"inline"},"result":{}}""", ViewErrorCode.INVALID_REQUEST)</ID>
     <ID>MaxLineLength:WorkPlayLensTest.kt$WorkPlayLensTest$assertEquals(listOf(LensDestination.Memory, LensDestination.Schedules, LensDestination.Channels, LensDestination.Skills), workDestinations)</ID>
     <ID>MaxLineLength:WorkingDirectoryPickerControllerTest.kt$WorkingDirectoryPickerControllerTest$val picker = controller(creator = FolderCreator { _, _ -&gt; throw DirectoryBrowseException("A folder with this name already exists.") })</ID>
-    <ID>MaxLineLength:WorkspaceFileViewerController.kt$ToolFileTargets$fun</ID>
-    <ID>MaxLineLength:WorkspaceFilesControllersTest.kt$WorkspaceFilesControllersTest$listOf("memory", "memory_insert", "memory_replace", "core_memory_append", "Memory").forEach { assertTrue(ToolFileTargets.isMemoryTool(it), it) }</ID>
     <ID>MaxLineLength:WorkspaceRelayClient.kt$WorkspaceRelayClient$override suspend</ID>
     <ID>MaxLineLength:WorkspaceRelayClient.kt$WorkspaceRelayClient$override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse</ID>
     <ID>MaxLineLength:WorkspaceRelayClient.kt$WorkspaceRelayClient$override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse)</ID>
@@ -1626,7 +1624,6 @@
     <ID>ReturnCount:TimelineSyncReconcile.kt$private fun Timeline.findRecentContentSupersetIndex(incoming: TimelineEvent.Confirmed): Int?</ID>
     <ID>ReturnCount:TimelineSyncReconcile.kt$private fun Timeline.findRecentSameRealRunAssistantIndex(incoming: TimelineEvent.Confirmed): Int?</ID>
     <ID>ReturnCount:ToolArgumentsNormalizer.kt$ToolArgumentsNormalizer$fun normalize(arguments: String?): String?</ID>
-    <ID>ReturnCount:ToolDisplayRegistry.kt$ToolDisplayRegistry$private fun extractJsonStringField(json: String, field: String): String?</ID>
     <ID>ReturnCount:ToolOutputParser.kt$ToolOutputParser$private fun parseStackTrace(text: String): ToolOutputBlock.StackTrace?</ID>
     <ID>ReturnCount:ToolOutputParser.kt$ToolOutputParser$private fun parseTable(text: String): ToolOutputBlock.Table?</ID>
     <ID>ReturnCount:ToolTimelineProjection.kt$private fun UiToolCall.isAwaitingApproval(request: UiApprovalRequest?): Boolean</ID>
@@ -1687,7 +1684,6 @@
     <ID>SwallowedException:RuntimeEventFanoutTest.kt$RuntimeEventFanoutTest$e: RuntimeException</ID>
     <ID>SwallowedException:StdioLcpTransport.kt$StdioLcpTransport.StreamSink$e: IOException</ID>
     <ID>SwallowedException:System1Client.kt$System1Client$@Suppress("TooGenericExceptionCaught") error: Throwable</ID>
-    <ID>SwallowedException:ToolDisplayRegistry.kt$ToolDisplayRegistry$e: Exception</ID>
     <ID>SwallowedException:TurnInputAcceptance.kt$timeout: AppServerRequestTimeoutException</ID>
     <ID>SwallowedException:TurnInputAcceptance.kt$unsupported: UnsupportedOperationException</ID>
     <ID>ThrowsCount:AppServerServeSpec.kt$private fun requireRemoteAuthForNonLoopback(listen: String, wsAuth: String?)</ID>
@@ -1832,7 +1828,6 @@
     <ID>TooGenericExceptionCaught:TimelineSyncLoop.kt$TimelineSyncLoop$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:TimelineSyncLoop.kt$TimelineSyncLoop$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:TimelineSyncStreamSubscriber.kt$t: Throwable</ID>
-    <ID>TooGenericExceptionCaught:ToolDisplayRegistry.kt$ToolDisplayRegistry$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ToolLibraryController.kt$ToolLibraryController$e: Throwable</ID>
     <ID>TooGenericExceptionCaught:ToolLibraryController.kt$ToolLibraryController$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:TurnIdentityLedger.kt$TurnIdentityLedger$e: Exception</ID>

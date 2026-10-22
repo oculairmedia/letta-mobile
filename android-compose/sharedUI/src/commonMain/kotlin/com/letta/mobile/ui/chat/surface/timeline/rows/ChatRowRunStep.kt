@@ -44,10 +44,10 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /*
- * letta-mobile-ckmub.1.2: a run's steps are built from the shared primitives, so they read like every
- * other list row in the app: one [LettaListRow] per step, led by the same [RunStatusGlyph] the run's
+ * letta-mobile-ckmub.1.2: a run's reasoning steps are built from the shared primitives, so they read like
+ * every other list row in the app: one [LettaListRow] per step, led by the same [RunStatusGlyph] the run's
  * summary line carries, with the shared [DisclosureChevron] only when the step has details to show
- * (its details read in [ToolOutputBlock]). An expanded run lists these rows straight under its
+ * (tool calls read as [ToolStep] lines instead). An expanded run lists its steps straight under its
  * summary line: there is no "Ran 2 commands" group row with a second chevron of its own.
  */
 
@@ -101,12 +101,7 @@ internal fun ToolTimelineState.glyphTone(): RunSummaryTone = when (this) {
 
 /** The test tags a step row carries: on the row (its toggle) and on its glyph. */
 @Immutable
-internal class RunStepRowTags(val row: String, val glyph: String) {
-    companion object {
-        /** A tool call's step. */
-        val Tool = RunStepRowTags(ChatRowTestTags.TOOL_CARD_TOGGLE, ChatRowTestTags.TOOL_STATUS_GLYPH)
-    }
-}
+internal class RunStepRowTags(val row: String, val glyph: String)
 
 /** What one step row shows: its label, its one-line preview, its glyph and the glyph's spoken state. */
 @Immutable
@@ -115,7 +110,7 @@ internal class RunStepRowSpec(
     val subtitle: String?,
     val tone: RunSummaryTone,
     val glyphLabel: String?,
-    val tags: RunStepRowTags = RunStepRowTags.Tool,
+    val tags: RunStepRowTags,
 )
 
 /** What a step's disclosure says: its chevron's action labels and the row's spoken open / closed state. */
@@ -174,7 +169,7 @@ private fun RunStepChevron(disclosure: RunStepDisclosure) {
 }
 
 /**
- * An expanded run's tool calls, listed straight under its summary line: one [ToolCard] step row per
+ * An expanded run's tool calls, listed straight under its summary line: one [ToolStep] step row per
  * call (no group row, no second chevron). Calls of more than one kind get a plain, non-disclosing
  * [LettaSectionLabel] over them ("Ran 3 commands"). A request waiting on the person keeps its
  * approval card under the steps, unchanged.
@@ -216,7 +211,7 @@ private fun RunStepsSubheader(calls: ToolRunCalls) {
 }
 
 /**
- * Each call as one step row ([ToolCard]), its state read with the run's approvals, so a call a
+ * Each call as one step row ([ToolStep]), its state read with the run's approvals, so a call a
  * parked permission gate holds reads "awaiting approval", not "running". Shared by the run's steps
  * and the lone tool line's sheet and disclosure.
  */
@@ -228,7 +223,7 @@ internal fun ToolStepList(calls: ToolRunCalls, callbacks: ChatRowCallbacks, modi
         toolCalls.forEachIndexed { index, call ->
             val disclosureKey = call.disclosureKey().ifBlank { "step:$index" }
             key(index, disclosureKey) {
-                ToolCard(call, disclosureKey, callbacks, state = states[index])
+                ToolStep(call, disclosureKey, callbacks, state = states[index])
             }
         }
     }
