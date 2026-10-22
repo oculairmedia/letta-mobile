@@ -107,6 +107,7 @@ class DesktopCreateAgentRoutingTest {
         DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = this,
+            rosterProvider = TEST_ROSTER,
             gatewayFactory = { gateway },
             agentByIdProvider = { ids -> agentsById.filterKeys(ids::contains) },
         )

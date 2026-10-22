@@ -1,7 +1,8 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.backend.RemoteRoute
-import androidx.paging.PagingData
+import com.letta.mobile.util.AgentConversationFleet
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCountEstimate
@@ -18,7 +19,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,8 +31,14 @@ import kotlinx.coroutines.sync.withLock
 fun defaultCachedAllConversationsRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-/** Phase 5b.2: platform-neutral cached all-conversations repository. Paging stays in the Android binder. */
+/**
+ * Phase 5b.2: platform-neutral cached all-conversations repository: the fleet's conversations, read
+ * agent by agent through the shared [AgentConversationFleet] (each [roster] agent's own pages), never
+ * as one window across every agent.
+ */
 open class CachedAllConversationsRepository(
+    /** The agents whose conversations the list carries, read when the list is (re)loaded. */
+    private val roster: suspend () -> List<Agent>,
     private val remote: RemoteRoute<ConversationRemoteSource>,
     private val localCache: (() -> AllConversationsLocalCache)? = null,
     private val repositoryScope: CoroutineScope = defaultCachedAllConversationsRepositoryScope(),
@@ -51,7 +57,14 @@ open class CachedAllConversationsRepository(
     override val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
 
     private val refreshMutex = Mutex()
-    private var currentCursor: String? = null
+    private val fleet = AgentConversationFleet(::readAgentPage) { agent, failure ->
+        Telemetry.event(
+            TAG, "agent_read_failed",
+            "agentId" to agent.value,
+            "error" to failure.toString(),
+            level = Telemetry.Level.WARN,
+        )
+    }
     private var lastRefreshAtMillis: Long = 0L
     private var hasLoadedAtLeastOnce: Boolean = false
 
@@ -59,7 +72,8 @@ open class CachedAllConversationsRepository(
         repositoryScope.launch {
             try {
                 val cached = localCache?.invoke()?.getAllOnce().orEmpty()
-                if (cached.isNotEmpty()) {
+                // A list already read from the backend wins over a cache that arrived late.
+                if (cached.isNotEmpty() && !hasLoadedAtLeastOnce) {
                     _conversations.value = cached
                 }
             } catch (cancelled: CancellationException) {
@@ -112,18 +126,12 @@ open class CachedAllConversationsRepository(
         }
     }
 
-    override fun getConversationsPaged(
-        agentId: AgentId?,
-        archiveStatus: String?,
-        summarySearch: String?,
-    ): Flow<PagingData<Conversation>> {
-        error("getConversationsPaged is Android-bound; override in AllConversationsRepository")
-    }
-
     override suspend fun loadNextPage() = refreshMutex.withLock {
         if (!_hasMore.value) return@withLock
-        val newConversations = fetchPage(after = currentCursor)
-        applyLoadedPage(newConversations)
+        if (!hasLoadedAtLeastOnce) return@withLock refreshLocked()
+        val listed = fleet.loadMore()
+        // Rows the list gained meanwhile (a push, an optimistic write) stay.
+        publish(listed + _conversations.value.filterNot { row -> listed.any { it.id == row.id } })
     }
 
     override suspend fun refresh() = refreshMutex.withLock {
@@ -132,7 +140,6 @@ open class CachedAllConversationsRepository(
 
     override suspend fun clearForBackendSwitch() {
         refreshMutex.withLock {
-            currentCursor = null
             lastRefreshAtMillis = 0L
             hasLoadedAtLeastOnce = false
             _conversations.value = emptyList()
@@ -181,87 +188,41 @@ open class CachedAllConversationsRepository(
         )
     }
 
-    /** Exposed for the Android paging binder when Iroh list routing is active. */
-    fun irohPageLoaderOrNull(): (suspend (
-        agentId: AgentId?,
-        limit: Int?,
-        after: String?,
-        archiveStatus: String?,
-        summarySearch: String?,
-        order: String?,
-        orderBy: String?,
-    ) -> List<Conversation>)? =
-        irohConversationListSource?.takeIf { it.shouldUseIroh() }?.let { source ->
-            { pageAgentId, limit, after, pageArchiveStatus, pageSummarySearch, order, orderBy ->
-                source.listConversations(
-                    agentId = pageAgentId,
-                    limit = limit,
-                    after = after,
-                    archiveStatus = pageArchiveStatus,
-                    summarySearch = pageSummarySearch,
-                    order = order,
-                    orderBy = orderBy,
-                )
-            }
-        }
-
     companion object {
-        internal const val PAGE_SIZE = 50
-        private const val ARCHIVE_STATUS_ALL = "all"
         private const val TAG = "AllConversationsRepo"
+
+        /** The list filters archived rows itself (its Archived tab), so it reads them too. */
+        private const val ARCHIVE_STATUS_ALL = "all"
     }
 
     private suspend fun refreshLocked() {
-        val firstPage = fetchPage(after = null)
-        currentCursor = null
-        hasLoadedAtLeastOnce = false
-        _conversations.update { emptyList() }
-        _hasMore.update { true }
-        applyLoadedPage(firstPage)
+        publish(fleet.refresh(roster()))
         lastRefreshAtMillis = nowMillis()
     }
 
-    private suspend fun fetchPage(after: String?): List<Conversation> {
+    /** One page of one agent's own conversations, from the session's channel or the backend seam. */
+    private suspend fun readAgentPage(agent: AgentId, after: ConversationId?, limit: Int): List<Conversation> {
         val irohSource = irohConversationListSource
         return if (irohSource?.shouldUseIroh() == true) {
-            irohSource.listConversations(
-                agentId = null,
-                limit = PAGE_SIZE,
-                after = after,
-                // The list screen filters archived rows itself (its Archived tab), so it needs them;
-                // the server's default is active-only, which emptied that tab on every refresh.
-                archiveStatus = ARCHIVE_STATUS_ALL,
-                order = "desc",
-                orderBy = "last_message_at",
-            )
+            irohSource.listAgentConversations(agent, after, limit)
         } else {
             remote.source().listConversations(
-                agentId = null,
-                limit = PAGE_SIZE,
-                after = after,
-                archiveStatus = null,
+                agentId = agent,
+                limit = limit,
+                after = after?.value,
+                archiveStatus = ARCHIVE_STATUS_ALL,
                 summarySearch = null,
-                order = null,
-                orderBy = null,
+                order = "desc",
+                orderBy = "last_message_at",
             )
         }
     }
 
-    private suspend fun applyLoadedPage(newConversations: List<Conversation>) {
+    private suspend fun publish(listed: List<Conversation>) {
         hasLoadedAtLeastOnce = true
-        if (newConversations.isEmpty() || newConversations.size < PAGE_SIZE) {
-            _hasMore.update { false }
-        }
-
-        if (newConversations.isNotEmpty()) {
-            _conversations.update { current ->
-                val existingIds = current.map { it.id }.toSet()
-                val deduped = newConversations.filter { it.id !in existingIds }
-                current + deduped
-            }
-            cacheConversations(newConversations)
-            currentCursor = newConversations.last().id.value
-        }
+        _conversations.value = listed
+        _hasMore.value = fleet.hasMore
+        if (listed.isNotEmpty()) cacheConversations(listed)
     }
 
     private suspend fun cacheConversations(conversations: List<Conversation>) {

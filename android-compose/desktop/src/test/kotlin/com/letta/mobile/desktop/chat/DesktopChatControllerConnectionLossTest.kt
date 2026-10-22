@@ -235,6 +235,7 @@ class DesktopChatControllerConnectionLossTest {
     ): DesktopChatController = DesktopChatController(
         bootstrapState = defaultDesktopBootstrapState(),
         scope = this,
+        rosterProvider = TEST_ROSTER,
         gatewayFactory = gatewayFactory,
     )
 }

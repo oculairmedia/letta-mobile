@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
@@ -60,7 +61,7 @@ class DesktopAppServerChatGatewayAdminTest {
         client.retrieveConversation = created
         assertEquals(created, gateway.getConversation(created.id.value))
         client.listedConversations = listOf(created)
-        assertEquals(listOf(created), gateway.listConversations(limit = 40, archiveStatus = null))
+        assertEquals(listOf(created), gateway.listAgentConversations(AgentConversationPage(AgentId("agent-1"))))
     }
 
     @Test
@@ -80,7 +81,7 @@ class DesktopAppServerChatGatewayAdminTest {
         }
 
         assertEquals("writer unavailable", failure.message)
-        assertEquals(emptyList(), gateway.listConversations(limit = 40, archiveStatus = null))
+        assertEquals(emptyList(), gateway.listAgentConversations(AgentConversationPage(AgentId("agent-1"))))
     }
 
     @Test
@@ -103,7 +104,7 @@ class DesktopAppServerChatGatewayAdminTest {
 
         assertEquals("conversation-persisted", turnEngine.command?.conversationId?.value)
         val reloaded = adminGateway(client)
-        assertEquals(listOf(created), reloaded.listConversations(limit = 40, archiveStatus = null))
+        assertEquals(listOf(created), reloaded.listAgentConversations(AgentConversationPage(AgentId("agent-1"))))
         assertEquals(created, reloaded.getConversation(created.id.value))
         gateway.close()
     }
@@ -114,7 +115,7 @@ class DesktopAppServerChatGatewayAdminTest {
         val gateway = adminGateway(client)
 
         assertFailsWith<IllegalStateException> {
-            gateway.listConversations(limit = 40, archiveStatus = null)
+            gateway.listAgentConversations(AgentConversationPage(AgentId("agent-1")))
         }
     }
 

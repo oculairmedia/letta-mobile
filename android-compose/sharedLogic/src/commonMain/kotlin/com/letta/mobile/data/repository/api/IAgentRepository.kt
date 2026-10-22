@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -93,4 +94,18 @@ interface IAgentRepository {
     suspend fun attachArchive(agentId: String, archiveId: String) = attachArchive(AgentId(agentId), archiveId)
     suspend fun detachArchive(agentId: AgentId, archiveId: String)
     suspend fun detachArchive(agentId: String, archiveId: String) = detachArchive(AgentId(agentId), archiveId)
+}
+
+/** How old a cached roster a conversation list still reads by. */
+const val LIST_ROSTER_MAX_AGE_MS: Long = 60_000L
+
+/**
+ * The agents a conversation list reads by: refreshed when older than [maxAgeMs]. A failed refresh
+ * keeps the cached agents, so a blip does not empty every list; with none cached it fails.
+ */
+suspend fun IAgentRepository.rosterForLists(maxAgeMs: Long = LIST_ROSTER_MAX_AGE_MS): List<Agent> {
+    runCatching { refreshAgentsIfStale(maxAgeMs) }.exceptionOrNull()?.let { failure ->
+        if (failure is CancellationException || agents.value.isEmpty()) throw failure
+    }
+    return agents.value
 }

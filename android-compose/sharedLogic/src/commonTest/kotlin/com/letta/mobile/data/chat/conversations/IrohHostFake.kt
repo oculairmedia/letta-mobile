@@ -21,7 +21,8 @@ import kotlinx.serialization.json.put
 /** One conversation as an Iroh host stores and answers it. */
 internal data class HostConversation(
     val id: String,
-    val agent: String,
+    /** Null for an agent-free worker conversation (the Letta API's ephemeral ones). */
+    val agent: String?,
     val summary: String? = null,
     val archived: Boolean = false,
     val lastMessageAt: String? = null,
@@ -55,9 +56,6 @@ internal class IrohHost(vararg listed: HostConversation) : AppServerClient {
     /** The App Server's own commands sent here (an Iroh host refuses them all). */
     val native = mutableListOf<String>()
 
-    /** Conversations the cross-agent window leaves out; the agent's own list still has them. */
-    val outsideWindow = mutableSetOf<String>()
-
     /** Methods that fail, as a host does when it cannot do them. */
     val failing = mutableSetOf<String>()
 
@@ -77,8 +75,7 @@ internal class IrohHost(vararg listed: HostConversation) : AppServerClient {
     }
 
     private fun answer(method: String, params: JsonObject): JsonElement? = when (method) {
-        "conversation.list" -> JsonArray(conversations.filterNot { it.id in outsideWindow }.map(HostConversation::json))
-        "conversation.list_agent" -> JsonArray(conversations.filter { it.agent == params.text("agent_id") }.map(HostConversation::json))
+        "conversation.list" -> JsonArray(listed(params).map(HostConversation::json))
         "conversation.create" -> HostConversation("new-${++made}", params.text("agent_id")).also { conversations.add(0, it) }.json()
         "conversation.update" -> edit(params) { it.copy(summary = params.text("summary")) }
         "conversation.archive" -> edit(params) { it.copy(archived = true) }
@@ -87,6 +84,16 @@ internal class IrohHost(vararg listed: HostConversation) : AppServerClient {
         "conversation.get" -> stored(params.text("conversation_id"))?.json()
         "message.list" -> JsonArray(emptyList())
         else -> null
+    }
+
+    /** The App Server's list: the asked agent's (every row without one), after the cursor, a page at most. */
+    private fun listed(params: JsonObject): List<HostConversation> {
+        val agent = params.text("agent_id").takeIf(String::isNotEmpty)
+        val rows = conversations.filter { agent == null || it.agent == agent }
+        val after = params.text("after").takeIf(String::isNotEmpty)
+        val from = after?.let { id -> rows.indexOfFirst { it.id == id } + 1 } ?: 0
+        val limit = params.text("limit").toIntOrNull() ?: rows.size
+        return rows.drop(from).take(limit)
     }
 
     private fun edit(params: JsonObject, change: (HostConversation) -> HostConversation): JsonElement? {

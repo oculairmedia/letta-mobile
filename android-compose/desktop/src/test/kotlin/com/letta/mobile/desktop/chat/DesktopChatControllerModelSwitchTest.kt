@@ -65,6 +65,7 @@ class DesktopChatControllerModelSwitchTest {
         val controller = DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = backgroundScope,
+            rosterProvider = TEST_ROSTER,
             gatewayFactory = { ModelSwitchGateway() },
             agentByIdProvider = { ids ->
                 agentLookup.await()
@@ -107,6 +108,7 @@ class DesktopChatControllerModelSwitchTest {
         val controller = DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = backgroundScope,
+            rosterProvider = TEST_ROSTER,
             gatewayFactory = { FakeDesktopChatGateway() },
             agentByIdProvider = { ids -> ids.associateWith { Agent(id = AgentId(it), name = it, model = "anthropic/old") } },
         )
@@ -128,6 +130,7 @@ class DesktopChatControllerModelSwitchTest {
         DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = backgroundScope,
+            rosterProvider = TEST_ROSTER,
             gatewayFactory = { gateway },
             agentByIdProvider = { ids -> ids.associateWith { Agent(id = AgentId(it), name = it, model = agentModel) } },
         )

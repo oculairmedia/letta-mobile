@@ -3782,6 +3782,10 @@ abstract fun interface com.letta.mobile.ui.haptics/Haptics { // com.letta.mobile
     abstract fun play(com.letta.mobile.ui.haptics/LettaHapticCue) // com.letta.mobile.ui.haptics/Haptics.play|play(com.letta.mobile.ui.haptics.LettaHapticCue){}[0]
 }
 
+abstract fun interface com.letta.mobile.util/AgentConversationReader { // com.letta.mobile.util/AgentConversationReader|null[0]
+    abstract suspend fun read(com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId?, kotlin/Int): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.util/AgentConversationReader.read|read(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.ConversationId?;kotlin.Int){}[0]
+}
+
 abstract interface <#A: com.letta.mobile.data.document/DocumentOp, #B: kotlin/Any?> com.letta.mobile.data.document/DocumentReducer { // com.letta.mobile.data.document/DocumentReducer|null[0]
     abstract fun aclOf(#B): com.letta.mobile.data.document/DocumentAcl? // com.letta.mobile.data.document/DocumentReducer.aclOf|aclOf(1:1){}[0]
     abstract fun lamportOf(#B): kotlin/Long // com.letta.mobile.data.document/DocumentReducer.lamportOf|lamportOf(1:1){}[0]
@@ -4072,20 +4076,12 @@ abstract interface com.letta.mobile.data.chat.runtime/ChatConversationStore { //
         open fun <get-deleteBehavior>(): com.letta.mobile.data.chat.runtime/ConversationDeleteBehavior // com.letta.mobile.data.chat.runtime/ChatConversationStore.deleteBehavior.<get-deleteBehavior>|<get-deleteBehavior>(){}[0]
 
     abstract suspend fun getConversation(kotlin/String): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.chat.runtime/ChatConversationStore.getConversation|getConversation(kotlin.String){}[0]
-    abstract suspend fun listConversations(kotlin/Int = ..., kotlin/String? = ...): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.chat.runtime/ChatConversationStore.listConversations|listConversations(kotlin.Int;kotlin.String?){}[0]
+    abstract suspend fun listAgentConversations(com.letta.mobile.data.chat.runtime/AgentConversationPage): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.chat.runtime/ChatConversationStore.listAgentConversations|listAgentConversations(com.letta.mobile.data.chat.runtime.AgentConversationPage){}[0]
     open suspend fun deleteConversation(kotlin/String) // com.letta.mobile.data.chat.runtime/ChatConversationStore.deleteConversation|deleteConversation(kotlin.String){}[0]
-    open suspend fun listConversationsForAgent(kotlin/String, kotlin/Int = ...): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.chat.runtime/ChatConversationStore.listConversationsForAgent|listConversationsForAgent(kotlin.String;kotlin.Int){}[0]
     open suspend fun restoreDeletedConversation(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.chat.runtime/ChatConversationStore.restoreDeletedConversation|restoreDeletedConversation(kotlin.String;kotlin.Boolean){}[0]
 }
 
-abstract interface com.letta.mobile.data.chat.runtime/ChatGateway : com.letta.mobile.data.chat.runtime/ChatConversationStore, com.letta.mobile.data.timeline/TimelineTransport { // com.letta.mobile.data.chat.runtime/ChatGateway|null[0]
-    final object Companion { // com.letta.mobile.data.chat.runtime/ChatGateway.Companion|null[0]
-        final const val DEFAULT_AGENT_CONVERSATION_LIMIT // com.letta.mobile.data.chat.runtime/ChatGateway.Companion.DEFAULT_AGENT_CONVERSATION_LIMIT|{}DEFAULT_AGENT_CONVERSATION_LIMIT[0]
-            final fun <get-DEFAULT_AGENT_CONVERSATION_LIMIT>(): kotlin/Int // com.letta.mobile.data.chat.runtime/ChatGateway.Companion.DEFAULT_AGENT_CONVERSATION_LIMIT.<get-DEFAULT_AGENT_CONVERSATION_LIMIT>|<get-DEFAULT_AGENT_CONVERSATION_LIMIT>(){}[0]
-        final const val DEFAULT_CONVERSATION_LIMIT // com.letta.mobile.data.chat.runtime/ChatGateway.Companion.DEFAULT_CONVERSATION_LIMIT|{}DEFAULT_CONVERSATION_LIMIT[0]
-            final fun <get-DEFAULT_CONVERSATION_LIMIT>(): kotlin/Int // com.letta.mobile.data.chat.runtime/ChatGateway.Companion.DEFAULT_CONVERSATION_LIMIT.<get-DEFAULT_CONVERSATION_LIMIT>|<get-DEFAULT_CONVERSATION_LIMIT>(){}[0]
-    }
-}
+abstract interface com.letta.mobile.data.chat.runtime/ChatGateway : com.letta.mobile.data.chat.runtime/ChatConversationStore, com.letta.mobile.data.timeline/TimelineTransport // com.letta.mobile.data.chat.runtime/ChatGateway|null[0]
 
 abstract interface com.letta.mobile.data.chat.runtime/ChatGatewayExtras { // com.letta.mobile.data.chat.runtime/ChatGatewayExtras|null[0]
     abstract suspend fun createAgent(com.letta.mobile.data.model/AgentCreateParams): com.letta.mobile.data.model/Agent // com.letta.mobile.data.chat.runtime/ChatGatewayExtras.createAgent|createAgent(com.letta.mobile.data.model.AgentCreateParams){}[0]
@@ -4676,7 +4672,6 @@ abstract interface com.letta.mobile.data.repository.api/IAllConversationsReposit
     abstract val hasMore // com.letta.mobile.data.repository.api/IAllConversationsRepository.hasMore|{}hasMore[0]
         abstract fun <get-hasMore>(): kotlinx.coroutines.flow/StateFlow<kotlin/Boolean> // com.letta.mobile.data.repository.api/IAllConversationsRepository.hasMore.<get-hasMore>|<get-hasMore>(){}[0]
 
-    abstract fun getConversationsPaged(com.letta.mobile.data.model/AgentId? = ..., kotlin/String? = ..., kotlin/String? = ...): kotlinx.coroutines.flow/Flow<androidx.paging/PagingData<com.letta.mobile.data.model/Conversation>> // com.letta.mobile.data.repository.api/IAllConversationsRepository.getConversationsPaged|getConversationsPaged(com.letta.mobile.data.model.AgentId?;kotlin.String?;kotlin.String?){}[0]
     abstract fun handleOptimisticDelete(com.letta.mobile.data.model/ConversationId) // com.letta.mobile.data.repository.api/IAllConversationsRepository.handleOptimisticDelete|handleOptimisticDelete(com.letta.mobile.data.model.ConversationId){}[0]
     abstract fun handleOptimisticUpdate(com.letta.mobile.data.model/Conversation) // com.letta.mobile.data.repository.api/IAllConversationsRepository.handleOptimisticUpdate|handleOptimisticUpdate(com.letta.mobile.data.model.Conversation){}[0]
     abstract fun hasFreshConversations(kotlin/Long): kotlin/Boolean // com.letta.mobile.data.repository.api/IAllConversationsRepository.hasFreshConversations|hasFreshConversations(kotlin.Long){}[0]
@@ -22982,6 +22977,12 @@ final class <#A: kotlin/Any?> com.letta.mobile.ui.chat.session/DerivedStateFlow 
     final suspend fun collect(kotlinx.coroutines.flow/FlowCollector<#A>): kotlin/Nothing // com.letta.mobile.ui.chat.session/DerivedStateFlow.collect|collect(kotlinx.coroutines.flow.FlowCollector<1:0>){}[0]
 }
 
+final class <#A: kotlin/Any?> com.letta.mobile.util/ReadThroughConversationFleets { // com.letta.mobile.util/ReadThroughConversationFleets|null[0]
+    constructor <init>(kotlin/Function1<#A, com.letta.mobile.util/AgentConversationReader>) // com.letta.mobile.util/ReadThroughConversationFleets.<init>|<init>(kotlin.Function1<1:0,com.letta.mobile.util.AgentConversationReader>){}[0]
+
+    final fun fleetFor(#A): com.letta.mobile.util/AgentConversationFleet // com.letta.mobile.util/ReadThroughConversationFleets.fleetFor|fleetFor(1:0){}[0]
+}
+
 final class com.letta.mobile.data.a2ui/A2uiAction { // com.letta.mobile.data.a2ui/A2uiAction|null[0]
     constructor <init>(kotlin/String, kotlin/String, kotlinx.serialization.json/JsonObject = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlinx.serialization.json/JsonObject = ..., com.letta.mobile.data.a2ui/A2uiActionOrigin = ...) // com.letta.mobile.data.a2ui/A2uiAction.<init>|<init>(kotlin.String;kotlin.String;kotlinx.serialization.json.JsonObject;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlinx.serialization.json.JsonObject;com.letta.mobile.data.a2ui.A2uiActionOrigin){}[0]
 
@@ -28260,7 +28261,7 @@ final class com.letta.mobile.data.chat.conversations/TimelineConversationChat { 
 }
 
 final class com.letta.mobile.data.chat.conversations/TimelineConversations : com.letta.mobile.data.shell/ShellChatPort { // com.letta.mobile.data.chat.conversations/TimelineConversations|null[0]
-    constructor <init>(kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.chat.runtime/ChatGateway, kotlin/Function1<com.letta.mobile.data.model/AgentId, kotlin/String>, com.letta.mobile.data.chat.conversations/ConversationManagementPrefs = ...) // com.letta.mobile.data.chat.conversations/TimelineConversations.<init>|<init>(kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.chat.runtime.ChatGateway;kotlin.Function1<com.letta.mobile.data.model.AgentId,kotlin.String>;com.letta.mobile.data.chat.conversations.ConversationManagementPrefs){}[0]
+    constructor <init>(kotlinx.coroutines/CoroutineScope, com.letta.mobile.data.chat.runtime/ChatGateway, kotlin.collections/List<com.letta.mobile.data.model/Agent>, com.letta.mobile.data.chat.conversations/ConversationManagementPrefs = ...) // com.letta.mobile.data.chat.conversations/TimelineConversations.<init>|<init>(kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.chat.runtime.ChatGateway;kotlin.collections.List<com.letta.mobile.data.model.Agent>;com.letta.mobile.data.chat.conversations.ConversationManagementPrefs){}[0]
 
     final val management // com.letta.mobile.data.chat.conversations/TimelineConversations.management|{}management[0]
         final fun <get-management>(): com.letta.mobile.data.chat.conversations/ConversationManagement // com.letta.mobile.data.chat.conversations/TimelineConversations.management.<get-management>|<get-management>(){}[0]
@@ -28268,6 +28269,10 @@ final class com.letta.mobile.data.chat.conversations/TimelineConversations : com
         final fun <get-selectedConversation>(): com.letta.mobile.data.model/ConversationId? // com.letta.mobile.data.chat.conversations/TimelineConversations.selectedConversation.<get-selectedConversation>|<get-selectedConversation>(){}[0]
     final val state // com.letta.mobile.data.chat.conversations/TimelineConversations.state|{}state[0]
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.chat.conversations/TimelineConversationsState> // com.letta.mobile.data.chat.conversations/TimelineConversations.state.<get-state>|<get-state>(){}[0]
+
+    final var roster // com.letta.mobile.data.chat.conversations/TimelineConversations.roster|{}roster[0]
+        final fun <get-roster>(): kotlin.collections/List<com.letta.mobile.data.model/Agent> // com.letta.mobile.data.chat.conversations/TimelineConversations.roster.<get-roster>|<get-roster>(){}[0]
+        final fun <set-roster>(kotlin.collections/List<com.letta.mobile.data.model/Agent>) // com.letta.mobile.data.chat.conversations/TimelineConversations.roster.<set-roster>|<set-roster>(kotlin.collections.List<com.letta.mobile.data.model.Agent>){}[0]
 
     final fun conversations(): kotlin.collections/List<com.letta.mobile.data.shell/ShellConversationRef> // com.letta.mobile.data.chat.conversations/TimelineConversations.conversations|conversations(){}[0]
     final fun createConversationForAgent(com.letta.mobile.data.model/AgentId, kotlin/Function1<com.letta.mobile.data.model/ConversationId, kotlin/Unit>) // com.letta.mobile.data.chat.conversations/TimelineConversations.createConversationForAgent|createConversationForAgent(com.letta.mobile.data.model.AgentId;kotlin.Function1<com.letta.mobile.data.model.ConversationId,kotlin.Unit>){}[0]
@@ -28856,6 +28861,28 @@ final class com.letta.mobile.data.chat.recompile/IrohConversationRecompileClient
         final const val HOST_NEEDS_UPDATE // com.letta.mobile.data.chat.recompile/IrohConversationRecompileClient.Companion.HOST_NEEDS_UPDATE|{}HOST_NEEDS_UPDATE[0]
             final fun <get-HOST_NEEDS_UPDATE>(): kotlin/String // com.letta.mobile.data.chat.recompile/IrohConversationRecompileClient.Companion.HOST_NEEDS_UPDATE.<get-HOST_NEEDS_UPDATE>|<get-HOST_NEEDS_UPDATE>(){}[0]
     }
+}
+
+final class com.letta.mobile.data.chat.runtime/AgentConversationPage { // com.letta.mobile.data.chat.runtime/AgentConversationPage|null[0]
+    constructor <init>(com.letta.mobile.data.model/AgentId, kotlin/Int = ..., com.letta.mobile.data.model/ConversationId? = ..., kotlin/String = ...) // com.letta.mobile.data.chat.runtime/AgentConversationPage.<init>|<init>(com.letta.mobile.data.model.AgentId;kotlin.Int;com.letta.mobile.data.model.ConversationId?;kotlin.String){}[0]
+
+    final val after // com.letta.mobile.data.chat.runtime/AgentConversationPage.after|{}after[0]
+        final fun <get-after>(): com.letta.mobile.data.model/ConversationId? // com.letta.mobile.data.chat.runtime/AgentConversationPage.after.<get-after>|<get-after>(){}[0]
+    final val agent // com.letta.mobile.data.chat.runtime/AgentConversationPage.agent|{}agent[0]
+        final fun <get-agent>(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.chat.runtime/AgentConversationPage.agent.<get-agent>|<get-agent>(){}[0]
+    final val archiveStatus // com.letta.mobile.data.chat.runtime/AgentConversationPage.archiveStatus|{}archiveStatus[0]
+        final fun <get-archiveStatus>(): kotlin/String // com.letta.mobile.data.chat.runtime/AgentConversationPage.archiveStatus.<get-archiveStatus>|<get-archiveStatus>(){}[0]
+    final val limit // com.letta.mobile.data.chat.runtime/AgentConversationPage.limit|{}limit[0]
+        final fun <get-limit>(): kotlin/Int // com.letta.mobile.data.chat.runtime/AgentConversationPage.limit.<get-limit>|<get-limit>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.model/AgentId // com.letta.mobile.data.chat.runtime/AgentConversationPage.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // com.letta.mobile.data.chat.runtime/AgentConversationPage.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.model/ConversationId? // com.letta.mobile.data.chat.runtime/AgentConversationPage.component3|component3(){}[0]
+    final fun component4(): kotlin/String // com.letta.mobile.data.chat.runtime/AgentConversationPage.component4|component4(){}[0]
+    final fun copy(com.letta.mobile.data.model/AgentId = ..., kotlin/Int = ..., com.letta.mobile.data.model/ConversationId? = ..., kotlin/String = ...): com.letta.mobile.data.chat.runtime/AgentConversationPage // com.letta.mobile.data.chat.runtime/AgentConversationPage.copy|copy(com.letta.mobile.data.model.AgentId;kotlin.Int;com.letta.mobile.data.model.ConversationId?;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.runtime/AgentConversationPage.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.runtime/AgentConversationPage.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.chat.runtime/AgentConversationPage.toString|toString(){}[0]
 }
 
 final class com.letta.mobile.data.chat.runtime/AlwaysAllowAnswer { // com.letta.mobile.data.chat.runtime/AlwaysAllowAnswer|null[0]
@@ -48248,8 +48275,7 @@ final class com.letta.mobile.data.repository.appserver/AppServerConversationAdmi
     final suspend fun deleteConversation(kotlin/String) // com.letta.mobile.data.repository.appserver/AppServerConversationAdmin.deleteConversation|deleteConversation(kotlin.String){}[0]
     final suspend fun forkConversation(com.letta.mobile.data.chat.branch/ConversationForkRequest): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository.appserver/AppServerConversationAdmin.forkConversation|forkConversation(com.letta.mobile.data.chat.branch.ConversationForkRequest){}[0]
     final suspend fun getConversation(kotlin/String): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository.appserver/AppServerConversationAdmin.getConversation|getConversation(kotlin.String){}[0]
-    final suspend fun listConversations(kotlin/Int, kotlin/String?): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository.appserver/AppServerConversationAdmin.listConversations|listConversations(kotlin.Int;kotlin.String?){}[0]
-    final suspend fun listConversationsForAgent(kotlin/String, kotlin/Int): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository.appserver/AppServerConversationAdmin.listConversationsForAgent|listConversationsForAgent(kotlin.String;kotlin.Int){}[0]
+    final suspend fun listAgentConversations(com.letta.mobile.data.chat.runtime/AgentConversationPage): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository.appserver/AppServerConversationAdmin.listAgentConversations|listAgentConversations(com.letta.mobile.data.chat.runtime.AgentConversationPage){}[0]
     final suspend fun listLlmModels(): kotlin.collections/List<com.letta.mobile.data.model/LlmModel> // com.letta.mobile.data.repository.appserver/AppServerConversationAdmin.listLlmModels|listLlmModels(){}[0]
     final suspend fun recompileConversation(com.letta.mobile.data.chat.recompile/ConversationRecompileRequest) // com.letta.mobile.data.repository.appserver/AppServerConversationAdmin.recompileConversation|recompileConversation(com.letta.mobile.data.chat.recompile.ConversationRecompileRequest){}[0]
     final suspend fun restoreDeletedConversation(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.repository.appserver/AppServerConversationAdmin.restoreDeletedConversation|restoreDeletedConversation(kotlin.String;kotlin.Boolean){}[0]
@@ -48265,9 +48291,9 @@ final class com.letta.mobile.data.repository.appserver/AppServerLocalAdminGatewa
     final suspend fun createConversation(com.letta.mobile.data.model/AgentId, kotlin/String?): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository.appserver/AppServerLocalAdminGateway.createConversation|createConversation(com.letta.mobile.data.model.AgentId;kotlin.String?){}[0]
     final suspend fun forkConversation(com.letta.mobile.data.chat.branch/ConversationForkRequest): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository.appserver/AppServerLocalAdminGateway.forkConversation|forkConversation(com.letta.mobile.data.chat.branch.ConversationForkRequest){}[0]
     final suspend fun getConversation(com.letta.mobile.data.model/ConversationId): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository.appserver/AppServerLocalAdminGateway.getConversation|getConversation(com.letta.mobile.data.model.ConversationId){}[0]
+    final suspend fun listAgentConversations(com.letta.mobile.data.chat.runtime/AgentConversationPage): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository.appserver/AppServerLocalAdminGateway.listAgentConversations|listAgentConversations(com.letta.mobile.data.chat.runtime.AgentConversationPage){}[0]
     final suspend fun listConversationMessages(com.letta.mobile.data.model/ConversationId, kotlin/Int?, kotlin/String?, kotlin/String?): kotlin.collections/List<com.letta.mobile.data.model/LettaMessage> // com.letta.mobile.data.repository.appserver/AppServerLocalAdminGateway.listConversationMessages|listConversationMessages(com.letta.mobile.data.model.ConversationId;kotlin.Int?;kotlin.String?;kotlin.String?){}[0]
     final suspend fun listConversationMessagesBefore(com.letta.mobile.data.model/ConversationId, kotlin/Int, kotlin/String, kotlin/String): kotlin.collections/List<com.letta.mobile.data.model/LettaMessage> // com.letta.mobile.data.repository.appserver/AppServerLocalAdminGateway.listConversationMessagesBefore|listConversationMessagesBefore(com.letta.mobile.data.model.ConversationId;kotlin.Int;kotlin.String;kotlin.String){}[0]
-    final suspend fun listConversations(kotlin/Int, kotlin/String?, com.letta.mobile.data.model/AgentId? = ...): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository.appserver/AppServerLocalAdminGateway.listConversations|listConversations(kotlin.Int;kotlin.String?;com.letta.mobile.data.model.AgentId?){}[0]
     final suspend fun listLlmModels(): kotlin.collections/List<com.letta.mobile.data.model/LlmModel> // com.letta.mobile.data.repository.appserver/AppServerLocalAdminGateway.listLlmModels|listLlmModels(){}[0]
     final suspend fun recompileConversation(com.letta.mobile.data.chat.recompile/ConversationRecompileRequest) // com.letta.mobile.data.repository.appserver/AppServerLocalAdminGateway.recompileConversation|recompileConversation(com.letta.mobile.data.chat.recompile.ConversationRecompileRequest){}[0]
     final suspend fun renameConversation(com.letta.mobile.data.chat.runtime/ConversationSummaryUpdate): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository.appserver/AppServerLocalAdminGateway.renameConversation|renameConversation(com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate){}[0]
@@ -48377,11 +48403,10 @@ final class com.letta.mobile.data.repository.iroh/IrohAdminRpcChatGateway : com.
     final suspend fun forkConversation(com.letta.mobile.data.chat.branch/ConversationForkRequest): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository.iroh/IrohAdminRpcChatGateway.forkConversation|forkConversation(com.letta.mobile.data.chat.branch.ConversationForkRequest){}[0]
     final suspend fun getConversation(kotlin/String): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository.iroh/IrohAdminRpcChatGateway.getConversation|getConversation(kotlin.String){}[0]
     final suspend fun getToolReturn(com.letta.mobile.data.model/ConversationId, com.letta.mobile.data.model/MessageId): com.letta.mobile.data.model/LettaMessage? // com.letta.mobile.data.repository.iroh/IrohAdminRpcChatGateway.getToolReturn|getToolReturn(com.letta.mobile.data.model.ConversationId;com.letta.mobile.data.model.MessageId){}[0]
+    final suspend fun listAgentConversations(com.letta.mobile.data.chat.runtime/AgentConversationPage): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository.iroh/IrohAdminRpcChatGateway.listAgentConversations|listAgentConversations(com.letta.mobile.data.chat.runtime.AgentConversationPage){}[0]
     final suspend fun listAgentMessages(com.letta.mobile.data.model/AgentId, kotlin/Int?, kotlin/String?, com.letta.mobile.data.model/ConversationId?): kotlin.collections/List<com.letta.mobile.data.model/LettaMessage> // com.letta.mobile.data.repository.iroh/IrohAdminRpcChatGateway.listAgentMessages|listAgentMessages(com.letta.mobile.data.model.AgentId;kotlin.Int?;kotlin.String?;com.letta.mobile.data.model.ConversationId?){}[0]
     final suspend fun listConversationMessages(com.letta.mobile.data.model/ConversationId, kotlin/Int?, kotlin/String?, kotlin/String?): kotlin.collections/List<com.letta.mobile.data.model/LettaMessage> // com.letta.mobile.data.repository.iroh/IrohAdminRpcChatGateway.listConversationMessages|listConversationMessages(com.letta.mobile.data.model.ConversationId;kotlin.Int?;kotlin.String?;kotlin.String?){}[0]
     final suspend fun listConversationMessagesBefore(com.letta.mobile.data.model/ConversationId, kotlin/Int, kotlin/String, kotlin/String): kotlin.collections/List<com.letta.mobile.data.model/LettaMessage> // com.letta.mobile.data.repository.iroh/IrohAdminRpcChatGateway.listConversationMessagesBefore|listConversationMessagesBefore(com.letta.mobile.data.model.ConversationId;kotlin.Int;kotlin.String;kotlin.String){}[0]
-    final suspend fun listConversations(kotlin/Int, kotlin/String?): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository.iroh/IrohAdminRpcChatGateway.listConversations|listConversations(kotlin.Int;kotlin.String?){}[0]
-    final suspend fun listConversationsForAgent(kotlin/String, kotlin/Int): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository.iroh/IrohAdminRpcChatGateway.listConversationsForAgent|listConversationsForAgent(kotlin.String;kotlin.Int){}[0]
     final suspend fun listLlmModels(): kotlin.collections/List<com.letta.mobile.data.model/LlmModel> // com.letta.mobile.data.repository.iroh/IrohAdminRpcChatGateway.listLlmModels|listLlmModels(){}[0]
     final suspend fun recompileConversation(com.letta.mobile.data.chat.recompile/ConversationRecompileRequest) // com.letta.mobile.data.repository.iroh/IrohAdminRpcChatGateway.recompileConversation|recompileConversation(com.letta.mobile.data.chat.recompile.ConversationRecompileRequest){}[0]
     final suspend fun restoreDeletedConversation(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.repository.iroh/IrohAdminRpcChatGateway.restoreDeletedConversation|restoreDeletedConversation(kotlin.String;kotlin.Boolean){}[0]
@@ -49478,7 +49503,8 @@ final class com.letta.mobile.data.repository/IrohAdminRpcConversationListSource 
     final suspend fun deleteConversation(com.letta.mobile.data.model/ConversationId) // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.deleteConversation|deleteConversation(com.letta.mobile.data.model.ConversationId){}[0]
     final suspend fun forkConversation(com.letta.mobile.data.chat.branch/ConversationForkRequest): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.forkConversation|forkConversation(com.letta.mobile.data.chat.branch.ConversationForkRequest){}[0]
     final suspend fun getConversation(com.letta.mobile.data.model/ConversationId): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.getConversation|getConversation(com.letta.mobile.data.model.ConversationId){}[0]
-    final suspend fun listConversations(com.letta.mobile.data.model/AgentId?, kotlin/Int? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.listConversations|listConversations(com.letta.mobile.data.model.AgentId?;kotlin.Int?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+    final suspend fun listAgentConversations(com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId?, kotlin/Int): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.listAgentConversations|listAgentConversations(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.ConversationId?;kotlin.Int){}[0]
+    final suspend fun listConversations(com.letta.mobile.data.model/AgentId): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.listConversations|listConversations(com.letta.mobile.data.model.AgentId){}[0]
     final suspend fun listConversationsForAgent(com.letta.mobile.data.model/AgentId, kotlin/Int? = ...): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.listConversationsForAgent|listConversationsForAgent(com.letta.mobile.data.model.AgentId;kotlin.Int?){}[0]
     final suspend fun setConversationArchived(com.letta.mobile.data.model/ConversationId, kotlin/Boolean): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.setConversationArchived|setConversationArchived(com.letta.mobile.data.model.ConversationId;kotlin.Boolean){}[0]
     final suspend fun updateConversation(com.letta.mobile.data.model/ConversationId, kotlin/String): com.letta.mobile.data.model/Conversation // com.letta.mobile.data.repository/IrohAdminRpcConversationListSource.updateConversation|updateConversation(com.letta.mobile.data.model.ConversationId;kotlin.String){}[0]
@@ -61174,6 +61200,37 @@ final class com.letta.mobile.ui.theme/LettaThemePresetTokens { // com.letta.mobi
     final fun toString(): kotlin/String // com.letta.mobile.ui.theme/LettaThemePresetTokens.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.util/AgentConversationFleet { // com.letta.mobile.util/AgentConversationFleet|null[0]
+    constructor <init>(com.letta.mobile.util/AgentConversationReader, com.letta.mobile.util/AgentConversationFleetPaging = ..., kotlin/Function2<com.letta.mobile.data.model/AgentId, kotlin/Throwable, kotlin/Unit> = ...) // com.letta.mobile.util/AgentConversationFleet.<init>|<init>(com.letta.mobile.util.AgentConversationReader;com.letta.mobile.util.AgentConversationFleetPaging;kotlin.Function2<com.letta.mobile.data.model.AgentId,kotlin.Throwable,kotlin.Unit>){}[0]
+
+    final val conversations // com.letta.mobile.util/AgentConversationFleet.conversations|{}conversations[0]
+        final fun <get-conversations>(): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.util/AgentConversationFleet.conversations.<get-conversations>|<get-conversations>(){}[0]
+    final val hasMore // com.letta.mobile.util/AgentConversationFleet.hasMore|{}hasMore[0]
+        final fun <get-hasMore>(): kotlin/Boolean // com.letta.mobile.util/AgentConversationFleet.hasMore.<get-hasMore>|<get-hasMore>(){}[0]
+
+    final suspend fun loadMore(): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.util/AgentConversationFleet.loadMore|loadMore(){}[0]
+    final suspend fun refresh(kotlin.collections/List<com.letta.mobile.data.model/Agent>): kotlin.collections/List<com.letta.mobile.data.model/Conversation> // com.letta.mobile.util/AgentConversationFleet.refresh|refresh(kotlin.collections.List<com.letta.mobile.data.model.Agent>){}[0]
+}
+
+final class com.letta.mobile.util/AgentConversationFleetPaging { // com.letta.mobile.util/AgentConversationFleetPaging|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ...) // com.letta.mobile.util/AgentConversationFleetPaging.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+
+    final val eagerPagesPerAgent // com.letta.mobile.util/AgentConversationFleetPaging.eagerPagesPerAgent|{}eagerPagesPerAgent[0]
+        final fun <get-eagerPagesPerAgent>(): kotlin/Int // com.letta.mobile.util/AgentConversationFleetPaging.eagerPagesPerAgent.<get-eagerPagesPerAgent>|<get-eagerPagesPerAgent>(){}[0]
+    final val pageSize // com.letta.mobile.util/AgentConversationFleetPaging.pageSize|{}pageSize[0]
+        final fun <get-pageSize>(): kotlin/Int // com.letta.mobile.util/AgentConversationFleetPaging.pageSize.<get-pageSize>|<get-pageSize>(){}[0]
+    final val parallelism // com.letta.mobile.util/AgentConversationFleetPaging.parallelism|{}parallelism[0]
+        final fun <get-parallelism>(): kotlin/Int // com.letta.mobile.util/AgentConversationFleetPaging.parallelism.<get-parallelism>|<get-parallelism>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.util/AgentConversationFleetPaging.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // com.letta.mobile.util/AgentConversationFleetPaging.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // com.letta.mobile.util/AgentConversationFleetPaging.component3|component3(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ...): com.letta.mobile.util/AgentConversationFleetPaging // com.letta.mobile.util/AgentConversationFleetPaging.copy|copy(kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.util/AgentConversationFleetPaging.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.util/AgentConversationFleetPaging.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.util/AgentConversationFleetPaging.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.util/TelemetryContext { // com.letta.mobile.util/TelemetryContext|null[0]
     constructor <init>() // com.letta.mobile.util/TelemetryContext.<init>|<init>(){}[0]
 
@@ -62095,15 +62152,13 @@ open class com.letta.mobile.data.repository/CachedAgentRepository : com.letta.mo
 }
 
 open class com.letta.mobile.data.repository/CachedAllConversationsRepository : com.letta.mobile.data.repository.api/IAllConversationsRepository, com.letta.mobile.data.session/BackendScopedCache { // com.letta.mobile.data.repository/CachedAllConversationsRepository|null[0]
-    constructor <init>(com.letta.mobile.data.backend/RemoteRoute<com.letta.mobile.data.repository.api/ConversationRemoteSource>, kotlin/Function0<com.letta.mobile.data.repository.api/AllConversationsLocalCache>? = ..., kotlinx.coroutines/CoroutineScope = ..., com.letta.mobile.data.repository/IrohAdminRpcConversationListSource? = ..., com.letta.mobile.data.transport.api/IChannelTransport? = ...) // com.letta.mobile.data.repository/CachedAllConversationsRepository.<init>|<init>(com.letta.mobile.data.backend.RemoteRoute<com.letta.mobile.data.repository.api.ConversationRemoteSource>;kotlin.Function0<com.letta.mobile.data.repository.api.AllConversationsLocalCache>?;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.repository.IrohAdminRpcConversationListSource?;com.letta.mobile.data.transport.api.IChannelTransport?){}[0]
+    constructor <init>(kotlin.coroutines/SuspendFunction0<kotlin.collections/List<com.letta.mobile.data.model/Agent>>, com.letta.mobile.data.backend/RemoteRoute<com.letta.mobile.data.repository.api/ConversationRemoteSource>, kotlin/Function0<com.letta.mobile.data.repository.api/AllConversationsLocalCache>? = ..., kotlinx.coroutines/CoroutineScope = ..., com.letta.mobile.data.repository/IrohAdminRpcConversationListSource? = ..., com.letta.mobile.data.transport.api/IChannelTransport? = ...) // com.letta.mobile.data.repository/CachedAllConversationsRepository.<init>|<init>(kotlin.coroutines.SuspendFunction0<kotlin.collections.List<com.letta.mobile.data.model.Agent>>;com.letta.mobile.data.backend.RemoteRoute<com.letta.mobile.data.repository.api.ConversationRemoteSource>;kotlin.Function0<com.letta.mobile.data.repository.api.AllConversationsLocalCache>?;kotlinx.coroutines.CoroutineScope;com.letta.mobile.data.repository.IrohAdminRpcConversationListSource?;com.letta.mobile.data.transport.api.IChannelTransport?){}[0]
 
     open val conversations // com.letta.mobile.data.repository/CachedAllConversationsRepository.conversations|{}conversations[0]
         open fun <get-conversations>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.model/Conversation>> // com.letta.mobile.data.repository/CachedAllConversationsRepository.conversations.<get-conversations>|<get-conversations>(){}[0]
     open val hasMore // com.letta.mobile.data.repository/CachedAllConversationsRepository.hasMore|{}hasMore[0]
         open fun <get-hasMore>(): kotlinx.coroutines.flow/StateFlow<kotlin/Boolean> // com.letta.mobile.data.repository/CachedAllConversationsRepository.hasMore.<get-hasMore>|<get-hasMore>(){}[0]
 
-    final fun irohPageLoaderOrNull(): kotlin.coroutines/SuspendFunction7<com.letta.mobile.data.model/AgentId?, kotlin/Int?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin.collections/List<com.letta.mobile.data.model/Conversation>>? // com.letta.mobile.data.repository/CachedAllConversationsRepository.irohPageLoaderOrNull|irohPageLoaderOrNull(){}[0]
-    open fun getConversationsPaged(com.letta.mobile.data.model/AgentId?, kotlin/String?, kotlin/String?): kotlinx.coroutines.flow/Flow<androidx.paging/PagingData<com.letta.mobile.data.model/Conversation>> // com.letta.mobile.data.repository/CachedAllConversationsRepository.getConversationsPaged|getConversationsPaged(com.letta.mobile.data.model.AgentId?;kotlin.String?;kotlin.String?){}[0]
     open fun handleOptimisticDelete(com.letta.mobile.data.model/ConversationId) // com.letta.mobile.data.repository/CachedAllConversationsRepository.handleOptimisticDelete|handleOptimisticDelete(com.letta.mobile.data.model.ConversationId){}[0]
     open fun handleOptimisticUpdate(com.letta.mobile.data.model/Conversation) // com.letta.mobile.data.repository/CachedAllConversationsRepository.handleOptimisticUpdate|handleOptimisticUpdate(com.letta.mobile.data.model.Conversation){}[0]
     open fun hasFreshConversations(kotlin/Long): kotlin/Boolean // com.letta.mobile.data.repository/CachedAllConversationsRepository.hasFreshConversations|hasFreshConversations(kotlin.Long){}[0]
@@ -64895,6 +64950,7 @@ final object com.letta.mobile.data.model/GoalStatusStateSerializer : kotlinx.ser
 }
 
 final object com.letta.mobile.data.model/HiddenListFilter { // com.letta.mobile.data.model/HiddenListFilter|null[0]
+    final fun isAgentFreeRow(kotlinx.serialization.json/JsonObject): kotlin/Boolean // com.letta.mobile.data.model/HiddenListFilter.isAgentFreeRow|isAgentFreeRow(kotlinx.serialization.json.JsonObject){}[0]
     final fun isHidden(com.letta.mobile.data.model/Agent): kotlin/Boolean // com.letta.mobile.data.model/HiddenListFilter.isHidden|isHidden(com.letta.mobile.data.model.Agent){}[0]
     final fun isHidden(com.letta.mobile.data.model/Conversation): kotlin/Boolean // com.letta.mobile.data.model/HiddenListFilter.isHidden|isHidden(com.letta.mobile.data.model.Conversation){}[0]
 }
@@ -66681,6 +66737,8 @@ final const val com.letta.mobile.data.model/SUBAGENT_ACTIVITY_MAX_LINE_BYTES // 
     final fun <get-SUBAGENT_ACTIVITY_MAX_LINE_BYTES>(): kotlin/Int // com.letta.mobile.data.model/SUBAGENT_ACTIVITY_MAX_LINE_BYTES.<get-SUBAGENT_ACTIVITY_MAX_LINE_BYTES>|<get-SUBAGENT_ACTIVITY_MAX_LINE_BYTES>(){}[0]
 final const val com.letta.mobile.data.plugin.catalog/PLUGINS_SECTION_KEY // com.letta.mobile.data.plugin.catalog/PLUGINS_SECTION_KEY|{}PLUGINS_SECTION_KEY[0]
     final fun <get-PLUGINS_SECTION_KEY>(): kotlin/String // com.letta.mobile.data.plugin.catalog/PLUGINS_SECTION_KEY.<get-PLUGINS_SECTION_KEY>|<get-PLUGINS_SECTION_KEY>(){}[0]
+final const val com.letta.mobile.data.repository.api/LIST_ROSTER_MAX_AGE_MS // com.letta.mobile.data.repository.api/LIST_ROSTER_MAX_AGE_MS|{}LIST_ROSTER_MAX_AGE_MS[0]
+    final fun <get-LIST_ROSTER_MAX_AGE_MS>(): kotlin/Long // com.letta.mobile.data.repository.api/LIST_ROSTER_MAX_AGE_MS.<get-LIST_ROSTER_MAX_AGE_MS>|<get-LIST_ROSTER_MAX_AGE_MS>(){}[0]
 final const val com.letta.mobile.data.repository.modelcontrol/PROVIDER_FIELD_BASE_URL // com.letta.mobile.data.repository.modelcontrol/PROVIDER_FIELD_BASE_URL|{}PROVIDER_FIELD_BASE_URL[0]
     final fun <get-PROVIDER_FIELD_BASE_URL>(): kotlin/String // com.letta.mobile.data.repository.modelcontrol/PROVIDER_FIELD_BASE_URL.<get-PROVIDER_FIELD_BASE_URL>|<get-PROVIDER_FIELD_BASE_URL>(){}[0]
 final const val com.letta.mobile.data.runtime/LOCAL_RUNTIME_PROVIDER_NAME // com.letta.mobile.data.runtime/LOCAL_RUNTIME_PROVIDER_NAME|{}LOCAL_RUNTIME_PROVIDER_NAME[0]
@@ -66743,6 +66801,10 @@ final const val com.letta.mobile.ui.chat.render/ToolOutputMaxRenderedChars // co
     final fun <get-ToolOutputMaxRenderedChars>(): kotlin/Int // com.letta.mobile.ui.chat.render/ToolOutputMaxRenderedChars.<get-ToolOutputMaxRenderedChars>|<get-ToolOutputMaxRenderedChars>(){}[0]
 final const val com.letta.mobile.ui.chat.render/ToolOutputMaxRenderedLines // com.letta.mobile.ui.chat.render/ToolOutputMaxRenderedLines|{}ToolOutputMaxRenderedLines[0]
     final fun <get-ToolOutputMaxRenderedLines>(): kotlin/Int // com.letta.mobile.ui.chat.render/ToolOutputMaxRenderedLines.<get-ToolOutputMaxRenderedLines>|<get-ToolOutputMaxRenderedLines>(){}[0]
+final const val com.letta.mobile.util/AGENT_CONVERSATION_PAGE_SIZE // com.letta.mobile.util/AGENT_CONVERSATION_PAGE_SIZE|{}AGENT_CONVERSATION_PAGE_SIZE[0]
+    final fun <get-AGENT_CONVERSATION_PAGE_SIZE>(): kotlin/Int // com.letta.mobile.util/AGENT_CONVERSATION_PAGE_SIZE.<get-AGENT_CONVERSATION_PAGE_SIZE>|<get-AGENT_CONVERSATION_PAGE_SIZE>(){}[0]
+final const val com.letta.mobile.util/READ_THROUGH_PAGES // com.letta.mobile.util/READ_THROUGH_PAGES|{}READ_THROUGH_PAGES[0]
+    final fun <get-READ_THROUGH_PAGES>(): kotlin/Int // com.letta.mobile.util/READ_THROUGH_PAGES.<get-READ_THROUGH_PAGES>|<get-READ_THROUGH_PAGES>(){}[0]
 
 final val com.letta.mobile.data.a2ui/A2UI_DEFAULT_SUPPORTED_CATALOGS // com.letta.mobile.data.a2ui/A2UI_DEFAULT_SUPPORTED_CATALOGS|{}A2UI_DEFAULT_SUPPORTED_CATALOGS[0]
     final fun <get-A2UI_DEFAULT_SUPPORTED_CATALOGS>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.a2ui/A2UI_DEFAULT_SUPPORTED_CATALOGS.<get-A2UI_DEFAULT_SUPPORTED_CATALOGS>|<get-A2UI_DEFAULT_SUPPORTED_CATALOGS>(){}[0]
@@ -66831,6 +66893,7 @@ final fun (com.letta.mobile.data.canvas/CanvasRelayLink).com.letta.mobile.data.c
 final fun (com.letta.mobile.data.chat.projection/ToolTimelineState).com.letta.mobile.data.chat.projection/toWireStatus(): kotlin/String? // com.letta.mobile.data.chat.projection/toWireStatus|toWireStatus@com.letta.mobile.data.chat.projection.ToolTimelineState(){}[0]
 final fun (com.letta.mobile.data.chat.runtime/ChatComposerError).com.letta.mobile.ui.chat.session/message(com.letta.mobile.data.attachment/AttachmentLimits): kotlin/String // com.letta.mobile.ui.chat.session/message|message@com.letta.mobile.data.chat.runtime.ChatComposerError(com.letta.mobile.data.attachment.AttachmentLimits){}[0]
 final fun (com.letta.mobile.data.chat.runtime/ChatConnectionState).com.letta.mobile.ui.chat.render/toConversationState(kotlin/String?, kotlin/String?): com.letta.mobile.ui.chat.render/ConversationState // com.letta.mobile.ui.chat.render/toConversationState|toConversationState@com.letta.mobile.data.chat.runtime.ChatConnectionState(kotlin.String?;kotlin.String?){}[0]
+final fun (com.letta.mobile.data.chat.runtime/ChatConversationStore).com.letta.mobile.data.chat.runtime/agentConversationReader(): com.letta.mobile.util/AgentConversationReader // com.letta.mobile.data.chat.runtime/agentConversationReader|agentConversationReader@com.letta.mobile.data.chat.runtime.ChatConversationStore(){}[0]
 final fun (com.letta.mobile.data.chat.runtime/ChatConversationSummary).com.letta.mobile.data.chat.runtime/displayTitle(kotlin/Int = ...): kotlin/String // com.letta.mobile.data.chat.runtime/displayTitle|displayTitle@com.letta.mobile.data.chat.runtime.ChatConversationSummary(kotlin.Int){}[0]
 final fun (com.letta.mobile.data.chat.runtime/ChatConversationSummary).com.letta.mobile.data.chat.runtime/persistedTitleCandidate(kotlin/String, kotlin/Int = ...): kotlin/String? // com.letta.mobile.data.chat.runtime/persistedTitleCandidate|persistedTitleCandidate@com.letta.mobile.data.chat.runtime.ChatConversationSummary(kotlin.String;kotlin.Int){}[0]
 final fun (com.letta.mobile.data.chat.runtime/ChatGateway).com.letta.mobile.data.chat.branch/branchBackendOrNull(): com.letta.mobile.data.chat.branch/BranchBackend? // com.letta.mobile.data.chat.branch/branchBackendOrNull|branchBackendOrNull@com.letta.mobile.data.chat.runtime.ChatGateway(){}[0]
@@ -67136,6 +67199,7 @@ final suspend fun (com.letta.mobile.data.canvas/CanvasDocumentStore).com.letta.m
 final suspend fun (com.letta.mobile.data.canvas/CanvasSession).com.letta.mobile.data.canvas/movePluginElement(com.letta.mobile.data.model/CanvasElementId, com.letta.mobile.data.canvas/CanvasDocumentFrame, com.letta.mobile.data.model/CanvasActorId = ...): com.letta.mobile.data.canvas/CanvasHistory.Step.Documents? // com.letta.mobile.data.canvas/movePluginElement|movePluginElement@com.letta.mobile.data.canvas.CanvasSession(com.letta.mobile.data.model.CanvasElementId;com.letta.mobile.data.canvas.CanvasDocumentFrame;com.letta.mobile.data.model.CanvasActorId){}[0]
 final suspend fun (com.letta.mobile.data.canvas/CanvasSession).com.letta.mobile.data.canvas/movePluginElements(kotlin.collections/Map<com.letta.mobile.data.model/CanvasElementId, com.letta.mobile.data.canvas/CanvasDocumentFrame>, com.letta.mobile.data.model/CanvasActorId = ...): com.letta.mobile.data.canvas/CanvasHistory.Step.Documents? // com.letta.mobile.data.canvas/movePluginElements|movePluginElements@com.letta.mobile.data.canvas.CanvasSession(kotlin.collections.Map<com.letta.mobile.data.model.CanvasElementId,com.letta.mobile.data.canvas.CanvasDocumentFrame>;com.letta.mobile.data.model.CanvasActorId){}[0]
 final suspend fun (com.letta.mobile.data.canvas/CanvasSession).com.letta.mobile.data.canvas/removePluginElement(com.letta.mobile.data.model/CanvasElementId, com.letta.mobile.data.model/CanvasActorId = ...): com.letta.mobile.data.canvas/CanvasHistory.Step.Documents? // com.letta.mobile.data.canvas/removePluginElement|removePluginElement@com.letta.mobile.data.canvas.CanvasSession(com.letta.mobile.data.model.CanvasElementId;com.letta.mobile.data.model.CanvasActorId){}[0]
+final suspend fun (com.letta.mobile.data.repository.api/IAgentRepository).com.letta.mobile.data.repository.api/rosterForLists(kotlin/Long = ...): kotlin.collections/List<com.letta.mobile.data.model/Agent> // com.letta.mobile.data.repository.api/rosterForLists|rosterForLists@com.letta.mobile.data.repository.api.IAgentRepository(kotlin.Long){}[0]
 final suspend fun (com.letta.mobile.data.repository.modelcontrol/ConversationModelSelections).com.letta.mobile.data.repository.modelcontrol/followHost(kotlinx.coroutines.flow/Flow<kotlin.collections/List<com.letta.mobile.data.model/Conversation>>) // com.letta.mobile.data.repository.modelcontrol/followHost|followHost@com.letta.mobile.data.repository.modelcontrol.ConversationModelSelections(kotlinx.coroutines.flow.Flow<kotlin.collections.List<com.letta.mobile.data.model.Conversation>>){}[0]
 final suspend fun (com.letta.mobile.data.runtime/AppServerTurnEngine).com.letta.mobile.data.runtime/reanswerReplayedApproval(com.letta.mobile.data.controller.fanout/ApprovalDecisionCache.CachedDecision): com.letta.mobile.data.controller/ApprovalSubmitResult // com.letta.mobile.data.runtime/reanswerReplayedApproval|reanswerReplayedApproval@com.letta.mobile.data.runtime.AppServerTurnEngine(com.letta.mobile.data.controller.fanout.ApprovalDecisionCache.CachedDecision){}[0]
 final suspend fun (com.letta.mobile.data.runtime/AppServerTurnEngine).com.letta.mobile.data.runtime/setPermissionMode(com.letta.mobile.data.transport.appserver/AppServerRuntimeScope, com.letta.mobile.data.transport.appserver/AppServerPermissionMode): com.letta.mobile.data.runtime/ModeChangeResult // com.letta.mobile.data.runtime/setPermissionMode|setPermissionMode@com.letta.mobile.data.runtime.AppServerTurnEngine(com.letta.mobile.data.transport.appserver.AppServerRuntimeScope;com.letta.mobile.data.transport.appserver.AppServerPermissionMode){}[0]

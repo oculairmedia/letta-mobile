@@ -1,6 +1,6 @@
 package com.letta.mobile.data.repository
 
-import androidx.paging.PagingSource
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.ConversationCountEstimate
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -19,6 +19,9 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -31,13 +34,16 @@ import org.junit.jupiter.api.Tag
 @Tag("integration")
 class AllConversationsRepositoryTest {
 
+    /** The agent every test conversation belongs to (TestData's default). */
+    private val roster: suspend () -> List<Agent> = { listOf(TestData.agent()) }
+
     private lateinit var fakeApi: FakeConversationApi
     private lateinit var repository: AllConversationsRepository
 
     @Before
     fun setup() {
         fakeApi = FakeConversationApi()
-        repository = AllConversationsRepository(fakeApi)
+        repository = AllConversationsRepository(fakeApi, roster)
     }
 
     @Test
@@ -57,7 +63,7 @@ class AllConversationsRepositoryTest {
     @Test
     fun `conversation_updated push refreshes a loaded list`() = runTest {
         val transport = FakeChannelTransport()
-        val pushed = AllConversationsRepository(fakeApi, repositoryScope = backgroundScope, transport = transport)
+        val pushed = AllConversationsRepository(fakeApi, roster, repositoryScope = backgroundScope, transport = transport)
         fakeApi.conversations.add(TestData.conversation(id = "1"))
         pushed.refresh()
         runCurrent()
@@ -72,7 +78,7 @@ class AllConversationsRepositoryTest {
     @Test
     fun `conversation_updated push before the list ever loaded fetches nothing`() = runTest {
         val transport = FakeChannelTransport()
-        AllConversationsRepository(fakeApi, repositoryScope = backgroundScope, transport = transport)
+        AllConversationsRepository(fakeApi, roster, repositoryScope = backgroundScope, transport = transport)
         runCurrent()
 
         transport.events.emit(conversationPush("from-phone"))
@@ -84,7 +90,7 @@ class AllConversationsRepositoryTest {
     @Test
     fun `reconnect re-reads a loaded list since pushes sent while offline are lost`() = runTest {
         val transport = FakeChannelTransport()
-        val pushed = AllConversationsRepository(fakeApi, repositoryScope = backgroundScope, transport = transport)
+        val pushed = AllConversationsRepository(fakeApi, roster, repositoryScope = backgroundScope, transport = transport)
         runCurrent()
         pushed.refresh()
         val callsAfterLoad = fakeApi.calls.count { it == "listConversations" }
@@ -105,47 +111,6 @@ class AllConversationsRepositoryTest {
         conversationId = conversationId,
         reason = "created",
     )
-
-    @Test
-    fun `paged conversations factory injects existing iroh source`() = runTest {
-        val transport = FakeChannelTransport().apply {
-            adminRpcHandler = { _, _, _ ->
-                AppServerInboundFrame.AdminRpcResponse(
-                    requestId = "req",
-                    success = true,
-                    result = Json.parseToJsonElement(
-                        Json.encodeToString(listOf(TestData.conversation(id = "iroh-page"))),
-                    ),
-                )
-            }
-        }
-        val settings = FakeSettingsRepository(
-            initialActiveConfig = LettaConfig(
-                id = "iroh",
-                mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = "iroh://EndpointTicket",
-            ),
-        )
-        val pagedRepository = AllConversationsRepository(
-            remote = armedConversationApi(),
-            conversationDao = null,
-            repositoryScope = this,
-            irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
-        )
-
-        val pagingSource = pagedRepository.createConversationsPagingSource(null, null, null)
-        assertTrue(pagingSource.pageLoader != null)
-        val result = pagingSource.load(
-            PagingSource.LoadParams.Refresh(
-                key = null,
-                loadSize = 50,
-                placeholdersEnabled = false,
-            ),
-        ) as PagingSource.LoadResult.Page
-
-        assertEquals(listOf("iroh-page"), result.data.map { it.id.value })
-        assertEquals("conversation.list", transport.adminRpcCalls.single().method)
-    }
 
     // The list screen's Archived tab filters locally, so the fetch must ask for archived rows too;
     // the server's default (active only) emptied that tab on every refresh. A push then refetches
@@ -176,6 +141,7 @@ class AllConversationsRepositoryTest {
             initialActiveConfig = LettaConfig(id = "iroh", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://EndpointTicket"),
         )
         val pushed = AllConversationsRepository(
+            roster = roster,
             remote = armedConversationApi(),
             conversationDao = null,
             repositoryScope = backgroundScope,
@@ -265,6 +231,50 @@ class AllConversationsRepositoryTest {
         repository.handleOptimisticDelete(com.letta.mobile.data.model.ConversationId("1"))
         assertEquals(1, repository.conversations.value.size)
         assertTrue(repository.conversations.value.none { it.id.value == "1" })
+    }
+
+    // letta-mobile-fyo4s: the affected host's newest 100 were 98 agent-free worker rows and 2 real ones.
+    @Test
+    fun `agent-free worker conversations never crowd out an agent's own and the list pages to more`() = runTest {
+        val workers = List(98) { index -> """{"id":"worker-$index","agent_id":null,"last_message_at":"2026-10-22T10:00:00Z"}""" }
+        val own = List(60) { index -> """{"id":"conv-$index","agent_id":"agent-1","last_message_at":"2026-10-01T00:00:00Z"}""" }
+        val rows = workers + own
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, body ->
+                val params = Json.parseToJsonElement(body.orEmpty()).jsonObject
+                val agent = params["agent_id"]?.jsonPrimitive?.contentOrNull
+                val after = params["after"]?.jsonPrimitive?.contentOrNull
+                val limit = params["limit"]?.jsonPrimitive?.content?.toInt() ?: rows.size
+                // As the host's App Server lists: unfiltered, its newest rows are the workers'.
+                val matching = if (agent == null) rows else own.takeIf { agent == "agent-1" }.orEmpty()
+                val from = after?.let { cursor -> matching.indexOfFirst { "\"$cursor\"" in it } + 1 } ?: 0
+                AppServerInboundFrame.AdminRpcResponse(
+                    requestId = "req",
+                    success = true,
+                    result = Json.parseToJsonElement(matching.drop(from).take(limit).joinToString(",", "[", "]")),
+                )
+            }
+        }
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(id = "iroh", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://EndpointTicket"),
+        )
+        val listed = AllConversationsRepository(
+            roster = roster,
+            remote = armedConversationApi(),
+            conversationDao = null,
+            repositoryScope = backgroundScope,
+            irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
+        )
+
+        listed.refresh()
+        assertEquals(50, listed.conversations.value.size)
+        assertTrue(listed.hasMore.value)
+        listed.loadNextPage()
+
+        assertEquals(60, listed.conversations.value.size)
+        assertFalse(listed.hasMore.value)
+        assertTrue(listed.conversations.value.none { it.id.value.startsWith("worker-") })
+        assertTrue(transport.adminRpcCalls.all { "\"agent_id\":\"agent-1\"" in it.body.orEmpty() })
     }
 
     @Test

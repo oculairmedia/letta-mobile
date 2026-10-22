@@ -1,4 +1,4 @@
-﻿package com.letta.mobile.desktop.chat
+package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
@@ -24,6 +24,7 @@ class DesktopChatControllerSnapshotTest {
         val cancelled = CompletableDeferred<Unit>()
         val controller = DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(), scope = this,
+            rosterProvider = TEST_ROSTER,
             gatewayFactory = { gateway },
         )
         controller.canonicalEligible = { true }
@@ -46,6 +47,7 @@ class DesktopChatControllerSnapshotTest {
         val gateway = GatedHydrationGateway(CompletableDeferred())
         val controller = DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(), scope = this,
+            rosterProvider = TEST_ROSTER,
             gatewayFactory = { gateway },
         )
         controller.canonicalEligible = { true }
@@ -82,6 +84,7 @@ class DesktopChatControllerSnapshotTest {
         val owners = mutableMapOf<String, com.letta.mobile.data.timeline.CanonicalTimelineCoordinator.Owner>()
         val controller = DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(), scope = this,
+            rosterProvider = TEST_ROSTER,
             gatewayFactory = { gateway },
         )
         controller.canonicalEligible = { true }

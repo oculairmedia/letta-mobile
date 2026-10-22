@@ -4,12 +4,14 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 /**
- * A host's conversation list, read row by row. A row this client cannot represent (the host's
- * agent-free conversations carry `agent_id: null`, which [Conversation] cannot hold) is skipped
- * rather than failing the whole list, so one odd row never leaves every conversation unlisted;
- * [onSkipped] hears what was left out: how many rows, how many stayed and why the first was refused. A payload that is not a list still fails as a whole.
+ * A host's conversation list, read row by row. Agent-free rows ([HiddenListFilter.isAgentFreeRow]:
+ * worker transcripts) are left out by that rule before decoding. Any other row this client cannot
+ * represent is skipped rather than failing the whole list, so one malformed row never leaves every
+ * conversation unlisted; [onSkipped] hears what was left out: how many rows, how many stayed and
+ * why the first was refused. A payload that is not a list still fails as a whole.
  */
 internal fun Json.decodeConversationList(
     payload: JsonElement,
@@ -18,14 +20,16 @@ internal fun Json.decodeConversationList(
     if (payload !is JsonArray) return decodeFromJsonElement(ListSerializer(Conversation.serializer()), payload)
     var skipped = 0
     var firstError: String? = null
-    val rows = payload.mapNotNull { row ->
-        runCatching { decodeFromJsonElement(Conversation.serializer(), row) }
-            .onFailure {
-                skipped += 1
-                if (firstError == null) firstError = it.message?.lineSequence()?.firstOrNull()
-            }
-            .getOrNull()
-    }
+    val rows = payload
+        .filterNot { row -> row is JsonObject && HiddenListFilter.isAgentFreeRow(row) }
+        .mapNotNull { row ->
+            runCatching { decodeFromJsonElement(Conversation.serializer(), row) }
+                .onFailure {
+                    skipped += 1
+                    if (firstError == null) firstError = it.message?.lineSequence()?.firstOrNull()
+                }
+                .getOrNull()
+        }
     if (skipped > 0) onSkipped("skipped=$skipped kept=${rows.size} firstError=${firstError.orEmpty()}")
     return rows
 }

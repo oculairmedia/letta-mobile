@@ -11,6 +11,7 @@ import com.letta.mobile.data.chat.runtime.ArchivedConversations
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.repository.api.rosterForLists
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
@@ -298,9 +299,7 @@ private fun buildDesktopChatController(
                     ),
                 )
         },
-        agentNamesByIdProvider = { agentIds ->
-            agentRepository()?.let { resolveDesktopAgentNames(agentIds, it) }.orEmpty()
-        },
+        rosterProvider = { agentRepository()?.rosterForLists().orEmpty() },
         agentByIdProvider = { agentIds ->
             agentRepository()?.let { resolveDesktopAgents(agentIds, it) }.orEmpty()
         },

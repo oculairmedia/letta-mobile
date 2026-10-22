@@ -4,6 +4,7 @@ import com.letta.mobile.data.transport.teardown.TransportTeardown
 import com.letta.mobile.data.chat.branch.ConversationForkGateway
 import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
+import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
@@ -466,13 +467,8 @@ class DesktopAppServerChatGateway internal constructor(
     /** The shared App Server conversation operations over [admin]; this gateway adds what it remembers of each. */
     private val conversations = AppServerConversationAdmin(admin)
 
-    override suspend fun listConversations(
-        limit: Int,
-        archiveStatus: String?,
-    ): List<Conversation> = conversations.listConversations(limit, archiveStatus).onEach(::remember)
-
-    override suspend fun listConversationsForAgent(agentId: String, limit: Int): List<Conversation> =
-        conversations.listConversationsForAgent(agentId, limit).onEach(::remember)
+    override suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> =
+        conversations.listAgentConversations(page).onEach(::remember)
 
     override suspend fun getConversation(conversationId: String): Conversation =
         conversations.getConversation(conversationId).also(::remember)

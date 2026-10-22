@@ -15,6 +15,7 @@ import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
+import com.letta.mobile.data.repository.api.rosterForLists
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.ProjectWorkRepository
 import com.letta.mobile.data.repository.ScheduleRepository
@@ -121,6 +122,8 @@ class SessionGraphAssembler @Inject constructor(
         val irohConversationListSource = request.irohSource(::IrohAdminRpcConversationListSource)
         return ConversationRepos(
             allConversations = AllConversationsRepository(
+                // letta-mobile-fyo4s: the list reads each roster agent's own conversations.
+                roster = { agentRepository.rosterForLists() },
                 remote = remoteSources.conversations,
                 conversationDao = conversationDao,
                 repositoryScope = request.scope,

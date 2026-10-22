@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository.appserver
 
+import com.letta.mobile.data.chat.runtime.AgentConversationPage
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.runtime.TurnEngineTestStreamClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -34,7 +36,7 @@ class AppServerListLimitEncodingTest {
         val client = QueryRecordingClient()
         val gateway = AppServerLocalAdminGateway(client) { it }
 
-        gateway.listConversations(limit = 200, archiveStatus = null)
+        gateway.listAgentConversations(AgentConversationPage(AgentId("agent-1"), limit = 200))
         gateway.listConversationMessages(ConversationId("conv-1"), limit = 50, after = null, order = "desc")
         gateway.listConversationMessagesBefore(ConversationId("conv-1"), limit = 30, before = "msg-9", order = "desc")
 

@@ -143,6 +143,7 @@ class DesktopPhoneShellTest {
         val controller = DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = scope,
+            rosterProvider = com.letta.mobile.desktop.chat.TEST_ROSTER,
             gatewayFactory = { FakeDesktopChatGateway() },
         )
         val port = DesktopChatSessionPort(controller = controller, scope = scope.backgroundScope)
