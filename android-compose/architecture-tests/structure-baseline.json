@@ -101,7 +101,6 @@
     "com.letta.mobile.data.chat.runtime -> com.letta.mobile.data.model",
     "com.letta.mobile.data.chat.runtime -> com.letta.mobile.data.repository.api",
     "com.letta.mobile.data.chat.runtime -> com.letta.mobile.data.runtime",
-    "com.letta.mobile.data.chat.runtime -> com.letta.mobile.data.session",
     "com.letta.mobile.data.chat.runtime -> com.letta.mobile.data.timeline",
     "com.letta.mobile.data.chat.runtime -> com.letta.mobile.data.transport.appserver",
     "com.letta.mobile.data.chat.runtime -> com.letta.mobile.util",
