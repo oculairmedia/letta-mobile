@@ -31,6 +31,16 @@ class ConversationListDecodingTest {
     }
 
     @Test
+    fun theSkippedRowsAreReportedOnce() {
+        val reports = mutableListOf<Pair<Int, Int>>()
+        json.decodeConversationList(JsonArray(listOf(row("c1", "a1"), row("c2", null), row("c3", null)))) { skipped, kept, _ ->
+            reports += skipped to kept
+        }
+
+        assertEquals(listOf(2 to 1), reports)
+    }
+
+    @Test
     fun aListOfOnlyAgentFreeRowsIsEmptyNotAnError() {
         val listed = json.decodeConversationList(JsonArray(List(3) { row("c$it", null) }))
 
