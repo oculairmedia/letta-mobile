@@ -109,3 +109,27 @@ sealed interface ToolPreviewTarget {
 /** A failure the step line says out loud; success is quiet. [exitCode] is non-zero when known. */
 @Immutable
 data class ToolFailure(val exitCode: Int?)
+
+/**
+ * What a kind of step adds up to when several are grouped ("Explored files, ran commands"):
+ * reading and searching are both exploring, writing and editing both edit files.
+ */
+enum class ToolActivity {
+    Explored,
+    Ran,
+    Edited,
+    Fetched,
+    Delegated,
+    Called,
+}
+
+/** The activity a step of this verb adds to its group. */
+val ToolVerb.activity: ToolActivity
+    get() = when (this) {
+        ToolVerb.Read, ToolVerb.Searched -> ToolActivity.Explored
+        ToolVerb.Ran -> ToolActivity.Ran
+        ToolVerb.Wrote, ToolVerb.Edited -> ToolActivity.Edited
+        ToolVerb.Fetched -> ToolActivity.Fetched
+        ToolVerb.Delegated -> ToolActivity.Delegated
+        ToolVerb.Called -> ToolActivity.Called
+    }

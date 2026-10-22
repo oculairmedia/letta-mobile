@@ -28,21 +28,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ToolTimelineState
-import com.letta.mobile.data.chat.tools.ToolVerb
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_collapse
 import com.letta.mobile.sharedui.resources.rows_expand
 import com.letta.mobile.sharedui.resources.rows_state_collapsed
 import com.letta.mobile.sharedui.resources.rows_state_expanded
-import com.letta.mobile.sharedui.resources.rows_steps_called
-import com.letta.mobile.sharedui.resources.rows_steps_delegated
-import com.letta.mobile.sharedui.resources.rows_steps_edited
-import com.letta.mobile.sharedui.resources.rows_steps_explored
-import com.letta.mobile.sharedui.resources.rows_steps_fetched
-import com.letta.mobile.sharedui.resources.rows_steps_join
-import com.letta.mobile.sharedui.resources.rows_steps_ran
+import com.letta.mobile.data.chat.tools.activity
 import com.letta.mobile.ui.chat.tools.LocalToolPresenters
+import com.letta.mobile.ui.chat.tools.groupLabel
 import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LettaListRow
@@ -212,41 +206,19 @@ internal fun RunToolSteps(
     }
 }
 
-/** The plain label over several steps: what their verbs add up to, never a disclosure. */
+/** The plain label over several steps: what their presenters' verbs add up to, never a disclosure. */
 @Composable
 private fun StepGroupLabel(toolCalls: List<UiToolCall>) {
     val presenters = LocalToolPresenters.current
-    val activities = remember(toolCalls, presenters) { toolCalls.map { presenters.line(it.facts()).verb.activity() }.distinct() }
-    val phrases = activities.map { stringResource(it.phrase) }
-    val separator = stringResource(Res.string.rows_steps_join, "", "")
-    val label = phrases.joinToString(separator).replaceFirstChar { it.uppercaseChar() }
+    val activities = remember(toolCalls, presenters) { toolCalls.map { presenters.line(it.facts()).verb.activity }.distinct() }
     Text(
-        text = label,
+        text = groupLabel(activities),
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
             .testTag(ChatRowTestTags.RUN_STEP_GROUP_LABEL)
             .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
     )
-}
-
-/** What a kind of step adds to its group's label; reading and searching are both exploring. */
-private enum class StepActivity(val phrase: StringResource) {
-    Explored(Res.string.rows_steps_explored),
-    Ran(Res.string.rows_steps_ran),
-    Edited(Res.string.rows_steps_edited),
-    Fetched(Res.string.rows_steps_fetched),
-    Delegated(Res.string.rows_steps_delegated),
-    Called(Res.string.rows_steps_called),
-}
-
-private fun ToolVerb.activity(): StepActivity = when (this) {
-    ToolVerb.Read, ToolVerb.Searched -> StepActivity.Explored
-    ToolVerb.Ran -> StepActivity.Ran
-    ToolVerb.Wrote, ToolVerb.Edited -> StepActivity.Edited
-    ToolVerb.Fetched -> StepActivity.Fetched
-    ToolVerb.Delegated -> StepActivity.Delegated
-    ToolVerb.Called -> StepActivity.Called
 }
 
 /**

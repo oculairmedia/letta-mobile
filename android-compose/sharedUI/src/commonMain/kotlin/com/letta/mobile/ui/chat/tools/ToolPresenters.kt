@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import com.letta.mobile.data.chat.tools.ToolActivity
 import com.letta.mobile.data.chat.tools.ToolPresenterRegistry
 import com.letta.mobile.data.chat.tools.ToolStepExpansions
 import com.letta.mobile.data.chat.tools.ToolStepLine
@@ -11,6 +12,13 @@ import com.letta.mobile.data.chat.tools.ToolVerb
 import com.letta.mobile.data.chat.tools.bundled.BundledToolPresenters
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.rows_steps_called
+import com.letta.mobile.sharedui.resources.rows_steps_delegated
+import com.letta.mobile.sharedui.resources.rows_steps_edited
+import com.letta.mobile.sharedui.resources.rows_steps_explored
+import com.letta.mobile.sharedui.resources.rows_steps_fetched
+import com.letta.mobile.sharedui.resources.rows_steps_join
+import com.letta.mobile.sharedui.resources.rows_steps_ran
 import com.letta.mobile.sharedui.resources.rows_tool_step_label
 import com.letta.mobile.sharedui.resources.rows_tool_verb_called
 import com.letta.mobile.sharedui.resources.rows_tool_verb_delegated
@@ -61,3 +69,21 @@ fun ProvideToolStepExpansions(settings: SecureSettingsStore, content: @Composabl
     val expansions = remember(settings) { ToolStepExpansions(settings) }
     CompositionLocalProvider(LocalToolStepExpansions provides expansions, content = content)
 }
+
+/** Several steps' label: their [activities] joined in order, its first letter capitalised ("Explored files, ran commands"). */
+@Composable
+fun groupLabel(activities: List<ToolActivity>): String {
+    val separator = stringResource(Res.string.rows_steps_join, "", "")
+    val phrases = activities.map { stringResource(it.phrase) }
+    return phrases.joinToString(separator).replaceFirstChar { it.uppercaseChar() }
+}
+
+private val ToolActivity.phrase: StringResource
+    get() = when (this) {
+        ToolActivity.Explored -> Res.string.rows_steps_explored
+        ToolActivity.Ran -> Res.string.rows_steps_ran
+        ToolActivity.Edited -> Res.string.rows_steps_edited
+        ToolActivity.Fetched -> Res.string.rows_steps_fetched
+        ToolActivity.Delegated -> Res.string.rows_steps_delegated
+        ToolActivity.Called -> Res.string.rows_steps_called
+    }

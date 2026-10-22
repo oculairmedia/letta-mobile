@@ -15,7 +15,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -101,8 +100,9 @@ internal fun ToolStep(
         return
     }
     val resolved = state ?: remember(toolCall) { classifyToolCallState(toolCall) }
-    val expanded = rememberStepExpanded(disclosureKey, toolCall.shouldInitiallyExpand())
-    val isExpanded = expanded.value
+    val expansions = LocalToolStepExpansions.current ?: remember { ToolStepExpansions() }
+    val toggled by expansions.toggled.collectAsState()
+    val isExpanded = expansions.isExpanded(disclosureKey, toolCall.shouldInitiallyExpand(), toggled)
     RequestFullResultOnExpand(toolCall, isExpanded, callbacks)
     val haptics = LocalHaptics.current
     val running = resolved == ToolTimelineState.Running
@@ -112,7 +112,7 @@ internal fun ToolStep(
             spec = stepLineSpec(toolCall, resolved, callbacks),
             disclosure = if (!toolCall.hasDetails()) null else RunStepDisclosure(isExpanded) {
                 haptics.play(LettaHapticCue.SegmentTick)
-                expanded.toggle()
+                expansions.toggle(disclosureKey)
             },
         )
         AnimatedVisibility(
@@ -124,24 +124,6 @@ internal fun ToolStep(
             ToolStepDetails(toolCall, callbacks, live = running || toolCall.isStreaming())
         }
     }
-}
-
-/** A step's open state and how to flip it, kept by the host's [LocalToolStepExpansions] (or by the step alone). */
-@Stable
-private class StepExpanded(private val expansions: ToolStepExpansions, private val key: String, private val openByDefault: Boolean) {
-    val value: Boolean
-        @Composable get() {
-            val toggled by expansions.toggled.collectAsState()
-            return expansions.isExpanded(key, openByDefault, toggled)
-        }
-
-    fun toggle() = expansions.toggle(key)
-}
-
-@Composable
-private fun rememberStepExpanded(key: String, openByDefault: Boolean): StepExpanded {
-    val expansions = LocalToolStepExpansions.current ?: remember { ToolStepExpansions() }
-    return remember(expansions, key, openByDefault) { StepExpanded(expansions, key, openByDefault) }
 }
 
 /** What a step's line shows: the presenter's line, or an agent message's sender -> recipient over its delivery state. */

@@ -2182,6 +2182,7 @@ public final class com/letta/mobile/ui/chat/tools/ToolPresentersKt {
 	public static final fun ProvideToolStepExpansions (Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 	public static final fun getLocalToolPresenters ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalToolStepExpansions ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun groupLabel (Ljava/util/List;Landroidx/compose/runtime/Composer;I)Ljava/lang/String;
 	public static final fun title (Lcom/letta/mobile/data/chat/tools/ToolStepLine;Landroidx/compose/runtime/Composer;I)Ljava/lang/String;
 }
 
