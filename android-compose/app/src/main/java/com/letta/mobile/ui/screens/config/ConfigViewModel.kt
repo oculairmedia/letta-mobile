@@ -637,16 +637,18 @@ class ConfigViewModel @Inject constructor(
 
     /** Why the form cannot be saved as it is, in words; null when it can. */
     private suspend fun saveProblem(state: ConfigUiState): String? {
-        val local = state.mode == ServerMode.LOCAL
-        val maxTokens = state.localModelMaxTokens.trim()
         val providerBaseUrl = state.localProviderBaseUrl.trim()
-        return when {
-            !local && state.serverUrl.isBlank() -> "Server URL is required"
-            local && maxTokens.isNotBlank() && (maxTokens.toIntOrNull() ?: 0) <= 0 -> "Local model max tokens must be a positive number."
-            local && providerBaseUrl.isNotBlank() && !providerBaseUrl.startsWith("http://") && !providerBaseUrl.startsWith("https://") ->
-                "Custom provider URL must start with http:// or https://."
-            else -> (validateModelSelection(state, providerBaseUrl) as? ModelHandleValidator.Result.Invalid)?.reason
-        }
+        val formProblem = if (state.mode == ServerMode.LOCAL) localProblem(state, providerBaseUrl) else remoteProblem(state)
+        return formProblem ?: (validateModelSelection(state, providerBaseUrl) as? ModelHandleValidator.Result.Invalid)?.reason
+    }
+
+    private fun remoteProblem(state: ConfigUiState): String? = "Server URL is required".takeIf { state.serverUrl.isBlank() }
+
+    private fun localProblem(state: ConfigUiState, providerBaseUrl: String): String? {
+        val maxTokens = state.localModelMaxTokens.trim()
+        if (maxTokens.isNotBlank() && (maxTokens.toIntOrNull() ?: 0) <= 0) return "Local model max tokens must be a positive number."
+        val hasScheme = providerBaseUrl.startsWith("http://") || providerBaseUrl.startsWith("https://")
+        return "Custom provider URL must start with http:// or https://.".takeIf { providerBaseUrl.isNotBlank() && !hasScheme }
     }
 
     /** The config the form saves as [id]: a remote host's address and token, or the on-device runtime's model. */
