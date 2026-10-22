@@ -47,6 +47,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry
+import com.letta.mobile.data.repository.modelcontrol.ReasoningTier
 import com.letta.mobile.ui.components.LettaSectionLabel
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
@@ -227,7 +228,7 @@ internal fun ModelEffortOptions(menu: ModelEffortMenu, highlight: Int, onPick: (
                 tag = ModelEffortTags.LEVEL_PREFIX + level,
                 modifier = Modifier.semantics { selected = current },
             ) {
-                Text(ModelControlStrings.effortName(level), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                Text(ReasoningTier.of(level)?.label ?: level, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                 if (current) {
                     Icon(
                         LettaIcons.Check,

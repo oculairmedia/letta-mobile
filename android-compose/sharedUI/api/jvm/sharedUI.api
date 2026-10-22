@@ -4922,7 +4922,6 @@ public final class com/letta/mobile/ui/modelcontrol/ModelControlStrings {
 	public static final field SIGN_IN_WAITING Ljava/lang/String;
 	public static final field THINKING Ljava/lang/String;
 	public final fun connectTitle (Ljava/lang/String;)Ljava/lang/String;
-	public final fun effortName (Ljava/lang/String;)Ljava/lang/String;
 	public final fun effortOptionsOf (Ljava/lang/String;)Ljava/lang/String;
 	public final fun noMatch (Ljava/lang/String;)Ljava/lang/String;
 	public final fun removeLabel (Ljava/lang/String;)Ljava/lang/String;

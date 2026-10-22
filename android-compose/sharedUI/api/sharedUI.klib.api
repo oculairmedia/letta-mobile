@@ -9055,7 +9055,6 @@ final object com.letta.mobile.ui.modelcontrol/ModelControlStrings { // com.letta
         final fun <get-THINKING>(): kotlin/String // com.letta.mobile.ui.modelcontrol/ModelControlStrings.THINKING.<get-THINKING>|<get-THINKING>(){}[0]
 
     final fun connectTitle(kotlin/String): kotlin/String // com.letta.mobile.ui.modelcontrol/ModelControlStrings.connectTitle|connectTitle(kotlin.String){}[0]
-    final fun effortName(kotlin/String): kotlin/String // com.letta.mobile.ui.modelcontrol/ModelControlStrings.effortName|effortName(kotlin.String){}[0]
     final fun effortOptionsOf(kotlin/String): kotlin/String // com.letta.mobile.ui.modelcontrol/ModelControlStrings.effortOptionsOf|effortOptionsOf(kotlin.String){}[0]
     final fun noMatch(kotlin/String): kotlin/String // com.letta.mobile.ui.modelcontrol/ModelControlStrings.noMatch|noMatch(kotlin.String){}[0]
     final fun removeLabel(kotlin/String): kotlin/String // com.letta.mobile.ui.modelcontrol/ModelControlStrings.removeLabel|removeLabel(kotlin.String){}[0]

@@ -33,6 +33,9 @@ enum class ReasoningTier(val effort: String) {
     MAX("max"),
     ;
 
+    /** The level's readable name ("Extra high"), from the one effort ladder ([ComposerEffort]). */
+    val label: String get() = ComposerEffort.labelOf(effort)
+
     companion object {
         fun of(effort: String?): ReasoningTier? {
             val wanted = effort?.trim()?.takeIf { it.isNotEmpty() } ?: return null

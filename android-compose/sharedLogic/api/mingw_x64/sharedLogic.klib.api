@@ -2276,6 +2276,8 @@ final enum class com.letta.mobile.data.repository.modelcontrol/ReasoningTier : k
         final fun <get-effort>(): kotlin/String // com.letta.mobile.data.repository.modelcontrol/ReasoningTier.effort.<get-effort>|<get-effort>(){}[0]
     final val entries // com.letta.mobile.data.repository.modelcontrol/ReasoningTier.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.repository.modelcontrol/ReasoningTier> // com.letta.mobile.data.repository.modelcontrol/ReasoningTier.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val label // com.letta.mobile.data.repository.modelcontrol/ReasoningTier.label|{}label[0]
+        final fun <get-label>(): kotlin/String // com.letta.mobile.data.repository.modelcontrol/ReasoningTier.label.<get-label>|<get-label>(){}[0]
 
     final fun valueOf(kotlin/String): com.letta.mobile.data.repository.modelcontrol/ReasoningTier // com.letta.mobile.data.repository.modelcontrol/ReasoningTier.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<com.letta.mobile.data.repository.modelcontrol/ReasoningTier> // com.letta.mobile.data.repository.modelcontrol/ReasoningTier.values|values#static(){}[0]

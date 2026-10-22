@@ -39,18 +39,6 @@ object ModelControlStrings {
         ReasoningTier.MAX -> "Max"
     }
 
-    /** An effort level's full name in the effort options ("Extra high"); a literal outside the ladder reads as sent. */
-    fun effortName(level: String): String = when (ReasoningTier.of(level)) {
-        ReasoningTier.NONE -> "None"
-        ReasoningTier.MINIMAL -> "Minimal"
-        ReasoningTier.LOW -> "Low"
-        ReasoningTier.MEDIUM -> "Medium"
-        ReasoningTier.HIGH -> "High"
-        ReasoningTier.XHIGH -> "Extra high"
-        ReasoningTier.MAX -> "Max"
-        null -> level
-    }
-
     // Models sheet (B)
     const val MODELS_TITLE = "Models"
     const val CLOSE = "Close"
