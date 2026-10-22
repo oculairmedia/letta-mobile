@@ -51,14 +51,7 @@ class SessionScopedAllConversationsRepositoryTest {
             conversations = mutableListOf(TestData.conversation(id = "conv-a", summary = "Backend A"))
         }
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
-        val sessionManager = SessionManager(
-            settingsRepository = settingsRepository,
-            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
-                agentApi = rosterApi()
-                conversationApi = fakeConversationApi
-            },
-            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val sessionManager = sessionManager(settingsRepository, fakeConversationApi, dispatcher)
         val conversationsProxy = sessionManager.scopedAllConversationsRepository()
 
         conversationsProxy.refresh()
@@ -88,14 +81,7 @@ class SessionScopedAllConversationsRepositoryTest {
             listDelayMillis = 50L
         }
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
-        val sessionManager = SessionManager(
-            settingsRepository = settingsRepository,
-            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
-                agentApi = rosterApi()
-                conversationApi = fakeConversationApi
-            },
-            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val sessionManager = sessionManager(settingsRepository, fakeConversationApi, dispatcher)
         val conversationsProxy = sessionManager.scopedAllConversationsRepository()
         advanceUntilIdle()
 
@@ -124,14 +110,7 @@ class SessionScopedAllConversationsRepositoryTest {
             staleTransportIaeCountdown = 1
         }
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
-        val sessionManager = SessionManager(
-            settingsRepository = settingsRepository,
-            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
-                agentApi = rosterApi()
-                conversationApi = fakeConversationApi
-            },
-            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val sessionManager = sessionManager(settingsRepository, fakeConversationApi, dispatcher)
         val conversationsProxy = sessionManager.scopedAllConversationsRepository()
         advanceUntilIdle()
 
@@ -158,14 +137,7 @@ class SessionScopedAllConversationsRepositoryTest {
             staleTransportIaeCountdown = Int.MAX_VALUE
         }
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
-        val sessionManager = SessionManager(
-            settingsRepository = settingsRepository,
-            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
-                agentApi = rosterApi()
-                conversationApi = fakeConversationApi
-            },
-            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val sessionManager = sessionManager(settingsRepository, fakeConversationApi, dispatcher)
         val conversationsProxy = sessionManager.scopedAllConversationsRepository()
         advanceUntilIdle()
 
@@ -190,14 +162,7 @@ class SessionScopedAllConversationsRepositoryTest {
             listDelayMillis = 200L
         }
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
-        val sessionManager = SessionManager(
-            settingsRepository = settingsRepository,
-            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
-                agentApi = rosterApi()
-                conversationApi = fakeConversationApi
-            },
-            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val sessionManager = sessionManager(settingsRepository, fakeConversationApi, dispatcher)
         val conversationsProxy = sessionManager.scopedAllConversationsRepository()
         advanceUntilIdle()
 
@@ -226,5 +191,19 @@ class SessionScopedAllConversationsRepositoryTest {
     }
 }
 
-/** fyo4s: the list reads its roster's agents' conversations; every test conversation is TestData's agent's. */
-private fun rosterApi() = FakeAgentApi().apply { agents = mutableListOf(TestData.agent()) }
+/**
+ * A session manager over [conversationApi]. fyo4s: the list reads its roster's agents' conversations, and
+ * every test conversation is TestData's agent's, so the roster has that agent.
+ */
+private fun sessionManager(
+    settingsRepository: FakeSettingsRepository,
+    conversationApi: FakeConversationApi,
+    dispatcher: kotlinx.coroutines.CoroutineDispatcher,
+) = SessionManager(
+    settingsRepository = settingsRepository,
+    sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
+        agentApi = FakeAgentApi().apply { agents = mutableListOf(TestData.agent()) }
+        this.conversationApi = conversationApi
+    },
+    managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+)

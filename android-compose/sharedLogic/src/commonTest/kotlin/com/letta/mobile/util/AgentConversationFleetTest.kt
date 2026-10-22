@@ -1,6 +1,5 @@
-package com.letta.mobile.data.chat.conversations
+package com.letta.mobile.util
 
-import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
@@ -65,6 +64,18 @@ class AgentConversationFleetTest {
     }
 
     @Test
+    fun aHiddenRowInAFullPageDoesNotEndPaging() = runTest {
+        val hidden = Conversation(id = ConversationId("n1"), agentId = nora.id, hidden = true)
+        val host = Host(rows = listOf(row("n0", nora.id.value), nora.id.value to hidden, row("n2", nora.id.value)))
+        val fleet = AgentConversationFleet(host, AgentConversationFleetPaging(pageSize = 2, eagerPagesPerAgent = 5))
+
+        val listed = fleet.refresh(listOf(nora))
+
+        assertEquals(setOf("n0", "n2"), listed.map { it.id.value }.toSet())
+        assertEquals(listOf(null, ConversationId("n1")), host.reads.map { it.after })
+    }
+
+    @Test
     fun oneAgentsFailedReadKeepsItsLastListAndTheOthersListed() = runTest {
         val host = Host(rows = listOf(row("n0", nora.id.value), row("i0", ivo.id.value)))
         val fleet = AgentConversationFleet(host)
@@ -96,17 +107,19 @@ class AgentConversationFleetTest {
         private val rows: List<Pair<String?, Conversation>>,
         private val ignoresAgentFilter: Boolean = false,
     ) : AgentConversationReader {
-        val reads = mutableListOf<AgentConversationPage>()
+        val reads = mutableListOf<Read>()
         val failing = mutableSetOf<AgentId>()
 
-        override suspend fun read(page: AgentConversationPage): List<Conversation> {
-            reads += page
-            check(page.agent !in failing) { "${page.agent.value} unreadable" }
-            val own = rows.filter { (agent, _) -> agent != null && (ignoresAgentFilter || agent == page.agent.value) }.map { it.second }
-            val from = page.after?.let { cursor -> own.indexOfFirst { it.id == cursor } + 1 } ?: 0
-            return own.drop(from).take(page.limit)
+        override suspend fun read(agent: AgentId, after: ConversationId?, limit: Int): List<Conversation> {
+            reads += Read(agent, after)
+            check(agent !in failing) { "${agent.value} unreadable" }
+            val own = rows.filter { (owner, _) -> owner != null && (ignoresAgentFilter || owner == agent.value) }.map { it.second }
+            val from = after?.let { cursor -> own.indexOfFirst { it.id == cursor } + 1 } ?: 0
+            return own.drop(from).take(limit)
         }
     }
+
+    private data class Read(val agent: AgentId, val after: ConversationId?)
 
     private fun row(id: String, agent: String?, at: String? = null): Pair<String?, Conversation> =
         agent to Conversation(id = ConversationId(id), agentId = AgentId(agent ?: "unused"), lastMessageAt = at)

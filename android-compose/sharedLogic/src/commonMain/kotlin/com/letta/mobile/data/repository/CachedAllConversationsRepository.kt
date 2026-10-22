@@ -1,9 +1,9 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.backend.RemoteRoute
-import com.letta.mobile.data.chat.conversations.AgentConversationFleet
-import com.letta.mobile.data.chat.runtime.AgentConversationPage
+import com.letta.mobile.util.AgentConversationFleet
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCountEstimate
 import com.letta.mobile.data.model.ConversationId
@@ -57,7 +57,14 @@ open class CachedAllConversationsRepository(
     override val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
 
     private val refreshMutex = Mutex()
-    private val fleet = AgentConversationFleet(::readAgentPage)
+    private val fleet = AgentConversationFleet(::readAgentPage) { agent, failure ->
+        Telemetry.event(
+            TAG, "agent_read_failed",
+            "agentId" to agent.value,
+            "error" to failure.toString(),
+            level = Telemetry.Level.WARN,
+        )
+    }
     private var lastRefreshAtMillis: Long = 0L
     private var hasLoadedAtLeastOnce: Boolean = false
 
@@ -65,7 +72,8 @@ open class CachedAllConversationsRepository(
         repositoryScope.launch {
             try {
                 val cached = localCache?.invoke()?.getAllOnce().orEmpty()
-                if (cached.isNotEmpty()) {
+                // A list already read from the backend wins over a cache that arrived late.
+                if (cached.isNotEmpty() && !hasLoadedAtLeastOnce) {
                     _conversations.value = cached
                 }
             } catch (cancelled: CancellationException) {
@@ -182,6 +190,9 @@ open class CachedAllConversationsRepository(
 
     companion object {
         private const val TAG = "AllConversationsRepo"
+
+        /** The list filters archived rows itself (its Archived tab), so it reads them too. */
+        private const val ARCHIVE_STATUS_ALL = "all"
     }
 
     private suspend fun refreshLocked() {
@@ -190,16 +201,16 @@ open class CachedAllConversationsRepository(
     }
 
     /** One page of one agent's own conversations, from the session's channel or the backend seam. */
-    private suspend fun readAgentPage(page: AgentConversationPage): List<Conversation> {
+    private suspend fun readAgentPage(agent: AgentId, after: ConversationId?, limit: Int): List<Conversation> {
         val irohSource = irohConversationListSource
         return if (irohSource?.shouldUseIroh() == true) {
-            irohSource.listAgentConversations(page)
+            irohSource.listAgentConversations(agent, after, limit)
         } else {
             remote.source().listConversations(
-                agentId = page.agent,
-                limit = page.limit,
-                after = page.after?.value,
-                archiveStatus = page.archiveStatus,
+                agentId = agent,
+                limit = limit,
+                after = after?.value,
+                archiveStatus = ARCHIVE_STATUS_ALL,
                 summarySearch = null,
                 order = "desc",
                 orderBy = "last_message_at",

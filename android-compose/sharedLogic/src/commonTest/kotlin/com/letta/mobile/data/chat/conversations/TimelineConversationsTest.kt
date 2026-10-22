@@ -59,6 +59,18 @@ class TimelineConversationsTest {
     }
 
     @Test
+    fun aRosterEmptiedAfterLoadingListsNothing() = runTest {
+        val owner = owner(IrohHost(HostConversation("c1", "agent-1"), HostConversation("c2", "agent-2")))
+        runCurrent()
+
+        owner.roster = emptyList()
+        runCurrent()
+
+        assertTrue(owner.state.value.loaded)
+        assertTrue(owner.state.value.conversations.isEmpty())
+    }
+
+    @Test
     fun aFailedListSaysWhyAndKeepsTheListUnloaded() = runTest {
         val host = IrohHost().apply { failing += "conversation.list" }
         val owner = owner(host)

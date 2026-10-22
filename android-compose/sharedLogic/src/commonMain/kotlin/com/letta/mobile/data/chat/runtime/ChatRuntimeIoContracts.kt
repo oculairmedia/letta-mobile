@@ -2,11 +2,13 @@ package com.letta.mobile.data.chat.runtime
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
-import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
-import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.timeline.TimelineTransport
+import com.letta.mobile.util.AGENT_CONVERSATION_PAGE_SIZE
+import com.letta.mobile.util.AgentConversationReader
 
 /**
  * A backend's conversation records: list, read, delete and the undo. Part of every [ChatGateway];
@@ -15,9 +17,10 @@ import com.letta.mobile.data.timeline.TimelineTransport
  */
 interface ChatConversationStore {
     /**
-     * One page of [AgentConversationPage.agent]'s own conversations, newest first. Lists are read
-     * per agent, never across every agent: a host's newest conversations are mostly agent-free
-     * worker transcripts that would crowd a user's chats out of any cross-agent window.
+     * One page of [AgentConversationPage.agent]'s conversations, newest first, as the backend sent it
+     * (a store that ignores `agent_id`, or a hidden row, is filtered by the reader, which pages on
+     * from the page's last row). Lists are read per agent, never across every agent: a host's newest
+     * conversations are mostly agent-free worker transcripts that would crowd a user's chats out.
      */
     suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation>
     suspend fun getConversation(conversationId: String): Conversation
@@ -44,16 +47,15 @@ interface ChatGateway : TimelineTransport, ChatConversationStore
 /** Which page of one agent's conversations to read: [limit] rows after the [after] cursor (none: the newest). */
 data class AgentConversationPage(
     val agent: AgentId,
-    val limit: Int = DEFAULT_LIMIT,
+    val limit: Int = AGENT_CONVERSATION_PAGE_SIZE,
     val after: ConversationId? = null,
     /** Every conversation, active and archived: the lists filter archived rows themselves. */
-    val archiveStatus: String = ARCHIVE_STATUS_ALL,
-) {
-    companion object {
-        const val DEFAULT_LIMIT = 50
-        const val ARCHIVE_STATUS_ALL = "all"
-    }
-}
+    val archiveStatus: String = "all",
+)
+
+/** This store's own conversations as the shared conversation lists read them, a page per agent. */
+fun ChatConversationStore.agentConversationReader(): AgentConversationReader =
+    AgentConversationReader { agent, after, limit -> listAgentConversations(AgentConversationPage(agent, limit, after)) }
 
 /**
  * Management operations beyond the core [ChatGateway] contract (agent/

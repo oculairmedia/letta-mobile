@@ -57,8 +57,8 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import com.letta.mobile.data.chat.conversations.AgentConversationFleet
-import com.letta.mobile.data.chat.conversations.AgentConversationFleetPaging
+import com.letta.mobile.data.chat.runtime.agentConversationReader
+import com.letta.mobile.util.ReadThroughConversationFleets
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -1080,15 +1080,8 @@ class DesktopChatController(
         }
     }
 
-    /** Each agent's conversations over [forGateway], read through (the list has no "load more"); one per gateway. */
-    private fun conversationFleet(forGateway: DesktopChatGateway): AgentConversationFleet =
-        fleet?.takeIf { it.first === forGateway }?.second
-            ?: AgentConversationFleet(
-                forGateway::listAgentConversations,
-                AgentConversationFleetPaging(eagerPagesPerAgent = AgentConversationFleetPaging.READ_THROUGH_PAGES),
-            ).also { fleet = forGateway to it }
-
-    private var fleet: Pair<DesktopChatGateway, AgentConversationFleet>? = null
+    /** Each agent's conversations over the current gateway, read through (the list has no "load more"). */
+    private val fleets = ReadThroughConversationFleets<DesktopChatGateway> { it.agentConversationReader() }
 
     private suspend fun reloadConversationsAndSelect(preferConversationId: String?) {
         val nextGateway = gateway ?: return
@@ -1106,7 +1099,7 @@ class DesktopChatController(
 
     private suspend fun loadConversationSummaries(nextGateway: DesktopChatGateway): List<ChatConversationSummary> {
         val roster = rosterProvider()
-        val conversations = conversationFleet(nextGateway).refresh(roster)
+        val conversations = fleets.fleetFor(nextGateway).refresh(roster)
         models.picks.seedFromHost(conversations) // dxz5s: host overrides, before any selection reads them
         // Every listed conversation is a roster agent's, so the roster names them all.
         val agentNamesById = roster.filter { it.name.isNotBlank() }.associate { it.id.value to it.name }

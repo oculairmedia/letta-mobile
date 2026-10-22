@@ -2,8 +2,12 @@ package com.letta.mobile.data.chat.conversations
 
 import com.letta.mobile.data.chat.branch.BranchDraft
 import com.letta.mobile.data.chat.branch.PendingDraft
+import com.letta.mobile.util.AgentConversationFleet
+import com.letta.mobile.util.AgentConversationFleetPaging
 import com.letta.mobile.data.chat.runtime.AgentConversationPage
+import com.letta.mobile.util.READ_THROUGH_PAGES
 import com.letta.mobile.data.chat.runtime.ChatGateway
+import com.letta.mobile.data.chat.runtime.agentConversationReader
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummary
@@ -80,8 +84,8 @@ class TimelineConversations(
 
     /** Each agent's conversations, read through: the web's list has no "load more". */
     private val fleet = AgentConversationFleet(
-        gateway::listAgentConversations,
-        AgentConversationFleetPaging(eagerPagesPerAgent = AgentConversationFleetPaging.READ_THROUGH_PAGES),
+        gateway.agentConversationReader(),
+        AgentConversationFleetPaging(eagerPagesPerAgent = READ_THROUGH_PAGES),
     )
 
     private val mutableState = MutableStateFlow(TimelineConversationsState())
@@ -103,8 +107,9 @@ class TimelineConversations(
      * roster yet there is nothing to list, and the list stays unloaded.
      */
     suspend fun refresh() {
-        val agents = roster.takeIf { it.isNotEmpty() } ?: return
-        runCatchingCancellable { fleet.refresh(agents) }
+        // With no roster yet the list stays unloaded; a roster emptied after loading lists nothing.
+        if (roster.isEmpty() && !mutableState.value.loaded) return
+        runCatchingCancellable { fleet.refresh(roster) }
             .onSuccess { listed ->
                 mutableState.update { current ->
                     val selected = current.conversations.filter { it.id == current.selected }
@@ -206,7 +211,9 @@ class TimelineConversations(
 
     /** [agent]'s newest active conversation on the server, which joins the list and opens; null when it has none. */
     private suspend fun existingChat(agent: AgentId): ConversationId? {
-        val own = gateway.listAgentConversations(AgentConversationPage(agent)).visibleConversationsInLists()
+        val own = gateway.listAgentConversations(AgentConversationPage(agent))
+            .filter { it.agentId == agent }
+            .visibleConversationsInLists()
         mutableState.update { it.copy(conversations = it.conversations.keeping(own)) }
         val newest = own.firstOrNull { it.archived != true } ?: return null
         selectConversation(newest.id)

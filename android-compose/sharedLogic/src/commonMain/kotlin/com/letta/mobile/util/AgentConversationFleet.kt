@@ -1,6 +1,5 @@
-package com.letta.mobile.data.chat.conversations
+package com.letta.mobile.util
 
-import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
@@ -8,8 +7,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ConversationRecency
 import com.letta.mobile.data.model.visibleConversationsInLists
 import com.letta.mobile.data.model.visibleInLists
-import com.letta.mobile.util.Telemetry
-import com.letta.mobile.util.runCatchingCancellable
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -18,25 +16,25 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 
-/** Reads one page of one agent's own conversations, newest first. */
+/** Every conversation list's page size: rows per read of one agent's conversations. */
+const val AGENT_CONVERSATION_PAGE_SIZE: Int = 50
+
+/** How many pages a list with no "load more" reads per agent, reading each agent through. */
+const val READ_THROUGH_PAGES: Int = 10
+
+/** Reads one page of [agent]'s own conversations, newest first: [limit] rows after the [after] cursor (none: the newest). */
 fun interface AgentConversationReader {
-    suspend fun read(page: AgentConversationPage): List<Conversation>
+    suspend fun read(agent: AgentId, after: ConversationId?, limit: Int): List<Conversation>
 }
 
 /** How a [AgentConversationFleet] pages: rows per read, reads at once, and how many pages a refresh reads eagerly per agent. */
 data class AgentConversationFleetPaging(
-    val pageSize: Int = AgentConversationPage.DEFAULT_LIMIT,
-    val parallelism: Int = DEFAULT_PARALLELISM,
-    /** 1 reads only the newest page (the host pages on with [AgentConversationFleet.loadMore]). */
+    val pageSize: Int = AGENT_CONVERSATION_PAGE_SIZE,
+    /** Reads at once across the roster. */
+    val parallelism: Int = 4,
+    /** 1 reads only the newest page (the host pages on with [AgentConversationFleet.loadMore]); see [READ_THROUGH_PAGES]. */
     val eagerPagesPerAgent: Int = 1,
-) {
-    companion object {
-        const val DEFAULT_PARALLELISM = 4
-
-        /** A list with no "load more": each agent's conversations are read through, up to this many pages. */
-        const val READ_THROUGH_PAGES = 10
-    }
-}
+)
 
 /**
  * Every conversation list's one reader, for every host (web, desktop, Android): the fleet's
@@ -50,6 +48,8 @@ data class AgentConversationFleetPaging(
 class AgentConversationFleet(
     private val reader: AgentConversationReader,
     private val paging: AgentConversationFleetPaging = AgentConversationFleetPaging(),
+    /** Hears each agent's failed read (its last rows stay listed). */
+    private val onReadFailed: (AgentId, Throwable) -> Unit = { _, _ -> },
 ) {
     private val mutex = Mutex()
     private val permits = Semaphore(paging.parallelism)
@@ -97,26 +97,31 @@ class AgentConversationFleet(
     }
 
     private suspend fun readPage(agent: AgentId, listing: AgentListing): AgentListing {
-        val page = AgentConversationPage(agent, limit = paging.pageSize, after = listing.cursor)
-        return runCatchingCancellable { permits.withPermit { reader.read(page) } }
+        return runCatching { permits.withPermit { reader.read(agent, listing.cursor, paging.pageSize) } }
             .fold(
                 onSuccess = { rows -> listing.plus(agent, rows, full = rows.size >= paging.pageSize) },
                 onFailure = { failure ->
-                    Telemetry.event(
-                        TELEMETRY_TAG, "agent_read_failed",
-                        "agentId" to agent.value,
-                        "error" to (failure.message ?: failure::class.simpleName.orEmpty()),
-                        level = Telemetry.Level.WARN,
-                    )
+                    if (failure is CancellationException) throw failure
+                    onReadFailed(agent, failure)
                     listing.copy(failure = failure)
                 },
             )
     }
+}
 
-    private companion object {
-        const val TELEMETRY_TAG = "ConversationFleet"
-        const val LIST_FAILED = "Could not list the conversations"
-    }
+private const val LIST_FAILED = "Could not list the conversations"
+
+/**
+ * A read-through [AgentConversationFleet] per source (a session's gateway): the same source keeps its
+ * fleet, so an agent whose read fails keeps its last rows; a new source starts a new fleet.
+ */
+class ReadThroughConversationFleets<S>(private val reader: (S) -> AgentConversationReader) {
+    private var current: Pair<S, AgentConversationFleet>? = null
+
+    fun fleetFor(source: S): AgentConversationFleet =
+        current?.takeIf { it.first === source }?.second
+            ?: AgentConversationFleet(reader(source), AgentConversationFleetPaging(eagerPagesPerAgent = READ_THROUGH_PAGES))
+                .also { current = source to it }
 }
 
 /**

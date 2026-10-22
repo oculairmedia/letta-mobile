@@ -23,7 +23,6 @@ import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.decodeConversationList
-import com.letta.mobile.data.model.visibleConversationsInLists
 import com.letta.mobile.data.repository.conversationListParams
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
@@ -207,13 +206,15 @@ class IrohAdminRpcChatGateway(
     // ChatGateway — admin_rpc reads
     // ------------------------------------------------------------------
 
-    /** The host's `conversation.list` for one agent (the App Server's own list, paged by `after`). */
+    /** The host's `conversation.list` for one agent (the App Server's own list, paged by `after`), unfiltered. */
     override suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> {
         val result = rpc(
             AdminRpcCall.of(
                 method = AdminRpcMethod("conversation.list"),
                 path = AdminRpcPath("/v1/conversations"),
-                body = AdminRpcBody(page.conversationListParams().toString()),
+                body = AdminRpcBody(
+                    conversationListParams(page.agent, page.after, page.limit, page.archiveStatus).toString(),
+                ),
             ),
         ) ?: return emptyList()
 
@@ -225,12 +226,9 @@ class IrohAdminRpcChatGateway(
                 level = Telemetry.Level.WARN,
             )
         }
+        // The page as the host sent it: the lists filter (and page on from its last row) themselves.
         return json.decodeConversationList(result, ::reportSkippedConversationRows)
-            .filter { it.agentId == page.agent }
-            .also { conversations ->
-                conversations.forEach { agentIdByConversation[it.id] = it.agentId }
-            }
-            .visibleConversationsInLists()
+            .onEach { agentIdByConversation[it.id] = it.agentId }
     }
 
     override suspend fun getConversation(conversationId: String): Conversation {

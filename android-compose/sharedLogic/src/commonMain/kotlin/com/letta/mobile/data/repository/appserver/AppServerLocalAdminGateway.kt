@@ -307,9 +307,9 @@ class AppServerConversationAdmin(private val admin: AppServerLocalAdminGateway) 
     ConversationSummaryGateway,
     ConversationForkGateway,
     ConversationRecompileGateway {
-    /** The agent's own conversations; filtered here too, for a store that ignores `agent_id`. */
+    /** The agent's page as the store sent it; the shared list keeps only the agent's own rows. */
     override suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> =
-        admin.listAgentConversations(page).filter { it.agentId == page.agent }
+        admin.listAgentConversations(page)
 
     override suspend fun getConversation(conversationId: String): Conversation = admin.getConversation(ConversationId(conversationId))
 

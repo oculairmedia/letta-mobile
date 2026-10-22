@@ -82,7 +82,8 @@ class IrohAdminRpcChatGatewayTest {
             AgentConversationPage(AgentId("agent-1"), limit = 10, after = ConversationId("conv-0")),
         )
 
-        assertEquals(listOf("conv-1"), conversations.map { it.id.value }, "only the agent's own rows, no agent-free worker")
+        // The agent-free worker row is left out by rule; the rest is the page as sent (the list filters it).
+        assertEquals(listOf("conv-1", "conv-2"), conversations.map { it.id.value })
         val body = transport.rpcCalls.single().body.orEmpty()
         assertTrue("\"agent_id\":\"agent-1\"" in body, "the read names the agent: $body")
         assertTrue("\"after\":\"conv-0\"" in body && "\"10\"" in body, "body should carry the cursor + stringified limit: $body")
