@@ -39,6 +39,7 @@ import com.letta.mobile.sharedui.resources.rows_tool_output_truncated
 import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -92,25 +93,28 @@ private fun BoundedScroll(modifier: Modifier, content: @Composable () -> Unit) {
 @Composable
 private fun CommandInset(inset: ToolInset.Command) {
     if (inset.command.isNotBlank()) {
-        val prompt = inset.workingDirectory?.let { "$it $PROMPT" } ?: PROMPT
-        HoverCopy(inset.command, stringResource(Res.string.rows_copy_command)) {
-            CommandLine(prompt, inset.command)
-        }
+        HoverCopy(inset.command, Res.string.rows_copy_command) { CommandLine(inset) }
     }
     inset.output.forEach { stream ->
-        val ink = if (stream.kind == ToolOutputStream.Kind.Stderr) InsetInk.Removed else InsetInk.Plain
-        HoverCopy(stream.text, stringResource(Res.string.rows_copy_output)) { OutputText(stream.text, ink) }
+        val ink = if (stream.kind == ToolOutputStream.Kind.Stderr) InsetInk.Stderr else InsetInk.Plain
+        HoverCopy(stream.text, Res.string.rows_copy_output) { OutputText(stream.text, ink) }
     }
 }
 
 /** `dir $ ` muted, then the command in full. */
 @Composable
-private fun CommandLine(prompt: String, command: String) {
+private fun CommandLine(inset: ToolInset.Command) {
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    val text = remember(prompt, command, muted) {
+    val text = remember(inset, muted) {
         buildAnnotatedString {
-            withStyle(SpanStyle(color = muted)) { append(prompt) }
-            append(command)
+            withStyle(SpanStyle(color = muted)) {
+                inset.workingDirectory?.let {
+                    append(it)
+                    append(" ")
+                }
+                append(PROMPT)
+            }
+            append(inset.command)
         }
     }
     Text(
@@ -123,14 +127,14 @@ private fun CommandLine(prompt: String, command: String) {
 
 @Composable
 private fun BeforeAfterInset(inset: ToolInset.BeforeAfter) {
-    if (inset.before.isNotEmpty()) OutputText(inset.before, InsetInk.Removed, marker = REMOVED_MARKER)
-    if (inset.after.isNotEmpty()) OutputText(inset.after, InsetInk.Added, marker = ADDED_MARKER)
+    if (inset.before.isNotEmpty()) OutputText(inset.before, InsetInk.Removed)
+    if (inset.after.isNotEmpty()) OutputText(inset.after, InsetInk.Added)
 }
 
 @Composable
 private fun ArgumentsInset(inset: ToolInset.Arguments) {
     inset.fields.forEach { ArgumentLine(it) }
-    inset.result?.let { result -> HoverCopy(result, stringResource(Res.string.rows_copy_output)) { OutputText(result, InsetInk.Plain) } }
+    inset.result?.let { result -> HoverCopy(result, Res.string.rows_copy_output) { OutputText(result, InsetInk.Plain) } }
 }
 
 @Composable
@@ -150,7 +154,7 @@ private fun ArgumentLine(field: ToolArgumentField) {
 
 /** [text]'s last lines, wrapped, in [ink]; says how many lines it left out above them. */
 @Composable
-private fun OutputText(text: String, ink: InsetInk, marker: String? = null) {
+private fun OutputText(text: String, ink: InsetInk) {
     val window = remember(text) { OutputWindow.tail(text) }
     if (window.hiddenLines > 0) {
         Text(
@@ -160,19 +164,19 @@ private fun OutputText(text: String, ink: InsetInk, marker: String? = null) {
             modifier = Modifier.testTag(ChatRowTestTags.TOOL_OUTPUT_TRUNCATED),
         )
     }
-    val shown = if (marker == null) window.text else window.text.lines().joinToString("\n") { "$marker$it" }
+    val shown = remember(window, ink) { ink.marked(window.text) }
     Text(text = shown, style = monoStyle(), color = ink.color())
 }
 
-/** [content] with a copy action for [text] that shows while the pointer is over it. */
+/** [content] with a copy action for [text], named [label], that shows while the pointer is over it. */
 @Composable
-private fun HoverCopy(text: String, label: String, content: @Composable () -> Unit) {
+private fun HoverCopy(text: String, label: StringResource, content: @Composable () -> Unit) {
     val hover = remember { MutableInteractionSource() }
     val hovered by hover.collectIsHoveredAsState()
     Box(Modifier.fillMaxWidth().hoverable(hover)) {
         content()
         CopyIconButton(
-            CopyAction(text = text, contentDescription = label, visible = hovered),
+            CopyAction(text = text, contentDescription = stringResource(label), visible = hovered),
             modifier = Modifier.align(Alignment.TopEnd),
         )
     }
@@ -181,17 +185,23 @@ private fun HoverCopy(text: String, label: String, content: @Composable () -> Un
 @Composable
 private fun monoStyle(): TextStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
 
-/** The inks an inset's text reads in: muted output, muted red for stderr and removals, muted green for additions. */
-private enum class InsetInk {
-    Plain,
-    Removed,
-    Added,
+/**
+ * The inks an inset's text reads in: muted output, muted red for stderr, and the before / after of
+ * a replacement in muted red / green, each line led by its marker.
+ */
+private enum class InsetInk(private val marker: String?) {
+    Plain(null),
+    Stderr(null),
+    Removed("- "),
+    Added("+ "),
     ;
+
+    fun marked(text: String): String = marker?.let { prefix -> text.lines().joinToString("\n") { prefix + it } } ?: text
 
     @Composable
     fun color(): Color = when (this) {
         Plain -> MaterialTheme.colorScheme.onSurfaceVariant
-        Removed -> MaterialTheme.colorScheme.error.copy(alpha = ChatRowAlpha.insetMutedInk)
+        Stderr, Removed -> MaterialTheme.colorScheme.error.copy(alpha = ChatRowAlpha.insetMutedInk)
         Added -> successTint().copy(alpha = ChatRowAlpha.insetMutedInk)
     }
 }
@@ -205,29 +215,15 @@ internal class OutputWindow private constructor(val text: String, val visibleLin
     companion object {
         fun tail(raw: String, maxLines: Int = ChatRowDimens.toolOutputVisibleLines): OutputWindow {
             val end = raw.indexOfLast { !it.isWhitespace() } + 1
-            if (end == 0) return OutputWindow("", 0, 0)
-            val start = startOfLastLines(raw, end, maxLines)
-            val kept = newlinesIn(raw, start, end) + 1
-            return OutputWindow(raw.substring(start, end), kept, newlinesIn(raw, 0, start))
+            // The newlines before the last lines, nearest first; the one past maxLines - 1 cuts the window.
+            val breaks = generateSequence(raw.lastIndexOf('\n', end - 1)) { raw.lastIndexOf('\n', it - 1) }.takeWhile { it >= 0 }
+            val start = breaks.drop(maxLines - 1).firstOrNull()?.plus(1) ?: 0
+            val hidden = (0 until start).count { raw[it] == '\n' }
+            val kept = if (end == 0) 0 else (start until end).count { raw[it] == '\n' } + 1
+            return OutputWindow(raw.substring(start, end), kept, hidden)
         }
-
-        /** Where the last [maxLines] lines before [end] begin, walking back newline by newline. */
-        private fun startOfLastLines(raw: String, end: Int, maxLines: Int): Int {
-            var start = end
-            repeat(maxLines) {
-                val newline = raw.lastIndexOf('\n', start - 1)
-                if (newline < 0) return 0
-                start = newline
-            }
-            return start + 1
-        }
-
-        private fun newlinesIn(raw: String, from: Int, until: Int): Int = (from until until).count { raw[it] == '\n' }
     }
 }
-
-private const val REMOVED_MARKER = "- "
-private const val ADDED_MARKER = "+ "
 
 /** A shell prompt's sigil, not words: the same in every language. */
 private const val PROMPT = "$ "
