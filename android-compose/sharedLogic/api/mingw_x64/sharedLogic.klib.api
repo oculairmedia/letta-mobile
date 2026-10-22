@@ -3632,6 +3632,10 @@ abstract fun interface com.letta.mobile.data.pairing/QrEncoder { // com.letta.mo
     abstract fun encode(kotlin/String): com.letta.mobile.data.pairing/QrModules // com.letta.mobile.data.pairing/QrEncoder.encode|encode(kotlin.String){}[0]
 }
 
+abstract fun interface com.letta.mobile.data.pairing/RelayInviteAuthenticator { // com.letta.mobile.data.pairing/RelayInviteAuthenticator|null[0]
+    abstract suspend fun authenticate(com.letta.mobile.data.model/IrohServerAddress, kotlin/String, kotlin/String): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AuthResponse // com.letta.mobile.data.pairing/RelayInviteAuthenticator.authenticate|authenticate(com.letta.mobile.data.model.IrohServerAddress;kotlin.String;kotlin.String){}[0]
+}
+
 abstract fun interface com.letta.mobile.data.plugin.view/PluginViewConsent { // com.letta.mobile.data.plugin.view/PluginViewConsent|null[0]
     abstract suspend fun allow(com.letta.mobile.data.plugin/PluginCapability): kotlin/Boolean // com.letta.mobile.data.plugin.view/PluginViewConsent.allow|allow(com.letta.mobile.data.plugin.PluginCapability){}[0]
 
@@ -45761,6 +45765,17 @@ final class com.letta.mobile.data.pairing/QrModules { // com.letta.mobile.data.p
     final fun isDark(kotlin/Int, kotlin/Int): kotlin/Boolean // com.letta.mobile.data.pairing/QrModules.isDark|isDark(kotlin.Int;kotlin.Int){}[0]
 }
 
+final class com.letta.mobile.data.pairing/RelayPairingRedeemer : com.letta.mobile.data.pairing/PairingRedeemer { // com.letta.mobile.data.pairing/RelayPairingRedeemer|null[0]
+    constructor <init>(com.letta.mobile.data.pairing/RelayInviteAuthenticator, kotlin/Long = ...) // com.letta.mobile.data.pairing/RelayPairingRedeemer.<init>|<init>(com.letta.mobile.data.pairing.RelayInviteAuthenticator;kotlin.Long){}[0]
+
+    final suspend fun redeem(com.letta.mobile.data.pairing/ScannedInvite, kotlin/String): com.letta.mobile.data.pairing/RedeemOutcome // com.letta.mobile.data.pairing/RelayPairingRedeemer.redeem|redeem(com.letta.mobile.data.pairing.ScannedInvite;kotlin.String){}[0]
+
+    final object Companion { // com.letta.mobile.data.pairing/RelayPairingRedeemer.Companion|null[0]
+        final const val DEFAULT_TIMEOUT_MS // com.letta.mobile.data.pairing/RelayPairingRedeemer.Companion.DEFAULT_TIMEOUT_MS|{}DEFAULT_TIMEOUT_MS[0]
+            final fun <get-DEFAULT_TIMEOUT_MS>(): kotlin/Long // com.letta.mobile.data.pairing/RelayPairingRedeemer.Companion.DEFAULT_TIMEOUT_MS.<get-DEFAULT_TIMEOUT_MS>|<get-DEFAULT_TIMEOUT_MS>(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.pairing/ScannedInvite { // com.letta.mobile.data.pairing/ScannedInvite|null[0]
     constructor <init>(kotlin/String, kotlin/String, kotlin/Long, kotlin/String?) // com.letta.mobile.data.pairing/ScannedInvite.<init>|<init>(kotlin.String;kotlin.String;kotlin.Long;kotlin.String?){}[0]
 
@@ -65169,6 +65184,11 @@ final object com.letta.mobile.data.pairing/InvitePhases { // com.letta.mobile.da
         final fun <get-EXPIRING_WINDOW_MS>(): kotlin/Long // com.letta.mobile.data.pairing/InvitePhases.EXPIRING_WINDOW_MS.<get-EXPIRING_WINDOW_MS>|<get-EXPIRING_WINDOW_MS>(){}[0]
 
     final fun of(com.letta.mobile.data.pairing/PairInviteUiState, kotlin/Long): com.letta.mobile.data.pairing/InvitePhase // com.letta.mobile.data.pairing/InvitePhases.of|of(com.letta.mobile.data.pairing.PairInviteUiState;kotlin.Long){}[0]
+}
+
+final object com.letta.mobile.data.pairing/PairingAuthOutcome { // com.letta.mobile.data.pairing/PairingAuthOutcome|null[0]
+    final fun of(com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AuthResponse, com.letta.mobile.data.pairing/PairedHost): com.letta.mobile.data.pairing/RedeemOutcome // com.letta.mobile.data.pairing/PairingAuthOutcome.of|of(com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AuthResponse;com.letta.mobile.data.pairing.PairedHost){}[0]
+    final suspend fun present(com.letta.mobile.data.pairing/ScannedInvite, com.letta.mobile.data.pairing/PairedHost, kotlin/Long, kotlin.coroutines/SuspendFunction0<com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AuthResponse>): com.letta.mobile.data.pairing/RedeemOutcome // com.letta.mobile.data.pairing/PairingAuthOutcome.present|present(com.letta.mobile.data.pairing.ScannedInvite;com.letta.mobile.data.pairing.PairedHost;kotlin.Long;kotlin.coroutines.SuspendFunction0<com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AuthResponse>){}[0]
 }
 
 final object com.letta.mobile.data.pairing/ScannedInviteParser { // com.letta.mobile.data.pairing/ScannedInviteParser|null[0]

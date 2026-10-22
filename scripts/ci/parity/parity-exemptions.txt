@@ -69,7 +69,6 @@ web SettingsPageServices.appearance | web leaves appearance unbound (default, nu
 web SettingsPageServices.contributions | web leaves contributions unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web SettingsPageServices.notifications | web leaves notifications unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web SettingsPageServices.onOpenProviders | web leaves onOpenProviders unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
-web SettingsPageServices.pairing | web leaves pairing unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web ShellAgentEditorHost.creator | web leaves creator unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web ShellAgentEditorHost.modelCatalog | web leaves modelCatalog unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web ShellAgentEditorHost.onIdentityChange | web leaves onIdentityChange unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)

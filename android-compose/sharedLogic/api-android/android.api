@@ -31127,6 +31127,12 @@ public final class com/letta/mobile/data/pairing/PairingAdminRepository {
 	public final fun revokeInvite (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
+public final class com/letta/mobile/data/pairing/PairingAuthOutcome {
+	public static final field INSTANCE Lcom/letta/mobile/data/pairing/PairingAuthOutcome;
+	public final fun of (Lcom/letta/mobile/data/transport/appserver/AppServerInboundFrame$AuthResponse;Lcom/letta/mobile/data/pairing/PairedHost;)Lcom/letta/mobile/data/pairing/RedeemOutcome;
+	public final fun present (Lcom/letta/mobile/data/pairing/ScannedInvite;Lcom/letta/mobile/data/pairing/PairedHost;JLkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public final class com/letta/mobile/data/pairing/PairingError : java/lang/Enum {
 	public static final field DENIED Lcom/letta/mobile/data/pairing/PairingError;
 	public static final field EXPIRED Lcom/letta/mobile/data/pairing/PairingError;
@@ -31310,6 +31316,21 @@ public final class com/letta/mobile/data/pairing/RedeemOutcome$Paired : com/lett
 	public final fun getHost ()Lcom/letta/mobile/data/pairing/PairedHost;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/letta/mobile/data/pairing/RelayInviteAuthenticator {
+	public abstract fun authenticate (Lcom/letta/mobile/data/model/IrohServerAddress;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/pairing/RelayPairingRedeemer : com/letta/mobile/data/pairing/PairingRedeemer {
+	public static final field Companion Lcom/letta/mobile/data/pairing/RelayPairingRedeemer$Companion;
+	public static final field DEFAULT_TIMEOUT_MS J
+	public fun <init> (Lcom/letta/mobile/data/pairing/RelayInviteAuthenticator;J)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/pairing/RelayInviteAuthenticator;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun redeem (Lcom/letta/mobile/data/pairing/ScannedInvite;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/letta/mobile/data/pairing/RelayPairingRedeemer$Companion {
 }
 
 public final class com/letta/mobile/data/pairing/ScannedInvite {

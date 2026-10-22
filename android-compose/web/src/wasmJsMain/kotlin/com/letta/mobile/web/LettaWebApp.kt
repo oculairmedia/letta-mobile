@@ -29,6 +29,7 @@ import com.letta.mobile.ui.theme.HighContrastPreference
 import com.letta.mobile.ui.theme.LocalHighContrastPreference
 import com.letta.mobile.ui.theme.SharedMaterialTheme
 import com.letta.mobile.ui.shell.conversations.rememberShellTimelineChat
+import com.letta.mobile.web.data.WebPairedHostStore
 import com.letta.mobile.web.mascot.RiveCanvasRenderer
 import kotlinx.coroutines.launch
 
@@ -67,7 +68,9 @@ fun LettaWebApp() {
     val controllers = rememberShellLibraryControllers(app.gateway.sessionGraphProvider, app.services.sources, scope)
     ShellHomeFleetEffect(controllers.home, ShellHomeFleet(conversations = emptyList(), roster = backend.agents.value))
     val onRosterChanged: () -> Unit = { scope.launch { backend.reloadRoster(graph, workspace) } }
-    val settings = webSettingsServices(backend.config, app.settingsStore, app.gateway.permissionModeSettings)
+    val pairing = WebPairedHostStore(backend.config, app.settingsStore)
+        .installAndPairBindings(scope) { workspace.navigate(ShellDestination.Chat()) }
+    val settings = webSettingsServices(backend.config, app.settingsStore, app.gateway.permissionModeSettings, pairing)
     val page = WebPageInputs(chat, connection, app.canvas, settings, WebPagesSession(graph, controllers, app.services, onRosterChanged))
     val header = rememberShellWorkspaceHeader(ShellWorkspaceHeaderBinding(shell.navigator, layout, webSearch(shell, page), chat.list::tab))
     CompositionLocalProvider(LocalHighContrastPreference provides highContrastPreference) {
