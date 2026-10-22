@@ -76,7 +76,11 @@ class SessionScopedAllConversationsRepositoryTest {
         // refresh is mid-flight; the rebuild lands before the op finishes and
         // withCurrentSession's post-check throws CancellationException("Session
         // switched during operation"). The retry must re-run on the rebuilt graph.
-        refreshLandsOnTheRebuiltGraph(staleTransportErrors = 0)
+        val refreshed = refreshAcrossARebuild(staleTransportErrors = 0)
+
+        assertNull(refreshed.error)
+        assertEquals(listOf("conv-b"), refreshed.listed)
+        assertEquals(2, refreshed.listCalls)
     }
 
     @Test
@@ -84,7 +88,11 @@ class SessionScopedAllConversationsRepositoryTest {
         // letta-mobile-xzoy3: the rebuild lands while the refresh runs on the
         // old graph; the stale transport throws the default-transport ISE. The
         // retry waits for the new graph and re-runs the refresh there.
-        refreshLandsOnTheRebuiltGraph(staleTransportErrors = 1)
+        val refreshed = refreshAcrossARebuild(staleTransportErrors = 1)
+
+        assertNull(refreshed.error)
+        assertEquals(listOf("conv-b"), refreshed.listed)
+        assertEquals(2, refreshed.listCalls)
     }
 
     @Test
@@ -150,8 +158,10 @@ class SessionScopedAllConversationsRepositoryTest {
         assertEquals(3, fakeConversationApi.calls.count { it == "listConversations" })
     }
 
-    /** A refresh still in flight when the backend switches (failing [staleTransportErrors] times) lists the new graph's rows. */
-    private suspend fun TestScope.refreshLandsOnTheRebuiltGraph(staleTransportErrors: Int) {
+    /** What a refresh still in flight when the backend switches (failing [staleTransportErrors] times) ends with. */
+    private data class RebuildRefresh(val error: Throwable?, val listed: List<String>, val listCalls: Int)
+
+    private suspend fun TestScope.refreshAcrossARebuild(staleTransportErrors: Int): RebuildRefresh {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val fakeConversationApi = FakeConversationApi().apply {
             conversations = mutableListOf(TestData.conversation(id = "conv-b", summary = "Backend B"))
@@ -170,10 +180,11 @@ class SessionScopedAllConversationsRepositoryTest {
         advanceTimeBy(1)
         advanceUntilIdle()
         refreshJob.join()
-
-        assertNull(error)
-        assertEquals(listOf("conv-b"), conversationsProxy.conversations.value.map { it.id.value })
-        assertEquals(2, fakeConversationApi.calls.count { it == "listConversations" })
+        return RebuildRefresh(
+            error = error,
+            listed = conversationsProxy.conversations.value.map { it.id.value },
+            listCalls = fakeConversationApi.calls.count { it == "listConversations" },
+        )
     }
 }
 
