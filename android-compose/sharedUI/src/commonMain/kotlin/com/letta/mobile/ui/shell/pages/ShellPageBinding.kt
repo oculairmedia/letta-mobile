@@ -9,7 +9,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
 import com.letta.mobile.data.schedules.ScheduleLibraryController
 import com.letta.mobile.data.schedules.ScheduleLibraryState
-import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
+import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.storage.SecureSettingsStore
@@ -72,7 +72,7 @@ class ShellPageHost(
  */
 @Composable
 fun rememberShellPageDeps(
-    graph: SharedSessionRepositoryGraph,
+    graph: SessionRepositoryGraph,
     controllers: ShellLibraryControllers,
     host: ShellPageHost,
 ): ShellPageDeps {
@@ -82,7 +82,7 @@ fun rememberShellPageDeps(
 
 /** [rememberShellPageDeps]'s pages, without the focus effects. */
 fun shellPageDeps(
-    graph: SharedSessionRepositoryGraph,
+    graph: SessionRepositoryGraph,
     controllers: ShellLibraryControllers,
     host: ShellPageHost,
 ): ShellPageDeps {
@@ -123,7 +123,7 @@ private fun memoryPage(controllers: ShellLibraryControllers) = ShellPageContent<
 
 /** The shared Schedules page; a schedule can be made where the session serves them and an agent is chosen. */
 private fun schedulesPage(
-    graph: SharedSessionRepositoryGraph,
+    graph: SessionRepositoryGraph,
     schedules: ScheduleLibraryController,
     focus: ShellPageFocus,
 ) = ShellPageContent<ShellDestination.Schedules> { destination, modifier ->

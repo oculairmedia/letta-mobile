@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.agenteditor.AgentEditorController
@@ -229,8 +230,15 @@ fun shellSettingsPage(
  */
 class AgentEditorBinding(
     val controller: @Composable (agentId: String?) -> AgentEditorController,
-    val options: (agentId: String?, controller: AgentEditorController) -> AgentEditorPageOptions = { _, _ -> AgentEditorPageOptions() },
+    val options: @Composable (agentId: String?, controller: AgentEditorController) -> AgentEditorPageOptions =
+        { _, _ -> AgentEditorPageOptions() },
 )
+
+/**
+ * Whether the host frames the page it draws (the desktop's side pane draws the editor's title and
+ * close), so the page draws no Back of its own. Where the page is the window's page, it is not framed.
+ */
+val LocalShellPageFramed = staticCompositionLocalOf { false }
 
 /** The shared agent editor, for the destination's agent or a new one. */
 fun shellAgentEditorPage(binding: AgentEditorBinding) = ShellPageContent<ShellDestination.AgentEditor> { destination, modifier ->

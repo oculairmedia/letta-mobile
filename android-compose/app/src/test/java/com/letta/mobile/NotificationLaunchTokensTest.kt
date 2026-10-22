@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
-import com.letta.mobile.feature.chat.route.AgentChatRoute
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -46,7 +45,6 @@ class NotificationLaunchTokensTest {
         val resolved = AppLaunchTarget.fromIntent(first, context, automationExtrasEnabled = false)
 
         assertEquals(target, resolved)
-        assertEquals(AgentChatRoute(agentId = "agent-1", agentName = "Ada", conversationId = "conv-1"), resolved?.toRoute())
         assertFalse(first.hasExtra(NotificationNavigationTarget.EXTRA_LAUNCH_TOKEN))
         assertNull(AppLaunchTarget.fromIntent(tokenIntent(token), context, automationExtrasEnabled = false))
     }

@@ -1,52 +1,34 @@
 package com.letta.mobile.ui.navigation
 
-import android.content.Context
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.letta.mobile.AppLaunchTarget
-import com.letta.mobile.channel.ChatPushAlarmScheduler
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.toBackendLabel
 import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.feature.chat.route.AgentChatRoute
-import com.letta.mobile.feature.chat.route.chatGraph
 import com.letta.mobile.feature.chat.screen.shared.ChatCanvasSlot
 import com.letta.mobile.feature.chat.screen.shared.LocalChatCanvasSlot
-import com.letta.mobile.data.shell.ShellDestination
-import com.letta.mobile.data.shell.ShellSkillsSection
-import com.letta.mobile.ui.screens.config.BackendSwitcherSheet
+import com.letta.mobile.ui.screens.config.ConfigListScreen
+import com.letta.mobile.ui.screens.config.SettingsDestinations
+import com.letta.mobile.ui.screens.systemaccess.SystemAccessDashboardScreen
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
-@OptIn(ExperimentalSharedTransitionApi::class)
-val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
 
 /**
  * letta-mobile-bglj6.1: the conversation's own board under the shared chat page. Its share and
@@ -76,52 +58,6 @@ private val AppChatCanvasSlot = ChatCanvasSlot { target, actions, chromeTopInset
                 cameraRequest = actions.camera,
             )
         }
-    }
-}
-
-private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavHostController) {
-    chatGraph(
-        enterTransition = { fadeIn(animationSpec = tween(150)) },
-        exitTransition = { fadeOut(animationSpec = tween(150)) },
-        popEnterTransition = { fadeIn(animationSpec = tween(150)) },
-        popExitTransition = { fadeOut(animationSpec = tween(150)) },
-        onNavigateBack = {
-            if (!navController.popBackStack()) {
-                navController.navigate(ConversationsRoute) {
-                    popUpTo(0) { inclusive = true }
-                    launchSingleTop = true
-                }
-            }
-        },
-        // letta-mobile-ckmub.3.4: shared destinations go through their Android route mapping.
-        onNavigateToSettings = { agentId -> navController.navigateTo(ShellDestination.AgentEditor(agentId)) },
-        onNavigateToTools = { navController.navigateTo(ShellDestination.Skills(section = ShellSkillsSection.Tools)) },
-        onNavigateToMemory = { agentId -> navController.navigateTo(ShellDestination.Memory(agentId)) },
-        onNavigateToAdmin = { navController.navigateTo(ShellDestination.Home) },
-        onNavigateToProviders = { navController.navigateTo(ShellDestination.Providers) },
-        onNavigateToSchedules = { agentId -> navController.navigateTo(ShellDestination.Schedules(agentId)) },
-        onNavigateToProjects = { navController.navigate(HomeRoute) },
-        onNavigateToConversationList = { navController.navigateTo(ShellDestination.Chat()) },
-        onSwitchConversation = { route ->
-            navController.navigate(route) {
-                popUpTo<AgentChatRoute> { inclusive = true }
-            }
-        },
-        onNavigateToCanvas = { agentId, conversationId, shareRecipient ->
-            navController.navigate(
-                CanvasRoute(canvasId = "", conversationId = conversationId, agentId = agentId, shareRecipient = shareRecipient),
-            )
-        },
-        onNavigateToAppSettings = { navController.navigateTo(ShellDestination.Settings()) },
-        onOpenCanvas = { canvasId -> navController.navigateTo(ShellDestination.Canvas(canvasId = canvasId)) },
-        onNavigateToChannels = { navController.navigateTo(ShellDestination.Channels) },
-        onNavigateToSkills = { agentId -> navController.navigateTo(ShellDestination.Skills(agentId)) },
-    )
-}
-
-/** letta-mobile-c3np7.5.7: the shared Channels page, reached from the shared drawer's Channels row. */private fun androidx.navigation.NavGraphBuilder.appChannelsGraph(navController: NavHostController) {
-    composable<ChannelsRoute> {
-        com.letta.mobile.ui.screens.channels.ChannelsScreen(onNavigateBack = { navController.popBackStack() })
     }
 }
 
@@ -183,30 +119,26 @@ private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: Na
     }
 }
 
-val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
-
+/** The settings the workspace's start page and backend layout are read from. */
 @HiltViewModel
-class NavViewModel @Inject constructor(
-    private val settingsRepository: ISettingsRepository,
-    @param:ApplicationContext private val appContext: Context,
-) : ViewModel() {
+class NavViewModel @Inject constructor(private val settingsRepository: ISettingsRepository) : ViewModel() {
     val activeConfig: StateFlow<LettaConfig?> = settingsRepository.activeConfig
-    internal val startInputs = AppStartInputs(
-        activeConfig = settingsRepository.activeConfig,
-        lastChatSelection = settingsRepository.lastChatSelection,
-        favoriteAgentId = settingsRepository.favoriteAgentId,
-        adminAgentId = settingsRepository.adminAgentId,
+
+    /** letta-mobile-v7aln: read once, synchronously (every input is filled at construction). */
+    internal fun startDestination(target: AppLaunchTarget?) = resolveStartDestination(
+        hasConfig = settingsRepository.activeConfig.value != null,
+        initialTarget = target,
+        restoredChatSelection = settingsRepository.lastChatSelection.value,
+        fallbackAgentId = settingsRepository.favoriteAgentId.value ?: settingsRepository.adminAgentId.value,
     )
-
-    fun clearAllData() {
-        ChatPushAlarmScheduler.cancel(appContext)
-        viewModelScope.launch { settingsRepository.clearAllData() }
-    }
-
 }
 
-@Suppress("NoAnyType") // NavHost.startDestination is Any; each branch is a typed route object.
-@OptIn(ExperimentalSharedTransitionApi::class)
+/**
+ * letta-mobile-ckmub.2 (hard cut): the app is the shared shell workspace ([AndroidShellWorkspace]); the
+ * nav host above it only holds Android's own screens the workspace leaves for: the camera scanner and
+ * the pairing invite, the system-access dashboard, the saved backends list, the full-screen board and
+ * the canvas debug board.
+ */
 @Composable
 fun AppNavGraph(
     navController: NavHostController = rememberNavController(),
@@ -215,101 +147,52 @@ fun AppNavGraph(
 ) {
     val navViewModel: NavViewModel = hiltViewModel()
     val activeConfig by navViewModel.activeConfig.collectAsStateWithLifecycle()
-    val activeBackendLabel = activeConfig.toBackendLabel()
-
-    // letta-mobile-cdlk: backend-switcher bottom sheet. State is lifted to
-    // the NavHost host so a single sheet instance overlays whichever screen
-    // owns the pill (Home, Conversations, ProjectHome).
-    // rememberSaveable so the sheet survives configuration changes; the
-    // ModalBottomSheet manages its own enter/exit animation internally.
-    var showBackendSwitcher by rememberSaveable { mutableStateOf(false) }
-    val openBackendSwitcher: () -> Unit = remember { { showBackendSwitcher = true } }
-
-    val initialNotificationTarget = remember { notificationTarget }
-    // letta-mobile-v7aln: stable across rotation; see rememberAppStartDestination.
-    val startDestination = rememberAppStartDestination(navViewModel.startInputs, initialNotificationTarget)
-
-    HandleNotificationTarget(
-        notificationTarget = notificationTarget,
-        initialNotificationTarget = initialNotificationTarget,
-        navController = navController,
-        onConsumed = onNotificationTargetConsumed,
-    )
-
+    // Decided once: a new start page would replace the workspace (see resolveStartDestination).
+    val start = remember { navViewModel.startDestination(notificationTarget) }
     // letta-mobile-bglj6.1: the shared chat page docks under the conversation's canvas; the
     // canvas screen lives here in :app, so it is handed to feature-chat as a slot.
     androidx.compose.runtime.CompositionLocalProvider(LocalChatCanvasSlot provides AppChatCanvasSlot) {
-    NavHost(
-        navController = navController,
-        startDestination = startDestination,
-    ) {
-        projectsGraph(
-            navController = navController,
-            activeBackendLabel = activeBackendLabel,
-            openBackendSwitcher = openBackendSwitcher,
-        )
-
-        adminGraph(
-            navController = navController,
-            activeBackendLabel = activeBackendLabel,
-            openBackendSwitcher = openBackendSwitcher,
-            clearAllData = { navViewModel.clearAllData() },
-        )
-
-        configGraph(navController = navController)
-
-        conversationsGraph(
-            navController = navController,
-            activeBackendLabel = activeBackendLabel,
-            openBackendSwitcher = openBackendSwitcher,
-        )
-
-        appAgentEditorGraph(navController)
-
-        appChatGraph(navController)
-
-        appCanvasGraph(navController)
-
-        appChannelsGraph(navController)
-    }
-    }
-
-    AppBackendSwitcherHost(
-        show = showBackendSwitcher,
-        onDismiss = { showBackendSwitcher = false },
-        navController = navController,
-    )
-}
-
-@Composable
-private fun HandleNotificationTarget(
-    notificationTarget: AppLaunchTarget?,
-    initialNotificationTarget: AppLaunchTarget?,
-    navController: NavHostController,
-    onConsumed: () -> Unit,
-) {
-    LaunchedEffect(notificationTarget) {
-        val target = notificationTarget ?: return@LaunchedEffect
-        if (target != initialNotificationTarget) {
-            navController.navigate(target.toRoute()) {
-                launchSingleTop = true
+        NavHost(navController = navController, startDestination = ShellWorkspaceRoute) {
+            composable<ShellWorkspaceRoute> {
+                AndroidShellWorkspace(
+                    start = start,
+                    config = activeConfig,
+                    exits = androidShellExits(navController),
+                    launch = AndroidShellLaunch(notificationTarget, onNotificationTargetConsumed) {
+                        navController.navigate(PairingScanRoute)
+                    },
+                )
             }
+            pairingRoutes(navController)
+            composable<SystemAccessRoute> {
+                SystemAccessDashboardScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToPairingScan = { navController.navigate(PairingScanRoute) },
+                    onNavigateToPairDevice = { navController.navigate(PairingInviteRoute) },
+                )
+            }
+            composable<ConfigListRoute> { ConfigListScreen(onNavigateBack = { navController.popBackStack() }) }
+            composable<CanvasDebugRoute> {
+                com.letta.mobile.ui.canvas.CanvasWorkspace(
+                    initialJson = com.letta.mobile.ui.canvas.CanvasSamples.buildCycleJson,
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            }
+            appCanvasGraph(navController)
         }
-        onConsumed()
     }
 }
 
-@Composable
-private fun AppBackendSwitcherHost(
-    show: Boolean,
-    onDismiss: () -> Unit,
-    navController: NavHostController,
-) {
-    if (show) {
-        BackendSwitcherSheet(
-            onDismiss = onDismiss,
-            onNavigateToAddNewServer = { navController.navigate(ConfigRoute(createNew = true)) },
-            onNavigateToEditServer = { navController.navigate(ConfigRoute()) },
-        )
-    }
-}
+/** Where the workspace leaves for Android's own screens. */
+private fun androidShellExits(navController: NavHostController) = AndroidShellExits(
+    openCanvas = { agentId, conversationId, shareRecipient ->
+        navController.navigate(CanvasRoute(conversationId = conversationId, agentId = agentId, shareRecipient = shareRecipient))
+    },
+    openCanvasById = { canvasId -> navController.navigate(CanvasRoute(canvasId = canvasId)) },
+    settings = SettingsDestinations(
+        onConfigList = { navController.navigate(ConfigListRoute) },
+        onSystemAccess = { navController.navigate(SystemAccessRoute) },
+        onCanvasDebug = { navController.navigate(CanvasDebugRoute) },
+    ),
+)
+

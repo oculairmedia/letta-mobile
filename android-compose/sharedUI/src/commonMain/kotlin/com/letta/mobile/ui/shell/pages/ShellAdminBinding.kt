@@ -19,7 +19,7 @@ import com.letta.mobile.data.projects.SettingsStoreProjectPinStore
 import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
 import com.letta.mobile.data.runs.RunMonitorController
 import com.letta.mobile.data.session.ifSupported
-import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
+import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellPageErrors
 import com.letta.mobile.data.storage.SecureSettingsStore
@@ -46,7 +46,7 @@ private const val PROJECT_PINS_KEY = "desktop.projects.pinned"
  * `DesktopAdminPages`), each over its sharedLogic controller, which lives while its page is on screen and
  * is rebuilt with the session graph. Projects ride an Iroh host's relay; elsewhere the page says why.
  */
-internal fun shellAdminPages(graph: SharedSessionRepositoryGraph, host: ShellPageHost): ShellAdminPages {
+internal fun shellAdminPages(graph: SessionRepositoryGraph, host: ShellPageHost): ShellAdminPages {
     val slots = host.pages.slots
     val openSettings = { host.navigator.navigate(ShellDestination.Settings()) }
     return ShellAdminPages(
@@ -61,7 +61,7 @@ internal fun shellAdminPages(graph: SharedSessionRepositoryGraph, host: ShellPag
     )
 }
 
-private fun runsPage(graph: SharedSessionRepositoryGraph, host: ShellPageHost, slots: ChannelsPageSlots) =
+private fun runsPage(graph: SessionRepositoryGraph, host: ShellPageHost, slots: ChannelsPageSlots) =
     ShellPageContent<ShellDestination.Runs> { destination, modifier ->
         val scope = rememberCoroutineScope()
         // letta-mobile-by4vm.13: a session that serves no runs gets no repository; the page says why.
@@ -80,13 +80,13 @@ private fun runsPage(graph: SharedSessionRepositoryGraph, host: ShellPageHost, s
     }
 
 @Composable
-private fun rememberAgentNames(graph: SharedSessionRepositoryGraph): Map<String, String> {
+private fun rememberAgentNames(graph: SessionRepositoryGraph): Map<String, String> {
     val roster = graph.ifSupported(SessionRoute.AGENTS) { agentRepository.agents } ?: return emptyMap()
     val agents by roster.collectAsState()
     return remember(agents) { agents.associate { it.id.value to it.name.ifBlank { it.id.value } } }
 }
 
-private fun templatesPage(graph: SharedSessionRepositoryGraph, host: ShellPageHost) =
+private fun templatesPage(graph: SessionRepositoryGraph, host: ShellPageHost) =
     ShellPageContent<ShellDestination.Templates> { destination, modifier ->
         val scope = rememberCoroutineScope()
         val controller = remember(graph) {
@@ -102,7 +102,7 @@ private fun templatesPage(graph: SharedSessionRepositoryGraph, host: ShellPageHo
         shellTemplatesPage(state, actions).Content(destination, modifier)
     }
 
-private fun projectsPage(graph: SharedSessionRepositoryGraph, host: ShellPageHost, slots: ChannelsPageSlots) =
+private fun projectsPage(graph: SessionRepositoryGraph, host: ShellPageHost, slots: ChannelsPageSlots) =
     ShellPageContent<ShellDestination.Projects> { destination, modifier ->
         val scope = rememberCoroutineScope()
         val pins = rememberProjectPins(host.settings)

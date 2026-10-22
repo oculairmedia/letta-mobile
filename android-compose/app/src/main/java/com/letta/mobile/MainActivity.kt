@@ -51,7 +51,6 @@ import com.letta.mobile.ui.host.OverlayHostRoot
 import com.letta.mobile.ui.host.OverlayPresentation
 import com.letta.mobile.ui.host.OverlayResponse
 import com.letta.mobile.ui.host.rememberOverlayHost
-import com.letta.mobile.ui.navigation.AdaptiveScaffold
 import com.letta.mobile.ui.navigation.AppNavGraph
 import com.letta.mobile.ui.theme.HighContrastPreference
 import com.letta.mobile.ui.theme.LocalHighContrastPreference
@@ -122,13 +121,11 @@ class MainActivity : ComponentActivity() {
                                 // seats (letta-mobile-te3n1.8); overlays stay above it.
                                 MascotTransportLayer {
                                     val navController = rememberNavController()
-                                    AdaptiveScaffold(navController = navController) {
-                                        AppNavGraph(
-                                            navController = navController,
-                                            notificationTarget = launchTarget.value,
-                                            onNotificationTargetConsumed = { launchTarget.value = null },
-                                        )
-                                    }
+                                    AppNavGraph(
+                                        navController = navController,
+                                        notificationTarget = launchTarget.value,
+                                        onNotificationTargetConsumed = { launchTarget.value = null },
+                                    )
                                 }
                             }
                         }

@@ -2,19 +2,12 @@ package com.letta.mobile
 
 import android.content.Context
 import android.content.Intent
-import com.letta.mobile.feature.chat.route.AgentChatRoute
 
 data class NotificationNavigationTarget(
     val agentId: String,
     val conversationId: String,
     val agentName: String? = null,
 ) : AppLaunchTarget {
-    override fun toRoute(): AgentChatRoute = AgentChatRoute(
-        agentId = agentId,
-        agentName = agentName,
-        conversationId = conversationId,
-    )
-
     /**
      * letta-mobile-by4vm.31: the intent carries only an opaque single-use token issued by
      * [NotificationLaunchTokens]; the agent/conversation never travel as extras.

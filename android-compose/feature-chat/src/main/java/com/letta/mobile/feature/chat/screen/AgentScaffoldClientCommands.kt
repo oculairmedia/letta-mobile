@@ -47,7 +47,7 @@ internal class RepositoryRecompileGateway(private val repository: IConversationR
 }
 
 /**
- * The scaffold's routes: search expands the chat search, memory / MCP / connect open their screens,
+ * The scaffold's routes: search opens the workspace's search, memory / MCP / connect open their screens,
  * models the model sheet, new a fresh chat, rename a dialog. A command whose screen this host has
  * no route to is not offered.
  */
@@ -92,7 +92,7 @@ private fun routeClientCommand(state: AgentScaffoldRuntimeState, command: Client
     val navigation = params.navigation
     val agentId = state.agentIdValue
     when (command) {
-        ClientSlashCommand.Search -> params.searchUi.onOpenSearch()
+        ClientSlashCommand.Search -> params.workspace.openSearch()
         ClientSlashCommand.Memory -> navigation.onNavigateToMemory?.invoke(agentId)
         // The tools screen is where Android manages tools and MCP servers.
         ClientSlashCommand.Mcp -> navigation.onNavigateToTools?.invoke()

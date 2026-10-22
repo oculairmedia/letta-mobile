@@ -38,7 +38,6 @@ internal fun DesktopShellContext.agentEditorHost(): ShellAgentEditorHost {
         panels = { agent -> desktopPanels(agent.value, panels) },
         onIdentityChange = { agent, identity -> avatarOverrides.value += agent.value to identity },
         onRosterChanged = chat::retryConnection,
-        embedded = true,
     )
 }
 

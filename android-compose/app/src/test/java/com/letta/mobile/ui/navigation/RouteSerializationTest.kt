@@ -5,8 +5,6 @@ import com.letta.mobile.feature.chat.route.ProjectChatStartAction
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 
@@ -18,45 +16,15 @@ class RouteSerializationTest {
     // ── Data objects (parameterless routes) ──────────────────
 
     @Test
-    fun `HomeRoute serializes and deserializes`() =
-        verifyIdempotent(HomeRoute)
-
-    @Test
-    fun `AdminRoute serializes and deserializes`() =
-        verifyIdempotent(AdminRoute)
-
-    @Test
-    fun `ConversationsRoute serializes and deserializes`() =
-        verifyIdempotent(ConversationsRoute)
-
-    @Test
-    fun `AgentListRoute and the new-agent route serialize and deserialize`() {
-        verifyRoundTrip(AgentListRoute)
-        verifyRoundTrip(EditAgentRoute())
+    fun `the workspace and Android's own screens serialize and deserialize`() {
+        verifyIdempotent(ShellWorkspaceRoute)
+        verifyIdempotent(ConfigListRoute)
+        verifyIdempotent(SystemAccessRoute)
+        verifyIdempotent(PairingScanRoute)
+        verifyIdempotent(PairingInviteRoute)
+        verifyIdempotent(CanvasDebugRoute)
+        verifyRoundTrip(CanvasRoute(canvasId = "c-1", conversationId = "conv-1", agentId = "a-1", shareRecipient = "share-1"))
     }
-
-    @Test
-    fun `ConfigRoute serializes and deserializes`() {
-        // letta-mobile-cdlk: ConfigRoute changed from `data object` to
-        // `data class ConfigRoute(val createNew: Boolean = false)`.
-        // verifyIdempotent only handles singletons; use verifyRoundTrip
-        // for instances and cover both default (createNew = false) and
-        // the new create-mode (createNew = true) explicitly.
-        verifyRoundTrip(ConfigRoute())
-        verifyRoundTrip(ConfigRoute(createNew = true))
-    }
-
-    @Test
-    fun `RunsRoute serializes and deserializes`() =
-        verifyIdempotent(RunsRoute)
-
-    @Test
-    fun `TemplatesRoute serializes and deserializes`() =
-        verifyIdempotent(TemplatesRoute)
-
-    @Test
-    fun `ProjectsRoute serializes and deserializes`() =
-        verifyIdempotent(ProjectsRoute)
 
     // ── Data classes (parameterized routes) ──────────────────
 
@@ -87,22 +55,6 @@ class RouteSerializationTest {
         verifyRoundTrip(route)
     }
 
-    @Test
-    fun `SkillsRoute round-trips`() {
-        verifyRoundTrip(SkillsRoute(agentId = "agent-1"))
-        verifyRoundTrip(SkillsRoute())
-    }
-
-    @Test
-    fun `EditAgentRoute round-trips`() {
-        verifyRoundTrip(EditAgentRoute(agentId = "agent-edit"))
-    }
-
-    @Test
-    fun `ShareToAgentRoute round-trips`() {
-        verifyRoundTrip(ShareToAgentRoute(sharedText = "check this out: https://example.com"))
-    }
-
     // ── Edge cases ───────────────────────────────────────────
 
     @Test
@@ -119,13 +71,6 @@ class RouteSerializationTest {
         val route = AgentChatRoute(agentId = "specific-agent-id-42")
         val decoded = decode<AgentChatRoute>(encode(route))
         assertEquals("specific-agent-id-42", decoded.agentId)
-    }
-
-    @Test
-    fun `EditAgentRoute agentId is preserved after round-trip`() {
-        val route = EditAgentRoute(agentId = "edit-me-99")
-        val decoded = decode<EditAgentRoute>(encode(route))
-        assertEquals("edit-me-99", decoded.agentId)
     }
 
     // ── Helpers ──────────────────────────────────────────────

@@ -1,110 +1,33 @@
 package com.letta.mobile.feature.chat.route
 
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.compose.composable
-import androidx.navigation.toRoute
-import com.letta.mobile.feature.chat.screen.AgentScaffold
+import android.os.Bundle
+import androidx.core.os.bundleOf
 
-fun NavGraphBuilder.chatGraph(
-    enterTransition: (AnimatedContentTransitionScope<*>.() -> EnterTransition)? = null,
-    exitTransition: (AnimatedContentTransitionScope<*>.() -> ExitTransition)? = null,
-    popEnterTransition: (AnimatedContentTransitionScope<*>.() -> EnterTransition)? = null,
-    popExitTransition: (AnimatedContentTransitionScope<*>.() -> ExitTransition)? = null,
-    onNavigateBack: () -> Unit,
-    onNavigateToSettings: (String) -> Unit,
-    onNavigateToTools: () -> Unit,
-    onNavigateToMemory: (String) -> Unit,
-    onNavigateToAdmin: () -> Unit,
-    onNavigateToSchedules: (String) -> Unit,
-    onNavigateToProjects: () -> Unit,
-    onNavigateToConversationList: () -> Unit,
-    onSwitchConversation: (AgentChatRoute) -> Unit,
-    onNavigateToCanvas: ((agentId: String, conversationId: String?, shareRecipient: String) -> Unit)? = null,
-    onNavigateToProviders: (() -> Unit)? = null,
-    onNavigateToAppSettings: (() -> Unit)? = null,
-    onOpenCanvas: ((canvasId: String) -> Unit)? = null,
-    onNavigateToChannels: (() -> Unit)? = null,
-    onNavigateToSkills: ((agentId: String) -> Unit)? = null,
-) {
-    composable<AgentChatRoute>(
-        enterTransition = enterTransition,
-        exitTransition = exitTransition,
-        popEnterTransition = popEnterTransition,
-        popExitTransition = popExitTransition,
-    ) { backStackEntry ->
-        val route = backStackEntry.toRoute<AgentChatRoute>()
-        AgentScaffold(
-            initialProjectStartAction = route.projectStartAction,
-            onNavigateBack = onNavigateBack,
-            onNavigateToSettings = onNavigateToSettings,
-            onNavigateToTools = onNavigateToTools,
-            onNavigateToMemory = onNavigateToMemory,
-            onNavigateToAdmin = onNavigateToAdmin,
-            onNavigateToProviders = onNavigateToProviders,
-            onNavigateToSchedules = onNavigateToSchedules,
-            onNavigateToProjects = onNavigateToProjects,
-            onNavigateToConversationList = onNavigateToConversationList,
-            onSwitchConversation = { agentId, conversationId, agentName ->
-                val normalizedConversationId = conversationId?.takeIf { it.isNotBlank() }
-                onSwitchConversation(
-                    AgentChatRoute(
-                        agentId = agentId,
-                        agentName = agentName,
-                        conversationId = normalizedConversationId,
-                        freshRouteKey = if (normalizedConversationId == null) System.currentTimeMillis() else null,
-                    )
-                )
-            },
-            // letta-mobile-aw0dv: open a subagent's OWN conversation, pinning
-            // its conversation id (never a fresh route — a subagent always has
-            // a real transcript) and defaulting to INTERACTIVE mode so the
-            // user sees the full tool/turn detail of the subagent's work.
-            onViewSubagentConversation = { subagentAgentId, subagentConversationId ->
-                // letta-mobile-aw0dv: a subagent's registry conversation id is
-                // almost always the BARE literal "default", which is NOT
-                // addressable to the subagent's real transcript — the shim maps
-                // bare "default" to the external form "conv-default-<agentId>"
-                // (native-goal-mode.ts / mobile-channel-host.ts). #515 pinned
-                // the route but passed the bare form, so resolution landed on a
-                // fresh/wrong conversation. Transform "default" -> the external
-                // resolvable id here so the chip opens the actual transcript.
-                val normalizedConversationId = subagentConversationId
-                    .takeIf { it.isNotBlank() }
-                    ?.let { convId ->
-                        if (convId == "default") "conv-default-$subagentAgentId" else convId
-                    }
-                onSwitchConversation(
-                    AgentChatRoute(
-                        agentId = subagentAgentId,
-                        conversationId = normalizedConversationId,
-                        // Never mint a fresh route for a subagent view — it has
-                        // a real conversation. If the id is somehow blank, still
-                        // avoid freshRouteKey so resolution targets the agent's
-                        // existing transcript rather than a new conversation.
-                        freshRouteKey = null,
-                        initialChatMode = "interactive",
-                    )
-                )
-            },
-            onNavigateToCanvas = onNavigateToCanvas,
-            viewModelKey = route.toViewModelKey(),
-            onNavigateToAppSettings = onNavigateToAppSettings,
-            onOpenCanvas = onOpenCanvas,
-            onNavigateToChannels = onNavigateToChannels,
-            onNavigateToSkills = onNavigateToSkills,
-        )
-    }
-}
+/** One chat view model per route: its agent, conversation, freshness and project. */
+fun AgentChatRoute.toViewModelKey(): String =
+    listOf(agentId, conversationId.orEmpty(), freshRouteKey?.toString().orEmpty(), projectIdentifier.orEmpty()).joinToString(":")
 
-fun AgentChatRoute.toViewModelKey(): String = buildString {
-    append(agentId)
-    append(':')
-    append(conversationId.orEmpty())
-    append(':')
-    append(freshRouteKey?.toString().orEmpty())
-    append(':')
-    append(projectIdentifier.orEmpty())
-}
+/**
+ * letta-mobile-aw0dv: a subagent's registry conversation is almost always the bare "default", which the
+ * host addresses as "conv-default-<agentId>"; the bare form would open a fresh conversation, not its transcript.
+ */
+internal fun subagentConversation(agentId: String, conversationId: String): String? =
+    conversationId.takeIf { it.isNotBlank() }?.let { if (it == "default") "conv-default-$agentId" else it }
+
+/** The route as the chat view model's arguments, as a navigation route would hand them over. */
+fun AgentChatRoute.toArgs(): Bundle = bundleOf(
+    "agentId" to agentId,
+    "agentName" to agentName,
+    "conversationId" to conversationId,
+    "freshRouteKey" to freshRouteKey,
+    "initialMessage" to initialMessage,
+    "initialChatMode" to initialChatMode,
+    "scrollToMessageId" to scrollToMessageId,
+    "projectIdentifier" to projectIdentifier,
+    "projectName" to projectName,
+    "projectLettaFolderId" to projectLettaFolderId,
+    "projectFilesystemPath" to projectFilesystemPath,
+    "projectGitUrl" to projectGitUrl,
+    "projectLastSyncAt" to projectLastSyncAt,
+    "projectActiveCodingAgents" to projectActiveCodingAgents,
+)

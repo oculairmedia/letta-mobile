@@ -5,6 +5,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.letta.mobile.data.agents.RecentAgentsPolicy
+import com.letta.mobile.data.canvas.CanvasDocument
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
@@ -18,6 +20,7 @@ import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
 import com.letta.mobile.ui.shell.sidebar.ShellPanelAgent
 import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
+import com.letta.mobile.ui.shell.sidebar.ShellChatOptionsState
 import kotlin.time.Instant
 
 /**
@@ -72,6 +75,7 @@ fun SyncShellWorkspace(workspace: ShellWorkspaceState, selection: ShellChatSelec
 fun ShellWorkspaceState.navDrawerInput(
     agents: List<Pair<String, String>>,
     conversations: ShellDrawerConversations = ShellDrawerConversations(),
+    library: ShellDrawerLibrary = ShellDrawerLibrary(),
 ): ShellNavDrawerInput {
     val focusedIndex = agents.indexOfFirst { it.first == focusedAgentId?.value }
     return ShellNavDrawerInput(
@@ -87,6 +91,12 @@ fun ShellWorkspaceState.navDrawerInput(
         archiveFilter = conversations.archiveFilter,
         pinnedConversationIds = conversations.pinnedIds,
         conversationParents = conversations.parentIds,
+        settledConversationIds = conversations.settledIds,
+        conversationMarkers = conversations.markers,
+        chatOptions = library.chatOptions,
+        canvases = library.canvases,
+        archivedCanvasIds = library.archivedCanvasIds,
+        pinnedAgentIds = library.pinnedAgentIds,
     )
 }
 
@@ -95,8 +105,9 @@ fun ShellWorkspaceState.navDrawerState(
     agents: List<Pair<String, String>>,
     now: Instant,
     conversations: ShellDrawerConversations = ShellDrawerConversations(),
+    library: ShellDrawerLibrary = ShellDrawerLibrary(),
 ): ShellNavDrawerState {
-    val base = ShellNavDrawerMapping.state(navDrawerInput(agents, conversations), now)
+    val base = ShellNavDrawerMapping.state(navDrawerInput(agents, conversations, library), now)
     val home = page == ShellDestination.Home
     return base.copy(
         rail = base.rail.copy(homeSelected = home, expanded = railExpanded),
@@ -149,4 +160,16 @@ data class ShellDrawerConversations(
     val pinnedIds: Set<String> = emptySet(),
     /** Each fork's source conversation id. */
     val parentIds: Map<String, String> = emptyMap(),
+    /** Settled conversations (listed last) and each conversation's marker. */
+    val settledIds: Set<String> = emptySet(),
+    val markers: Map<String, String> = emptyMap(),
+)
+
+/** What else the agent panel lists: the Chat options, the canvas library and the agents pinned to Home. */
+data class ShellDrawerLibrary(
+    /** The Chat options dialog's state; null leaves it out of the agent menu. */
+    val chatOptions: ShellChatOptionsState? = null,
+    val canvases: List<CanvasDocument> = emptyList(),
+    val archivedCanvasIds: Set<CanvasId> = emptySet(),
+    val pinnedAgentIds: Set<String> = emptySet(),
 )

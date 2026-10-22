@@ -5,7 +5,6 @@ import android.os.Build
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
 import com.letta.mobile.data.api.AppServerConnectionTester
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
@@ -28,7 +27,6 @@ import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.ui.common.UiState
-import com.letta.mobile.ui.navigation.ConfigRoute
 import com.letta.mobile.ui.state.RetainedContentRefresh
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -112,12 +110,9 @@ class ConfigViewModel @Inject constructor(
         const val DEFAULT_LOCAL_MODEL_MAX_TOKENS = "4096"
     }
 
-    // letta-mobile-cdlk: when the route arg signals create-new mode, the
-    // screen opens with an empty form and saveConfig mints a fresh UUID
-    // instead of overwriting the currently active config. Defaults to false
-    // so every existing nav site keeps the original "edit active" behaviour.
-    private val createNew: Boolean =
-        runCatching { savedStateHandle.toRoute<ConfigRoute>().createNew }.getOrDefault(false)
+    // letta-mobile-cdlk: a "createNew" argument opens an empty form whose save mints a fresh UUID
+    // instead of overwriting the active config; without one the page edits the active config.
+    private val createNew: Boolean = savedStateHandle.get<Boolean>("createNew") == true
 
     private val _uiState = MutableStateFlow<UiState<ConfigUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ConfigUiState>> = _uiState.asStateFlow()

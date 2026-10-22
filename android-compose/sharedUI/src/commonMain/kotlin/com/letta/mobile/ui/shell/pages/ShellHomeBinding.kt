@@ -16,7 +16,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.session.agentRosterOrEmpty
-import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
+import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellHomePrompt
 import com.letta.mobile.data.shell.ShellHomeShortcuts
@@ -88,7 +88,7 @@ private fun rememberFleetClock(): Instant {
 
 /** The shared Home page over its controller, behind the connection hero while there is one. */
 internal fun shellHomeBinding(
-    graph: SharedSessionRepositoryGraph,
+    graph: SessionRepositoryGraph,
     controller: HomePageController,
     host: ShellPageHost,
 ) = ShellPageContent<ShellDestination.Home> { destination, modifier ->
@@ -102,7 +102,7 @@ internal fun shellHomeBinding(
     }
 }
 
-private fun homeNavigation(graph: SharedSessionRepositoryGraph, host: ShellPageHost): HomePageNavigation {
+private fun homeNavigation(graph: SessionRepositoryGraph, host: ShellPageHost): HomePageNavigation {
     val router = host.navigator
     val workspace = router.state
     val openConversation = { id: String -> router.openConversation(ConversationId(id)) }

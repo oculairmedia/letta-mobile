@@ -28,10 +28,10 @@ class ShellLayoutController(private val store: ShellLayoutStore) {
 }
 
 /** The layout store for [backend] in [preferences]: one record per backend config. */
-fun shellLayoutStore(backend: LettaConfig, preferences: SecureSettingsStore): ShellLayoutStore =
-    ShellLayoutStore(preferences, key = "shell.${backend.id}.layout")
+fun shellLayoutStore(backend: LettaConfig?, preferences: SecureSettingsStore): ShellLayoutStore =
+    ShellLayoutStore(preferences, key = "shell.${backend?.id.orEmpty()}.layout")
 
-/** The [ShellLayoutController] for [backend], kept while the backend config is the same. */
+/** The [ShellLayoutController] for [backend], kept while the backend config is the same; null before one is configured. */
 @Composable
-fun rememberShellLayoutController(backend: LettaConfig, preferences: SecureSettingsStore): ShellLayoutController =
-    remember(backend.id, preferences) { ShellLayoutController(shellLayoutStore(backend, preferences)) }
+fun rememberShellLayoutController(backend: LettaConfig?, preferences: SecureSettingsStore): ShellLayoutController =
+    remember(backend?.id, preferences) { ShellLayoutController(shellLayoutStore(backend, preferences)) }

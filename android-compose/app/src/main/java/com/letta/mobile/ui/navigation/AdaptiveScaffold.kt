@@ -1,255 +1,258 @@
 package com.letta.mobile.ui.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.Row
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalView
-import androidx.navigation.NavController
-import androidx.navigation.NavDestination
-import androidx.navigation.NavDestination.Companion.hasRoute
-import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.compose.currentBackStackEntryAsState
-import com.letta.mobile.feature.chat.route.AgentChatRoute
-import com.letta.mobile.ui.haptics.HapticEffects
-import com.letta.mobile.ui.shell.shortcuts.ProvideShortcutHub
+import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
+import com.letta.mobile.data.desktopshell.ShellLayoutEvent
+import com.letta.mobile.data.chat.runtime.ConversationSummary
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellWorkspaceNavigator
+import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.feature.chat.screen.SharedNavDrawerViewModel
+import com.letta.mobile.feature.chat.screen.WorkspaceChatPanel
+import com.letta.mobile.ui.components.tabs.LettaTab
+import com.letta.mobile.ui.mascot.LocalMascotRegistry
+import com.letta.mobile.ui.shell.ShellDrawerConversations
+import com.letta.mobile.ui.shell.ShellDrawerLibrary
+import com.letta.mobile.ui.shell.header.UnifiedSearchSources
+import com.letta.mobile.ui.shell.pages.ShellLibraryControllers
+import com.letta.mobile.ui.shell.pages.rememberShellLibraryControllers
+import com.letta.mobile.ui.shell.rememberShellWorkspaceState
 import com.letta.mobile.ui.shell.shortcuts.ShellShortcutBinding
-import com.letta.mobile.ui.shell.shortcuts.ShortcutHelpOverlay
+import com.letta.mobile.ui.shell.shortcuts.ShellShortcutId
+import com.letta.mobile.ui.shell.shortcuts.ShortcutActions
+import com.letta.mobile.ui.shell.shortcuts.ShortcutLists
 import com.letta.mobile.ui.shell.shortcuts.ShortcutPlatform
-import com.letta.mobile.ui.shell.shortcuts.rememberShellShortcuts
-import com.letta.mobile.ui.theme.LocalWindowSizeClass
-import com.letta.mobile.ui.theme.isExpandedWidth
-import kotlin.reflect.KClass
-import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.shell.shortcuts.ShortcutStepping
+import com.letta.mobile.ui.shell.shortcuts.WorkspaceShortcuts
+import com.letta.mobile.ui.shell.shortcuts.handleShortcut
+import com.letta.mobile.ui.shell.workspace.LettaShellWorkspace
+import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceHost
+import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceSlots
+import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceState
+import com.letta.mobile.ui.shell.workspace.ShellLayoutController
+import com.letta.mobile.ui.shell.workspace.ShellWindowChrome
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceDrawer
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceEvents
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderBinding
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceLayout
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigation
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigationActions
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceSearch
+import com.letta.mobile.ui.shell.workspace.rememberShellLayoutController
+import com.letta.mobile.ui.shell.workspace.rememberShellWorkspaceHeader
+import com.letta.mobile.ui.shell.workspace.workspaceNavigation
+import com.letta.mobile.ui.shell.workspace.workspaceNavigationActions
+import com.letta.mobile.ui.theme.rememberReducedMotionEnabled
+import kotlin.time.Clock
 
-@Composable
-fun AdaptiveScaffold(
-    navController: NavController,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
+/** Where the workspace leaves for Android's own screens: the camera, diagnostics and the full-screen board. */
+internal class AndroidShellExits(
+    val openCanvas: (agentId: String?, conversationId: String?, shareRecipient: String?) -> Unit,
+    val openCanvasById: (canvasId: String) -> Unit,
+    val settings: com.letta.mobile.ui.screens.config.SettingsDestinations,
+)
+
+/** One composition's Android shell: the workspace, its navigation, the chat it drives and the drawer binding. */
+internal class WorkspaceShell(
+    /** The active backend config; null before one is configured. */
+    val config: LettaConfig?,
+    val workspace: ShellWorkspaceState,
+    val port: AndroidShellChatPort,
+    val drawerModel: SharedNavDrawerViewModel,
+    val layout: ShellLayoutController,
+    val drawer: ShellWorkspaceDrawer,
+    val exits: AndroidShellExits,
+    /** The open chat's model card and Chat options, which its page puts here while it shows. */
+    val chatPanel: MutableState<WorkspaceChatPanel?>,
+    val controllers: ShellLibraryControllers,
 ) {
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val destination = navBackStackEntry?.destination
-    val insetPolicy = remember(destination) { destination.insetPolicy() }
-    var helpOpen by remember { mutableStateOf(false) }
-    val shortcuts = rememberAndroidShortcuts(navController) { helpOpen = !helpOpen }
-
-    ProvideShortcutHub {
-        AdaptiveScaffoldLayout(
-            expanded = LocalWindowSizeClass.current.isExpandedWidth,
-            insetPolicy = insetPolicy,
-            navigationRail = { LettaNavigationRail(navController = navController) },
-            modifier = modifier.then(rememberShellShortcuts(shortcuts)),
-            content = content,
-        )
-        if (helpOpen) {
-            ShortcutHelpOverlay(onDismiss = { helpOpen = false })
-        }
-    }
-}
-
-@Composable
-private fun rememberAndroidShortcuts(
-    navController: NavController,
-    onHelp: () -> Unit,
-): ShellShortcutBinding {
-    val model: AndroidShortcutViewModel = hiltViewModel()
-    val conversations by model.conversations.collectAsStateWithLifecycle()
-    val agents by model.agents.collectAsStateWithLifecycle()
-    val lists = androidShortcutLists(conversations, agents, navController)
-    val latestLists = rememberUpdatedState(lists)
-    val latestHelp = rememberUpdatedState(onHelp)
-    val latestNav = rememberUpdatedState(navController)
-    return remember {
-        ShellShortcutBinding(ShortcutPlatform.Android, AndroidShortcuts) { id ->
-            handleAndroidShortcut(id, latestNav.value, latestLists.value, latestHelp.value)
-        }
-    }
+    /** The shell's verbs over the workspace and the chat they drive. */
+    val navigator = ShellWorkspaceNavigator(workspace, port)
 }
 
 /**
- * letta-mobile-v7aln: [content] sits at the same place in the composition whether the window is
- * compact or expanded. Rotating a phone crosses that line (expanded is 600dp and wider), and the
- * two layouts used to call [content] from different branches. Saved state is keyed by position,
- * so the rotated Activity found none of what the NavHost had saved: every destination's
- * rememberSaveable state (the chat's scroll position and display mode among them) was lost.
- * Only the rail and the padding differ between the two widths now; [insetPolicy] decides who pads
- * a compact destination for the system bars (letta-mobile-ckmub.2.1).
+ * letta-mobile-ckmub.2 (hard cut): Android mounts the shared [LettaShellWorkspace] as desktop and web do.
+ * This only binds Android's state into it: the roster and conversations from the drawer binding, the
+ * session graph's pages ([androidPageHost]), Android's chat page ([androidChatPage]) and the back gesture.
  */
 @Composable
-internal fun AdaptiveScaffoldLayout(
-    expanded: Boolean,
-    insetPolicy: DestinationInsetPolicy,
-    navigationRail: @Composable () -> Unit,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surface,
-    ) { innerPadding ->
-        val layoutDirection = LocalLayoutDirection.current
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(
-                    if (expanded) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
-                    else Modifier
+internal fun AndroidShellWorkspace(start: ShellDestination, config: LettaConfig?, exits: AndroidShellExits, launch: AndroidShellLaunch) {
+    val drawerModel: SharedNavDrawerViewModel = hiltViewModel()
+    val agents by drawerModel.agents.collectAsStateWithLifecycle()
+    val fleet by drawerModel.fleet.collectAsStateWithLifecycle()
+    val workspace = rememberShellWorkspaceState(start)
+    val latestFleet by rememberUpdatedState(fleet)
+    val latestAgents by rememberUpdatedState(agents)
+    val port = remember(workspace) { AndroidShellChatPort(workspace, { latestFleet }, { latestAgents.map { it.id } }) }
+    val sources = drawerModel.sources
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val shell = WorkspaceShell(
+        config = config,
+        workspace = workspace,
+        port = port,
+        drawerModel = drawerModel,
+        layout = rememberShellLayoutController(config, sources.library.settings),
+        drawer = remember { ShellWorkspaceDrawer() },
+        exits = exits,
+        chatPanel = remember { mutableStateOf(null) },
+        controllers = rememberShellLibraryControllers(sources.sessions, sources.library, scope),
+    )
+    LaunchedEffect(agents) { workspace.rosterChanged(agents.map { it.id }) }
+    // Each backend's roster and conversations load as the workspace comes up (a new backend reloads them).
+    LaunchedEffect(config?.id) { drawerModel.refresh(workspace.focusedAgentId, roster = true) }
+    LaunchedEffect(shell.drawer.open, workspace.focusedAgentId) { if (shell.drawer.open) drawerModel.refresh(workspace.focusedAgentId) }
+    AndroidShellLaunchEffect(shell, launch)
+    ShellFailures(drawerModel)
+    // Back closes the drawer, then returns to Home; on Home it leaves the app.
+    BackHandler(enabled = shell.drawer.open || workspace.page != ShellDestination.Home) {
+        if (shell.drawer.open) shell.drawer.open = false else workspace.navigate(ShellDestination.Home)
+    }
+    val header = rememberShellWorkspaceHeader(
+        ShellWorkspaceHeaderBinding(
+            navigator = shell.navigator,
+            layout = shell.layout,
+            search = ShellWorkspaceSearch(shell.controllers.home, searchSources(shell, agents, fleet)),
+            tabFor = tabFor(fleet),
+        ),
+    )
+    LettaShellWorkspace(
+        state = LettaShellWorkspaceState(
+            header = header,
+            navigation = rememberAndroidNavigation(shell, agents.map { it.id.value to it.name }),
+            layout = ShellWorkspaceLayout(
+                sidebarVisible = shell.layout.state.isSidebarVisible,
+                reducedMotion = rememberReducedMotionEnabled(),
+            ),
+        ),
+        host = LettaShellWorkspaceHost(
+            actions = androidNavigationActions(shell),
+            slots = androidSlots(shell, agents),
+            chrome = ShellWindowChrome.Inline,
+            drawer = shell.drawer,
+            events = ShellWorkspaceEvents(
+                onWidthChanged = { shell.layout.dispatch(ShellLayoutEvent.WindowWidthChanged(it)) },
+                shortcuts = rememberAndroidShortcuts(shell, agents),
+            ),
+        ),
+    )
+}
+
+/** The page, the open chat's card in the panel, the background tasks beside the page, and the overlays. */
+private fun androidSlots(shell: WorkspaceShell, agents: List<Agent>) = LettaShellWorkspaceSlots(
+    main = { modifier -> AndroidShellPage(shell, modifier) },
+    agentCard = { shell.chatPanel.value?.agentCard?.invoke() },
+    sidePane = { AndroidBackgroundTasks(shell) },
+    overlays = { AndroidShellOverlays(shell, agents) },
+)
+
+/** The rail over the roster and the focused agent's panel: its conversations, marks, canvases and Chat options. */
+@Composable
+private fun rememberAndroidNavigation(shell: WorkspaceShell, roster: List<Pair<String, String>>): ShellWorkspaceNavigation {
+    val model = shell.drawerModel
+    val focused = shell.workspace.focusedAgentId
+    val conversations by remember(focused) { focused?.let(model::conversationsOf) ?: kotlinx.coroutines.flow.flowOf(emptyList()) }
+        .collectAsStateWithLifecycle(emptyList())
+    val drawer = ShellDrawerConversations(
+        conversations = conversations,
+        archiveFilter = model.archiveFilter.collectAsStateWithLifecycle().value,
+        pinnedIds = model.pinnedConversationIds.collectAsStateWithLifecycle().value,
+        parentIds = model.conversationParents.collectAsStateWithLifecycle().value,
+        settledIds = model.settledConversationIds.collectAsStateWithLifecycle().value,
+        markers = model.conversationMarkers.collectAsStateWithLifecycle().value,
+    )
+    val library = ShellDrawerLibrary(
+        chatOptions = shell.chatPanel.value?.chatOptions,
+        canvases = model.canvases.collectAsStateWithLifecycle().value,
+        pinnedAgentIds = model.pinnedAgentIds.collectAsStateWithLifecycle().value,
+    )
+    // Relative times are taken when the drawer opens; they do not tick while it is open.
+    val now = remember(shell.drawer.open) { Clock.System.now() }
+    return shell.workspace.workspaceNavigation(roster, now, drawer, LocalMascotRegistry.current.identities.toMap(), library)
+}
+
+/** The shared verbs, with the rows' conversation actions and the agent pins written through Android's stores. */
+private fun androidNavigationActions(shell: WorkspaceShell): ShellWorkspaceNavigationActions {
+    val base = shell.navigator.workspaceNavigationActions()
+    val model = shell.drawerModel
+    val agent = { shell.workspace.focusedAgentId?.value.orEmpty() }
+    return base.copy(
+        rail = base.rail.copy(onAgentPinnedChange = model::setAgentPinned),
+        panel = base.panel.copy(
+            onArchiveFilterChange = model::setArchiveFilter,
+            onArchiveConversation = { id, archived -> model.setConversationArchived(id, agent(), archived) },
+            onDeleteConversation = { id -> model.deleteConversation(id, agent()) },
+            deleteBehavior = model.deleteBehavior,
+            onRenameConversation = { id, title ->
+                model.renameConversation(ConversationId(id), AgentId(agent()), ConversationSummary(title))
+            },
+            onPinConversation = { id, pinned -> model.setConversationPinned(ConversationId(id), pinned) },
+            onOpenCanvas = { canvasId -> shell.exits.openCanvasById(canvasId.value) },
+            conversationMarks = model.conversationMarkActions,
+            chatOptions = shell.chatPanel.value?.chatOptionsActions ?: base.panel.chatOptions,
+        ),
+    )
+}
+
+private fun searchSources(shell: WorkspaceShell, agents: List<Agent>, fleet: List<Conversation>) = UnifiedSearchSources(
+    conversations = fleet.toChatConversationSummaries(agents.associate { it.id.value to it.name }),
+    agents = agents,
+    agentId = shell.workspace.focusedAgentId?.value,
+)
+
+/** A tab's title: the conversation's summary, else its agent's name. */
+private fun tabFor(fleet: List<Conversation>): (String) -> LettaTab? = { id ->
+    fleet.firstOrNull { it.id.value == id }?.let {
+        LettaTab(key = id, title = it.summary?.takeIf(String::isNotBlank) ?: it.agentName.orEmpty().ifBlank { "Chat" })
+    }
+}
+
+/** The shared keymap on Android's hardware keyboards: the workspace's verbs, without the rename dialog. */
+@Composable
+private fun rememberAndroidShortcuts(shell: WorkspaceShell, agents: List<Agent>): ShellShortcutBinding {
+    val latestAgents by rememberUpdatedState(agents)
+    return remember(shell.workspace, shell.port) {
+        val actions = ShortcutActions(
+            overlays = shell.workspace.overlays,
+            navigate = shell.workspace::navigate,
+            toggleSidebar = { shell.layout.dispatch(ShellLayoutEvent.ToggleSidebar) },
+            lists = ShortcutLists(
+                conversations = ShortcutStepping(
+                    ids = { shell.port.conversations().map { it.id.value } },
+                    current = { shell.workspace.selectedConversationId?.value },
+                    open = { shell.navigator.openConversation(ConversationId(it)) },
                 ),
-        ) {
-            if (expanded) {
-                navigationRail()
-                VerticalDivider()
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .then(if (expanded) Modifier else insetPolicy.frame(innerPadding, layoutDirection)),
-            ) {
-                content()
-            }
-        }
-    }
-}
-
-@Composable
-private fun LettaNavigationRail(
-    navController: NavController,
-    modifier: Modifier = Modifier,
-) {
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
-    val focusManager = LocalFocusManager.current
-    val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
-    val visibleDestinations = visibleTopLevelDestinations()
-
-    NavigationRail(
-        modifier = modifier.fillMaxHeight(),
-        containerColor = MaterialTheme.colorScheme.surface,
-        header = { Spacer(Modifier.width(LettaDimens.Space.sm)) },
-    ) {
-        Spacer(Modifier.weight(1f))
-        visibleDestinations.forEach { destination ->
-            val selected = destination.isSelected(currentDestination)
-
-            NavigationRailItem(
-                selected = selected,
-                onClick = {
-                    HapticEffects.segmentTick(haptic, view, enabled = !selected)
-                    navController.navigateTopLevel(destination, focusManager)
-                },
-                icon = {
-                    Icon(destination.icon, contentDescription = destination.label)
-                },
-                label = { Text(destination.label) },
-            )
-        }
-        Spacer(Modifier.weight(1f))
-    }
-}
-
-/**
- * letta-mobile-2ixd: filter [TopLevelDestination] entries against the
- * connected backend's capabilities. Today only the Projects entry is
- * conditional; future capability gates layer in here.
- *
- * Default is "show everything" — when the probe hasn't completed yet, or
- * fails for a transient reason, we err on the side of visible. Hiding a
- * feature behind an inconclusive probe is worse UX than showing a
- * working feature that occasionally hits a 404.
- */
-@Composable
-private fun visibleTopLevelDestinations(): List<TopLevelDestination> {
-    val capabilities: CapabilityViewModel = hiltViewModel()
-    val projectsSupported by capabilities.projectsSupported.collectAsStateWithLifecycle()
-    return TopLevelDestination.entries.filter { destination ->
-        when (destination) {
-            TopLevelDestination.HOME -> projectsSupported
-            else -> true
-        }
-    }
-}
-
-private fun NavController.navigateTopLevel(
-    destination: TopLevelDestination,
-    focusManager: FocusManager,
-) {
-    focusManager.clearFocus(force = true)
-    if (popToExistingTopLevel(destination)) {
-        return
-    }
-    navigate(destination.route) {
-        popUpTo(graph.startDestinationId) {
-            saveState = true
-        }
-        launchSingleTop = true
-        restoreState = true
-    }
-}
-
-private fun NavController.popToExistingTopLevel(destination: TopLevelDestination): Boolean =
-    when (destination) {
-        TopLevelDestination.HOME,
-        TopLevelDestination.CHAT,
-        -> false
-        // Chat can be opened from Admin shortcuts. In that case AgentChatRoute
-        // is visually a chat destination, but AdminRoute is still the parent
-        // stack the user expects to return to when tapping Admin.
-        TopLevelDestination.ADMIN -> popBackStack<AdminRoute>(inclusive = false)
-    }
-
-internal fun TopLevelDestination.isSelected(currentDestination: NavDestination?): Boolean {
-    if (currentDestination == null) return false
-    val routeClasses: List<KClass<*>> = when (this) {
-        TopLevelDestination.HOME -> listOf(HomeRoute::class, ProjectsRoute::class)
-        TopLevelDestination.CHAT -> listOf(ConversationsRoute::class, AgentChatRoute::class)
-        TopLevelDestination.ADMIN -> listOf(
-            AdminRoute::class,
-            AgentListRoute::class,
-            ConfigRoute::class,
-            ConfigListRoute::class,
-            TemplatesRoute::class,
-            PluginsRoute::class,
-            ProvidersRoute::class,
-            SchedulesRoute::class,
-            RunsRoute::class,
-            AboutRoute::class,
-            AllToolsRoute::class,
-            SkillsRoute::class,
-            SystemAccessRoute::class,
-            EditAgentRoute::class,
+                agents = ShortcutStepping(
+                    ids = { latestAgents.map { it.id.value } },
+                    current = { shell.workspace.focusedAgentId?.value },
+                    open = { shell.navigator.openAgent(AgentId(it)) },
+                ),
+            ),
         )
+        ShellShortcutBinding(ShortcutPlatform.Android, WorkspaceShortcuts - ShellShortcutId.Rename) { id ->
+            handleShortcut(id, actions)
+        }
     }
-    return currentDestination.hierarchy.any { destination ->
-        routeClasses.any { routeClass -> destination.hasRoute(routeClass) }
-    }
+}
+
+/** A row action that failed says so briefly. */
+@Composable
+private fun ShellFailures(model: SharedNavDrawerViewModel) {
+    val context = LocalContext.current
+    LaunchedEffect(model) { model.failures.collect { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() } }
 }

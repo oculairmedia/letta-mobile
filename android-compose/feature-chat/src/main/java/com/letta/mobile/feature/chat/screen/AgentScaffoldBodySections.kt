@@ -1,23 +1,19 @@
 package com.letta.mobile.feature.chat.screen
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -40,10 +36,6 @@ internal fun AgentScaffoldInteractionEffects(state: AgentScaffoldRuntimeState) {
         }
     }
 
-    BackHandler(enabled = state.drawerState.isOpen) {
-        state.scope.launch { state.drawerState.close() }
-    }
-
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -58,37 +50,44 @@ internal fun AgentScaffoldInteractionEffects(state: AgentScaffoldRuntimeState) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The page's part of the workspace (letta-mobile-ckmub.2): the conversation it settled on, a draft the
+ * shell routed to its composer, and its model card and Chat options in the agent panel while it shows.
+ */
 @Composable
-internal fun AgentScaffoldDrawerScaffold(state: AgentScaffoldRuntimeState) {
-    LogDrawerTransitions(state.drawerState)
-    // Hard cut S9: the shared navigation drawer (the desktop's rail and agent panel, sharedUI) is
-    // the only drawer; AgentScaffold always provides its binding (a test host may leave it out).
-    val sharedDrawer = LocalSharedNavDrawer.current
-    ModalNavigationDrawer(
-        drawerState = state.drawerState,
-        drawerContent = { sharedDrawer?.let { AgentScaffoldSharedDrawerSheet(state, it) } },
-    ) {
-        AgentScaffoldChromeScaffold(state)
+internal fun AgentScaffoldWorkspaceEffects(state: AgentScaffoldRuntimeState) {
+    val workspace = state.params.workspace
+    val viewModel = state.params.viewModel
+    val conversationId = state.conversationId
+    LaunchedEffect(conversationId) { conversationId?.let { workspace.onConversationShown(state.agentIdValue, it) } }
+    val draft = workspace.draft.value
+    LaunchedEffect(draft) {
+        draft ?: return@LaunchedEffect
+        viewModel.handleComposerTextChanged(draft)
+        workspace.draft.value = null
+    }
+    val latest by rememberUpdatedState(state)
+    val chatOptions = rememberAndroidChatOptionsState(state, workspace.drawer)
+    val chatOptionsActions = rememberAndroidChatOptionsActions(state, workspace.drawer)
+    val panel = remember(chatOptions, chatOptionsActions) {
+        WorkspaceChatPanel(agentCard = { AndroidAgentContextCard(latest) }, chatOptions, chatOptionsActions)
+    }
+    DisposableEffect(panel) {
+        workspace.panel.value = panel
+        onDispose { if (workspace.panel.value === panel) workspace.panel.value = null }
     }
 }
 
-internal fun closeDrawerAndRun(state: AgentScaffoldRuntimeState, action: () -> Unit) {
-    state.scope.launch { state.drawerState.close() }
-    action()
-}
-
+/**
+ * The chat inside the shared shell workspace (letta-mobile-ckmub.2): the workspace draws the header,
+ * the agent rail and panel, so the page is the chat and its project tray, edge to edge under them.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-private fun AgentScaffoldChromeScaffold(state: AgentScaffoldRuntimeState) {
-    // letta-mobile-bglj6.1: the shared page's phone canvas mode keeps the board's top clear, so the
-    // header (agent pill and menu) gives way to it; the board's menu carries both while it is hidden.
-    // letta-mobile-bglj6.1.22: the agent's pill alone stays, so the agent is known at a glance.
-    var headerHidden by rememberSaveable { mutableStateOf(false) }
+internal fun AgentScaffoldChatPane(state: AgentScaffoldRuntimeState) {
     Scaffold(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = { AgentScaffoldTopChrome(state, headerHidden) },
         floatingActionButton = { AgentScaffoldProjectBugFab(state) },
     ) { paddingValues ->
         // letta-mobile-bccty: thread the agentId -> display-name resolver
@@ -128,11 +127,7 @@ private fun AgentScaffoldChromeScaffold(state: AgentScaffoldRuntimeState) {
             )
         }
         CompositionLocalProvider(LocalAndroidAgentMessageContext provides agentMessages) {
-            AgentScaffoldMainContent(
-                state = state,
-                paddingValues = paddingValues,
-                onHeaderHiddenChange = { headerHidden = it },
-            )
+            AgentScaffoldMainContent(state = state, paddingValues = paddingValues)
         }
     }
 }
