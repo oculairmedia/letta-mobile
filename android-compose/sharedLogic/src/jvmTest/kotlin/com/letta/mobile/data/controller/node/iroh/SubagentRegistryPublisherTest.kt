@@ -7,6 +7,7 @@ import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ServerFrameSerializer
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -54,6 +55,50 @@ class SubagentRegistryPublisherTest {
     private class RecordingViewer(override val connectionId: String) : ViewerHandle {
         val frames = CopyOnWriteArrayList<String>()
         override suspend fun writeFrame(frame: String): Boolean = frames.add(frame)
+    }
+
+    @Test
+    fun aBurstOfChangesToOneConversationIsSentOnce() = runTest {
+        val published = CopyOnWriteArrayList<String>()
+        val publisher = SubagentRegistryPublisher(backgroundScope, source, clock = { Instant.ofEpochMilli(nowMs) })
+        publisher.attach { conversationId, _ -> published += conversationId; 1 }
+        val key = SubagentConversationKey(AGENT, CONVERSATION)
+
+        repeat(50) { publisher.onConversationChanged(key) }
+        runCurrent()
+
+        assertEquals(listOf(CONVERSATION), published)
+    }
+
+    @Test
+    fun changesToDifferentConversationsAreAllSentInOrder() = runTest {
+        val published = CopyOnWriteArrayList<String>()
+        val publisher = SubagentRegistryPublisher(backgroundScope, source, clock = { Instant.ofEpochMilli(nowMs) })
+        publisher.attach { conversationId, _ -> published += conversationId; 1 }
+
+        listOf("c1", "c2", "c3", "c2", "c1").forEach { publisher.onConversationChanged(SubagentConversationKey(AGENT, it)) }
+        runCurrent()
+
+        assertEquals(listOf("c1", "c2", "c3"), published)
+    }
+
+    @Test
+    fun theQueueKeepsTheNewestChangesPastItsCap() = runTest {
+        val published = CopyOnWriteArrayList<String>()
+        val publisher = SubagentRegistryPublisher(backgroundScope, source, clock = { Instant.ofEpochMilli(nowMs) })
+        val total = SubagentRegistryPublisher.MAX_PENDING_KEYS + 5
+        Telemetry.clear()
+        // Nothing runs the sender until runCurrent, so every key queues first.
+        (1..total).forEach { publisher.onConversationChanged(SubagentConversationKey(AGENT, "c$it")) }
+        // Read before the sender runs: its thousand "published" lines would push these out of the telemetry ring.
+        val overflows = Telemetry.snapshot().filter { it.tag == "SubagentPush" && it.name == "pending_overflow" }
+        assertEquals(setOf("c1", "c2", "c3", "c4", "c5"), overflows.map { it.attrs["droppedConversationId"] }.toSet())
+        publisher.attach { conversationId, _ -> published += conversationId; 1 }
+        runCurrent()
+
+        assertEquals(SubagentRegistryPublisher.MAX_PENDING_KEYS, published.size)
+        assertEquals("c$total", published.last())
+        assertTrue("c1" !in published, "the oldest waiting key is the one dropped")
     }
 
     @Test

@@ -139,7 +139,6 @@ internal class AdminRpcStreamServer(
     suspend fun serveAcceptLoop(acceptBi: suspend () -> AdminRpcBiStream?) = supervisorScope {
         while (true) {
             val stream = acceptBi() ?: break
-            Telemetry.event("IrohNode", "admin_rpc.stream.accepted", "remoteEndpointId" to remoteEndpointId)
             launchHandler(stream)
         }
     }
@@ -272,11 +271,7 @@ internal class AdminRpcStreamServer(
             val type = obj["type"]?.jsonPrimitive?.contentOrNull
             val requestId = obj["request_id"]?.jsonPrimitive?.contentOrNull
             val method = obj["method"]?.jsonPrimitive?.contentOrNull
-            Telemetry.event(
-                "IrohNode", "admin_rpc.stream.recv",
-                "remoteEndpointId" to remoteEndpointId,
-                "type" to type, "requestId" to requestId, "method" to method,
-            )
+            noteReceived(obj)
             if (type != "admin_rpc") {
                 errorEnvelope(requestId ?: "", "Expected admin_rpc frame")
             } else if (!authenticated.get()) {
@@ -297,6 +292,19 @@ internal class AdminRpcStreamServer(
         } catch (error: Exception) {
             errorEnvelope("", "Failed to parse admin_rpc frame: ${error.message ?: error.toString()}")
         }
+    }
+
+    /** One line per request, except health.check: a client's keep-alive poll was two thirds of every admin_rpc line. */
+    private fun noteReceived(frame: JsonObject) {
+        val method = frame["method"]?.jsonPrimitive?.contentOrNull
+        if (method == HEALTH_CHECK_METHOD) return
+        Telemetry.event(
+            "IrohNode", "admin_rpc.stream.recv",
+            "remoteEndpointId" to remoteEndpointId,
+            "type" to frame["type"]?.jsonPrimitive?.contentOrNull,
+            "requestId" to frame["request_id"]?.jsonPrimitive?.contentOrNull,
+            "method" to method,
+        )
     }
 
     /**
@@ -391,5 +399,6 @@ internal class AdminRpcStreamServer(
         const val DEFAULT_MAX_ACTIVE_HANDLERS = 16
         const val DEFAULT_FIRST_FRAME_TIMEOUT_MS = 15_000L
         private const val READ_CHUNK_SIZE = 8192
+        private const val HEALTH_CHECK_METHOD = "health.check"
     }
 }

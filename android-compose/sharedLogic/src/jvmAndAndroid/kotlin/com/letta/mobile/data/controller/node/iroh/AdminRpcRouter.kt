@@ -119,6 +119,7 @@ class AdminRpcRouter(
             Telemetry.event("AdminRpc", "authz.agent_scope_denied", "method" to invocation.method)
             return encodeFailure(invocation.requestId, AgentScopeGuard.DENIED)
         }
+        val startedNs = System.nanoTime()
         return try {
             val result = AgentScopeGuard.filterResult(
                 agentScope,
@@ -133,7 +134,7 @@ class AdminRpcRouter(
                     put("success", true)
                     put("result", result)
                 },
-            )
+            ).also { response -> reportIfSlow(invocation, startedNs, response.length) }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {

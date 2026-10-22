@@ -172,6 +172,10 @@ internal class ConversationTurnFanout(
     /** A delta that ends a run already reached the viewers. */
     private var terminalDeltaRelayed = false
 
+    /** The audience the last `fanout.broadcast` line named, so a delta that finds the same one logs nothing. */
+    @Volatile
+    private var lastBroadcastAudience = -1
+
     /**
      * The initiator's connection is gone but the turn keeps running
      * (see [NodeTurnHost]). Frames still go to every other viewer and are still tracked for
@@ -489,16 +493,27 @@ internal class ConversationTurnFanout(
      * When there is no queue (legacy/test construction) every write stays
      * synchronous, preserving the pre-queue behaviour exactly.
      */
-    private suspend fun broadcastDeltaBodyNoPark(delta: JsonObject) {
-        val viewers = snapshotViewers()
-        // Endpoint identities are stable public keys and therefore correlatable.
-        // Emit only aggregate delivery state; never copy endpoint values into fanout telemetry.
+    /**
+     * Endpoint identities are stable public keys and therefore correlatable: emit only aggregate
+     * delivery state, never endpoint values. One line per CHANGE of audience, not per delta: a
+     * streamed turn is thousands of deltas.
+     */
+    private fun noteAudience(initiators: List<ViewerHandle>, observers: List<ViewerHandle>) {
+        val viewerCount = initiators.size + observers.size
+        val hasInitiator = initiators.isNotEmpty()
+        val audience = viewerCount * 2 + if (hasInitiator) 1 else 0
+        if (audience == lastBroadcastAudience) return
+        lastBroadcastAudience = audience
         Telemetry.event(
             "IrohNode", "fanout.broadcast",
             "conversationId" to conversationId,
-            "viewerCount" to viewers.size,
-            "hasInitiator" to (initiatorViewer != null),
+            "viewerCount" to viewerCount,
+            "hasInitiator" to hasInitiator,
         )
+    }
+
+    private suspend fun broadcastDeltaBodyNoPark(delta: JsonObject) {
+        val viewers = snapshotViewers()
         if (viewers.isEmpty()) return
         // tg7b8: split the join. The initiator MUST receive every frame for
         // redial parity (q71yi parking) — keep awaitAll on its single write.
@@ -507,6 +522,8 @@ internal class ConversationTurnFanout(
         // hitch on send. Fire-and-forget observer writes so the call site
         // returns as soon as the initiator's write commits.
         val (initiatorWrite, observerViewers) = partitionViewersByInitiator(viewers)
+        // Counted after partitioning so a detached initiator's dead handle is not in the audience.
+        noteAudience(initiatorWrite, observerViewers)
         observerViewers.forEach { viewer ->
             val queue = observerWrites
             if (queue == null) {
