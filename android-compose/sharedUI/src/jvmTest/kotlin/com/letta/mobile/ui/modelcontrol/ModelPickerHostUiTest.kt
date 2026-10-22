@@ -2,12 +2,17 @@
 
 package com.letta.mobile.ui.modelcontrol
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.repository.modelcontrol.CatalogModel
 import com.letta.mobile.ui.context.ModelPickerHost
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -57,4 +62,40 @@ class ModelPickerHostUiTest {
         onNodeWithTag("${ModelPickerTags.ROW_PREFIX}entry-a").performClick()
         runOnIdle { assertEquals(listOf("entry-a"), picks.models) }
     }
+
+    @Test
+    fun aRowClickSelectsTheModelAtItsDefaultEffortUntilAnEffortWasPickedForIt() = runComposeUiTest {
+        val picks = RecordedPicks()
+        val models = listOf(effortModel("openai/a", "Model A"), effortModel("anthropic/b", "Model B"))
+        val picker = testCatalogPicker(models, picks)
+        val host = LettaHost.Touch.copy(sheet = { _, content -> Column { content() } }, dialog = { _, content -> Column { content() } })
+        setContent { MaterialTheme { ProvideLettaHost(host) { ModelPickerHost(picker, selectedValue = "openai/a") } } }
+
+        picker.open()
+        onNodeWithTag("${ModelPickerTags.ROW_PREFIX}anthropic/b").performClick()
+        runOnIdle { assertEquals(listOf("anthropic/b"), picks.models) }
+
+        picker.open()
+        onNodeWithTag("${ModelEffortTags.PILL_PREFIX}anthropic/b").performClick()
+        onNodeWithTag("${ModelEffortTags.LEVEL_PREFIX}high").performClick()
+        runOnIdle {
+            assertEquals(listOf<Pair<String, String?>>("anthropic/b" to "high"), picks.efforts)
+            assertFalse(picker.pickerOpen)
+        }
+
+        // The next click on that model brings its effort back; the row shows it.
+        picker.open()
+        onNodeWithTag("${ModelEffortTags.PILL_PREFIX}anthropic/b").assertTextContains("High")
+        onNodeWithTag("${ModelPickerTags.ROW_PREFIX}anthropic/b").performClick()
+        runOnIdle {
+            assertEquals(listOf<Pair<String, String?>>("anthropic/b" to "high", "anthropic/b" to "high"), picks.efforts)
+            assertEquals(listOf("anthropic/b"), picks.models)
+        }
+    }
+
+    private fun effortModel(handle: String, label: String) = CatalogModel(
+        model = pickerModel(handle, label),
+        exposed = true,
+        reasoningEfforts = listOf("low", "medium", "high"),
+    )
 }

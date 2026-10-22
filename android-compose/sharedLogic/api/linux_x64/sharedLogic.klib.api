@@ -2276,6 +2276,8 @@ final enum class com.letta.mobile.data.repository.modelcontrol/ReasoningTier : k
         final fun <get-effort>(): kotlin/String // com.letta.mobile.data.repository.modelcontrol/ReasoningTier.effort.<get-effort>|<get-effort>(){}[0]
     final val entries // com.letta.mobile.data.repository.modelcontrol/ReasoningTier.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.repository.modelcontrol/ReasoningTier> // com.letta.mobile.data.repository.modelcontrol/ReasoningTier.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val label // com.letta.mobile.data.repository.modelcontrol/ReasoningTier.label|{}label[0]
+        final fun <get-label>(): kotlin/String // com.letta.mobile.data.repository.modelcontrol/ReasoningTier.label.<get-label>|<get-label>(){}[0]
 
     final fun valueOf(kotlin/String): com.letta.mobile.data.repository.modelcontrol/ReasoningTier // com.letta.mobile.data.repository.modelcontrol/ReasoningTier.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<com.letta.mobile.data.repository.modelcontrol/ReasoningTier> // com.letta.mobile.data.repository.modelcontrol/ReasoningTier.values|values#static(){}[0]
@@ -48778,6 +48780,9 @@ final class com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding { /
     final fun close() // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.close|close(){}[0]
     final fun editModels() // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.editModels|editModels(){}[0]
     final fun open() // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.open|open(){}[0]
+    final fun rememberedEffort(com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry): kotlin/String? // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.rememberedEffort|rememberedEffort(com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry){}[0]
+    final fun selectEffort(com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry, kotlin/String?) // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.selectEffort|selectEffort(com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry;kotlin.String?){}[0]
+    final fun selectModel(com.letta.mobile.data.repository.modelcontrol/ModelPickerEntry) // com.letta.mobile.data.repository.modelcontrol/ModelPickerBinding.selectModel|selectModel(com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry){}[0]
 }
 
 final class com.letta.mobile.data.repository.modelcontrol/ModelPickerController { // com.letta.mobile.data.repository.modelcontrol/ModelPickerController|null[0]

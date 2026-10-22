@@ -39809,6 +39809,9 @@ public final class com/letta/mobile/data/repository/modelcontrol/ModelPickerBind
 	public final fun getPickerOpen ()Z
 	public final fun getSource ()Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
 	public final fun open ()V
+	public final fun rememberedEffort (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerEntry;)Ljava/lang/String;
+	public final fun selectEffort (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerEntry;Ljava/lang/String;)V
+	public final fun selectModel (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerEntry;)V
 }
 
 public final class com/letta/mobile/data/repository/modelcontrol/ModelPickerBindingKt {
@@ -40473,6 +40476,7 @@ public final class com/letta/mobile/data/repository/modelcontrol/ReasoningTier :
 	public static final field XHIGH Lcom/letta/mobile/data/repository/modelcontrol/ReasoningTier;
 	public final fun getEffort ()Ljava/lang/String;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getLabel ()Ljava/lang/String;
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/repository/modelcontrol/ReasoningTier;
 	public static fun values ()[Lcom/letta/mobile/data/repository/modelcontrol/ReasoningTier;
 }

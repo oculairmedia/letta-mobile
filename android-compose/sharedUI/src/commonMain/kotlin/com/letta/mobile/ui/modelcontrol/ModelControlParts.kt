@@ -3,7 +3,6 @@ package com.letta.mobile.ui.modelcontrol
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,29 +51,6 @@ internal fun DisconnectConfirmDialog(provider: ConnectableProvider, onConfirm: (
         confirmLabel = "Disconnect",
     )
     LettaConfirmPane(request, onConfirm = onConfirm, onDismiss = onDismiss)
-}
-
-/**
- * Reasoning-effort chooser for a model that advertises variants. "Default"
- * restores the provider default (`reasoning_effort: null`).
- */
-@Composable
-fun ReasoningEffortChips(
-    efforts: List<String>,
-    onSelect: (effort: String?) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    if (efforts.isEmpty()) return
-    FlowRow(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-        AssistChip(onClick = { onSelect(null) }, label = { Text("Default") })
-        efforts.forEach { effort ->
-            AssistChip(
-                onClick = { onSelect(effort) },
-                label = { Text(effort) },
-                modifier = Modifier.testTag("reasoning_effort_$effort"),
-            )
-        }
-    }
 }
 
 /**

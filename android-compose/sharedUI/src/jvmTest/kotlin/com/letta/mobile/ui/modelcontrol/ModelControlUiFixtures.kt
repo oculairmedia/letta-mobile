@@ -67,13 +67,20 @@ internal object ModelControlUiFixtures {
         reasoningEffort = effort,
     )
 
+    private fun CatalogModel.offering(vararg efforts: String) = copy(reasoningEfforts = efforts.toList())
+
+    private fun CatalogModel.inWindow(tokens: Int) = copy(model = model.copy(contextWindow = tokens))
+
     private fun CatalogModel.hidden() = copy(exposed = false)
 
     val models: List<CatalogModel> = listOf(
-        model("chatgpt-plus-pro/gpt-5.5", "GPT-5.5", effort = "medium"),
-        model("chatgpt-plus-pro/gpt-5.5-codex", "GPT-5.5 Codex", effort = "high"),
+        // GPT-5.5 can switch thinking off ("none"); Codex cannot.
+        model("chatgpt-plus-pro/gpt-5.5", "GPT-5.5", effort = "medium")
+            .offering("none", "low", "medium", "high", "xhigh")
+            .inWindow(400_000),
+        model("chatgpt-plus-pro/gpt-5.5-codex", "GPT-5.5 Codex", effort = "high").offering("low", "medium", "high").inWindow(400_000),
         model("chatgpt-plus-pro/gpt-5.5-mini", "GPT-5.5 Mini").hidden(),
-        model("minimax/minimax-m3", "MiniMax M3", effort = "medium"),
+        model("minimax/minimax-m3", "MiniMax M3", effort = "medium").inWindow(200_000),
         model("minimax/minimax-m3-lightning", "MiniMax M3 Lightning"),
         model("lmstudio/qwen3-coder-30b", "qwen3-coder-30b"),
         model("lmstudio/gemma-4-27b", "gemma-4-27b").hidden(),

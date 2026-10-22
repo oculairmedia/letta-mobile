@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ColorScheme
@@ -32,6 +33,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectForm
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 import com.letta.mobile.ui.host.LettaDialogFrame
 import com.letta.mobile.ui.host.PaneSpec
 import com.letta.mobile.ui.theme.LettaColorTokens
@@ -68,9 +71,32 @@ class ModelControlSnapshotTest {
         onOpenSignIn = {}, onCheckSignIn = {}, onDismissSignIn = {}, onEdit = {},
     )
 
+    /** Picks efforts: compact rows with the effort in force (desktop), or an effort pill (phone). */
+    private val effortPicker = noPicker.copy(onEffortSelected = { _, _ -> })
+
     @Test
     fun picker() = renderAll("picker") { form ->
-        Modal(form) { ModelPickerContent(ModelControlUiFixtures.pickerState(), noPicker) }
+        ProvideLettaHost(if (form == Form.DESKTOP) LettaHost.Pointer else LettaHost.Touch) {
+            Modal(form) { ModelPickerContent(ModelControlUiFixtures.pickerState(), effortPicker) }
+        }
+    }
+
+    /** GPT-5.5's options as its flyout (desktop) or sheet (phone) shows them: Thinking, then its levels. */
+    @Test
+    fun pickerEffortOptions() = listOf(false, true).forEach { dark ->
+        render("picker-effort-options", Form.DESKTOP, dark) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Surface(
+                    shape = RoundedCornerShape(LettaDimens.Radius.md),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shadowElevation = LettaDimens.Space.sm,
+                    modifier = Modifier.width(220.dp),
+                ) {
+                    val gpt = ModelControlUiFixtures.pickerState().groups.flatMap { it.entries }.first { it.selected }
+                    ModelEffortOptions(gpt.effortMenu(remembered = null), highlight = 1, onPick = {})
+                }
+            }
+        }
     }
 
     @Test
