@@ -35,30 +35,31 @@ internal class LocalBackendAgentReader(
      */
     fun countAgents(): Int? = runCatching { support.agentIndex.entries().size }.getOrNull()
 
-    /** Ids of hidden (subagent) agents; null when the store cannot be read. */
+    /**
+     * Ids of hidden (subagent) agents; null when the store cannot be read. Agents past the index cap
+     * were never read, so they count as hidden: their conversations stay out of the list rather
+     * than a subagent's leaking into it.
+     */
     fun hiddenAgentIds(): Set<String>? = runCatching {
-        support.agentIndex.entries().filter { it.hidden }.mapTo(HashSet()) { it.id }
+        val scan = support.agentIndex.scan()
+        scan.entries.filter { it.hidden }.mapTo(HashSet()) { it.id } + scan.uncoveredIds
     }.getOrNull()
 
     fun listAgentsProjected(limit: Int?, offset: Int?): JsonArray? = runCatching {
         val entries = support.agentIndex.entries()
         val from = (offset ?: 0).coerceAtLeast(0)
-        val windowed = if (from >= entries.size) {
-            emptyList()
-        } else {
-            val end = (from + (limit?.coerceAtLeast(0) ?: MAX_PROJECTED_AGENTS)).coerceAtMost(entries.size)
-            if (limit == null && end < entries.size) {
-                Telemetry.event(
-                    "LocalBackendAgents", "unpaged_list_truncated",
-                    "agents" to entries.size, "max" to MAX_PROJECTED_AGENTS, level = Telemetry.Level.WARN,
-                )
-            }
-            entries.subList(from, end)
+        val pageSize = limit?.coerceAtLeast(0) ?: MAX_PROJECTED_AGENTS
+        if (limit == null && entries.size - from > MAX_PROJECTED_AGENTS) {
+            Telemetry.event(
+                "LocalBackendAgents", "unpaged_list_truncated",
+                "agents" to entries.size, "max" to MAX_PROJECTED_AGENTS, level = Telemetry.Level.WARN,
+            )
         }
+        // A record that vanished or cannot be parsed since the index saw it is skipped and the
+        // next one fills its place, so a page is short only at the end of the roster.
+        val page = entries.asSequence().drop(from).mapNotNull(::readAgentRecord).take(pageSize)
         buildJsonArray {
-            windowed.forEach { entry ->
-                readAgentRecord(entry)?.let { rec -> add(agentToLettaState(rec, blocks = readBlocksForAgent(rec.id))) }
-            }
+            page.forEach { rec -> add(agentToLettaState(rec, blocks = readBlocksForAgent(rec.id))) }
         }
     }.getOrNull()
 

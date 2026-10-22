@@ -45,6 +45,20 @@ class AgentFileIndexTest {
     }
 
     @Test
+    fun aRecordThatCouldNotBeReadIsRetriedOnTheNextScan() {
+        val root = store()
+        val file = root.agent("locked", mtimeMs = 1_000)
+        // Root ignores file permissions, so this only runs where a chmod takes effect.
+        org.junit.Assume.assumeTrue(file.setReadable(false) && !file.canRead())
+        val index = index(root)
+        assertEquals(emptyList(), index.entries().map { it.id })
+
+        file.setReadable(true)
+
+        assertEquals(listOf("locked"), index.entries().map { it.id })
+    }
+
+    @Test
     fun hiddenAgentsAreFlaggedByTheirTagOrTheirHiddenField() {
         val root = store()
         root.agent("plain", mtimeMs = 1_000)
@@ -105,6 +119,30 @@ class AgentFileIndexTest {
         val entries = index(root, max = 3).entries()
 
         assertEquals(listOf("a10", "a9", "a8"), entries.map { it.id })
+    }
+
+    @Test
+    fun filesPastTheCapAreNamedAsUncovered() {
+        val root = store()
+        (1..5).forEach { root.agent("a$it", mtimeMs = it * 1_000L) }
+
+        val scan = index(root, max = 3).scan()
+
+        assertEquals(listOf("a5", "a4", "a3"), scan.entries.map { it.id })
+        assertEquals(setOf("a1", "a2"), scan.uncoveredIds)
+    }
+
+    @Test
+    fun aRewriteWithinTheSameMillisecondAndSizeIsStillSeen() {
+        val root = store()
+        val file = root.agent("x", body = """{"id":"x","hidden":false}""", mtimeMs = 1_000)
+        val index = index(root)
+        assertEquals(listOf(false), index.entries().map { it.hidden })
+
+        file.writeText("""{"id":"x","hidden":true }""")
+        Files.setLastModifiedTime(file.toPath(), FileTime.from(java.time.Instant.ofEpochMilli(1_000).plusNanos(500_000)))
+
+        assertEquals(listOf(true), index.entries().map { it.hidden })
     }
 
     @Test

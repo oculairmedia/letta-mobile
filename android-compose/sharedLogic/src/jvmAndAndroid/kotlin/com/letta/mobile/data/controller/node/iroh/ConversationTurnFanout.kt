@@ -498,8 +498,9 @@ internal class ConversationTurnFanout(
      * delivery state, never endpoint values. One line per CHANGE of audience, not per delta: a
      * streamed turn is thousands of deltas.
      */
-    private fun noteAudience(viewerCount: Int) {
-        val hasInitiator = initiatorViewer != null
+    private fun noteAudience(initiators: List<ViewerHandle>, observers: List<ViewerHandle>) {
+        val viewerCount = initiators.size + observers.size
+        val hasInitiator = initiators.isNotEmpty()
         val audience = viewerCount * 2 + if (hasInitiator) 1 else 0
         if (audience == lastBroadcastAudience) return
         lastBroadcastAudience = audience
@@ -513,7 +514,6 @@ internal class ConversationTurnFanout(
 
     private suspend fun broadcastDeltaBodyNoPark(delta: JsonObject) {
         val viewers = snapshotViewers()
-        noteAudience(viewers.size)
         if (viewers.isEmpty()) return
         // tg7b8: split the join. The initiator MUST receive every frame for
         // redial parity (q71yi parking) — keep awaitAll on its single write.
@@ -522,6 +522,8 @@ internal class ConversationTurnFanout(
         // hitch on send. Fire-and-forget observer writes so the call site
         // returns as soon as the initiator's write commits.
         val (initiatorWrite, observerViewers) = partitionViewersByInitiator(viewers)
+        // Counted after partitioning so a detached initiator's dead handle is not in the audience.
+        noteAudience(initiatorWrite, observerViewers)
         observerViewers.forEach { viewer ->
             val queue = observerWrites
             if (queue == null) {

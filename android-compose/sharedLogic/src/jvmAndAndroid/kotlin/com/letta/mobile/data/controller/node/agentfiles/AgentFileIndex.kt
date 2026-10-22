@@ -8,6 +8,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.attribute.FileTime
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -15,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
  * re-parsing the record itself: its id, its newest-first position and whether it is hidden.
  *
  * Each call lists the directory and reads one set of file attributes per file; a record is parsed
- * only when its (modified time, size) differ from what was parsed last, so a count, the hidden set
+ * only when its (modified time at the filesystem's full precision, size) differ from what was parsed last, so a count, the hidden set
  * or the block index no longer re-reads the whole store. What is kept is a few fields per file,
  * dropped when the file goes, and the index never covers more than [maxEntries] files (the newest).
  */
@@ -30,26 +31,38 @@ internal class AgentFileIndex(
     /** One readable agent record on disk. */
     class Entry(val file: File, val id: String, val mtimeMs: Long, val hidden: Boolean)
 
-    private class Derived(val mtimeMs: Long, val sizeBytes: Long, val id: String?, val hidden: Boolean)
+    /**
+     * One scan: [entries] as [entries] returns them, and [uncoveredIds] for the files past the cap,
+     * named by file (`<id>.json`) since they are never parsed.
+     */
+    class Scan(val entries: List<Entry>, val uncoveredIds: Set<String>)
+
+    private class Derived(val modified: FileTime, val sizeBytes: Long, val id: String?, val hidden: Boolean)
 
     private val derived = ConcurrentHashMap<String, Derived>()
 
     /** The readable agents, newest first. A record that is not a JSON object with an id is left out. */
-    fun entries(): List<Entry> {
-        val files = agentsDir.listFiles { f -> f.isFile && f.name.endsWith(SUFFIX) } ?: return emptyList()
+    fun entries(): List<Entry> = scan().entries
+
+    fun scan(): Scan {
+        val files = agentsDir.listFiles { f -> f.isFile && f.name.endsWith(SUFFIX) } ?: return Scan(emptyList(), emptySet())
         val stamped = files.mapNotNull { file -> stamp(file) }
-        val newest = if (stamped.size > maxEntries) stamped.sortedByDescending { it.mtimeMs }.take(maxEntries) else stamped
+        val byAge = if (stamped.size > maxEntries) stamped.sortedByDescending { it.mtimeMs } else stamped
+        val newest = byAge.take(maxEntries)
+        val uncovered = byAge.drop(maxEntries).mapTo(HashSet()) { it.file.name.removeSuffix(SUFFIX) }
         noteCap(stamped.size)
         val live = newest.mapTo(HashSet(newest.size)) { it.file.name }
         derived.keys.retainAll(live)
-        return newest
+        val entries = newest
             .mapNotNull { stamp ->
+                // A null from parse (the read failed) leaves nothing cached, so the next scan retries.
                 val info = derived.compute(stamp.file.name) { _, known ->
-                    known?.takeIf { it.mtimeMs == stamp.mtimeMs && it.sizeBytes == stamp.sizeBytes } ?: parse(stamp)
+                    known?.takeIf { it.modified == stamp.modified && it.sizeBytes == stamp.sizeBytes } ?: parse(stamp)
                 }
                 info?.id?.let { id -> Entry(stamp.file, id, stamp.mtimeMs, info.hidden) }
             }
             .sortedByDescending { it.mtimeMs }
+        return Scan(entries, uncovered)
     }
 
     /** Reports once per crossing that records beyond the cap are not seen: counts and hidden sets then leave the oldest out. */
@@ -61,17 +74,21 @@ internal class AgentFileIndex(
 
     @Volatile private var capWarned = false
 
-    private class Stamp(val file: File, val mtimeMs: Long, val sizeBytes: Long)
+    private class Stamp(val file: File, val modified: FileTime, val sizeBytes: Long) {
+        val mtimeMs: Long get() = modified.toMillis()
+    }
 
     private fun stamp(file: File): Stamp? = runCatching {
         val attributes = Files.readAttributes(file.toPath(), BasicFileAttributes::class.java)
-        Stamp(file, attributes.lastModifiedTime().toMillis(), attributes.size())
+        Stamp(file, attributes.lastModifiedTime(), attributes.size())
     }.getOrNull()
 
-    private fun parse(stamp: Stamp): Derived {
-        val record = runCatching { json.parseToJsonElement(stamp.file.readText()).jsonObject }.getOrNull()
+    /** Null when the file could not be read; a readable file that is not an agent record caches a null id. */
+    private fun parse(stamp: Stamp): Derived? {
+        val text = runCatching { stamp.file.readText() }.getOrElse { return null }
+        val record = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull()
         val id = record?.get("id")?.let { runCatching { it.jsonPrimitive.takeUnless { p -> p is JsonNull }?.content }.getOrNull() }
-        return Derived(stamp.mtimeMs, stamp.sizeBytes, id, hidden = id != null && isHidden(record))
+        return Derived(stamp.modified, stamp.sizeBytes, id, hidden = id != null && isHidden(record))
     }
 
     companion object {
