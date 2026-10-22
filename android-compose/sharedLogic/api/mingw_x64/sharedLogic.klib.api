@@ -3706,6 +3706,8 @@ abstract fun interface com.letta.mobile.data.repository/SettingsBackendCacheClea
 }
 
 abstract fun interface com.letta.mobile.data.runtime.host/LocalAppServerLauncher { // com.letta.mobile.data.runtime.host/LocalAppServerLauncher|null[0]
+    open val blockingContext // com.letta.mobile.data.runtime.host/LocalAppServerLauncher.blockingContext|{}blockingContext[0]
+        open fun <get-blockingContext>(): kotlin.coroutines/CoroutineContext // com.letta.mobile.data.runtime.host/LocalAppServerLauncher.blockingContext.<get-blockingContext>|<get-blockingContext>(){}[0]
     open val singleLaunch // com.letta.mobile.data.runtime.host/LocalAppServerLauncher.singleLaunch|{}singleLaunch[0]
         open fun <get-singleLaunch>(): kotlin/Boolean // com.letta.mobile.data.runtime.host/LocalAppServerLauncher.singleLaunch.<get-singleLaunch>|<get-singleLaunch>(){}[0]
 
