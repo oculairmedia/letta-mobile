@@ -49,9 +49,6 @@ class FakeSettingsRepository(
     val pinnedAgentOrder: MutableStateFlow<List<String>> =
         MutableStateFlow(emptyList())
 
-    val pinnedShortcutOrder: MutableStateFlow<List<String>> =
-        MutableStateFlow(emptyList())
-
     private val favoriteAgentIdState = MutableStateFlow<String?>(null)
     private val adminAgentIdState = MutableStateFlow<String?>(null)
     private val lastChatSelectionState = MutableStateFlow<LastChatSelection?>(null)
@@ -169,12 +166,6 @@ class FakeSettingsRepository(
         }
     }
 
-    override suspend fun setPinnedAgentOrder(order: List<String>) {
-        val deduped = order.distinct()
-        pinnedAgentOrder.value = deduped
-        pinnedAgentIds.value = deduped.toSet()
-    }
-
     override fun getPinnedProjectIds(): Flow<Set<String>> = pinnedProjectIds
 
     override suspend fun setProjectPinned(projectId: String, pinned: Boolean) {
@@ -183,44 +174,6 @@ class FakeSettingsRepository(
         } else {
             pinnedProjectIds.value - projectId
         }
-    }
-
-    override fun getPinnedShortcutOrder(): Flow<List<String>> = pinnedShortcutOrder
-
-    override suspend fun setPinnedShortcutOrder(order: List<String>) {
-        pinnedShortcutOrder.value = order
-    }
-
-    override suspend fun addPinnedShortcut(name: String) {
-        if (name !in pinnedShortcutOrder.value) {
-            pinnedShortcutOrder.value = pinnedShortcutOrder.value + name
-        }
-    }
-
-    override suspend fun removePinnedShortcut(name: String) {
-        pinnedShortcutOrder.value = pinnedShortcutOrder.value - name
-    }
-
-    val pinnedItemsOrder: MutableStateFlow<List<String>> =
-        MutableStateFlow(emptyList())
-
-    override fun getPinnedItemsOrder(): Flow<List<String>> = pinnedItemsOrder
-
-    override suspend fun setPinnedItemsOrder(order: List<String>) {
-        pinnedItemsOrder.value = order.distinct()
-    }
-
-    val pinnedAgentNames: MutableStateFlow<Map<String, String>> =
-        MutableStateFlow(emptyMap())
-
-    override fun getPinnedAgentNames(): Flow<Map<String, String>> = pinnedAgentNames
-
-    override suspend fun upsertPinnedAgentName(id: String, name: String) {
-        pinnedAgentNames.value = pinnedAgentNames.value + (id to name)
-    }
-
-    override suspend fun removePinnedAgentName(id: String) {
-        pinnedAgentNames.value = pinnedAgentNames.value - id
     }
 
     override fun getChatBackgroundKey(): Flow<String> = chatBackgroundKeyState

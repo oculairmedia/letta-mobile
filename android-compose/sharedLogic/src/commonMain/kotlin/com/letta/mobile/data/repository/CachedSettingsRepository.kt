@@ -249,10 +249,6 @@ open class CachedSettingsRepository(
         readUnifiedPinnedItems(prefs).mapNotNull(::parseAgentKeyPart)
     }
 
-    override fun getPinnedItemsOrder(): Flow<List<String>> = preferencesStore.snapshots.map { prefs ->
-        readUnifiedPinnedItems(prefs)
-    }
-
     override suspend fun setAgentPinned(agentId: String, pinned: Boolean) {
         preferencesStore.edit { prefs ->
             val current = readUnifiedPinnedItems(prefs)
@@ -263,49 +259,6 @@ open class CachedSettingsRepository(
                 current - key
             }
             writeUnifiedPinnedItems(prefs, updated)
-            if (!pinned) {
-                val names = readPinnedAgentNames(prefs).toMutableMap()
-                if (names.remove(agentId) != null) {
-                    prefs.putString(SettingsPreferenceKeys.PINNED_AGENT_NAMES, json.encodeToString(names))
-                }
-            }
-        }
-    }
-
-    override suspend fun setPinnedAgentOrder(order: List<String>) {
-        preferencesStore.edit { prefs ->
-            val current = readUnifiedPinnedItems(prefs)
-            val newAgents = order.distinct().map(::agentKeyPart)
-            val unified = replaceTypeSegment(current, newAgents, ::isAgentKeyPart)
-            writeUnifiedPinnedItems(prefs, unified)
-        }
-    }
-
-    override suspend fun setPinnedItemsOrder(order: List<String>) {
-        preferencesStore.edit { prefs ->
-            writeUnifiedPinnedItems(prefs, order.distinct())
-        }
-    }
-
-    override fun getPinnedAgentNames(): Flow<Map<String, String>> = preferencesStore.snapshots.map { prefs ->
-        readPinnedAgentNames(prefs)
-    }
-
-    override suspend fun upsertPinnedAgentName(id: String, name: String) {
-        preferencesStore.edit { prefs ->
-            val current = readPinnedAgentNames(prefs).toMutableMap()
-            if (current[id] == name) return@edit
-            current[id] = name
-            prefs.putString(SettingsPreferenceKeys.PINNED_AGENT_NAMES, json.encodeToString(current))
-        }
-    }
-
-    override suspend fun removePinnedAgentName(id: String) {
-        preferencesStore.edit { prefs ->
-            val current = readPinnedAgentNames(prefs).toMutableMap()
-            if (current.remove(id) != null) {
-                prefs.putString(SettingsPreferenceKeys.PINNED_AGENT_NAMES, json.encodeToString(current))
-            }
         }
     }
 
@@ -385,36 +338,6 @@ open class CachedSettingsRepository(
         }
     }
 
-    override fun getPinnedShortcutOrder(): Flow<List<String>> = preferencesStore.snapshots.map { prefs ->
-        readUnifiedPinnedItems(prefs).mapNotNull(::parseShortcutKeyPart)
-    }
-
-    override suspend fun setPinnedShortcutOrder(order: List<String>) {
-        preferencesStore.edit { prefs ->
-            val current = readUnifiedPinnedItems(prefs)
-            val newShortcuts = order.distinct().map(::shortcutKeyPart)
-            val unified = replaceTypeSegment(current, newShortcuts, ::isShortcutKeyPart)
-            writeUnifiedPinnedItems(prefs, unified)
-        }
-    }
-
-    override suspend fun addPinnedShortcut(name: String) {
-        preferencesStore.edit { prefs ->
-            val current = readUnifiedPinnedItems(prefs)
-            val key = shortcutKeyPart(name)
-            if (key !in current) {
-                writeUnifiedPinnedItems(prefs, current + key)
-            }
-        }
-    }
-
-    override suspend fun removePinnedShortcut(name: String) {
-        preferencesStore.edit { prefs ->
-            val current = readUnifiedPinnedItems(prefs)
-            writeUnifiedPinnedItems(prefs, current - shortcutKeyPart(name))
-        }
-    }
-
     private fun persistConfigs(configs: List<LettaConfig>) {
         secureSettingsStore.putString(SettingsSecureKeys.CONFIGS, LettaConfigPersistence.encodeList(configs))
     }
@@ -438,15 +361,6 @@ open class CachedSettingsRepository(
         }
     }
 
-    private fun readPinnedAgentNames(prefs: SettingsPreferencesSnapshot): Map<String, String> {
-        val raw = prefs.getString(SettingsPreferenceKeys.PINNED_AGENT_NAMES) ?: return emptyMap()
-        return try {
-            json.decodeFromString<Map<String, String>>(raw)
-        } catch (_: Exception) {
-            emptyMap()
-        }
-    }
-
     private fun readUnifiedPinnedItems(prefs: SettingsPreferencesSnapshot): List<String> {
         prefs.getString(SettingsPreferenceKeys.PINNED_ITEMS_ORDER)?.let { raw ->
             return try {
@@ -455,7 +369,7 @@ open class CachedSettingsRepository(
                 emptyList()
             }
         }
-        return DEFAULT_PINNED_SHORTCUTS.map(::shortcutKeyPart)
+        return emptyList()
     }
 
     private fun writeUnifiedPinnedItems(prefs: MutableSettingsPreferencesEditor, items: List<String>) {
@@ -463,24 +377,4 @@ open class CachedSettingsRepository(
         prefs.putString(SettingsPreferenceKeys.PINNED_ITEMS_ORDER, json.encodeToString(deduped))
     }
 
-    private fun replaceTypeSegment(
-        current: List<String>,
-        replacement: List<String>,
-        typePredicate: (String) -> Boolean,
-    ): List<String> {
-        val existingMatches = current.count(typePredicate)
-        if (existingMatches == replacement.size) {
-            val iter = replacement.iterator()
-            return current.map { if (typePredicate(it)) iter.next() else it }
-        }
-        val others = current.filterNot(typePredicate)
-        return replacement + others
-    }
-
-    companion object {
-        val DEFAULT_PINNED_SHORTCUTS = listOf(
-            "CONVERSATIONS", "AGENTS", "TOOLS", "BLOCKS",
-            "USAGE", "FAVORITE_AGENT",
-        )
-    }
 }

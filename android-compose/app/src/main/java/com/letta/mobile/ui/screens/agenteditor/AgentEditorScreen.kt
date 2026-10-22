@@ -1,57 +1,56 @@
 package com.letta.mobile.ui.screens.agenteditor
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import com.letta.mobile.data.agenteditor.AgentCreated
-import com.letta.mobile.data.agenteditor.AgentEditorLinks
-import com.letta.mobile.data.shell.ShellDestination
-import com.letta.mobile.ui.agenteditor.AgentEditorPageOptions
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.data.compaction.ConversationCompactRpc
+import com.letta.mobile.data.dreaming.AdminRpcDreamingRepository
+import com.letta.mobile.data.dreaming.DreamHistorySource
+import com.letta.mobile.data.dreaming.DreamTarget
+import com.letta.mobile.data.dreaming.DreamingController
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.ui.agenteditor.AgentEditorPanels
 import com.letta.mobile.ui.dreaming.DreamingPanelHost
-import com.letta.mobile.ui.shell.AgentEditorBinding
-import com.letta.mobile.ui.shell.ShellPage
-import com.letta.mobile.ui.shell.ShellPageDeps
-import com.letta.mobile.ui.shell.shellAgentEditorPage
+import com.letta.mobile.ui.mascot.LocalMascotRegistry
+import com.letta.mobile.feature.chat.screen.SharedNavDrawerViewModel
+import com.letta.mobile.ui.shell.pages.ShellAgentEditorHost
 
-/** Where the editor's actions lead on Android. */
-class AgentEditorNavigation(
-    val onBack: () -> Unit,
-    /** A new agent was created: open its chat (the editor leaves the back stack). */
-    val onCreated: (AgentCreated) -> Unit,
-    val onDeleted: () -> Unit,
-    val onOpen: (ShellDestination) -> Unit,
-)
-
-/**
- * letta-mobile-ckmub.3.24 (hard cut S15): the AgentEditor route's container. It draws the shared
- * agent editor through ShellPage and binds it to [AgentEditorViewModel] and the nav host.
- * Platform-UI-Reason: container only (Hilt view model + navigation for the shared AgentEditorPage).
- */
+/** letta-mobile-ckmub.3.24, ckmub.2: what Android adds to the shared agent editor: its creator and its Dreaming panel. */
 @Composable
-fun AgentEditorScreen(navigation: AgentEditorNavigation, viewModel: AgentEditorViewModel = hiltViewModel()) {
-    val agentId = viewModel.agentId
-    val deps = remember(viewModel, navigation) {
-        ShellPageDeps(agentEditor = shellAgentEditorPage(AgentEditorBinding(controller = { viewModel.controller }, options = { _, _ -> options(viewModel, navigation) })))
-    }
-    ShellPage(destination = ShellDestination.AgentEditor(agentId), deps = deps)
+internal fun androidAgentEditorHost(drawer: SharedNavDrawerViewModel): ShellAgentEditorHost {
+    val sources = drawer.sources
+    val graph by sources.sessions.currentGraph.collectAsStateWithLifecycle()
+    val registry = LocalMascotRegistry.current
+    return ShellAgentEditorHost(
+        creator = sources.creator,
+        modelCatalog = graph.modelRepository.llmModels,
+        panels = { agent -> AgentEditorPanels(dreaming = { AndroidDreamingPanel(drawer, agent) }) },
+        // The editor's mascot pick shows at once, before the roster next refreshes.
+        onIdentityChange = { agent, identity -> registry.update(registry.identities + (agent.value to identity)) },
+        onRosterChanged = { drawer.refresh(agent = null, roster = true) },
+    )
 }
 
-private fun options(viewModel: AgentEditorViewModel, navigation: AgentEditorNavigation): AgentEditorPageOptions {
-    val agentId = viewModel.agentId
-    val dreaming = viewModel.dreaming
-    return AgentEditorPageOptions(
-        onBack = navigation.onBack,
-        onSaved = { created -> if (agentId == null) navigation.onCreated(created) else navigation.onBack() },
-        onDeleted = navigation.onDeleted,
-        links = agentId?.let { id ->
-            AgentEditorLinks(
-                memory = { navigation.onOpen(ShellDestination.Memory(id)) },
-                schedules = { navigation.onOpen(ShellDestination.Schedules(id)) },
-                channels = { navigation.onOpen(ShellDestination.Channels) },
-            )
-        } ?: AgentEditorLinks(),
-        panels = AgentEditorPanels(dreaming = dreaming?.let { { DreamingPanelHost(controller = it.controller, target = it.target) } }),
-        settings = viewModel.settings,
-    )
+/** The agent's Dreaming panel over the Iroh host's `reflection.*`, its MemFS dream log and its live runs. */
+@Composable
+private fun AndroidDreamingPanel(drawer: SharedNavDrawerViewModel, agent: AgentId) {
+    val scope = rememberCoroutineScope()
+    val sources = drawer.sources
+    val graph by sources.sessions.currentGraph.collectAsStateWithLifecycle()
+    val controller = remember(agent, scope, graph) {
+        DreamingController(
+            repository = AdminRpcDreamingRepository(sources.dreamingRpc),
+            history = DreamHistorySource(sources.library.memfs),
+            scope = scope,
+            activity = { id ->
+                graph.subagentRepository.activeSubagentsFlow(SubagentParentScope(id.value, ConversationCompactRpc.DEFAULT_CONVERSATION))
+            },
+        )
+    }
+    DisposableEffect(controller) { onDispose { controller.close() } }
+    DreamingPanelHost(controller = controller, target = remember(agent) { DreamTarget(agent) })
 }

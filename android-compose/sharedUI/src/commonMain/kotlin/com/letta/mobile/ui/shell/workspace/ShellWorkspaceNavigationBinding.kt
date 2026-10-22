@@ -13,6 +13,7 @@ import com.letta.mobile.ui.shell.header.UnifiedSearchKind
 import com.letta.mobile.ui.shell.navDrawerActions
 import com.letta.mobile.ui.shell.navDrawerState
 import com.letta.mobile.ui.shell.ShellDrawerConversations
+import com.letta.mobile.ui.shell.ShellDrawerLibrary
 import com.letta.mobile.ui.shell.conversations.ShellTimelineConversationList
 import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
 import com.letta.mobile.ui.shell.rail.ShellRailFocus
@@ -26,8 +27,26 @@ fun ShellWorkspaceState.workspaceNavigation(
     now: Instant,
     identities: Map<String, MascotIdentity> = emptyMap(),
     conversations: ShellTimelineConversationList? = null,
+): ShellWorkspaceNavigation =
+    workspaceNavigation(
+        agents = agents,
+        now = now,
+        conversations = conversations?.drawer(focusedAgentId) ?: ShellDrawerConversations(),
+        library = ShellDrawerLibrary(identities = identities),
+    )
+
+/**
+ * [workspaceNavigation] over a host's own list of the focused agent's [conversations] (Android's
+ * conversation repository), with its marks and its [library] (identities, Chat options, canvases) in the panel.
+ */
+fun ShellWorkspaceState.workspaceNavigation(
+    agents: List<Pair<String, String>>,
+    now: Instant,
+    conversations: ShellDrawerConversations,
+    library: ShellDrawerLibrary = ShellDrawerLibrary(),
 ): ShellWorkspaceNavigation {
-    val drawer = navDrawerState(agents, now, conversations?.drawer(focusedAgentId) ?: ShellDrawerConversations())
+    val drawer = navDrawerState(agents, now, conversations, library)
+    val identities = library.identities
     return ShellWorkspaceNavigation(
         rail = ShellLibraryRailState(
             agents = agents,

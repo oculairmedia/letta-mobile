@@ -2,10 +2,8 @@ package com.letta.mobile.feature.chat.screen
 
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasDocumentStore
-import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummary
-import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.Conversation
@@ -27,7 +25,6 @@ import io.mockk.mockk
 import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -57,19 +54,24 @@ class SharedNavDrawerBindingTest {
 
     private val now = Instant.parse("2026-10-17T12:00:00Z")
 
-    private fun viewModel() = SharedNavDrawerViewModel(settings, canvasStore, allConversations, InMemorySecureSettingsStore())
+    private fun viewModel(repository: IConversationRepository = conversations) =
+        SharedNavDrawerViewModel(settings, canvasStore, allConversations, InMemorySecureSettingsStore(), sources(repository))
+
+    private fun sources(repository: IConversationRepository): SharedNavDrawerSources = mockk(relaxed = true) {
+        every { this@mockk.conversations } returns repository
+    }
 
     @Test
     fun refreshReadsTheCanvasLibraryAndKeepsItOnFailure() = runTest(mainDispatcherRule.dispatcher) {
         val board = CanvasDocument(id = CanvasId("k1"), title = "Board")
         coEvery { canvasStore.listAll() } returns listOf(board)
         val vm = viewModel()
-        vm.refreshCanvases()
+        vm.refresh(agent = null)
         advanceUntilIdle()
         assertEquals(listOf(board), vm.canvases.value)
 
         coEvery { canvasStore.listAll() } throws IllegalStateException("offline")
-        vm.refreshCanvases()
+        vm.refresh(agent = null)
         advanceUntilIdle()
         assertEquals(listOf(board), vm.canvases.value)
     }
@@ -78,8 +80,8 @@ class SharedNavDrawerBindingTest {
     fun rowActionsReachTheConversationRepository() = runTest(mainDispatcherRule.dispatcher) {
         val vm = viewModel()
         vm.setArchiveFilter(ShellArchiveFilter.Archived)
-        vm.setConversationArchived(conversations, "c1", "agent-1", archived = true)
-        vm.deleteConversation(conversations, "c2", "agent-1")
+        vm.setConversationArchived(ConversationId("c1"), AgentId("agent-1"), archived = true)
+        vm.deleteConversation(ConversationId("c2"), AgentId("agent-1"))
         advanceUntilIdle()
         assertEquals(ShellArchiveFilter.Archived, vm.archiveFilter.value)
         coVerify { conversations.setConversationArchived("c1", "agent-1", true) }
@@ -95,9 +97,9 @@ class SharedNavDrawerBindingTest {
                 Conversation(id = ConversationId("c2"), agentId = agent, summary = "Keep"),
             ),
         )
-        val vm = SharedNavDrawerViewModel(settings, canvasStore, allConversations, InMemorySecureSettingsStore())
-        vm.renameConversation(fake, ConversationId("c1"), agent, ConversationSummary("  Plan B  "))
-        vm.renameConversation(fake, ConversationId("c2"), agent, ConversationSummary("   "))
+        val vm = viewModel(fake)
+        vm.renameConversation(ConversationId("c1"), agent, ConversationSummary("  Plan B  "))
+        vm.renameConversation(ConversationId("c2"), agent, ConversationSummary("   "))
         advanceUntilIdle()
         assertEquals(listOf("Plan B", "Keep"), fake.getCachedConversations(agent).map { it.summary })
     }
@@ -127,47 +129,30 @@ class SharedNavDrawerBindingTest {
     }
 
     @Test
-    fun theDrawerPanelBindsRenameAndPin() = runTest(mainDispatcherRule.dispatcher) {
-        val vm = viewModel()
-        val scaffold = mockk<AgentScaffoldRuntimeState>(relaxed = true) {
-            every { agentIdValue } returns "agent-1"
-            every { drawerConversationRepo } returns conversations
-        }
-        val actions = sharedDrawerPanelActions(scaffold, vm)
-        actions.onRenameConversation!!.invoke("c1", "Renamed")
-        actions.onPinConversation!!.invoke("c1", true)
-        advanceUntilIdle()
-        coVerify { conversations.updateConversation(ConversationId("c1"), AgentId("agent-1"), "Renamed") }
-        assertEquals(setOf("c1"), settings.getPinnedConversationIds().first())
-    }
-
-    @Test
-    fun theDrawerActionsWriteThroughTheRepositoryTheDrawerListsFrom() = runTest(mainDispatcherRule.dispatcher) {
-        // The scaffold's own repository, not any other: a rename through another would miss its cache.
-        val agent = AgentId("agent-1")
-        val listed = FakeConversationRepository(listOf(Conversation(id = ConversationId("c1"), agentId = agent, summary = "Old")))
-        val scaffold = mockk<AgentScaffoldRuntimeState>(relaxed = true) {
-            every { agentIdValue } returns "agent-1"
-            every { drawerConversationRepo } returns listed
-        }
-        sharedDrawerPanelActions(scaffold, viewModel()).onRenameConversation!!.invoke("c1", "Renamed")
-        advanceUntilIdle()
-        assertEquals(listOf("Renamed"), listed.getCachedConversations(agent).map { it.summary })
-        coVerify(exactly = 0) { conversations.updateConversation(any<ConversationId>(), any<AgentId>(), any()) }
-    }
-
-    @Test
     fun aFailedConversationActionIsSurfacedNotSwallowed() = runTest(mainDispatcherRule.dispatcher) {
         val failing: IConversationRepository = mockk(relaxed = true) {
             coEvery { updateConversation(ConversationId("c1"), AgentId("agent-1"), "Name") } throws IllegalStateException("offline")
         }
-        val vm = viewModel()
+        val vm = viewModel(failing)
         val messages = mutableListOf<String>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.failures.collect { messages += it } }
         advanceUntilIdle()
-        vm.renameConversation(failing, ConversationId("c1"), AgentId("agent-1"), ConversationSummary("Name"))
+        vm.renameConversation(ConversationId("c1"), AgentId("agent-1"), ConversationSummary("Name"))
         advanceUntilIdle()
         assertEquals(listOf("Couldn't rename the chat"), messages)
+    }
+
+    @Test
+    fun aChatsViewModelStoreOutlivesItsPageUntilReleased() {
+        val vm = viewModel()
+        val store = vm.chatStore("a:c")
+        val model = object : androidx.lifecycle.ViewModel() {}
+        store.put("chat", model)
+        // A rotation asks again for the same chat and finds the same store.
+        assertEquals(store, vm.chatStore("a:c"))
+        vm.releaseChat("a:c")
+        assertEquals(null, store["chat"])
+        assertFalse(vm.chatStore("a:c") === store)
     }
 
     @Test
@@ -181,49 +166,16 @@ class SharedNavDrawerBindingTest {
         backgroundScope.launch { vm.pinnedAgentIds.collect {} }
         advanceUntilIdle()
         assertEquals(emptySet<String>(), vm.pinnedAgentIds.value)
-        vm.setAgentPinned("agent-2", pinned = true)
+        vm.setAgentPinned(AgentId("agent-2"), pinned = true)
         advanceUntilIdle()
         assertEquals(setOf("agent-2"), vm.pinnedAgentIds.value)
-        vm.setAgentPinned("agent-2", pinned = false)
+        vm.setAgentPinned(AgentId("agent-2"), pinned = false)
         advanceUntilIdle()
         assertEquals(emptySet<String>(), vm.pinnedAgentIds.value)
     }
 
     @Test
-    fun theRailIsTheDesktopsRecentsStripNotTheWholeRoster() {
-        // Twelve agents; a1..a10 active an hour apart (a1 newest), a11 stale, a12 never ran.
-        val agents = (1..12).map { n ->
-            val updatedAt = when {
-                n <= 10 -> "2026-10-17T${(12 - n).toString().padStart(2, '0')}:00:00Z"
-                n == 11 -> "2026-08-01T12:00:00Z"
-                else -> null
-            }
-            Agent(id = AgentId("a$n"), name = "Agent $n", updatedAt = updatedAt)
-        }
-        val input = ShellNavDrawerInput(agent = ShellPanelAgent(name = "Agent 1", agentId = "a1"))
-            .withRoster(SharedDrawerRoster(agents = agents, favoriteAgentId = "a12", pinnedAgentIds = setOf("a11")))
-        val state = ShellNavDrawerMapping.state(input, now)
-        // Pins and the favourite first, then the eight newest; the focused agent heads the panel, not the rail.
-        assertEquals(
-            listOf("Agent 11", "Agent 12") + (2..9).map { "Agent $it" },
-            state.rail.entries.map { it.name },
-        )
-        // Only a10 fell off the strip; the rail's New reaches it through the agent switcher.
-        assertFalse(state.rail.entries.any { it.agentId == "a10" })
-    }
-
-    @Test
-    fun aRosterWithNoTimestampsStillFillsTheRail() {
-        // The device report: 139 agents and no activity on their records gave the rail one orb and "99+".
-        val agents = (1..139).map { Agent(id = AgentId("a$it"), name = "Agent $it") }
-        val input = ShellNavDrawerInput(agent = ShellPanelAgent(name = "Agent 1", agentId = "a1"))
-            .withRoster(SharedDrawerRoster(agents = agents, favoriteAgentId = "a50"))
-        val rail = ShellNavDrawerMapping.state(input, now).rail
-        assertEquals(listOf("Agent 50") + (2..9).map { "Agent $it" }, rail.entries.map { it.name })
-    }
-
-    @Test
-    fun conversationActivityOrdersTheRailAheadOfTheAgentRecords() = runTest(mainDispatcherRule.dispatcher) {
+    fun eachAgentsNewestConversationIsItsActivity() = runTest(mainDispatcherRule.dispatcher) {
         val vm = viewModel()
         backgroundScope.launch { vm.agentActivity.collect {} }
         fleetConversations.value = listOf(
@@ -236,14 +188,6 @@ class SharedNavDrawerBindingTest {
             mapOf("a7" to Instant.parse("2026-10-17T11:00:00Z"), "a5" to Instant.parse("2026-10-17T10:00:00Z")),
             vm.agentActivity.value,
         )
-        // a3's record is newer than a5's conversation but older than a7's.
-        val agents = (1..10).map { n ->
-            Agent(id = AgentId("a$n"), name = "Agent $n", updatedAt = "2026-10-17T10:30:00Z".takeIf { n == 3 })
-        }
-        val input = ShellNavDrawerInput(agent = ShellPanelAgent(name = "Agent 1", agentId = "a1"))
-            .withRoster(SharedDrawerRoster(agents = agents, conversationActivity = vm.agentActivity.value))
-        val rail = ShellNavDrawerMapping.state(input, now).rail
-        assertEquals(listOf("Agent 7", "Agent 3", "Agent 5", "Agent 2", "Agent 4", "Agent 6", "Agent 8", "Agent 9"), rail.entries.map { it.name })
     }
 
     @Test
@@ -251,7 +195,7 @@ class SharedNavDrawerBindingTest {
         coEvery { allConversations.refreshIfStale(any()) } throws IllegalStateException("offline")
         val vm = viewModel()
         backgroundScope.launch { vm.agentActivity.collect {} }
-        vm.refreshAgentActivity()
+        vm.refresh(agent = null)
         advanceUntilIdle()
         coVerify { allConversations.refreshIfStale(any()) }
         // The failed refresh leaves the rail's activity as it was.
@@ -259,42 +203,4 @@ class SharedNavDrawerBindingTest {
     }
 
     private fun conversation(id: String, agentId: String, lastMessageAt: String) =
-        Conversation(id = ConversationId(id), agentId = AgentId(agentId), lastMessageAt = lastMessageAt)
-    @Test
-    fun sectionsNavigateToTheAndroidPages() {
-        val calls = mutableListOf<String>()
-        val navigation = AgentScaffoldNavigationCallbacks(
-            onNavigateBack = {},
-            onNavigateToSettings = {},
-            onNavigateToMemory = { calls += "memory:$it" },
-            onNavigateToSchedules = { calls += "schedules:$it" },
-            onNavigateToTools = { calls += "tools" },
-            onNavigateToConversationList = { calls += "conversations" },
-            onNavigateToChannels = { calls += "channels" },
-            onNavigateToSkills = { calls += "skills:$it" },
-        )
-        LensDestination.entries.forEach { openSection(navigation, "agent-1", it) }
-        assertEquals(listOf("memory:agent-1", "schedules:agent-1", "channels", "skills:agent-1", "conversations"), calls)
-        assertEquals(emptySet<LensDestination>(), androidHiddenDrawerSections(navigation))
-    }
-
-    /** letta-mobile-zxk2n.32: the drawer's Skills row opened the Tools page; it must open Skills. */
-    @Test
-    fun skillsOpensTheSkillsPageNotTools() {
-        val calls = mutableListOf<String>()
-        val navigation = AgentScaffoldNavigationCallbacks(
-            onNavigateBack = {},
-            onNavigateToSettings = {},
-            onNavigateToTools = { calls += "tools" },
-            onNavigateToSkills = { calls += "skills:$it" },
-        )
-        openSection(navigation, "agent-1", LensDestination.Skills)
-        assertEquals(listOf("skills:agent-1"), calls)
-    }
-
-    @Test
-    fun sectionsStayHiddenWithoutTheirPages() {
-        val navigation = AgentScaffoldNavigationCallbacks(onNavigateBack = {}, onNavigateToSettings = {})
-        assertEquals(setOf(LensDestination.Channels, LensDestination.Skills), androidHiddenDrawerSections(navigation))
-    }
-}
+        Conversation(id = ConversationId(id), agentId = AgentId(agentId), lastMessageAt = lastMessageAt)}

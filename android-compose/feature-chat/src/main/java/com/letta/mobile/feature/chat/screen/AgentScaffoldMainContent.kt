@@ -12,19 +12,16 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
 
 @Composable
 internal fun AgentScaffoldMainContent(
     state: AgentScaffoldRuntimeState,
     paddingValues: PaddingValues,
-    /** The shared page asks for the header to hide (its phone canvas mode) or come back. */
-    onHeaderHiddenChange: (Boolean) -> Unit = {},
 ) {
     val topPadding = paddingValues.calculateTopPadding()
     Column(modifier = Modifier.fillMaxSize()) {
         AgentScaffoldProjectInfoSection(state, topPadding)
-        AgentScaffoldChatSection(state, topPadding, onHeaderHiddenChange)
+        AgentScaffoldChatSection(state, topPadding)
     }
 }
 
@@ -58,9 +55,7 @@ private fun AgentScaffoldProjectInfoSection(
 private fun ColumnScope.AgentScaffoldChatSection(
     state: AgentScaffoldRuntimeState,
     topPadding: androidx.compose.ui.unit.Dp,
-    onHeaderHiddenChange: (Boolean) -> Unit,
 ) {
-    // The message search lives in the header's search pane (ChatMessageSearch); the chat stays put.
     val chatModifier = Modifier
         .fillMaxWidth()
         .weight(1f)
@@ -70,7 +65,6 @@ private fun ColumnScope.AgentScaffoldChatSection(
         state = state,
         chatModifier = chatModifier,
         contentTopPadding = contentTopPadding,
-        onHeaderHiddenChange = onHeaderHiddenChange,
     )
 }
 
@@ -79,15 +73,13 @@ private fun AgentScaffoldChatScreenPane(
     state: AgentScaffoldRuntimeState,
     chatModifier: Modifier,
     contentTopPadding: androidx.compose.ui.unit.Dp,
-    onHeaderHiddenChange: (Boolean) -> Unit,
 ) {
-    val params = state.params
     // letta-mobile-zxk2n.5: the client-local `/` commands the shared page offers, and `/rename`'s dialog.
     val rename = rememberRenameDialogState()
     val clientCommands = rememberAndroidClientCommands(state, onRename = { rename.open = true })
     if (rename.open) AndroidRenameChatDialog(state, onDismiss = { rename.open = false })
     CompositionLocalProvider(LocalAndroidClientCommands provides clientCommands) {
-        AgentScaffoldChatScreen(state, chatModifier, contentTopPadding, onHeaderHiddenChange)
+        AgentScaffoldChatScreen(state, chatModifier, contentTopPadding)
     }
 }
 
@@ -96,7 +88,6 @@ private fun AgentScaffoldChatScreen(
     state: AgentScaffoldRuntimeState,
     chatModifier: Modifier,
     contentTopPadding: androidx.compose.ui.unit.Dp,
-    onHeaderHiddenChange: (Boolean) -> Unit,
 ) {
     val params = state.params
     ChatScreen(
@@ -105,11 +96,10 @@ private fun AgentScaffoldChatScreen(
         chatBackground = state.chatBackground,
         chatMode = params.chatMode,
         onBugCommand = { params.sheetVisibility.onShowBugReportSheetChange(true) },
-        // The companion mascot opens the same agent pane as the top bar's menu.
-        onOpenAgentPane = { state.scope.launch { state.drawerState.open() } },
-        // The header's agent pill, for the phone canvas mode's board menu while the header is hidden.
+        // The companion mascot opens the workspace's agent panel, as the header's menu does.
+        onOpenAgentPane = params.workspace.openAgentPane,
+        // The agent switcher, for the phone canvas mode's board menu.
         onOpenAgentSwitcher = { params.sheetVisibility.onShowAgentSwitcherChange(true) },
-        onHostHeaderHiddenChange = onHeaderHiddenChange,
         // letta-mobile-y5q9z: the canvas bubble's "+" lists and switches the drawer's conversations.
         recentInteractions = rememberAgentRecentInteractions(state),
         onViewSubagentConversation = params.navigation.onViewSubagentConversation

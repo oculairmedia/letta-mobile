@@ -10,11 +10,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -52,7 +58,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.flow.drop
 
 /**
- * Shared shell workspace mounted by the desktop window and browser.
+ * Shared shell workspace mounted by the desktop window, the browser and the Android activity.
  * The header (tab strip and "+", search, now-active identity), the agent
  * rail, the agent panel (mascot hero, model card, sections, chats, canvases), the page, and the
  * overlays over them, in one overlay root with one inspector frame and one mascot layer.
@@ -117,15 +123,21 @@ private fun WorkspaceFrame.header(): ShellWorkspaceHeaderState {
     if (!fit.compact) return state.header
     return state.header.copy(sidebar = ShellSidebarControl(collapsed = true, onToggle = { drawer.open = true }, opensDrawer = true))
 }
+/**
+ * The workspace owns the window's insets once, for every host: the side cutouts here, the
+ * status bar under the inline header (its colour runs up behind it), and the body below takes the
+ * top as consumed so no page pads for it again. The bottom bar and the keyboard stay the pages'
+ * (the composer rides the keyboard). A window without insets (desktop, browser) sees none.
+ */
 @Composable
 private fun WorkspaceColumn(frame: WorkspaceFrame) {
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
         val header = frame.header()
         when (val chrome = frame.host.chrome) {
             ShellWindowChrome.Inline -> InlineHeader(header)
             is ShellWindowChrome.Hoisted -> SideEffect { chrome.onHeader(header) }
         }
-        WorkspaceBody(frame, Modifier.weight(1f))
+        WorkspaceBody(frame, Modifier.weight(1f).consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)))
     }
 }
 
@@ -141,8 +153,9 @@ private fun InlineHeader(header: ShellWorkspaceHeaderState) {
         header,
         Modifier
             .fillMaxWidth()
-            .height(inlineHeaderHeight(tabbed))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+            .height(inlineHeaderHeight(tabbed))
             .testTag(LettaShellWorkspaceTags.INLINE_HEADER),
     )
     if (!tabbed) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

@@ -15,34 +15,14 @@ android ChatSurfaceHost.pickWorkingDirectory | platform-only by design (ckmub.17
 android ChatSurfaceHost.resolveAgentName | android leaves resolveAgentName unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
 android ChatSurfaceHost.showOnCanvas | android leaves showOnCanvas unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
 android HostSessionBinding | Android does not mount the shared shell (LettaShellWorkspace) yet; Android hard cut letta-mobile-ckmub.2
-android LettaShellWorkspaceHost | Android does not mount the shared shell (LettaShellWorkspace) yet; Android hard cut letta-mobile-ckmub.2
-android LettaShellWorkspaceSlots | Android does not mount the shared shell (LettaShellWorkspace) yet; Android hard cut letta-mobile-ckmub.2
 android LocalAppServerHost.clockMs | test seam with a production default (clock/token/timeout/policy), not a platform capability (letta-mobile-ckmub.2)
 android LocalAppServerHost.newToken | test seam with a production default (clock/token/timeout/policy), not a platform capability (letta-mobile-ckmub.2)
 android LocalAppServerHost.policy | test seam with a production default (clock/token/timeout/policy), not a platform capability (letta-mobile-ckmub.2)
 android LocalAppServerHost.readyTimeoutMs | test seam with a production default (clock/token/timeout/policy), not a platform capability (letta-mobile-ckmub.2)
-android PluginsPageBinding | Android does not mount the shared shell (LettaShellWorkspace) yet; Android hard cut letta-mobile-ckmub.2
-android SchedulesPageActions.onDeleteCron | android leaves onDeleteCron unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
-android SchedulesPageActions.onTogglePause | android leaves onTogglePause unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
 android SettingsContribution.needsHost | per-contribution option left unbound (default, null, empty or false); bind it or make it required (letta-mobile-ckmub.2)
 android SettingsContribution.updates | per-contribution option left unbound (default, null, empty or false); bind it or make it required (letta-mobile-ckmub.2)
 android SettingsPageServices.pairing | android leaves pairing unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
-android ShellAgentEditorHost | Android does not mount the shared shell (LettaShellWorkspace) yet; Android hard cut letta-mobile-ckmub.2
-android ShellAgentPanelActions.chatOptions | Android binds the legacy drawer, not the shared shell; Android hard cut letta-mobile-ckmub.2
-android ShellAgentPanelActions.conversationMarks | Android binds the legacy drawer, not the shared shell; Android hard cut letta-mobile-ckmub.2
-android ShellAgentPanelActions.onArchiveCanvas | Android binds the legacy drawer, not the shared shell; Android hard cut letta-mobile-ckmub.2
 android ShellChatOptionsActions.onAutoPinNewChatsChange | Android binds the legacy drawer, not the shared shell; Android hard cut letta-mobile-ckmub.2
-android ShellHomeHost | Android does not mount the shared shell (LettaShellWorkspace) yet; Android hard cut letta-mobile-ckmub.2
-android ShellHostPages | Android does not mount the shared shell (LettaShellWorkspace) yet; Android hard cut letta-mobile-ckmub.2
-android ShellPageFocus | Android does not mount the shared shell (LettaShellWorkspace) yet; Android hard cut letta-mobile-ckmub.2
-android ShellPageHost | Android does not mount the shared shell (LettaShellWorkspace) yet; Android hard cut letta-mobile-ckmub.2
-android ShellWorkspaceEvents | Android does not mount the shared shell (LettaShellWorkspace) yet; Android hard cut letta-mobile-ckmub.2
-android ShellWorkspaceHeaderBinding | Android does not mount the shared shell (LettaShellWorkspace) yet; Android hard cut letta-mobile-ckmub.2
-android ShellWorkspaceNavigationActions | Android does not mount the shared shell (LettaShellWorkspace) yet; Android hard cut letta-mobile-ckmub.2
-android ShellWorkspaceOverlayActions | Android does not mount the shared shell (LettaShellWorkspace) yet; Android hard cut letta-mobile-ckmub.2
-android ShortcutActions | Android does not mount the shared shell (LettaShellWorkspace) yet; Android hard cut letta-mobile-ckmub.2
-android SkillsPageActions.onAddTool | android leaves onAddTool unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
-android SkillsPageActions.onToolClick | android leaves onToolClick unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
 desktop BackendSettingsActions.onScanToConnect | desktop leaves onScanToConnect unbound (default, null, empty or false); bind it (letta-mobile-7d9ua)
 desktop ChatSurfaceCapabilities.editAndResend | capability editAndResend not supported on desktop yet (letta-mobile-7d9ua)
 desktop ChatSurfaceCapabilities.fork | capability fork not supported on desktop yet (letta-mobile-7d9ua)
@@ -91,7 +71,6 @@ web SettingsPageServices.notifications | web leaves notifications unbound (defau
 web SettingsPageServices.onOpenProviders | web leaves onOpenProviders unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web SettingsPageServices.pairing | web leaves pairing unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web ShellAgentEditorHost.creator | web leaves creator unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
-web ShellAgentEditorHost.embedded | web leaves embedded unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web ShellAgentEditorHost.modelCatalog | web leaves modelCatalog unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web ShellAgentEditorHost.onIdentityChange | web leaves onIdentityChange unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web ShellAgentEditorHost.panels | web leaves panels unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)

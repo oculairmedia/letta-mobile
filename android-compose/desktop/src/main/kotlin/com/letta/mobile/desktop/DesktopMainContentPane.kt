@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.ui.shell.LocalShellPageFramed
 import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.desktop.chat.showsCanvasSidePane
@@ -81,7 +83,10 @@ private fun MainDestination(inputs: DesktopMainContentInputs) {
 private fun AgentEditorSidePane(editor: ShellDestination.AgentEditor, inputs: DesktopMainContentInputs, actions: DesktopMainContentActions) {
     val title = if (editor.agentId == null) "New agent" else "Edit agent"
     LettaSidePane(title = title, onClose = actions.onEditAgentClose, initialWidth = 460.dp) {
-        ShellPage(destination = editor, deps = inputs.pages, modifier = Modifier.fillMaxSize())
+        // The pane draws the title and close, so the editor draws no Back.
+        CompositionLocalProvider(LocalShellPageFramed provides true) {
+            ShellPage(destination = editor, deps = inputs.pages, modifier = Modifier.fillMaxSize())
+        }
     }
 }
 

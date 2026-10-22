@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.SettingsStoreRecentModels
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelRepository
 import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
+import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectionRepository
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.transport.api.IChannelTransport
@@ -27,14 +28,18 @@ object ModelControlModule {
     fun provideModelControlRpc(transport: IChannelTransport): AdminRpcInvoker =
         AdminRpcInvoker.overTransport { transport }
 
+    /** letta-mobile-ckmub.2: the shell's Providers page and the chat's picker share one catalog. */
     @Provides
     @Singleton
-    fun provideProviderConnectionRepository(rpc: AdminRpcInvoker): ProviderConnectionRepository =
-        ProviderConnectionRepository(rpc)
+    fun provideModelControlSession(rpc: AdminRpcInvoker): ModelControlSession = ModelControlSession(rpc)
 
     @Provides
     @Singleton
-    fun provideModelCatalogRepository(rpc: AdminRpcInvoker): ModelCatalogRepository = ModelCatalogRepository(rpc)
+    fun provideProviderConnectionRepository(session: ModelControlSession): ProviderConnectionRepository = session.providers
+
+    @Provides
+    @Singleton
+    fun provideModelCatalogRepository(session: ModelControlSession): ModelCatalogRepository = session.catalog
 
     @Provides
     @Singleton

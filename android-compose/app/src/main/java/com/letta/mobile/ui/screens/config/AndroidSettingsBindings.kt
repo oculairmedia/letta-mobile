@@ -26,7 +26,6 @@ import com.letta.mobile.util.Telemetry
 
 /** Where the Settings page's rows lead on Android. */
 data class SettingsDestinations(
-    val onConfigList: () -> Unit = {},
     val onSystemAccess: () -> Unit = {},
     val onCanvasDebug: () -> Unit = {},
     val onProviders: () -> Unit = {},
@@ -70,7 +69,6 @@ internal fun androidSettingsContributions(state: UiState<ConfigUiState>, inputs:
         } else {
             null
         },
-        SettingsContribution(SettingsGroup.Backend, savedBackendsSection(destinations.onConfigList)),
         SettingsContribution(SettingsGroup.Notifications, backgroundDeliverySection(inputs.battery.exempt, inputs.battery.requestExemption)),
         SettingsContribution(SettingsGroup.Providers, systemAccessSection(destinations.onSystemAccess)),
         pluginsSettingsContributionOrNull(destinations.onPlugins),

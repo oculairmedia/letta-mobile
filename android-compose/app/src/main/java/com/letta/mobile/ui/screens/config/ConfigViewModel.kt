@@ -2,10 +2,8 @@ package com.letta.mobile.ui.screens.config
 
 import android.net.Uri
 import android.os.Build
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
 import com.letta.mobile.data.api.AppServerConnectionTester
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
@@ -28,7 +26,6 @@ import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.ui.common.UiState
-import com.letta.mobile.ui.navigation.ConfigRoute
 import com.letta.mobile.ui.state.RetainedContentRefresh
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -89,7 +86,6 @@ data class ConfigUiState(
 
 @HiltViewModel
 class ConfigViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
     private val settingsRepository: ISettingsRepository,
     private val embeddedRuntimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
     private val onDeviceModelImporter: OnDeviceModelImporter,
@@ -112,13 +108,6 @@ class ConfigViewModel @Inject constructor(
         const val DEFAULT_LOCAL_MODEL_MAX_TOKENS = "4096"
     }
 
-    // letta-mobile-cdlk: when the route arg signals create-new mode, the
-    // screen opens with an empty form and saveConfig mints a fresh UUID
-    // instead of overwriting the currently active config. Defaults to false
-    // so every existing nav site keeps the original "edit active" behaviour.
-    private val createNew: Boolean =
-        runCatching { savedStateHandle.toRoute<ConfigRoute>().createNew }.getOrDefault(false)
-
     private val _uiState = MutableStateFlow<UiState<ConfigUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ConfigUiState>> = _uiState.asStateFlow()
     private var latestLoadRequestId = 0L
@@ -131,13 +120,24 @@ class ConfigViewModel @Inject constructor(
 
     /**
      * letta-mobile-ckmub.3.12: the backend the shared Settings page's Backend section edits: the
-     * active config, or a fresh remote host when adding one (createNew) or before the first setup.
+     * active config, or a fresh remote host before the first setup.
      */
     private val newBackendId = UUID.randomUUID().toString()
 
     val backendConfig: StateFlow<LettaConfig> = settingsRepository.activeConfig
-        .map { active -> active?.takeUnless { createNew } ?: blankBackend }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SETTING_STOP_TIMEOUT_MS), settingsRepository.activeConfig.value?.takeUnless { createNew } ?: blankBackend)
+        .map { active -> active ?: blankBackend }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SETTING_STOP_TIMEOUT_MS), settingsRepository.activeConfig.value ?: blankBackend)
+
+    /** letta-mobile-ckmub.2: every saved backend, for the shared Backend section's switch, add and remove. */
+    val backends: StateFlow<List<LettaConfig>> = settingsRepository.configs
+
+    fun switchBackend(id: String) {
+        viewModelScope.launch { settingsRepository.setActiveConfigId(id) }
+    }
+
+    fun removeBackend(id: String) {
+        viewModelScope.launch { settingsRepository.deleteConfig(id) }
+    }
 
     private val blankBackend: LettaConfig
         get() = LettaConfig(id = newBackendId, mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "")
@@ -220,7 +220,7 @@ class ConfigViewModel @Inject constructor(
     private suspend fun buildConfigUiState(): ConfigUiState {
         val activeConfig = settingsRepository.activeConfig.value
         val preferences = loadDisplayPreferences()
-        return if (activeConfig != null && !createNew) {
+        return if (activeConfig != null) {
             ConfigUiState(
                 mode = activeConfig.mode.toServerMode(),
                 serverUrl = activeConfig.serverUrl,
@@ -245,9 +245,7 @@ class ConfigViewModel @Inject constructor(
                 localRuntimeHealth = localAppServerHost.health.value,
             )
         } else {
-            // createNew = true: empty form, fresh UUID at save time.
-            // OR there's no active config yet (first-time setup): a remote
-            // host to set up (ConfigUiState's default mode).
+            // No active config yet (first-time setup): a remote host to set up (ConfigUiState's default mode).
             ConfigUiState(
                 theme = preferences.theme,
                 themePreset = preferences.themePreset,
@@ -348,7 +346,16 @@ class ConfigViewModel @Inject constructor(
      * letta-mobile-ckmub.3.12: saves what the shared Backend section [config] holds (mode, address,
      * token) together with the on-device model fields of this form.
      */
-    fun saveBackend(config: LettaConfig, onSuccess: () -> Unit, onError: ((String) -> Unit)? = null) {
+    fun saveBackend(config: LettaConfig, onSuccess: () -> Unit, onError: ((String) -> Unit)? = null) =
+        saveBackend(config, BackendSave(onSuccess, onError, asNewEntry = false))
+
+    /** Saves [config] as a new backend beside the others (the shared Backend section's Add a backend). */
+    fun addBackend(config: LettaConfig, onSaved: () -> Unit, onError: (String) -> Unit) =
+        saveBackend(config, BackendSave(onSaved, onError, asNewEntry = true))
+
+    private class BackendSave(val onSuccess: () -> Unit, val onError: ((String) -> Unit)?, val asNewEntry: Boolean)
+
+    private fun saveBackend(config: LettaConfig, save: BackendSave) {
         val state = (_uiState.value as? UiState.Success)?.data ?: return
         val mode = config.mode.toServerMode()
         _uiState.value = UiState.Success(
@@ -359,7 +366,7 @@ class ConfigViewModel @Inject constructor(
                 apiToken = config.accessToken.orEmpty(),
             )
         )
-        saveConfig(onSuccess = onSuccess, onError = onError)
+        saveConfig(onSuccess = save.onSuccess, onError = save.onError, asNewEntry = save.asNewEntry)
     }
 
     /** Forgets the remote host's saved access token. */
@@ -538,7 +545,7 @@ class ConfigViewModel @Inject constructor(
         saveConfig(
             onSuccess = {},
             onError = null,
-            asNewEntry = createNew || (activeMode != null && activeMode != LettaConfig.Mode.LOCAL),
+            asNewEntry = activeMode != null && activeMode != LettaConfig.Mode.LOCAL,
         )
     }
 
@@ -598,112 +605,26 @@ class ConfigViewModel @Inject constructor(
     fun saveConfig(
         onSuccess: () -> Unit,
         onError: ((String) -> Unit)? = null,
-        asNewEntry: Boolean = createNew,
+        asNewEntry: Boolean = false,
     ) {
         viewModelScope.launch {
             val state = (_uiState.value as? UiState.Success)?.data ?: return@launch
             if (state.isSaving) return@launch
+            saveProblem(state)?.let { problem ->
+                onError?.invoke(problem)
+                return@launch
+            }
+            _uiState.value = UiState.Success(state.copy(isSaving = true))
             try {
-                val url = when (state.mode) {
-                    ServerMode.LOCAL -> LOCAL_RUNTIME_URL
-                    ServerMode.SELF_HOSTED -> {
-                        val raw = state.serverUrl.trim()
-                        if (raw.isBlank()) {
-                            onError?.invoke("Server URL is required")
-                            return@launch
-                        }
-                        if (raw.startsWith("http://") || raw.startsWith("https://") || raw.contains("://")) raw
-                        else "https://$raw"
-                    }
-                }
-                _uiState.value = UiState.Success(state.copy(isSaving = true))
-                val apiToken = state.apiToken.trim()
-                val localModelMaxTokens = if (state.mode == ServerMode.LOCAL) {
-                    val rawMaxTokens = state.localModelMaxTokens.trim()
-                    if (rawMaxTokens.isBlank()) {
-                        DEFAULT_LOCAL_MODEL_MAX_TOKENS.toInt()
-                    } else {
-                        rawMaxTokens.toIntOrNull()?.takeIf { it > 0 } ?: run {
-                            _uiState.value = UiState.Success(state.copy(isSaving = false))
-                            onError?.invoke("Local model max tokens must be a positive number.")
-                            return@launch
-                        }
-                    }
-                } else {
-                    null
-                }
-                val trimmedProviderBaseUrl = state.localProviderBaseUrl.trim()
-                if (state.mode == ServerMode.LOCAL && trimmedProviderBaseUrl.isNotBlank() &&
-                    !trimmedProviderBaseUrl.startsWith("http://") && !trimmedProviderBaseUrl.startsWith("https://")
-                ) {
-                    _uiState.value = UiState.Success(state.copy(isSaving = false))
-                    onError?.invoke("Custom provider URL must start with http:// or https://.")
-                    return@launch
-                }
-                val modelValidation = validateModelSelection(
-                    state = state,
-                    trimmedProviderBaseUrl = trimmedProviderBaseUrl,
-                )
-                if (modelValidation is ModelHandleValidator.Result.Invalid) {
-                    _uiState.value = UiState.Success(state.copy(isSaving = false))
-                    onError?.invoke(modelValidation.reason)
-                    return@launch
-                }
                 settingsRepository.setHuggingFaceToken(state.huggingFaceToken.trim().ifBlank { null })
-                // letta-mobile-cdlk: asNewEntry bypasses the activeConfig
-                // id lookup so '+ Add server' in the backend-switcher sheet
-                // actually creates a new entry instead of overwriting the
-                // currently active backend.
+                // letta-mobile-cdlk: asNewEntry bypasses the activeConfig id lookup so adding a backend
+                // creates a new entry instead of overwriting the one in use.
                 val reuseId = if (asNewEntry) null else settingsRepository.activeConfig.value?.id
-                val config = LettaConfig(
-                    id = reuseId ?: UUID.randomUUID().toString(),
-                    mode = state.mode.toLettaMode(),
-                    serverUrl = url,
-                    accessToken = if (state.mode == ServerMode.LOCAL) null else apiToken.ifBlank { null },
-                    localModelPath = if (state.mode == ServerMode.LOCAL) {
-                        state.localModelPath.trim().ifBlank { null }
-                    } else {
-                        null
-                    },
-                    localModelHandle = if (state.mode == ServerMode.LOCAL) {
-                        state.localModelHandle.trim().ifBlank { DEFAULT_LOCAL_MODEL_HANDLE }
-                    } else {
-                        null
-                    },
-                    localModelRuntime = if (state.mode == ServerMode.LOCAL) DEFAULT_LOCAL_MODEL_RUNTIME else null,
-                    localModelAccelerator = if (state.mode == ServerMode.LOCAL) {
-                        state.localModelAccelerator.normalizedLocalModelAccelerator()
-                    } else {
-                        null
-                    },
-                    localModelMaxTokens = localModelMaxTokens,
-                    localProviderBaseUrl = if (state.mode == ServerMode.LOCAL) {
-                        state.localProviderBaseUrl.trim().trimEnd('/').ifBlank { null }
-                    } else {
-                        null
-                    },
-                    localProviderApiKey = if (state.mode == ServerMode.LOCAL) {
-                        state.localProviderApiKey.trim().ifBlank { null }
-                    } else {
-                        null
-                    },
-                    localProviderModel = if (state.mode == ServerMode.LOCAL) {
-                        state.localProviderModel.trim().ifBlank { null }
-                    } else {
-                        null
-                    },
-                )
-                settingsRepository.saveConfig(config)
-                // Clear isSaving on success too: auto-persist callers
-                // (selectEmbeddedModel/importLocalModel) keep the screen open,
-                // and a stuck flag short-circuits every subsequent save.
+                settingsRepository.saveConfig(configOf(state, reuseId ?: UUID.randomUUID().toString()))
+                // Clear isSaving on success too: auto-persist callers (selectEmbeddedModel/importLocalModel)
+                // keep the screen open, and a stuck flag short-circuits every subsequent save.
                 val latest = (_uiState.value as? UiState.Success)?.data ?: state
-                _uiState.value = UiState.Success(
-                    latest.copy(
-                        hasUnsavedChanges = false,
-                        isSaving = false,
-                    )
-                )
+                _uiState.value = UiState.Success(latest.copy(hasUnsavedChanges = false, isSaving = false))
                 onSuccess()
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -712,6 +633,45 @@ class ConfigViewModel @Inject constructor(
                 onError?.invoke(e.message ?: "Failed to save config")
             }
         }
+    }
+
+    /** Why the form cannot be saved as it is, in words; null when it can. */
+    private suspend fun saveProblem(state: ConfigUiState): String? {
+        val providerBaseUrl = state.localProviderBaseUrl.trim()
+        val formProblem = if (state.mode == ServerMode.LOCAL) localProblem(state, providerBaseUrl) else remoteProblem(state)
+        return formProblem ?: (validateModelSelection(state, providerBaseUrl) as? ModelHandleValidator.Result.Invalid)?.reason
+    }
+
+    private fun remoteProblem(state: ConfigUiState): String? = "Server URL is required".takeIf { state.serverUrl.isBlank() }
+
+    private fun localProblem(state: ConfigUiState, providerBaseUrl: String): String? {
+        val maxTokens = state.localModelMaxTokens.trim()
+        if (maxTokens.isNotBlank() && (maxTokens.toIntOrNull() ?: 0) <= 0) return "Local model max tokens must be a positive number."
+        val hasScheme = providerBaseUrl.startsWith("http://") || providerBaseUrl.startsWith("https://")
+        return "Custom provider URL must start with http:// or https://.".takeIf { providerBaseUrl.isNotBlank() && !hasScheme }
+    }
+
+    /** The config the form saves as [id]: a remote host's address and token, or the on-device runtime's model. */
+    private fun configOf(state: ConfigUiState, id: String): LettaConfig {
+        if (state.mode != ServerMode.LOCAL) {
+            val raw = state.serverUrl.trim()
+            val url = if (raw.contains("://")) raw else "https://$raw"
+            val token = state.apiToken.trim().ifBlank { null }
+            return LettaConfig(id = id, mode = state.mode.toLettaMode(), serverUrl = url, accessToken = token)
+        }
+        return LettaConfig(
+            id = id,
+            mode = state.mode.toLettaMode(),
+            serverUrl = LOCAL_RUNTIME_URL,
+            localModelPath = state.localModelPath.trim().ifBlank { null },
+            localModelHandle = state.localModelHandle.trim().ifBlank { DEFAULT_LOCAL_MODEL_HANDLE },
+            localModelRuntime = DEFAULT_LOCAL_MODEL_RUNTIME,
+            localModelAccelerator = state.localModelAccelerator.normalizedLocalModelAccelerator(),
+            localModelMaxTokens = state.localModelMaxTokens.trim().ifBlank { DEFAULT_LOCAL_MODEL_MAX_TOKENS }.toInt(),
+            localProviderBaseUrl = state.localProviderBaseUrl.trim().trimEnd('/').ifBlank { null },
+            localProviderApiKey = state.localProviderApiKey.trim().ifBlank { null },
+            localProviderModel = state.localProviderModel.trim().ifBlank { null },
+        )
     }
 
     private suspend fun validateModelSelection(

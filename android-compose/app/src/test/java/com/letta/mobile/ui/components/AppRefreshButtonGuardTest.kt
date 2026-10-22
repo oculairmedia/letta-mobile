@@ -70,9 +70,7 @@ class AppRefreshButtonGuardTest {
 
     private companion object {
         /** File name -> why it still shows the refresh glyph. None of these reloads a list. */
-        val ALLOWLIST: Map<String, String> = mapOf(
-            "ConversationAdminDialog.kt" to "the conversation inspector's \"Recompile\" item: a rebuild of the agent's context, not a reload",
-        )
+        val ALLOWLIST: Map<String, String> = emptyMap()
 
         private val REFRESH_GLYPH =
             Regex("""LettaIcons\.Refresh\b|Icons\.\w+\.Refresh\b|import androidx\.compose\.material\.icons\.\w+\.Refresh\b""")

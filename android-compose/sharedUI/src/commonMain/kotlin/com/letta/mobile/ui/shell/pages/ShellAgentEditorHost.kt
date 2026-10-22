@@ -13,12 +13,13 @@ import com.letta.mobile.data.agenteditor.RepositoryAgentEditorBackend
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LlmModel
-import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
+import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.ifSupported
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.ui.agenteditor.AgentEditorPageOptions
 import com.letta.mobile.ui.agenteditor.AgentEditorPanels
 import com.letta.mobile.ui.shell.AgentEditorBinding
+import com.letta.mobile.ui.shell.LocalShellPageFramed
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.shellAgentEditorPage
 import kotlinx.coroutines.flow.StateFlow
@@ -34,8 +35,6 @@ class ShellAgentEditorHost(
     val panels: (AgentId) -> AgentEditorPanels = { AgentEditorPanels() },
     val onIdentityChange: (AgentId, MascotIdentity) -> Unit = { _, _ -> },
     val onRosterChanged: () -> Unit = {},
-    /** The host frames the editor (the desktop's side pane draws its title and close); else the page has Back. */
-    val embedded: Boolean = false,
 )
 
 /**
@@ -44,7 +43,7 @@ class ShellAgentEditorHost(
  * reloads the host's roster.
  */
 internal fun shellAgentEditorBinding(
-    graph: SharedSessionRepositoryGraph,
+    graph: SessionRepositoryGraph,
     host: ShellPageHost,
 ): ShellPageContent<ShellDestination.AgentEditor> = shellAgentEditorPage(
     AgentEditorBinding(
@@ -54,7 +53,7 @@ internal fun shellAgentEditorBinding(
 )
 
 @Composable
-private fun rememberAgentEditor(agent: AgentId?, graph: SharedSessionRepositoryGraph, host: ShellAgentEditorHost): AgentEditorController {
+private fun rememberAgentEditor(agent: AgentId?, graph: SessionRepositoryGraph, host: ShellAgentEditorHost): AgentEditorController {
     val scope = rememberCoroutineScope()
     // Keyed by the agent and the graph only: a host rebuilds its creator lambda on every composition.
     return remember(agent, graph) {
@@ -71,12 +70,15 @@ private fun rememberAgentEditor(agent: AgentId?, graph: SharedSessionRepositoryG
     }
 }
 
+/** A framed editor ([LocalShellPageFramed]: the desktop's side pane) draws no Back; its frame closes it. */
+@Composable
 private fun editorOptions(agent: AgentId?, controller: AgentEditorController, host: ShellPageHost): AgentEditorPageOptions {
     val editor = host.agentEditor
+    val framed = LocalShellPageFramed.current
     val workspace = host.navigator.state
     val close = { workspace.editAgentId = null }
     return AgentEditorPageOptions(
-        onBack = close.takeUnless { editor.embedded },
+        onBack = close.takeUnless { framed },
         onSaved = {
             val state = controller.state.value
             val renamed = agent != null && state.agent?.name != state.form.name.trim()
@@ -91,7 +93,7 @@ private fun editorOptions(agent: AgentId?, controller: AgentEditorController, ho
         panels = agent?.let(editor.panels) ?: AgentEditorPanels(),
         settings = host.settings,
         onIdentityChange = { id, identity -> editor.onIdentityChange(AgentId(id), identity) },
-        embedded = editor.embedded,
+        embedded = framed,
     )
 }
 

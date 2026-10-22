@@ -2,7 +2,9 @@ package com.letta.mobile.feature.chat.screen
 
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.data.agenteditor.AgentCreator
 import com.letta.mobile.data.agents.RecentAgents
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasDocumentStore
@@ -15,14 +17,22 @@ import com.letta.mobile.data.chat.runtime.ConversationListPrefs
 import com.letta.mobile.data.chat.runtime.ConversationMarker
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.activeBackendUsesChannel
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
+import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
+import com.letta.mobile.data.session.SessionManager
+import com.letta.mobile.ui.shell.pages.ShellLibrarySources
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.ui.shell.sidebar.ShellConversationMarkActions
 import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -32,39 +42,55 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.time.Instant
 
-/**
- * The shared navigation drawer's binding for the chat scaffold; null (tests, hosts without Hilt)
- * keeps the legacy drawer. [AgentScaffold] provides it.
- */
+/** The workspace's drawer binding, for the chat page's display options and `/` commands. */
 internal val LocalSharedNavDrawer = staticCompositionLocalOf<SharedNavDrawerViewModel?> { null }
 
+/** What the shared shell workspace reads on Android besides the drawer's own stores (letta-mobile-ckmub.2). */
+class SharedNavDrawerSources @Inject constructor(
+    val agents: IAgentRepository,
+    val conversations: IConversationRepository,
+    val sessions: SessionManager,
+    val library: ShellLibrarySources,
+    val modelControl: ModelControlSession,
+    /** The agent editor's creator, and what its Dreaming panel reads (the host's `reflection.*`, the MemFS dream log). */
+    val creator: AgentCreator,
+    val dreamingRpc: AdminRpcInvoker,
+)
+
 /**
- * The Android side of the shared navigation drawer (letta-mobile-c3np7.5.5): whether it replaces the
- * legacy chat drawer, the canvases it lists, its archive filter, and the conversation actions its
- * rows offer (conversation archive / delete, agent pins). The drawer's look and its mapping live in sharedUI; this only binds Android's stores.
+ * The Android side of the shared shell workspace's navigation (letta-mobile-c3np7.5.5, ckmub.2): the
+ * roster, the fleet's and the focused agent's conversations, the canvases the panel lists, its archive
+ * filter, and what its rows do (archive, delete, rename, pin; agent pins). The look and the mapping
+ * live in sharedUI; this only binds Android's stores.
  */
 @HiltViewModel
-internal class SharedNavDrawerViewModel @Inject constructor(
+class SharedNavDrawerViewModel @Inject constructor(
     private val settingsRepository: ISettingsRepository,
     private val canvasStore: CanvasDocumentStore,
     private val allConversations: IAllConversationsRepository,
     secureSettings: SecureSettingsStore,
+    val sources: SharedNavDrawerSources,
     /** letta-mobile-7mys7 (G37): each fork's source conversation; null in tests. */
     private val lineage: com.letta.mobile.data.chat.branch.ConversationLineage? = null,
 ) : ViewModel() {
-    /** letta-mobile-zxk2n.5: settled chats and markers (client marks; the server has no field for them). */
+    /** letta-mobile-zxk2n.5: settled chats and markers (client marks), and the Chat options' display toggles. */
     private val listMarks = ConversationListPrefs(secureSettings)
-
-    /** letta-mobile-zxk2n.5: the Chat options' display toggles, read by the shared chat page too. */
     private val displayPrefs = ChatDisplayPrefs(secureSettings)
 
     val settledConversationIds: StateFlow<Set<String>> = listMarks.settled
     val conversationMarkers: StateFlow<Map<String, String>> = listMarks.markers
     val displayOptions: StateFlow<ChatDisplayOptions> = displayPrefs.options
+    val agents: StateFlow<List<Agent>> = sources.agents.agents
+    /** Every conversation the fleet list knows, for the shell's "open this agent" and its tabs. */
+    val fleet: StateFlow<List<Conversation>> = allConversations.conversations
+
+    /** [agent]'s own conversations, as the panel lists them. */
+    fun conversationsOf(agent: AgentId): Flow<List<Conversation>> = sources.conversations.getConversations(agent)
 
     /** Settle / move to active and the marker, for the drawer's row menus. */
     val conversationMarkActions = ShellConversationMarkActions(
@@ -80,7 +106,7 @@ internal class SharedNavDrawerViewModel @Inject constructor(
 
     /** Each fork's source conversation id, so a fork's row reads "Forked from …". */
     val conversationParents: StateFlow<Map<String, String>> =
-        (lineage?.parents ?: kotlinx.coroutines.flow.MutableStateFlow(emptyMap()))
+        (lineage?.parents ?: MutableStateFlow(emptyMap()))
             .map { parents -> parents.mapValues { it.value.conversationId } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyMap())
 
@@ -92,98 +118,62 @@ internal class SharedNavDrawerViewModel @Inject constructor(
     val pinnedConversationIds: StateFlow<Set<String>> = settingsRepository.getPinnedConversationIds()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptySet())
 
-    /**
-     * Each agent's newest conversation activity across the fleet, for the rail's recents cut. An
-     * agent's own record rarely carries a last run, so this is the rail's main recency signal.
-     */
+    /** Each agent's newest conversation activity across the fleet. */
     val agentActivity: StateFlow<Map<String, Instant>> = allConversations.conversations
         .map { RecentAgents.lastActiveAtFromConversations(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyMap())
 
     private val _canvases = MutableStateFlow<List<CanvasDocument>>(emptyList())
     val canvases: StateFlow<List<CanvasDocument>> = _canvases.asStateFlow()
-
     private val _archiveFilter = MutableStateFlow(ShellArchiveFilter.Active)
     val archiveFilter: StateFlow<ShellArchiveFilter> = _archiveFilter.asStateFlow()
 
-    /** Re-reads the canvas library; the drawer calls it each time it opens. */
-    fun refreshCanvases() {
-        viewModelScope.launch {
-            _canvases.value = runCatchingNonCancel { canvasStore.listAll() } ?: _canvases.value
-        }
+    /** Re-reads the canvases and brings the fleet's and [agent]'s lists up to date (cached ones stay); as the panel opens. */
+    fun refresh(agent: AgentId?, roster: Boolean = false) {
+        if (roster) run("Couldn't reload the agents") { sources.agents.refreshAgents() }
+        viewModelScope.launch { _canvases.value = runCatchingNonCancel { canvasStore.listAll() } ?: _canvases.value }
+        viewModelScope.launch { runCatchingNonCancel { allConversations.refreshIfStale(ACTIVITY_MAX_AGE_MS) } }
+        if (agent == null) return
+        viewModelScope.launch { runCatchingNonCancel { sources.conversations.refreshConversationsIfStale(agent, ACTIVITY_MAX_AGE_MS) } }
     }
 
-    /** Brings the fleet's conversation list up to date (a cached list stays); the drawer calls it each time it opens. */
-    fun refreshAgentActivity() {
-        viewModelScope.launch {
-            runCatchingNonCancel { allConversations.refreshIfStale(ACTIVITY_MAX_AGE_MS) }
-        }
-    }
+    fun setArchiveFilter(filter: ShellArchiveFilter) = _archiveFilter.update { filter }
 
-    fun setArchiveFilter(filter: ShellArchiveFilter) {
-        _archiveFilter.value = filter
-    }
 
-    /**
-     * The conversation actions take the repository the drawer LISTS from (the scaffold's own, which
-     * can differ from any injected one): a write through another repository would miss this one's
-     * cache, and a rename would silently do nothing.
-     */
-    fun setConversationArchived(repository: IConversationRepository, conversationId: String, agentId: String, archived: Boolean) {
-        viewModelScope.launch {
-            reportFailure("Couldn't ${if (archived) "archive" else "restore"} the chat") {
-                repository.setConversationArchived(conversationId, agentId, archived)
-            }
+    fun setConversationArchived(conversation: ConversationId, agent: AgentId, archived: Boolean) =
+        run("Couldn't ${if (archived) "archive" else "restore"} the chat") {
+            sources.conversations.setConversationArchived(conversation.value, agent.value, archived)
         }
-    }
 
-    fun setAgentPinned(agentId: String, pinned: Boolean) {
-        viewModelScope.launch {
-            reportFailure("Couldn't ${if (pinned) "pin" else "unpin"} the agent") { settingsRepository.setAgentPinned(agentId, pinned) }
-        }
+    fun setAgentPinned(agent: AgentId, pinned: Boolean) = run("Couldn't ${if (pinned) "pin" else "unpin"} the agent") {
+        settingsRepository.setAgentPinned(agent.value, pinned)
     }
 
     /** The Iroh backend has no delete command, so a delete there only archives (it stays under Archived); the confirm dialog says so. */
     val deleteBehavior: ConversationDeleteBehavior
-        get() = if (settingsRepository.activeBackendUsesChannel()) {
-            ConversationDeleteBehavior.MovesToArchived
-        } else {
-            ConversationDeleteBehavior.Permanent
-        }
+        get() = ConversationDeleteBehavior.MovesToArchived.takeIf { settingsRepository.activeBackendUsesChannel() }
+            ?: ConversationDeleteBehavior.Permanent
 
-    fun setConversationPinned(conversationId: ConversationId, pinned: Boolean) {
-        viewModelScope.launch {
-            reportFailure("Couldn't ${if (pinned) "pin" else "unpin"} the chat") { settingsRepository.setConversationPinned(conversationId.value, pinned) }
-        }
-    }
+    fun setConversationPinned(id: ConversationId, pinned: Boolean) =
+        run("Couldn't ${if (pinned) "pin" else "unpin"} the chat") { settingsRepository.setConversationPinned(id.value, pinned) }
 
     /** A blank title is ignored; the row keeps its name. */
-    fun renameConversation(
-        repository: IConversationRepository,
-        conversationId: ConversationId,
-        agentId: AgentId,
-        title: ConversationSummary,
-    ) {
+    fun renameConversation(conversationId: ConversationId, agentId: AgentId, title: ConversationSummary) {
         val trimmed = title.value.trim()
         if (trimmed.isEmpty()) return
-        viewModelScope.launch {
-            reportFailure("Couldn't rename the chat") { repository.updateConversation(conversationId, agentId, trimmed) }
-        }
+        run("Couldn't rename the chat") { sources.conversations.updateConversation(conversationId, agentId, trimmed) }
     }
 
-    fun deleteConversation(repository: IConversationRepository, conversationId: String, agentId: String) {
-        viewModelScope.launch {
-            reportFailure("Couldn't delete the chat") { repository.deleteConversation(conversationId, agentId) }
-        }
+    fun deleteConversation(conversation: ConversationId, agent: AgentId) = run("Couldn't delete the chat") {
+        sources.conversations.deleteConversation(conversation.value, agent.value)
     }
 
     private val _failures = MutableSharedFlow<String>(extraBufferCapacity = FAILURE_BUFFER)
-
     /** A conversation action that failed, as a message for the drawer to show. */
     val failures: SharedFlow<String> = _failures.asSharedFlow()
 
-    private suspend fun reportFailure(message: String, block: suspend () -> Unit) {
-        if (runCatchingNonCancel { block() } == null) _failures.tryEmit(message)
+    private fun run(failure: String, block: suspend () -> Unit) {
+        viewModelScope.launch { if (runCatchingNonCancel { block() } == null) _failures.tryEmit(failure) }
     }
 
     /** A failed store call leaves the drawer as it was; cancellation still propagates. */
@@ -196,6 +186,19 @@ internal class SharedNavDrawerViewModel @Inject constructor(
             android.util.Log.w(TAG, "shared nav drawer store call failed", error)
             null
         }
+
+    /** The chat page's view models, a store per chat kept across a rotation; a chat left behind is cleared. */
+    private val chatStores = mutableMapOf<String, ViewModelStore>()
+    fun chatStore(key: String): ViewModelStore = chatStores.getOrPut(key) { ViewModelStore() }
+
+    fun releaseChat(key: String) {
+        chatStores.remove(key)?.clear()
+    }
+
+    override fun onCleared() {
+        chatStores.values.forEach(ViewModelStore::clear)
+        chatStores.clear()
+    }
 
     private companion object {
         const val TAG = "SharedNavDrawer"

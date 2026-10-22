@@ -3,7 +3,6 @@ package com.letta.mobile
 import android.content.Intent
 import android.net.Uri
 import android.os.Parcelable
-import com.letta.mobile.ui.navigation.ShareToAgentRoute
 
 /**
  * Launch target for Android Sharesheet ACTION_SEND/ACTION_SEND_MULTIPLE intents.
@@ -15,8 +14,6 @@ data class ShareLaunchTarget(
     val sharedText: String,
     private val requestId: Long = System.currentTimeMillis(),
 ) : AppLaunchTarget {
-    override fun toRoute(): Any = ShareToAgentRoute(sharedText = sharedText)
-
     companion object {
         private const val MAX_SHARED_TEXT_LENGTH = 16_000
 

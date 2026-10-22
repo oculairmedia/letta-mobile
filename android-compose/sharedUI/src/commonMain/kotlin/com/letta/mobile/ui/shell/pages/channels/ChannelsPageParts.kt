@@ -63,7 +63,12 @@ fun interface ChannelsRefreshActionSlot {
 data class ChannelsPageSlots(
     val searchField: ChannelsSearchFieldSlot = DefaultChannelsSearchField,
     val refreshAction: ChannelsRefreshActionSlot = DefaultChannelsRefreshAction,
-)
+) {
+    companion object {
+        /** The plain Material 3 field and refresh: the touch host's own controls (Android). */
+        val Material = ChannelsPageSlots()
+    }
+}
 
 private val DefaultChannelsSearchField = ChannelsSearchFieldSlot { query, onQueryChange, placeholder, modifier ->
     OutlinedTextField(
