@@ -1,47 +1,46 @@
 package com.letta.mobile.web.data
 
 import com.letta.mobile.data.backend.SessionCapabilities
-import com.letta.mobile.data.canvas.CanvasRelayDial
-import com.letta.mobile.data.context.limit.AgentContextRoutes
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.canvas.CanvasRelayDial
+import com.letta.mobile.data.chat.approval.SettingsApprovalOutboxStore
+import com.letta.mobile.data.chat.conversations.TimelineConversationChat
+import com.letta.mobile.data.chat.runtime.ChatGateway
+import com.letta.mobile.data.context.limit.AgentContextRoutes
+import com.letta.mobile.data.memory.memfs.AppServerMemfsSource
+import com.letta.mobile.data.memory.memfs.MemfsSource
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.subagents.SubagentView
-import com.letta.mobile.data.session.graph.HostSessionBinding
-import com.letta.mobile.data.memory.memfs.AppServerMemfsSource
-import com.letta.mobile.data.memory.memfs.MemfsSource
+import com.letta.mobile.data.model.RecentModelsStore
+import com.letta.mobile.data.model.SettingsStoreRecentModels
 import com.letta.mobile.data.model.isIrohBackendUrl
-import com.letta.mobile.data.chat.runtime.ChatGateway
-import com.letta.mobile.data.repository.appserver.AppServerLocalAdminGateway
-import com.letta.mobile.data.chat.approval.SettingsApprovalOutboxStore
-import com.letta.mobile.data.chat.conversations.TimelineConversationChat
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
+import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
+import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
 import com.letta.mobile.data.runtime.IrohApprovalControls
 import com.letta.mobile.data.runtime.PermissionModeSettings
-import com.letta.mobile.data.storage.SecureSettingsStore
-import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
-import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
-import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
+import com.letta.mobile.data.session.graph.HostSessionBinding
 import com.letta.mobile.data.session.graph.HostSessionGraphFactory
 import com.letta.mobile.data.session.graph.HostSessionGraphProvider
 import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
 import com.letta.mobile.data.session.graph.hostServedKind
-import com.letta.mobile.runtime.BackendId
+import com.letta.mobile.data.storage.SecureSettingsStore
+import com.letta.mobile.data.subagents.SubagentView
 import com.letta.mobile.data.transport.appserver.AppServerApprovalAnswer
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerRunControls
 import com.letta.mobile.data.transport.appserver.AppServerTimelineConnection
 import com.letta.mobile.data.transport.appserver.AppServerTimelineTransport
-import com.letta.mobile.ui.chat.session.ConversationModelBackend
-import com.letta.mobile.ui.chat.session.TimelineChatRunControls
+import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.ui.chat.session.SubagentTimelineRoute
+import com.letta.mobile.ui.chat.session.TimelineChatRunControls
 import com.letta.mobile.ui.chat.session.TimelineChatTarget
 import com.letta.mobile.ui.chat.session.TimelineChipSources
-import com.letta.mobile.ui.chat.session.TimelineModelSource
+import com.letta.mobile.ui.chat.session.timelineModelSource
 import com.letta.mobile.web.chat.WebChatBinding
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.js.Js
@@ -54,8 +53,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
@@ -98,8 +97,8 @@ class WasmAppServerClientGateway(
     /** The live session's `admin_rpc`. */
     private val adminRpc = AdminRpcInvoker.overTransport { activeSession?.let { sessionGraphProvider.current.channelTransport } }
 
-    /** The provider and model catalog over the live session's `admin_rpc`, as desktop's Providers reads them. */
-    val modelControl: ModelControlSession = ModelControlSession(adminRpc)
+    /** The provider and model catalog over the live session's `admin_rpc`, as desktop's Providers reads them; recents in the browser. */
+    val modelControl: ModelControlSession = ModelControlSession(adminRpc, recents = RecentModelsStore(SettingsStoreRecentModels(settings)))
 
     /**
      * The context card's compaction and context limit, over the live session's `admin_rpc` and,
@@ -194,7 +193,7 @@ class WasmAppServerClientGateway(
             hostApprovals = session.irohChat,
             conversations = conversations,
             chips = TimelineChipSources(
-                models = webModelSource(session.irohChat, session.appServerAdmin, agentModel, modelControl.catalog),
+                models = timelineModelSource(session.irohChat, session.appServerAdmin, agentModel, modelControl),
                 permissionModes = session.permissionModes,
             ),
         )
@@ -307,31 +306,6 @@ internal fun unservedStatus(config: LettaConfig): BackendConnectionStatus? = whe
     config.serverUrl.isBlank() -> BackendConnectionStatus.Unconfigured
     !webSessionCapabilities(config).supports(SessionRoute.AGENTS) -> BackendConnectionStatus.Failed(NO_BROWSER_ROUTE)
     else -> null
-}
-
-/**
- * Where a chat lists and switches models. An Iroh host's control channel answers no native
- * `list_models` / `conversation_update`, so there the chat goes through the shared Iroh chat gateway
- * ([iroh]: `model.list`, and `model.update` with the effort [catalog] advertises), as desktop does;
- * a ws:// App Server keeps its own commands ([admin]).
- */
-internal fun webModelSource(
-    iroh: IrohAdminRpcChatGateway?,
-    admin: AppServerLocalAdminGateway,
-    agentModel: String?,
-    catalog: ModelCatalogRepository,
-): TimelineModelSource {
-    val gateway = iroh ?: return TimelineModelSource(
-        backend = ConversationModelBackend.of(admin),
-        conversation = { admin.getConversation(it) },
-        agentModel = agentModel,
-    )
-    return TimelineModelSource(
-        backend = checkNotNull(ConversationModelBackend.of(gateway)),
-        conversation = { gateway.getConversation(it.value) },
-        agentModel = agentModel,
-        catalog = catalog,
-    )
 }
 
 /**

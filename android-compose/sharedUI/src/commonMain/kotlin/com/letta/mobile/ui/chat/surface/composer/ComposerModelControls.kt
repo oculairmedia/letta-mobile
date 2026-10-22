@@ -10,10 +10,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -21,9 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import com.composables.icons.lucide.Gauge
 import com.composables.icons.lucide.Lucide
 import com.letta.mobile.data.composer.ComposerEffort
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelCatalogNormalizer
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
-import com.letta.mobile.ui.providers.icons.ProviderIcons
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_effort_default
 import com.letta.mobile.sharedui.resources.composer_effort_header
@@ -31,17 +36,20 @@ import com.letta.mobile.sharedui.resources.composer_model_fallback
 import com.letta.mobile.sharedui.resources.composer_model_selected
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatModelHandle
-import com.letta.mobile.ui.chat.session.ChatModelOption
 import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
+import com.letta.mobile.ui.context.ModelPickerHost
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.providers.icons.ProviderIcons
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import org.jetbrains.compose.resources.stringResource
 
 /**
  * The model chip (and, when the current model has named reasoning efforts, the effort chip).
- * The chip opens the host's own picker when it has one, otherwise the shared sheet.
+ * The chip opens the shared picker the host binds ([ChatSurfaceHost.modelPicker]).
  */
 @Composable
 internal fun ComposerModelControls(
@@ -49,15 +57,15 @@ internal fun ComposerModelControls(
     actions: ChatActions,
     host: ChatSurfaceHost,
 ) {
-    var sheetOpen by remember { mutableStateOf(false) }
+    val picker = host.modelPicker
     ComposerActionChip(
         label = ComposerChipLabel(
             text = model.currentLabel.ifBlank { stringResource(Res.string.composer_model_fallback) },
             // The provider the current model routes through ("lmstudio/…"), when the app has its logo.
             leadingIcon = model.currentHandle?.let { ProviderIcons.forProvider(ModelCatalogNormalizer.providerPrefix(it)) },
         ),
-        onClick = { host.openModelPicker?.invoke() ?: run { sheetOpen = true } },
-        enabled = !model.isSwitching,
+        onClick = { picker?.open() },
+        enabled = !model.isSwitching && picker != null,
         modifier = Modifier.testTag(ComposerTestTags.MODEL_CHIP),
     )
     val efforts = currentModelEfforts(model)
@@ -67,18 +75,6 @@ internal fun ComposerModelControls(
             current = model.currentEffort,
             efforts = efforts,
             onSelect = { choice -> actions.selectModel(ChatModelHandle(handle), choice) },
-        )
-    }
-    if (sheetOpen) {
-        ComposerModelPickerSheet(
-            model = model,
-            onSelect = { option ->
-                sheetOpen = false
-                if (option.handle != model.currentHandle) {
-                    actions.selectModel(ChatModelHandle(option.handle), ReasoningEffortChoice.Unchanged)
-                }
-            },
-            onDismiss = { sheetOpen = false },
         )
     }
 }
@@ -155,20 +151,37 @@ private fun EffortRow(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** Options grouped by provider in first-seen order; options without one go under [otherLabel]. */
-internal fun groupModelOptions(
-    options: List<ChatModelOption>,
-    query: String,
-    otherLabel: String,
-): List<Pair<String, List<ChatModelOption>>> {
-    val needle = query.trim()
-    return options
-        .filter { needle.isEmpty() || it.matches(needle) }
-        .groupBy { it.provider?.takeIf(String::isNotBlank) ?: otherLabel }
-        .toList()
+/**
+ * The open picker over a plain [models] list (the agent editor's Model row), re-read through
+ * [reload]: [onPick] gets the picked model's value; it shows no effort chips and no Models sheet.
+ */
+@Composable
+internal fun rememberModelListPicker(
+    models: StateFlow<List<LlmModel>>,
+    reload: suspend () -> Unit,
+    onPick: (String) -> Unit,
+): ModelPickerBinding {
+    val latestPick by rememberUpdatedState(onPick)
+    val latestReload by rememberUpdatedState(reload)
+    return remember(models) {
+        ModelPickerBinding(
+            source = ModelPickerSource.of(models) { latestReload() },
+            onModelSelected = { entry -> latestPick(entry.value) },
+            onEffortSelected = null,
+            editor = null,
+            onAddProvider = null,
+            onModelsEdited = {},
+        ).also(ModelPickerBinding::open)
+    }
 }
 
-private fun ChatModelOption.matches(needle: String): Boolean =
-    label.contains(needle, ignoreCase = true) ||
-        handle.contains(needle, ignoreCase = true) ||
-        provider?.contains(needle, ignoreCase = true) == true
+/** The one model picker over [binding], shown until a pick or a dismiss closes it, then [onDismiss]. */
+@Composable
+internal fun ModelListPicker(binding: ModelPickerBinding, selectedValue: String?, onDismiss: () -> Unit) {
+    val latestDismiss by rememberUpdatedState(onDismiss)
+    LaunchedEffect(binding) {
+        snapshotFlow { binding.pickerOpen }.first { open -> !open }
+        latestDismiss()
+    }
+    ModelPickerHost(binding, selectedValue)
+}

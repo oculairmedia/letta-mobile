@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.screen
 
 import androidx.compose.runtime.staticCompositionLocalOf
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
 
 internal data class ChatScreenNavigationCallbacks(
     val onBugCommand: (() -> Unit)? = null,
@@ -26,3 +27,6 @@ internal data class AndroidAgentMessageContext(
 )
 
 internal val LocalAndroidAgentMessageContext = staticCompositionLocalOf { AndroidAgentMessageContext() }
+
+/** The scaffold's one model picker, which the shared page's composer chip opens. */
+internal val LocalChatModelPicker = staticCompositionLocalOf<ModelPickerBinding?> { null }

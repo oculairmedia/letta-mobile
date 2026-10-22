@@ -870,7 +870,9 @@ public abstract interface class com/letta/mobile/data/agenteditor/AgentCreator {
 public abstract interface class com/letta/mobile/data/agenteditor/AgentEditorActions {
 	public abstract fun delete (Lkotlin/jvm/functions/Function0;)V
 	public abstract fun dismissError ()V
+	public abstract fun getLlmModels ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun pickStarter (Lcom/letta/mobile/data/agenteditor/AgentStarter;)V
+	public abstract fun reloadModels (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun retry ()V
 	public abstract fun save (Lkotlin/jvm/functions/Function1;)V
 	public abstract fun update (Lkotlin/jvm/functions/Function1;)V
@@ -903,8 +905,10 @@ public final class com/letta/mobile/data/agenteditor/AgentEditorController : com
 	public fun <init> (Lcom/letta/mobile/data/agenteditor/AgentEditorBackend;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/data/agenteditor/AgentEditorMode;)V
 	public fun delete (Lkotlin/jvm/functions/Function0;)V
 	public fun dismissError ()V
+	public fun getLlmModels ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun pickStarter (Lcom/letta/mobile/data/agenteditor/AgentStarter;)V
+	public fun reloadModels (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun retry ()V
 	public fun save (Lkotlin/jvm/functions/Function1;)V
 	public fun update (Lkotlin/jvm/functions/Function1;)V
@@ -38202,10 +38206,11 @@ public final class com/letta/mobile/data/repository/modelcontrol/ModelControlExc
 }
 
 public final class com/letta/mobile/data/repository/modelcontrol/ModelControlSession {
-	public fun <init> (Lcom/letta/mobile/data/repository/modelcontrol/AdminRpcInvoker;Lcom/letta/mobile/data/repository/modelcontrol/ProviderOAuthHttp;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/repository/modelcontrol/AdminRpcInvoker;Lcom/letta/mobile/data/repository/modelcontrol/ProviderOAuthHttp;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/repository/modelcontrol/AdminRpcInvoker;Lcom/letta/mobile/data/repository/modelcontrol/ProviderOAuthHttp;Lcom/letta/mobile/data/model/RecentModelsStore;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/repository/modelcontrol/AdminRpcInvoker;Lcom/letta/mobile/data/repository/modelcontrol/ProviderOAuthHttp;Lcom/letta/mobile/data/model/RecentModelsStore;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCatalog ()Lcom/letta/mobile/data/repository/modelcontrol/ModelCatalogRepository;
 	public final fun getProviders ()Lcom/letta/mobile/data/repository/modelcontrol/ProviderConnectionRepository;
+	public final fun getRecents ()Lcom/letta/mobile/data/model/RecentModelsStore;
 	public final fun managementController (Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/repository/modelcontrol/ProviderManagementController;
 	public final fun pickerSource ()Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
 }
@@ -38231,6 +38236,25 @@ public final class com/letta/mobile/data/repository/modelcontrol/ModelLoad : jav
 	public final fun getForce ()Z
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/repository/modelcontrol/ModelLoad;
 	public static fun values ()[Lcom/letta/mobile/data/repository/modelcontrol/ModelLoad;
+}
+
+public final class com/letta/mobile/data/repository/modelcontrol/ModelPickerBinding {
+	public fun <init> (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;)V
+	public final fun close ()V
+	public final fun editModels ()V
+	public final fun getEditor ()Lkotlin/jvm/functions/Function1;
+	public final fun getEditorOpen ()Z
+	public final fun getOnAddProvider ()Lkotlin/jvm/functions/Function0;
+	public final fun getOnEffortSelected ()Lkotlin/jvm/functions/Function2;
+	public final fun getOnModelSelected ()Lkotlin/jvm/functions/Function1;
+	public final fun getOnModelsEdited ()Lkotlin/jvm/functions/Function1;
+	public final fun getPickerOpen ()Z
+	public final fun getSource ()Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
+	public final fun open ()V
+}
+
+public final class com/letta/mobile/data/repository/modelcontrol/ModelPickerBindingKt {
+	public static final fun chatModelPicker (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;Lkotlin/jvm/functions/Function1;Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerBinding;
 }
 
 public final class com/letta/mobile/data/repository/modelcontrol/ModelPickerCatalog {
@@ -38308,8 +38332,7 @@ public abstract interface class com/letta/mobile/data/repository/modelcontrol/Mo
 
 public final class com/letta/mobile/data/repository/modelcontrol/ModelPickerSource$Companion {
 	public final fun catalog (Lcom/letta/mobile/data/repository/modelcontrol/ProviderConnectionRepository;Lcom/letta/mobile/data/repository/modelcontrol/ModelCatalogRepository;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
-	public final fun forChat (Lcom/letta/mobile/data/repository/modelcontrol/ModelControlSession;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function1;Lkotlinx/coroutines/flow/Flow;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
-	public static synthetic fun forChat$default (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource$Companion;Lcom/letta/mobile/data/repository/modelcontrol/ModelControlSession;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function1;Lkotlinx/coroutines/flow/Flow;ILjava/lang/Object;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
+	public final fun forChat (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;Lkotlinx/coroutines/flow/Flow;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
 	public final fun of (Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function2;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
 	public final fun withFallback (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerSource;
 }
@@ -42454,15 +42477,11 @@ public final class com/letta/mobile/data/shell/ShellOverlays {
 	public fun <init> ()V
 	public final fun getCommandPalette ()Z
 	public final fun getIrohResetConfirm ()Z
-	public final fun getModelPicker ()Z
-	public final fun getModelsEditor ()Z
 	public final fun getNewConversation ()Z
 	public final fun getRenameChat ()Z
 	public final fun getShortcutHelp ()Z
 	public final fun setCommandPalette (Z)V
 	public final fun setIrohResetConfirm (Z)V
-	public final fun setModelPicker (Z)V
-	public final fun setModelsEditor (Z)V
 	public final fun setNewConversation (Z)V
 	public final fun setRenameChat (Z)V
 	public final fun setShortcutHelp (Z)V
@@ -62249,27 +62268,27 @@ public final class com/letta/mobile/ui/chat/session/ChatSurfaceCapabilities$Comp
 
 public final class com/letta/mobile/ui/chat/session/ChatSurfaceHost {
 	public fun <init> ()V
-	public fun <init> (Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;)V
-	public synthetic fun <init> (Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerBinding;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerBinding;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lkotlin/jvm/functions/Function0;
 	public final fun component10 ()Lkotlin/jvm/functions/Function0;
 	public final fun component2 ()Lkotlin/jvm/functions/Function1;
 	public final fun component3 ()Lkotlin/jvm/functions/Function1;
 	public final fun component4 ()Lkotlin/jvm/functions/Function1;
 	public final fun component5 ()Lkotlin/jvm/functions/Function3;
-	public final fun component6 ()Lkotlin/jvm/functions/Function0;
+	public final fun component6 ()Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerBinding;
 	public final fun component7 ()Lkotlin/jvm/functions/Function0;
 	public final fun component8 ()Lkotlin/jvm/functions/Function0;
 	public final fun component9 ()Lkotlin/jvm/functions/Function0;
-	public final fun copy (Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/chat/session/ChatSurfaceHost;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/chat/session/ChatSurfaceHost;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/chat/session/ChatSurfaceHost;
+	public final fun copy (Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerBinding;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/chat/session/ChatSurfaceHost;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/chat/session/ChatSurfaceHost;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function3;Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerBinding;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/chat/session/ChatSurfaceHost;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getEditAgent ()Lkotlin/jvm/functions/Function0;
+	public final fun getModelPicker ()Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerBinding;
 	public final fun getOpenAgent ()Lkotlin/jvm/functions/Function1;
 	public final fun getOpenAgentPane ()Lkotlin/jvm/functions/Function0;
 	public final fun getOpenAgentSwitcher ()Lkotlin/jvm/functions/Function0;
 	public final fun getOpenCanvas ()Lkotlin/jvm/functions/Function0;
-	public final fun getOpenModelPicker ()Lkotlin/jvm/functions/Function0;
 	public final fun getOpenSubagent ()Lkotlin/jvm/functions/Function3;
 	public final fun getPickWorkingDirectory ()Lkotlin/jvm/functions/Function0;
 	public final fun getResolveAgentName ()Lkotlin/jvm/functions/Function1;
@@ -62496,6 +62515,10 @@ public final class com/letta/mobile/ui/chat/session/ConversationModelHost$Defaul
 	public static fun recordModel (Lcom/letta/mobile/ui/chat/session/ConversationModelHost;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
+public final class com/letta/mobile/ui/chat/session/ConversationModelPickerKt {
+	public static final fun conversationModelPicker (Lcom/letta/mobile/data/repository/modelcontrol/ModelControlSession;Lcom/letta/mobile/ui/chat/session/ConversationModels;Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerBinding;
+}
+
 public final class com/letta/mobile/ui/chat/session/ConversationModelUpdate {
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -62598,6 +62621,7 @@ public abstract interface class com/letta/mobile/ui/chat/session/SubagentViewSes
 }
 
 public final class com/letta/mobile/ui/chat/session/TimelineChatComposerChipsKt {
+	public static final fun timelineModelSource (Lcom/letta/mobile/data/chat/runtime/ChatGateway;Lcom/letta/mobile/data/repository/appserver/AppServerLocalAdminGateway;Ljava/lang/String;Lcom/letta/mobile/data/repository/modelcontrol/ModelControlSession;)Lcom/letta/mobile/ui/chat/session/TimelineModelSource;
 	public static final fun withChips (Lcom/letta/mobile/ui/chat/session/TimelineChatSessionOptions;Lkotlinx/coroutines/CoroutineScope;Lcom/letta/mobile/ui/chat/session/TimelineChatTarget;Lcom/letta/mobile/ui/chat/session/TimelineChipSources;)Lcom/letta/mobile/ui/chat/session/TimelineChatSessionOptions;
 }
 
@@ -62756,12 +62780,13 @@ public final class com/letta/mobile/ui/chat/session/TimelineLocalState {
 }
 
 public final class com/letta/mobile/ui/chat/session/TimelineModelSource {
-	public fun <init> (Lcom/letta/mobile/ui/chat/session/ConversationModelBackend;Lkotlin/jvm/functions/Function2;Ljava/lang/String;Lcom/letta/mobile/data/repository/modelcontrol/ModelCatalogRepository;)V
-	public synthetic fun <init> (Lcom/letta/mobile/ui/chat/session/ConversationModelBackend;Lkotlin/jvm/functions/Function2;Ljava/lang/String;Lcom/letta/mobile/data/repository/modelcontrol/ModelCatalogRepository;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/ui/chat/session/ConversationModelBackend;Lkotlin/jvm/functions/Function2;Ljava/lang/String;Lcom/letta/mobile/data/repository/modelcontrol/ModelCatalogRepository;Lcom/letta/mobile/data/model/RecentModelsStore;)V
+	public synthetic fun <init> (Lcom/letta/mobile/ui/chat/session/ConversationModelBackend;Lkotlin/jvm/functions/Function2;Ljava/lang/String;Lcom/letta/mobile/data/repository/modelcontrol/ModelCatalogRepository;Lcom/letta/mobile/data/model/RecentModelsStore;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getAgentModel ()Ljava/lang/String;
 	public final fun getBackend ()Lcom/letta/mobile/ui/chat/session/ConversationModelBackend;
 	public final fun getCatalog ()Lcom/letta/mobile/data/repository/modelcontrol/ModelCatalogRepository;
 	public final fun getConversation ()Lkotlin/jvm/functions/Function2;
+	public final fun getRecents ()Lcom/letta/mobile/data/model/RecentModelsStore;
 }
 
 public final class com/letta/mobile/ui/chat/session/TimelineRunState {

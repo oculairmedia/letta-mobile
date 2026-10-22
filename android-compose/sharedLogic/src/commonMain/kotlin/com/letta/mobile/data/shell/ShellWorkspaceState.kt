@@ -185,10 +185,6 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
 @Stable
 class ShellOverlays {
     var commandPalette: Boolean by mutableStateOf(false)
-    var modelPicker: Boolean by mutableStateOf(false)
-
-    /** The "Models" exposure editor behind the picker's "Edit Models…". */
-    var modelsEditor: Boolean by mutableStateOf(false)
     var newConversation: Boolean by mutableStateOf(false)
 
     /** `/rename`'s dialog for the open chat. */

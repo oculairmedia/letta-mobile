@@ -34,7 +34,7 @@ internal fun RunErrorActionButton(errorText: String, context: ChatRowContext, ca
 internal fun runErrorHandler(action: RunErrorAction, context: ChatRowContext, callbacks: ChatRowCallbacks): (() -> Unit)? =
     when (action) {
         RunErrorAction.Retry -> retryHandler(context, callbacks)
-        RunErrorAction.SwitchModel -> callbacks.host.openModelPicker?.takeIf { context.capabilities.modelSwitch }
+        RunErrorAction.SwitchModel -> callbacks.host.modelPicker?.takeIf { context.capabilities.modelSwitch }?.let { it::open }
         // Puts the server's /compact command in the draft, as picking it from the "/" list does.
         RunErrorAction.Compact -> { { callbacks.actions.updateComposerText(COMPACT_COMMAND) } }
         RunErrorAction.None -> null

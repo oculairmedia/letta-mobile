@@ -2784,7 +2784,6 @@
 :sharedLogic com.letta.mobile.ui.chat.session/ChatSurfaceCapabilities/workingDirectory/#/ (common)
 :sharedLogic com.letta.mobile.ui.chat.session/ChatSurfaceHost/openAgent/#/ (common)
 :sharedLogic com.letta.mobile.ui.chat.session/ChatSurfaceHost/openCanvas/#/ (common)
-:sharedLogic com.letta.mobile.ui.chat.session/ChatSurfaceHost/openModelPicker/#/ (common)
 :sharedLogic com.letta.mobile.ui.chat.session/ChatSurfaceHost/pickWorkingDirectory/#/ (common)
 :sharedLogic com.letta.mobile.ui.chat.session/ChatSurfaceModeReducer/ (common)
 :sharedLogic com.letta.mobile.ui.chat.session/ChatSurfacePresentation.Companion/ (common)

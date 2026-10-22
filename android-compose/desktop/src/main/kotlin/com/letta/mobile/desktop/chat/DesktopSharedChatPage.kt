@@ -45,6 +45,7 @@ import com.letta.mobile.ui.shell.workspace.ShellChatDestination
 import com.letta.mobile.ui.shell.workspace.ShellChatLook
 import com.letta.mobile.ui.shell.workspace.ShellChatPage
 import com.letta.mobile.ui.shell.workspace.rememberShellChatPresentation
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
 
 /*
  * letta-mobile-bglj6.1, ckmub.3.11, ckmub.17.4: the Conversations destination is the shared
@@ -85,7 +86,8 @@ internal data class DesktopSharedChatPageNavigation(
     /** Opens the canvas beside the conversation (the composer's canvas button today). */
     val openCanvas: () -> Unit,
     val openAgent: (agentId: String) -> Unit,
-    val openModelPicker: () -> Unit,
+    /** The chat's one model picker. */
+    val modelPicker: ModelPickerBinding,
     /** The composer companion mascot was clicked: bring back the agent pane (the sidebar). */
     val openAgentPane: (() -> Unit)? = null,
     /** The pencil on the mascot: open the selected agent's editor. */
@@ -224,13 +226,14 @@ private fun rememberDesktopChatSurfaceHost(
     val hasEditAgent = navigation.editAgent != null
     // Keyed on the roster: rows resolve names while they compose, so new names are a new host.
     val agentNames = navigation.agentNamesById
-    return remember(directoryPicker, supportsWorkingDirectory, hasAgentPane, hasEditAgent, agentNames, phone) {
+    val picker = navigation.modelPicker
+    return remember(directoryPicker, supportsWorkingDirectory, hasAgentPane, hasEditAgent, agentNames, phone, picker) {
         // On the phone the agent pane is the drawer, and it is also the agent switcher (Android's header pill).
         val openDrawer: (() -> Unit)? = phone?.let { chrome -> { chrome.drawerOpen = true } }
         ChatSurfaceHost(
             openCanvas = { latest.openCanvas() },
             openAgent = { agentId -> latest.openAgent(agentId) },
-            openModelPicker = { latest.openModelPicker() },
+            modelPicker = picker,
             resolveAgentName = agentNames::get,
             pickWorkingDirectory = if (supportsWorkingDirectory) {
                 {

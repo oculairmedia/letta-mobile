@@ -36,8 +36,7 @@ import com.letta.mobile.ui.components.picker.rememberPickerDrillIn
 import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerController
-import com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry
-import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
 import com.letta.mobile.ui.modelcontrol.ModelPickerActions
 import com.letta.mobile.ui.theme.AgentContextDimens
 import kotlinx.coroutines.flow.map
@@ -48,7 +47,6 @@ class AgentContextCardDeps(
     val readings: ContextTokenReadings?,
     val breakdown: ContextBreakdownLoader?,
     val compaction: CompactionController?,
-    val pickerSource: ModelPickerSource?,
     /** The context-limit change; null when the host has no route to letta-code's `/context-limit`. */
     val contextLimit: ContextLimitController? = null,
     /** The agent's notification mute; null when the host posts no notifications. */
@@ -88,20 +86,15 @@ data class AgentContextFocus(
     }
 }
 
-/** Model picks; the host keeps its own per-conversation vs agent semantics behind them. */
-data class AgentContextCardActions(
-    val onModelSelected: (ModelPickerEntry) -> Unit,
-    val onEffortSelected: ((ModelPickerEntry, String?) -> Unit)? = null,
-)
-
 /**
- * How a host binds the card: the session pieces and the model picks. Where the detail opens is the
- * window's: the [InspectorPane] docks on the right of a wide window's inspector frame and is a
+ * How a host binds the card: the session pieces and the chat's one model picker,
+ * whose models the sheet lists and whose picks it makes; null lists none. Where the detail opens is
+ * the window's: the [InspectorPane] docks on the right of a wide window's inspector frame and is a
  * sheet on a compact one (S13).
  */
-data class AgentContextCardBinding(
+class AgentContextCardBinding(
     val deps: AgentContextCardDeps,
-    val actions: AgentContextCardActions,
+    val picker: ModelPickerBinding?,
 )
 
 /**
@@ -115,7 +108,7 @@ fun AgentContextCardHost(binding: AgentContextCardBinding, focus: AgentContextFo
     var open by remember { mutableStateOf(false) }
     var lastOutcome by remember(focus.agentId, focus.conversationId) { mutableStateOf<CompactionOutcome?>(null) }
     val requests = CardRequests.of(focus, rememberReading(deps.readings, focus))
-    val windows = rememberWindows(deps, focus, requests)
+    val windows = rememberWindows(binding, focus, requests)
     // The session's one breakdown cache, the same the composer meter reads.
     val overview = deps.breakdown?.breakdowns?.collectAsState()?.value?.get(requests.breakdown.key)?.overview
     val model = rememberCardModel(deps, focus, requests, CardSnapshot(windows, overview, lastOutcome))
@@ -142,7 +135,7 @@ fun AgentContextCardHost(binding: AgentContextCardBinding, focus: AgentContextFo
                     LimitTarget.of(focus, windows, windows.current(overview), model.meter?.usage?.usedTokens),
                     onApplied = { deps.breakdown?.load(requests.breakdown, force = true) },
                 )
-                val picker = rememberPicker(deps.pickerSource, focus, binding.actions)?.copy(levels = levels)
+                val picker = rememberPicker(binding.picker, focus)?.copy(levels = levels)
                 AgentContextSheetContent(model, picker, onCompact, limit)
                 if (levels.atRoot) {
                     deps.attention?.let { prefs ->
@@ -182,9 +175,11 @@ private class CardSnapshot(val windows: FocusedContextWindows, val overview: Con
  * figure, else the sheet catalog's window for the focused model (see [FocusedContextWindows]).
  */
 @Composable
-private fun rememberWindows(deps: AgentContextCardDeps, focus: AgentContextFocus, requests: CardRequests): FocusedContextWindows {
-    // deps is fixed per session, so which of these flows exist never changes between compositions.
-    val catalogFlow = remember(deps.pickerSource) { deps.pickerSource?.models?.map { rows -> rows.map { it.model } } }
+private fun rememberWindows(binding: AgentContextCardBinding, focus: AgentContextFocus, requests: CardRequests): FocusedContextWindows {
+    val deps = binding.deps
+    val source = binding.picker?.source
+    // The binding is fixed per session, so which of these flows exist never changes between compositions.
+    val catalogFlow = remember(source) { source?.models?.map { rows -> rows.map { it.model } } }
     val catalog = catalogFlow?.collectAsState(initial = emptyList())?.value.orEmpty()
     val applied = deps.contextLimit?.applied?.collectAsState()?.value.orEmpty()
     val modelMax = focus.modelWindowTokens ?: modelCatalogWindowOf(catalog, focus.modelValue)
@@ -242,30 +237,26 @@ private fun rememberReading(readings: ContextTokenReadings?, focus: AgentContext
  * model. A pick applies at once and the sheet stays open, so the slider can follow it.
  */
 @Composable
-private fun rememberPicker(
-    source: ModelPickerSource?,
-    focus: AgentContextFocus,
-    actions: AgentContextCardActions,
-): AgentContextPicker? {
-    source ?: return null
+private fun rememberPicker(binding: ModelPickerBinding?, focus: AgentContextFocus): AgentContextPicker? {
+    binding ?: return null
     val scope = rememberCoroutineScope()
-    val controller = remember(source) { ModelPickerController(scope, source) }
+    val controller = remember(binding) { ModelPickerController(scope, binding.source) }
     LaunchedEffect(controller, focus.modelValue) { controller.setSelected(focus.modelValue) }
     LaunchedEffect(controller) { controller.ensureLoaded() }
     val state by controller.state.collectAsState()
-    val bound = remember(controller, actions) {
+    val bound = remember(controller, binding) {
         ModelPickerActions.bind(
             controller = controller,
             onSelect = { entry ->
                 if (!entry.selected) {
                     controller.setSelected(entry.value)
-                    actions.onModelSelected(entry)
+                    binding.onModelSelected(entry)
                 }
             },
             onEditModels = null,
         )
     }
-    return AgentContextPicker(state, bound, actions.onEffortSelected)
+    return AgentContextPicker(state, bound, binding.onEffortSelected)
 }
 
 private const val DEFAULT_CONVERSATION = "default"

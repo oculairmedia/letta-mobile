@@ -11,6 +11,8 @@ import com.letta.mobile.data.repository.activeBackendUsesChannel
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelTarget
 import com.letta.mobile.data.repository.modelcontrol.ModelHandle
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
+import com.letta.mobile.data.repository.modelcontrol.chatModelPicker
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -18,9 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-/**
- * Model picker and local-runtime binding updates for [AdminChatViewModel].
- */
+/** Model picker and local-runtime binding updates for [AdminChatViewModel]. */
 internal class AdminChatModelCoordinator(
     private val scope: CoroutineScope,
     private val agentId: AgentId,
@@ -55,13 +55,18 @@ internal class AdminChatModelCoordinator(
 
     fun reasoningEffortsFor(handle: ModelHandle?): List<String> = modelControl?.reasoningEffortsFor(handle).orEmpty()
 
-    /** letta-mobile-w4q4p.6.1: the host catalog for the shared picker, on an Iroh host only (else the plain list). */
-    fun pickerSource(): com.letta.mobile.data.repository.modelcontrol.ModelPickerSource? =
-        modelControl?.takeIf { settingsRepository.activeBackendUsesChannel() }?.pickerSource()
-
-    /** The Models sheet's presenter; null when the host has no exposure to edit. */
-    fun modelsEditController(scope: CoroutineScope): com.letta.mobile.data.repository.modelcontrol.ProviderManagementController? =
-        modelControl?.takeIf { settingsRepository.activeBackendUsesChannel() }?.managementController(scope)
+    /** The chat's one model picker (the host catalog on an Iroh host, else the chat's list). */
+    fun modelPicker(onAddProvider: (() -> Unit)?) = modelControl?.takeIf { settingsRepository.activeBackendUsesChannel() }.let { control ->
+        chatModelPicker(
+            catalog = control?.pickerSource(),
+            editor = control?.let { it::managementController },
+            chat = ModelPickerSource.of(modelRepository.llmModels) { modelRepository.refreshLlmModels() },
+            recents = control?.recentModels,
+            onModelSelected = { entry -> updateActiveAgentModel(ModelPick(entry.handle)) },
+            onEffortSelected = { entry, effort -> updateActiveAgentModel(ModelPick(entry.handle, EffortSelection.Set(effort))) },
+            onAddProvider = onAddProvider,
+        )
+    }
 
     /**
      * On an Iroh host with an open conversation the pick goes through

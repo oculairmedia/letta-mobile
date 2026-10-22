@@ -86,6 +86,9 @@ data class ModelPickerActions(
 
 object ModelPickerTags {
     const val PICKER = "model_picker"
+
+    /** The shared picker's pane ([ModelPickerHost]). */
+    const val PANE = "model_picker_pane"
     const val SEARCH = "model_picker_search"
     const val LIST = "model_picker_list"
     const val GROUP_PREFIX = "model_picker_group_"

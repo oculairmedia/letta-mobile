@@ -307,12 +307,11 @@ android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/render/
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/route/ChatGraph.kt 110
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/route/ChatRouteArgs.kt 102
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/route/ChatRoutes.kt 32
-android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldNavigation.kt 70
+android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldNavigation.kt 60
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldSearch.kt 79
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/ChatPagingHost.kt 171
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/ChatPagingPresentationAdapter.kt 75
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/ChatScreenCallbacks.kt 28
-android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/ModelPickerReasoning.kt 16
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/SharedNavDrawerViewModel.kt 206
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/AdminChatComposerMapping.kt 103
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/AdminChatContextUsage.kt 76
@@ -336,7 +335,7 @@ android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/WebShellPages.kt 
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/WebShortcuts.kt 37
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/chat/WebChatSessionPort.kt 110
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/BrowserErrors.kt 21
-android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WasmAppServerClientGateway.kt 364
+android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WasmAppServerClientGateway.kt 342
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WasmAppServerSession.kt 308
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WebSessionBinding.kt 41
 android-compose/web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WebSettingsStore.kt 34

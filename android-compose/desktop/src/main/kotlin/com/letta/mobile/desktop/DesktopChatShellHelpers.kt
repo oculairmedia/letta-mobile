@@ -27,8 +27,10 @@ import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.chat.runtime.groupSubagentConversations
 import com.letta.mobile.data.model.SubagentEntry
-import com.letta.mobile.desktop.chat.DesktopModelControlHost
-import com.letta.mobile.desktop.data.DesktopDataBindings
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
+import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.ui.chat.session.conversationModelPicker
+import com.letta.mobile.ui.context.ContextConversationFocus
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.ui.shell.header.UnifiedSearchDestination
@@ -450,11 +452,7 @@ internal fun handleDesktopShareCanvasToChat(
 }
 
 internal data class CreateDesktopOverlayActionsParams(
-    val chatController: DesktopChatController,
-    val onSelectDestination: (DesktopDestination) -> Unit,
     val onOpenAgent: (String) -> Unit,
-    /** The host's model control lives here. */
-    val dataBindings: DesktopDataBindings,
     /** Opens the shared agent editor's new-agent flow (letta-mobile-ckmub.3.24). */
     val onNewAgent: () -> Unit,
     val onIrohIdentityReset: () -> Unit,
@@ -466,14 +464,6 @@ internal data class CreateDesktopOverlayActionsParams(
 internal fun createDesktopOverlayActions(
     params: CreateDesktopOverlayActionsParams,
 ): DesktopOverlayActions = DesktopOverlayActions(
-    modelControl = DesktopModelControlHost(
-        session = params.dataBindings.modelControl,
-        chatModels = params.chatController.models.available,
-        reloadChatModels = params.chatController.models::reload,
-        onModelSelected = params.chatController.models::select,
-        recentModels = params.chatController.conversationMarks.recentModels,
-    ),
-    onNavigate = params.onSelectDestination,
     onIrohIdentityReset = params.onIrohIdentityReset,
     workspace = ShellWorkspaceOverlayActions(
         onOpenAgent = params.onOpenAgent,
@@ -483,3 +473,17 @@ internal fun createDesktopOverlayActions(
     ),
 )
 
+/** The desktop chat's one model picker, the TUI's recent models first; "Add provider…" opens Providers. */
+internal fun desktopModelPicker(core: DesktopShellCore, navigator: ShellWorkspaceState): ModelPickerBinding {
+    val chat = core.chatController
+    return conversationModelPicker(core.bootstrap.dataBindings.modelControl, chat.models, chat.conversationMarks.recentModels) {
+        navigator.selectedDestination = DesktopDestination.Providers
+    }
+}
+
+/** The conversation the composer meter and the context card describe. */
+internal fun DesktopShellFrame.contextFocus() = ContextConversationFocus(
+    agentId = focus.selectedAgentId,
+    conversationId = chatState.selectedConversationId,
+    turnRunning = activity.isThinkingSelected || activity.isStreamingReplySelected,
+)

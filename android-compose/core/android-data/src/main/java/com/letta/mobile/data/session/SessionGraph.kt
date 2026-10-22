@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.context.ContextBreakdownLoader
 import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.AllConversationsRepository
@@ -22,6 +23,10 @@ class SessionGraph internal constructor(
     /** letta-mobile-r2zo8: each conversation's latest context total, fed by [channelTransport]. */
     val contextTokenReadings: ContextTokenReadings
         get() = repositories.contextTokenReadings
+
+    /** The session's one context-breakdown owner, which the composer meter and the card read. */
+    val contextBreakdown: ContextBreakdownLoader
+        get() = repositories.contextBreakdown
 
     override fun close() {
         scope.cancel()

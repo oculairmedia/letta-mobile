@@ -119,7 +119,7 @@ internal class AdminChatSessionPort(
             agent = viewModel.activeAgent,
             models = viewModel.llmModels,
             modelSelections = viewModel.conversationModelSelections,
-            breakdown = viewModel.contextCardSession.map { it.breakdown },
+            breakdown = viewModel.sessionGraph.map { it.contextBreakdown },
         ).contextUsage()
         val slash = viewModel.composerState.map { it.slashCommands }.distinctUntilChanged()
         return combine(slash, usage, fileMentions) { commands, contextUsage, files ->
@@ -148,6 +148,7 @@ internal class AdminChatSessionPort(
             attachImages = true,
             rerun = true,
             approvals = true,
+            modelSwitch = true,
             search = true,
             pagedHistory = true,
             fontScale = true,

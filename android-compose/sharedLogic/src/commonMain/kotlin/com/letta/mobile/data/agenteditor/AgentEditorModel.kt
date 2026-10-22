@@ -2,7 +2,9 @@ package com.letta.mobile.data.agenteditor
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.CompactAgentProfile
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.ui.chat.session.ChatModelOption
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.JsonElement
 
 /*
@@ -118,6 +120,12 @@ data class AgentEditorState(
 
 /** What the page asks of the editor. The controller implements it; tests record it. */
 interface AgentEditorActions {
+    /** The models the editor offers, which the shared model picker lists. */
+    val llmModels: StateFlow<List<LlmModel>>
+
+    /** Re-reads the models the editor offers ("Refresh Models"). */
+    suspend fun reloadModels()
+
     fun update(change: AgentEditorForm.() -> AgentEditorForm)
     fun pickStarter(starter: AgentStarter)
     fun save(onSaved: (AgentCreated) -> Unit)

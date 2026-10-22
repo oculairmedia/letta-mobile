@@ -32,9 +32,6 @@ object ChatComposerDimens {
     /** The share column in the context breakdown, wide enough for "100%". */
     val contextShareColumn: Dp = 52.dp
 
-    val modelSheetWidth: Dp = 560.dp
-    val modelSheetMaxHeight: Dp = 540.dp
-
     /** The `@` mention suggestions cap at this height and scroll. */
     val mentionPickerMaxHeight: Dp = 320.dp
 

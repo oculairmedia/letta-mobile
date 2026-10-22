@@ -13,8 +13,10 @@ import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
+import com.letta.mobile.ui.modelcontrol.testModelPicker
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /** letta-mobile-bzvro.9 (F09): each actionable run error offers its one action. */
 class ChatRowErrorActionUiTest {
@@ -56,18 +58,18 @@ class ChatRowErrorActionUiTest {
 
     @Test
     fun aCreditLimitOffersTheModelPicker() = runComposeUiTest {
-        var opened = 0
+        val picker = testModelPicker()
         setContent {
             MaterialTheme {
                 ChatMessageRow(
                     error(TurnFailureNotices.messageFor("credit_limit")),
                     newest(),
-                    callbacks(RecordingChatActions(), host = ChatSurfaceHost(openModelPicker = { opened++ })),
+                    callbacks(RecordingChatActions(), host = ChatSurfaceHost(modelPicker = picker)),
                 )
             }
         }
         onNodeWithTag(ChatRowTestTags.ERROR_ACTION).assertTextEquals("Switch model").performClick()
-        assertEquals(1, opened)
+        assertTrue(picker.pickerOpen)
     }
 
     @Test

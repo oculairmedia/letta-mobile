@@ -12,7 +12,6 @@ import com.letta.mobile.data.model.visibleConversationsInLists
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.api.IChannelTransport
-import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.reportSkippedConversationRows
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject

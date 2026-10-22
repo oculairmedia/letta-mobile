@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.screen
 
 import androidx.lifecycle.SavedStateHandle
+import com.letta.mobile.data.context.ContextBreakdownLoader
 import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.presence.ConversationRunRegistry
@@ -111,7 +112,11 @@ private fun stubSessionManager(session: FixtureSession) = mockk<SessionManager>(
         mockk<SessionGraph>(relaxed = true) {
             every { contextTokenReadings } returns session.contextReadings
             // A host without `agent.context`: the chip keeps the streamed total.
-            coEvery { agentRepository.getContextBreakdown(any(), any(), any()) } throws IllegalStateException("capability_unavailable")
+            val agents = mockk<IAgentRepository>(relaxed = true) {
+                coEvery { getContextBreakdown(any(), any(), any()) } throws IllegalStateException("capability_unavailable")
+            }
+            every { agentRepository } returns agents
+            every { contextBreakdown } returns ContextBreakdownLoader(agents)
         },
     )
 }

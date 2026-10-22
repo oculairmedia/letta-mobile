@@ -96,7 +96,7 @@ private fun routeClientCommand(state: AgentScaffoldRuntimeState, command: Client
         ClientSlashCommand.Memory -> navigation.onNavigateToMemory?.invoke(agentId)
         // The tools screen is where Android manages tools and MCP servers.
         ClientSlashCommand.Mcp -> navigation.onNavigateToTools?.invoke()
-        ClientSlashCommand.Models -> params.sheetVisibility.onShowModelPickerChange(true)
+        ClientSlashCommand.Models -> params.modelPicker.open()
         ClientSlashCommand.New -> navigation.onSwitchConversation?.invoke(agentId, null, state.agentName.takeIf { it.isNotBlank() })
         ClientSlashCommand.Rename -> onRename()
         ClientSlashCommand.Connect -> navigation.onNavigateToProviders?.invoke()

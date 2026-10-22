@@ -30,7 +30,6 @@ internal object AgentScaffoldTestTags {
     const val PROJECT_BRIEF_CARD = "agent_scaffold_project_brief_card"
     const val PROJECT_BUG_SUMMARY_CARD = "agent_scaffold_project_bug_summary_card"
     const val AGENT_PICKER_SEARCH_FIELD = "agent_scaffold_agent_picker_search_field"
-    const val MODEL_PICKER_SHEET = "agent_scaffold_model_picker_sheet"
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -97,7 +96,6 @@ internal fun AgentScaffoldContent(
     }
     var showAgentSwitcher by remember { mutableStateOf(false) }
     val searchOpenRequest = remember { LettaSearchOpenRequest() }
-    var showModelPicker by remember { mutableStateOf(false) }
     val projectContext = viewModel.projectContext
     var isProjectInfoExpanded by rememberSaveable(projectContext?.identifier) { mutableStateOf(false) }
     var chatMode by rememberSaveable { mutableStateOf(viewModel.initialChatMode ?: "simple") }
@@ -113,8 +111,6 @@ internal fun AgentScaffoldContent(
                 onShowBugReportSheetChange = { showBugReportSheet = it },
                 showAgentSwitcher = showAgentSwitcher,
                 onShowAgentSwitcherChange = { showAgentSwitcher = it },
-                showModelPicker = showModelPicker,
-                onShowModelPickerChange = { showModelPicker = it },
             ),
             searchUi = AgentScaffoldSearchUiState(
                 openRequest = searchOpenRequest,
@@ -125,6 +121,7 @@ internal fun AgentScaffoldContent(
                 onProjectInfoExpandedChange = { isProjectInfoExpanded = it },
             ),
             conversationRepository = conversationRepository,
+            modelPicker = remember(viewModel) { viewModel.modelPicker(navigation.onNavigateToProviders) },
         ),
     )
 }

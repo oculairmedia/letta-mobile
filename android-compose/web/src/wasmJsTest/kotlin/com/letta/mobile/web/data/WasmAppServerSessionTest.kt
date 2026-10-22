@@ -5,23 +5,35 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId as DataConversationId
 import com.letta.mobile.data.repository.appserver.AppServerLocalAdminGateway
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
+import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelChange
+import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
+import com.letta.mobile.data.repository.modelcontrol.ModelHandle
+import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
+import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.IrohApprovalControls
 import com.letta.mobile.data.runtime.PermissionModeRpc
 import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
-import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
-import com.letta.mobile.data.repository.modelcontrol.ConversationModelChange
-import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
-import com.letta.mobile.data.repository.modelcontrol.ModelHandle
-import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerTransport
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.runtime.ConversationId
+import com.letta.mobile.ui.chat.session.timelineModelSource
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -32,17 +44,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.onStart
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.coroutines.withTimeout
 
 class WasmAppServerSessionTest {
     @Test
@@ -108,7 +109,7 @@ class WasmAppServerSessionTest {
     @Test
     fun `over iroh the chat lists and switches models through the shared gateway's admin rpc`() = runTest {
         val host = RecordingHost()
-        val source = webModelSource(IrohAdminRpcChatGateway(host), nativeAdmin(), null, ModelCatalogRepository(unexpectedRpc))
+        val source = timelineModelSource(IrohAdminRpcChatGateway(host), nativeAdmin(), null, unexpectedModelControl())
 
         source.backend.listModels()
         source.backend.switchModel(
@@ -122,7 +123,7 @@ class WasmAppServerSessionTest {
 
     @Test
     fun `a websocket chat keeps the app server's own model commands`() = runTest {
-        val source = webModelSource(null, nativeAdmin(), null, ModelCatalogRepository(unexpectedRpc))
+        val source = timelineModelSource(null, nativeAdmin(), null, unexpectedModelControl())
 
         assertFalse(source.backend.supportsReasoningEffort)
     }
@@ -160,6 +161,8 @@ class WasmAppServerSessionTest {
     private fun nativeAdmin() = AppServerLocalAdminGateway(DefaultAppServerClient(FakeTransport())) { operation -> "test-$operation" }
 
     private val unexpectedRpc = AdminRpcInvoker { method, _ -> error("unexpected $method") }
+
+    private fun unexpectedModelControl() = ModelControlSession(unexpectedRpc, oauthHttp = null)
 
     /** An Iroh host's admin_rpc: it answers the model and conversation methods and records each call. */
     private class RecordingHost(override val hostCapabilities: Set<String> = emptySet()) : NoOpChannelTransport() {

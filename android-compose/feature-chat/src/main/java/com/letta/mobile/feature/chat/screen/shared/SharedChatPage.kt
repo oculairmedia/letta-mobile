@@ -32,6 +32,8 @@ import com.letta.mobile.data.commands.ClientSlashCommand
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.feature.chat.screen.AndroidAgentMessageContext
 import com.letta.mobile.feature.chat.screen.LocalAndroidAgentMessageContext
+import com.letta.mobile.feature.chat.screen.LocalChatModelPicker
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
 import com.letta.mobile.feature.chat.screen.AndroidClientCommands
 import com.letta.mobile.feature.chat.screen.LocalAndroidClientCommands
 import com.letta.mobile.feature.chat.screen.LocalSharedNavDrawer
@@ -124,8 +126,9 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     // Read live by the rings overlay, whose slot lambda is remembered with the platform.
     val currentSubagents by rememberUpdatedState(params.subagents)
     val agentMessages = LocalAndroidAgentMessageContext.current
-    val host = remember(params.navigation, subagentSheet, agentMessages) {
-        params.navigation.toSurfaceHost(openSubagent = subagentSheet::openDispatch).withAgentMessages(agentMessages)
+    val modelPicker = LocalChatModelPicker.current
+    val host = remember(params.navigation, subagentSheet, agentMessages, modelPicker) {
+        params.navigation.toSurfaceHost(subagentSheet, modelPicker).withAgentMessages(agentMessages)
     }
     val hasCanvasSlot = canvasSlot != null
     val onIntent = rememberSurfaceIntentHandler(presentationState, hasCanvasSlot, host)
@@ -332,14 +335,15 @@ private fun rememberAdminChatSessionPort(
 }
 
 private fun ChatScreenNavigationCallbacks.toSurfaceHost(
-    openSubagent: (toolCallId: String, subagentAgentId: String?, description: String) -> Unit,
+    subagents: SharedChatSubagentSheetState,
+    modelPicker: ModelPickerBinding?,
 ): ChatSurfaceHost {
     val openPane = onOpenAgentPane
     return ChatSurfaceHost(
         openCanvas = onOpenCanvas,
         openAgent = openPane?.let { { _: String -> it() } },
-        openSubagent = openSubagent,
-        openModelPicker = null,
+        openSubagent = subagents::openDispatch,
+        modelPicker = modelPicker,
         // The composer companion mascot opens the agent drawer, as the legacy page's does.
         openAgentPane = openPane,
         // The header's agent pill, which the canvas mode's board menu stands in for.

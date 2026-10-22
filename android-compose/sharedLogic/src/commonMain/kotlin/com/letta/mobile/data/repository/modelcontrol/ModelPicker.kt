@@ -153,7 +153,12 @@ interface ModelPickerSource {
     suspend fun load(mode: ModelLoad)
 
     /** This source with [recents] heading its list. */
-    fun withRecents(recents: Flow<List<String>>): ModelPickerSource = RecentsPickerSource(this, recents)
+    fun withRecents(recents: Flow<List<String>>): ModelPickerSource {
+        val headed = recents
+        return object : ModelPickerSource by this {
+            override val recents: Flow<List<String>> = headed
+        }
+    }
 
     companion object {
         /**
@@ -191,27 +196,21 @@ interface ModelPickerSource {
             FallbackPickerSource(primary, fallback)
 
         /**
-         * A chat's
-         * picker. The host's admin catalog ([session]) while it answers, else the chat's own
-         * [chatModels]; either way a catalog load re-reads the chat's list through [reloadChatModels],
-         * so the picked model routes. [recents] head the list. Desktop and the web bind it.
+         * A chat's picker: the host's admin [catalog] (a [ModelControlSession]'s, or Android's Hilt
+         * repositories') while it answers, else the [chat]'s own list ([of]); either way a catalog
+         * load re-reads the chat's list, so the picked model routes. [recents] head the list.
+         * Desktop, the web and Android bind it.
          */
-        fun forChat(
-            session: ModelControlSession?,
-            chatModels: Flow<List<LlmModel>>,
-            reloadChatModels: suspend () -> Unit,
-            recents: Flow<List<String>> = flowOf(emptyList()),
-        ): ModelPickerSource {
-            val fallback = of(chatModels) { reloadChatModels() }
-            val catalog = session?.pickerSource() ?: return fallback.withRecents(recents)
+        fun forChat(catalog: ModelPickerSource?, chat: ModelPickerSource, recents: Flow<List<String>>): ModelPickerSource {
+            catalog ?: return chat.withRecents(recents)
             // A catalog load also re-reads the chat's model list, which routes the picked model.
             val synced = object : ModelPickerSource by catalog {
                 override suspend fun load(mode: ModelLoad) {
                     catalog.load(mode)
-                    reloadChatModelsQuietly(reloadChatModels)
+                    reloadChatModelsQuietly { chat.load(ModelLoad.CACHED) }
                 }
             }
-            return withFallback(synced, fallback).withRecents(recents)
+            return withFallback(synced, chat).withRecents(recents)
         }
     }
 }
@@ -231,11 +230,6 @@ private class CatalogPickerSource(
         Unit
     }
 }
-
-private class RecentsPickerSource(
-    private val delegate: ModelPickerSource,
-    override val recents: Flow<List<String>>,
-) : ModelPickerSource by delegate
 
 private class FallbackPickerSource(
     private val primary: ModelPickerSource,

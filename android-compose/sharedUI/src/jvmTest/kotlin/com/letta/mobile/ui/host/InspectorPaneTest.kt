@@ -31,7 +31,6 @@ import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.ui.chat.subagents.BackgroundTasksSidePane
 import com.letta.mobile.ui.chat.subagents.BackgroundTasksTags
-import com.letta.mobile.ui.context.AgentContextCardActions
 import com.letta.mobile.ui.context.AgentContextCardBinding
 import com.letta.mobile.ui.context.AgentContextCardDeps
 import com.letta.mobile.ui.context.AgentContextCardHost
@@ -108,7 +107,7 @@ class InspectorPaneTest {
 
     @Test
     fun aControlOutsideTheFrameOpensItsDetailInTheFrame() = runComposeUiTest {
-        val deps = AgentContextCardDeps(ContextTokenReadings(), breakdown = null, compaction = null, pickerSource = null)
+        val deps = AgentContextCardDeps(ContextTokenReadings(), breakdown = null, compaction = null)
         val focus = AgentContextFocus(
             agentId = "agent-1",
             conversationId = null,
@@ -125,7 +124,7 @@ class InspectorPaneTest {
                     // The sidebar's context card, beside the frame that keeps the window's details.
                     Row(Modifier.size(WIDE + SIDEBAR, 600.dp)) {
                         Box(Modifier.width(SIDEBAR).fillMaxHeight()) {
-                            AgentContextCardHost(AgentContextCardBinding(deps, AgentContextCardActions(onModelSelected = {})), focus)
+                            AgentContextCardHost(AgentContextCardBinding(deps, picker = null), focus)
                         }
                         InspectorFrame(Modifier.width(WIDE).fillMaxHeight(), host = inspectors) { Box(Modifier) }
                     }

@@ -12,7 +12,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.notify.AttentionPrefs
 import com.letta.mobile.data.notify.AttentionPrefsRepository
-import com.letta.mobile.ui.context.AgentContextCardActions
 import com.letta.mobile.ui.context.AgentContextCardBinding
 import com.letta.mobile.ui.context.AgentContextCardDeps
 import com.letta.mobile.ui.context.AgentContextCardHost
@@ -79,7 +78,7 @@ class AgentNotificationsSectionUiTest {
     @Test
     fun theDrawerCardSheetCarriesTheSwitchWhenTheHostPostsNotifications() = runComposeUiTest {
         val prefs = FakePrefs()
-        val deps = AgentContextCardDeps(readings = null, breakdown = null, compaction = null, pickerSource = null, attention = prefs)
+        val deps = AgentContextCardDeps(readings = null, breakdown = null, compaction = null, attention = prefs)
         val focus = AgentContextFocus(
             agentId = "agent-1",
             conversationId = null,
@@ -92,7 +91,7 @@ class AgentNotificationsSectionUiTest {
         setContent {
             MaterialTheme {
                 CompositionLocalProvider(LocalLettaHost provides LettaHost.Pointer) {
-                    AgentContextCardHost(AgentContextCardBinding(deps, AgentContextCardActions(onModelSelected = {})), focus)
+                    AgentContextCardHost(AgentContextCardBinding(deps, picker = null), focus)
                 }
             }
         }

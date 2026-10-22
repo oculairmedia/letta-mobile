@@ -7,12 +7,10 @@ android BackendSettingsActions.onIrohIdentityReset | android leaves onIrohIdenti
 android BackendSettingsActions.onScanToConnect | android leaves onScanToConnect unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
 android ChatSurfaceCapabilities.editAndResend | capability editAndResend not supported on android yet (letta-mobile-ckmub.2)
 android ChatSurfaceCapabilities.fork | capability fork not supported on android yet (letta-mobile-ckmub.2)
-android ChatSurfaceCapabilities.modelSwitch | android has its own model picker/context card host; unify in letta-mobile-crvvv
 android ChatSurfaceCapabilities.nameForks | capability nameForks not supported on android yet (letta-mobile-ckmub.2)
 android ChatSurfaceCapabilities.rerunInFork | capability rerunInFork not supported on android yet (letta-mobile-ckmub.2)
 android ChatSurfaceCapabilities.workingDirectory | platform-only by design (ckmub.17.8; letta-mobile-ckmub.2): no local working directory on this platform yet
 android ChatSurfaceHost.editAgent | android leaves editAgent unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
-android ChatSurfaceHost.openModelPicker | android has its own model picker/context card host; unify in letta-mobile-crvvv
 android ChatSurfaceHost.pickWorkingDirectory | platform-only by design (ckmub.17.8; letta-mobile-ckmub.2): working directory picker is desktop-only today
 android ChatSurfaceHost.resolveAgentName | android leaves resolveAgentName unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
 android ChatSurfaceHost.showOnCanvas | android leaves showOnCanvas unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
@@ -45,12 +43,10 @@ android ShellWorkspaceOverlayActions | Android does not mount the shared shell (
 android ShortcutActions | Android does not mount the shared shell (LettaShellWorkspace) yet; Android hard cut letta-mobile-ckmub.2
 android SkillsPageActions.onAddTool | android leaves onAddTool unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
 android SkillsPageActions.onToolClick | android leaves onToolClick unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
-desktop AgentContextCardActions.onEffortSelected | desktop has its own model picker/context card host; unify in letta-mobile-crvvv
 desktop BackendSettingsActions.onScanToConnect | desktop leaves onScanToConnect unbound (default, null, empty or false); bind it (letta-mobile-7d9ua)
 desktop ChatSurfaceCapabilities.editAndResend | capability editAndResend not supported on desktop yet (letta-mobile-7d9ua)
 desktop ChatSurfaceCapabilities.fork | capability fork not supported on desktop yet (letta-mobile-7d9ua)
 desktop ChatSurfaceCapabilities.goals | capability goals not supported on desktop yet (letta-mobile-7d9ua)
-desktop ChatSurfaceCapabilities.modelSwitch | desktop has its own model picker/context card host; unify in letta-mobile-crvvv
 desktop ChatSurfaceCapabilities.nameForks | capability nameForks not supported on desktop yet (letta-mobile-7d9ua)
 desktop ChatSurfaceCapabilities.rerun | capability rerun not supported on desktop yet (letta-mobile-7d9ua)
 desktop ChatSurfaceCapabilities.rerunInFork | capability rerunInFork not supported on desktop yet (letta-mobile-7d9ua)
@@ -74,8 +70,6 @@ desktop ShellAgentRailActions.onAgentPinnedChange | desktop leaves onAgentPinned
 desktop ShellHostPages.fallback | desktop leaves fallback unbound (default, null, empty or false); bind it (letta-mobile-7d9ua)
 desktop ShellWorkspaceHeaderBinding | desktop builds ShellWorkspaceHeaderState itself (LettaDesktopApp.kt); bind rememberShellWorkspaceHeader (letta-mobile-7d9ua)
 desktop StreamIntegrityBinding.budget | desktop leaves budget unbound (default, null, empty or false); bind it (letta-mobile-7d9ua)
-web AgentContextCardActions | web has its own model picker/context card host; unify in letta-mobile-crvvv
-web AgentContextCardBinding | web has its own model picker/context card host; unify in letta-mobile-crvvv
 web BackendSettingsActions.onIrohIdentityReset | web leaves onIrohIdentityReset unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web BackendSettingsActions.onScanToConnect | web leaves onScanToConnect unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web BackendSettingsActions.testConnection | web leaves testConnection unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
@@ -83,7 +77,6 @@ web ChatSurfaceHost.editAgent | web leaves editAgent unbound (default, null, emp
 web ChatSurfaceHost.openAgent | web leaves openAgent unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web ChatSurfaceHost.openAgentSwitcher | web leaves openAgentSwitcher unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web ChatSurfaceHost.openCanvas | web leaves openCanvas unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
-web ChatSurfaceHost.openModelPicker | web has its own model picker/context card host; unify in letta-mobile-crvvv
 web ChatSurfaceHost.openSubagent | web leaves openSubagent unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)
 web ChatSurfaceHost.pickWorkingDirectory | platform-only by design (ckmub.17.8; letta-mobile-ckmub.17): working directory picker is desktop-only today
 web ChatSurfaceHost.showOnCanvas | web leaves showOnCanvas unbound (default, null, empty or false); bind it (letta-mobile-ckmub.17)

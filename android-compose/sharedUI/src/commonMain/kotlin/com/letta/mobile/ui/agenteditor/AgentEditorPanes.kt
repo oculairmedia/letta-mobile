@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,8 +17,8 @@ import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.agenteditor.AgentEditorActions
 import com.letta.mobile.data.agenteditor.AgentEditorState
 import com.letta.mobile.data.agenteditor.AgentToolOption
-import com.letta.mobile.ui.chat.session.ChatModelUiState
-import com.letta.mobile.ui.chat.surface.composer.ComposerModelPickerSheet
+import com.letta.mobile.ui.chat.surface.composer.ModelListPicker
+import com.letta.mobile.ui.chat.surface.composer.rememberModelListPicker
 import com.letta.mobile.ui.components.picker.LettaPicker
 import com.letta.mobile.ui.components.picker.LettaPickerSpec
 import com.letta.mobile.ui.components.picker.PickMode
@@ -32,7 +33,6 @@ import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.mascot.MascotPicker
 import com.letta.mobile.ui.theme.LettaDimens
-import kotlinx.collections.immutable.toImmutableList
 
 /** What a pane reads and writes. */
 internal class AgentEditorPaneInputs(
@@ -64,24 +64,16 @@ private fun MascotPane(identity: AgentEditorIdentity, onClose: () -> Unit) {
     }
 }
 
-/** The composer's model picker (one picker for every model choice); a pick keeps the effort only where the new model takes it. */
+/** The one model picker over the editor's models; a pick keeps the effort only where the new model takes it. */
 @Composable
 private fun ModelPane(inputs: AgentEditorPaneInputs, onClose: () -> Unit) {
-    val state = inputs.state
-    ComposerModelPickerSheet(
-        model = ChatModelUiState(
-            currentHandle = state.form.model.ifBlank { null },
-            currentLabel = state.modelOption?.label ?: state.form.model,
-            options = state.models.toImmutableList(),
-            unavailableReason = state.modelsUnavailable,
-        ),
-        onSelect = { option ->
-            inputs.actions.update { copy(model = option.handle, reasoningEffort = reasoningEffort?.takeIf { it in option.reasoningEfforts }) }
-            onClose()
-        },
-        onDismiss = onClose,
-        testTag = AgentEditorPageTags.MODEL_PANE,
-    )
+    val actions = inputs.actions
+    val latest by rememberUpdatedState(inputs.state)
+    val picker = rememberModelListPicker(actions.llmModels, actions::reloadModels) { value ->
+        val efforts = latest.models.firstOrNull { it.handle == value }?.reasoningEfforts.orEmpty()
+        actions.update { copy(model = value, reasoningEffort = reasoningEffort?.takeIf { it in efforts }) }
+    }
+    ModelListPicker(picker, selectedValue = inputs.state.form.model.ifBlank { null }, onDismiss = onClose)
 }
 
 /** Every tool the agent can have, built-in and MCP apart; a pick attaches or removes it. */
