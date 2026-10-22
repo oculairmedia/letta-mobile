@@ -11,7 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.feature.chat.route.AgentChatRoute
@@ -95,7 +94,6 @@ fun WorkspaceAgentChat(route: AgentChatRoute, host: WorkspaceChatHost) {
 internal fun AgentScaffoldContent(
     initialProjectStartAction: String? = null,
     navigation: AgentScaffoldNavigationCallbacks,
-    conversationRepository: IConversationRepository? = null,
     viewModel: AdminChatViewModel,
     workspace: WorkspaceChatHost,
 ) {
@@ -123,7 +121,6 @@ internal fun AgentScaffoldContent(
                 isProjectInfoExpanded = isProjectInfoExpanded,
                 onProjectInfoExpandedChange = { isProjectInfoExpanded = it },
             ),
-            conversationRepository = conversationRepository,
             modelPicker = remember(viewModel) { viewModel.modelPicker(navigation.onNavigateToProviders) },
             workspace = workspace,
         ),

@@ -6569,10 +6569,10 @@ public final class com/letta/mobile/ui/settings/SettingsStandardSectionsKt {
 
 public final class com/letta/mobile/ui/shell/AgentEditorBinding {
 	public static final field $stable I
-	public fun <init> (Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;)V
-	public synthetic fun <init> (Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function4;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function4;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getController ()Lkotlin/jvm/functions/Function3;
-	public final fun getOptions ()Lkotlin/jvm/functions/Function2;
+	public final fun getOptions ()Lkotlin/jvm/functions/Function4;
 }
 
 public final class com/letta/mobile/ui/shell/ShellAdminPages {
@@ -6656,19 +6656,45 @@ public final class com/letta/mobile/ui/shell/ShellConversationMenuActions {
 public final class com/letta/mobile/ui/shell/ShellDrawerConversations {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (Ljava/util/List;Lcom/letta/mobile/ui/shell/sidebar/ShellArchiveFilter;Ljava/util/Set;Ljava/util/Map;)V
-	public synthetic fun <init> (Ljava/util/List;Lcom/letta/mobile/ui/shell/sidebar/ShellArchiveFilter;Ljava/util/Set;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Lcom/letta/mobile/ui/shell/sidebar/ShellArchiveFilter;Ljava/util/Set;Ljava/util/Map;Ljava/util/Set;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/letta/mobile/ui/shell/sidebar/ShellArchiveFilter;Ljava/util/Set;Ljava/util/Map;Ljava/util/Set;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;
 	public final fun component2 ()Lcom/letta/mobile/ui/shell/sidebar/ShellArchiveFilter;
 	public final fun component3 ()Ljava/util/Set;
 	public final fun component4 ()Ljava/util/Map;
-	public final fun copy (Ljava/util/List;Lcom/letta/mobile/ui/shell/sidebar/ShellArchiveFilter;Ljava/util/Set;Ljava/util/Map;)Lcom/letta/mobile/ui/shell/ShellDrawerConversations;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/ShellDrawerConversations;Ljava/util/List;Lcom/letta/mobile/ui/shell/sidebar/ShellArchiveFilter;Ljava/util/Set;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/ShellDrawerConversations;
+	public final fun component5 ()Ljava/util/Set;
+	public final fun component6 ()Ljava/util/Map;
+	public final fun copy (Ljava/util/List;Lcom/letta/mobile/ui/shell/sidebar/ShellArchiveFilter;Ljava/util/Set;Ljava/util/Map;Ljava/util/Set;Ljava/util/Map;)Lcom/letta/mobile/ui/shell/ShellDrawerConversations;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/ShellDrawerConversations;Ljava/util/List;Lcom/letta/mobile/ui/shell/sidebar/ShellArchiveFilter;Ljava/util/Set;Ljava/util/Map;Ljava/util/Set;Ljava/util/Map;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/ShellDrawerConversations;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getArchiveFilter ()Lcom/letta/mobile/ui/shell/sidebar/ShellArchiveFilter;
 	public final fun getConversations ()Ljava/util/List;
+	public final fun getMarkers ()Ljava/util/Map;
 	public final fun getParentIds ()Ljava/util/Map;
 	public final fun getPinnedIds ()Ljava/util/Set;
+	public final fun getSettledIds ()Ljava/util/Set;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/shell/ShellDrawerLibrary {
+	public static final field $stable I
+	public fun <init> ()V
+	public fun <init> (Ljava/util/Map;Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsState;Ljava/util/List;Ljava/util/Set;Ljava/util/Set;)V
+	public synthetic fun <init> (Ljava/util/Map;Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsState;Ljava/util/List;Ljava/util/Set;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/Map;
+	public final fun component2 ()Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsState;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ljava/util/Set;
+	public final fun component5 ()Ljava/util/Set;
+	public final fun copy (Ljava/util/Map;Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsState;Ljava/util/List;Ljava/util/Set;Ljava/util/Set;)Lcom/letta/mobile/ui/shell/ShellDrawerLibrary;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/ShellDrawerLibrary;Ljava/util/Map;Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsState;Ljava/util/List;Ljava/util/Set;Ljava/util/Set;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/ShellDrawerLibrary;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArchivedCanvasIds ()Ljava/util/Set;
+	public final fun getCanvases ()Ljava/util/List;
+	public final fun getChatOptions ()Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsState;
+	public final fun getIdentities ()Ljava/util/Map;
+	public final fun getPinnedAgentIds ()Ljava/util/Set;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -6804,6 +6830,7 @@ public final class com/letta/mobile/ui/shell/ShellPageDeps {
 public final class com/letta/mobile/ui/shell/ShellPageKt {
 	public static final fun ShellPage (Lcom/letta/mobile/data/shell/ShellDestination;Lcom/letta/mobile/ui/shell/ShellPageDeps;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun getEmptyShellPage ()Lcom/letta/mobile/ui/shell/ShellPageContent;
+	public static final fun getLocalShellPageFramed ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun shellAgentEditorPage (Lcom/letta/mobile/ui/shell/AgentEditorBinding;)Lcom/letta/mobile/ui/shell/ShellPageContent;
 	public static final fun shellChannelsPage (Lcom/letta/mobile/data/channel/ChannelsPageState;Lcom/letta/mobile/data/channel/ChannelsPageActions;Lcom/letta/mobile/ui/shell/pages/channels/ChannelsPageOptions;)Lcom/letta/mobile/ui/shell/ShellPageContent;
 	public static synthetic fun shellChannelsPage$default (Lcom/letta/mobile/data/channel/ChannelsPageState;Lcom/letta/mobile/data/channel/ChannelsPageActions;Lcom/letta/mobile/ui/shell/pages/channels/ChannelsPageOptions;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/ShellPageContent;
@@ -6858,10 +6885,10 @@ public final class com/letta/mobile/ui/shell/ShellRowMenusKt {
 public final class com/letta/mobile/ui/shell/ShellWorkspaceBindingKt {
 	public static final fun SyncShellWorkspace (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Lcom/letta/mobile/ui/shell/ShellChatSelection;Landroidx/compose/runtime/Composer;I)V
 	public static final fun navDrawerActions (Lcom/letta/mobile/data/shell/ShellWorkspaceNavigator;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/shell/ShellNavDrawerActions;
-	public static final fun navDrawerInput (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/util/List;Lcom/letta/mobile/ui/shell/ShellDrawerConversations;)Lcom/letta/mobile/ui/shell/ShellNavDrawerInput;
-	public static synthetic fun navDrawerInput$default (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/util/List;Lcom/letta/mobile/ui/shell/ShellDrawerConversations;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/ShellNavDrawerInput;
-	public static final fun navDrawerState (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/util/List;Lkotlin/time/Instant;Lcom/letta/mobile/ui/shell/ShellDrawerConversations;)Lcom/letta/mobile/ui/shell/ShellNavDrawerState;
-	public static synthetic fun navDrawerState$default (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/util/List;Lkotlin/time/Instant;Lcom/letta/mobile/ui/shell/ShellDrawerConversations;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/ShellNavDrawerState;
+	public static final fun navDrawerInput (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/util/List;Lcom/letta/mobile/ui/shell/ShellDrawerConversations;Lcom/letta/mobile/ui/shell/ShellDrawerLibrary;)Lcom/letta/mobile/ui/shell/ShellNavDrawerInput;
+	public static synthetic fun navDrawerInput$default (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/util/List;Lcom/letta/mobile/ui/shell/ShellDrawerConversations;Lcom/letta/mobile/ui/shell/ShellDrawerLibrary;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/ShellNavDrawerInput;
+	public static final fun navDrawerState (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/util/List;Lkotlin/time/Instant;Lcom/letta/mobile/ui/shell/ShellDrawerConversations;Lcom/letta/mobile/ui/shell/ShellDrawerLibrary;)Lcom/letta/mobile/ui/shell/ShellNavDrawerState;
+	public static synthetic fun navDrawerState$default (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/util/List;Lkotlin/time/Instant;Lcom/letta/mobile/ui/shell/ShellDrawerConversations;Lcom/letta/mobile/ui/shell/ShellDrawerLibrary;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/ShellNavDrawerState;
 	public static final fun rememberShellWorkspaceState (Lcom/letta/mobile/data/shell/ShellDestination;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/data/shell/ShellWorkspaceState;
 }
 
@@ -7305,10 +7332,9 @@ public final class com/letta/mobile/ui/shell/pages/ShellAdminBindingKt {
 public final class com/letta/mobile/ui/shell/pages/ShellAgentEditorHost {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (Lcom/letta/mobile/data/agenteditor/AgentCreator;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;Z)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/agenteditor/AgentCreator;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/agenteditor/AgentCreator;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/agenteditor/AgentCreator;Lkotlinx/coroutines/flow/StateFlow;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCreator ()Lcom/letta/mobile/data/agenteditor/AgentCreator;
-	public final fun getEmbedded ()Z
 	public final fun getModelCatalog ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getOnIdentityChange ()Lkotlin/jvm/functions/Function2;
 	public final fun getOnRosterChanged ()Lkotlin/jvm/functions/Function0;
@@ -7381,9 +7407,9 @@ public final class com/letta/mobile/ui/shell/pages/ShellLibraryFactory {
 	public final fun channels (Lcom/letta/mobile/data/session/SessionRepositoryGraphProvider;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/channel/ChannelsPageController;
 	public final fun home (Lcom/letta/mobile/data/session/SessionRepositoryGraphProvider;Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/home/HomePageController;
 	public final fun memory (Lcom/letta/mobile/data/session/SessionRepositoryGraphProvider;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/memory/graph/MemoryPageController;
-	public final fun schedules (Lcom/letta/mobile/data/session/graph/SharedSessionRepositoryGraph;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/schedules/ScheduleLibraryController;
-	public final fun skills (Lcom/letta/mobile/data/session/graph/SharedSessionRepositoryGraph;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/skills/SkillsCatalogController;
-	public final fun tools (Lcom/letta/mobile/data/session/graph/SharedSessionRepositoryGraph;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/tools/ToolLibraryController;
+	public final fun schedules (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/schedules/ScheduleLibraryController;
+	public final fun skills (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/skills/SkillsCatalogController;
+	public final fun tools (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lkotlinx/coroutines/CoroutineScope;)Lcom/letta/mobile/data/tools/ToolLibraryController;
 }
 
 public final class com/letta/mobile/ui/shell/pages/ShellLibrarySources {
@@ -7394,8 +7420,8 @@ public final class com/letta/mobile/ui/shell/pages/ShellLibrarySources {
 }
 
 public final class com/letta/mobile/ui/shell/pages/ShellPageBindingKt {
-	public static final fun rememberShellPageDeps (Lcom/letta/mobile/data/session/graph/SharedSessionRepositoryGraph;Lcom/letta/mobile/ui/shell/pages/ShellLibraryControllers;Lcom/letta/mobile/ui/shell/pages/ShellPageHost;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/ShellPageDeps;
-	public static final fun shellPageDeps (Lcom/letta/mobile/data/session/graph/SharedSessionRepositoryGraph;Lcom/letta/mobile/ui/shell/pages/ShellLibraryControllers;Lcom/letta/mobile/ui/shell/pages/ShellPageHost;)Lcom/letta/mobile/ui/shell/ShellPageDeps;
+	public static final fun rememberShellPageDeps (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lcom/letta/mobile/ui/shell/pages/ShellLibraryControllers;Lcom/letta/mobile/ui/shell/pages/ShellPageHost;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/ShellPageDeps;
+	public static final fun shellPageDeps (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lcom/letta/mobile/ui/shell/pages/ShellLibraryControllers;Lcom/letta/mobile/ui/shell/pages/ShellPageHost;)Lcom/letta/mobile/ui/shell/ShellPageDeps;
 }
 
 public final class com/letta/mobile/ui/shell/pages/ShellPageFocus {
@@ -7487,6 +7513,7 @@ public final class com/letta/mobile/ui/shell/pages/channels/ChannelsPageOptions 
 
 public final class com/letta/mobile/ui/shell/pages/channels/ChannelsPageSlots {
 	public static final field $stable I
+	public static final field Companion Lcom/letta/mobile/ui/shell/pages/channels/ChannelsPageSlots$Companion;
 	public fun <init> ()V
 	public fun <init> (Lcom/letta/mobile/ui/shell/pages/channels/ChannelsSearchFieldSlot;Lcom/letta/mobile/ui/shell/pages/channels/ChannelsRefreshActionSlot;)V
 	public synthetic fun <init> (Lcom/letta/mobile/ui/shell/pages/channels/ChannelsSearchFieldSlot;Lcom/letta/mobile/ui/shell/pages/channels/ChannelsRefreshActionSlot;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -7499,6 +7526,10 @@ public final class com/letta/mobile/ui/shell/pages/channels/ChannelsPageSlots {
 	public final fun getSearchField ()Lcom/letta/mobile/ui/shell/pages/channels/ChannelsSearchFieldSlot;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/shell/pages/channels/ChannelsPageSlots$Companion {
+	public final fun getMaterial ()Lcom/letta/mobile/ui/shell/pages/channels/ChannelsPageSlots;
 }
 
 public final class com/letta/mobile/ui/shell/pages/channels/ChannelsPageTags {
@@ -10118,7 +10149,9 @@ public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationA
 public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationBindingKt {
 	public static final fun openSearchHit (Lcom/letta/mobile/data/shell/ShellWorkspaceNavigator;Lcom/letta/mobile/ui/shell/header/UnifiedSearchHit;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
 	public static synthetic fun openSearchHit$default (Lcom/letta/mobile/data/shell/ShellWorkspaceNavigator;Lcom/letta/mobile/ui/shell/header/UnifiedSearchHit;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public static final fun workspaceNavigation (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/util/List;Lkotlin/time/Instant;Lcom/letta/mobile/ui/shell/ShellDrawerConversations;Lcom/letta/mobile/ui/shell/ShellDrawerLibrary;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigation;
 	public static final fun workspaceNavigation (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/util/List;Lkotlin/time/Instant;Ljava/util/Map;Lcom/letta/mobile/ui/shell/conversations/ShellTimelineConversationList;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigation;
+	public static synthetic fun workspaceNavigation$default (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/util/List;Lkotlin/time/Instant;Lcom/letta/mobile/ui/shell/ShellDrawerConversations;Lcom/letta/mobile/ui/shell/ShellDrawerLibrary;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigation;
 	public static synthetic fun workspaceNavigation$default (Lcom/letta/mobile/data/shell/ShellWorkspaceState;Ljava/util/List;Lkotlin/time/Instant;Ljava/util/Map;Lcom/letta/mobile/ui/shell/conversations/ShellTimelineConversationList;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigation;
 	public static final fun workspaceNavigationActions (Lcom/letta/mobile/data/shell/ShellWorkspaceNavigator;Lcom/letta/mobile/ui/shell/conversations/ShellTimelineConversationList;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;
 	public static synthetic fun workspaceNavigationActions$default (Lcom/letta/mobile/data/shell/ShellWorkspaceNavigator;Lcom/letta/mobile/ui/shell/conversations/ShellTimelineConversationList;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceNavigationActions;

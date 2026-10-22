@@ -80,8 +80,8 @@ class SharedNavDrawerBindingTest {
     fun rowActionsReachTheConversationRepository() = runTest(mainDispatcherRule.dispatcher) {
         val vm = viewModel()
         vm.setArchiveFilter(ShellArchiveFilter.Archived)
-        vm.setConversationArchived("c1", "agent-1", archived = true)
-        vm.deleteConversation("c2", "agent-1")
+        vm.setConversationArchived(ConversationId("c1"), AgentId("agent-1"), archived = true)
+        vm.deleteConversation(ConversationId("c2"), AgentId("agent-1"))
         advanceUntilIdle()
         assertEquals(ShellArchiveFilter.Archived, vm.archiveFilter.value)
         coVerify { conversations.setConversationArchived("c1", "agent-1", true) }
@@ -166,10 +166,10 @@ class SharedNavDrawerBindingTest {
         backgroundScope.launch { vm.pinnedAgentIds.collect {} }
         advanceUntilIdle()
         assertEquals(emptySet<String>(), vm.pinnedAgentIds.value)
-        vm.setAgentPinned("agent-2", pinned = true)
+        vm.setAgentPinned(AgentId("agent-2"), pinned = true)
         advanceUntilIdle()
         assertEquals(setOf("agent-2"), vm.pinnedAgentIds.value)
-        vm.setAgentPinned("agent-2", pinned = false)
+        vm.setAgentPinned(AgentId("agent-2"), pinned = false)
         advanceUntilIdle()
         assertEquals(emptySet<String>(), vm.pinnedAgentIds.value)
     }

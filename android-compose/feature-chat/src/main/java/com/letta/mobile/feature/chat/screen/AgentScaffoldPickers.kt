@@ -9,9 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
-import androidx.lifecycle.ViewModel
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.components.picker.LettaPicker
 import com.letta.mobile.ui.components.picker.LettaPickerSpec
@@ -23,9 +21,7 @@ import com.letta.mobile.ui.components.picker.PickerSearch
 import com.letta.mobile.ui.components.picker.PickerSection
 import com.letta.mobile.ui.components.picker.PickerTags
 import com.letta.mobile.ui.haptics.HapticEffects
-import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.Locale
-import javax.inject.Inject
 
 /**
  * The header pill's agent switcher (hard cut S9): the shared [LettaPicker] (a sheet on a phone)
@@ -102,9 +98,3 @@ internal fun sortAgentsForPicker(
             .thenByDescending { it.id.value in pinnedAgentIds }
             .thenBy { it.name.lowercase(Locale.getDefault()) },
     )
-
-/** The drawer's conversation repository, when the scaffold's caller does not hand one in. */
-@HiltViewModel
-internal class ConversationPickerViewModel @Inject constructor(
-    val conversationRepository: IConversationRepository,
-) : ViewModel()

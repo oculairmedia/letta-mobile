@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
+import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.model.CanvasId
@@ -97,6 +98,7 @@ fun ShellWorkspaceState.navDrawerInput(
         canvases = library.canvases,
         archivedCanvasIds = library.archivedCanvasIds,
         pinnedAgentIds = library.pinnedAgentIds,
+        identities = library.identities,
     )
 }
 
@@ -165,8 +167,10 @@ data class ShellDrawerConversations(
     val markers: Map<String, String> = emptyMap(),
 )
 
-/** What else the agent panel lists: the Chat options, the canvas library and the agents pinned to Home. */
+/** What else the rail and panel show: mascot identities, the Chat options, the canvas library and the agents pinned to Home. */
 data class ShellDrawerLibrary(
+    /** Mascot identities by agent id (the rail's orbs and the panel's hero). */
+    val identities: Map<String, MascotIdentity> = emptyMap(),
     /** The Chat options dialog's state; null leaves it out of the agent menu. */
     val chatOptions: ShellChatOptionsState? = null,
     val canvases: List<CanvasDocument> = emptyList(),

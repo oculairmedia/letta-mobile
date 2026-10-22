@@ -8,7 +8,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.navigation.NavBackStackEntry
@@ -61,8 +60,7 @@ internal fun rememberAgentScaffoldRuntimeState(params: AgentScaffoldBodyParams):
     val activeAgentModel = rememberSelectedConversationModel(viewModel)
     val projectBindings = viewModel.projectBindings
     val pinnedAgentIds by viewModel.pinnedAgentIds.collectAsStateWithLifecycle()
-    val drawerConversationRepo = params.conversationRepository
-        ?: hiltViewModel<ConversationPickerViewModel>().conversationRepository
+    val drawerConversationRepo = params.workspace.drawer.sources.conversations
     val drawerConversations by drawerConversationRepo.getConversations(viewModel.agentId)
         .collectAsStateWithLifecycle(emptyList())
 

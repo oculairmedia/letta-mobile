@@ -177,29 +177,31 @@ private fun rememberAndroidNavigation(shell: WorkspaceShell, roster: List<Pair<S
         markers = model.conversationMarkers.collectAsStateWithLifecycle().value,
     )
     val library = ShellDrawerLibrary(
+        identities = LocalMascotRegistry.current.identities.toMap(),
         chatOptions = shell.chatPanel.value?.chatOptions,
         canvases = model.canvases.collectAsStateWithLifecycle().value,
         pinnedAgentIds = model.pinnedAgentIds.collectAsStateWithLifecycle().value,
     )
     // Relative times are taken when the drawer opens; they do not tick while it is open.
     val now = remember(shell.drawer.open) { Clock.System.now() }
-    return shell.workspace.workspaceNavigation(roster, now, drawer, LocalMascotRegistry.current.identities.toMap(), library)
+    return shell.workspace.workspaceNavigation(roster, now, drawer, library)
 }
 
 /** The shared verbs, with the rows' conversation actions and the agent pins written through Android's stores. */
 private fun androidNavigationActions(shell: WorkspaceShell): ShellWorkspaceNavigationActions {
     val base = shell.navigator.workspaceNavigationActions()
     val model = shell.drawerModel
-    val agent = { shell.workspace.focusedAgentId?.value.orEmpty() }
+    // The panel lists a focused agent's conversations only, so its rows always have one.
+    val agent = { checkNotNull(shell.workspace.focusedAgentId) }
     return base.copy(
-        rail = base.rail.copy(onAgentPinnedChange = model::setAgentPinned),
+        rail = base.rail.copy(onAgentPinnedChange = { id, pinned -> model.setAgentPinned(AgentId(id), pinned) }),
         panel = base.panel.copy(
             onArchiveFilterChange = model::setArchiveFilter,
-            onArchiveConversation = { id, archived -> model.setConversationArchived(id, agent(), archived) },
-            onDeleteConversation = { id -> model.deleteConversation(id, agent()) },
+            onArchiveConversation = { id, archived -> model.setConversationArchived(ConversationId(id), agent(), archived) },
+            onDeleteConversation = { id -> model.deleteConversation(ConversationId(id), agent()) },
             deleteBehavior = model.deleteBehavior,
             onRenameConversation = { id, title ->
-                model.renameConversation(ConversationId(id), AgentId(agent()), ConversationSummary(title))
+                model.renameConversation(ConversationId(id), agent(), ConversationSummary(title))
             },
             onPinConversation = { id, pinned -> model.setConversationPinned(ConversationId(id), pinned) },
             onOpenCanvas = { canvasId -> shell.exits.openCanvasById(canvasId.value) },

@@ -124,7 +124,7 @@ private fun WorkspaceFrame.header(): ShellWorkspaceHeaderState {
     return state.header.copy(sidebar = ShellSidebarControl(collapsed = true, onToggle = { drawer.open = true }, opensDrawer = true))
 }
 /**
- * The workspace owns the window's insets once (letta-mobile-ckmub.2): the side cutouts here, the
+ * The workspace owns the window's insets once, for every host: the side cutouts here, the
  * status bar under the inline header (its colour runs up behind it), and the body below takes the
  * top as consumed so no page pads for it again. The bottom bar and the keyboard stay the pages'
  * (the composer rides the keyboard). A window without insets (desktop, browser) sees none.

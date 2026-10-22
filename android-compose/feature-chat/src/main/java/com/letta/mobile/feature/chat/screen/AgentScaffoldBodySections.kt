@@ -104,10 +104,7 @@ internal fun AgentScaffoldChatPane(state: AgentScaffoldRuntimeState) {
         val agentNamesById = remember(state.switchableAgents) {
             state.switchableAgents.associate { it.id.value to it.name }
         }
-        // letta-mobile-i9h61.3.4: use drawerConversationRepo (params OR Hilt
-        // ConversationPickerViewModel fallback) so the picker always has a
-        // live IConversationRepository. Using params.conversationRepository
-        // alone silently fell through to null — ChatGraph never passes it.
+        // letta-mobile-i9h61.3.4: the workspace's own conversation repository, the one its panel lists from.
         val conversationRepo = state.drawerConversationRepo
         val scope = rememberCoroutineScope()
         val switchConversation by androidx.compose.runtime.rememberUpdatedState(state.params.navigation.onSwitchConversation)

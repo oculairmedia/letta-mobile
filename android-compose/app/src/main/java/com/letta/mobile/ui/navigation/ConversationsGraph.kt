@@ -104,9 +104,9 @@ internal fun showNavigation(shell: WorkspaceShell) {
 @Composable
 internal fun AndroidBackgroundTasks(shell: WorkspaceShell) {
     val workspace = shell.workspace
-    val agent = workspace.focusedAgentId
-    val conversation = workspace.selectedConversationId
-    if (!workspace.showBackgroundTasks || agent == null || conversation == null) return
+    if (!workspace.showBackgroundTasks) return
+    val agent = workspace.focusedAgentId ?: return
+    val conversation = workspace.selectedConversationId ?: return
     val graph by shell.drawerModel.sources.sessions.currentGraph.collectAsStateWithLifecycle()
     val subagents by remember(graph, agent, conversation) {
         graph.subagentRepository.activeSubagentsFlow(SubagentParentScope(agent.value, conversation.value))

@@ -115,7 +115,8 @@ class AgentScaffoldHiltTest {
         }
         val settings = InMemorySecureSettingsStore()
         drawer = SharedNavDrawerViewModel(
-            FakeSettingsRepository(), mockk(relaxed = true), allConversations, settings, sources = mockk(relaxed = true),
+            FakeSettingsRepository(), mockk(relaxed = true), allConversations, settings,
+            sources = mockk(relaxed = true) { every { conversations } returns conversationRepository },
         )
     }
 
@@ -123,7 +124,6 @@ class AgentScaffoldHiltTest {
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
             AgentScaffoldContent(
                 navigation = AgentScaffoldNavigationCallbacks(onNavigateBack = {}, onNavigateToSettings = {}),
-                conversationRepository = conversationRepository,
                 viewModel = viewModel,
                 workspace = host,
             )

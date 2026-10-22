@@ -140,13 +140,13 @@ class SharedNavDrawerViewModel @Inject constructor(
     fun setArchiveFilter(filter: ShellArchiveFilter) = _archiveFilter.update { filter }
 
 
-    fun setConversationArchived(conversationId: String, agentId: String, archived: Boolean) =
+    fun setConversationArchived(conversation: ConversationId, agent: AgentId, archived: Boolean) =
         run("Couldn't ${if (archived) "archive" else "restore"} the chat") {
-            sources.conversations.setConversationArchived(conversationId, agentId, archived)
+            sources.conversations.setConversationArchived(conversation.value, agent.value, archived)
         }
 
-    fun setAgentPinned(agentId: String, pinned: Boolean) = run("Couldn't ${if (pinned) "pin" else "unpin"} the agent") {
-        settingsRepository.setAgentPinned(agentId, pinned)
+    fun setAgentPinned(agent: AgentId, pinned: Boolean) = run("Couldn't ${if (pinned) "pin" else "unpin"} the agent") {
+        settingsRepository.setAgentPinned(agent.value, pinned)
     }
 
     /** The Iroh backend has no delete command, so a delete there only archives (it stays under Archived); the confirm dialog says so. */
@@ -164,8 +164,8 @@ class SharedNavDrawerViewModel @Inject constructor(
         run("Couldn't rename the chat") { sources.conversations.updateConversation(conversationId, agentId, trimmed) }
     }
 
-    fun deleteConversation(conversationId: String, agentId: String) = run("Couldn't delete the chat") {
-        sources.conversations.deleteConversation(conversationId, agentId)
+    fun deleteConversation(conversation: ConversationId, agent: AgentId) = run("Couldn't delete the chat") {
+        sources.conversations.deleteConversation(conversation.value, agent.value)
     }
 
     private val _failures = MutableSharedFlow<String>(extraBufferCapacity = FAILURE_BUFFER)

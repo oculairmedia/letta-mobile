@@ -1,6 +1,5 @@
 package com.letta.mobile.feature.chat.screen
 
-import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
 
 internal data class AgentScaffoldNavigationCallbacks(
@@ -46,7 +45,6 @@ internal data class AgentScaffoldBodyParams(
     val onChatModeChange: (String) -> Unit,
     val sheetVisibility: AgentScaffoldSheetVisibility,
     val projectUi: AgentScaffoldProjectUiState,
-    val conversationRepository: IConversationRepository?,
     /** The chat's one model picker (composer chip, `/models`, the drawer's card). */
     val modelPicker: ModelPickerBinding,
     /** The shared shell workspace around the chat (letta-mobile-ckmub.2): its header, rail and agent panel. */

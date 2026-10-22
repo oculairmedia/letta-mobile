@@ -28,20 +28,25 @@ fun ShellWorkspaceState.workspaceNavigation(
     identities: Map<String, MascotIdentity> = emptyMap(),
     conversations: ShellTimelineConversationList? = null,
 ): ShellWorkspaceNavigation =
-    workspaceNavigation(agents, now, conversations?.drawer(focusedAgentId) ?: ShellDrawerConversations(), identities)
+    workspaceNavigation(
+        agents = agents,
+        now = now,
+        conversations = conversations?.drawer(focusedAgentId) ?: ShellDrawerConversations(),
+        library = ShellDrawerLibrary(identities = identities),
+    )
 
 /**
  * [workspaceNavigation] over a host's own list of the focused agent's [conversations] (Android's
- * conversation repository), with its marks and its [library] in the panel.
+ * conversation repository), with its marks and its [library] (identities, Chat options, canvases) in the panel.
  */
 fun ShellWorkspaceState.workspaceNavigation(
     agents: List<Pair<String, String>>,
     now: Instant,
     conversations: ShellDrawerConversations,
-    identities: Map<String, MascotIdentity> = emptyMap(),
     library: ShellDrawerLibrary = ShellDrawerLibrary(),
 ): ShellWorkspaceNavigation {
     val drawer = navDrawerState(agents, now, conversations, library)
+    val identities = library.identities
     return ShellWorkspaceNavigation(
         rail = ShellLibraryRailState(
             agents = agents,
