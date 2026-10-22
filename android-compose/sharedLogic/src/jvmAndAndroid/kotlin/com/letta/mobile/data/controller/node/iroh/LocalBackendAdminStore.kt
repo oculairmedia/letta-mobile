@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -65,7 +66,7 @@ open class LocalBackendAdminStore(
      * agent's message ids, last run time and so its roster order from there). Null when unreadable.
      */
     open fun agentFilesSignature(): Long? = runCatching {
-        support.agentIndex.signature { agentId -> support.defaultConversationFile(agentId) }
+        support.agentIndex.signature { id -> support.defaultConversationFile(AgentId(id)) }
     }.getOrNull()
 
     /** See [LocalBackendAgentReader.hiddenAgentIds]. */
