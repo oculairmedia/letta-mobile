@@ -14853,6 +14853,7 @@ public class com/letta/mobile/data/controller/node/iroh/LocalBackendAdminStore {
 	public fun agentFilesSignature ()Ljava/lang/Long;
 	public final fun blockCountProjected ()I
 	public final fun blocksForAgentProjected (Ljava/lang/String;)Lkotlinx/serialization/json/JsonArray;
+	public fun conversationRecordsSignature ()Ljava/lang/Long;
 	public final fun countAgents ()Ljava/lang/Integer;
 	public final fun getBlockProjected (Ljava/lang/String;)Lkotlinx/serialization/json/JsonObject;
 	public final fun getRunProjected (Ljava/lang/String;)Lkotlinx/serialization/json/JsonObject;

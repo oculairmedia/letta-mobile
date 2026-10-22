@@ -1,5 +1,8 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.node.listcache.HeldListCache
+import com.letta.mobile.data.controller.node.listcache.HeldListLimits
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.chat.branch.IrohConversationForkRpc
 import com.letta.mobile.data.runtime.TurnIdentityLedger
@@ -8,11 +11,15 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration.Companion.milliseconds
+
+/** A successful conversation write: its result, the id when the result has none, its kind, the agent id when the result has none. */
+private typealias ConversationWriteNotice = suspend (JsonElement?, String?, ConversationChangeKind, String?) -> Unit
 
 object ConversationAdminHandlers {
     /**
@@ -63,8 +70,20 @@ object ConversationAdminHandlers {
         controller: com.letta.mobile.data.controller.AppServerController? = null,
     ) {
         val nativeClient = tiers.nativeClient
-        registerConversationReadRoutes(router, nativeClient, tiers)
-        registerConversationWriteRoutes(router, nativeClient, controller, tiers.conversationChanges)
+        // Without a local store there is no cheap change signal, so every list is fetched as before.
+        val heldList = tiers.localBackendStore?.let { store ->
+            HeldListCache(
+                signature = store::conversationRecordsSignature,
+                limits = HeldListLimits(maxItems = MAX_HELD_CONVERSATIONS),
+                onTooLarge = { conversations, max -> reportHeldListTooLarge("conversation.list", conversations, max) },
+            )
+        }
+        val onChanged: suspend (String, String?, ConversationChangeKind) -> Unit = { id, agent, kind ->
+            heldList?.invalidate()
+            tiers.conversationChanges?.notify(id, agent, kind)
+        }
+        registerConversationReadRoutes(router, nativeClient, tiers, heldList)
+        registerConversationWriteRoutes(router, nativeClient, controller, onChanged)
         registerMessageRoutes(router, nativeClient, tiers.localBackendStore, tiers.turnIdentity)
     }
 
@@ -72,9 +91,10 @@ object ConversationAdminHandlers {
         router: AdminRpcRouter,
         nativeClient: AppServerClient?,
         tiers: NativeReadTiers,
+        heldList: HeldListCache?,
     ) {
         val hiddenAgents = tiers.localBackendStore?.let { store -> HiddenAgentIndex(load = store::hiddenAgentIds) }
-        registerConversationListRoute(router, nativeClient, hiddenAgents)
+        registerConversationListRoute(router, nativeClient, hiddenAgents, heldList)
         registerConversationAgentListRoute(router, tiers)
         registerConversationGetRoute(router, nativeClient)
     }
@@ -83,31 +103,69 @@ object ConversationAdminHandlers {
         router: AdminRpcRouter,
         nativeClient: AppServerClient?,
         hiddenAgents: HiddenAgentIndex?,
+        heldList: HeldListCache?,
     ) {
         router.registerScoped("conversation.list") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
             val conversations = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationList) { c ->
-                val response = c.conversationList(
-                    AppServerCommand.ConversationList(
-                        requestId = NativeAdmin.requestId(),
-                        query = NativeAdmin.queryOf(
-                            "agent_id" to agentId,
-                            "limit" to param(params, AdminParamKey("limit")),
-                            "after" to param(params, AdminParamKey("after")),
-                            "archive_status" to param(params, AdminParamKey("archive_status")),
-                            "summary_search" to param(params, AdminParamKey("summary_search")),
-                            "order" to param(params, AdminParamKey("order")),
-                            "order_by" to param(params, AdminParamKey("order_by")),
-                        ),
-                    ),
+                val own = suspend { listConversations(c, params) }
+                // One agent's page (no summary search) is cut from the held full list: the App Server
+                // re-reads every conversation record per list call, so per-agent calls cost the same as
+                // a full one and a client listing agent by agent paid that once per agent.
+                val held = heldList?.takeIf { agentId != null && param(params, AdminParamKey("summary_search")) == null }
+                if (held == null) own() else held.serve(
+                    fetchAll = { listAgentConversations(c) },
+                    fromFull = { full ->
+                        agentConversationPage(
+                            full,
+                            agent = AgentId(checkNotNull(agentId)),
+                            after = param(params, AdminParamKey("after"))?.let(::ConversationId),
+                            limit = param(params, AdminParamKey("limit")),
+                        )
+                    },
+                    fetchOwn = own,
                 )
-                if (response.success) response.conversations ?: JsonArray(emptyList()) else null
             }
             val scoped = scopeConversationList(conversations, context)
             // letta-mobile-fxoew.9: the agent-wide chat list drops conversations owned by hidden
             // (subagent) agents. A list asked for one agent explicitly is served as is.
             if (agentId == null && hiddenAgents != null) dropHiddenAgentConversations(scoped, hiddenAgents) else scoped
         }
+    }
+
+    /** The conversation list exactly as the client asked for it, from the App Server. */
+    private suspend fun listConversations(client: AppServerClient, params: JsonObject?): JsonArray? {
+        val response = client.conversationList(
+            AppServerCommand.ConversationList(
+                requestId = NativeAdmin.requestId(),
+                query = NativeAdmin.queryOf(
+                    "agent_id" to param(params, AdminParamKey("agent_id")),
+                    "limit" to param(params, AdminParamKey("limit")),
+                    "after" to param(params, AdminParamKey("after")),
+                    "archive_status" to param(params, AdminParamKey("archive_status")),
+                    "summary_search" to param(params, AdminParamKey("summary_search")),
+                    "order" to param(params, AdminParamKey("order")),
+                    "order_by" to param(params, AdminParamKey("order_by")),
+                ),
+            ),
+        )
+        return if (response.success) response.conversations ?: JsonArray(emptyList()) else null
+    }
+
+    /**
+     * Every visible conversation that belongs to an agent, newest first: the App Server's full list
+     * (one more than is held, so a list too long to hold is seen) without agent-free rows.
+     */
+    private suspend fun listAgentConversations(client: AppServerClient): JsonArray? {
+        val response = client.conversationList(
+            AppServerCommand.ConversationList(
+                requestId = NativeAdmin.requestId(),
+                query = NativeAdmin.queryOf("limit" to (MAX_HELD_CONVERSATIONS + 1).toString()),
+            ),
+        )
+        if (!response.success) return null
+        val rows = response.conversations ?: return JsonArray(emptyList())
+        return JsonArray(rows.filter { row -> (row as? JsonObject)?.get("agent_id")?.let { it !is JsonNull } == true })
     }
 
     private fun dropHiddenAgentConversations(result: JsonElement, hiddenAgents: HiddenAgentIndex): JsonElement {
@@ -172,22 +230,41 @@ object ConversationAdminHandlers {
         router: AdminRpcRouter,
         nativeClient: AppServerClient?,
         controller: com.letta.mobile.data.controller.AppServerController?,
-        changes: ConversationChangeNotifier?,
+        onChanged: suspend (String, String?, ConversationChangeKind) -> Unit,
     ) {
         // Every conversation write from an Iroh client lands in these handlers, so this is where
-        // connected clients learn of it (ConversationChangeNotifier, letta-mobile-lks7m). Only a
-        // successful write notifies: a failed one tells no client to refetch.
-        suspend fun notifyChanged(
-            result: JsonElement?,
-            fallbackId: String?,
-            kind: ConversationChangeKind,
-            fallbackAgentId: String? = null,
-        ) {
+        // connected clients learn of it (ConversationChangeNotifier, letta-mobile-lks7m) and the held
+        // conversation list is dropped. Only a successful write notifies: a failed one tells no client
+        // to refetch. Arguments: the write's result, the id when the result has none, the kind, and
+        // the agent id when the result has none.
+        val notifyChanged: ConversationWriteNotice = { result, fallbackId, kind, fallbackAgentId ->
             val conversation = result as? JsonObject
-            val id = conversation?.get("id")?.jsonPrimitive?.contentOrNull ?: fallbackId ?: return
-            val agentId = conversation?.get("agent_id")?.jsonPrimitive?.contentOrNull ?: fallbackAgentId
-            changes?.notify(id, agentId, kind)
+            val id = conversation?.get("id")?.jsonPrimitive?.contentOrNull ?: fallbackId
+            if (id != null) {
+                onChanged(id, conversation?.get("agent_id")?.jsonPrimitive?.contentOrNull ?: fallbackAgentId, kind)
+            }
         }
+        registerConversationCreateRoute(router, nativeClient, notifyChanged)
+        router.register("conversation.delete") { params ->
+            params.requireParam(AdminParamKey("conversation_id"))
+            // Phase 2: fail closed unconditionally. Prefer conversation.archive.
+            adminError("capability_unavailable: conversation_delete is not in the pinned App Server v2 contract; archive instead")
+        }
+        registerConversationUpdateRoute(router, nativeClient, controller, notifyChanged)
+        registerConversationArchiveRoutes(router, nativeClient, notifyChanged)
+        router.register(IrohConversationForkRpc.METHOD) { params ->
+            val sourceId = params.requireParam(AdminParamKey(IrohConversationForkRpc.CONVERSATION_ID))
+            // notifyChanged reads the fork's id from the result, so only a real fork notifies.
+            ConversationForkHandler.fork(nativeClient, sourceId, params)
+                .also { notifyChanged(it, null, ConversationChangeKind.Created, null) }
+        }
+    }
+
+    private fun registerConversationCreateRoute(
+        router: AdminRpcRouter,
+        nativeClient: AppServerClient?,
+        notifyChanged: ConversationWriteNotice,
+    ) {
         router.register("conversation.create") { params ->
             val agentId = params.requireParam(AdminParamKey("agent_id"))
             val createBody = checkNotNull(params)
@@ -196,13 +273,16 @@ object ConversationAdminHandlers {
                     AppServerCommand.ConversationCreate(requestId = NativeAdmin.requestId(), body = createBody),
                 )
                 if (response.success) response.conversation else null
-            }.also { if (it is JsonObject) notifyChanged(it, fallbackId = null, ConversationChangeKind.Created, fallbackAgentId = agentId) }
+            }.also { if (it is JsonObject) notifyChanged(it, null, ConversationChangeKind.Created, agentId) }
         }
-        router.register("conversation.delete") { params ->
-            params.requireParam(AdminParamKey("conversation_id"))
-            // Phase 2: fail closed unconditionally. Prefer conversation.archive.
-            adminError("capability_unavailable: conversation_delete is not in the pinned App Server v2 contract; archive instead")
-        }
+    }
+
+    private fun registerConversationUpdateRoute(
+        router: AdminRpcRouter,
+        nativeClient: AppServerClient?,
+        controller: com.letta.mobile.data.controller.AppServerController?,
+        notifyChanged: ConversationWriteNotice,
+    ) {
         router.register("conversation.update") { params ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
             val body = kotlinx.serialization.json.buildJsonObject {
@@ -220,7 +300,7 @@ object ConversationAdminHandlers {
                 )
                 if (response.success) response.conversation else null
             }
-            if (result is JsonObject) notifyChanged(result, fallbackId = id, ConversationChangeKind.Updated)
+            if (result is JsonObject) notifyChanged(result, id, ConversationChangeKind.Updated, null)
             if (RuntimeInvalidationPolicy.conversationUpdateRequiresRestart(body)) {
                 val agentId = param(params, AdminParamKey("agent_id"))
                     ?: (result as? JsonObject)?.get("agent_id")?.jsonPrimitive?.contentOrNull
@@ -230,41 +310,32 @@ object ConversationAdminHandlers {
             }
             result
         }
-        router.register("conversation.archive") { params ->
-            val id = params.requireParam(AdminParamKey("conversation_id"))
-            NativeAdmin.require(nativeClient, NativeAdminOp.ConversationArchive) { c ->
-                val response = c.conversationUpdate(
-                    AppServerCommand.ConversationUpdate(
-                        requestId = NativeAdmin.requestId(),
-                        conversationId = id,
-                        body = kotlinx.serialization.json.buildJsonObject {
-                            put("archived", JsonPrimitive(true))
-                        },
-                    ),
-                )
-                if (response.success) response.conversation else null
-            }.also { if (it is JsonObject) notifyChanged(it, fallbackId = id, ConversationChangeKind.Archived) }
-        }
-        router.register(IrohConversationForkRpc.METHOD) { params ->
-            val sourceId = params.requireParam(AdminParamKey(IrohConversationForkRpc.CONVERSATION_ID))
-            // notifyChanged reads the fork's id from the result, so only a real fork notifies.
-            ConversationForkHandler.fork(nativeClient, sourceId, params)
-                .also { notifyChanged(it, fallbackId = null, ConversationChangeKind.Created) }
-        }
-        router.register("conversation.restore") { params ->
-            val id = params.requireParam(AdminParamKey("conversation_id"))
-            NativeAdmin.require(nativeClient, NativeAdminOp.ConversationRestore) { c ->
-                val response = c.conversationUpdate(
-                    AppServerCommand.ConversationUpdate(
-                        requestId = NativeAdmin.requestId(),
-                        conversationId = id,
-                        body = kotlinx.serialization.json.buildJsonObject {
-                            put("archived", JsonPrimitive(false))
-                        },
-                    ),
-                )
-                if (response.success) response.conversation else null
-            }.also { if (it is JsonObject) notifyChanged(it, fallbackId = id, ConversationChangeKind.Restored) }
+    }
+
+    /** `conversation.archive` and `conversation.restore`: the same update with the archived flag set or cleared. */
+    private fun registerConversationArchiveRoutes(
+        router: AdminRpcRouter,
+        nativeClient: AppServerClient?,
+        notifyChanged: ConversationWriteNotice,
+    ) {
+        for ((method, archived) in listOf("conversation.archive" to true, "conversation.restore" to false)) {
+            val op = if (archived) NativeAdminOp.ConversationArchive else NativeAdminOp.ConversationRestore
+            val kind = if (archived) ConversationChangeKind.Archived else ConversationChangeKind.Restored
+            router.register(method) { params ->
+                val id = params.requireParam(AdminParamKey("conversation_id"))
+                NativeAdmin.require(nativeClient, op) { c ->
+                    val response = c.conversationUpdate(
+                        AppServerCommand.ConversationUpdate(
+                            requestId = NativeAdmin.requestId(),
+                            conversationId = id,
+                            body = kotlinx.serialization.json.buildJsonObject {
+                                put("archived", JsonPrimitive(archived))
+                            },
+                        ),
+                    )
+                    if (response.success) response.conversation else null
+                }.also { if (it is JsonObject) notifyChanged(it, id, kind, null) }
+            }
         }
     }
 
@@ -428,6 +499,9 @@ object ConversationAdminHandlers {
             adminError("forbidden: conversation out of authorized scope")
         }
     }
+
+    /** Conversation lists past this are not held: about 1 KB per row, so roughly 20 MB at the cap. */
+    private const val MAX_HELD_CONVERSATIONS = 20_000
 
     /** How many of the newest local messages `message.list` looks in for images to restore. */
     private const val ENRICHMENT_WINDOW = 64
