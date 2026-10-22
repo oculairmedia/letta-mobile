@@ -47,10 +47,22 @@ pub struct IrohAppServerSession {
 
 #[wasm_bindgen]
 impl IrohAppServerSession {
-    pub async fn connect(ticket_or_url: &str) -> Result<IrohAppServerSession, JsError> {
+    /// Dials the App Server. `secret_key` is the page's persistent identity
+    /// (letta-mobile-wisqe S1): with it the browser keeps one NodeId across
+    /// reloads, so a host can pair it. `None` keeps the old ephemeral key.
+    pub async fn connect(
+        ticket_or_url: &str,
+        secret_key: Option<Vec<u8>>,
+    ) -> Result<IrohAppServerSession, JsError> {
         let endpoint_id = parse_endpoint_id(ticket_or_url)?;
-        let endpoint = Endpoint::builder(iroh::endpoint::presets::N0)
-            .alpns(vec![APP_SERVER_ALPN.to_vec()])
+        let mut builder =
+            Endpoint::builder(iroh::endpoint::presets::N0).alpns(vec![APP_SERVER_ALPN.to_vec()]);
+        if let Some(bytes) = secret_key {
+            let key = crate::identity::parse_secret_key(&bytes)
+                .map_err(|message| js_error("loading browser identity", message))?;
+            builder = builder.secret_key(key);
+        }
+        let endpoint = builder
             .bind()
             .await
             .map_err(|error| js_error("binding browser Iroh endpoint", error))?;

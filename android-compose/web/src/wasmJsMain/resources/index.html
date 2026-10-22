@@ -35,7 +35,8 @@
         }
     </style>
     <script type="module">
-        import init, { IrohAppServerSession } from './iroh/letta_iroh_wasm.js';
+        import init, { IrohAppServerSession, identityNodeId } from './iroh/letta_iroh_wasm.js';
+        import { loadOrCreateIdentity } from './iroh-identity.js';
 
         const sessions = new Map();
         const maxQueuedControlFrames = 256;
@@ -63,9 +64,24 @@
             }
         };
 
+        // letta-mobile-wisqe S1: one persistent identity per browser profile, so the
+        // NodeId survives reloads and a host can pair it. null => ephemeral (as before).
+        let identity;
+        const browserIdentity = () => {
+            identity ??= loadOrCreateIdentity();
+            return identity;
+        };
+
+        /** This browser's NodeId, or null when it has no persistent identity. */
+        window.irohLocalNodeId = async () => {
+            await initialize();
+            const secret = await browserIdentity();
+            return secret ? identityNodeId(secret) : null;
+        };
+
         window.irohConnect = async (ticket) => {
             await initialize();
-            const native = await IrohAppServerSession.connect(ticket);
+            const native = await IrohAppServerSession.connect(ticket, await browserIdentity());
             const id = nextSessionId++;
             const session = {
                 native,
