@@ -171,14 +171,6 @@ private fun localProviderRows(state: ConfigUiState, vm: ConfigViewModel): List<S
 
 private val LOCAL_MODEL_ACCELERATORS = listOf("cpu" to "CPU", "gpu" to "GPU", "npu" to "NPU")
 
-/** The other saved backends, to switch between or remove (Backend group). */
-internal fun savedBackendsSection(onOpen: () -> Unit) = SettingsSectionModel(
-    key = "android-saved-backends",
-    title = "Saved backends",
-    supporting = "Every remote host and local runtime you have set up on this phone.",
-    rows = listOf(SettingsRow.Actions("saved-backends", listOf(SettingsAction("saved-backends-open", "Manage saved backends") { onOpen() }))),
-)
-
 /** Battery optimization, which decides whether replies arrive while the app is closed (Notifications group). */
 internal fun backgroundDeliverySection(exempt: Boolean, onAllow: () -> Unit) = SettingsSectionModel(
     key = "android-background-delivery",

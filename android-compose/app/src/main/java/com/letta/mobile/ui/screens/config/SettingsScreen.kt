@@ -28,6 +28,7 @@ import com.letta.mobile.runtime.local.runtimeLifecycleLogFile
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.notify.LocalAttentionPrefs
 import com.letta.mobile.ui.settings.BackendSettingsActions
+import com.letta.mobile.ui.settings.SavedBackends
 import com.letta.mobile.ui.settings.SettingsPageServices
 import com.letta.mobile.ui.settings.SettingsPageState
 import com.letta.mobile.ui.shell.ShellPageContent
@@ -73,7 +74,14 @@ internal fun androidSettingsPage(onBack: () -> Unit, destinations: SettingsDesti
         onOpenProviders = destinations.onProviders,
         contributions = androidSettingsContributions(uiState, inputs),
     )
-    shellSettingsPage(SettingsPageState(config), services, onBack = onBack).Content(destination, modifier)
+    val backends by viewModel.backends.collectAsStateWithLifecycle()
+    val saved = SavedBackends(
+        configs = backends, activeId = config.id,
+        onSwitch = viewModel::switchBackend,
+        onAdd = { added -> viewModel.addBackend(added, onSaved = { snackbar.dispatch(CONFIG_SAVED) }, onError = snackbar::dispatch) },
+        onRemove = viewModel::removeBackend,
+    )
+    shellSettingsPage(SettingsPageState(config, saved = saved), services, onBack = onBack).Content(destination, modifier)
 }
 
 /** Debug builds: puts the on-device runtime's lifecycle log on the clipboard; returns what to tell the user. */

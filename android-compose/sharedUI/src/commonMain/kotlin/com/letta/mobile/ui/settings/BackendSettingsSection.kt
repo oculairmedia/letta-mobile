@@ -106,13 +106,19 @@ val LettaConfig.Mode.settingsDescription: String
 /** What the address field suggests for a remote host. */
 const val REMOTE_HOST_PLACEHOLDER = "iroh://<endpoint id>@host:port, iroh://<ticket> or ws://host:port"
 
-/** The Backend form, the saved config it edits and the live connection; [onFormChange] keeps the form hoisted to the page. */
+/**
+ * The Backend form, the saved config it edits (a new, empty one while [saved] is adding) and the live
+ * connection; [onFormChange] keeps the form hoisted to the page.
+ */
 class BackendFormState(
     val config: LettaConfig,
     val form: BackendSettingsForm,
     val connection: BackendConnectionStatus? = null,
+    val saved: SavedBackendsState? = null,
     val onFormChange: (BackendSettingsForm) -> Unit,
-)
+) {
+    val adding: Boolean get() = saved?.adding == true
+}
 
 /** The connection as the Status row says it: words a person can act on, never colour alone. */
 fun BackendConnectionStatus.settingsStatus(): SettingsStatus = when (this) {
@@ -168,6 +174,7 @@ fun BackendSettingsSection(state: BackendFormState, actions: BackendSettingsActi
         }
     }
     SettingsSection(SettingsHeader(BackendSettingsTags.SECTION, "Backend", showTitle = false), modifier) {
+        state.saved?.let { SavedBackendRows(it) }
         ChoiceRow(modeRow(state))
         state.connection?.let { StatusRow(SettingsRow.Status(SettingsCopy.STATUS.key, SettingsCopy.STATUS.title, it.settingsStatus(), it.settingsHelper())) }
         if (form.mode == LettaConfig.Mode.SELF_HOSTED) {
@@ -176,6 +183,7 @@ fun BackendSettingsSection(state: BackendFormState, actions: BackendSettingsActi
             (test as? ConnectionTest.Done)?.let { NoteRow(SettingsRow.Note(BackendSettingsTags.TEST_RESULT, it.result)) }
         }
         ActionRow("backend-actions", listOf(saveButton(state, actions)))
+        state.saved?.let { RemoveBackendRows(it) }
     }
 }
 
@@ -284,14 +292,21 @@ private fun tokenRow(config: LettaConfig) = SettingsRow.Text(
 /** Save waits for a valid change (or a backend that was never set up). */
 private fun saveButton(state: BackendFormState, actions: BackendSettingsActions): ActionButton {
     val form = state.form
-    val changed = form.isDirty(state.config) || state.connection == BackendConnectionStatus.Unconfigured
+    val changed = form.isDirty(state.config) || state.connection == BackendConnectionStatus.Unconfigured || state.adding
+    val saved = state.saved
     return ActionButton(
         key = BackendSettingsTags.SAVE,
-        label = "Save",
+        label = if (state.adding) "Add backend" else "Save",
         primary = true,
         enabled = form.problem == null && changed,
         onClick = {
-            actions.onConfigSaved(form.applyTo(state.config))
+            val config = form.applyTo(state.config)
+            if (saved?.adding == true) {
+                saved.saved.onAdd(config)
+                saved.onAddingChange(false)
+            } else {
+                actions.onConfigSaved(config)
+            }
             state.onFormChange(form.copy(tokenInput = ""))
         },
     )

@@ -30,7 +30,6 @@ import com.letta.mobile.di.pluginViewsOf
 import com.letta.mobile.feature.chat.screen.shared.ChatCanvasSlot
 import com.letta.mobile.feature.chat.screen.shared.LocalChatCanvasSlot
 import com.letta.mobile.ui.screens.agenteditor.androidAgentEditorHost
-import com.letta.mobile.ui.screens.config.ConfigListScreen
 import com.letta.mobile.ui.screens.config.SettingsDestinations
 import com.letta.mobile.ui.screens.config.androidSettingsPage
 import com.letta.mobile.ui.screens.systemaccess.SystemAccessDashboardScreen
@@ -155,7 +154,7 @@ class NavViewModel @Inject constructor(private val settingsRepository: ISettings
 /**
  * letta-mobile-ckmub.2 (hard cut): the app is the shared shell workspace ([AndroidShellWorkspace]); the
  * nav host above it only holds Android's own screens the workspace leaves for: the camera scanner and
- * the pairing invite, the system-access dashboard, the saved backends list, the full-screen board and
+ * the pairing invite, the system-access dashboard, the full-screen board and
  * the canvas debug board.
  */
 @Composable
@@ -190,7 +189,6 @@ fun AppNavGraph(
                     onNavigateToPairDevice = { navController.navigate(PairingInviteRoute) },
                 )
             }
-            composable<ConfigListRoute> { ConfigListScreen(onNavigateBack = { navController.popBackStack() }) }
             composable<CanvasDebugRoute> {
                 com.letta.mobile.ui.canvas.CanvasWorkspace(
                     initialJson = com.letta.mobile.ui.canvas.CanvasSamples.buildCycleJson,
@@ -209,7 +207,6 @@ private fun androidShellExits(navController: NavHostController) = AndroidShellEx
     },
     openCanvasById = { canvasId -> navController.navigate(CanvasRoute(canvasId = canvasId)) },
     settings = SettingsDestinations(
-        onConfigList = { navController.navigate(ConfigListRoute) },
         onSystemAccess = { navController.navigate(SystemAccessRoute) },
         onCanvasDebug = { navController.navigate(CanvasDebugRoute) },
     ),

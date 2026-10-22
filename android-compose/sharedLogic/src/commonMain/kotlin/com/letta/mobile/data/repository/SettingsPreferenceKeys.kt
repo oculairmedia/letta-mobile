@@ -11,7 +11,6 @@ internal object SettingsPreferenceKeys {
     const val CHAT_FONT_SCALE = "chat_font_scale"
     const val ENABLE_PROJECTS = "enable_projects"
     const val PINNED_ITEMS_ORDER = "pinned_items_order"
-    const val PINNED_AGENT_NAMES = "pinned_agent_names"
     const val RESUME_RECENT_CONVERSATION = "resume_recent_conversation"
     const val HAPTICS_ENABLED = "haptics_enabled"
     const val OPEN_CHATS_ON_CANVAS = "open_chats_on_canvas"

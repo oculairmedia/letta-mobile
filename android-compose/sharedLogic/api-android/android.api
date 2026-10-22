@@ -35214,7 +35214,6 @@ public final class com/letta/mobile/data/projects/SettingsStoreProjectPinStore$C
 
 public final class com/letta/mobile/data/repository/ActiveConfigSettingsRepository : com/letta/mobile/data/repository/api/ISettingsRepository {
 	public fun <init> (Lcom/letta/mobile/data/model/LettaConfig;)V
-	public fun addPinnedShortcut (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun clearAllData (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun deleteConfig (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getActiveConfig ()Lkotlinx/coroutines/flow/Flow;
@@ -35233,17 +35232,12 @@ public final class com/letta/mobile/data/repository/ActiveConfigSettingsReposito
 	public fun getLastChatSelection ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getOpenChatsOnCanvas ()Lkotlinx/coroutines/flow/Flow;
 	public fun getPinnedAgentIds ()Lkotlinx/coroutines/flow/Flow;
-	public fun getPinnedAgentNames ()Lkotlinx/coroutines/flow/Flow;
 	public fun getPinnedAgentOrder ()Lkotlinx/coroutines/flow/Flow;
 	public fun getPinnedConversationIds ()Lkotlinx/coroutines/flow/Flow;
-	public fun getPinnedItemsOrder ()Lkotlinx/coroutines/flow/Flow;
 	public fun getPinnedProjectIds ()Lkotlinx/coroutines/flow/Flow;
-	public fun getPinnedShortcutOrder ()Lkotlinx/coroutines/flow/Flow;
 	public fun getTheme ()Lkotlinx/coroutines/flow/Flow;
 	public fun getThemePreset ()Lkotlinx/coroutines/flow/Flow;
 	public fun observeResumeRecentConversation ()Lkotlinx/coroutines/flow/Flow;
-	public fun removePinnedAgentName (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun removePinnedShortcut (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun saveConfig (Lcom/letta/mobile/data/model/LettaConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setActiveConfigId (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setAgentPinned (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -35258,14 +35252,10 @@ public final class com/letta/mobile/data/repository/ActiveConfigSettingsReposito
 	public fun setHuggingFaceToken (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setLastChatSelection (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public fun setOpenChatsOnCanvas (ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun setPinnedAgentOrder (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun setPinnedItemsOrder (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun setPinnedShortcutOrder (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setProjectPinned (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setTheme (Lcom/letta/mobile/data/model/AppTheme;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setThemePreset (Lcom/letta/mobile/data/model/ThemePreset;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun updateActiveConfig (Lcom/letta/mobile/data/model/LettaConfig;)V
-	public fun upsertPinnedAgentName (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/repository/AdminRpcJsonBody {
@@ -35513,10 +35503,8 @@ public class com/letta/mobile/data/repository/CachedRunRepository : com/letta/mo
 }
 
 public class com/letta/mobile/data/repository/CachedSettingsRepository : com/letta/mobile/data/repository/api/ISettingsRepository {
-	public static final field Companion Lcom/letta/mobile/data/repository/CachedSettingsRepository$Companion;
 	public fun <init> (Lcom/letta/mobile/data/storage/SettingsPreferencesStore;Lcom/letta/mobile/data/storage/SecureSettingsStore;Lcom/letta/mobile/data/storage/SettingsPlatformDefaults;Lcom/letta/mobile/data/repository/SettingsBackendCacheClearer;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/storage/SettingsPreferencesStore;Lcom/letta/mobile/data/storage/SecureSettingsStore;Lcom/letta/mobile/data/storage/SettingsPlatformDefaults;Lcom/letta/mobile/data/repository/SettingsBackendCacheClearer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun addPinnedShortcut (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun clearAllData (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun deleteConfig (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getActiveConfig ()Lkotlinx/coroutines/flow/Flow;
@@ -35535,17 +35523,12 @@ public class com/letta/mobile/data/repository/CachedSettingsRepository : com/let
 	public fun getLastChatSelection ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getOpenChatsOnCanvas ()Lkotlinx/coroutines/flow/Flow;
 	public fun getPinnedAgentIds ()Lkotlinx/coroutines/flow/Flow;
-	public fun getPinnedAgentNames ()Lkotlinx/coroutines/flow/Flow;
 	public fun getPinnedAgentOrder ()Lkotlinx/coroutines/flow/Flow;
 	public fun getPinnedConversationIds ()Lkotlinx/coroutines/flow/Flow;
-	public fun getPinnedItemsOrder ()Lkotlinx/coroutines/flow/Flow;
 	public fun getPinnedProjectIds ()Lkotlinx/coroutines/flow/Flow;
-	public fun getPinnedShortcutOrder ()Lkotlinx/coroutines/flow/Flow;
 	public fun getTheme ()Lkotlinx/coroutines/flow/Flow;
 	public fun getThemePreset ()Lkotlinx/coroutines/flow/Flow;
 	public fun observeResumeRecentConversation ()Lkotlinx/coroutines/flow/Flow;
-	public fun removePinnedAgentName (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun removePinnedShortcut (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun saveConfig (Lcom/letta/mobile/data/model/LettaConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setActiveConfigId (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun setAdminAgentId (Ljava/lang/String;)V
@@ -35561,17 +35544,9 @@ public class com/letta/mobile/data/repository/CachedSettingsRepository : com/let
 	public fun setHuggingFaceToken (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setLastChatSelection (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public fun setOpenChatsOnCanvas (ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun setPinnedAgentOrder (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun setPinnedItemsOrder (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun setPinnedShortcutOrder (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setProjectPinned (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setTheme (Lcom/letta/mobile/data/model/AppTheme;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun setThemePreset (Lcom/letta/mobile/data/model/ThemePreset;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun upsertPinnedAgentName (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
-public final class com/letta/mobile/data/repository/CachedSettingsRepository$Companion {
-	public final fun getDEFAULT_PINNED_SHORTCUTS ()Ljava/util/List;
 }
 
 public class com/letta/mobile/data/repository/CachedSlashCommandRepository : com/letta/mobile/data/repository/api/ISlashCommandRepository {
@@ -36858,7 +36833,6 @@ public final class com/letta/mobile/data/repository/api/ISelfTodoRepository$Defa
 }
 
 public abstract interface class com/letta/mobile/data/repository/api/ISettingsRepository {
-	public abstract fun addPinnedShortcut (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun clearAllData (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun deleteConfig (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun getActiveConfig ()Lkotlinx/coroutines/flow/Flow;
@@ -36877,17 +36851,12 @@ public abstract interface class com/letta/mobile/data/repository/api/ISettingsRe
 	public abstract fun getLastChatSelection ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun getOpenChatsOnCanvas ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getPinnedAgentIds ()Lkotlinx/coroutines/flow/Flow;
-	public abstract fun getPinnedAgentNames ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getPinnedAgentOrder ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getPinnedConversationIds ()Lkotlinx/coroutines/flow/Flow;
-	public abstract fun getPinnedItemsOrder ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getPinnedProjectIds ()Lkotlinx/coroutines/flow/Flow;
-	public abstract fun getPinnedShortcutOrder ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getTheme ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getThemePreset ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun observeResumeRecentConversation ()Lkotlinx/coroutines/flow/Flow;
-	public abstract fun removePinnedAgentName (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun removePinnedShortcut (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun saveConfig (Lcom/letta/mobile/data/model/LettaConfig;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun setActiveConfigId (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun setAgentPinned (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -36902,13 +36871,9 @@ public abstract interface class com/letta/mobile/data/repository/api/ISettingsRe
 	public abstract fun setHuggingFaceToken (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun setLastChatSelection (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public abstract fun setOpenChatsOnCanvas (ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun setPinnedAgentOrder (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun setPinnedItemsOrder (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun setPinnedShortcutOrder (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun setProjectPinned (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun setTheme (Lcom/letta/mobile/data/model/AppTheme;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun setThemePreset (Lcom/letta/mobile/data/model/ThemePreset;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun upsertPinnedAgentName (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/repository/api/ISettingsRepository$DefaultImpls {

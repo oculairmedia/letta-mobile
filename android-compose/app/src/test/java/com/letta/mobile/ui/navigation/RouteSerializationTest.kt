@@ -18,7 +18,6 @@ class RouteSerializationTest {
     @Test
     fun `the workspace and Android's own screens serialize and deserialize`() {
         verifyIdempotent(ShellWorkspaceRoute)
-        verifyIdempotent(ConfigListRoute)
         verifyIdempotent(SystemAccessRoute)
         verifyIdempotent(PairingScanRoute)
         verifyIdempotent(PairingInviteRoute)

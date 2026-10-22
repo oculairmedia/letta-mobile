@@ -10,8 +10,6 @@ import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.relayTopicOf
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
-import com.letta.mobile.data.health.IServerHealthRepository
-import com.letta.mobile.data.health.ServerHealthRepository
 import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.session.BackendScopedCache
@@ -348,10 +346,6 @@ abstract class AppModule {
 
 
 
-
-    @Binds
-    @Singleton
-    abstract fun bindServerHealthRepository(impl: ServerHealthRepository): IServerHealthRepository
 
     @Binds
     @Singleton

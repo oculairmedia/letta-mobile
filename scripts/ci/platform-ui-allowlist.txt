@@ -15,9 +15,6 @@ android-compose/app/src/main/java/com/letta/mobile/ui/navigation/AppStartDestina
 android-compose/app/src/main/java/com/letta/mobile/ui/navigation/ConversationsGraph.kt 180 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/agenteditor/AgentEditorScreen.kt 57 container
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/canvas/CanvasScreen.kt 126 legacy-pending(ckmub.2)
-android-compose/app/src/main/java/com/letta/mobile/ui/screens/config/ConfigListScreen.kt 345 legacy-pending(ckmub.2)
-android-compose/app/src/main/java/com/letta/mobile/ui/screens/config/ConfigListViewModel.kt 210 legacy-pending(ckmub.2)
-android-compose/app/src/main/java/com/letta/mobile/ui/screens/config/HealthIndicator.kt 170 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/config/SettingsScreen.kt 131 container
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/pairing/QrScanScreen.kt 145 container
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/systemaccess/SystemAccessDashboardScreen.kt 630 legacy-pending(ckmub.2)

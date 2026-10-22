@@ -4,7 +4,6 @@ import kotlinx.serialization.Serializable
 
 /** letta-mobile-ckmub.2: the shared shell workspace, the app's page; the routes below are Android's own screens. */
 @Serializable data object ShellWorkspaceRoute
-@Serializable data object ConfigListRoute
 @Serializable data object SystemAccessRoute
 @Serializable data object PairingScanRoute
 @Serializable data object PairingInviteRoute

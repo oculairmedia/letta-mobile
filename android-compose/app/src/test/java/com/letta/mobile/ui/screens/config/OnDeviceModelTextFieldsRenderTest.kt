@@ -17,7 +17,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
-import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.settings.SettingsGroup
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
@@ -62,7 +61,6 @@ class OnDeviceModelTextFieldsRenderTest {
     val composeRule = createComposeRule()
 
     private val viewModel = ConfigViewModel(
-        SavedStateHandle(),
         FakeSettingsRepository(),
         RunnableRuntime(),
         mockk<OnDeviceModelImporter>(relaxed = true),

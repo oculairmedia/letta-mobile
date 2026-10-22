@@ -6346,12 +6346,14 @@ public final class com/letta/mobile/ui/settings/BackendConnectionViewsKt {
 
 public final class com/letta/mobile/ui/settings/BackendFormState {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/ui/settings/BackendSettingsForm;Lcom/letta/mobile/data/model/BackendConnectionStatus;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/ui/settings/BackendSettingsForm;Lcom/letta/mobile/data/model/BackendConnectionStatus;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/ui/settings/BackendSettingsForm;Lcom/letta/mobile/data/model/BackendConnectionStatus;Lcom/letta/mobile/ui/settings/SavedBackendsState;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/ui/settings/BackendSettingsForm;Lcom/letta/mobile/data/model/BackendConnectionStatus;Lcom/letta/mobile/ui/settings/SavedBackendsState;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAdding ()Z
 	public final fun getConfig ()Lcom/letta/mobile/data/model/LettaConfig;
 	public final fun getConnection ()Lcom/letta/mobile/data/model/BackendConnectionStatus;
 	public final fun getForm ()Lcom/letta/mobile/ui/settings/BackendSettingsForm;
 	public final fun getOnFormChange ()Lkotlin/jvm/functions/Function1;
+	public final fun getSaved ()Lcom/letta/mobile/ui/settings/SavedBackendsState;
 }
 
 public final class com/letta/mobile/ui/settings/BackendSettingsActions {
@@ -6496,6 +6498,33 @@ public final class com/letta/mobile/ui/settings/ConnectionTest$Testing : com/let
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/settings/SavedBackends {
+	public static final field $stable I
+	public fun <init> (Ljava/util/List;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
+	public final fun getActiveId ()Ljava/lang/String;
+	public final fun getConfigs ()Ljava/util/List;
+	public final fun getOnAdd ()Lkotlin/jvm/functions/Function1;
+	public final fun getOnRemove ()Lkotlin/jvm/functions/Function1;
+	public final fun getOnSwitch ()Lkotlin/jvm/functions/Function1;
+}
+
+public final class com/letta/mobile/ui/settings/SavedBackendsState {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/ui/settings/SavedBackends;ZLkotlin/jvm/functions/Function1;)V
+	public final fun getAdding ()Z
+	public final fun getOnAddingChange ()Lkotlin/jvm/functions/Function1;
+	public final fun getSaved ()Lcom/letta/mobile/ui/settings/SavedBackends;
+}
+
+public final class com/letta/mobile/ui/settings/SavedBackendsTags {
+	public static final field $stable I
+	public static final field ADD Ljava/lang/String;
+	public static final field CANCEL_ADD Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/ui/settings/SavedBackendsTags;
+	public static final field REMOVE_PREFIX Ljava/lang/String;
+	public static final field SAVED Ljava/lang/String;
+}
+
 public final class com/letta/mobile/ui/settings/SettingsContributionSectionKt {
 	public static final fun SettingsContributionSection (Lcom/letta/mobile/data/settings/SettingsContribution;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun SettingsModelSection (Lcom/letta/mobile/data/settings/SettingsSectionModel;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
@@ -6602,16 +6631,18 @@ public final class com/letta/mobile/ui/settings/SettingsPageServices {
 
 public final class com/letta/mobile/ui/settings/SettingsPageState {
 	public static final field $stable I
-	public fun <init> (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/data/model/BackendConnectionStatus;Lcom/letta/mobile/data/shell/ShellSettingsSection;)V
-	public synthetic fun <init> (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/data/model/BackendConnectionStatus;Lcom/letta/mobile/data/shell/ShellSettingsSection;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/data/model/BackendConnectionStatus;Lcom/letta/mobile/data/shell/ShellSettingsSection;Lcom/letta/mobile/ui/settings/SavedBackends;)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/data/model/BackendConnectionStatus;Lcom/letta/mobile/data/shell/ShellSettingsSection;Lcom/letta/mobile/ui/settings/SavedBackends;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/letta/mobile/data/model/LettaConfig;
 	public final fun component2 ()Lcom/letta/mobile/data/model/BackendConnectionStatus;
 	public final fun component3 ()Lcom/letta/mobile/data/shell/ShellSettingsSection;
-	public final fun copy (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/data/model/BackendConnectionStatus;Lcom/letta/mobile/data/shell/ShellSettingsSection;)Lcom/letta/mobile/ui/settings/SettingsPageState;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/settings/SettingsPageState;Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/data/model/BackendConnectionStatus;Lcom/letta/mobile/data/shell/ShellSettingsSection;ILjava/lang/Object;)Lcom/letta/mobile/ui/settings/SettingsPageState;
+	public final fun component4 ()Lcom/letta/mobile/ui/settings/SavedBackends;
+	public final fun copy (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/data/model/BackendConnectionStatus;Lcom/letta/mobile/data/shell/ShellSettingsSection;Lcom/letta/mobile/ui/settings/SavedBackends;)Lcom/letta/mobile/ui/settings/SettingsPageState;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/settings/SettingsPageState;Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/data/model/BackendConnectionStatus;Lcom/letta/mobile/data/shell/ShellSettingsSection;Lcom/letta/mobile/ui/settings/SavedBackends;ILjava/lang/Object;)Lcom/letta/mobile/ui/settings/SettingsPageState;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getConfig ()Lcom/letta/mobile/data/model/LettaConfig;
 	public final fun getConnection ()Lcom/letta/mobile/data/model/BackendConnectionStatus;
+	public final fun getSaved ()Lcom/letta/mobile/ui/settings/SavedBackends;
 	public final fun getSection ()Lcom/letta/mobile/data/shell/ShellSettingsSection;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
