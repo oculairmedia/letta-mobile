@@ -204,26 +204,25 @@ private enum class InsetInk {
 internal class OutputWindow private constructor(val text: String, val visibleLines: Int, val hiddenLines: Int) {
     companion object {
         fun tail(raw: String, maxLines: Int = ChatRowDimens.toolOutputVisibleLines): OutputWindow {
-            var end = raw.length
-            while (end > 0 && raw[end - 1].isWhitespace()) end--
-            var start = end
-            var kept = 1
-            while (start > 0) {
-                if (raw[start - 1] == '\n') {
-                    if (kept == maxLines) break
-                    kept++
-                }
-                start--
-            }
-            val hidden = if (start == 0) 0 else raw.count(0, start) { it == '\n' }
-            return OutputWindow(raw.substring(start, end), if (end == 0) 0 else kept, hidden)
+            val end = raw.indexOfLast { !it.isWhitespace() } + 1
+            if (end == 0) return OutputWindow("", 0, 0)
+            val start = startOfLastLines(raw, end, maxLines)
+            val kept = newlinesIn(raw, start, end) + 1
+            return OutputWindow(raw.substring(start, end), kept, newlinesIn(raw, 0, start))
         }
 
-        private inline fun String.count(from: Int, until: Int, predicate: (Char) -> Boolean): Int {
-            var count = 0
-            for (index in from until until) if (predicate(this[index])) count++
-            return count
+        /** Where the last [maxLines] lines before [end] begin, walking back newline by newline. */
+        private fun startOfLastLines(raw: String, end: Int, maxLines: Int): Int {
+            var start = end
+            repeat(maxLines) {
+                val newline = raw.lastIndexOf('\n', start - 1)
+                if (newline < 0) return 0
+                start = newline
+            }
+            return start + 1
         }
+
+        private fun newlinesIn(raw: String, from: Int, until: Int): Int = (from until until).count { raw[it] == '\n' }
     }
 }
 
