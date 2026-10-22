@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.transport.teardown.TransportTeardown
 import com.letta.mobile.data.controller.reconnect.AppServerClientGeneration
 import com.letta.mobile.data.transport.appserver.AppServerConnectionState
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
@@ -52,7 +53,7 @@ internal class DesktopIrohGenerationMinter(
         val endpoint = Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode(), secretKey = identity()))
         val generationJob = Job(scope.coroutineContext.job)
         val state = MutableStateFlow<AppServerConnectionState>(AppServerConnectionState.Connecting)
-        var resources: DesktopTransportResources? = null
+        var resources: TransportTeardown? = null
         val close: (String?) -> Unit = { reason ->
             resources?.close() ?: closeEndpoint(endpoint)
             generationJob.cancel(CancellationException(reason ?: "Iroh generation closed"))
@@ -65,7 +66,7 @@ internal class DesktopIrohGenerationMinter(
                 endpoint = AppServerEndpoint(scheme = "iroh", address = IrohChannelTransport.normalizeIrohAddress(serverUrl)),
                 scope = CoroutineScope(scope.coroutineContext + generationJob),
             ) as IrohAppServerTransport
-            resources = DesktopTransportResources(endpoint, transport)
+            resources = TransportTeardown(listOf({ transport.close() }, { endpoint.shutdown() }, { endpoint.close() }))
             transport.awaitConnectionReady()
             val client = DefaultAppServerClient(transport, parentScope = CoroutineScope(scope.coroutineContext + generationJob))
             authenticate(client, state)
@@ -90,6 +91,6 @@ internal class DesktopIrohGenerationMinter(
     }
 
     private fun closeEndpoint(endpoint: Endpoint) {
-        DesktopTransportResources(teardownSteps = listOf({ endpoint.shutdown() }, { endpoint.close() })).close()
+        TransportTeardown(listOf({ endpoint.shutdown() }, { endpoint.close() })).close()
     }
 }

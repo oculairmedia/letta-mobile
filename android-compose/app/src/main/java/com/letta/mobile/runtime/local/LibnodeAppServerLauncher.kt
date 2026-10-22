@@ -7,7 +7,9 @@ import com.letta.mobile.data.runtime.host.LocalAppServerStartException
 import java.io.File
 import java.io.IOException
 import javax.inject.Inject
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.consumeAsFlow
@@ -27,6 +29,9 @@ class LibnodeAppServerLauncher @Inject constructor(
     private val node: EmbeddedNode,
 ) : LocalAppServerLauncher {
     override val singleLaunch: Boolean = true
+
+    /** Asset extraction and the node start block; the host may be acquired from the main thread. */
+    override val blockingContext: CoroutineContext = Dispatchers.IO
 
     override fun start(launch: LocalAppServerLaunch, tokenFile: String, token: String): LocalAppServerProcess {
         try {

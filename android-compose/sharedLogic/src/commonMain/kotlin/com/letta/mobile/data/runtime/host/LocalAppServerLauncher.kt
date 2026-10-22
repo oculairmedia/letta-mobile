@@ -1,5 +1,7 @@
 package com.letta.mobile.data.runtime.host
 
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -33,6 +35,13 @@ fun interface LocalAppServerLauncher {
      * the host then never stops it when idle and never restarts it.
      */
     val singleLaunch: Boolean get() = false
+
+    /**
+     * Where the host runs this platform's blocking launch work: preparing a launch and [start]. The
+     * host may be acquired from a UI thread, so a platform that extracts assets or spawns a process
+     * binds its IO dispatcher here; the default runs that work in the caller's context.
+     */
+    val blockingContext: CoroutineContext get() = EmptyCoroutineContext
 
     /**
      * Writes [token] to [tokenFile], readable by this user only and creating its directory, then

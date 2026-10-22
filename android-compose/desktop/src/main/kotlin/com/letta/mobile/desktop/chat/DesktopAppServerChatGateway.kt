@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.transport.teardown.TransportTeardown
 import com.letta.mobile.data.chat.branch.ConversationForkGateway
 import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
@@ -123,7 +124,7 @@ class DesktopAppServerChatGateway internal constructor(
     private val admin: AppServerLocalAdminGateway = AppServerLocalAdminGateway(client) { operation ->
         "desktop-local-$operation-${UUID.randomUUID()}"
     },
-    private val transportResources: DesktopTransportResources? = null,
+    private val transportResources: TransportTeardown? = null,
     private val onClose: (() -> Unit)? = null,
     override val permissionModes: PermissionModeRegistry? = null,
     private val heartbeatIntervalMs: Long = IrohAdminRpcChatGateway.STREAM_HEARTBEAT_INTERVAL_MS,

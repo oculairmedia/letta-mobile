@@ -41730,6 +41730,7 @@ public final class com/letta/mobile/data/runtime/host/JvmLocalAppServerLauncher 
 	public fun <init> ()V
 	public fun <init> (Lkotlin/jvm/functions/Function1;J)V
 	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun getBlockingContext ()Lkotlin/coroutines/CoroutineContext;
 	public fun getSingleLaunch ()Z
 	public fun start (Lcom/letta/mobile/data/runtime/host/LocalAppServerLaunch;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/runtime/host/LocalAppServerProcess;
 }
@@ -41782,11 +41783,13 @@ public final class com/letta/mobile/data/runtime/host/LocalAppServerLaunch {
 }
 
 public abstract interface class com/letta/mobile/data/runtime/host/LocalAppServerLauncher {
+	public fun getBlockingContext ()Lkotlin/coroutines/CoroutineContext;
 	public fun getSingleLaunch ()Z
 	public abstract fun start (Lcom/letta/mobile/data/runtime/host/LocalAppServerLaunch;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/runtime/host/LocalAppServerProcess;
 }
 
 public final class com/letta/mobile/data/runtime/host/LocalAppServerLauncher$DefaultImpls {
+	public static fun getBlockingContext (Lcom/letta/mobile/data/runtime/host/LocalAppServerLauncher;)Lkotlin/coroutines/CoroutineContext;
 	public static fun getSingleLaunch (Lcom/letta/mobile/data/runtime/host/LocalAppServerLauncher;)Z
 }
 
@@ -61683,6 +61686,18 @@ public final class com/letta/mobile/data/transport/iroh/RuntimeEventServerFrameM
 	public final fun getTurnId ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/transport/teardown/TransportTeardown : java/lang/AutoCloseable {
+	public static final field Companion Lcom/letta/mobile/data/transport/teardown/TransportTeardown$Companion;
+	public static final field STEP_TIMEOUT_MS J
+	public fun <init> (Ljava/util/List;JLjava/util/concurrent/Executor;)V
+	public synthetic fun <init> (Ljava/util/List;JLjava/util/concurrent/Executor;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun close ()V
+	public final fun closeAsync ()Ljava/util/concurrent/Future;
+}
+
+public final class com/letta/mobile/data/transport/teardown/TransportTeardown$Companion {
 }
 
 public final class com/letta/mobile/data/workspace/AppServerWorkspaceFileSource : com/letta/mobile/data/workspace/WorkspaceFileSource {
