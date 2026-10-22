@@ -148,17 +148,6 @@ class AdminRpcRouter(
         }
     }
 
-    /** Names a handler that took [SLOW_HANDLER_MS] or more, with its response size: the only per-call timing the host keeps. */
-    private fun reportIfSlow(invocation: AdminRpcInvocation, startedNs: Long, responseChars: Int) {
-        val tookMs = (System.nanoTime() - startedNs) / NANOS_PER_MILLI
-        if (tookMs < SLOW_HANDLER_MS) return
-        Telemetry.event(
-            "AdminRpc", "handler.slow",
-            "method" to invocation.method, "responseChars" to responseChars,
-            durationMs = tookMs, level = Telemetry.Level.WARN,
-        )
-    }
-
     private fun encodeFailure(requestId: String, message: String): String =
         json.encodeToString(
             kotlinx.serialization.serializer(),
@@ -170,6 +159,3 @@ class AdminRpcRouter(
             },
         )
 }
-
-private const val SLOW_HANDLER_MS = 250L
-private const val NANOS_PER_MILLI = 1_000_000L

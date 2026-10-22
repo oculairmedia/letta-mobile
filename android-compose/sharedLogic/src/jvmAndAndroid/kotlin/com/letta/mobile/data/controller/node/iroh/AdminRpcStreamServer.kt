@@ -271,7 +271,7 @@ internal class AdminRpcStreamServer(
             val type = obj["type"]?.jsonPrimitive?.contentOrNull
             val requestId = obj["request_id"]?.jsonPrimitive?.contentOrNull
             val method = obj["method"]?.jsonPrimitive?.contentOrNull
-            noteReceived(type, requestId, method)
+            noteReceived(obj)
             if (type != "admin_rpc") {
                 errorEnvelope(requestId ?: "", "Expected admin_rpc frame")
             } else if (!authenticated.get()) {
@@ -295,12 +295,15 @@ internal class AdminRpcStreamServer(
     }
 
     /** One line per request, except health.check: a client's keep-alive poll was two thirds of every admin_rpc line. */
-    private fun noteReceived(type: String?, requestId: String?, method: String?) {
+    private fun noteReceived(frame: JsonObject) {
+        val method = frame["method"]?.jsonPrimitive?.contentOrNull
         if (method == HEALTH_CHECK_METHOD) return
         Telemetry.event(
             "IrohNode", "admin_rpc.stream.recv",
             "remoteEndpointId" to remoteEndpointId,
-            "type" to type, "requestId" to requestId, "method" to method,
+            "type" to frame["type"]?.jsonPrimitive?.contentOrNull,
+            "requestId" to frame["request_id"]?.jsonPrimitive?.contentOrNull,
+            "method" to method,
         )
     }
 
