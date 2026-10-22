@@ -4525,6 +4525,27 @@ abstract interface com.letta.mobile.data.notify/AttentionPrefsRepository { // co
     abstract fun setApprovalNotificationsEnabled(kotlin/Boolean) // com.letta.mobile.data.notify/AttentionPrefsRepository.setApprovalNotificationsEnabled|setApprovalNotificationsEnabled(kotlin.Boolean){}[0]
 }
 
+abstract interface com.letta.mobile.data.pairing.composition/PairingNetwork { // com.letta.mobile.data.pairing.composition/PairingNetwork|null[0]
+    abstract fun nodeIdOf(kotlin/ByteArray): kotlin/String // com.letta.mobile.data.pairing.composition/PairingNetwork.nodeIdOf|nodeIdOf(kotlin.ByteArray){}[0]
+    abstract fun redeemer(kotlin.coroutines/SuspendFunction0<kotlin/ByteArray>): com.letta.mobile.data.pairing/PairingRedeemer // com.letta.mobile.data.pairing.composition/PairingNetwork.redeemer|redeemer(kotlin.coroutines.SuspendFunction0<kotlin.ByteArray>){}[0]
+}
+
+abstract interface com.letta.mobile.data.pairing.composition/PairingPorts { // com.letta.mobile.data.pairing.composition/PairingPorts|null[0]
+    abstract val adminRpc // com.letta.mobile.data.pairing.composition/PairingPorts.adminRpc|{}adminRpc[0]
+        abstract fun <get-adminRpc>(): com.letta.mobile.data.repository.modelcontrol/AdminRpcInvoker? // com.letta.mobile.data.pairing.composition/PairingPorts.adminRpc.<get-adminRpc>|<get-adminRpc>(){}[0]
+    abstract val deviceName // com.letta.mobile.data.pairing.composition/PairingPorts.deviceName|{}deviceName[0]
+        abstract fun <get-deviceName>(): kotlin/String // com.letta.mobile.data.pairing.composition/PairingPorts.deviceName.<get-deviceName>|<get-deviceName>(){}[0]
+    abstract val hostStore // com.letta.mobile.data.pairing.composition/PairingPorts.hostStore|{}hostStore[0]
+        abstract fun <get-hostStore>(): com.letta.mobile.data.pairing/PairedHostStore // com.letta.mobile.data.pairing.composition/PairingPorts.hostStore.<get-hostStore>|<get-hostStore>(){}[0]
+    abstract val network // com.letta.mobile.data.pairing.composition/PairingPorts.network|{}network[0]
+        abstract fun <get-network>(): com.letta.mobile.data.pairing.composition/PairingNetwork // com.letta.mobile.data.pairing.composition/PairingPorts.network.<get-network>|<get-network>(){}[0]
+    abstract val qrEncoder // com.letta.mobile.data.pairing.composition/PairingPorts.qrEncoder|{}qrEncoder[0]
+        abstract fun <get-qrEncoder>(): com.letta.mobile.data.pairing/QrEncoder // com.letta.mobile.data.pairing.composition/PairingPorts.qrEncoder.<get-qrEncoder>|<get-qrEncoder>(){}[0]
+
+    abstract fun nowMs(): kotlin/Long // com.letta.mobile.data.pairing.composition/PairingPorts.nowMs|nowMs(){}[0]
+    abstract suspend fun loadIdentityKey(): kotlin/ByteArray // com.letta.mobile.data.pairing.composition/PairingPorts.loadIdentityKey|loadIdentityKey(){}[0]
+}
+
 abstract interface com.letta.mobile.data.pairing/BackendConfigSink { // com.letta.mobile.data.pairing/BackendConfigSink|null[0]
     abstract fun currentConfigs(): kotlin.collections/List<com.letta.mobile.data.model/LettaConfig> // com.letta.mobile.data.pairing/BackendConfigSink.currentConfigs|currentConfigs(){}[0]
     abstract suspend fun activate(kotlin/String) // com.letta.mobile.data.pairing/BackendConfigSink.activate|activate(kotlin.String){}[0]
@@ -46139,6 +46160,20 @@ final class com.letta.mobile.data.onboarding/OnboardingTask { // com.letta.mobil
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.onboarding/OnboardingTask.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.onboarding/OnboardingTask.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.onboarding/OnboardingTask.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.pairing.composition/PairingComposition { // com.letta.mobile.data.pairing.composition/PairingComposition|null[0]
+    constructor <init>(com.letta.mobile.data.pairing.composition/PairingPorts) // com.letta.mobile.data.pairing.composition/PairingComposition.<init>|<init>(com.letta.mobile.data.pairing.composition.PairingPorts){}[0]
+
+    final val adminRpc // com.letta.mobile.data.pairing.composition/PairingComposition.adminRpc|{}adminRpc[0]
+        final fun <get-adminRpc>(): com.letta.mobile.data.repository.modelcontrol/AdminRpcInvoker? // com.letta.mobile.data.pairing.composition/PairingComposition.adminRpc.<get-adminRpc>|<get-adminRpc>(){}[0]
+    final val qrEncoder // com.letta.mobile.data.pairing.composition/PairingComposition.qrEncoder|{}qrEncoder[0]
+        final fun <get-qrEncoder>(): com.letta.mobile.data.pairing/QrEncoder // com.letta.mobile.data.pairing.composition/PairingComposition.qrEncoder.<get-qrEncoder>|<get-qrEncoder>(){}[0]
+
+    final fun inviteSession(com.letta.mobile.data.repository.modelcontrol/AdminRpcInvoker, kotlinx.coroutines/CoroutineScope): com.letta.mobile.data.pairing/PairInviteSession // com.letta.mobile.data.pairing.composition/PairingComposition.inviteSession|inviteSession(com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker;kotlinx.coroutines.CoroutineScope){}[0]
+    final fun joinFlow(): com.letta.mobile.data.pairing/PairingFlow // com.letta.mobile.data.pairing.composition/PairingComposition.joinFlow|joinFlow(){}[0]
+    final fun nowMs(): kotlin/Long // com.letta.mobile.data.pairing.composition/PairingComposition.nowMs|nowMs(){}[0]
+    final suspend fun selfNodeId(): kotlin/String? // com.letta.mobile.data.pairing.composition/PairingComposition.selfNodeId|selfNodeId(){}[0]
 }
 
 final class com.letta.mobile.data.pairing/MintedPairInvite { // com.letta.mobile.data.pairing/MintedPairInvite|null[0]

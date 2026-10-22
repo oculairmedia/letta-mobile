@@ -31,6 +31,8 @@ data class SettingsDestinations(
     val onProviders: () -> Unit = {},
     /** Null while the host does not run plugins: the Plugins entry is hidden (letta-mobile-cdgpr.8). */
     val onPlugins: (() -> Unit)? = null,
+    /** The camera scanner for a host's pairing QR (letta-mobile-wisqe.1). */
+    val onScanToConnect: () -> Unit = {},
 )
 
 /** Whether the app is exempt from battery optimization, and how to ask for the exemption. */

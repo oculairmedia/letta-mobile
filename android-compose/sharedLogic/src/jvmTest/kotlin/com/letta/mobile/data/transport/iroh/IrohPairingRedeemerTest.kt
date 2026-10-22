@@ -5,13 +5,14 @@ import com.letta.mobile.data.pairing.PairedHost
 import com.letta.mobile.data.pairing.PairingError
 import com.letta.mobile.data.pairing.RedeemOutcome
 import com.letta.mobile.data.pairing.ScannedInvite
+import com.letta.mobile.data.pairing.composition.IrohPairingNetwork
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.test.runTest
 
 class IrohPairingRedeemerTest {
     private val nodeId = "ab".repeat(32)
@@ -76,5 +77,19 @@ class IrohPairingRedeemerTest {
             RedeemOutcome.Failed(PairingError.HOST_MISMATCH),
             neverCalled.redeem(invite("${"cd".repeat(32)}@10.0.0.2:1"), "pixel"),
         )
+    }
+
+    @Test
+    fun theIrohNetworkRedeemsThroughItsSeamWithTheIdentityPort() = runTest {
+        var loads = 0
+        var seenKey: ByteArray? = null
+        val network = IrohPairingNetwork { secretKey, _ ->
+            seenKey = secretKey
+            response(success = true)
+        }
+        val outcome = network.redeemer { loads++; key }.redeem(invite(null), "pixel")
+        assertEquals(RedeemOutcome.Paired(PairedHost(nodeId, nodeId), alreadyPaired = false), outcome)
+        assertEquals(1, loads)
+        assertContentEquals(key, seenKey)
     }
 }

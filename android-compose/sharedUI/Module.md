@@ -168,6 +168,10 @@ Per-agent notification preference controls. Provide [AttentionPrefsRepository](h
 
 Install/pair, invite, scanner and paired-device components. [PairDeviceBinding](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.pairing/-pair-device-binding/index.html), scan inputs and action callbacks connect host services; invite verification, identity storage and trust decisions stay outside the displayed cards.
 
+# Package com.letta.mobile.ui.pairing.composition
+
+Builds the install-and-pair card's bindings the same way on every client. A platform implements the pairing ports and [PairingShellPorts](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.pairing.composition/-pairing-shell-ports/index.html) (roster, pending deep link, chat navigation, share target) and calls [installAndPairBindings](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.pairing.composition/install-and-pair-bindings.html); it never constructs the card's flow or bindings itself.
+
 # Package com.letta.mobile.ui.providers.icons
 
 Provider-brand renderers and icon lookup. Consume [ProviderIcon](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.providers.icons/-provider-icon.html) and its lookup catalog directly; authentication and provider capability discovery stay outside brand artwork.

@@ -4,7 +4,6 @@
 # <platform> <Contract> alone means the platform does not construct a core contract
 # (scripts/ci/parity/parity-contracts.txt) at all.
 android BackendSettingsActions.onIrohIdentityReset | android leaves onIrohIdentityReset unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
-android BackendSettingsActions.onScanToConnect | android leaves onScanToConnect unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
 android ChatSurfaceCapabilities.editAndResend | capability editAndResend not supported on android yet (letta-mobile-ckmub.2)
 android ChatSurfaceCapabilities.fork | capability fork not supported on android yet (letta-mobile-ckmub.2)
 android ChatSurfaceCapabilities.nameForks | capability nameForks not supported on android yet (letta-mobile-ckmub.2)
@@ -21,7 +20,6 @@ android LocalAppServerHost.policy | test seam with a production default (clock/t
 android LocalAppServerHost.readyTimeoutMs | test seam with a production default (clock/token/timeout/policy), not a platform capability (letta-mobile-ckmub.2)
 android SettingsContribution.needsHost | per-contribution option left unbound (default, null, empty or false); bind it or make it required (letta-mobile-ckmub.2)
 android SettingsContribution.updates | per-contribution option left unbound (default, null, empty or false); bind it or make it required (letta-mobile-ckmub.2)
-android SettingsPageServices.pairing | android leaves pairing unbound (default, null, empty or false); bind it (letta-mobile-ckmub.2)
 android ShellChatOptionsActions.onAutoPinNewChatsChange | Android binds the legacy drawer, not the shared shell; Android hard cut letta-mobile-ckmub.2
 desktop BackendSettingsActions.onScanToConnect | desktop leaves onScanToConnect unbound (default, null, empty or false); bind it (letta-mobile-7d9ua)
 desktop ChatSurfaceCapabilities.editAndResend | capability editAndResend not supported on desktop yet (letta-mobile-7d9ua)
@@ -34,7 +32,6 @@ desktop ChatSurfaceCapabilities.search | capability search not supported on desk
 desktop ChatSurfaceCapabilities.workingDirectory | platform-only by design (ckmub.17.8; letta-mobile-7d9ua): no local working directory on this platform yet
 desktop ChatSurfaceHost.openSubagent | desktop leaves openSubagent unbound (default, null, empty or false); bind it (letta-mobile-7d9ua)
 desktop ChatSurfaceHost.showOnCanvas | desktop leaves showOnCanvas unbound (default, null, empty or false); bind it (letta-mobile-7d9ua)
-desktop InstallAndPairBindings.onShareLink | desktop leaves onShareLink unbound (default, null, empty or false); bind it (letta-mobile-7d9ua)
 desktop LettaTabStripActions.newLabel | desktop leaves newLabel unbound (default, null, empty or false); bind it (letta-mobile-7d9ua)
 desktop LocalAppServerHost.clockMs | test seam with a production default (clock/token/timeout/policy), not a platform capability (letta-mobile-7d9ua)
 desktop LocalAppServerHost.newToken | test seam with a production default (clock/token/timeout/policy), not a platform capability (letta-mobile-7d9ua)

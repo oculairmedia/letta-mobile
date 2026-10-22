@@ -217,7 +217,6 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/plugin/view/Plu
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/plugin/view/PluginPageServer.kt 98
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/plugin/view/PluginPageShim.kt 16
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/plugin/view/PluginViewWork.kt 19
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/qr/DesktopPairingBindings.kt 65
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/runtime/DesktopGitEnvironment.kt 196
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/runtime/DesktopLettaCodeRuntime.kt 203
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/runtime/DesktopListenerSpawnRegistry.kt 185
