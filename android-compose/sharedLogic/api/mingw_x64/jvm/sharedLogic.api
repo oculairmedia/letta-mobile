@@ -9780,12 +9780,6 @@ public final class com/letta/mobile/data/chat/runtime/ChatScreenStatusKt {
 	public static final fun shouldShowStatePanel (Lcom/letta/mobile/data/chat/runtime/ChatScreenStatus;Lcom/letta/mobile/data/chat/runtime/ChatSessionState;)Z
 }
 
-public abstract interface class com/letta/mobile/data/chat/runtime/ChatSessionGraph {
-	public abstract fun close ()V
-	public abstract fun getGateway ()Lcom/letta/mobile/data/chat/runtime/ChatGateway;
-	public abstract fun getRepositories ()Lcom/letta/mobile/data/session/SessionRepositoryGraph;
-}
-
 public final class com/letta/mobile/data/chat/runtime/ChatSessionReducer {
 	public static final field INSTANCE Lcom/letta/mobile/data/chat/runtime/ChatSessionReducer;
 	public final fun attachImage (Lcom/letta/mobile/data/chat/runtime/ChatSessionState;Lcom/letta/mobile/data/model/MessageContentPart$Image;Lcom/letta/mobile/data/attachment/AttachmentLimits;)Lcom/letta/mobile/data/chat/runtime/ChatSessionState;

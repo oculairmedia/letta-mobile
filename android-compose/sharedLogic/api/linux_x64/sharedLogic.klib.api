@@ -3846,15 +3846,6 @@ abstract interface <#A: kotlin/Any?> com.letta.mobile.data.document/DocumentSnap
         abstract fun <get-updatedAtEpochMs>(): kotlin/Long // com.letta.mobile.data.document/DocumentSnapshot.updatedAtEpochMs.<get-updatedAtEpochMs>|<get-updatedAtEpochMs>(){}[0]
 }
 
-abstract interface <#A: out com.letta.mobile.data.session/SessionRepositoryGraph> com.letta.mobile.data.chat.runtime/ChatSessionGraph { // com.letta.mobile.data.chat.runtime/ChatSessionGraph|null[0]
-    abstract val gateway // com.letta.mobile.data.chat.runtime/ChatSessionGraph.gateway|{}gateway[0]
-        abstract fun <get-gateway>(): com.letta.mobile.data.chat.runtime/ChatGateway // com.letta.mobile.data.chat.runtime/ChatSessionGraph.gateway.<get-gateway>|<get-gateway>(){}[0]
-    abstract val repositories // com.letta.mobile.data.chat.runtime/ChatSessionGraph.repositories|{}repositories[0]
-        abstract fun <get-repositories>(): #A // com.letta.mobile.data.chat.runtime/ChatSessionGraph.repositories.<get-repositories>|<get-repositories>(){}[0]
-
-    abstract fun close() // com.letta.mobile.data.chat.runtime/ChatSessionGraph.close|close(){}[0]
-}
-
 abstract interface <#A: out com.letta.mobile.data.session/SessionRepositoryGraph> com.letta.mobile.data.session/SessionRepositoryGraphFactory { // com.letta.mobile.data.session/SessionRepositoryGraphFactory|null[0]
     abstract fun create(): #A // com.letta.mobile.data.session/SessionRepositoryGraphFactory.create|create(){}[0]
 }

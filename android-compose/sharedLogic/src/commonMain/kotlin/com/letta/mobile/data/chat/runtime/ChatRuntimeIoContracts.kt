@@ -4,7 +4,6 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LlmModel
-import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.timeline.TimelineTransport
 
 /**
@@ -78,11 +77,4 @@ interface ChatGatewayExtras {
  */
 interface ConnectionStatusGateway {
     val connectionState: kotlinx.coroutines.flow.StateFlow<com.letta.mobile.data.transport.ChannelTransportState>
-}
-
-interface ChatSessionGraph<out Repositories : SessionRepositoryGraph> {
-    val repositories: Repositories
-    val gateway: ChatGateway
-
-    fun close()
 }
