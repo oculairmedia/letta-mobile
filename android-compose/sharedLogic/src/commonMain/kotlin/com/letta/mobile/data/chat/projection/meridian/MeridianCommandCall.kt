@@ -1,6 +1,6 @@
 package com.letta.mobile.data.chat.projection.meridian
 
-import com.letta.mobile.data.chat.tools.ShellTools
+import com.letta.mobile.data.chat.tools.shell.ShellTools
 import com.letta.mobile.data.model.ToolCall
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull

@@ -10528,8 +10528,8 @@ public final class com/letta/mobile/data/chat/send/ServerQueueBlocker : java/lan
 }
 
 public final class com/letta/mobile/data/chat/tools/CommandMatch {
-	public fun <init> (Lcom/letta/mobile/data/chat/tools/CommandPresenter;Lcom/letta/mobile/data/chat/tools/ShellCommandLine;)V
-	public final fun getCommand ()Lcom/letta/mobile/data/chat/tools/ShellCommandLine;
+	public fun <init> (Lcom/letta/mobile/data/chat/tools/CommandPresenter;Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;)V
+	public final fun getCommand ()Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;
 	public final fun getPresenter ()Lcom/letta/mobile/data/chat/tools/CommandPresenter;
 }
 
@@ -10544,15 +10544,19 @@ public final class com/letta/mobile/data/chat/tools/CommandMatcher {
 	public final fun getProgram ()Ljava/lang/String;
 	public final fun getSubcommands ()Ljava/util/List;
 	public fun hashCode ()I
-	public final fun specificity (Lcom/letta/mobile/data/chat/tools/ShellCommandLine;)Ljava/lang/Integer;
+	public final fun specificity (Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;)Ljava/lang/Integer;
 	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class com/letta/mobile/data/chat/tools/CommandPresenter {
 	public abstract fun getId ()Ljava/lang/String;
 	public abstract fun getMatcher ()Lcom/letta/mobile/data/chat/tools/CommandMatcher;
-	public abstract fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ShellCommandLine;)Lcom/letta/mobile/data/chat/tools/ToolInset;
-	public abstract fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ShellCommandLine;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+	public abstract fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public abstract fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+}
+
+public final class com/letta/mobile/data/chat/tools/CommandPresenterKt {
+	public static final fun shellCommandInset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;)Lcom/letta/mobile/data/chat/tools/ToolInset;
 }
 
 public final class com/letta/mobile/data/chat/tools/CommandPresenterRegistry {
@@ -10640,71 +10644,12 @@ public final class com/letta/mobile/data/chat/tools/GenericToolPresenter : com/l
 	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
 }
 
-public final class com/letta/mobile/data/chat/tools/ShellCommand {
-	public fun <init> (Ljava/util/List;Ljava/lang/String;ZZ)V
-	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/util/List;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun component3 ()Z
-	public final fun component4 ()Z
-	public final fun copy (Ljava/util/List;Ljava/lang/String;ZZ)Lcom/letta/mobile/data/chat/tools/ShellCommand;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ShellCommand;Ljava/util/List;Ljava/lang/String;ZZILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ShellCommand;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getPiped ()Z
-	public final fun getStdin ()Ljava/lang/String;
-	public final fun getStdinFromFile ()Z
-	public final fun getWords ()Ljava/util/List;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/data/chat/tools/ShellCommandLine {
-	public fun <init> (Ljava/util/List;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/util/List;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun copy (Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ShellCommandLine;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ShellCommandLine;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ShellCommandLine;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun flag (Ljava/lang/String;)Ljava/lang/String;
-	public final fun getArgs ()Ljava/util/List;
-	public final fun getProgram ()Ljava/lang/String;
-	public final fun getStdin ()Ljava/lang/String;
-	public final fun getWords ()Ljava/util/List;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/letta/mobile/data/chat/tools/ShellScript {
-	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/ShellScript;
-	public final fun scan (Ljava/lang/String;)Ljava/util/List;
-}
-
-public final class com/letta/mobile/data/chat/tools/ShellTools {
-	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/ShellTools;
-	public final fun argvScript (Ljava/util/List;)Ljava/lang/String;
-	public final fun commandInset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;)Lcom/letta/mobile/data/chat/tools/ToolInset;
-	public final fun commandsOf (Ljava/lang/String;)Ljava/util/List;
-	public final fun getNAMES ()Ljava/util/Set;
-	public final fun isShellTool (Ljava/lang/String;)Z
-	public final fun scriptOf (Lkotlinx/serialization/json/JsonObject;)Ljava/lang/String;
-}
-
-public final class com/letta/mobile/data/chat/tools/ShellToolsKt {
-	public static final fun argvWords (Ljava/util/List;)Ljava/util/List;
-	public static final fun asShellScript (Ljava/util/List;)Ljava/lang/String;
-	public static final fun isShellProgram (Ljava/lang/String;)Z
-	public static final fun isShellScriptFlag (Ljava/lang/String;)Z
-	public static final fun programWords (Lcom/letta/mobile/data/chat/tools/ShellCommand;)Ljava/util/List;
-	public static final fun shellQuoted (Ljava/lang/String;)Ljava/lang/String;
-}
-
 public final class com/letta/mobile/data/chat/tools/SpecCommandPresenter : com/letta/mobile/data/chat/tools/CommandPresenter {
 	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/data/chat/tools/CommandPresenterSpec;)V
 	public fun getId ()Ljava/lang/String;
 	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/CommandMatcher;
-	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ShellCommandLine;)Lcom/letta/mobile/data/chat/tools/ToolInset;
-	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ShellCommandLine;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
 }
 
 public final class com/letta/mobile/data/chat/tools/SpecToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
@@ -11141,6 +11086,65 @@ public final class com/letta/mobile/data/chat/tools/bundled/BashToolPresenter : 
 public final class com/letta/mobile/data/chat/tools/bundled/BundledToolPresenters {
 	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/BundledToolPresenters;
 	public final fun getRegistry ()Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;
+}
+
+public final class com/letta/mobile/data/chat/tools/shell/ShellCommand {
+	public fun <init> (Ljava/util/List;Ljava/lang/String;ZZ)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun copy (Ljava/util/List;Ljava/lang/String;ZZ)Lcom/letta/mobile/data/chat/tools/shell/ShellCommand;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/shell/ShellCommand;Ljava/util/List;Ljava/lang/String;ZZILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/shell/ShellCommand;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPiped ()Z
+	public final fun getStdin ()Ljava/lang/String;
+	public final fun getStdinFromFile ()Z
+	public final fun getWords ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/shell/ShellCommandLine {
+	public fun <init> (Ljava/util/List;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/shell/ShellCommandLine;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun flag (Ljava/lang/String;)Ljava/lang/String;
+	public final fun getArgs ()Ljava/util/List;
+	public final fun getProgram ()Ljava/lang/String;
+	public final fun getStdin ()Ljava/lang/String;
+	public final fun getWords ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/shell/ShellScript {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/shell/ShellScript;
+	public final fun scan (Ljava/lang/String;)Ljava/util/List;
+}
+
+public final class com/letta/mobile/data/chat/tools/shell/ShellTools {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/shell/ShellTools;
+	public final fun argvScript (Ljava/util/List;)Ljava/lang/String;
+	public final fun commandsOf (Ljava/lang/String;)Ljava/util/List;
+	public final fun getNAMES ()Ljava/util/Set;
+	public final fun getWORKDIR_KEYS ()Ljava/util/List;
+	public final fun isShellTool (Ljava/lang/String;)Z
+	public final fun scriptOf (Lkotlinx/serialization/json/JsonObject;)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/shell/ShellToolsKt {
+	public static final fun argvWords (Ljava/util/List;)Ljava/util/List;
+	public static final fun asShellScript (Ljava/util/List;)Ljava/lang/String;
+	public static final fun isShellProgram (Ljava/lang/String;)Z
+	public static final fun isShellScriptFlag (Ljava/lang/String;)Z
+	public static final fun programWords (Lcom/letta/mobile/data/chat/tools/shell/ShellCommand;)Ljava/util/List;
+	public static final fun shellQuoted (Ljava/lang/String;)Ljava/lang/String;
 }
 
 public final class com/letta/mobile/data/commands/AgentSlashCommand {
@@ -33661,6 +33665,10 @@ public final class com/letta/mobile/data/plugin/PluginToolDefinition {
 	public final fun getPluginId ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/plugin/PluginToolPresentersKt {
+	public static final fun contributedBy (Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;Ljava/util/List;)Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;
 }
 
 public abstract interface class com/letta/mobile/data/plugin/PluginTransition {

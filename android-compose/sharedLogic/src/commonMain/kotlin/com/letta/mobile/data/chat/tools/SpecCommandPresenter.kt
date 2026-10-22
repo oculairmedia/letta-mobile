@@ -1,5 +1,8 @@
 package com.letta.mobile.data.chat.tools
 
+import com.letta.mobile.data.chat.tools.shell.ShellCommandLine
+import com.letta.mobile.data.chat.tools.shell.asShellScript
+
 /** A [CommandPresenterSpec] as a [CommandPresenter]: what a plugin's manifest contributes. */
 class SpecCommandPresenter(override val id: String, private val spec: CommandPresenterSpec) : CommandPresenter {
     override val matcher: CommandMatcher = CommandMatcher(spec.program, spec.subcommands)
@@ -12,5 +15,5 @@ class SpecCommandPresenter(override val id: String, private val spec: CommandPre
         presenterId = id,
     )
 
-    override fun inset(call: ToolCallFacts, command: ShellCommandLine): ToolInset? = ShellTools.commandInset(call)
+    override fun inset(call: ToolCallFacts, command: ShellCommandLine): ToolInset? = shellCommandInset(call)
 }

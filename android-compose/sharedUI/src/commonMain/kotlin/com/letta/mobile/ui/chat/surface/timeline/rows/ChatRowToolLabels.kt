@@ -1,10 +1,14 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import com.letta.mobile.data.chat.tools.ToolCallFacts
+import com.letta.mobile.data.chat.tools.ToolStepLine
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_duration_ms
+import com.letta.mobile.ui.chat.tools.LocalToolPresenters
 import org.jetbrains.compose.resources.stringResource
 
 // letta-mobile-bglj6.1: lifted from desktop's DesktopChatToolLabels.kt. How a step reads (its verb and
@@ -66,3 +70,13 @@ internal fun outputLineKind(line: String): OutputLineKind {
 
 private val SUCCESS_NEEDLES = listOf("build successful", "success", "passed")
 private val FAILURE_NEEDLES = listOf("error", "failed", "exception", "fatal")
+
+/** [this] call as a tool presenter reads it. */
+internal fun UiToolCall.facts(): ToolCallFacts = ToolCallFacts(name, arguments, result)
+
+/** [call]'s step line from the provided presenters, worked out again only when the call or the presenters change. */
+@Composable
+internal fun rememberToolStepLine(call: UiToolCall): ToolStepLine {
+    val presenters = LocalToolPresenters.current
+    return remember(call, presenters) { presenters.line(call.facts()) }
+}

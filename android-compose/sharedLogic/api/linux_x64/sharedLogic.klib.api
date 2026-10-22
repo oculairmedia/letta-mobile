@@ -4205,8 +4205,8 @@ abstract interface com.letta.mobile.data.chat.tools/CommandPresenter { // com.le
     abstract val matcher // com.letta.mobile.data.chat.tools/CommandPresenter.matcher|{}matcher[0]
         abstract fun <get-matcher>(): com.letta.mobile.data.chat.tools/CommandMatcher // com.letta.mobile.data.chat.tools/CommandPresenter.matcher.<get-matcher>|<get-matcher>(){}[0]
 
-    abstract fun inset(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ShellCommandLine): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools/CommandPresenter.inset|inset(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ShellCommandLine){}[0]
-    abstract fun line(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ShellCommandLine): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools/CommandPresenter.line|line(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ShellCommandLine){}[0]
+    abstract fun inset(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools.shell/ShellCommandLine): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools/CommandPresenter.inset|inset(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.shell.ShellCommandLine){}[0]
+    abstract fun line(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools.shell/ShellCommandLine): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools/CommandPresenter.line|line(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.shell.ShellCommandLine){}[0]
 }
 
 abstract interface com.letta.mobile.data.chat.tools/ToolPresenter { // com.letta.mobile.data.chat.tools/ToolPresenter|null[0]
@@ -29834,11 +29834,54 @@ final class com.letta.mobile.data.chat.send/ScopedRuntimeEvent { // com.letta.mo
     final fun toString(): kotlin/String // com.letta.mobile.data.chat.send/ScopedRuntimeEvent.toString|toString(){}[0]
 }
 
+final class com.letta.mobile.data.chat.tools.shell/ShellCommand { // com.letta.mobile.data.chat.tools.shell/ShellCommand|null[0]
+    constructor <init>(kotlin.collections/List<kotlin/String>, kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.letta.mobile.data.chat.tools.shell/ShellCommand.<init>|<init>(kotlin.collections.List<kotlin.String>;kotlin.String?;kotlin.Boolean;kotlin.Boolean){}[0]
+
+    final val piped // com.letta.mobile.data.chat.tools.shell/ShellCommand.piped|{}piped[0]
+        final fun <get-piped>(): kotlin/Boolean // com.letta.mobile.data.chat.tools.shell/ShellCommand.piped.<get-piped>|<get-piped>(){}[0]
+    final val stdin // com.letta.mobile.data.chat.tools.shell/ShellCommand.stdin|{}stdin[0]
+        final fun <get-stdin>(): kotlin/String? // com.letta.mobile.data.chat.tools.shell/ShellCommand.stdin.<get-stdin>|<get-stdin>(){}[0]
+    final val stdinFromFile // com.letta.mobile.data.chat.tools.shell/ShellCommand.stdinFromFile|{}stdinFromFile[0]
+        final fun <get-stdinFromFile>(): kotlin/Boolean // com.letta.mobile.data.chat.tools.shell/ShellCommand.stdinFromFile.<get-stdinFromFile>|<get-stdinFromFile>(){}[0]
+    final val words // com.letta.mobile.data.chat.tools.shell/ShellCommand.words|{}words[0]
+        final fun <get-words>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools.shell/ShellCommand.words.<get-words>|<get-words>(){}[0]
+
+    final fun component1(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools.shell/ShellCommand.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.chat.tools.shell/ShellCommand.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.data.chat.tools.shell/ShellCommand.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // com.letta.mobile.data.chat.tools.shell/ShellCommand.component4|component4(){}[0]
+    final fun copy(kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.data.chat.tools.shell/ShellCommand // com.letta.mobile.data.chat.tools.shell/ShellCommand.copy|copy(kotlin.collections.List<kotlin.String>;kotlin.String?;kotlin.Boolean;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.tools.shell/ShellCommand.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.tools.shell/ShellCommand.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools.shell/ShellCommand.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.chat.tools.shell/ShellCommandLine { // com.letta.mobile.data.chat.tools.shell/ShellCommandLine|null[0]
+    constructor <init>(kotlin.collections/List<kotlin/String>, kotlin/String? = ...) // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.<init>|<init>(kotlin.collections.List<kotlin.String>;kotlin.String?){}[0]
+
+    final val args // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.args|{}args[0]
+        final fun <get-args>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.args.<get-args>|<get-args>(){}[0]
+    final val program // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.program|{}program[0]
+        final fun <get-program>(): kotlin/String // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.program.<get-program>|<get-program>(){}[0]
+    final val stdin // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.stdin|{}stdin[0]
+        final fun <get-stdin>(): kotlin/String? // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.stdin.<get-stdin>|<get-stdin>(){}[0]
+    final val words // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.words|{}words[0]
+        final fun <get-words>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.words.<get-words>|<get-words>(){}[0]
+
+    final fun component1(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.component2|component2(){}[0]
+    final fun copy(kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ...): com.letta.mobile.data.chat.tools.shell/ShellCommandLine // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.copy|copy(kotlin.collections.List<kotlin.String>;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.equals|equals(kotlin.Any?){}[0]
+    final fun flag(kotlin/String): kotlin/String? // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.flag|flag(kotlin.String){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools.shell/ShellCommandLine.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.chat.tools/CommandMatch { // com.letta.mobile.data.chat.tools/CommandMatch|null[0]
-    constructor <init>(com.letta.mobile.data.chat.tools/CommandPresenter, com.letta.mobile.data.chat.tools/ShellCommandLine) // com.letta.mobile.data.chat.tools/CommandMatch.<init>|<init>(com.letta.mobile.data.chat.tools.CommandPresenter;com.letta.mobile.data.chat.tools.ShellCommandLine){}[0]
+    constructor <init>(com.letta.mobile.data.chat.tools/CommandPresenter, com.letta.mobile.data.chat.tools.shell/ShellCommandLine) // com.letta.mobile.data.chat.tools/CommandMatch.<init>|<init>(com.letta.mobile.data.chat.tools.CommandPresenter;com.letta.mobile.data.chat.tools.shell.ShellCommandLine){}[0]
 
     final val command // com.letta.mobile.data.chat.tools/CommandMatch.command|{}command[0]
-        final fun <get-command>(): com.letta.mobile.data.chat.tools/ShellCommandLine // com.letta.mobile.data.chat.tools/CommandMatch.command.<get-command>|<get-command>(){}[0]
+        final fun <get-command>(): com.letta.mobile.data.chat.tools.shell/ShellCommandLine // com.letta.mobile.data.chat.tools/CommandMatch.command.<get-command>|<get-command>(){}[0]
     final val presenter // com.letta.mobile.data.chat.tools/CommandMatch.presenter|{}presenter[0]
         final fun <get-presenter>(): com.letta.mobile.data.chat.tools/CommandPresenter // com.letta.mobile.data.chat.tools/CommandMatch.presenter.<get-presenter>|<get-presenter>(){}[0]
 }
@@ -29856,7 +29899,7 @@ final class com.letta.mobile.data.chat.tools/CommandMatcher { // com.letta.mobil
     final fun copy(kotlin/String = ..., kotlin.collections/List<kotlin/String> = ...): com.letta.mobile.data.chat.tools/CommandMatcher // com.letta.mobile.data.chat.tools/CommandMatcher.copy|copy(kotlin.String;kotlin.collections.List<kotlin.String>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.tools/CommandMatcher.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.tools/CommandMatcher.hashCode|hashCode(){}[0]
-    final fun specificity(com.letta.mobile.data.chat.tools/ShellCommandLine): kotlin/Int? // com.letta.mobile.data.chat.tools/CommandMatcher.specificity|specificity(com.letta.mobile.data.chat.tools.ShellCommandLine){}[0]
+    final fun specificity(com.letta.mobile.data.chat.tools.shell/ShellCommandLine): kotlin/Int? // com.letta.mobile.data.chat.tools/CommandMatcher.specificity|specificity(com.letta.mobile.data.chat.tools.shell.ShellCommandLine){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools/CommandMatcher.toString|toString(){}[0]
 }
 
@@ -29942,49 +29985,6 @@ final class com.letta.mobile.data.chat.tools/CommandPreviewSpec { // com.letta.m
     }
 }
 
-final class com.letta.mobile.data.chat.tools/ShellCommand { // com.letta.mobile.data.chat.tools/ShellCommand|null[0]
-    constructor <init>(kotlin.collections/List<kotlin/String>, kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.letta.mobile.data.chat.tools/ShellCommand.<init>|<init>(kotlin.collections.List<kotlin.String>;kotlin.String?;kotlin.Boolean;kotlin.Boolean){}[0]
-
-    final val piped // com.letta.mobile.data.chat.tools/ShellCommand.piped|{}piped[0]
-        final fun <get-piped>(): kotlin/Boolean // com.letta.mobile.data.chat.tools/ShellCommand.piped.<get-piped>|<get-piped>(){}[0]
-    final val stdin // com.letta.mobile.data.chat.tools/ShellCommand.stdin|{}stdin[0]
-        final fun <get-stdin>(): kotlin/String? // com.letta.mobile.data.chat.tools/ShellCommand.stdin.<get-stdin>|<get-stdin>(){}[0]
-    final val stdinFromFile // com.letta.mobile.data.chat.tools/ShellCommand.stdinFromFile|{}stdinFromFile[0]
-        final fun <get-stdinFromFile>(): kotlin/Boolean // com.letta.mobile.data.chat.tools/ShellCommand.stdinFromFile.<get-stdinFromFile>|<get-stdinFromFile>(){}[0]
-    final val words // com.letta.mobile.data.chat.tools/ShellCommand.words|{}words[0]
-        final fun <get-words>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools/ShellCommand.words.<get-words>|<get-words>(){}[0]
-
-    final fun component1(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools/ShellCommand.component1|component1(){}[0]
-    final fun component2(): kotlin/String? // com.letta.mobile.data.chat.tools/ShellCommand.component2|component2(){}[0]
-    final fun component3(): kotlin/Boolean // com.letta.mobile.data.chat.tools/ShellCommand.component3|component3(){}[0]
-    final fun component4(): kotlin/Boolean // com.letta.mobile.data.chat.tools/ShellCommand.component4|component4(){}[0]
-    final fun copy(kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.data.chat.tools/ShellCommand // com.letta.mobile.data.chat.tools/ShellCommand.copy|copy(kotlin.collections.List<kotlin.String>;kotlin.String?;kotlin.Boolean;kotlin.Boolean){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.tools/ShellCommand.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.tools/ShellCommand.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools/ShellCommand.toString|toString(){}[0]
-}
-
-final class com.letta.mobile.data.chat.tools/ShellCommandLine { // com.letta.mobile.data.chat.tools/ShellCommandLine|null[0]
-    constructor <init>(kotlin.collections/List<kotlin/String>, kotlin/String? = ...) // com.letta.mobile.data.chat.tools/ShellCommandLine.<init>|<init>(kotlin.collections.List<kotlin.String>;kotlin.String?){}[0]
-
-    final val args // com.letta.mobile.data.chat.tools/ShellCommandLine.args|{}args[0]
-        final fun <get-args>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools/ShellCommandLine.args.<get-args>|<get-args>(){}[0]
-    final val program // com.letta.mobile.data.chat.tools/ShellCommandLine.program|{}program[0]
-        final fun <get-program>(): kotlin/String // com.letta.mobile.data.chat.tools/ShellCommandLine.program.<get-program>|<get-program>(){}[0]
-    final val stdin // com.letta.mobile.data.chat.tools/ShellCommandLine.stdin|{}stdin[0]
-        final fun <get-stdin>(): kotlin/String? // com.letta.mobile.data.chat.tools/ShellCommandLine.stdin.<get-stdin>|<get-stdin>(){}[0]
-    final val words // com.letta.mobile.data.chat.tools/ShellCommandLine.words|{}words[0]
-        final fun <get-words>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools/ShellCommandLine.words.<get-words>|<get-words>(){}[0]
-
-    final fun component1(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools/ShellCommandLine.component1|component1(){}[0]
-    final fun component2(): kotlin/String? // com.letta.mobile.data.chat.tools/ShellCommandLine.component2|component2(){}[0]
-    final fun copy(kotlin.collections/List<kotlin/String> = ..., kotlin/String? = ...): com.letta.mobile.data.chat.tools/ShellCommandLine // com.letta.mobile.data.chat.tools/ShellCommandLine.copy|copy(kotlin.collections.List<kotlin.String>;kotlin.String?){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.tools/ShellCommandLine.equals|equals(kotlin.Any?){}[0]
-    final fun flag(kotlin/String): kotlin/String? // com.letta.mobile.data.chat.tools/ShellCommandLine.flag|flag(kotlin.String){}[0]
-    final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.tools/ShellCommandLine.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools/ShellCommandLine.toString|toString(){}[0]
-}
-
 final class com.letta.mobile.data.chat.tools/SpecCommandPresenter : com.letta.mobile.data.chat.tools/CommandPresenter { // com.letta.mobile.data.chat.tools/SpecCommandPresenter|null[0]
     constructor <init>(kotlin/String, com.letta.mobile.data.chat.tools/CommandPresenterSpec) // com.letta.mobile.data.chat.tools/SpecCommandPresenter.<init>|<init>(kotlin.String;com.letta.mobile.data.chat.tools.CommandPresenterSpec){}[0]
 
@@ -29993,8 +29993,8 @@ final class com.letta.mobile.data.chat.tools/SpecCommandPresenter : com.letta.mo
     final val matcher // com.letta.mobile.data.chat.tools/SpecCommandPresenter.matcher|{}matcher[0]
         final fun <get-matcher>(): com.letta.mobile.data.chat.tools/CommandMatcher // com.letta.mobile.data.chat.tools/SpecCommandPresenter.matcher.<get-matcher>|<get-matcher>(){}[0]
 
-    final fun inset(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ShellCommandLine): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools/SpecCommandPresenter.inset|inset(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ShellCommandLine){}[0]
-    final fun line(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ShellCommandLine): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools/SpecCommandPresenter.line|line(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ShellCommandLine){}[0]
+    final fun inset(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools.shell/ShellCommandLine): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools/SpecCommandPresenter.inset|inset(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.shell.ShellCommandLine){}[0]
+    final fun line(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools.shell/ShellCommandLine): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools/SpecCommandPresenter.line|line(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.shell.ShellCommandLine){}[0]
 }
 
 final class com.letta.mobile.data.chat.tools/SpecToolPresenter : com.letta.mobile.data.chat.tools/ToolPresenter { // com.letta.mobile.data.chat.tools/SpecToolPresenter|null[0]
@@ -64963,6 +64963,22 @@ final object com.letta.mobile.data.chat.tools.bundled/BundledToolPresenters { //
         final fun <get-registry>(): com.letta.mobile.data.chat.tools/ToolPresenterRegistry // com.letta.mobile.data.chat.tools.bundled/BundledToolPresenters.registry.<get-registry>|<get-registry>(){}[0]
 }
 
+final object com.letta.mobile.data.chat.tools.shell/ShellScript { // com.letta.mobile.data.chat.tools.shell/ShellScript|null[0]
+    final fun scan(kotlin/String): kotlin.collections/List<com.letta.mobile.data.chat.tools.shell/ShellCommand>? // com.letta.mobile.data.chat.tools.shell/ShellScript.scan|scan(kotlin.String){}[0]
+}
+
+final object com.letta.mobile.data.chat.tools.shell/ShellTools { // com.letta.mobile.data.chat.tools.shell/ShellTools|null[0]
+    final val NAMES // com.letta.mobile.data.chat.tools.shell/ShellTools.NAMES|{}NAMES[0]
+        final fun <get-NAMES>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.chat.tools.shell/ShellTools.NAMES.<get-NAMES>|<get-NAMES>(){}[0]
+    final val WORKDIR_KEYS // com.letta.mobile.data.chat.tools.shell/ShellTools.WORKDIR_KEYS|{}WORKDIR_KEYS[0]
+        final fun <get-WORKDIR_KEYS>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools.shell/ShellTools.WORKDIR_KEYS.<get-WORKDIR_KEYS>|<get-WORKDIR_KEYS>(){}[0]
+
+    final fun argvScript(kotlin.collections/List<kotlin/String>): kotlin/String? // com.letta.mobile.data.chat.tools.shell/ShellTools.argvScript|argvScript(kotlin.collections.List<kotlin.String>){}[0]
+    final fun commandsOf(kotlin/String): kotlin.collections/List<com.letta.mobile.data.chat.tools.shell/ShellCommandLine> // com.letta.mobile.data.chat.tools.shell/ShellTools.commandsOf|commandsOf(kotlin.String){}[0]
+    final fun isShellTool(kotlin/String): kotlin/Boolean // com.letta.mobile.data.chat.tools.shell/ShellTools.isShellTool|isShellTool(kotlin.String){}[0]
+    final fun scriptOf(kotlinx.serialization.json/JsonObject): kotlin/String? // com.letta.mobile.data.chat.tools.shell/ShellTools.scriptOf|scriptOf(kotlinx.serialization.json.JsonObject){}[0]
+}
+
 final object com.letta.mobile.data.chat.tools/GenericToolPresenter : com.letta.mobile.data.chat.tools/ToolPresenter { // com.letta.mobile.data.chat.tools/GenericToolPresenter|null[0]
     final const val RAW_ARGUMENTS // com.letta.mobile.data.chat.tools/GenericToolPresenter.RAW_ARGUMENTS|{}RAW_ARGUMENTS[0]
         final fun <get-RAW_ARGUMENTS>(): kotlin/String // com.letta.mobile.data.chat.tools/GenericToolPresenter.RAW_ARGUMENTS.<get-RAW_ARGUMENTS>|<get-RAW_ARGUMENTS>(){}[0]
@@ -64975,21 +64991,6 @@ final object com.letta.mobile.data.chat.tools/GenericToolPresenter : com.letta.m
     final fun argumentsInset(com.letta.mobile.data.chat.tools/ToolCallFacts): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools/GenericToolPresenter.argumentsInset|argumentsInset(com.letta.mobile.data.chat.tools.ToolCallFacts){}[0]
     final fun inset(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools/GenericToolPresenter.inset|inset(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
     final fun line(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools/GenericToolPresenter.line|line(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
-}
-
-final object com.letta.mobile.data.chat.tools/ShellScript { // com.letta.mobile.data.chat.tools/ShellScript|null[0]
-    final fun scan(kotlin/String): kotlin.collections/List<com.letta.mobile.data.chat.tools/ShellCommand>? // com.letta.mobile.data.chat.tools/ShellScript.scan|scan(kotlin.String){}[0]
-}
-
-final object com.letta.mobile.data.chat.tools/ShellTools { // com.letta.mobile.data.chat.tools/ShellTools|null[0]
-    final val NAMES // com.letta.mobile.data.chat.tools/ShellTools.NAMES|{}NAMES[0]
-        final fun <get-NAMES>(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.chat.tools/ShellTools.NAMES.<get-NAMES>|<get-NAMES>(){}[0]
-
-    final fun argvScript(kotlin.collections/List<kotlin/String>): kotlin/String? // com.letta.mobile.data.chat.tools/ShellTools.argvScript|argvScript(kotlin.collections.List<kotlin.String>){}[0]
-    final fun commandInset(com.letta.mobile.data.chat.tools/ToolCallFacts): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools/ShellTools.commandInset|commandInset(com.letta.mobile.data.chat.tools.ToolCallFacts){}[0]
-    final fun commandsOf(kotlin/String): kotlin.collections/List<com.letta.mobile.data.chat.tools/ShellCommandLine> // com.letta.mobile.data.chat.tools/ShellTools.commandsOf|commandsOf(kotlin.String){}[0]
-    final fun isShellTool(kotlin/String): kotlin/Boolean // com.letta.mobile.data.chat.tools/ShellTools.isShellTool|isShellTool(kotlin.String){}[0]
-    final fun scriptOf(kotlinx.serialization.json/JsonObject): kotlin/String? // com.letta.mobile.data.chat.tools/ShellTools.scriptOf|scriptOf(kotlinx.serialization.json.JsonObject){}[0]
 }
 
 final object com.letta.mobile.data.chat.tools/ToolArguments { // com.letta.mobile.data.chat.tools/ToolArguments|null[0]
@@ -67607,7 +67608,8 @@ final fun (com.letta.mobile.data.chat.runtime/ChatConversationSummary).com.letta
 final fun (com.letta.mobile.data.chat.runtime/ChatGateway).com.letta.mobile.data.chat.branch/branchBackendOrNull(): com.letta.mobile.data.chat.branch/BranchBackend? // com.letta.mobile.data.chat.branch/branchBackendOrNull|branchBackendOrNull@com.letta.mobile.data.chat.runtime.ChatGateway(){}[0]
 final fun (com.letta.mobile.data.chat.runtime/ChatScreenStatus).com.letta.mobile.data.chat.runtime/shouldShowStatePanel(com.letta.mobile.data.chat.runtime/ChatSessionState): kotlin/Boolean // com.letta.mobile.data.chat.runtime/shouldShowStatePanel|shouldShowStatePanel@com.letta.mobile.data.chat.runtime.ChatScreenStatus(com.letta.mobile.data.chat.runtime.ChatSessionState){}[0]
 final fun (com.letta.mobile.data.chat.runtime/ChatSessionState).com.letta.mobile.ui.chat.render/toConversationState(): com.letta.mobile.ui.chat.render/ConversationState // com.letta.mobile.ui.chat.render/toConversationState|toConversationState@com.letta.mobile.data.chat.runtime.ChatSessionState(){}[0]
-final fun (com.letta.mobile.data.chat.tools/ShellCommand).com.letta.mobile.data.chat.tools/programWords(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools/programWords|programWords@com.letta.mobile.data.chat.tools.ShellCommand(){}[0]
+final fun (com.letta.mobile.data.chat.tools.shell/ShellCommand).com.letta.mobile.data.chat.tools.shell/programWords(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools.shell/programWords|programWords@com.letta.mobile.data.chat.tools.shell.ShellCommand(){}[0]
+final fun (com.letta.mobile.data.chat.tools/ToolPresenterRegistry).com.letta.mobile.data.plugin/contributedBy(kotlin.collections/List<com.letta.mobile.data.plugin/PluginManifest>): com.letta.mobile.data.chat.tools/ToolPresenterRegistry // com.letta.mobile.data.plugin/contributedBy|contributedBy@com.letta.mobile.data.chat.tools.ToolPresenterRegistry(kotlin.collections.List<com.letta.mobile.data.plugin.PluginManifest>){}[0]
 final fun (com.letta.mobile.data.chat.tools/ToolPreviewKind).com.letta.mobile.data.chat.tools/target(kotlin/String, kotlin.ranges/IntRange? = ...): com.letta.mobile.data.chat.tools/ToolPreviewTarget // com.letta.mobile.data.chat.tools/target|target@com.letta.mobile.data.chat.tools.ToolPreviewKind(kotlin.String;kotlin.ranges.IntRange?){}[0]
 final fun (com.letta.mobile.data.compaction/CommandAnswer).com.letta.mobile.data.context.limit/toOutcome(kotlin/Int): com.letta.mobile.data.context.limit/ContextLimitOutcome // com.letta.mobile.data.context.limit/toOutcome|toOutcome@com.letta.mobile.data.compaction.CommandAnswer(kotlin.Int){}[0]
 final fun (com.letta.mobile.data.compaction/CommandAnswer).com.letta.mobile.data.dreaming/toDreamOutcome(): com.letta.mobile.data.dreaming/DreamOutcome<com.letta.mobile.data.dreaming/DreamRunStart> // com.letta.mobile.data.dreaming/toDreamOutcome|toDreamOutcome@com.letta.mobile.data.compaction.CommandAnswer(){}[0]
@@ -67739,15 +67741,15 @@ final fun (kotlin.collections/List<com.letta.mobile.data.model/SubagentEntry>).c
 final fun (kotlin.collections/List<com.letta.mobile.data.model/SubagentEntry>).com.letta.mobile.data.subagents/visibleRunningCount(): kotlin/Int // com.letta.mobile.data.subagents/visibleRunningCount|visibleRunningCount@kotlin.collections.List<com.letta.mobile.data.model.SubagentEntry>(){}[0]
 final fun (kotlin.collections/List<com.letta.mobile.data.model/UiMessage>).com.letta.mobile.data.chat.projection/withoutContentlessSegments(): kotlin.collections/List<com.letta.mobile.data.model/UiMessage> // com.letta.mobile.data.chat.projection/withoutContentlessSegments|withoutContentlessSegments@kotlin.collections.List<com.letta.mobile.data.model.UiMessage>(){}[0]
 final fun (kotlin.collections/List<com.letta.mobile.data.swarm/SwarmAgent>).com.letta.mobile.data.swarm/resolveAgent(com.letta.mobile.data.swarm/AgentRef): com.letta.mobile.data.swarm/AgentResolution // com.letta.mobile.data.swarm/resolveAgent|resolveAgent@kotlin.collections.List<com.letta.mobile.data.swarm.SwarmAgent>(com.letta.mobile.data.swarm.AgentRef){}[0]
-final fun (kotlin.collections/List<kotlin/String>).com.letta.mobile.data.chat.tools/asShellScript(): kotlin/String // com.letta.mobile.data.chat.tools/asShellScript|asShellScript@kotlin.collections.List<kotlin.String>(){}[0]
-final fun (kotlin.collections/List<kotlinx.serialization.json/JsonElement>).com.letta.mobile.data.chat.tools/argvWords(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools/argvWords|argvWords@kotlin.collections.List<kotlinx.serialization.json.JsonElement>(){}[0]
+final fun (kotlin.collections/List<kotlin/String>).com.letta.mobile.data.chat.tools.shell/asShellScript(): kotlin/String // com.letta.mobile.data.chat.tools.shell/asShellScript|asShellScript@kotlin.collections.List<kotlin.String>(){}[0]
+final fun (kotlin.collections/List<kotlinx.serialization.json/JsonElement>).com.letta.mobile.data.chat.tools.shell/argvWords(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.chat.tools.shell/argvWords|argvWords@kotlin.collections.List<kotlinx.serialization.json.JsonElement>(){}[0]
 final fun (kotlin.collections/Map<com.letta.mobile.data.context/ContextReadingKey, kotlin/Int>).com.letta.mobile.data.context/readingFor(kotlin/String?, kotlin/String?): kotlin/Int? // com.letta.mobile.data.context/readingFor|readingFor@kotlin.collections.Map<com.letta.mobile.data.context.ContextReadingKey,kotlin.Int>(kotlin.String?;kotlin.String?){}[0]
 final fun (kotlin.collections/Map<kotlin/String, com.letta.mobile.data.presence/ConversationRunState>).com.letta.mobile.data.presence/presenceByAgent(): kotlin.collections/Map<kotlin/String, com.letta.mobile.data.presence/AgentPresence> // com.letta.mobile.data.presence/presenceByAgent|presenceByAgent@kotlin.collections.Map<kotlin.String,com.letta.mobile.data.presence.ConversationRunState>(){}[0]
 final fun (kotlin/String).com.letta.mobile.data.a2ui/clampToA2uiTextLimit(): kotlin/String // com.letta.mobile.data.a2ui/clampToA2uiTextLimit|clampToA2uiTextLimit@kotlin.String(){}[0]
 final fun (kotlin/String).com.letta.mobile.data.chat.projection/toChatDisplayMode(): com.letta.mobile.data.chat.projection/ChatDisplayMode // com.letta.mobile.data.chat.projection/toChatDisplayMode|toChatDisplayMode@kotlin.String(){}[0]
-final fun (kotlin/String).com.letta.mobile.data.chat.tools/isShellProgram(): kotlin/Boolean // com.letta.mobile.data.chat.tools/isShellProgram|isShellProgram@kotlin.String(){}[0]
-final fun (kotlin/String).com.letta.mobile.data.chat.tools/isShellScriptFlag(): kotlin/Boolean // com.letta.mobile.data.chat.tools/isShellScriptFlag|isShellScriptFlag@kotlin.String(){}[0]
-final fun (kotlin/String).com.letta.mobile.data.chat.tools/shellQuoted(): kotlin/String // com.letta.mobile.data.chat.tools/shellQuoted|shellQuoted@kotlin.String(){}[0]
+final fun (kotlin/String).com.letta.mobile.data.chat.tools.shell/isShellProgram(): kotlin/Boolean // com.letta.mobile.data.chat.tools.shell/isShellProgram|isShellProgram@kotlin.String(){}[0]
+final fun (kotlin/String).com.letta.mobile.data.chat.tools.shell/isShellScriptFlag(): kotlin/Boolean // com.letta.mobile.data.chat.tools.shell/isShellScriptFlag|isShellScriptFlag@kotlin.String(){}[0]
+final fun (kotlin/String).com.letta.mobile.data.chat.tools.shell/shellQuoted(): kotlin/String // com.letta.mobile.data.chat.tools.shell/shellQuoted|shellQuoted@kotlin.String(){}[0]
 final fun (kotlin/String).com.letta.mobile.data.swarm/withSenderLine(com.letta.mobile.data.swarm/SenderLabel?): kotlin/String // com.letta.mobile.data.swarm/withSenderLine|withSenderLine@kotlin.String(com.letta.mobile.data.swarm.SenderLabel?){}[0]
 final fun (kotlin/String).com.letta.mobile.data.timeline/stripEnvelopeReminders(): kotlin/String // com.letta.mobile.data.timeline/stripEnvelopeReminders|stripEnvelopeReminders@kotlin.String(){}[0]
 final fun (kotlin/Throwable).com.letta.mobile.data.controller.fanout/isRuntimeStreamDetached(): kotlin/Boolean // com.letta.mobile.data.controller.fanout/isRuntimeStreamDetached|isRuntimeStreamDetached@kotlin.Throwable(){}[0]
@@ -67809,6 +67811,7 @@ final fun com.letta.mobile.data.chat.runtime/chatScreenStatusOf(com.letta.mobile
 final fun com.letta.mobile.data.chat.runtime/groupConversationsByAgentName(kotlin.collections/List<com.letta.mobile.data.chat.runtime/ChatConversationSummary>): kotlin.collections/List<com.letta.mobile.data.chat.runtime/ChatConversationGroup> // com.letta.mobile.data.chat.runtime/groupConversationsByAgentName|groupConversationsByAgentName(kotlin.collections.List<com.letta.mobile.data.chat.runtime.ChatConversationSummary>){}[0]
 final fun com.letta.mobile.data.chat.runtime/groupSubagentConversations(kotlin.collections/List<com.letta.mobile.data.chat.runtime/ChatConversationSummary>, kotlin.collections/List<com.letta.mobile.data.model/SubagentEntry>): com.letta.mobile.data.chat.runtime/SubagentConversationGrouping // com.letta.mobile.data.chat.runtime/groupSubagentConversations|groupSubagentConversations(kotlin.collections.List<com.letta.mobile.data.chat.runtime.ChatConversationSummary>;kotlin.collections.List<com.letta.mobile.data.model.SubagentEntry>){}[0]
 final fun com.letta.mobile.data.chat.runtime/nowActiveStatus(kotlin/Boolean, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean = ...): com.letta.mobile.data.chat.runtime/NowActiveStatus // com.letta.mobile.data.chat.runtime/nowActiveStatus|nowActiveStatus(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+final fun com.letta.mobile.data.chat.tools/shellCommandInset(com.letta.mobile.data.chat.tools/ToolCallFacts): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools/shellCommandInset|shellCommandInset(com.letta.mobile.data.chat.tools.ToolCallFacts){}[0]
 final fun com.letta.mobile.data.compaction/wireConversationIdOf(com.letta.mobile.data.model/AgentId, com.letta.mobile.data.model/ConversationId?): kotlin/String // com.letta.mobile.data.compaction/wireConversationIdOf|wireConversationIdOf(com.letta.mobile.data.model.AgentId;com.letta.mobile.data.model.ConversationId?){}[0]
 final fun com.letta.mobile.data.context/contextReadingEstimate(com.letta.mobile.data.transport/ServerFrame, kotlin.collections/Map<com.letta.mobile.data.context/ContextReadingKey, kotlin/Int>): kotlin/Pair<com.letta.mobile.data.context/ContextReadingKey, kotlin/Boolean>? // com.letta.mobile.data.context/contextReadingEstimate|contextReadingEstimate(com.letta.mobile.data.transport.ServerFrame;kotlin.collections.Map<com.letta.mobile.data.context.ContextReadingKey,kotlin.Int>){}[0]
 final fun com.letta.mobile.data.context/contextReadingKeyOf(kotlin/String?, kotlin/String?): com.letta.mobile.data.context/ContextReadingKey? // com.letta.mobile.data.context/contextReadingKeyOf|contextReadingKeyOf(kotlin.String?;kotlin.String?){}[0]

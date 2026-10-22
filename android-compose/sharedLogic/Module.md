@@ -117,6 +117,10 @@ The tool presenter plugin contract: how a tool call reads as a timeline step on 
 
 The presenters every host ships, one unit per tool or CLI, registered into [BundledToolPresenters](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.bundled/-bundled-tool-presenters/index.html) through the same registry calls a plugin's contributions use. Keep each presenter to its own tool and leave rendering to `sharedUI`; start a new one from [BashToolPresenter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.bundled/-bash-tool-presenter/index.html).
 
+# Package com.letta.mobile.data.chat.tools.shell
+
+A lenient reader of the shell scripts agents pass to their shell tools: quotes, separators, heredocs and `bash -lc` wrappers, never expanding or throwing. Tool presenters and the meridian recogniser read shell calls through it so they agree on what ran; read a call's script with [ShellTools](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.shell/-shell-tools/index.html) and its commands as [ShellCommandLine](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.shell/-shell-command-line/index.html).
+
 # Package com.letta.mobile.data.commands
 
 Slash-command contracts and commands answered by the client itself. Navigation/local actions remain distinct from commands requiring active backend support. Keep arbitrary shell execution outside slash-command discovery; provide backend command capabilities through [SlashCommandsApi](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.commands/-slash-commands-api/index.html) and client commands through [ClientSlashCommands](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.commands/-client-slash-commands/index.html).

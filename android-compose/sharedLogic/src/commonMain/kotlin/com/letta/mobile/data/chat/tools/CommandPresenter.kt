@@ -1,23 +1,8 @@
 package com.letta.mobile.data.chat.tools
 
 import androidx.compose.runtime.Immutable
-
-/** One command a shell call runs, from its program on (`meridian canvas compose --id x`). */
-@Immutable
-data class ShellCommandLine(val words: List<String>, val stdin: String? = null) {
-    /** The program's name without its directory: `meridian` of `/usr/local/bin/meridian`. */
-    val program: String get() = words.firstOrNull()?.substringAfterLast('/').orEmpty()
-
-    /** The words after the program. */
-    val args: List<String> get() = words.drop(1)
-
-    /** The word after [flag] (`--id x`), or the value of `--flag=x`; null when it is not given. */
-    fun flag(flag: String): String? {
-        val index = args.indexOf(flag)
-        if (index >= 0) return args.getOrNull(index + 1)
-        return args.firstOrNull { it.startsWith("$flag=") }?.substringAfter('=')
-    }
-}
+import com.letta.mobile.data.chat.tools.shell.ShellCommandLine
+import com.letta.mobile.data.chat.tools.shell.ShellTools
 
 /**
  * Which commands a command presenter claims: its [program] (ignoring case) and, optionally, the
@@ -87,4 +72,20 @@ class CommandPresenterRegistry private constructor(private val entries: List<Ran
     companion object {
         val Empty: CommandPresenterRegistry = CommandPresenterRegistry(emptyList())
     }
+}
+
+/**
+ * A shell call's inset: `dir $ command`, then its output, which reads as stderr when the command
+ * exited non-zero. The output is the call's result as it is, never copied.
+ */
+fun shellCommandInset(call: ToolCallFacts): ToolInset? {
+    val script = call.arguments?.let(ShellTools::scriptOf).orEmpty()
+    val result = call.result?.takeIf { it.isNotBlank() }
+    if (script.isEmpty() && result == null) return null
+    val kind = if (ToolArguments.exitFailure(result) != null) ToolOutputStream.Kind.Stderr else ToolOutputStream.Kind.Output
+    return ToolInset.Command(
+        workingDirectory = ShellTools.WORKDIR_KEYS.firstNotNullOfOrNull(call::string),
+        command = script,
+        output = listOfNotNull(result?.let { ToolOutputStream(kind, it) }),
+    )
 }

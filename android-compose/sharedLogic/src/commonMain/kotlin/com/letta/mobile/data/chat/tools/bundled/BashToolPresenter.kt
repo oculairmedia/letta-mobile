@@ -1,6 +1,5 @@
 package com.letta.mobile.data.chat.tools.bundled
 
-import com.letta.mobile.data.chat.tools.ShellTools
 import com.letta.mobile.data.chat.tools.ToolArguments
 import com.letta.mobile.data.chat.tools.ToolCallFacts
 import com.letta.mobile.data.chat.tools.ToolInset
@@ -9,6 +8,8 @@ import com.letta.mobile.data.chat.tools.ToolPresenter
 import com.letta.mobile.data.chat.tools.ToolPresenterScope
 import com.letta.mobile.data.chat.tools.ToolStepLine
 import com.letta.mobile.data.chat.tools.ToolVerb
+import com.letta.mobile.data.chat.tools.shell.ShellTools
+import com.letta.mobile.data.chat.tools.shellCommandInset
 
 /**
  * letta-code's `Bash` (and the shell tools of its other toolsets). A command a CLI's command
@@ -33,7 +34,7 @@ object BashToolPresenter : ToolPresenter {
 
     override fun inset(call: ToolCallFacts, scope: ToolPresenterScope): ToolInset? {
         scope.commands.find(scriptOf(call))?.let { return it.presenter.inset(call, it.command) }
-        return ShellTools.commandInset(call)
+        return shellCommandInset(call)
     }
 
     private fun scriptOf(call: ToolCallFacts): String = call.arguments?.let(ShellTools::scriptOf).orEmpty()

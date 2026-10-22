@@ -48,7 +48,7 @@ import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigation
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigationActions
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlayData
 import com.letta.mobile.ui.theme.LocalReducedMotion
-import com.letta.mobile.ui.chat.tools.ProvidePluginToolPresenters
+import com.letta.mobile.ui.shell.pages.plugins.ProvidePluginToolPresenters
 import com.letta.mobile.ui.context.FocusedAgentContextCard
 
 /**

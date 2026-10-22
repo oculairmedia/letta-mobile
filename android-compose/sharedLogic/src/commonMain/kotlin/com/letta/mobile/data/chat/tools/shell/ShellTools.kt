@@ -1,4 +1,4 @@
-package com.letta.mobile.data.chat.tools
+package com.letta.mobile.data.chat.tools.shell
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -52,25 +52,10 @@ object ShellTools {
             }
         }
 
-    /**
-     * A shell call's inset: `dir $ command`, then its output, which reads as stderr when the command
-     * exited non-zero. The output is the call's result as it is, never copied.
-     */
-    fun commandInset(call: ToolCallFacts): ToolInset? {
-        val script = call.arguments?.let(::scriptOf).orEmpty()
-        val result = call.result?.takeIf { it.isNotBlank() }
-        if (script.isEmpty() && result == null) return null
-        val kind = if (ToolArguments.exitFailure(result) != null) ToolOutputStream.Kind.Stderr else ToolOutputStream.Kind.Output
-        return ToolInset.Command(
-            workingDirectory = WORKDIR_KEYS.firstNotNullOfOrNull(call::string),
-            command = script,
-            output = listOfNotNull(result?.let { ToolOutputStream(kind, it) }),
-        )
-    }
-
     private const val MAX_WRAP_DEPTH = 2
 
-    private val WORKDIR_KEYS = listOf("workdir", "cwd", "directory", "dir_path")
+    /** The arguments a shell call names its working directory with. */
+    val WORKDIR_KEYS: List<String> = listOf("workdir", "cwd", "directory", "dir_path")
 }
 
 /** The command's words from its program on: `NAME=value`, `env`, `exec`, … dropped. */
@@ -98,3 +83,20 @@ private val SCRIPT_FLAG = Regex("-[a-z]*c[a-z]*")
 private val SAFE_WORD = Regex("[A-Za-z0-9_./=:,@%+-]+")
 private val PREFIX_PROGRAMS = setOf("env", "exec", "command", "time", "nohup")
 private val ENV_ASSIGNMENT = Regex("""[A-Za-z_][A-Za-z0-9_]*=[\s\S]*""")
+
+/** One command a shell call runs, from its program on (`meridian canvas compose --id x`). */
+data class ShellCommandLine(val words: List<String>, val stdin: String? = null) {
+    /** The program's name without its directory: `meridian` of `/usr/local/bin/meridian`. */
+    val program: String get() = words.firstOrNull()?.substringAfterLast('/').orEmpty()
+
+    /** The words after the program. */
+    val args: List<String> get() = words.drop(1)
+
+    /** The word after [flag] (`--id x`), or the value of `--flag=x`; null when it is not given. */
+    fun flag(flag: String): String? {
+        val index = args.indexOf(flag)
+        if (index >= 0) return args.getOrNull(index + 1)
+        return args.firstOrNull { it.startsWith("$flag=") }?.substringAfter('=')
+    }
+}
+

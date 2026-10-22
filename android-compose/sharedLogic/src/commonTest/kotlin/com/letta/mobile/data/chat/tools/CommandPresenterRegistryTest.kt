@@ -1,6 +1,7 @@
 package com.letta.mobile.data.chat.tools
 
 import com.letta.mobile.data.chat.tools.bundled.BundledToolPresenters
+import com.letta.mobile.data.chat.tools.shell.ShellTools
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals

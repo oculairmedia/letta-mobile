@@ -1,4 +1,4 @@
-package com.letta.mobile.data.chat.tools
+package com.letta.mobile.data.chat.tools.shell
 
 /**
  * One simple command of a shell script, as [ShellScript.scan] reads it: its words with quotes

@@ -48,7 +48,6 @@ import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.mascot.mascotAttention
-import com.letta.mobile.ui.chat.tools.rememberToolStepLine
 import com.letta.mobile.ui.chat.tools.title
 import com.letta.mobile.ui.shell.pages.workspace.ToolCallFileLink
 import com.letta.mobile.ui.theme.ChatRowMotion

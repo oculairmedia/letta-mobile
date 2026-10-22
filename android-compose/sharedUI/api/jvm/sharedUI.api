@@ -2178,12 +2178,8 @@ public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSing
 }
 
 public final class com/letta/mobile/ui/chat/tools/ToolPresentersKt {
-	public static final fun ProvidePluginToolPresenters (Lcom/letta/mobile/data/plugin/view/PluginViewsModel;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
-	public static final fun ProvideToolPresenters (Ljava/util/List;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
-	public static final fun contributedBy (Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;Ljava/util/List;)Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;
-	public static final fun facts (Lcom/letta/mobile/data/model/UiToolCall;)Lcom/letta/mobile/data/chat/tools/ToolCallFacts;
+	public static final fun ProvideToolPresenters (Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 	public static final fun getLocalToolPresenters ()Landroidx/compose/runtime/ProvidableCompositionLocal;
-	public static final fun rememberToolStepLine (Lcom/letta/mobile/data/model/UiToolCall;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
 	public static final fun title (Lcom/letta/mobile/data/chat/tools/ToolStepLine;Landroidx/compose/runtime/Composer;I)Ljava/lang/String;
 }
 
@@ -8179,6 +8175,10 @@ public final class com/letta/mobile/ui/shell/pages/plugins/ComposableSingletons$
 	public final fun getLambda$-1540611104$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1122184034$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$350824640$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
+public final class com/letta/mobile/ui/shell/pages/plugins/PluginToolPresentersKt {
+	public static final fun ProvidePluginToolPresenters (Lcom/letta/mobile/data/plugin/view/PluginViewsModel;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 }
 
 public final class com/letta/mobile/ui/shell/pages/plugins/PluginsPageBinding {

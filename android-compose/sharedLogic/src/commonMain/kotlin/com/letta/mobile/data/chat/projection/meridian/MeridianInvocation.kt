@@ -1,10 +1,10 @@
 package com.letta.mobile.data.chat.projection.meridian
 
-import com.letta.mobile.data.chat.tools.ShellCommand
-import com.letta.mobile.data.chat.tools.ShellScript
-import com.letta.mobile.data.chat.tools.isShellProgram
-import com.letta.mobile.data.chat.tools.isShellScriptFlag
-import com.letta.mobile.data.chat.tools.programWords
+import com.letta.mobile.data.chat.tools.shell.ShellCommand
+import com.letta.mobile.data.chat.tools.shell.ShellScript
+import com.letta.mobile.data.chat.tools.shell.isShellProgram
+import com.letta.mobile.data.chat.tools.shell.isShellScriptFlag
+import com.letta.mobile.data.chat.tools.shell.programWords
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 

@@ -58,7 +58,7 @@ Subagent activity bars, roster/detail panes and dual-conversation views. OpenSub
 
 # Package com.letta.mobile.ui.chat.tools
 
-The tool presenters the timeline draws steps with, provided per window: the bundled ones plus what enabled plugins' manifests contribute. Hosts wrap their chat in ProvidePluginToolPresenters; rows read a step's line through rememberToolStepLine and never name a tool.
+The tool presenters the timeline draws steps with, provided per window through LocalToolPresenters: the bundled ones, plus what enabled plugins' manifests contribute when a host wraps its chat in ProvidePluginToolPresenters (ui.shell.pages.plugins). Rows draw a step line's title from here and never name a tool.
 
 # Package com.letta.mobile.ui.chat.surface
 
