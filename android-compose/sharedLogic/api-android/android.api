@@ -14376,8 +14376,10 @@ public final class com/letta/mobile/data/controller/node/iroh/FilePairingInviteS
 public final class com/letta/mobile/data/controller/node/iroh/FileTurnIdentityStore : com/letta/mobile/data/runtime/TurnIdentityStore {
 	public static final field Companion Lcom/letta/mobile/data/controller/node/iroh/FileTurnIdentityStore$Companion;
 	public static final field DEFAULT_MAX_ENTRIES I
-	public fun <init> (Ljava/io/File;I)V
-	public synthetic fun <init> (Ljava/io/File;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final field DEFAULT_MAX_FILES I
+	public static final field DEFAULT_MAX_FILE_BYTES J
+	public fun <init> (Ljava/io/File;IJI)V
+	public synthetic fun <init> (Ljava/io/File;IJIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun append (Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun load (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -14434,8 +14436,8 @@ public final class com/letta/mobile/data/controller/node/iroh/HttpProxyClientKt 
 
 public final class com/letta/mobile/data/controller/node/iroh/HttpUrlConnectionAdminProxyTransport : com/letta/mobile/data/controller/node/iroh/AdminProxyTransport {
 	public fun <init> ()V
-	public fun <init> (II)V
-	public synthetic fun <init> (IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (III)V
+	public synthetic fun <init> (IIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun execute (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/letta/mobile/data/controller/node/iroh/AdminProxyTransportResponse;
 }
 

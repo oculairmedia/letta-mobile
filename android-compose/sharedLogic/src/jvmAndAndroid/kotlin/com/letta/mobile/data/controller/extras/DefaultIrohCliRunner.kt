@@ -110,6 +110,11 @@ class DefaultIrohCliRunner(
             .redirectErrorStream(false)
             .start()
         processObserver?.invoke(process, "spawned")
+        // Drain both pipes from the start. A child that fills a pipe buffer
+        // (~64 KiB) before exiting would otherwise block until the deadline.
+        // Each drain keeps at most MAX_OUTPUT_BYTES and discards the rest.
+        val stdoutDrain = CliPipeDrain(process.inputStream, MAX_OUTPUT_BYTES, "iroh-cli-stdout")
+        val stderrDrain = CliPipeDrain(process.errorStream, MAX_OUTPUT_BYTES, "iroh-cli-stderr")
 
         // Write body to stdin, then close stdin so the CLI sees EOF. UTF-8
         // explicitly — the CLI's --body-file contract is UTF-8 and the body
@@ -130,10 +135,8 @@ class DefaultIrohCliRunner(
             )
         }
 
-        // Wait for the process first (with the invocation deadline). Only
-        // AFTER the process has exited (or been destroyed) do we drain
-        // stdout/stderr — reading those streams before the child exits can
-        // deadlock on a child that writes a lot and a small pipe buffer.
+        // Wait for the process (with the invocation deadline) while the
+        // drains above empty its pipes.
         //
         // Implementation note: we deliberately AVOID withTimeoutOrNull here.
         // The wrapper is reached from production dispatcher (Dispatchers.IO,
@@ -144,47 +147,47 @@ class DefaultIrohCliRunner(
         // `isAlive` on the IO dispatcher uses real wall time and is
         // scheduler-agnostic.
         val deadlineMs = invocationTimeoutMs
-        val exitCode = withContext(Dispatchers.IO) {
-            val start = System.nanoTime()
-            while (process.isAlive) {
-                val elapsedMs = (System.nanoTime() - start) / 1_000_000L
-                if (elapsedMs >= deadlineMs) {
-                    return@withContext null
+        val exitCode = try {
+            withContext(Dispatchers.IO) {
+                val start = System.nanoTime()
+                while (process.isAlive) {
+                    val elapsedMs = (System.nanoTime() - start) / 1_000_000L
+                    if (elapsedMs >= deadlineMs) {
+                        return@withContext null
+                    }
+                    // 50ms poll granularity — coarse enough to avoid pegging
+                    // a CPU, fine enough that destroyForcibly lands within one
+                    // poll of the deadline.
+                    delay(50.milliseconds)
                 }
-                // 50ms poll granularity — coarse enough to avoid pegging
-                // a CPU, fine enough that destroyForcibly lands within one
-                // poll of the deadline.
-                delay(50.milliseconds)
+                process.exitValue()
             }
-            process.exitValue()
+        } catch (e: CancellationException) {
+            // Kill the child so it cannot outlive the invocation and so the
+            // drains (which wait for its pipes to close) can finish.
+            process.destroyForcibly()
+            throw e
         }
         if (exitCode == null) {
             // Timed out — destroy the child and surface a Failed so the
             // dispatcher's is_error answer guarantee holds. The drain below
             // will pick up whatever the child had buffered before SIGKILL.
             process.destroyForcibly()
-            // Best-effort: drain whatever the child wrote before the kill so
-            // a future debugging session has the stderr to look at. We don't
-            // gate the return on this; the dispatcher's 5-minute window has
-            // its own watchdog.
-            val stderrTail = runCatching {
-                process.errorStream.bufferedReader(Charsets.UTF_8).readText()
-            }.getOrNull()?.take(MAX_REASON_LEN)
+            // Keep whatever stderr the child wrote before the kill so a
+            // future debugging session has it to look at.
+            val stderrTail = stderrDrain.textAfter(DRAIN_GRACE_MS).take(MAX_REASON_LEN)
             val reason = "cli_timeout_after_${invocationTimeoutMs}ms" +
-                (stderrTail?.let { ": ${it.take(200)}" } ?: "")
+                stderrTail.takeIf { it.isNotEmpty() }?.let { ": ${it.take(200)}" }.orEmpty()
             return@withContext IrohCliSendResult.Failed(
                 toAgentId = toAgentId,
                 reason = reason,
             )
         }
 
-        // Process has exited — safe to drain (and it WILL be empty/small).
-        val stdout = runCatching {
-            process.inputStream.bufferedReader(Charsets.UTF_8).readText()
-        }.getOrElse { "" }
-        val stderr = runCatching {
-            process.errorStream.bufferedReader(Charsets.UTF_8).readText()
-        }.getOrElse { "" }
+        // A grandchild holding a pipe open past the CLI's exit costs at most
+        // the grace; what was read by then is used.
+        val stdout = stdoutDrain.textAfter(DRAIN_GRACE_MS)
+        val stderr = stderrDrain.textAfter(DRAIN_GRACE_MS)
 
         if (exitCode == 0) {
             val parsed = parseCliResultJson(stdout, msgId = msgId, toAgentId = toAgentId)
@@ -348,6 +351,12 @@ class DefaultIrohCliRunner(
          * readable cause line.
          */
         const val MAX_REASON_LEN: Int = 1024
+
+        /** Most of each CLI pipe kept in memory. The result JSON is a few hundred bytes. */
+        internal const val MAX_OUTPUT_BYTES: Int = 64 * 1024
+
+        /** How long to wait for a pipe to close after the CLI has ended. */
+        private const val DRAIN_GRACE_MS: Long = 2_000L
 
         /**
          * Default binary path for the production wrapper distribution.

@@ -19,25 +19,37 @@ import java.io.File
 /**
  * Append-only `<stateDir>/turn-identity/<conversationId>.jsonl`, one entry per line:
  * `{"v":1,"d":"<durable id>","t":"<message_type>","l":"<logical id>","n":"<turn id>"}`. A later
- * line for the same row wins. [load] serves only the newest [maxEntries] lines and rewrites a file
- * that has grown past twice that. Compaction runs once per load, so a long-running host's file
- * grows with its turn count between restarts. A line that is not a version 1 entry is skipped and
- * reported as `turnIdentity.storeCorruptLine`.
+ * line for the same row wins. [load] serves only the newest [maxEntries] lines, holding no more
+ * than that many in memory, and rewrites a file that has grown past twice that. [append] rewrites a
+ * file to its newest [maxEntries] lines once it passes [maxFileBytes], so a long-running host's
+ * files stay bounded between restarts. When an append starts a new file and the directory holds
+ * more than [maxFiles] ledgers, the least recently written are deleted and reported as
+ * `turnIdentity.filesPruned`; those conversations fall back to the identities in their rows. A
+ * line that is not a version 1 entry is skipped and reported as `turnIdentity.storeCorruptLine` under the file's name.
  */
 class FileTurnIdentityStore(
     private val directory: File,
     private val maxEntries: Int = DEFAULT_MAX_ENTRIES,
+    private val maxFileBytes: Long = DEFAULT_MAX_FILE_BYTES,
+    private val maxFiles: Int = DEFAULT_MAX_FILES,
 ) : TurnIdentityStore {
+    init {
+        require(maxEntries > 0 && maxFiles > 0) { "maxEntries and maxFiles must be positive" }
+    }
+
+    // Serializes rewrites against appends so a compaction never drops a line appended meanwhile.
+    private val lock = Any()
+
     override suspend fun load(conversationId: String): Map<StoredRowRef, RowIdentity> = withContext(Dispatchers.IO) {
         val file = fileFor(conversationId)
-        if (!file.isFile) return@withContext emptyMap()
-        val lines = file.readLines().filter { it.isNotBlank() }
-        val newest = lines.takeLast(maxEntries).mapNotNull { parseLine(conversationId, it) }
-        if (lines.size > maxEntries * 2) rewrite(file, newest)
-        LinkedHashMap<StoredRowRef, RowIdentity>().also { map ->
-            newest.forEach { (ref, identity) ->
-                map.remove(ref)
-                map[ref] = identity
+        synchronized(lock) {
+            if (!file.isFile) return@withContext emptyMap()
+            val newest = newestEntries(file, compactPast = maxEntries * 2)
+            LinkedHashMap<StoredRowRef, RowIdentity>().also { map ->
+                newest.forEach { (ref, identity) ->
+                    map.remove(ref)
+                    map[ref] = identity
+                }
             }
         }
     }
@@ -45,9 +57,45 @@ class FileTurnIdentityStore(
     override suspend fun append(conversationId: String, entries: Map<StoredRowRef, RowIdentity>) {
         if (entries.isEmpty()) return
         withContext(Dispatchers.IO) {
-            directory.mkdirs()
-            fileFor(conversationId).appendText(entries.entries.joinToString("") { (ref, identity) -> line(ref, identity) + "\n" })
+            synchronized(lock) {
+                directory.mkdirs()
+                val file = fileFor(conversationId)
+                val isNew = !file.exists()
+                file.appendText(entries.entries.joinToString("") { (ref, identity) -> line(ref, identity) + "\n" })
+                if (file.length() > maxFileBytes) newestEntries(file, compactPast = maxEntries)
+                if (isNew) pruneOldestFiles(keep = file)
+            }
         }
+    }
+
+    /** The newest [maxEntries] parsed lines; rewrites [file] to them when it has more than [compactPast] lines. */
+    private fun newestEntries(file: File, compactPast: Int): List<Pair<StoredRowRef, RowIdentity>> {
+        val tail = ArrayDeque<String>(maxEntries)
+        var lineCount = 0
+        file.useLines { lines ->
+            lines.filter { it.isNotBlank() }.forEach { line ->
+                lineCount++
+                if (tail.size == maxEntries) tail.removeFirst()
+                tail.addLast(line)
+            }
+        }
+        val newest = tail.mapNotNull { parseLine(file, it) }
+        if (lineCount > compactPast) rewrite(file, newest)
+        return newest
+    }
+
+    /** Deletes the least recently written ledgers past [maxFiles], never [keep] (the one just started). */
+    private fun pruneOldestFiles(keep: File) {
+        val files = directory.listFiles { file -> file.isFile && file.name.endsWith(".jsonl") } ?: return
+        if (files.size <= maxFiles) return
+        val others = files.filter { it != keep }.sortedByDescending { it.lastModified() }
+        val pruned = others.drop(maxFiles - 1).count { it.delete() }
+        if (pruned == 0) return
+        Telemetry.event(
+            "TurnIdentity", "turnIdentity.filesPruned",
+            "pruned" to pruned, "maxFiles" to maxFiles,
+            level = Telemetry.Level.WARN,
+        )
     }
 
     private fun rewrite(file: File, entries: List<Pair<StoredRowRef, RowIdentity>>) {
@@ -70,7 +118,7 @@ class FileTurnIdentityStore(
         put("n", identity.turnId)
     }.toString()
 
-    private fun parseLine(conversationId: String, line: String): Pair<StoredRowRef, RowIdentity>? = runCatching {
+    private fun parseLine(ledger: File, line: String): Pair<StoredRowRef, RowIdentity>? = runCatching {
         val obj: JsonObject = Json.parseToJsonElement(line).jsonObject
         check(obj["v"]?.jsonPrimitive?.intOrNull == VERSION)
         fun field(key: String) = checkNotNull(obj[key]?.jsonPrimitive?.contentOrNull)
@@ -78,13 +126,19 @@ class FileTurnIdentityStore(
     }.onFailure {
         Telemetry.event(
             "TurnIdentity", "turnIdentity.storeCorruptLine",
-            "conversationId" to conversationId,
+            "conversationId" to ledger.nameWithoutExtension,
             "preview" to line.take(CORRUPT_PREVIEW_CHARS),
         )
     }.getOrNull()
 
     companion object {
         const val DEFAULT_MAX_ENTRIES = 5_000
+
+        /** About four times what [DEFAULT_MAX_ENTRIES] lines take, so appends rarely compact. */
+        const val DEFAULT_MAX_FILE_BYTES: Long = 4L * 1024 * 1024
+
+        /** One ledger per conversation the host has served turns for. */
+        const val DEFAULT_MAX_FILES = 2_000
         private const val VERSION = 1
         private const val CORRUPT_PREVIEW_CHARS = 80
         private val UNSAFE = Regex("[^A-Za-z0-9._-]")
