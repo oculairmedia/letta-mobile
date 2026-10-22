@@ -1,4 +1,5 @@
 pub mod frame;
+pub mod identity;
 pub mod negotiation;
 mod relay;
 mod session;
