@@ -718,7 +718,8 @@ jobs:
 
       - name: Test browser Iroh identity store
         # letta-mobile-wisqe S1: persistent, encrypted-at-rest browser identity (iroh-identity.js).
-        run: node --test android-compose/web/iroh-identity.test.mjs
+        # The job's default working-directory is android-compose/.
+        run: node --test web/iroh-identity.test.mjs
 
       - name: Build and test Compose web client
         # The wasm test executable links all of sharedUI; at the repo-wide
