@@ -1,12 +1,19 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.readUtf8AtMost
 import io.ktor.client.request.header
-import io.ktor.client.request.request
+import io.ktor.client.request.prepareRequest
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.utils.io.jvm.javaio.toInputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import java.io.IOException
+import java.io.InputStream
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
@@ -108,9 +115,15 @@ class AdminProxyClient(
     }
 }
 
+/**
+ * Bodies are read up to [maxBodyBytes]; a larger success body fails the call with an
+ * [IOException] instead of being buffered whole. The default is the largest admin_rpc response
+ * the Iroh frame codec can carry back to a client.
+ */
 class HttpUrlConnectionAdminProxyTransport(
     private val connectTimeoutMs: Int = 15_000,
     private val readTimeoutMs: Int = 15_000,
+    private val maxBodyBytes: Int = IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES,
 ) : AdminProxyTransport {
     override fun execute(method: String, url: String, body: String?): AdminProxyTransportResponse {
         // HttpURLConnection hard-rejects PATCH (ProtocolException "Invalid HTTP
@@ -132,31 +145,48 @@ class HttpUrlConnectionAdminProxyTransport(
             }
 
             val statusCode = connection.responseCode
-            val bodyText = if (statusCode in 200..299) {
-                connection.inputStream.bufferedReader().readText()
-            } else {
-                connection.errorStream?.bufferedReader()?.readText() ?: "{\"error\":\"HTTP $statusCode\"}"
-            }
-            AdminProxyTransportResponse(statusCode, bodyText)
+            val stream = if (statusCode in 200..299) connection.inputStream else connection.errorStream
+            AdminProxyTransportResponse(statusCode, readProxyBody(stream, statusCode))
         } finally {
             connection.disconnect()
         }
     }
+
+    /**
+     * A success body past [maxBodyBytes] throws, since a cut JSON body cannot be parsed. An error body
+     * is only quoted in [AdminProxyHttpException], so it is cut to [MAX_ERROR_BODY_BYTES] instead.
+     */
+    private fun readProxyBody(stream: InputStream?, statusCode: Int): String {
+        if (stream == null) return "{\"error\":\"HTTP $statusCode\"}"
+        if (statusCode !in 200..299) return stream.use { it.readUtf8AtMost(MAX_ERROR_BODY_BYTES).text }
+        val read = stream.use { it.readUtf8AtMost(maxBodyBytes) }
+        // The caller's proxy.failed event names the url.
+        if (read.truncated) throw IOException("Admin proxy response exceeded $maxBodyBytes bytes")
+        return read.text
+    }
+
+    /** PATCH via ktor CIO (HttpURLConnection cannot send PATCH on any JDK). */
+    private fun executePatchViaKtor(url: String, body: String?): AdminProxyTransportResponse =
+        kotlinx.coroutines.runBlocking {
+            io.ktor.client.HttpClient(io.ktor.client.engine.cio.CIO).use { client ->
+                // prepareRequest + execute streams the body; request() would save all of it first.
+                client.prepareRequest(url) {
+                    this.method = io.ktor.http.HttpMethod.Patch
+                    header(io.ktor.http.HttpHeaders.ContentType, "application/json")
+                    header(io.ktor.http.HttpHeaders.Accept, "application/json")
+                    setBody(body ?: "{}")
+                }.execute { response ->
+                    val statusCode = response.status.value
+                    val bodyText = withContext(Dispatchers.IO) {
+                        readProxyBody(response.bodyAsChannel().toInputStream(), statusCode)
+                    }
+                    AdminProxyTransportResponse(statusCode, bodyText)
+                }
+            }
+        }
 }
 
-/** PATCH via ktor CIO (HttpURLConnection cannot send PATCH on any JDK). */
-private fun executePatchViaKtor(url: String, body: String?): AdminProxyTransportResponse =
-    kotlinx.coroutines.runBlocking {
-        io.ktor.client.HttpClient(io.ktor.client.engine.cio.CIO).use { client ->
-            val response = client.request(url) {
-                this.method = io.ktor.http.HttpMethod.Patch
-                header(io.ktor.http.HttpHeaders.ContentType, "application/json")
-                header(io.ktor.http.HttpHeaders.Accept, "application/json")
-                setBody(body ?: "{}")
-            }
-            AdminProxyTransportResponse(response.status.value, response.bodyAsText())
-        }
-    }
+private const val MAX_ERROR_BODY_BYTES = 64 * 1024
 
 fun adminProxyRequest(vararg segments: String): AdminProxyRequest.Builder =
     AdminProxyRequest.Builder().segments(*segments)

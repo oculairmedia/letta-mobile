@@ -7,6 +7,7 @@ import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class FileTurnIdentityStoreTest {
     private val directory = Files.createTempDirectory("turn-identity").toFile()
@@ -44,6 +45,46 @@ class FileTurnIdentityStoreTest {
         store.append("c", mapOf(ref to RowIdentity("lm-real", "t")))
 
         assertEquals(RowIdentity("lm-real", "t"), store.load("c").getValue(ref))
+    }
+
+    @Test
+    fun appendCompactsAFilePastItsByteBudget() = runTest {
+        val store = FileTurnIdentityStore(directory, maxEntries = 5, maxFileBytes = 1_000)
+        (1..40).forEach { store.append("c", mapOf(entry(it))) }
+
+        val file = java.io.File(directory, "c.jsonl")
+
+        assertTrue(file.length() <= 1_000, "file grew to ${file.length()} bytes")
+        assertEquals((36..40).map { entry(it).first }, store.load("c").keys.toList())
+    }
+
+    @Test
+    fun startingALedgerPastTheFileCapDeletesTheLeastRecentlyWritten() = runTest {
+        val store = FileTurnIdentityStore(directory, maxFiles = 2)
+        listOf("old", "mid").forEachIndexed { age, id ->
+            store.append(id, mapOf(entry(age)))
+            java.io.File(directory, "$id.jsonl").setLastModified(1_000_000L * (age + 1))
+        }
+
+        store.append("new", mapOf(entry(9)))
+
+        assertEquals(setOf("mid.jsonl", "new.jsonl"), directory.list()!!.toSet())
+        assertEquals(emptyMap(), store.load("old"))
+    }
+
+    @Test
+    fun aNewLedgerIsKeptWhenEveryFileHasTheSameModifiedTime() = runTest {
+        val store = FileTurnIdentityStore(directory, maxFiles = 2)
+        listOf("a", "b").forEach { id ->
+            store.append(id, mapOf(entry(1)))
+            java.io.File(directory, "$id.jsonl").setLastModified(5_000_000L)
+        }
+
+        store.append("new", mapOf(entry(2)))
+        java.io.File(directory, "new.jsonl").setLastModified(5_000_000L)
+
+        assertEquals(2, directory.list()!!.size)
+        assertEquals(setOf(entry(2).first), store.load("new").keys)
     }
 
     @AfterTest

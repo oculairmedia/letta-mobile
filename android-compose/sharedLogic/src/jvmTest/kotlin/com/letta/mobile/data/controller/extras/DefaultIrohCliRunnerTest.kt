@@ -230,6 +230,42 @@ class DefaultIrohCliRunnerTest {
     }
 
     @Test
+    fun aCliThatFillsItsPipesBeforeExitingIsNotTimedOut() = runBlocking {
+        // 1 MiB on stderr fills the pipe buffer long before exit. Draining only
+        // after exit would stall the child until the deadline.
+        val tmp = kotlin.io.path.createTempDirectory("iroh-runner-test").toFile()
+        val script = writeCaptureScript(tmp, "chatty.sh", File(tmp, "stdout.txt"), """
+            #!/bin/sh
+            cat >/dev/null
+            head -c 1048576 /dev/zero | tr '\0' x >&2
+            printf '{"ok":true,"accepted":true,"applicationDelivered":true,"msgId":"m-chatty"}'
+            exit 0
+        """.trimIndent())
+        val result = DefaultIrohCliRunner(invocationTimeoutMs = 10_000L)
+            .send(script.absolutePath, "from", "to", "hi", IrohCliPaths())
+        assertTrue(result is IrohCliSendResult.Delivered, "a chatty CLI must still deliver, got: $result")
+    }
+
+    @Test
+    fun aGrandchildHoldingStdoutOpenDoesNotLoseTheResult() = runBlocking {
+        // The CLI answers and exits, but a process it started keeps stdout open.
+        val tmp = kotlin.io.path.createTempDirectory("iroh-runner-test").toFile()
+        val script = writeCaptureScript(tmp, "daemon.sh", File(tmp, "stdout.txt"), """
+            #!/bin/sh
+            cat >/dev/null
+            printf '{"ok":true,"accepted":true,"applicationDelivered":true,"msgId":"m-daemon"}'
+            sleep 30 &
+            exit 0
+        """.trimIndent())
+        val startedNs = System.nanoTime()
+        val result = DefaultIrohCliRunner(invocationTimeoutMs = 20_000L)
+            .send(script.absolutePath, "from", "to", "hi", IrohCliPaths())
+        val elapsedMs = (System.nanoTime() - startedNs) / 1_000_000L
+        assertTrue(result is IrohCliSendResult.Delivered, "the written result must survive, got: $result")
+        assertTrue(elapsedMs < 10_000L, "waited ${elapsedMs}ms on a pipe the CLI had finished with")
+    }
+
+    @Test
     fun timeoutMapsToFailed() = runBlocking {
         // Hang forever; runner must destroy the child at the deadline.
         val tmp = kotlin.io.path.createTempDirectory("iroh-runner-test").toFile()
