@@ -1,6 +1,5 @@
 package com.letta.mobile.di
 
-import com.letta.mobile.data.agenteditor.AgentCreator
 import com.letta.mobile.data.memory.memfs.AppServerMemfsSource
 import com.letta.mobile.data.memory.memfs.MemfsSource
 import com.letta.mobile.data.secrets.AgentSecretsFeature
@@ -14,7 +13,6 @@ import com.letta.mobile.data.workspace.AppServerWorkspaceFileSource
 import com.letta.mobile.data.workspace.WorkspaceFileSource
 import com.letta.mobile.data.workspace.relay.WorkspaceClientRoute
 import com.letta.mobile.data.workspace.relay.WorkspaceRelayCall
-import com.letta.mobile.ui.screens.agentlist.AndroidAgentCreator
 import com.letta.mobile.ui.shell.pages.ShellLibrarySources
 import dagger.Module
 import dagger.Provides
@@ -58,9 +56,6 @@ object WorkspaceModule {
     @Provides
     fun provideShellLibrarySources(settings: SecureSettingsStore, memfs: MemfsSource): ShellLibrarySources =
         ShellLibrarySources(settings, memfs)
-
-    @Provides
-    fun provideAgentCreator(creator: AndroidAgentCreator): AgentCreator = creator
 
     @Provides
     fun provideWorkspaceFileSource(route: WorkspaceClientRoute): WorkspaceFileSource =
