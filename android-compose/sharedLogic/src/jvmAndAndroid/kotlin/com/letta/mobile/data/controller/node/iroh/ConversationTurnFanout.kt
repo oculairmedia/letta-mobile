@@ -493,21 +493,27 @@ internal class ConversationTurnFanout(
      * When there is no queue (legacy/test construction) every write stays
      * synchronous, preserving the pre-queue behaviour exactly.
      */
+    /**
+     * Endpoint identities are stable public keys and therefore correlatable: emit only aggregate
+     * delivery state, never endpoint values. One line per CHANGE of audience, not per delta: a
+     * streamed turn is thousands of deltas.
+     */
+    private fun noteAudience(viewerCount: Int) {
+        val hasInitiator = initiatorViewer != null
+        val audience = viewerCount * 2 + if (hasInitiator) 1 else 0
+        if (audience == lastBroadcastAudience) return
+        lastBroadcastAudience = audience
+        Telemetry.event(
+            "IrohNode", "fanout.broadcast",
+            "conversationId" to conversationId,
+            "viewerCount" to viewerCount,
+            "hasInitiator" to hasInitiator,
+        )
+    }
+
     private suspend fun broadcastDeltaBodyNoPark(delta: JsonObject) {
         val viewers = snapshotViewers()
-        // Endpoint identities are stable public keys and therefore correlatable.
-        // Emit only aggregate delivery state; never copy endpoint values into fanout telemetry.
-        // One line per CHANGE of audience, not per delta: a streamed turn is thousands of deltas.
-        val audience = viewers.size * 2 + if (initiatorViewer != null) 1 else 0
-        if (audience != lastBroadcastAudience) {
-            lastBroadcastAudience = audience
-            Telemetry.event(
-                "IrohNode", "fanout.broadcast",
-                "conversationId" to conversationId,
-                "viewerCount" to viewers.size,
-                "hasInitiator" to (initiatorViewer != null),
-            )
-        }
+        noteAudience(viewers.size)
         if (viewers.isEmpty()) return
         // tg7b8: split the join. The initiator MUST receive every frame for
         // redial parity (q71yi parking) — keep awaitAll on its single write.

@@ -134,7 +134,7 @@ class AdminRpcRouter(
                     put("success", true)
                     put("result", result)
                 },
-            ).also { response -> reportIfSlow(invocation.method, startedNs, response.length) }
+            ).also { response -> reportIfSlow(invocation, startedNs, response.length) }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {
@@ -149,12 +149,12 @@ class AdminRpcRouter(
     }
 
     /** Names a handler that took [SLOW_HANDLER_MS] or more, with its response size: the only per-call timing the host keeps. */
-    private fun reportIfSlow(method: String, startedNs: Long, responseChars: Int) {
+    private fun reportIfSlow(invocation: AdminRpcInvocation, startedNs: Long, responseChars: Int) {
         val tookMs = (System.nanoTime() - startedNs) / NANOS_PER_MILLI
         if (tookMs < SLOW_HANDLER_MS) return
         Telemetry.event(
             "AdminRpc", "handler.slow",
-            "method" to method, "responseChars" to responseChars,
+            "method" to invocation.method, "responseChars" to responseChars,
             durationMs = tookMs, level = Telemetry.Level.WARN,
         )
     }
