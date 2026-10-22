@@ -9,7 +9,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import com.letta.mobile.data.model.AppTheme
@@ -87,11 +86,11 @@ class RelayedPendingApprovalTimelineTest {
         composeRule.onNodeWithText("Approval requested").assertIsDisplayed()
         composeRule.onNodeWithText("Approve").assertIsDisplayed()
         composeRule.onNodeWithText("Reject").assertIsDisplayed()
-        // ckmub.1.2: the parked call is one step row straight under the run's line (its glyph says it
-        // waits), not an "Approval needed - 1 command" group line.
+        // The parked call is one step line straight under the run's line (its note says it waits),
+        // not an "Approval needed - 1 command" group line.
         composeRule.onAllNodesWithTag(STEP_ROW).assertCountEquals(1)
         composeRule.onNodeWithTag(STEP_ROW).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Awaiting approval", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("awaiting approval", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithTag(GROUP_LINE).assertDoesNotExist()
         // The run's header says it waits, and so does the composer's token (not "Thinking…").
         composeRule.onNodeWithText("Waiting for your approval").assertIsDisplayed()
