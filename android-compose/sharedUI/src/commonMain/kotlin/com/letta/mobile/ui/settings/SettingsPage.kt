@@ -29,6 +29,8 @@ data class SettingsPageState(
     val config: LettaConfig,
     val connection: BackendConnectionStatus? = null,
     val section: ShellSettingsSection? = null,
+    /** The host's saved backends, where it keeps more than one; null edits [config] alone. */
+    val saved: SavedBackends? = null,
 )
 
 /**

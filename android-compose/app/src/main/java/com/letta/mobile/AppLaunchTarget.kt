@@ -4,12 +4,9 @@ import android.content.Context
 import android.content.Intent
 import ca.oculair.meridian.BuildConfig
 import com.letta.mobile.debug.AutomationImportGate
-import com.letta.mobile.ui.navigation.AgentListRoute
 
+/** Where an intent opens the app: a chat, a share, the agent directory or the pairing scanner. */
 sealed interface AppLaunchTarget {
-    @Suppress("NoAnyType") // Navigation routes are typed objects of unrelated classes (see AndroidShellRoutes).
-    fun toRoute(): Any
-
     companion object {
         /**
          * MainActivity is exported: every extra here may come from another app.
@@ -29,9 +26,6 @@ sealed interface AppLaunchTarget {
 
 data object AgentListLaunchTarget : AppLaunchTarget {
     private const val EXTRA_OPEN_AGENT_LIST = "automation_open_agent_list"
-
-    @Suppress("NoAnyType") // A typed navigation route object.
-    override fun toRoute(): Any = AgentListRoute
 
     fun fromIntent(intent: Intent?, automationExtrasEnabled: Boolean): AgentListLaunchTarget? {
         val requested = intent?.getBooleanExtra(EXTRA_OPEN_AGENT_LIST, false) == true

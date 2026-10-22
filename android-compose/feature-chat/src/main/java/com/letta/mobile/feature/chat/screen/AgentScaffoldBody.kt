@@ -10,7 +10,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 internal fun AgentScaffoldBody(params: AgentScaffoldBodyParams) {
     val state = rememberAgentScaffoldRuntimeState(params)
     AgentScaffoldInteractionEffects(state)
+    AgentScaffoldWorkspaceEffects(state)
     // The shared chat page's composer opens the picker `/models` and the drawer's card use.
-    CompositionLocalProvider(LocalChatModelPicker provides params.modelPicker) { AgentScaffoldDrawerScaffold(state) }
+    CompositionLocalProvider(LocalChatModelPicker provides params.modelPicker) { AgentScaffoldChatPane(state) }
     AgentScaffoldSheets(state)
 }

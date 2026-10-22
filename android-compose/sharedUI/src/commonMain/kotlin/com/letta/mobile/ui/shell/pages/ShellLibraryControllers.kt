@@ -19,7 +19,7 @@ import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohSkillsApi
 import com.letta.mobile.data.schedules.ScheduleLibraryController
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
-import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
+import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.ifSupported
 import com.letta.mobile.data.shell.ShellHomeShortcuts
 import com.letta.mobile.data.shell.ShellPageErrors
@@ -30,7 +30,7 @@ import com.letta.mobile.data.tools.ToolLibraryController
 import kotlinx.coroutines.CoroutineScope
 
 /** The session graph the shell's pages read: one provider per window (desktop) or tab (web). */
-typealias ShellGraphProvider = SessionRepositoryGraphProvider<SharedSessionRepositoryGraph>
+typealias ShellGraphProvider = SessionRepositoryGraphProvider<out SessionRepositoryGraph>
 
 /**
  * What the library controllers read besides the session graph: the device's settings store (Home's
@@ -62,7 +62,7 @@ object ShellLibraryFactory {
         MemoryPageController.forSession(provider, scope, ShellPageErrors::memory)
 
     /** Only an Iroh host relays schedules; the session's capabilities say so up front. */
-    fun schedules(graph: SharedSessionRepositoryGraph, scope: CoroutineScope): ScheduleLibraryController =
+    fun schedules(graph: SessionRepositoryGraph, scope: CoroutineScope): ScheduleLibraryController =
         ScheduleLibraryController(
             agentRepository = graph.agentRepository,
             scheduleRepository = graph.scheduleRepository,
@@ -75,11 +75,11 @@ object ShellLibraryFactory {
     fun channels(provider: ShellGraphProvider, scope: CoroutineScope): ChannelsPageController =
         ChannelsPageController.forSession(provider, scope)
 
-    fun tools(graph: SharedSessionRepositoryGraph, scope: CoroutineScope): ToolLibraryController =
+    fun tools(graph: SessionRepositoryGraph, scope: CoroutineScope): ToolLibraryController =
         ToolLibraryController(graph.toolRepository, graph.mcpServerRepository, scope, ShellPageErrors::tools)
 
     /** The skill registry rides an Iroh host's `admin_rpc`; elsewhere the catalog reports itself unavailable. */
-    fun skills(graph: SharedSessionRepositoryGraph, scope: CoroutineScope): SkillsCatalogController {
+    fun skills(graph: SessionRepositoryGraph, scope: CoroutineScope): SkillsCatalogController {
         val api = graph.ifSupported(SessionRoute.SKILLS) { IrohSkillsApi(IrohAdminRpcAgentDirectory(channelTransport)) }
         return SkillsCatalogController(api, scope)
     }

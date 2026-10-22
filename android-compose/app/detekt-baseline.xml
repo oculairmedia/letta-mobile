@@ -6,7 +6,6 @@
     <ID>CyclomaticComplexMethod:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$private fun handleSocket(socket: Socket)</ID>
     <ID>CyclomaticComplexMethod:AndroidProviderReadTool.kt$AndroidProviderReadTool$private fun readContacts(input: JsonObject): ProviderReadResult</ID>
     <ID>CyclomaticComplexMethod:BoundedTranscriptReader.kt$BoundedTranscriptReader$fun readLines(file: File, maxInlineValueChars: Int = DEFAULT_MAX_INLINE_VALUE_CHARS): List&lt;BoundedLine&gt;</ID>
-    <ID>CyclomaticComplexMethod:ConfigViewModel.kt$ConfigViewModel$fun saveConfig( onSuccess: () -&gt; Unit, onError: ((String) -&gt; Unit)? = null, asNewEntry: Boolean = createNew, )</ID>
     <ID>CyclomaticComplexMethod:DeviceActionCommandRunner.kt$DeviceActionCommandRunner$fun run(commandJson: String): DeviceActionCommandResult</ID>
     <ID>CyclomaticComplexMethod:OnDeviceOpenAiBridge.kt$LocalOpenAiOnDeviceBridge.BridgeServerSession$private fun handleSocket(socket: Socket)</ID>
     <ID>DestructuringDeclarationWithTooManyEntries:HomeScreen.kt$val (navigation, routes, backend, title) = spec</ID>
@@ -22,7 +21,6 @@
     <ID>LongMethod:ChannelNotificationPublisher.kt$ChannelNotificationPublisher$override fun publish(notification: ChannelNotification): Boolean</ID>
     <ID>LongMethod:ChatPushService.kt$ChatPushService$private fun warmupSubscribers()</ID>
     <ID>LongMethod:ConfigListScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun ConfigCard( config: ServerConfig, onSetActive: () -&gt; Unit, onDelete: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
-    <ID>LongMethod:ConfigViewModel.kt$ConfigViewModel$fun saveConfig( onSuccess: () -&gt; Unit, onError: ((String) -&gt; Unit)? = null, asNewEntry: Boolean = createNew, )</ID>
     <ID>LongMethod:DeviceSensorReadTool.kt$DeviceSensorReadTool$fun handle(input: JsonObject, nowMillis: Long = System.currentTimeMillis()): ReadSensorsToolResponse</ID>
     <ID>LongMethod:MobileActionRegistry.kt$AndroidMobileActionCapabilityProvider$override fun capabilities(): List&lt;MobileActionCapability&gt;</ID>
     <ID>LongMethod:MobileIntentActionTool.kt$MobileIntentActionTool$private fun handleIntent( toolName: String, dryRun: Boolean, userActionRequired: Boolean, buildIntent: () -&gt; Intent, ): MobileIntentActionResponse</ID>

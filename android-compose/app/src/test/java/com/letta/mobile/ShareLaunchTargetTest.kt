@@ -2,7 +2,6 @@ package com.letta.mobile
 
 import android.content.Intent
 import android.net.Uri
-import com.letta.mobile.ui.navigation.ShareToAgentRoute
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import org.junit.Test
@@ -24,9 +23,7 @@ class ShareLaunchTargetTest {
         val target = ShareLaunchTarget.fromIntent(intent)
 
         target shouldNotBe null
-        target?.toRoute() shouldBe ShareToAgentRoute(
-            sharedText = "Interesting article\n\nhttps://example.com/post",
-        )
+        target?.sharedText shouldBe "Interesting article\n\nhttps://example.com/post"
     }
 
     @Test
@@ -39,9 +36,7 @@ class ShareLaunchTargetTest {
         val target = ShareLaunchTarget.fromIntent(intent)
 
         target shouldNotBe null
-        target?.toRoute() shouldBe ShareToAgentRoute(
-            sharedText = "Shared file:\n- content://example/shared-note/1 (text/plain)",
-        )
+        target?.sharedText shouldBe "Shared file:\n- content://example/shared-note/1 (text/plain)"
     }
 
     @Test

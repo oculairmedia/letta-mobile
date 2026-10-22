@@ -1,8 +1,6 @@
 package com.letta.mobile.feature.chat.screen
 
-import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
-import com.letta.mobile.ui.search.LettaSearchOpenRequest
 
 internal data class AgentScaffoldNavigationCallbacks(
     val onNavigateBack: () -> Unit,
@@ -35,12 +33,6 @@ internal data class AgentScaffoldSheetVisibility(
     val onShowAgentSwitcherChange: (Boolean) -> Unit,
 )
 
-/** The header's message search: `/search` asks [openRequest] to open the pane, which takes it once. */
-internal data class AgentScaffoldSearchUiState(
-    val openRequest: LettaSearchOpenRequest? = null,
-    val onOpenSearch: () -> Unit = {},
-)
-
 internal data class AgentScaffoldProjectUiState(
     val isProjectInfoExpanded: Boolean,
     val onProjectInfoExpandedChange: (Boolean) -> Unit,
@@ -52,9 +44,9 @@ internal data class AgentScaffoldBodyParams(
     val chatMode: String,
     val onChatModeChange: (String) -> Unit,
     val sheetVisibility: AgentScaffoldSheetVisibility,
-    val searchUi: AgentScaffoldSearchUiState,
     val projectUi: AgentScaffoldProjectUiState,
-    val conversationRepository: IConversationRepository?,
     /** The chat's one model picker (composer chip, `/models`, the drawer's card). */
     val modelPicker: ModelPickerBinding,
+    /** The shared shell workspace around the chat (letta-mobile-ckmub.2): its header, rail and agent panel. */
+    val workspace: WorkspaceChatHost,
 )

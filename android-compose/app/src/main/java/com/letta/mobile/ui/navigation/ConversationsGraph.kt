@@ -1,181 +1,160 @@
 package com.letta.mobile.ui.navigation
 
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
+import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import com.letta.mobile.data.model.BackendConnectionStatus
+import com.letta.mobile.data.plugin.view.PluginViewsModel
+import com.letta.mobile.ui.screens.plugins.AndroidPluginPackagePicker
+import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
+import com.letta.mobile.ui.shell.pages.plugins.PluginsPageBinding
+import com.letta.mobile.ui.shell.pages.plugins.shellPluginsPage
+import com.letta.mobile.ui.shell.workspace.ShellChatWaiting
+import com.letta.mobile.ui.shell.workspace.ShellChatWaitingPage
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.navigation.NavBackStackEntry
-import androidx.navigation.NavController
-import androidx.navigation.NavGraphBuilder
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.toRoute
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.data.desktopshell.ShellLayoutEvent
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.shell.ShellDestination
-import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.feature.chat.route.AgentChatRoute
-import com.letta.mobile.feature.chat.route.toViewModelKey
-import com.letta.mobile.feature.chat.screen.AgentScaffold
-import com.letta.mobile.ui.components.LettaEmptyHint
-import com.letta.mobile.ui.screens.agentlist.AgentListScreen
-import com.letta.mobile.ui.screens.agentlist.AgentListScreenNavigation
-import com.letta.mobile.ui.screens.conversations.ConversationsDetail
-import com.letta.mobile.ui.screens.conversations.ConversationsDetailPane
-import com.letta.mobile.ui.screens.conversations.ConversationsScreen
-import com.letta.mobile.ui.screens.conversations.ConversationsScreenNavigation
+import com.letta.mobile.feature.chat.screen.WorkspaceAgentChat
+import com.letta.mobile.feature.chat.screen.WorkspaceChatHost
+import com.letta.mobile.ui.chat.subagents.BackgroundTasksSidePane
+import com.letta.mobile.ui.shell.ShellPage
+import com.letta.mobile.ui.shell.header.UnifiedSearchSources
+import com.letta.mobile.ui.shell.ShellPageContent
+import com.letta.mobile.ui.shell.pages.rememberShellPageDeps
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlayActions
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlayData
+import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlays
+import com.letta.mobile.ui.shell.workspace.openSearchHit
 
-@OptIn(ExperimentalSharedTransitionApi::class)
-fun NavGraphBuilder.conversationsGraph(
-    navController: NavHostController,
-    activeBackendLabel: String?,
-    openBackendSwitcher: () -> Unit,
-) {
-    conversationsRootDestination(navController, activeBackendLabel, openBackendSwitcher)
-    agentListDestination(navController)
-    shareToAgentDestination(navController)
-}
-
-/**
- * letta-mobile-ckmub.2.4 (hard cut S16): the Chat tab's root, the shared conversations page. A narrow
- * window opens a chat as its own route; a wide one opens it beside the list ([conversationsDetailPane]).
- */
-private fun NavGraphBuilder.conversationsRootDestination(
-    navController: NavHostController,
-    activeBackendLabel: String?,
-    openBackendSwitcher: () -> Unit,
-) {
-    composable<ConversationsRoute>(
-        enterTransition = drillInPopEnter,
-        exitTransition = drillInExit,
-        popEnterTransition = drillInPopEnter,
-        popExitTransition = drillInPopExit,
-    ) {
-        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
-            ConversationsScreen(
-                navigation = ConversationsScreenNavigation(
-                    onOpenChat = { agentId, conversationId, agentName ->
-                        navController.openResidentChatOrNavigate(chatRoute(agentId, conversationId, agentName))
-                    },
-                    onNavigateToSettings = { navController.navigate(ConfigRoute()) },
-                    onNavigateToAgentList = { navController.navigate(AgentListRoute) },
-                    onCreateFirstAgent = { navController.navigateTo(ShellDestination.AgentEditor()) },
-                    activeBackendLabel = activeBackendLabel,
-                    onNavigateToBackendSwitcher = openBackendSwitcher,
-                ),
-                detailPane = conversationsDetailPane(navController),
-            )
-        }
-    }
-}
-
-/** A chat route; a null conversation is a new chat, keyed fresh so it never reuses another's state. */
-private fun chatRoute(agentId: String, conversationId: String?, agentName: String?) = AgentChatRoute(
-    agentId = agentId,
-    agentName = agentName,
-    conversationId = conversationId,
-    freshRouteKey = if (conversationId == null) System.currentTimeMillis() else null,
-)
-
-/**
- * The chat beside the wide list: its own small nav host, so switching chats replaces the chat (and
- * its view model) instead of stacking them; everything else the chat opens goes to [outer].
- */
-private fun conversationsDetailPane(outer: NavController) = ConversationsDetailPane { detail, onClose, onOpen ->
-    if (detail == null) {
-        LettaEmptyHint("Select a conversation")
-    } else {
-        ConversationsDetailHost(outer, detail, onClose, onOpen)
-    }
-}
-
+/** The page beside the workspace's navigation: the shared page for its destination, over the session graph. */
 @Composable
-private fun ConversationsDetailHost(
-    outer: NavController,
-    detail: ConversationsDetail,
-    onClose: () -> Unit,
-    onOpen: (ConversationsDetail) -> Unit,
-) {
-    val detailNav = rememberNavController()
-    // The start is fixed for the host's life (a new start would rebuild its graph); later picks navigate.
-    val start = remember { chatRoute(detail.agentId, detail.conversationId, detail.agentName) }
-    LaunchedEffect(detail) {
-        val current = detailNav.currentBackStackEntry?.toRoute<AgentChatRoute>()
-        if (current != null && !current.shows(detail)) {
-            detailNav.navigate(chatRoute(detail.agentId, detail.conversationId, detail.agentName)) { popUpTo(0) { inclusive = true } }
-        }
-    }
-    NavHost(navController = detailNav, startDestination = start) {
-        composable<AgentChatRoute> { entry ->
-            val route = entry.toRoute<AgentChatRoute>()
-            AgentScaffold(
-                onNavigateBack = onClose,
-                onNavigateToSettings = { agentId -> outer.navigateTo(ShellDestination.AgentEditor(agentId)) },
-                onNavigateToTools = { outer.navigateTo(ShellDestination.Skills(section = ShellSkillsSection.Tools)) },
-                onNavigateToSkills = { agentId -> outer.navigateTo(ShellDestination.Skills(agentId)) },
-                onNavigateToMemory = { agentId -> outer.navigateTo(ShellDestination.Memory(agentId)) },
-                onNavigateToAdmin = { outer.navigateTo(ShellDestination.Home) },
-                onNavigateToProviders = { outer.navigateTo(ShellDestination.Providers) },
-                onNavigateToProjects = { outer.navigate(HomeRoute) },
-                // The list is already beside the chat.
-                onNavigateToConversationList = onClose,
-                onSwitchConversation = { agentId, conversationId, agentName ->
-                    onOpen(ConversationsDetail(agentId, conversationId?.takeIf { it.isNotBlank() }, agentName))
-                },
-                viewModelKey = route.toViewModelKey(),
-            )
-        }
-    }
+internal fun AndroidShellPage(shell: WorkspaceShell, modifier: Modifier) {
+    val graph by shell.drawerModel.sources.sessions.currentGraph.collectAsStateWithLifecycle()
+    val deps = rememberShellPageDeps(graph, shell.controllers, androidPageHost(shell))
+    ShellPage(destination = shell.workspace.destination, deps = deps, modifier = modifier)
 }
 
-
-/** Whether this chat route already shows [detail]'s conversation. */
-private fun AgentChatRoute.shows(detail: ConversationsDetail): Boolean =
-    agentId == detail.agentId && conversationId == detail.conversationId
-
-/** What one agent-list destination opens with: text shared into the app, if any. */
-private data class AgentListEntry(val sharedText: String? = null)
-
-private fun NavGraphBuilder.agentListDestination(navController: NavHostController) =
-    agentListComposable<AgentListRoute>(navController) { AgentListEntry() }
-
-/** The share sheet's target: the same agent list, opened to pick who the shared text goes to. */
-private fun NavGraphBuilder.shareToAgentDestination(navController: NavHostController) =
-    agentListComposable<ShareToAgentRoute>(navController) { AgentListEntry(sharedText = it.toRoute<ShareToAgentRoute>().sharedText) }
-
-/** One agent-list destination of route [T]; [entryOf] reads what it opens with from its back stack entry. */
-private inline fun <reified T : Any> NavGraphBuilder.agentListComposable(
-    navController: NavHostController,
-    crossinline entryOf: (NavBackStackEntry) -> AgentListEntry,
-) {
-    composable<T>(
-        enterTransition = drillInEnter,
-        exitTransition = drillInExit,
-        popEnterTransition = drillInPopEnter,
-        popExitTransition = drillInPopExit,
-    ) { backStackEntry ->
-        val entry = entryOf(backStackEntry)
-        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
-            AgentListScreen(navigation = agentListNavigation(navController, entry))
-        }
-    }
+/** Android's chat page (letta-mobile-ckmub.2): the focused agent's chat; with no agent yet, the fallback page. */
+internal fun androidChatPage(shell: WorkspaceShell): ShellPageContent<ShellDestination.Chat>? {
+    val agent = shell.workspace.focusedAgentId ?: return null
+    return ShellPageContent { _, modifier -> AndroidChatPage(shell, agent, modifier) }
 }
 
-private fun agentListNavigation(navController: NavHostController, entry: AgentListEntry) = AgentListScreenNavigation(
-    onNavigateBack = { navController.popBackStack() },
-    onNavigateToAgent = { agentId, agentName, conversationId ->
-        val route = AgentChatRoute(
-            agentId = agentId,
-            agentName = agentName,
-            conversationId = conversationId,
-            freshRouteKey = conversationId?.let { System.currentTimeMillis() },
-            initialMessage = entry.sharedText,
+/**
+ * The chat the shell's verbs chose ([AndroidShellChatPort.opening]), else the workspace's selection
+ * (a reload, a link): its route picks the chat's view model, so a new chat keeps its page once it exists.
+ */
+@Composable
+private fun AndroidChatPage(shell: WorkspaceShell, agent: AgentId, modifier: Modifier) {
+    val port = shell.port
+    val conversation = shell.workspace.selectedConversationId
+    val adopted = remember(agent, conversation) { port.adopt(agent, conversation) }
+    val opening = port.openingFor(agent, conversation) ?: adopted
+    val route = remember(opening) {
+        AgentChatRoute(
+            agentId = opening.agent.value,
+            conversationId = opening.conversation?.value,
+            freshRouteKey = opening.fresh,
+            initialMessage = opening.firstMessage,
         )
-        // A share hands its text to the chat once: the picker leaves the back stack.
-        navController.navigate(route) { if (entry.sharedText != null) popUpTo<ShareToAgentRoute> { inclusive = true } }
+    }
+    Box(modifier) { WorkspaceAgentChat(route, chatHost(shell, opening)) }
+}
+
+private fun chatHost(shell: WorkspaceShell, opening: AndroidShellChatPort.Opening) = WorkspaceChatHost(
+    // A library board opens full screen (Android's board route); everything else is a shell page.
+    open = { destination ->
+        val board = (destination as? ShellDestination.Canvas)?.canvasId
+        if (board != null) shell.exits.openCanvasById(board) else shell.navigator.navigate(destination)
     },
-    onNavigateToEditAgent = { agentId -> navController.navigateTo(ShellDestination.AgentEditor(agentId)) },
-    onNavigateToNewAgent = { navController.navigateTo(ShellDestination.AgentEditor()) },
-    shareContentPreview = entry.sharedText,
+    openConversation = { agentId, conversationId ->
+        if (conversationId == null) {
+            shell.navigator.openNewChat(AgentId(agentId))
+        } else {
+            shell.port.open(AgentId(agentId), ConversationId(conversationId))
+            shell.workspace.showChat()
+        }
+    },
+    openAgentPane = { showNavigation(shell) },
+    openCanvas = { agentId, conversationId, shareRecipient -> shell.exits.openCanvas(agentId, conversationId, shareRecipient) },
+    onConversationShown = { _, conversationId -> shell.port.conversationShown(opening, ConversationId(conversationId)) },
+    draft = shell.port.draft,
+    openSearch = { shell.workspace.overlays.commandPalette = true },
+    drawer = shell.drawerModel,
+    panel = shell.chatPanel,
 )
+
+/** Brings the agents back: the drawer on a phone, the sidebar on a wide window. */
+internal fun showNavigation(shell: WorkspaceShell) {
+    shell.drawer.open = true
+    shell.layout.dispatch(ShellLayoutEvent.SetSidebarCollapsed(false))
+}
+
+/** The open conversation's background tasks, beside the page while the person keeps them open. */
+@Composable
+internal fun AndroidBackgroundTasks(shell: WorkspaceShell) {
+    val workspace = shell.workspace
+    if (!workspace.showBackgroundTasks) return
+    val agent = workspace.focusedAgentId ?: return
+    val conversation = workspace.selectedConversationId ?: return
+    val graph by shell.drawerModel.sources.sessions.currentGraph.collectAsStateWithLifecycle()
+    val subagents by remember(graph, agent, conversation) {
+        graph.subagentRepository.activeSubagentsFlow(SubagentParentScope(agent.value, conversation.value))
+    }.collectAsStateWithLifecycle(emptyList())
+    BackgroundTasksSidePane(subagents = subagents, onClose = { workspace.showBackgroundTasks = false })
+}
+
+/** The workspace's overlays: the New conversation directory, the command palette and the shortcut help. */
+@Composable
+internal fun AndroidShellOverlays(shell: WorkspaceShell, agents: List<com.letta.mobile.data.model.Agent>) {
+    val workspace = shell.workspace
+    ShellWorkspaceOverlays(
+        visibility = workspace.overlays,
+        data = ShellWorkspaceOverlayData(
+            searchSources = UnifiedSearchSources(agents = agents, agentId = workspace.focusedAgentId?.value),
+            railAgents = agents.map { it.id.value to it.name },
+            rosterAgents = agents,
+        ),
+        actions = ShellWorkspaceOverlayActions(
+            // A share into the app waits for its agent here, and starts a new chat with it.
+            onOpenAgent = { id -> if (!shell.port.deliverShare(AgentId(id))) shell.navigator.openAgent(AgentId(id)) },
+            onNewAgent = workspace::openNewAgent,
+            onOpenSearchHit = { hit -> shell.navigator.openSearchHit(hit, openCanvas = { shell.exits.openCanvasById(it.value) }) },
+            onNewCanvas = { shell.exits.openCanvas(workspace.focusedAgentId?.value, null, null) },
+        ),
+    )
+}
+
+/** A chat with no agent to open yet: the connection, and the way on. */
+internal fun androidWaitingPage(shell: WorkspaceShell, connection: BackendConnectionStatus) =
+    ShellPageContent<ShellDestination> { _, modifier ->
+    ShellChatWaitingPage(
+        waiting = ShellChatWaiting(connection = connection, opening = connection == BackendConnectionStatus.Connecting),
+        actions = BackendConnectionNoticeActions(
+            onOpenSettings = { shell.workspace.navigate(ShellDestination.Settings()) },
+            onShowAgents = { showNavigation(shell) },
+            onRetry = { shell.drawerModel.sources.sessions.rebuild() },
+        ),
+        modifier = modifier,
+    )
+}
+
+/** The shared Plugins page over the app's plugin views, with the system file picker. */
+internal fun androidPluginsPage(model: PluginViewsModel, onBack: () -> Unit) =
+    ShellPageContent<ShellDestination.Plugins> { destination, modifier ->
+        val registry = checkNotNull(LocalActivityResultRegistryOwner.current).activityResultRegistry
+        val context = LocalContext.current
+        val pick = remember(registry, context) { AndroidPluginPackagePicker(registry, context.contentResolver)::pick }
+        LaunchedEffect(model) { model.refresh() }
+        val binding = remember(model, pick) { PluginsPageBinding(model.catalog, pick, model.liveViews) }
+        shellPluginsPage(binding, onBack).Content(destination, modifier)
+    }

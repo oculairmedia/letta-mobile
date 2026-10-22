@@ -140,7 +140,9 @@ internal class PageSearch(val query: String, val onQuery: (String) -> Unit, val 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun rememberSettingsPageModel(state: SettingsPageState, services: SettingsPageServices): SettingsPageModel {
-    var form by remember(state.config) { mutableStateOf(BackendSettingsForm.of(state.config)) }
+    var adding by remember(state.config) { mutableStateOf(false) }
+    val editing = if (adding) NewBackend else state.config
+    var form by remember(editing) { mutableStateOf(BackendSettingsForm.of(editing)) }
     var query by rememberSaveable { mutableStateOf("") }
     var pending by remember { mutableStateOf<SettingsGroup?>(null) }
     val scroll = rememberScrollState()
@@ -155,7 +157,8 @@ internal fun rememberSettingsPageModel(state: SettingsPageState, services: Setti
             pending = null
         }
     }
-    val backend = BackendFormState(state.config, form, state.connection) { form = it }
+    val saved = state.saved?.let { SavedBackendsState(it, adding) { next -> adding = next } }
+    val backend = BackendFormState(editing, form, state.connection.takeUnless { adding }, saved) { form = it }
     val search = PageSearch(query, onQuery = { query = it }, onOpen = { group ->
         query = ""
         pending = group

@@ -28,25 +28,21 @@ import com.letta.mobile.runtime.local.runtimeLifecycleLogFile
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.notify.LocalAttentionPrefs
 import com.letta.mobile.ui.settings.BackendSettingsActions
+import com.letta.mobile.ui.settings.SavedBackends
 import com.letta.mobile.ui.settings.SettingsPageServices
 import com.letta.mobile.ui.settings.SettingsPageState
-import com.letta.mobile.ui.shell.ShellPage
-import com.letta.mobile.ui.shell.ShellPageDeps
+import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.shellSettingsPage
 import com.letta.mobile.util.Telemetry
 
 /**
- * Container (letta-mobile-ckmub.3.12, hard cut S10): Android's Settings route is the shared
- * SettingsPage drawn by ShellPage's Settings destination. This only binds the settings view model,
- * the model-file picker, battery optimization and navigation to it; the page owns its insets (edge
- * to edge) and draws every row. Replaces ConfigScreen and its section composables.
+ * The workspace's Settings page (letta-mobile-ckmub.3.12, ckmub.2): the shared SettingsPage, bound to the
+ * settings view model, the model-file picker, battery optimization and Android's own screens. The page
+ * owns its insets and draws every row; a saved backend closes it ([onBack]).
  */
-@Composable
-fun SettingsScreen(
-    onNavigateBack: () -> Unit,
-    destinations: SettingsDestinations = SettingsDestinations(),
-    viewModel: ConfigViewModel = hiltViewModel(),
-) {
+internal fun androidSettingsPage(onBack: () -> Unit, destinations: SettingsDestinations) =
+    ShellPageContent<ShellDestination.Settings> { destination, modifier ->
+    val viewModel: ConfigViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val config by viewModel.backendConfig.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarDispatcher.current
@@ -65,7 +61,7 @@ fun SettingsScreen(
             onConfigSaved = { saved ->
                 val onSaved = {
                     snackbar.dispatch(CONFIG_SAVED)
-                    onNavigateBack()
+                    onBack()
                 }
                 viewModel.saveBackend(saved, onSuccess = onSaved, onError = snackbar::dispatch)
             },
@@ -78,10 +74,14 @@ fun SettingsScreen(
         onOpenProviders = destinations.onProviders,
         contributions = androidSettingsContributions(uiState, inputs),
     )
-    ShellPage(
-        destination = ShellDestination.Settings(),
-        deps = ShellPageDeps(settings = shellSettingsPage(SettingsPageState(config), services, onBack = onNavigateBack)),
+    val backends by viewModel.backends.collectAsStateWithLifecycle()
+    val saved = SavedBackends(
+        configs = backends, activeId = config.id,
+        onSwitch = viewModel::switchBackend,
+        onAdd = { added -> viewModel.addBackend(added, onSaved = { snackbar.dispatch(CONFIG_SAVED) }, onError = snackbar::dispatch) },
+        onRemove = viewModel::removeBackend,
     )
+    shellSettingsPage(SettingsPageState(config, saved = saved), services, onBack = onBack).Content(destination, modifier)
 }
 
 /** Debug builds: puts the on-device runtime's lifecycle log on the clipboard; returns what to tell the user. */

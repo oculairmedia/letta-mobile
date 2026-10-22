@@ -31,10 +31,7 @@ internal fun NavGraphBuilder.pairingRoutes(navController: NavHostController) {
     ) {
         QrScanScreen(
             onPaired = {
-                navController.navigate(ConversationsRoute) {
-                    popUpTo(0) { inclusive = true }
-                    launchSingleTop = true
-                }
+                navController.popBackStack(ShellWorkspaceRoute, inclusive = false)
             },
             onNavigateBack = { navController.popBackStack() },
         )
