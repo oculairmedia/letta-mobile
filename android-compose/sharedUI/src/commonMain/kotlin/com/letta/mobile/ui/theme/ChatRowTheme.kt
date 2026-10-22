@@ -112,6 +112,9 @@ object ChatRowSpacing {
      */
     val runStepDetailIndent: Dp = LettaDimens.Space.sm + runGlyphSize + LettaDimens.Space.sm
 
+    /** A tool step line's height, the same open or closed, running or settled. */
+    val toolStepMinHeight: Dp = 36.dp
+
     /** The thinking row's reserved height and its text's floor. */
     val thinkingRowHeight: Dp = LettaDimens.Space.xxl
     val thinkingTextMinHeight: Dp = LettaDimens.Space.xl

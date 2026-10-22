@@ -11,6 +11,9 @@ object ChatRowDimens {
     /** Cap for an expanded user prompt: tall enough to read, never a full viewport. */
     val promptExpandedMaxHeight: Dp = 340.dp
 
+    /** A tool step's inset grows to this height, then scrolls. */
+    val toolInsetMaxHeight: Dp = 160.dp
+
     /** Chat-anchored A2UI stays bounded; past this the surface scrolls internally. */
     val a2uiMaxHeight: Dp = 360.dp
 
@@ -30,14 +33,11 @@ object ChatRowDimens {
     /** Clamped user prompt line count. */
     const val promptCollapsedMaxLines: Int = 3
 
-    /** Lines a plain tool output shows before it says how much is hidden. */
-    const val toolOutputVisibleLines: Int = 40
+    /** Lines a tool step's inset keeps of an output, from its end, before it says how much is hidden. */
+    const val toolOutputVisibleLines: Int = 200
 
     /** Diff rows rendered before the block stops (the copy action still carries everything). */
     const val diffVisibleLines: Int = 200
-
-    /** Horizontal scroll step, in px, for the arrow keys inside a tool output block. */
-    const val toolOutputScrollStepPx: Int = 64
 
     /** Images shown in a grid / thumbnail strip before the rest collapse to a count. */
     const val gridMaxImages: Int = 4
@@ -62,8 +62,8 @@ object ChatRowAlpha {
     /** Added / removed diff row wash. */
     const val diffRowTint: Float = 0.12f
 
-    /** Failed tool output inset over errorContainer. */
-    const val errorInset: Float = 0.32f
+    /** Muted stderr and removed text inside a tool step's inset. */
+    const val insetMutedInk: Float = 0.8f
 
     /** Hover wash behind the assistant copy action. */
     const val hoverSurface: Float = 0.94f

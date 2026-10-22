@@ -27,6 +27,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
@@ -69,6 +71,7 @@ import com.letta.mobile.sharedui.resources.rows_requesting_input
 import com.letta.mobile.sharedui.resources.rows_send_answer
 import com.letta.mobile.sharedui.resources.rows_sending
 import com.letta.mobile.sharedui.resources.rows_tool_decisions
+import com.letta.mobile.sharedui.resources.rows_tool_argument_line
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.runtime.RuntimeUserInputTools
@@ -629,5 +632,17 @@ internal fun ApprovalResponseCard(response: UiApprovalResponse) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+/** A call's primary argument, monospace ("$ echo hello"): the Touch approval card's body. */
+@Composable
+internal fun ToolArgumentLine(arguments: String) {
+    val primary = remember(arguments) { ToolArguments.primary(arguments) }
+    SelectionContainer {
+        Text(
+            text = stringResource(Res.string.rows_tool_argument_line, primary),
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }

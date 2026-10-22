@@ -11,13 +11,11 @@ import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -54,25 +52,6 @@ internal class ChatRowMotion(private val reduced: Boolean) {
     fun expansionExit(): ExitTransition {
         if (reduced) return ExitTransition.None
         return fadeOut(fastFadeOutSpec) + shrinkVertically(exitSize(), shrinkTowards = Alignment.Top)
-    }
-
-    /**
-     * The tool card unfurl (legacy LettaMotion.unfurlEnter): the body opens
-     * from the leading edge and downwards at once, so it reads as the card opening rather than
-     * content appearing. Mirrored on collapse.
-     */
-    fun unfurlEnter(): EnterTransition {
-        if (reduced) return EnterTransition.None
-        return fadeIn(enterSpec) +
-            expandHorizontally(enterSize(), expandFrom = Alignment.Start) +
-            expandVertically(enterSize(), expandFrom = Alignment.Top)
-    }
-
-    fun unfurlExit(): ExitTransition {
-        if (reduced) return ExitTransition.None
-        return fadeOut(fastFadeOutSpec) +
-            shrinkHorizontally(exitSize(), shrinkTowards = Alignment.Start) +
-            shrinkVertically(exitSize(), shrinkTowards = Alignment.Top)
     }
 
     /**

@@ -310,8 +310,6 @@
     <ID>MaxLineLength:ChatRowRunStep.kt$val states = remember(toolCalls, calls.approvals) { toolCalls.map { call -&gt; call.runState(calls.approvals.requestFor(call), toolCalls) } }</ID>
     <ID>MaxLineLength:ChatRowRunStepPrimitivesUiTest.kt$ChatRowRunStepPrimitivesUiTest$RenderRow(item, rowContext(itemState = renderState(collapsedRunIds = setOf(RUN_ID)), newestMessageId = "a", toolDetails = details))</ID>
     <ID>MaxLineLength:ChatRowRunStepPrimitivesUiTest.kt$ChatRowRunStepPrimitivesUiTest$UiMessage(id = "t", role = "assistant", content = "", timestamp = "2026-10-11T16:00:02Z", runId = RUN_ID, toolCalls = calls.toList())</ID>
-    <ID>MaxLineLength:ChatRowToolStatus.kt$Icon(imageVector = outcome.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm), tint = outcome.tint)</ID>
-    <ID>MaxLineLength:ChatRowToolStatus.kt$ToolTimelineState.Succeeded -&gt; if (executionTimeMs != null) formatRunDuration(executionTimeMs) else stringResource(Res.string.rows_tool_done)</ID>
     <ID>MaxLineLength:ChatSurface.kt$head = frame.dock?.let { touchHeadContent(frame, it, TouchHeadInputs(touchInputPending(frame, turn.pendingApproval), bubble)) { turn } }</ID>
     <ID>MaxLineLength:ChatSurfaceContinuityTest.kt$ChatSurfaceContinuityTest$val seat = assertNotNull(shell.transport.seat(MascotTransport.SeatKey(ChatSurfaceFlickerRig.AGENT, MascotStage.COMPOSER_COMPANION)))</ID>
     <ID>MaxLineLength:ChatSurfaceFlickerRig.kt$ChatSurfaceFlickerRig$appendLine("canvas $canvas, timeline $timeline, composer $composer, mascot scene $mascotScene, seat registrations $seatRegistrations")</ID>

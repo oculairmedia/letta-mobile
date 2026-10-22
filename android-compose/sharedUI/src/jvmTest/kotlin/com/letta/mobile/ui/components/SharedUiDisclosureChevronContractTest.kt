@@ -43,8 +43,8 @@ class SharedUiDisclosureChevronContractTest {
             "ChatRowRunSummary.kt",
             "ChatRowRunStep.kt",
             "ChatRowToolRun.kt",
-            "ChatRowToolCard.kt",
-            "ChatRowToolStatus.kt",
+            "ChatRowToolStep.kt",
+            "ChatRowToolInset.kt",
             "ChatRowReasoning.kt",
         )
 

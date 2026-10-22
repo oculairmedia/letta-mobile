@@ -14,6 +14,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
@@ -29,16 +30,16 @@ import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DisclosureChevronDefaults
-import com.letta.mobile.ui.components.LettaListRowDefaults
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
  * letta-mobile-ckmub.1.2: a run block is built from the shared primitives. Opened, its tool calls
- * list as step rows straight under the summary line (no "Ran N commands" group row with a chevron
- * of its own); each step is a LettaListRow led by the summary line's own status glyph at the same
- * size, with one DisclosureChevron only when it has details, and its details read in ToolOutputBlock.
+ * list as step lines straight under the summary line (no "Ran N commands" group row with a chevron
+ * of its own); each step is one verb-first line (letta-mobile-2ccpv), a spinner at the summary glyph's
+ * size only while it runs, one DisclosureChevron only when it has details, its details in one inset.
  */
 class ChatRowRunStepPrimitivesUiTest {
     /** A call that ran (its output "ok"), failed (its output "boom") or, with a null [status], still runs. */
@@ -95,16 +96,15 @@ class ChatRowRunStepPrimitivesUiTest {
     }
 
     @Test
-    fun stepRowsAreTheSharedListRow() = runComposeUiTest {
+    fun stepsReadAsVerbFirstLines() = runComposeUiTest {
         showOpened(runOf(call("c1"), call("c2", command = "pwd")))
 
-        assertEquals(2, count(hasTestTag(LettaListRowDefaults.TitleTestTag) and under(ChatRowTestTags.TOOL_CARD_TOGGLE)))
-        assertEquals(2, count(hasTestTag(LettaListRowDefaults.TitleTestTag) and under(ChatRowTestTags.RUN_TOOL_STEPS)))
         // Straight under the run's line, no group row between them.
         onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
-        // The presenter's verb over the command's one-line preview (letta-mobile-2ccpv).
+        // The presenter's verb, then the command's one-line target.
         assertEquals(2, count(hasText("Ran") and under(ChatRowTestTags.TOOL_CARD_TOGGLE)))
         assertEquals(1, count(hasText("pwd") and under(ChatRowTestTags.TOOL_CARD_TOGGLE)))
+        assertEquals(2, count(hasTestTag(ChatRowTestTags.TOOL_CARD_TOGGLE) and under(ChatRowTestTags.RUN_TOOL_STEPS)))
     }
 
     @Test
@@ -120,28 +120,26 @@ class ChatRowRunStepPrimitivesUiTest {
     }
 
     @Test
-    fun theStepGlyphIsTheSummaryGlyphAtTheSameSize() = runComposeUiTest {
-        showOpened(runOf(call("c1"), call("c2", status = "error")))
+    fun onlyARunningStepHasAGlyphAndItIsTheSummaryGlyphAtTheSameSize() = runComposeUiTest {
+        showOpened(runOf(call("c1"), call("c2", status = "error"), call("c3", status = null)))
 
         val summary = onNodeWithTag(ChatRowTestTags.RUN_GLYPH, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val steps = onAllNodesWithTag(ChatRowTestTags.TOOL_STATUS_GLYPH, useUnmergedTree = true).fetchSemanticsNodes()
-        assertEquals(2, steps.size)
-        steps.forEach { step ->
-            assertEquals(summary.width, step.boundsInRoot.width, "a step glyph is not the summary glyph's width")
-            assertEquals(summary.height, step.boundsInRoot.height, "a step glyph is not the summary glyph's height")
-        }
+        assertEquals(1, steps.size, "settled steps are quiet: only the running one has a glyph")
+        assertEquals(summary.width, steps.single().boundsInRoot.width, "the step glyph is not the summary glyph's width")
+        assertEquals(summary.height, steps.single().boundsInRoot.height, "the step glyph is not the summary glyph's height")
+        assertEquals(1, onAllNodesWithTag(ChatRowTestTags.TOOL_STEP_NOTE, useUnmergedTree = true).fetchSemanticsNodes().size)
     }
 
     @Test
-    fun anOpenStepReadsItsDetailsInAToolOutputBlock() = runComposeUiTest {
+    fun anOpenStepReadsItsCommandThenItsOutputInOneInset() = runComposeUiTest {
         showOpened(runOf(call("c1", command = "echo hello")))
 
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertDoesNotExist()
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertExists()
-        // The command and the output, each in the shared monospace block.
-        assertEquals(2, count(hasTestTag(ChatRowTestTags.TOOL_OUTPUT) and under(ChatRowTestTags.TOOL_CARD_BODY)))
-        assertEquals(1, count(hasText("$ echo hello") and under(ChatRowTestTags.TOOL_OUTPUT)))
+        assertEquals(1, count(hasTestTag(ChatRowTestTags.TOOL_OUTPUT) and under(ChatRowTestTags.TOOL_CARD_BODY)))
+        onNodeWithTag(ChatRowTestTags.TOOL_COMMAND, useUnmergedTree = true).assertTextEquals("$ echo hello")
         assertEquals(1, count(hasText("ok") and under(ChatRowTestTags.TOOL_OUTPUT)))
     }
 

@@ -151,7 +151,6 @@
     <ID>WildcardImport:RememberStreamSmootherTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
     <ID>WildcardImport:StreamingDisplayTextSmootherTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
     <ID>WildcardImport:TimelineSendCoordinatorTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
-    <ID>WildcardImport:ToolDisplayRegistryTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
     <ID>WildcardImport:WsChatSendCoordinatorTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
   </CurrentIssues>
 </SmellBaseline>

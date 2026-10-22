@@ -1,5 +1,7 @@
 package com.letta.mobile.data.chat.display
 
+import com.letta.mobile.data.chat.tools.ToolInset
+import com.letta.mobile.data.chat.tools.ToolOutputStream
 import com.letta.mobile.data.model.UiSubagentNotification
 
 /**
@@ -78,3 +80,16 @@ private val DETAIL_LINE = Regex(
         """Command timed out after \d+ms""",
     ).joinToString("|", prefix = "(?m)\n\n(", postfix = ")$"),
 )
+
+/**
+ * This report as a tool step's command inset: its command, then each output tail in order (stderr
+ * as stderr). Null when it holds neither a command nor any output.
+ */
+fun BackgroundCommandReport.toInset(): ToolInset.Command? {
+    if (command == null && streams.isEmpty()) return null
+    val output = streams.map { stream ->
+        val kind = if (stream.kind == CommandStream.Kind.Stderr) ToolOutputStream.Kind.Stderr else ToolOutputStream.Kind.Output
+        ToolOutputStream(kind, stream.text)
+    }
+    return ToolInset.Command(workingDirectory = null, command = command.orEmpty(), output = output)
+}

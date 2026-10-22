@@ -10651,10 +10651,10 @@ final object com.letta.mobile.ui.theme/ChatRowAlpha { // com.letta.mobile.ui.the
         final fun <get-deliveryTime>(): kotlin/Float // com.letta.mobile.ui.theme/ChatRowAlpha.deliveryTime.<get-deliveryTime>|<get-deliveryTime>(){}[0]
     final const val diffRowTint // com.letta.mobile.ui.theme/ChatRowAlpha.diffRowTint|{}diffRowTint[0]
         final fun <get-diffRowTint>(): kotlin/Float // com.letta.mobile.ui.theme/ChatRowAlpha.diffRowTint.<get-diffRowTint>|<get-diffRowTint>(){}[0]
-    final const val errorInset // com.letta.mobile.ui.theme/ChatRowAlpha.errorInset|{}errorInset[0]
-        final fun <get-errorInset>(): kotlin/Float // com.letta.mobile.ui.theme/ChatRowAlpha.errorInset.<get-errorInset>|<get-errorInset>(){}[0]
     final const val hoverSurface // com.letta.mobile.ui.theme/ChatRowAlpha.hoverSurface|{}hoverSurface[0]
         final fun <get-hoverSurface>(): kotlin/Float // com.letta.mobile.ui.theme/ChatRowAlpha.hoverSurface.<get-hoverSurface>|<get-hoverSurface>(){}[0]
+    final const val insetMutedInk // com.letta.mobile.ui.theme/ChatRowAlpha.insetMutedInk|{}insetMutedInk[0]
+        final fun <get-insetMutedInk>(): kotlin/Float // com.letta.mobile.ui.theme/ChatRowAlpha.insetMutedInk.<get-insetMutedInk>|<get-insetMutedInk>(){}[0]
     final const val interAgentLabel // com.letta.mobile.ui.theme/ChatRowAlpha.interAgentLabel|{}interAgentLabel[0]
         final fun <get-interAgentLabel>(): kotlin/Float // com.letta.mobile.ui.theme/ChatRowAlpha.interAgentLabel.<get-interAgentLabel>|<get-interAgentLabel>(){}[0]
     final const val promptEdge // com.letta.mobile.ui.theme/ChatRowAlpha.promptEdge|{}promptEdge[0]
@@ -10684,8 +10684,6 @@ final object com.letta.mobile.ui.theme/ChatRowDimens { // com.letta.mobile.ui.th
         final fun <get-promptGridMaxImages>(): kotlin/Int // com.letta.mobile.ui.theme/ChatRowDimens.promptGridMaxImages.<get-promptGridMaxImages>|<get-promptGridMaxImages>(){}[0]
     final const val stripMaxImages // com.letta.mobile.ui.theme/ChatRowDimens.stripMaxImages|{}stripMaxImages[0]
         final fun <get-stripMaxImages>(): kotlin/Int // com.letta.mobile.ui.theme/ChatRowDimens.stripMaxImages.<get-stripMaxImages>|<get-stripMaxImages>(){}[0]
-    final const val toolOutputScrollStepPx // com.letta.mobile.ui.theme/ChatRowDimens.toolOutputScrollStepPx|{}toolOutputScrollStepPx[0]
-        final fun <get-toolOutputScrollStepPx>(): kotlin/Int // com.letta.mobile.ui.theme/ChatRowDimens.toolOutputScrollStepPx.<get-toolOutputScrollStepPx>|<get-toolOutputScrollStepPx>(){}[0]
     final const val toolOutputVisibleLines // com.letta.mobile.ui.theme/ChatRowDimens.toolOutputVisibleLines|{}toolOutputVisibleLines[0]
         final fun <get-toolOutputVisibleLines>(): kotlin/Int // com.letta.mobile.ui.theme/ChatRowDimens.toolOutputVisibleLines.<get-toolOutputVisibleLines>|<get-toolOutputVisibleLines>(){}[0]
 
@@ -10705,6 +10703,8 @@ final object com.letta.mobile.ui.theme/ChatRowDimens { // com.letta.mobile.ui.th
         final fun <get-thumbnailHeight>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/ChatRowDimens.thumbnailHeight.<get-thumbnailHeight>|<get-thumbnailHeight>(){}[0]
     final val thumbnailWidth // com.letta.mobile.ui.theme/ChatRowDimens.thumbnailWidth|{}thumbnailWidth[0]
         final fun <get-thumbnailWidth>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/ChatRowDimens.thumbnailWidth.<get-thumbnailWidth>|<get-thumbnailWidth>(){}[0]
+    final val toolInsetMaxHeight // com.letta.mobile.ui.theme/ChatRowDimens.toolInsetMaxHeight|{}toolInsetMaxHeight[0]
+        final fun <get-toolInsetMaxHeight>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/ChatRowDimens.toolInsetMaxHeight.<get-toolInsetMaxHeight>|<get-toolInsetMaxHeight>(){}[0]
 }
 
 final object com.letta.mobile.ui.theme/ChatRowSpacing { // com.letta.mobile.ui.theme/ChatRowSpacing|null[0]
@@ -10751,6 +10751,8 @@ final object com.letta.mobile.ui.theme/ChatRowSpacing { // com.letta.mobile.ui.t
         final fun <get-thinkingRowHeight>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/ChatRowSpacing.thinkingRowHeight.<get-thinkingRowHeight>|<get-thinkingRowHeight>(){}[0]
     final val thinkingTextMinHeight // com.letta.mobile.ui.theme/ChatRowSpacing.thinkingTextMinHeight|{}thinkingTextMinHeight[0]
         final fun <get-thinkingTextMinHeight>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/ChatRowSpacing.thinkingTextMinHeight.<get-thinkingTextMinHeight>|<get-thinkingTextMinHeight>(){}[0]
+    final val toolStepMinHeight // com.letta.mobile.ui.theme/ChatRowSpacing.toolStepMinHeight|{}toolStepMinHeight[0]
+        final fun <get-toolStepMinHeight>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/ChatRowSpacing.toolStepMinHeight.<get-toolStepMinHeight>|<get-toolStepMinHeight>(){}[0]
     final val ungrouped // com.letta.mobile.ui.theme/ChatRowSpacing.ungrouped|{}ungrouped[0]
         final fun <get-ungrouped>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/ChatRowSpacing.ungrouped.<get-ungrouped>|<get-ungrouped>(){}[0]
 }

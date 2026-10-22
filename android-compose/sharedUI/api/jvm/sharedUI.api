@@ -10600,8 +10600,8 @@ public final class com/letta/mobile/ui/theme/ChatRowAlpha {
 	public static final field copyIdle F
 	public static final field deliveryTime F
 	public static final field diffRowTint F
-	public static final field errorInset F
 	public static final field hoverSurface F
+	public static final field insetMutedInk F
 	public static final field interAgentLabel F
 	public static final field promptEdge F
 	public static final field thinkingTail F
@@ -10620,7 +10620,6 @@ public final class com/letta/mobile/ui/theme/ChatRowDimens {
 	public static final field promptCollapsedMaxLines I
 	public static final field promptGridMaxImages I
 	public static final field stripMaxImages I
-	public static final field toolOutputScrollStepPx I
 	public static final field toolOutputVisibleLines I
 	public final fun getA2uiMaxHeight-D9Ej5fM ()F
 	public final fun getDockedPromptImageMaxHeight-D9Ej5fM ()F
@@ -10630,6 +10629,7 @@ public final class com/letta/mobile/ui/theme/ChatRowDimens {
 	public final fun getPromptGridCellHeight-D9Ej5fM ()F
 	public final fun getThumbnailHeight-D9Ej5fM ()F
 	public final fun getThumbnailWidth-D9Ej5fM ()F
+	public final fun getToolInsetMaxHeight-D9Ej5fM ()F
 }
 
 public final class com/letta/mobile/ui/theme/ChatRowSpacing {
@@ -10656,6 +10656,7 @@ public final class com/letta/mobile/ui/theme/ChatRowSpacing {
 	public final fun getSummaryLineVertical-D9Ej5fM ()F
 	public final fun getThinkingRowHeight-D9Ej5fM ()F
 	public final fun getThinkingTextMinHeight-D9Ej5fM ()F
+	public final fun getToolStepMinHeight-D9Ej5fM ()F
 	public final fun getUngrouped-D9Ej5fM ()F
 }
 
