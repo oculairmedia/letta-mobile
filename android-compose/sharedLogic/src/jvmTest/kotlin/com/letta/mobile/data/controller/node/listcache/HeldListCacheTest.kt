@@ -8,7 +8,6 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 class HeldListCacheTest {
     private var signature: Long? = 1L
@@ -131,13 +130,18 @@ class HeldListCacheTest {
     }
 
     @Test
-    fun aFailedFetchIsNotHeld() = runTest {
+    fun aFailedFullFetchAnswersWithTheCallersFetchAndBacksOff() = runTest {
         val cache = cache()
 
-        assertNull(cache.read(result = null))
-        cache.read()
+        assertEquals(list("own"), cache.read(result = null))
+        nowMs = HeldListCache.FAILURE_BACKOFF_MS - 1
+        assertEquals(list("own"), cache.read())
+        assertEquals(1, fetches, "no full fetch inside the backoff")
 
+        nowMs = HeldListCache.FAILURE_BACKOFF_MS
+        assertEquals(list("a"), cache.read())
         assertEquals(2, fetches)
+        assertEquals(2, ownFetches)
     }
 
     @Test
@@ -156,7 +160,7 @@ class HeldListCacheTest {
         val cache = cache(onTooLarge = { items, max -> reports += items to max })
         val big = JsonArray(List(11) { JsonPrimitive(it) })
 
-        assertEquals(big, cache.read(big))
+        assertEquals(list("own"), cache.read(big), "a list too long to hold is never answered from")
         assertEquals(list("own"), cache.read(big))
         signature = 2L
         cache.read(list("a"))
@@ -164,6 +168,6 @@ class HeldListCacheTest {
 
         assertEquals(listOf(11 to 10), reports)
         assertEquals(2, fetches, "one too-large fetch, then one full fetch after the change")
-        assertEquals(1, ownFetches)
+        assertEquals(2, ownFetches)
     }
 }

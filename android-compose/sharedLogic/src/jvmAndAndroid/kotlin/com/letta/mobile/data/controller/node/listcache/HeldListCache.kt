@@ -31,9 +31,14 @@ internal data class HeldListLimits(
  * and a [signature] that watches a directory the App Server does not write. Callers waiting on a
  * miss share one fetch.
  *
- * When nothing can be held (no [signature], or the last full list was longer than
- * [HeldListLimits.maxItems], which [onTooLarge] is told), the caller's own fetch is used instead,
- * as before the cache.
+ * When nothing can be held (no [signature], the full list is longer than [HeldListLimits.maxItems],
+ * which [onTooLarge] is told, or a full fetch failed within the last [FAILURE_BACKOFF_MS]), the
+ * caller's own fetch answers instead, as before the cache: one failing full fetch never fails every
+ * caller, and a list too long to hold is never answered from a truncated copy.
+ *
+ * What the signature cannot see: a file rewritten twice within one modified-time tick at the same
+ * size (coarse-timestamp filesystems), and state the App Server holds in memory before it writes
+ * the file. The age bound covers the first; the second lasts until the App Server's next write.
  */
 internal class HeldListCache(
     private val signature: () -> Long?,
@@ -60,6 +65,9 @@ internal class HeldListCache(
     /** The signature under which the full list was last found too long to hold; null when it was not. */
     @Volatile private var tooLargeAt: Long? = null
 
+    /** When the last full fetch failed, on [clock]; null when none has. */
+    @Volatile private var failedAtMs: Long? = null
+
     /** Drops the held list; a fetch already running when this is called is not held either. */
     fun invalidate() {
         synchronized(lock) {
@@ -77,27 +85,42 @@ internal class HeldListCache(
         fetchAll: suspend () -> JsonArray?,
         fromFull: (JsonArray) -> JsonArray,
         fetchOwn: suspend () -> JsonArray?,
-    ): JsonArray? = when (val before = currentSignature()) {
-        null, tooLargeAt -> fetchOwn()
-        else -> (servable(before) ?: fetchAndHold(before, fetchAll))?.let(fromFull)
+    ): JsonArray? {
+        val before = currentSignature()?.takeIf(::mayHold) ?: return fetchOwn()
+        val full = servable(before) ?: fetchAndHold(before, fetchAll)
+        return if (full == null) fetchOwn() else fromFull(full)
     }
 
+    /** The full list, now held; null when it failed or is too long to hold. */
     private suspend fun fetchAndHold(before: Long, fetchAll: suspend () -> JsonArray?): JsonArray? =
         fetching.withLock {
             servable(before)?.let { return@withLock it }
+            if (recentlyFailed()) return@withLock null
             val startedAt = synchronized(lock) { generation }
             val fetchedAtMs = clock()
-            val fetched = fetchAll() ?: return@withLock null
-            if (fetched.size > limits.maxItems) {
-                tooLargeAt = before
-                onTooLarge(fetched.size, limits.maxItems)
-            } else {
-                synchronized(lock) {
-                    if (startedAt == generation) held = Held(before, fetchedAtMs, fetched)
+            val fetched = fetchAll()
+            when {
+                fetched == null -> {
+                    failedAtMs = clock()
+                    null
+                }
+                fetched.size > limits.maxItems -> {
+                    tooLargeAt = before
+                    onTooLarge(fetched.size, limits.maxItems)
+                    null
+                }
+                else -> fetched.also {
+                    synchronized(lock) {
+                        if (startedAt == generation) held = Held(before, fetchedAtMs, fetched)
+                    }
                 }
             }
-            fetched
         }
+
+    /** Whether a full list may be held under [signature]: not one already found too long, nor right after a failure. */
+    private fun mayHold(signature: Long): Boolean = signature != tooLargeAt && !recentlyFailed()
+
+    private fun recentlyFailed(): Boolean = failedAtMs?.let { clock() - it < FAILURE_BACKOFF_MS } == true
 
     private fun currentSignature(): Long? {
         val now = clock()
@@ -108,7 +131,10 @@ internal class HeldListCache(
     private fun servable(current: Long): JsonArray? =
         held?.takeIf { it.signature == current && clock() - it.fetchedAtMs < limits.maxAgeMs }?.list
 
-    private companion object {
-        const val NANOS_PER_MILLI = 1_000_000L
+    companion object {
+        /** After a failed full fetch, callers use their own fetch for this long. */
+        const val FAILURE_BACKOFF_MS: Long = 5_000L
+
+        private const val NANOS_PER_MILLI = 1_000_000L
     }
 }

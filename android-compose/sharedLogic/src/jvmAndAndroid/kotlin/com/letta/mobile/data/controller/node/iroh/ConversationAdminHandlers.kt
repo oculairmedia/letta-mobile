@@ -11,7 +11,6 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -112,7 +111,10 @@ object ConversationAdminHandlers {
                 // One agent's page (no summary search) is cut from the held full list: the App Server
                 // re-reads every conversation record per list call, so per-agent calls cost the same as
                 // a full one and a client listing agent by agent paid that once per agent.
-                val held = heldList?.takeIf { agentId != null && param(params, AdminParamKey("summary_search")) == null }
+                // An empty or all-digit agent_id makes the App Server drop the filter, so those pass through.
+                val sliceable = !agentId.isNullOrEmpty() && agentId.toLongOrNull() == null &&
+                    param(params, AdminParamKey("summary_search")) == null
+                val held = heldList?.takeIf { sliceable }
                 if (held == null) own() else held.serve(
                     fetchAll = { listAgentConversations(c) },
                     fromFull = { full ->
@@ -153,8 +155,9 @@ object ConversationAdminHandlers {
     }
 
     /**
-     * Every visible conversation that belongs to an agent, newest first: the App Server's full list
-     * (one more than is held, so a list too long to hold is seen) without agent-free rows.
+     * Every visible conversation, newest first: the App Server's full list, asking for one more row
+     * than is held so a list too long to hold is seen as such. Agent-free rows stay in, so the size
+     * is the App Server's; no agent's page includes them.
      */
     private suspend fun listAgentConversations(client: AppServerClient): JsonArray? {
         val response = client.conversationList(
@@ -163,9 +166,7 @@ object ConversationAdminHandlers {
                 query = NativeAdmin.queryOf("limit" to (MAX_HELD_CONVERSATIONS + 1).toString()),
             ),
         )
-        if (!response.success) return null
-        val rows = response.conversations ?: return JsonArray(emptyList())
-        return JsonArray(rows.filter { row -> (row as? JsonObject)?.get("agent_id")?.let { it !is JsonNull } == true })
+        return if (response.success) response.conversations ?: JsonArray(emptyList()) else null
     }
 
     private fun dropHiddenAgentConversations(result: JsonElement, hiddenAgents: HiddenAgentIndex): JsonElement {

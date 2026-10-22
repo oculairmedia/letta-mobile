@@ -54,8 +54,12 @@ class ConversationListHeldCacheTest {
         dispatch(r, "conversation.list", emptyMap())
         assertEquals(3, listCalls(), "a search and a cross-agent list still go to the App Server")
 
+        dispatch(r, "conversation.list", mapOf("agent_id" to ""))
+        dispatch(r, "conversation.list", mapOf("agent_id" to "12345"))
+        assertEquals(5, listCalls(), "an agent_id the App Server ignores (empty, all digits) passes through")
+
         dispatch(r, "conversation.update", mapOf("conversation_id" to "conv-1", "summary" to "renamed"))
         dispatch(r, "conversation.list", mapOf("agent_id" to "agent-a"))
-        assertEquals(4, listCalls(), "a write through the host drops the held list")
+        assertEquals(6, listCalls(), "a write through the host drops the held list")
     }
 }
