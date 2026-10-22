@@ -1,11 +1,13 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.node.agentfiles.AgentFileIndex
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -28,6 +30,9 @@ internal class LocalBackendStoreSupport(
     val lmstudioBaseUrl: String,
 ) {
     val json = Json { ignoreUnknownKeys = true }
+
+    /** The agent records on disk, shared so every admin read sees one bounded, change-aware view. */
+    val agentIndex = AgentFileIndex(File(baseDir, "agents"), json, isHidden = JsonObject::isHiddenAgentRecord)
 
     // letta-mobile-by4vm.21: key naming and the base64url codec live in [LocalBackendLayout].
     fun conversationKey(conversationId: String, agentId: String): String =

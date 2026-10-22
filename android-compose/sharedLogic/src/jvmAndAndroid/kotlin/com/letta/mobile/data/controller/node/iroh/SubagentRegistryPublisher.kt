@@ -33,19 +33,26 @@ fun interface SubagentPushTarget {
  *
  * Changes are queued and sent in order by one coroutine owned by [scope]. The
  * snapshot is read at send time, so a burst of mutations converges on the
- * latest state and an older snapshot can never overtake a newer one.
+ * latest state and an older snapshot can never overtake a newer one. For the
+ * same reason the queue holds each (agent, conversation) once however many
+ * times it changes before it is sent, and never more than [MAX_PENDING_KEYS]
+ * of them: past that the oldest waiting key is dropped (its viewers get the
+ * next change's snapshot, which is the full current state).
  */
 class SubagentRegistryPublisher(
     scope: CoroutineScope,
     private val source: ControllerSubagentRegistrySource,
     private val clock: () -> Instant = Instant::now,
 ) : SubagentRegistryChangeListener {
-    private val changes = Channel<SubagentConversationKey>(Channel.UNLIMITED)
+    private val pending = LinkedHashSet<SubagentConversationKey>()
+    private val wake = Channel<Unit>(Channel.CONFLATED)
 
     @Volatile private var target: SubagentPushTarget? = null
 
     private val sender: Job = scope.launch {
-        for (key in changes) send(key)
+        for (ignored in wake) {
+            while (true) send(takeNext() ?: break)
+        }
     }
 
     fun attach(target: SubagentPushTarget) {
@@ -53,7 +60,18 @@ class SubagentRegistryPublisher(
     }
 
     override fun onConversationChanged(key: SubagentConversationKey) {
-        changes.trySend(key)
+        synchronized(pending) {
+            if (key !in pending && pending.size >= MAX_PENDING_KEYS) {
+                pending.remove(pending.first())
+                Telemetry.event("SubagentPush", "pending_overflow", "max" to MAX_PENDING_KEYS, level = Telemetry.Level.WARN)
+            }
+            pending.add(key)
+        }
+        wake.trySend(Unit)
+    }
+
+    private fun takeNext(): SubagentConversationKey? = synchronized(pending) {
+        pending.firstOrNull()?.also { pending.remove(it) }
     }
 
     /**
@@ -72,7 +90,7 @@ class SubagentRegistryPublisher(
 
     /** Stops the sender. The owning scope normally does this; tests call it directly. */
     fun close() {
-        changes.close()
+        wake.close()
         sender.cancel()
     }
 
@@ -114,6 +132,9 @@ class SubagentRegistryPublisher(
     companion object {
         const val REASON_REGISTRY = "registry"
         const val REASON_REPLAY = "replay"
+
+        /** The most distinct (agent, conversation) changes waiting to be sent at once. */
+        const val MAX_PENDING_KEYS: Int = 1024
         private val FRAME_JSON = Json { encodeDefaults = true }
     }
 }

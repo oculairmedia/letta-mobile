@@ -172,6 +172,10 @@ internal class ConversationTurnFanout(
     /** A delta that ends a run already reached the viewers. */
     private var terminalDeltaRelayed = false
 
+    /** The audience the last `fanout.broadcast` line named, so a delta that finds the same one logs nothing. */
+    @Volatile
+    private var lastBroadcastAudience = -1
+
     /**
      * The initiator's connection is gone but the turn keeps running
      * (see [NodeTurnHost]). Frames still go to every other viewer and are still tracked for
@@ -493,12 +497,17 @@ internal class ConversationTurnFanout(
         val viewers = snapshotViewers()
         // Endpoint identities are stable public keys and therefore correlatable.
         // Emit only aggregate delivery state; never copy endpoint values into fanout telemetry.
-        Telemetry.event(
-            "IrohNode", "fanout.broadcast",
-            "conversationId" to conversationId,
-            "viewerCount" to viewers.size,
-            "hasInitiator" to (initiatorViewer != null),
-        )
+        // One line per CHANGE of audience, not per delta: a streamed turn is thousands of deltas.
+        val audience = viewers.size * 2 + if (initiatorViewer != null) 1 else 0
+        if (audience != lastBroadcastAudience) {
+            lastBroadcastAudience = audience
+            Telemetry.event(
+                "IrohNode", "fanout.broadcast",
+                "conversationId" to conversationId,
+                "viewerCount" to viewers.size,
+                "hasInitiator" to (initiatorViewer != null),
+            )
+        }
         if (viewers.isEmpty()) return
         // tg7b8: split the join. The initiator MUST receive every frame for
         // redial parity (q71yi parking) — keep awaitAll on its single write.

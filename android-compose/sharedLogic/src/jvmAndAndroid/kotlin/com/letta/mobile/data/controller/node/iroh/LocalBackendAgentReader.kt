@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.node.agentfiles.AgentFileIndex
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -9,7 +10,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import java.io.File
 
 /**
  * On-disk `agent.list` reader. Faithful port of admin-shim
@@ -32,25 +32,25 @@ internal class LocalBackendAgentReader(
      * from the same on-disk records without projecting full objects. Completeness
      * is proven by the directory listing itself (no page / offset).
      */
-    fun countAgents(): Int? = runCatching { readAgentRecords().size }.getOrNull()
+    fun countAgents(): Int? = runCatching { support.agentIndex.entries().size }.getOrNull()
 
     /** Ids of hidden (subagent) agents; null when the store cannot be read. */
     fun hiddenAgentIds(): Set<String>? = runCatching {
-        readAgentRecords().filter { it.obj.isHiddenAgentRecord() }.mapTo(HashSet()) { it.id }
+        support.agentIndex.entries().filter { it.hidden }.mapTo(HashSet()) { it.id }
     }.getOrNull()
 
     fun listAgentsProjected(limit: Int?, offset: Int?): JsonArray? = runCatching {
-        val records = readAgentRecords().sortedByDescending { it.mtimeMs }
+        val entries = support.agentIndex.entries()
         val from = (offset ?: 0).coerceAtLeast(0)
-        val windowed = if (from >= records.size) {
+        val windowed = if (from >= entries.size) {
             emptyList()
         } else {
-            val end = if (limit != null) (from + limit.coerceAtLeast(0)).coerceAtMost(records.size) else records.size
-            records.subList(from, end)
+            val end = (from + (limit?.coerceAtLeast(0) ?: MAX_PROJECTED_AGENTS)).coerceAtMost(entries.size)
+            entries.subList(from, end)
         }
         buildJsonArray {
-            windowed.forEach { rec ->
-                add(agentToLettaState(rec, blocks = readBlocksForAgent(rec.id)))
+            windowed.forEach { entry ->
+                readAgentRecord(entry)?.let { rec -> add(agentToLettaState(rec, blocks = readBlocksForAgent(rec.id))) }
             }
         }
     }.getOrNull()
@@ -62,20 +62,14 @@ internal class LocalBackendAgentReader(
         val ctimeMs: Long,
     )
 
-    private fun readAgentRecords(): List<AgentRecord> {
-        val dir = File(support.baseDir, "agents")
-        val files = dir.listFiles { f -> f.isFile && f.name.endsWith(".json") } ?: return emptyList()
-        val out = ArrayList<AgentRecord>(files.size)
-        for (f in files) {
-            val obj = runCatching { support.json.parseToJsonElement(f.readText()).jsonObject }.getOrNull() ?: continue
-            val id = obj["id"]?.jsonPrimitive?.contentOrNullSafe() ?: continue
-            // ctime is not portably readable via java.io; mtime drives ordering
-            // (admin-shim sorts by mtime) and both timestamps, matching the
-            // shim's behavior closely enough for decode (created<=updated).
-            val mtime = f.lastModified()
-            out += AgentRecord(id = id, obj = obj, mtimeMs = mtime, ctimeMs = mtime)
-        }
-        return out
+    /**
+     * One agent's record, parsed now: only the page being served is ever read, never the roster.
+     * ctime is not portably readable via java.io; mtime drives ordering (admin-shim sorts by mtime)
+     * and both timestamps, matching the shim's behavior closely enough for decode (created<=updated).
+     */
+    private fun readAgentRecord(entry: AgentFileIndex.Entry): AgentRecord? {
+        val obj = runCatching { support.json.parseToJsonElement(entry.file.readText()).jsonObject }.getOrNull() ?: return null
+        return AgentRecord(id = entry.id, obj = obj, mtimeMs = entry.mtimeMs, ctimeMs = entry.mtimeMs)
     }
 
     /** Provider/model/handle triple parsed from a model handle; bundled to keep [buildLlmConfig] out of primitive-obsession territory. */
@@ -216,5 +210,8 @@ internal class LocalBackendAgentReader(
 
     companion object {
         const val DEFAULT_MODEL_HANDLE = "lmstudio/opus-4-7"
+
+        /** How many agents an unpaged list projects at most; every agent's blocks are read for each. */
+        const val MAX_PROJECTED_AGENTS: Int = 10_000
     }
 }

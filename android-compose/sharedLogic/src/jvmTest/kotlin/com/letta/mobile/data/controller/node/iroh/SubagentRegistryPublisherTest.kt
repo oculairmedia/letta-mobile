@@ -57,6 +57,46 @@ class SubagentRegistryPublisherTest {
     }
 
     @Test
+    fun aBurstOfChangesToOneConversationIsSentOnce() = runTest {
+        val published = CopyOnWriteArrayList<String>()
+        val publisher = SubagentRegistryPublisher(backgroundScope, source, clock = { Instant.ofEpochMilli(nowMs) })
+        publisher.attach { conversationId, _ -> published += conversationId; 1 }
+        val key = SubagentConversationKey(AGENT, CONVERSATION)
+
+        repeat(50) { publisher.onConversationChanged(key) }
+        runCurrent()
+
+        assertEquals(listOf(CONVERSATION), published)
+    }
+
+    @Test
+    fun changesToDifferentConversationsAreAllSentInOrder() = runTest {
+        val published = CopyOnWriteArrayList<String>()
+        val publisher = SubagentRegistryPublisher(backgroundScope, source, clock = { Instant.ofEpochMilli(nowMs) })
+        publisher.attach { conversationId, _ -> published += conversationId; 1 }
+
+        listOf("c1", "c2", "c3", "c2", "c1").forEach { publisher.onConversationChanged(SubagentConversationKey(AGENT, it)) }
+        runCurrent()
+
+        assertEquals(listOf("c1", "c2", "c3"), published)
+    }
+
+    @Test
+    fun theQueueKeepsTheNewestChangesPastItsCap() = runTest {
+        val published = CopyOnWriteArrayList<String>()
+        val publisher = SubagentRegistryPublisher(backgroundScope, source, clock = { Instant.ofEpochMilli(nowMs) })
+        val total = SubagentRegistryPublisher.MAX_PENDING_KEYS + 5
+        // Nothing runs the sender until runCurrent, so every key queues first.
+        (1..total).forEach { publisher.onConversationChanged(SubagentConversationKey(AGENT, "c$it")) }
+        publisher.attach { conversationId, _ -> published += conversationId; 1 }
+        runCurrent()
+
+        assertEquals(SubagentRegistryPublisher.MAX_PENDING_KEYS, published.size)
+        assertEquals("c$total", published.last())
+        assertTrue("c1" !in published, "the oldest waiting key is the one dropped")
+    }
+
+    @Test
     fun registryMutationPublishesFullSnapshotIncludingCompleted() = runTest {
         val published = CopyOnWriteArrayList<Pair<String, String>>()
         val publisher = SubagentRegistryPublisher(backgroundScope, source, clock = { Instant.ofEpochMilli(nowMs) })

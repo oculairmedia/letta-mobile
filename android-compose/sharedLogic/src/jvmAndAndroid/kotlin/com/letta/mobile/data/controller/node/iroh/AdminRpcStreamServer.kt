@@ -139,7 +139,6 @@ internal class AdminRpcStreamServer(
     suspend fun serveAcceptLoop(acceptBi: suspend () -> AdminRpcBiStream?) = supervisorScope {
         while (true) {
             val stream = acceptBi() ?: break
-            Telemetry.event("IrohNode", "admin_rpc.stream.accepted", "remoteEndpointId" to remoteEndpointId)
             launchHandler(stream)
         }
     }
@@ -272,11 +271,14 @@ internal class AdminRpcStreamServer(
             val type = obj["type"]?.jsonPrimitive?.contentOrNull
             val requestId = obj["request_id"]?.jsonPrimitive?.contentOrNull
             val method = obj["method"]?.jsonPrimitive?.contentOrNull
-            Telemetry.event(
-                "IrohNode", "admin_rpc.stream.recv",
-                "remoteEndpointId" to remoteEndpointId,
-                "type" to type, "requestId" to requestId, "method" to method,
-            )
+            // health.check is a client's keep-alive poll and was two thirds of every admin_rpc line.
+            if (method != HEALTH_CHECK_METHOD) {
+                Telemetry.event(
+                    "IrohNode", "admin_rpc.stream.recv",
+                    "remoteEndpointId" to remoteEndpointId,
+                    "type" to type, "requestId" to requestId, "method" to method,
+                )
+            }
             if (type != "admin_rpc") {
                 errorEnvelope(requestId ?: "", "Expected admin_rpc frame")
             } else if (!authenticated.get()) {
@@ -391,5 +393,6 @@ internal class AdminRpcStreamServer(
         const val DEFAULT_MAX_ACTIVE_HANDLERS = 16
         const val DEFAULT_FIRST_FRAME_TIMEOUT_MS = 15_000L
         private const val READ_CHUNK_SIZE = 8192
+        private const val HEALTH_CHECK_METHOD = "health.check"
     }
 }

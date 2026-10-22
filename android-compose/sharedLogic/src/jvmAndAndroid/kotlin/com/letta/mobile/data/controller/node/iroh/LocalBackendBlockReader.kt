@@ -5,8 +5,6 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.io.File
 
@@ -158,17 +156,7 @@ internal class LocalBackendBlockReader(private val support: LocalBackendStoreSup
     }
 
     /** Agent ids in the same order the agent list serves them (mtime desc). */
-    private fun agentIds(): List<String> {
-        val dir = File(support.baseDir, "agents")
-        val files = dir.listFiles { f -> f.isFile && f.name.endsWith(".json") } ?: return emptyList()
-        return files
-            .sortedByDescending { it.lastModified() }
-            .mapNotNull { f ->
-                runCatching { support.json.parseToJsonElement(f.readText()).jsonObject }
-                    .getOrNull()
-                    ?.get("id")?.jsonPrimitive?.contentOrNullSafe()
-            }
-    }
+    private fun agentIds(): List<String> = support.agentIndex.entries().map { it.id }
 
     companion object {
         /** admin-shim's synthesised block value limit. */
