@@ -25,6 +25,7 @@ import com.letta.mobile.ui.common.GroupPosition
 import kotlinx.collections.immutable.toImmutableSet
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * letta-mobile-bglj6.1.12: settling a run must not move the timeline. The settle once slid the run's
@@ -95,34 +96,37 @@ class ChatRowRunSettleGlitchTest {
     }
 
     @Test
-    fun aRunComposedSettledHasTheSameShapeAsAWorkingOne() = runComposeUiTest {
-        // Control case: a settled run composed cold (history scroll, never streamed). Pairs with
-        // the transition test: the settled shape is structural, not where an animation stopped.
+    fun aRunThatSettlesFoldsToTheShapeOfOneComposedSettled() = runComposeUiTest {
+        // letta-mobile-2ccpv: a turn is open while it works and folds once it settles. Folding is
+        // animated (never a jump), and where it lands is the shape a settled run composed cold
+        // (history scroll, never streamed) has: structural, not where an animation stopped.
         mainClock.autoAdvance = false
-        val settledState = renderState(isStreaming = false)
         setContent {
             MaterialTheme {
                 Box(Modifier.width(400.dp)) {
-                    RenderRow(item = run, context = rowContextForRun(settledState))
+                    RenderRow(item = run, context = rowContextForRun(renderState(isStreaming = false)))
                 }
             }
         }
         awaitText("All done here.")
         val settledFromCold = awaitStableRunHeight()
 
-        val activeState = renderState(isStreaming = true)
+        var streamingState by mutableStateOf(renderState(isStreaming = true))
         setContent {
             MaterialTheme {
                 Box(Modifier.width(400.dp)) {
-                    RenderRow(item = run, context = rowContextForRun(activeState))
+                    RenderRow(item = run, context = rowContextForRun(streamingState))
                 }
             }
         }
         awaitText("All done here.")
         val activeHeight = awaitStableRunHeight()
+        streamingState = renderState(isStreaming = false)
+        mainClock.advanceTimeBy(FOLD_MILLIS)
+        val settledLive = awaitStableRunHeight()
 
-        // Cold (history scroll, never streamed) or settled live, the row is one shape.
-        assertEquals(activeHeight, settledFromCold, "a settled run is not the working run's shape (active=$activeHeight, settled=$settledFromCold)")
+        assertTrue(activeHeight > settledFromCold, "a working run is not open (active=$activeHeight, settled=$settledFromCold)")
+        assertEquals(settledFromCold, settledLive, "a run that settled live did not fold to the cold shape")
     }
 
     /**
@@ -147,5 +151,6 @@ class ChatRowRunSettleGlitchTest {
 
     private companion object {
         const val STABLE_FRAMES = 3
+        const val FOLD_MILLIS = 1_000L
     }
 }

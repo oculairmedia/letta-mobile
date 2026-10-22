@@ -14,6 +14,9 @@ object ChatRowDimens {
     /** A tool step's inset grows to this height, then scrolls. */
     val toolInsetMaxHeight: Dp = 160.dp
 
+    /** Several tool steps share a viewport this tall, then it scrolls. */
+    val toolGroupMaxHeight: Dp = 230.dp
+
     /** Chat-anchored A2UI stays bounded; past this the surface scrolls internally. */
     val a2uiMaxHeight: Dp = 360.dp
 

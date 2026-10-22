@@ -5,14 +5,22 @@ package com.letta.mobile.ui.chat.surface.timeline.rows
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
@@ -38,8 +46,10 @@ class ToolStepUiTest {
         toolCallId = "call-1",
     )
 
-    private fun androidx.compose.ui.test.ComposeUiTest.show(call: UiToolCall) {
-        setContent { MaterialTheme { Box(Modifier.width(WIDTH.dp)) { ToolStep(call, "call-1", rowCallbacks()) } } }
+    private fun androidx.compose.ui.test.ComposeUiTest.show(call: UiToolCall) = show { call }
+
+    private fun androidx.compose.ui.test.ComposeUiTest.show(call: () -> UiToolCall) {
+        setContent { MaterialTheme { Box(Modifier.width(WIDTH.dp)) { ToolStep(call(), "call-1", rowCallbacks()) } } }
     }
 
     @Test
@@ -105,6 +115,32 @@ class ToolStepUiTest {
         setContent { MaterialTheme { ToolInsetView(inset) } }
         onNodeWithTag(ChatRowTestTags.TOOL_COMMAND, useUnmergedTree = true).assertTextEquals("/repo $ make")
         onNodeWithText("error: nope").assertExists()
+    }
+
+    @Test
+    fun theKeyboardOpensAndClosesAFocusedStep() = runComposeUiTest {
+        show(bash("ls", "a.txt"))
+        val line = onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE)
+        line.requestFocus()
+        line.performKeyInput { pressKey(Key.Enter) }
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertExists()
+        line.performKeyInput { pressKey(Key.Escape) }
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertDoesNotExist()
+        line.performKeyInput { pressKey(Key.Spacebar) }
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertExists()
+    }
+
+    @Test
+    fun aRunningStepsOutputFollowsItsTailAsItGrows() = runComposeUiTest {
+        var call by mutableStateOf(bash("tail -f log", (1..5).joinToString("\n"), status = null))
+        show { call }
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
+        runOnIdle { call = call.copy(result = (1..400).joinToString("\n")) }
+        waitForIdle()
+        val range = onNodeWithTag(ChatRowTestTags.TOOL_INSET_VIEWPORT, useUnmergedTree = true)
+            .fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        assertTrue(range.maxValue() > 0f, "the output never outgrew its viewport")
+        assertEquals(range.maxValue(), range.value(), "the viewport did not follow the output's tail")
     }
 
     private companion object {

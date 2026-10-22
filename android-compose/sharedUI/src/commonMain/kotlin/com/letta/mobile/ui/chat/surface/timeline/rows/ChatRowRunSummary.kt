@@ -24,12 +24,13 @@ import com.letta.mobile.sharedui.resources.rows_run_collapse
 import com.letta.mobile.sharedui.resources.rows_run_expand
 import com.letta.mobile.sharedui.resources.rows_run_failed
 import com.letta.mobile.sharedui.resources.rows_run_failed_of
+import com.letta.mobile.sharedui.resources.rows_run_for_duration
 import com.letta.mobile.sharedui.resources.rows_run_state_collapsed
 import com.letta.mobile.sharedui.resources.rows_run_state_expanded
 import com.letta.mobile.sharedui.resources.rows_run_state_working
 import com.letta.mobile.sharedui.resources.rows_run_summary_join
 import com.letta.mobile.sharedui.resources.rows_run_thought
-import com.letta.mobile.sharedui.resources.rows_run_tool_count
+import com.letta.mobile.sharedui.resources.rows_run_step_count
 import com.letta.mobile.sharedui.resources.rows_run_worked
 import com.letta.mobile.sharedui.resources.rows_run_working
 import com.letta.mobile.sharedui.resources.run_status_approval
@@ -48,7 +49,7 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * A run's summary as ONE line, the way ChatGPT ("Thought for 8s ›"),
  * Perplexity ("1 step completed ›") and v0 (glyph + "Explored project structure ›") draw an agent's
- * work: a small status glyph, one muted label ("Worked · 10.8s · 1 tool", "Working…", "Failed · 1 of 3",
+ * work: a small status glyph, one muted label ("Worked for 10.8s · 1 step", "Working…", "Failed · 1 of 3",
  * "Waiting for your approval") and, when the run folds, a single trailing chevron. The whole line is
  * the hit target. The run's steps (its reasoning and its tool step rows) list under it only
  * once it is opened, so a folded run never shows a second stray line with a chevron of its own.
@@ -140,13 +141,13 @@ private fun failedParts(activity: RunActivityProjection): List<String> {
     return listOf(failed, stringResource(Res.string.rows_run_failed_of, activity.failureCount, activity.toolCount))
 }
 
-/** "Worked · 10.8s · 1 tool" (or "Thought · 2.1s" for a run that only reasoned). */
+/** "Worked for 2m · 3 steps" (or "Thought for 2.1s" for a run that only reasoned). */
 @Composable
 private fun doneParts(activity: RunActivityProjection): List<String> {
     val verb = stringResource(if (onlyThought(activity)) Res.string.rows_run_thought else Res.string.rows_run_worked)
-    val duration = activity.durationMs?.let { formatRunDuration(it) }
-    val tools = activity.toolCount.takeIf { it > 0 }?.let { pluralStringResource(Res.plurals.rows_run_tool_count, it, it) }
-    return listOfNotNull(verb, duration, tools)
+    val worked = activity.durationMs?.let { stringResource(Res.string.rows_run_for_duration, verb, formatRunDuration(it)) } ?: verb
+    val steps = activity.toolCount.takeIf { it > 0 }?.let { pluralStringResource(Res.plurals.rows_run_step_count, it, it) }
+    return listOfNotNull(worked, steps)
 }
 
 /** A run that reasoned and ran no tools "Thought"; one that ran tools "Worked", reasoning or not. */

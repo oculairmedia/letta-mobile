@@ -62,10 +62,10 @@
     <string name="rows_tool_run_failed">%1$d ran - %2$d failed</string>
     <string name="rows_tool_run_running">Running %1$s - %2$s - %3$s</string>
     <string name="rows_tool_run_approval">Approval needed - %1$s</string>
-    <!-- The run summary line: "Worked · 10.8s · 1 tool", "Failed · 1 of 3" (parts joined pairwise by rows_run_summary_join) -->
-    <plurals name="rows_run_tool_count">
-        <item quantity="one">%1$d tool</item>
-        <item quantity="other">%1$d tools</item>
+    <!-- The run summary line: "Worked for 10.8s · 1 step", "Failed · 1 of 3" (parts joined pairwise by rows_run_summary_join) -->
+    <plurals name="rows_run_step_count">
+        <item quantity="one">%1$d step</item>
+        <item quantity="other">%1$d steps</item>
     </plurals>
     <string name="rows_run_summary_join">%1$s · %2$s</string>
     <string name="rows_run_failed">Failed</string>
@@ -93,6 +93,14 @@
     <string name="rows_tool_status_running">Running</string>
     <string name="rows_tool_failed">failed</string>
     <string name="rows_tool_awaiting_approval">awaiting approval</string>
+    <!-- A group of tool steps' label: its activities, joined pairwise ("Explored files, ran commands"). -->
+    <string name="rows_steps_explored">explored files</string>
+    <string name="rows_steps_ran">ran commands</string>
+    <string name="rows_steps_edited">edited files</string>
+    <string name="rows_steps_fetched">fetched pages</string>
+    <string name="rows_steps_delegated">delegated work</string>
+    <string name="rows_steps_called">called tools</string>
+    <string name="rows_steps_join">%1$s, %2$s</string>
     <string name="rows_copy_command">Copy command</string>
     <string name="rows_tool_step_label">%1$s %2$s</string>
     <string name="rows_tool_verb_ran">Ran</string>

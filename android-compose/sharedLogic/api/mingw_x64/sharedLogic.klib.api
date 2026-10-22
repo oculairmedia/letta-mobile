@@ -717,6 +717,21 @@ final enum class com.letta.mobile.data.chat.send/ServerQueueBlocker : kotlin/Enu
     final fun values(): kotlin/Array<com.letta.mobile.data.chat.send/ServerQueueBlocker> // com.letta.mobile.data.chat.send/ServerQueueBlocker.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.chat.tools/ToolActivity : kotlin/Enum<com.letta.mobile.data.chat.tools/ToolActivity> { // com.letta.mobile.data.chat.tools/ToolActivity|null[0]
+    enum entry Called // com.letta.mobile.data.chat.tools/ToolActivity.Called|null[0]
+    enum entry Delegated // com.letta.mobile.data.chat.tools/ToolActivity.Delegated|null[0]
+    enum entry Edited // com.letta.mobile.data.chat.tools/ToolActivity.Edited|null[0]
+    enum entry Explored // com.letta.mobile.data.chat.tools/ToolActivity.Explored|null[0]
+    enum entry Fetched // com.letta.mobile.data.chat.tools/ToolActivity.Fetched|null[0]
+    enum entry Ran // com.letta.mobile.data.chat.tools/ToolActivity.Ran|null[0]
+
+    final val entries // com.letta.mobile.data.chat.tools/ToolActivity.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.chat.tools/ToolActivity> // com.letta.mobile.data.chat.tools/ToolActivity.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.chat.tools/ToolActivity // com.letta.mobile.data.chat.tools/ToolActivity.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.chat.tools/ToolActivity> // com.letta.mobile.data.chat.tools/ToolActivity.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.chat.tools/ToolInsetKind : kotlin/Enum<com.letta.mobile.data.chat.tools/ToolInsetKind> { // com.letta.mobile.data.chat.tools/ToolInsetKind|null[0]
     enum entry Arguments // com.letta.mobile.data.chat.tools/ToolInsetKind.Arguments|null[0]
     enum entry BeforeAfter // com.letta.mobile.data.chat.tools/ToolInsetKind.BeforeAfter|null[0]
@@ -30267,6 +30282,23 @@ final class com.letta.mobile.data.chat.tools/ToolPreviewSpec { // com.letta.mobi
         final val $childSerializers // com.letta.mobile.data.chat.tools/ToolPreviewSpec.Companion.$childSerializers|{}$childSerializers[0]
 
         final fun serializer(): kotlinx.serialization/KSerializer<com.letta.mobile.data.chat.tools/ToolPreviewSpec> // com.letta.mobile.data.chat.tools/ToolPreviewSpec.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.chat.tools/ToolStepExpansions { // com.letta.mobile.data.chat.tools/ToolStepExpansions|null[0]
+    constructor <init>(com.letta.mobile.data.storage/SecureSettingsStore? = ..., kotlin/Int = ...) // com.letta.mobile.data.chat.tools/ToolStepExpansions.<init>|<init>(com.letta.mobile.data.storage.SecureSettingsStore?;kotlin.Int){}[0]
+
+    final val toggled // com.letta.mobile.data.chat.tools/ToolStepExpansions.toggled|{}toggled[0]
+        final fun <get-toggled>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<kotlin/String>> // com.letta.mobile.data.chat.tools/ToolStepExpansions.toggled.<get-toggled>|<get-toggled>(){}[0]
+
+    final fun isExpanded(kotlin/String, kotlin/Boolean, kotlin.collections/List<kotlin/String> = ...): kotlin/Boolean // com.letta.mobile.data.chat.tools/ToolStepExpansions.isExpanded|isExpanded(kotlin.String;kotlin.Boolean;kotlin.collections.List<kotlin.String>){}[0]
+    final fun toggle(kotlin/String) // com.letta.mobile.data.chat.tools/ToolStepExpansions.toggle|toggle(kotlin.String){}[0]
+
+    final object Companion { // com.letta.mobile.data.chat.tools/ToolStepExpansions.Companion|null[0]
+        final const val DEFAULT_CAPACITY // com.letta.mobile.data.chat.tools/ToolStepExpansions.Companion.DEFAULT_CAPACITY|{}DEFAULT_CAPACITY[0]
+            final fun <get-DEFAULT_CAPACITY>(): kotlin/Int // com.letta.mobile.data.chat.tools/ToolStepExpansions.Companion.DEFAULT_CAPACITY.<get-DEFAULT_CAPACITY>|<get-DEFAULT_CAPACITY>(){}[0]
+        final const val KEY // com.letta.mobile.data.chat.tools/ToolStepExpansions.Companion.KEY|{}KEY[0]
+            final fun <get-KEY>(): kotlin/String // com.letta.mobile.data.chat.tools/ToolStepExpansions.Companion.KEY.<get-KEY>|<get-KEY>(){}[0]
     }
 }
 
@@ -67571,6 +67603,8 @@ final val com.letta.mobile.data.chat.runtime/isConnectionRetryable // com.letta.
     final fun (com.letta.mobile.data.chat.runtime/ChatScreenStatus).<get-isConnectionRetryable>(): kotlin/Boolean // com.letta.mobile.data.chat.runtime/isConnectionRetryable.<get-isConnectionRetryable>|<get-isConnectionRetryable>@com.letta.mobile.data.chat.runtime.ChatScreenStatus(){}[0]
 final val com.letta.mobile.data.chat.runtime/isError // com.letta.mobile.data.chat.runtime/isError|@com.letta.mobile.data.chat.runtime.ChatScreenStatus{}isError[0]
     final fun (com.letta.mobile.data.chat.runtime/ChatScreenStatus).<get-isError>(): kotlin/Boolean // com.letta.mobile.data.chat.runtime/isError.<get-isError>|<get-isError>@com.letta.mobile.data.chat.runtime.ChatScreenStatus(){}[0]
+final val com.letta.mobile.data.chat.tools/activity // com.letta.mobile.data.chat.tools/activity|@com.letta.mobile.data.chat.tools.ToolVerb{}activity[0]
+    final fun (com.letta.mobile.data.chat.tools/ToolVerb).<get-activity>(): com.letta.mobile.data.chat.tools/ToolActivity // com.letta.mobile.data.chat.tools/activity.<get-activity>|<get-activity>@com.letta.mobile.data.chat.tools.ToolVerb(){}[0]
 final val com.letta.mobile.data.compaction/key // com.letta.mobile.data.compaction/key|@com.letta.mobile.data.compaction.CompactionRequest{}key[0]
     final fun (com.letta.mobile.data.compaction/CompactionRequest).<get-key>(): com.letta.mobile.data.compaction/CompactionKey // com.letta.mobile.data.compaction/key.<get-key>|<get-key>@com.letta.mobile.data.compaction.CompactionRequest(){}[0]
 final val com.letta.mobile.data.context.limit/key // com.letta.mobile.data.context.limit/key|@com.letta.mobile.data.context.limit.ContextLimitRequest{}key[0]

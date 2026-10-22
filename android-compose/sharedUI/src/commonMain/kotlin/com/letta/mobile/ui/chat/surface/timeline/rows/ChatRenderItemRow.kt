@@ -124,8 +124,8 @@ internal object ChatRowTestTags {
     const val RUN_WORK_STEP = "chat-run-work-step"
     /** An expanded run's tool steps, listed straight under its summary line (no group row). */
     const val RUN_TOOL_STEPS = "chat-run-tool-steps"
-    /** The plain, non-disclosing subheader over a run's tool steps of more than one kind. */
-    const val RUN_STEP_SUBHEADER = "chat-run-step-subheader"
+    /** The plain, non-disclosing label over several tool steps ("Explored files, ran commands"). */
+    const val RUN_STEP_GROUP_LABEL = "chat-run-step-group-label"
     const val APPROVAL_REASON = "chat-approval-reason"
     const val APPROVAL_REJECT_DIALOG = "chat-approval-reject-dialog"
     const val APPROVAL_REJECT_CONFIRM = "chat-approval-reject-confirm"

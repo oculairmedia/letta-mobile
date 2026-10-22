@@ -15,15 +15,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.disabled
@@ -52,7 +58,9 @@ import com.letta.mobile.sharedui.resources.rows_tool_result_preview
 import com.letta.mobile.sharedui.resources.rows_tool_status_running
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceMetadata
 import com.letta.mobile.ui.chat.session.ChatMessageId
+import com.letta.mobile.data.chat.tools.ToolStepExpansions
 import com.letta.mobile.ui.chat.tools.LocalToolPresenters
+import com.letta.mobile.ui.chat.tools.LocalToolStepExpansions
 import com.letta.mobile.ui.chat.tools.title
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.haptics.LettaHapticCue
@@ -92,26 +100,28 @@ internal fun ToolStep(
         return
     }
     val resolved = state ?: remember(toolCall) { classifyToolCallState(toolCall) }
-    var expanded by rememberSaveable(disclosureKey) { mutableStateOf(toolCall.shouldInitiallyExpand()) }
-    RequestFullResultOnExpand(toolCall, expanded, callbacks)
+    val expansions = LocalToolStepExpansions.current ?: remember { ToolStepExpansions() }
+    val toggled by expansions.toggled.collectAsState()
+    val isExpanded = expansions.isExpanded(disclosureKey, toolCall.shouldInitiallyExpand(), toggled)
+    RequestFullResultOnExpand(toolCall, isExpanded, callbacks)
     val haptics = LocalHaptics.current
     val running = resolved == ToolTimelineState.Running
     // A running step is where a working mascot looks (te3n1.2).
     Column(modifier = Modifier.fillMaxWidth().mascotAttention(AttentionKey("tool:$disclosureKey"), AttentionKind.TOOL, enabled = running)) {
         ToolStepLineRow(
             spec = stepLineSpec(toolCall, resolved, callbacks),
-            disclosure = if (!toolCall.hasDetails()) null else RunStepDisclosure(expanded) {
+            disclosure = if (!toolCall.hasDetails()) null else RunStepDisclosure(isExpanded) {
                 haptics.play(LettaHapticCue.SegmentTick)
-                expanded = !expanded
+                expansions.toggle(disclosureKey)
             },
         )
         AnimatedVisibility(
-            visible = expanded && toolCall.hasDetails(),
+            visible = isExpanded && toolCall.hasDetails(),
             enter = ChatRowMotion(LocalReducedMotion.current).expansionEnter(),
             exit = ChatRowMotion(LocalReducedMotion.current).expansionExit(),
             label = "toolStepInset",
         ) {
-            ToolStepDetails(toolCall, callbacks)
+            ToolStepDetails(toolCall, callbacks, live = running || toolCall.isStreaming())
         }
     }
 }
@@ -205,12 +215,30 @@ private fun RowScope.StepLineWords(spec: StepLineSpec) {
     }
 }
 
+/**
+ * The line as a toggle, by pointer, touch or keyboard: Enter or Space opens or closes it, Escape
+ * closes it, and the arrow keys move to the step above or below.
+ */
 @Composable
 private fun Modifier.stepToggle(disclosure: RunStepDisclosure): Modifier {
     val stateText = stringResource(if (disclosure.expanded) Res.string.rows_state_expanded else Res.string.rows_state_collapsed)
     val action = stringResource(disclosure.actionLabel())
-    return clickable(role = Role.Button, onClickLabel = action, onClick = disclosure.onToggle)
+    val focus = LocalFocusManager.current
+    return onPreviewKeyEvent { event -> event.type == KeyEventType.KeyDown && stepKey(event.key, disclosure, focus) }
+        .clickable(role = Role.Button, onClickLabel = action, onClick = disclosure.onToggle)
         .semantics { stateDescription = stateText }
+}
+
+/** What a key does on a focused step line; false when it is not the line's to handle. */
+private fun stepKey(key: Key, disclosure: RunStepDisclosure, focus: FocusManager): Boolean = when (key) {
+    Key.Enter, Key.NumPadEnter, Key.Spacebar -> {
+        disclosure.onToggle()
+        true
+    }
+    Key.Escape -> disclosure.expanded.also { open -> if (open) disclosure.onToggle() }
+    Key.DirectionDown -> focus.moveFocus(FocusDirection.Down)
+    Key.DirectionUp -> focus.moveFocus(FocusDirection.Up)
+    else -> false
 }
 
 private fun RunStepDisclosure.actionLabel() = if (expanded) Res.string.rows_collapse else Res.string.rows_expand
@@ -229,7 +257,7 @@ private fun warningInk(): Color {
 
 /** An open step: its agent-message metadata, its inset (built now, not before), its file chips and its images. */
 @Composable
-private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks) {
+private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -241,14 +269,14 @@ private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks) {
             val failed = provenance.deliveryState == AgentMessageDeliveryState.FAILED
             AgentMessageProvenanceMetadata(provenance, if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary)
         }
-        ToolStepInset(toolCall, callbacks)
+        ToolStepInset(toolCall, callbacks, live)
         rememberToolStepLine(toolCall).previews.firstOrNull()?.let { ToolCallFileLink(it) }
         ToolGeneratedImages(toolCall, callbacks)
     }
 }
 
 @Composable
-private fun ToolStepInset(toolCall: UiToolCall, callbacks: ChatRowCallbacks) {
+private fun ToolStepInset(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean) {
     val notification = remember(toolCall.result) { toolCall.result?.let(::extractSubagentNotification) }
     if (notification != null) {
         SubagentNotificationCard(notification, callbacks.openSubagent, toolCall.toolCallId)
@@ -256,7 +284,7 @@ private fun ToolStepInset(toolCall: UiToolCall, callbacks: ChatRowCallbacks) {
     }
     val presenters = LocalToolPresenters.current
     val inset = remember(toolCall, presenters) { presenters.inset(toolCall.facts()) }
-    inset?.let { ToolInsetView(it) }
+    inset?.let { ToolInsetView(it, live = live) }
     if (toolCall.resultTruncation != null) {
         Text(
             text = stringResource(Res.string.rows_tool_result_preview),
@@ -284,3 +312,6 @@ private fun ToolGeneratedImages(toolCall: UiToolCall, callbacks: ChatRowCallback
 }
 
 private const val TARGET_ALPHA = 0.8f
+
+/** A call whose output may still grow: no terminal status yet, and not read back settled from the ledger. */
+private fun UiToolCall.isStreaming(): Boolean = status == null && !settled

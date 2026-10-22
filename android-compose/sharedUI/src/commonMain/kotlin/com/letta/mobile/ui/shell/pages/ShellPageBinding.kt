@@ -14,6 +14,7 @@ import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.ui.shell.EmptyShellPage
+import com.letta.mobile.ui.chat.tools.ProvideToolStepExpansions
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPageOptions
@@ -86,7 +87,12 @@ fun shellPageDeps(
     controllers: ShellLibraryControllers,
     host: ShellPageHost,
 ): ShellPageDeps {
-    val chat = host.pages.chat
+    // The chat remembers which tool steps the person opened, across reloads, in the device's settings.
+    val chat = host.pages.chat?.let { page ->
+        ShellPageContent<ShellDestination.Chat> { destination, modifier ->
+            ProvideToolStepExpansions(host.settings) { page.Content(destination, modifier) }
+        }
+    }
     return ShellPageDeps(
         home = shellHomeBinding(graph, controllers.home, host),
         chat = chat,

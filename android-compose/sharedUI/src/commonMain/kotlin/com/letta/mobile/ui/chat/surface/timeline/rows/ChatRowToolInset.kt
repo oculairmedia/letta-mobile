@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -49,25 +48,25 @@ import org.jetbrains.compose.resources.stringResource
  * a muted red. Long outputs keep only their last lines ([OutputWindow]).
  */
 @Composable
-internal fun ToolInsetView(inset: ToolInset, modifier: Modifier = Modifier) {
+internal fun ToolInsetView(inset: ToolInset, modifier: Modifier = Modifier, live: Boolean = false) {
     when (inset) {
-        is ToolInset.Diff -> BoundedScroll(modifier) { DiffBlock(inset.unified) }
-        is ToolInset.Command -> InsetPanel(modifier) { CommandInset(inset) }
-        is ToolInset.Text -> InsetPanel(modifier) { OutputText(inset.text, InsetInk.Plain) }
-        is ToolInset.BeforeAfter -> InsetPanel(modifier) { BeforeAfterInset(inset) }
-        is ToolInset.Arguments -> InsetPanel(modifier) { ArgumentsInset(inset) }
+        is ToolInset.Diff -> BoundedScroll(modifier, live) { DiffBlock(inset.unified) }
+        is ToolInset.Command -> InsetPanel(modifier, live) { CommandInset(inset) }
+        is ToolInset.Text -> InsetPanel(modifier, live) { OutputText(inset.text, InsetInk.Plain) }
+        is ToolInset.BeforeAfter -> InsetPanel(modifier, live) { BeforeAfterInset(inset) }
+        is ToolInset.Arguments -> InsetPanel(modifier, live) { ArgumentsInset(inset) }
     }
 }
 
 /** The inset's surface: surface-1, no border, bounded then scrolling. */
 @Composable
-private fun InsetPanel(modifier: Modifier, content: @Composable ColumnScope.() -> Unit) {
+private fun InsetPanel(modifier: Modifier, live: Boolean, content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier = modifier.fillMaxWidth().testTag(ChatRowTestTags.TOOL_OUTPUT),
         shape = RoundedCornerShape(LettaDimens.Radius.sm),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        BoundedScroll(Modifier) {
+        BoundedScroll(Modifier, live) {
             SelectionContainer {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.md),
@@ -80,13 +79,13 @@ private fun InsetPanel(modifier: Modifier, content: @Composable ColumnScope.() -
 }
 
 @Composable
-private fun BoundedScroll(modifier: Modifier, content: @Composable () -> Unit) {
+private fun BoundedScroll(modifier: Modifier, live: Boolean, content: @Composable () -> Unit) {
     Box(
         modifier
             .fillMaxWidth()
             .heightIn(max = ChatRowDimens.toolInsetMaxHeight)
             .testTag(ChatRowTestTags.TOOL_INSET_VIEWPORT)
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(rememberTailFollowingScroll(live)),
     ) { content() }
 }
 
