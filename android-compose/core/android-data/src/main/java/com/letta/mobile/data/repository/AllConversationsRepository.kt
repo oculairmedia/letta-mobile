@@ -3,23 +3,17 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.backend.bound
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.backend.RemoteRoute
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
-import androidx.paging.PagingData
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.GatedDao
 import com.letta.mobile.data.local.SessionCacheGate
 import com.letta.mobile.data.local.RoomAllConversationsLocalCache
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.Conversation
-import com.letta.mobile.data.paging.ConversationPagingSource
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.repository.api.ConversationRemoteSource
 import com.letta.mobile.data.transport.api.IChannelTransport
 import dagger.Lazy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.Flow
 
 /** The scope of a repository built outside a session graph (tests, previews); graphs pass their own. */
 @Suppress("NoDetachedCoroutineLifecycle")
@@ -31,12 +25,10 @@ internal fun defaultAllConversationsScope(): CoroutineScope =
  *
  * letta-mobile-ckmub.4: [remote] is the seam for a non-App-Server backend; production binds no
  * route (the Letta REST backend was removed).
- *
- * Phase 5b.2 — refresh/cache/hasMore/cursor logic lives in sharedLogic;
- * [getConversationsPaged] stays here because [ConversationPagingSource] is Android-bound.
  */
 open class AllConversationsRepository(
-    private val remote: RemoteRoute<ConversationRemoteSource> = RemoteRoute.Absent(SessionRoute.CONVERSATIONS),
+    roster: suspend () -> List<Agent>,
+    remote: RemoteRoute<ConversationRemoteSource> = RemoteRoute.Absent(SessionRoute.CONVERSATIONS),
     conversationDao: Lazy<ConversationDao>? = null,
     repositoryScope: CoroutineScope,
     irohConversationListSource: IrohAdminRpcConversationListSource? = null,
@@ -44,6 +36,7 @@ open class AllConversationsRepository(
     /** letta-mobile-by4vm.94: the session's cache clear every Room access waits for. */
     cacheGate: SessionCacheGate = SessionCacheGate.Open,
 ) : CachedAllConversationsRepository(
+    roster = roster,
     remote = remote,
     localCache = conversationDao?.let { GatedDao(it, cacheGate) }?.let { dao -> { RoomAllConversationsLocalCache(dao) } },
     repositoryScope = repositoryScope,
@@ -53,58 +46,17 @@ open class AllConversationsRepository(
     /** A repository over [remote] (the backend seam; tests and previews bind a fake). */
     constructor(
         remote: ConversationRemoteSource,
+        roster: suspend () -> List<Agent>,
         conversationDao: Lazy<ConversationDao>? = null,
         repositoryScope: CoroutineScope = defaultAllConversationsScope(),
-                irohConversationListSource: IrohAdminRpcConversationListSource? = null,
+        irohConversationListSource: IrohAdminRpcConversationListSource? = null,
         transport: IChannelTransport? = null,
     ) : this(
+        roster = roster,
         remote = remote.bound(),
         conversationDao = conversationDao,
         repositoryScope = repositoryScope,
-                irohConversationListSource = irohConversationListSource,
+        irohConversationListSource = irohConversationListSource,
         transport = transport,
     )
-
-    internal fun createConversationsPagingSource(
-        agentId: AgentId?,
-        archiveStatus: String?,
-        summarySearch: String?,
-    ): ConversationPagingSource = ConversationPagingSource(
-        remote = remote,
-        agentId = agentId,
-        archiveStatus = archiveStatus,
-        summarySearch = summarySearch,
-        order = "desc",
-        orderBy = "last_message_at",
-        pageLoader = irohPageLoaderOrNull()?.let { loader ->
-            { pageAgentId, limit, after, pageArchiveStatus, pageSummarySearch, order, orderBy ->
-                loader(
-                    pageAgentId,
-                    limit,
-                    after,
-                    pageArchiveStatus,
-                    pageSummarySearch,
-                    order,
-                    orderBy,
-                )
-            }
-        },
-    )
-
-    override fun getConversationsPaged(
-        agentId: AgentId?,
-        archiveStatus: String?,
-        summarySearch: String?,
-    ): Flow<PagingData<Conversation>> {
-        return Pager(
-            config = PagingConfig(
-                pageSize = ConversationPagingSource.PAGE_SIZE,
-                enablePlaceholders = false,
-                initialLoadSize = ConversationPagingSource.PAGE_SIZE,
-            ),
-            pagingSourceFactory = {
-                createConversationsPagingSource(agentId, archiveStatus, summarySearch)
-            },
-        ).flow
-    }
 }

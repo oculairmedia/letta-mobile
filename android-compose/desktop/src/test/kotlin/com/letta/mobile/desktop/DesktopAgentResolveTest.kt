@@ -29,51 +29,33 @@ import kotlin.test.assertEquals
 class DesktopAgentResolveTest {
 
     @Test
-    fun `a missing agent does not discard the names that resolved`() = runTest {
+    fun `a missing agent does not discard the agents that resolved`() = runTest {
         val repository = FakeAgentRepository(known = mapOf("agent-a" to "Meridian", "agent-c" to "Atlas"))
 
-        val names = resolveDesktopAgentNames(
+        val agents = resolveDesktopAgents(
             agentIds = setOf("agent-a", "agent-b-deleted", "agent-c"),
             agentRepository = repository,
         )
 
-        assertEquals(mapOf("agent-a" to "Meridian", "agent-c" to "Atlas"), names)
-    }
-
-    @Test
-    fun `a refresh failure still resolves per-id lookups`() = runTest {
-        val repository = FakeAgentRepository(known = mapOf("agent-a" to "Meridian"), refreshThrows = true)
-
-        assertEquals(mapOf("agent-a" to "Meridian"), resolveDesktopAgentNames(setOf("agent-a"), repository))
+        assertEquals(mapOf("agent-a" to "Meridian", "agent-c" to "Atlas"), agents.mapValues { it.value.name })
     }
 
     @Test
     fun `every agent missing yields an empty map rather than throwing`() = runTest {
         val repository = FakeAgentRepository(known = emptyMap())
 
-        assertEquals(emptyMap(), resolveDesktopAgentNames(setOf("gone-1", "gone-2"), repository))
-    }
-
-    @Test
-    fun `a blank agent name is not resolved`() = runTest {
-        val repository = FakeAgentRepository(known = mapOf("agent-a" to "   ", "agent-b" to "Atlas"))
-
-        assertEquals(mapOf("agent-b" to "Atlas"), resolveDesktopAgentNames(setOf("agent-a", "agent-b"), repository))
+        assertEquals(emptyMap(), resolveDesktopAgents(setOf("gone-1", "gone-2"), repository))
     }
 }
 
 private class FakeAgentRepository(
     private val known: Map<String, String>,
-    private val refreshThrows: Boolean = false,
 ) : IAgentRepository {
     override val agents: StateFlow<List<Agent>> = MutableStateFlow(emptyList())
     override val isRefreshing: StateFlow<Boolean> = MutableStateFlow(false)
     override val refreshError: StateFlow<Throwable?> = MutableStateFlow(null)
 
-    override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean {
-        if (refreshThrows) error("backend unreachable")
-        return true
-    }
+    override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = true
 
     override fun getCachedAgent(id: AgentId): Agent? = null
 

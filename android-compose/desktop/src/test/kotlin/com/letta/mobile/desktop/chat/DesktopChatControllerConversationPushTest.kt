@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
@@ -30,14 +31,15 @@ class DesktopChatControllerConversationPushTest {
 
         override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> {
             listCalls += 1
-            return roster.map { id ->
+            // Newest first, as the host lists them: the roster's first conversation is its latest.
+            return roster.mapIndexed { index, id ->
                 Conversation(
                     id = ConversationId(id),
                     agentId = AgentId("agent-0"),
                     summary = "Chat $id",
                     createdAt = "2026-06-07T01:00:00Z",
                     updatedAt = "2026-06-07T01:01:00Z",
-                    lastMessageAt = "2026-06-07T01:02:00Z",
+                    lastMessageAt = "2026-06-07T01:02:${(59 - index).toString().padStart(2, '0')}Z",
                 )
             }
         }
@@ -158,6 +160,8 @@ class DesktopChatControllerConversationPushTest {
         DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = backgroundScope,
+            // Every conversation here is agent-0's; one agent keeps one read per roster refresh.
+            rosterProvider = { listOf(Agent(id = AgentId("agent-0"), name = "Agent 0")) },
             gatewayFactory = { gateway },
             conversationChanges = transport,
         )

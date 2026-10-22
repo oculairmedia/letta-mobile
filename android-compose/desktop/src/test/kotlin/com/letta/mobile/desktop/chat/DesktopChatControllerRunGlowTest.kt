@@ -34,8 +34,8 @@ class DesktopChatControllerRunGlowTest {
         val controller = DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = this,
+            rosterProvider = TEST_ROSTER,
             gatewayFactory = { FakeDesktopChatGateway() },
-            agentNamesByIdProvider = { emptyMap() },
             loopFactory = { _, _, _ -> loop },
         )
         controller.start()

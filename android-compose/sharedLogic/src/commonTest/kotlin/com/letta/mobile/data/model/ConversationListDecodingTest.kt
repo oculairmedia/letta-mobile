@@ -9,9 +9,10 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** A host's list carries agent-free conversations (`agent_id: null`); one such row must not hide the rest. */
+/** A host's list carries agent-free worker conversations (`agent_id: null`); the list leaves them out by rule. */
 class ConversationListDecodingTest {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -19,22 +20,33 @@ class ConversationListDecodingTest {
         mapOf(
             "id" to JsonPrimitive(id),
             "agent_id" to (agentId?.let(::JsonPrimitive) ?: JsonNull),
-            "agent_free" to JsonPrimitive(agentId == null),
         ),
     )
 
+    /** A row with an agent that this client still cannot decode (an id that is not a string). */
+    private fun malformed(id: String) = JsonObject(mapOf("id" to JsonObject(emptyMap()), "agent_id" to JsonPrimitive(id)))
+
     @Test
-    fun anAgentFreeRowIsSkippedAndTheRestStayInOrder() {
+    fun anAgentFreeRowIsLeftOutAndTheRestStayInOrder() {
         val listed = json.decodeConversationList(JsonArray(listOf(row("c1", "a1"), row("c2", null), row("c3", "a2"))))
 
         assertEquals(listOf("c1", "c3"), listed.map { it.id.value })
     }
 
     @Test
-    fun theSkippedRowsAreReportedOnce() {
+    fun agentFreeRowsAreExcludedByRuleNotReportedAsSkipped() {
         val reports = mutableListOf<String>()
-        json.decodeConversationList(JsonArray(listOf(row("c1", "a1"), row("c2", null), row("c3", null)))) { reports += it }
+        json.decodeConversationList(JsonArray(listOf(row("c1", "a1"), row("c2", null), row("c3", "")))) { reports += it }
 
+        assertTrue(reports.isEmpty(), reports.toString())
+    }
+
+    @Test
+    fun malformedRowsAreSkippedAndReportedOnce() {
+        val reports = mutableListOf<String>()
+        val listed = json.decodeConversationList(JsonArray(listOf(row("c1", "a1"), malformed("a2"), malformed("a3")))) { reports += it }
+
+        assertEquals(listOf("c1"), listed.map { it.id.value })
         assertEquals(1, reports.size)
         assertTrue(reports.single().startsWith("skipped=2 kept=1 "), reports.single())
     }
@@ -56,5 +68,13 @@ class ConversationListDecodingTest {
     @Test
     fun aPayloadThatIsNotAListStillFails() {
         assertFailsWith<SerializationException> { json.decodeConversationList(row("c1", "a1")) }
+    }
+
+    @Test
+    fun aRowIsAgentFreeOnlyWithoutAnAgent() {
+        assertTrue(HiddenListFilter.isAgentFreeRow(JsonObject(mapOf("id" to JsonPrimitive("c1")))))
+        assertTrue(HiddenListFilter.isAgentFreeRow(row("c1", null)))
+        assertTrue(HiddenListFilter.isAgentFreeRow(row("c1", " ")))
+        assertFalse(HiddenListFilter.isAgentFreeRow(row("c1", "agent-1")))
     }
 }

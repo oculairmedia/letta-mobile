@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.runtime.AgentConversationPage
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
@@ -64,7 +65,7 @@ class DesktopChatControllerTest {
     fun startResolvesAgentNamesForConversationNavigation() = runTest {
         val controller = testController(
             gateway = FakeDesktopChatGateway(),
-            agentNamesByIdProvider = { mapOf("agent-0" to "Ada") },
+            roster = { listOf(Agent(id = AgentId("agent-0"), name = "Ada")) },
         )
 
         controller.start()
@@ -389,6 +390,7 @@ class DesktopChatControllerTest {
                 ),
             ),
             scope = this,
+            rosterProvider = TEST_ROSTER,
             gatewayFactory = {
                 gatewayConstructed = true
                 FakeDesktopChatGateway()
@@ -625,7 +627,7 @@ class DesktopChatControllerTest {
 
     private fun TestScope.testController(
         gateway: DesktopChatGateway,
-        agentNamesByIdProvider: suspend (Set<String>) -> Map<String, String> = { emptyMap() },
+        roster: suspend () -> List<Agent> = TEST_ROSTER,
         loopFactory: (
             gateway: DesktopChatGateway,
             conversation: DesktopConversationSummary,
@@ -635,31 +637,31 @@ class DesktopChatControllerTest {
         DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = this,
+            rosterProvider = roster,
             gatewayFactory = { gateway },
-            agentNamesByIdProvider = agentNamesByIdProvider,
             loopFactory = loopFactory,
         )
 
     private fun TestScope.testController(
         gateway: DesktopChatGateway,
-        agentNamesByIdProvider: suspend (Set<String>) -> Map<String, String> = { emptyMap() },
+        roster: suspend () -> List<Agent> = TEST_ROSTER,
     ): DesktopChatController =
         DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = this,
+            rosterProvider = roster,
             gatewayFactory = { gateway },
-            agentNamesByIdProvider = agentNamesByIdProvider,
         )
 
     private fun TestScope.testController(
         gatewayFactory: suspend () -> DesktopChatGateway,
-        agentNamesByIdProvider: suspend (Set<String>) -> Map<String, String> = { emptyMap() },
+        roster: suspend () -> List<Agent> = TEST_ROSTER,
     ): DesktopChatController =
         DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = this,
+            rosterProvider = roster,
             gatewayFactory = gatewayFactory,
-            agentNamesByIdProvider = agentNamesByIdProvider,
         )
 }
 
@@ -672,7 +674,8 @@ open class FakeDesktopChatGateway(
     val conversationMessageRequests = mutableListOf<String>()
     val agentMessageRequests = mutableListOf<Pair<String, String?>>()
 
-    override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> =
+    /** Every conversation the fake host has, newest first; the controller reads them agent by agent. */
+    open suspend fun listConversations(limit: Int = 40, archiveStatus: String? = null): List<Conversation> =
         conversationIds.mapIndexed { index, conversationId ->
             Conversation(
                 id = ConversationId(conversationId),
@@ -684,9 +687,12 @@ open class FakeDesktopChatGateway(
                 },
                 createdAt = "2026-06-07T01:00:00Z",
                 updatedAt = "2026-06-07T01:01:00Z",
-                lastMessageAt = "2026-06-07T01:02:00Z",
+                lastMessageAt = "2026-06-07T01:02:${(59 - index).toString().padStart(2, '0')}Z",
             )
         }
+
+    override suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> =
+        listConversations().filter { it.agentId == page.agent }.pageAfter(page)
 
     override suspend fun getConversation(conversationId: String): Conversation =
         listConversations().first { it.id.value == conversationId }
@@ -840,3 +846,12 @@ private class SuspendingSendDesktopLoop(conversationId: String) : DesktopTimelin
 
 private suspend fun awaitCancellation(): Nothing =
     CompletableDeferred<Nothing>().await()
+
+/** The agents the fake gateways' conversations belong to (`agent-<index>`), as the controller's roster. */
+internal val TEST_ROSTER: suspend () -> List<Agent> = { List(3) { Agent(id = AgentId("agent-$it"), name = "Agent $it") } }
+
+/** [page]'s window of these (one agent's) conversations: after its cursor, at most its limit. */
+internal fun List<Conversation>.pageAfter(page: AgentConversationPage): List<Conversation> {
+    val from = page.after?.let { cursor -> indexOfFirst { it.id == cursor } + 1 } ?: 0
+    return drop(from).take(page.limit)
+}

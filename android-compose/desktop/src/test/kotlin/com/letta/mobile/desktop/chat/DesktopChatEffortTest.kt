@@ -171,6 +171,7 @@ class DesktopChatEffortTest {
         DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = backgroundScope,
+            rosterProvider = TEST_ROSTER,
             gatewayFactory = { gateway },
             agentByIdProvider = { ids -> ids.associateWith { Agent(id = AgentId(it), name = it, model = SOL) } },
         )

@@ -3,6 +3,7 @@ package com.letta.mobile.data.chat.conversations
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.runtime.MapSettingsStore
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -29,7 +30,8 @@ class TimelineConversationsIrohTest {
 
         assertTrue(owner.state.value.loaded, "the list loaded: ${owner.state.value.error}")
         assertEquals(listOf("c1", "c2"), owner.state.value.conversations.map { it.id.value })
-        assertEquals(listOf("conversation.list"), host.methods)
+        assertEquals(listOf("agent-1", "agent-2"), host.calls.map { (_, params) -> params.text("agent_id") }.sorted())
+        assertEquals(listOf("conversation.list", "conversation.list"), host.methods)
         assertTrue(host.native.isEmpty(), "native commands sent: ${host.native}")
     }
 
@@ -49,7 +51,10 @@ class TimelineConversationsIrohTest {
         runCurrent()
 
         assertEquals(
-            listOf("conversation.list", "conversation.update", "conversation.archive", "conversation.fork", "conversation.archive"),
+            listOf(
+                "conversation.list", "conversation.list",
+                "conversation.update", "conversation.archive", "conversation.fork", "conversation.archive",
+            ),
             host.methods,
         )
         assertTrue(host.native.isEmpty(), "native commands sent: ${host.native}")
@@ -62,8 +67,7 @@ class TimelineConversationsIrohTest {
     @Test
     fun anAgentWithNoListedChatOpensItsOwnBeforeANewOneIsMade() = runTest {
         val host = IrohHost(HostConversation("c1", "agent-1", "Plans"), HostConversation("old", "agent-2", "Earlier"))
-        host.outsideWindow += "old"
-        val owner = owner(host)
+        val owner = owner(host, roster = listOf("agent-1"))
         runCurrent()
 
         owner.createConversationForAgent(AgentId("agent-2")) {}
@@ -72,15 +76,29 @@ class TimelineConversationsIrohTest {
 
         owner.createConversationForAgent(AgentId("agent-3")) {}
         runCurrent()
-        assertEquals(listOf("conversation.list", "conversation.list_agent", "conversation.list_agent", "conversation.create"), host.methods)
+        assertEquals(listOf("conversation.list", "conversation.list", "conversation.list", "conversation.create"), host.methods)
         assertEquals(ConversationId("new-1"), owner.selectedConversation)
         assertTrue(host.native.isEmpty(), "native commands sent: ${host.native}")
     }
 
-    private fun TestScope.owner(host: IrohHost) = TimelineConversations(
+    @Test
+    fun agentFreeWorkerConversationsNeverCrowdOutTheAgentsOwn() = runTest {
+        val workers = List(98) { HostConversation("worker-$it", agent = null, lastMessageAt = "2026-10-22T10:00:00Z") }
+        val own = List(60) { HostConversation("c$it", "agent-1", lastMessageAt = "2026-10-01T00:00:00Z") }
+        val host = IrohHost(*(workers + own + HostConversation("d1", "agent-2")).toTypedArray())
+        val owner = owner(host)
+        runCurrent()
+
+        val listed = owner.state.value.conversations.map { it.id.value }
+        assertEquals(61, listed.size, "every agent's own conversation, read past the first page")
+        assertTrue(listed.none { it.startsWith("worker-") })
+        assertTrue(host.calls.all { (_, params) -> params.text("agent_id").isNotEmpty() }, "no cross-agent read")
+    }
+
+    private fun TestScope.owner(host: IrohHost, roster: List<String> = listOf("agent-1", "agent-2")) = TimelineConversations(
         backgroundScope,
         host.chatGateway(backgroundScope),
-        agentName = { it.value },
+        roster.map { Agent(id = AgentId(it), name = it) },
         ConversationManagementPrefs.from(MapSettingsStore()),
     )
 }

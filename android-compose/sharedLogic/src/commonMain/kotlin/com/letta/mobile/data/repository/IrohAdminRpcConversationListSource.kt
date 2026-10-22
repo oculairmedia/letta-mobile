@@ -14,6 +14,7 @@ import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.reportSkippedConversationRows
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -25,24 +26,18 @@ class IrohAdminRpcConversationListSource(
     fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendUsesChannel()
 
-    suspend fun listConversations(
-        agentId: AgentId?,
-        limit: Int? = null,
-        after: String? = null,
-        archiveStatus: String? = null,
-        summarySearch: String? = null,
-        order: String? = null,
-        orderBy: String? = null,
-    ): List<Conversation> {
-        val params = buildJsonObject {
-            agentId?.value?.let { put("agent_id", it) }
-            limit?.let { put("limit", it.toString()) }
-            after?.let { put("after", it) }
-            archiveStatus?.let { put("archive_status", it) }
-            summarySearch?.let { put("summary_search", it) }
-            order?.let { put("order", it) }
-            orderBy?.let { put("order_by", it) }
-        }
+    /** One agent's conversations through the host's `conversation.list` (server default page and archive filter). */
+    suspend fun listConversations(agentId: AgentId): List<Conversation> =
+        conversationList(buildJsonObject { put("agent_id", agentId.value) }).visibleConversationsInLists()
+
+    /**
+     * One page of an agent's conversations, newest first, as the host sent it: the shared list filters
+     * it and pages on from its last row, so a filtered row never ends paging early.
+     */
+    suspend fun listAgentConversations(agent: AgentId, after: ConversationId?, limit: Int): List<Conversation> =
+        conversationList(conversationListParams(agent, after, limit))
+
+    private suspend fun conversationList(params: JsonObject): List<Conversation> {
         val response = channelTransport.adminRpc(
             method = "conversation.list",
             path = "/v1/conversations",
@@ -52,7 +47,7 @@ class IrohAdminRpcConversationListSource(
             error(response.error ?: "Iroh admin_rpc conversation.list failed")
         }
         val result = response.result ?: return emptyList()
-        return json.decodeConversationList(result, ::reportSkippedConversationRows).visibleConversationsInLists()
+        return json.decodeConversationList(result, ::reportSkippedConversationRows)
     }
 
     // letta-mobile-i9h61.3.2: agent-scoped conversation list — the
@@ -147,3 +142,21 @@ class IrohAdminRpcConversationListSource(
         return json.decodeFromJsonElement(Conversation.serializer(), result)
     }
 }
+
+/** The host's `conversation.list` params for one agent's page: the agent, the window and the newest-first order. */
+internal fun conversationListParams(
+    agent: AgentId,
+    after: ConversationId?,
+    limit: Int,
+    archiveStatus: String = ARCHIVE_STATUS_ALL,
+): JsonObject = buildJsonObject {
+    put("agent_id", agent.value)
+    put("limit", limit.toString())
+    after?.let { put("after", it.value) }
+    put("archive_status", archiveStatus)
+    put("order", "desc")
+    put("order_by", "last_message_at")
+}
+
+/** Every conversation, active and archived: the lists filter archived rows themselves. */
+private const val ARCHIVE_STATUS_ALL = "all"

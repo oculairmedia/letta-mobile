@@ -2,10 +2,16 @@ package com.letta.mobile.data.chat.conversations
 
 import com.letta.mobile.data.chat.branch.BranchDraft
 import com.letta.mobile.data.chat.branch.PendingDraft
+import com.letta.mobile.util.AgentConversationFleet
+import com.letta.mobile.util.AgentConversationFleetPaging
+import com.letta.mobile.data.chat.runtime.AgentConversationPage
+import com.letta.mobile.util.READ_THROUGH_PAGES
 import com.letta.mobile.data.chat.runtime.ChatGateway
+import com.letta.mobile.data.chat.runtime.agentConversationReader
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummary
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
@@ -55,20 +61,33 @@ data class TimelineConversationsState(
 
 /**
  * The web's conversation list owner: a host whose chat is a
- * [com.letta.mobile.ui.chat.session.TimelineChatSessionPort] per conversation. It lists every
- * agent's conversations through the session's [ChatGateway] (the App Server's own commands on
- * ws://, the host's `admin_rpc` over Iroh), keeps the selection, opens new chats and is the shell's
- * [ShellChatPort]. Its row actions, branching and `/recompile` are the shared [management], the
+ * [com.letta.mobile.ui.chat.session.TimelineChatSessionPort] per conversation. It lists the
+ * roster's agents' conversations agent by agent ([AgentConversationFleet]) through the session's
+ * [ChatGateway] (the App Server's own commands on ws://, the host's `admin_rpc` over Iroh), keeps
+ * the selection, opens new chats and is the shell's [ShellChatPort]. Its row actions, branching and `/recompile` are the shared [management], the
  * same one desktop's chat controller binds. Build one per session in a scope that ends with it,
  * and a port for the [selectedTarget].
  */
 class TimelineConversations(
     private val scope: CoroutineScope,
     private val gateway: ChatGateway,
-    /** The roster's name for an agent, for the chat's title. */
-    private val agentName: (AgentId) -> String,
+    roster: List<Agent>,
     prefs: ConversationManagementPrefs = ConversationManagementPrefs(),
 ) : ShellChatPort {
+    /** The agents whose conversations the list shows (and whose names title the chats); new agents list again. */
+    var roster: List<Agent> = roster
+        set(agents) {
+            val changed = agents.map { it.id } != field.map { it.id }
+            field = agents
+            if (changed) scope.launch { refresh() }
+        }
+
+    /** Each agent's conversations, read through: the web's list has no "load more". */
+    private val fleet = AgentConversationFleet(
+        gateway.agentConversationReader(),
+        AgentConversationFleetPaging(eagerPagesPerAgent = READ_THROUGH_PAGES),
+    )
+
     private val mutableState = MutableStateFlow(TimelineConversationsState())
     val state: StateFlow<TimelineConversationsState> = mutableState.asStateFlow()
 
@@ -83,11 +102,14 @@ class TimelineConversations(
     }
 
     /**
-     * Lists the conversations again; a failure keeps the last list and says why. A conversation the
-     * list does not carry yet (the open one, made while it loaded) stays.
+     * Lists the roster's conversations again; a failure keeps the last list and says why. A
+     * conversation the list does not carry yet (the open one, made while it loaded) stays. With no
+     * roster yet there is nothing to list, and the list stays unloaded.
      */
     suspend fun refresh() {
-        runCatchingCancellable { gateway.listConversations(LIST_LIMIT, ARCHIVE_STATUS_ALL).visibleConversationsInLists() }
+        // With no roster yet the list stays unloaded; a roster emptied after loading lists nothing.
+        if (roster.isEmpty() && !mutableState.value.loaded) return
+        runCatchingCancellable { fleet.refresh(roster) }
             .onSuccess { listed ->
                 mutableState.update { current ->
                     val selected = current.conversations.filter { it.id == current.selected }
@@ -101,7 +123,7 @@ class TimelineConversations(
     fun selectedTarget(): TimelineChatTarget? = mutableState.value.selectedRecord()?.let { conversation ->
         TimelineChatTarget(
             agentId = conversation.agentId.value,
-            agentName = conversation.agentName?.takeIf(String::isNotBlank) ?: agentName(conversation.agentId),
+            agentName = conversation.agentName?.takeIf(String::isNotBlank) ?: roster.nameOf(conversation.agentId),
             conversationId = conversation.id.value,
         )
     }
@@ -116,8 +138,8 @@ class TimelineConversations(
     }
 
     /**
-     * [agent]'s chat when the shell finds none listed (the list is a window across every agent):
-     * its newest active conversation on the server, else a new one; [onCreated] gets it either way.
+     * [agent]'s chat when the shell finds none listed (an agent the roster did not carry yet, or a
+     * list still loading): its newest active conversation on the server, else a new one; [onCreated] gets it either way.
      * When the server cannot be asked, nothing is made: that could duplicate a chat it already has.
      */
     override fun createConversationForAgent(agent: AgentId, onCreated: (ConversationId) -> Unit) =
@@ -189,7 +211,9 @@ class TimelineConversations(
 
     /** [agent]'s newest active conversation on the server, which joins the list and opens; null when it has none. */
     private suspend fun existingChat(agent: AgentId): ConversationId? {
-        val own = gateway.listConversationsForAgent(agent.value, LIST_LIMIT).visibleConversationsInLists()
+        val own = gateway.listAgentConversations(AgentConversationPage(agent))
+            .filter { it.agentId == agent }
+            .visibleConversationsInLists()
         mutableState.update { it.copy(conversations = it.conversations.keeping(own)) }
         val newest = own.firstOrNull { it.archived != true } ?: return null
         selectConversation(newest.id)
@@ -257,10 +281,6 @@ class TimelineConversations(
         const val LIST_FAILED = "Could not list the conversations"
         const val CREATE_FAILED = "Could not start a new conversation"
         const val NO_CREATE = "This backend can't start a new conversation"
-
-        /** The lists' window: the newest conversations across every agent. */
-        const val LIST_LIMIT = 100
-        const val ARCHIVE_STATUS_ALL = "all"
     }
 }
 
@@ -299,6 +319,9 @@ private fun TimelineConversationsState.without(conversation: ConversationId): Ti
     val next = if (selected == conversation) record(conversation)?.agentId?.let { agent -> remaining.activeChatOf(agent) } else selected
     return copy(conversations = remaining, selected = next, deleting = deleting - conversation)
 }
+
+/** The roster's name for [agent], for the chat's title. */
+private fun List<Agent>.nameOf(agent: AgentId): String = firstOrNull { it.id == agent }?.name.orEmpty()
 
 /** This list, then the [others] it does not carry (newest first within each). */
 private fun List<Conversation>.keeping(others: List<Conversation>): List<Conversation> {
