@@ -182,6 +182,7 @@ internal fun desktopCapabilities(approvals: Boolean, paged: Boolean) = ChatSurfa
     attachImages = true,
     rerun = false,
     approvals = approvals,
+    modelSwitch = true,
     search = false,
     pagedHistory = paged,
     fontScale = true,

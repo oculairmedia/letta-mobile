@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
-import com.letta.mobile.ui.context.AgentContextCardActions
 import com.letta.mobile.ui.context.AgentContextCardBinding
 import com.letta.mobile.ui.context.AgentContextCardDeps
 import com.letta.mobile.ui.context.AgentContextCardHost
@@ -144,7 +143,7 @@ class LettaPaneTest {
         val opened = mutableListOf<String>()
         fun recorder(kind: String): PaneContainer = { spec, content -> opened += kind; Column { Text(spec.testTag.orEmpty()); content() } }
         val recording = host.copy(sheet = recorder("sheet"), popover = recorder("popover"), dialog = recorder("dialog"))
-        setContent { Host(recording) { AgentContextCardHost(AgentContextCardBinding(contextDeps, AgentContextCardActions(onModelSelected = {})), contextFocus) } }
+        setContent { Host(recording) { AgentContextCardHost(AgentContextCardBinding(contextDeps, picker = null), contextFocus) } }
         onNodeWithTag(AgentContextTags.CARD).performClick()
         waitForIdle()
         assertEquals(expected, opened.distinct().single())
@@ -178,7 +177,7 @@ class LettaPaneTest {
         LettaPane(kind, onDismiss = onDismiss, title = "Pane", testTag = BODY) { Text("Pane body") }
     }
 
-    private val contextDeps = AgentContextCardDeps(ContextTokenReadings(), breakdown = null, compaction = null, pickerSource = null)
+    private val contextDeps = AgentContextCardDeps(ContextTokenReadings(), breakdown = null, compaction = null)
     private val contextFocus = AgentContextFocus(
         agentId = "agent-1",
         conversationId = null,

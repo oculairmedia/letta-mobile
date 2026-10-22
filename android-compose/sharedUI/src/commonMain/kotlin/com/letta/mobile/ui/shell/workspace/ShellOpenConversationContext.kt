@@ -5,18 +5,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import com.letta.mobile.data.context.limit.AgentContextRoutes
+import androidx.compose.runtime.rememberUpdatedState
 import com.letta.mobile.data.context.ContextWindowUsageState
+import com.letta.mobile.data.context.limit.AgentContextRoutes
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
-import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
 import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
 import com.letta.mobile.data.session.llmModelsOrEmpty
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ConversationModels
-import com.letta.mobile.ui.context.AgentContextCardActions
+import com.letta.mobile.ui.chat.session.conversationModelPicker
 import com.letta.mobile.ui.context.AgentContextCardBinding
 import com.letta.mobile.ui.context.AgentContextSession
 import com.letta.mobile.ui.context.ContextConversationFocus
@@ -31,14 +32,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * host hands over plain session pieces; the reading, windows and card are the shared ones above.
  */
 
-/** The session the meter and card read: its graph, the context routes, the model control and the roster. */
+/**
+ * The session the meter, the card and the model picker read: its graph, the context routes, the
+ * model control (with the recently used models it keeps), the roster and where the picker's "Add provider…" goes.
+ */
 class OpenConversationContextSession(
     val graph: SharedSessionRepositoryGraph,
     val routes: AgentContextRoutes,
-    /** The host's admin model catalog, which the card's picker lists first; null lists the chat's models. */
+    /** The host's admin model catalog, which the chat's picker lists first; null lists the chat's models. */
     val modelControl: ModelControlSession?,
     val agents: List<Agent>,
-)
+    val onAddProvider: () -> Unit,
+) {
+    /** The context card's session pieces: the graph's readings and breakdown, and the context routes. */
+    val context: AgentContextSession get() = AgentContextSession(graph.contextTokenReadings, graph.contextBreakdown, routes)
+}
 
 /** The open conversation: its port and, when the port has a model chip, its models and picks. */
 class OpenConversation(
@@ -64,25 +72,47 @@ fun OpenConversationContextMeter(
     LaunchedEffect(usage) { onUsage(usage) }
 }
 
-/** The [focusedAgent]'s model, context and Compact card, over the open [conversation] when there is one. */
+/**
+ * The chat's one model picker for [conversation]'s models, when it has a model
+ * chip: the session's admin catalog first, the recent models it keeps heading the list.
+ */
+@Composable
+fun rememberOpenConversationModelPicker(session: OpenConversationContextSession, conversation: OpenConversation?): ModelPickerBinding? {
+    val models = conversation?.models ?: return null
+    val addProvider by rememberUpdatedState(session.onAddProvider)
+    return remember(session.modelControl, models) {
+        conversationModelPicker(session.modelControl, models, session.modelControl?.recents?.recent, onAddProvider = { addProvider() })
+    }
+}
+
+/** The open [conversation]'s composer context meter (handed back through [onUsage]) and its one model picker. */
+@Composable
+fun rememberOpenConversationChat(
+    session: OpenConversationContextSession,
+    conversation: OpenConversation,
+    onUsage: (ContextWindowUsageState) -> Unit,
+): ModelPickerBinding? {
+    OpenConversationContextMeter(session, conversation, onUsage)
+    return rememberOpenConversationModelPicker(session, conversation)
+}
+
+/**
+ * The [focusedAgent]'s model, context and Compact card over the open [conversation] when there is
+ * one. The host builds the card's [binding] over [session] and the conversation's model picker.
+ */
 @Composable
 fun OpenConversationAgentContextCard(
     session: OpenConversationContextSession,
     focusedAgent: AgentId?,
     conversation: OpenConversation?,
+    binding: (ModelPickerBinding?) -> AgentContextCardBinding,
 ) {
-    val models = conversation?.models
-    val binding = remember(session.graph, session.routes, session.modelControl, models) {
-        val pickerSource = models?.let { ModelPickerSource.forChat(session.modelControl, it.available, it::reload) }
-        val graph = session.graph
-        AgentContextCardBinding(
-            deps = AgentContextSession(graph.contextTokenReadings, graph.contextBreakdown, session.routes).cardDeps(pickerSource),
-            actions = AgentContextCardActions(onModelSelected = { entry -> models?.select(entry.value) }),
-        )
-    }
+    val picker = rememberOpenConversationModelPicker(session, conversation)
+    val latestBinding by rememberUpdatedState(binding)
+    val card = remember(session.graph, session.routes, picker) { latestBinding(picker) }
     val composer = conversation?.port?.composer?.collectAsState()?.value
     FocusedAgentContextCard(
-        binding = binding,
+        binding = card,
         focus = rememberOpenConversationFocus(focusedAgent, conversation),
         window = rememberOpenConversationWindow(session, conversation),
         modelLabel = composer?.model?.currentLabel,

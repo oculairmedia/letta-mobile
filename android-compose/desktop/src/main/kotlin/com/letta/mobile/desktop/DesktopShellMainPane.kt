@@ -108,7 +108,7 @@ private fun rememberDesktopShellChatHost(context: DesktopShellContext, frame: De
             showDockedCanvas = showDockedCanvas,
             client = ClientCommandRoutes(
                 search = { context.overlays.commandPalette = true },
-                models = { context.overlays.modelPicker = true },
+                models = context.modelPicker::open,
                 rename = { context.overlays.renameChat = true },
                 newChat = { context.openNewChatForFocusedAgent(focus) },
             ),
@@ -268,7 +268,7 @@ private fun DesktopShellSharedChatPage(
         navigation = DesktopSharedChatPageNavigation(
             openCanvas = { page.host.openConversationCanvas() },
             openAgent = { context.router.openAgent(AgentId(it)) },
-            openModelPicker = { context.overlays.modelPicker = true },
+            modelPicker = context.modelPicker,
             // The companion mascot brings the agent pane back and leaves any
             // editor; its pencil opens the editor.
             openAgentPane = { context.openAgentPane() },

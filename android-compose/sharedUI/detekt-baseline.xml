@@ -124,7 +124,6 @@
     <ID>MaxLineLength:AgentContextCardConversationOverrideTest.kt$AgentContextCardConversationOverrideTest$selections.seedFromHost(listOf(json.decodeFromString(Conversation.serializer(), """{"id":"$CONVERSATION","agent_id":"agent-c356b54a"}""")))</ID>
     <ID>MaxLineLength:AgentContextCardUiTest.kt$AgentContextCardUiTest$val deps = AgentContextCardDeps(readings, breakdown = null, compaction = CompactionController(repository, readings), pickerSource = null)</ID>
     <ID>MaxLineLength:AgentContextCardUiTest.kt$AgentContextCardUiTest$val result = ConversationCompactResult("execute_command", messagesBefore = 48, messagesAfter = 12, contextTokensBefore = 60_000, contextTokensAfter = 10_000)</ID>
-    <ID>MaxLineLength:AgentContextCardUiTest.kt$CompositionLocalProvider(LocalLettaHost provides LettaHost.Pointer) { AgentContextCardHost(AgentContextCardBinding(deps, actions), focus) }</ID>
     <ID>MaxLineLength:AgentEditorPageTest.kt$AgentEditorPageTest$private val ada = Agent(id = AgentId("a-1"), name = "Ada", model = "openai/gpt-5", system = "You are Ada.", tools = persistentListOf(search))</ID>
     <ID>MaxLineLength:AgentEditorPanes.kt$TextButton(onClick = onClose, modifier = Modifier.align(Alignment.End).padding(vertical = LettaDimens.Space.sm)) { Text("Done") }</ID>
     <ID>MaxLineLength:AgentEditorPanes.kt$inputs.actions.update { copy(model = option.handle, reasoningEffort = reasoningEffort?.takeIf { it in option.reasoningEfforts }) }</ID>
@@ -330,7 +329,6 @@
     <ID>MaxLineLength:CommandPalettePane.kt$val unified = rememberUnifiedSearchSections(UnifiedSearchQuery(query, filterToAgent = false, surface = UnifiedSearchSurface.Palette), sources)</ID>
     <ID>MaxLineLength:CommandPalettePaneTest.kt$CommandPalettePaneTest$listOf(MessageSearchHit("c1", "a1", "m1", "Ask Emmanuel about the ${query.text} release")).takeIf { query.text == "emmanuel" }.orEmpty()</ID>
     <ID>MaxLineLength:ComposerAgentMentionUiTest.kt$ComposerAgentMentionUiTest$setContent { MaterialTheme { ChatComposerPanel(ComposerInputs(composer = composer("plain text"), actions = RecordingChatActions())) } }</ID>
-    <ID>MaxLineLength:ComposerModelPickerSheet.kt$val selected = model.currentHandle?.let { handle -&gt; sections.flatMap { it.items }.filter { it.value.handle == handle }.map { it.key }.toSet() }</ID>
     <ID>MaxLineLength:ComposerThinkingPlacementTest.kt$ComposerThinkingPlacementTest$messages = persistentListOf(UiMessage(id = "u1", role = "user", content = "update the changelog", timestamp = "2026-10-11T16:06:00Z"))</ID>
     <ID>MaxLineLength:ContextLimitSliderUiTest.kt$ContextLimitSliderUiTest$AgentContextCardInputs("opus", null, ContextMeter.of(112_800, 1_000_000), true, null, compacting = false, turnRunning = false)</ID>
     <ID>MaxLineLength:ContextLimitStrings.kt$ContextLimitStrings$"Below the ${usedTokens?.let(::formatContextTokens).orEmpty()} already in context: compact first, or the next turn compacts to fit"</ID>
@@ -385,7 +383,6 @@
     <ID>MaxLineLength:LettaPaneDefaults.kt$modifier = Modifier.padding(start = LettaDimens.Space.xl, end = LettaDimens.Space.xl, top = LettaDimens.Space.lg, bottom = LettaDimens.Space.md)</ID>
     <ID>MaxLineLength:LettaPaneTest.kt$LettaPaneTest$LettaConfirmPane(request, onConfirm = { outcomes += "confirm"; shown = false }, onDismiss = { outcomes += "dismiss"; shown = false })</ID>
     <ID>MaxLineLength:LettaPaneTest.kt$LettaPaneTest$MaterialTheme { CompositionLocalProvider(LocalPaneWindowClass provides PaneWindowClass.Compact) { ProvideLettaHost(host, content) } }</ID>
-    <ID>MaxLineLength:LettaPaneTest.kt$LettaPaneTest$setContent { Host(recording) { AgentContextCardHost(AgentContextCardBinding(contextDeps, AgentContextCardActions(onModelSelected = {})), contextFocus) } }</ID>
     <ID>MaxLineLength:LettaPicker.kt$private</ID>
     <ID>MaxLineLength:LettaPickerSearchField.kt$Icon(LettaIcons.Clear, contentDescription = LettaPickerStrings.CLEAR_SEARCH, modifier = Modifier.size(LettaDimens.Control.icon))</ID>
     <ID>MaxLineLength:LettaPickerTest.kt$LettaPickerTest$callbacks = PickerCallbacks(onQuery = {}, onPick = { chosen = if (it.key in chosen) chosen - it.key else chosen + it.key })</ID>

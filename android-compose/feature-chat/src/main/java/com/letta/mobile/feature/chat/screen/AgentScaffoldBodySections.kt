@@ -186,5 +186,4 @@ internal fun AgentScaffoldSheets(state: AgentScaffoldRuntimeState) {
         )
     }
 
-    ChatModelControlSheets(state)
 }

@@ -11,6 +11,7 @@ import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.desktop.chat.DesktopChatController
@@ -43,6 +44,8 @@ internal data class DesktopShellContext(
     val onA2uiAction: (A2uiAction) -> Unit,
     val sharedChat: DesktopSharedChatWiring,
     val imageIntake: DesktopImageIntake,
+    /** The chat's one model picker: the composer, `/models` and the context card open it. */
+    val modelPicker: ModelPickerBinding,
 )
 
 @Composable
@@ -78,6 +81,7 @@ internal fun rememberDesktopShellContext(
         onA2uiAction = onA2uiAction,
         sharedChat = rememberDesktopSharedChatWiring(chatController, onA2uiAction, core.bootstrap.dataBindings.modelControl?.catalog),
         imageIntake = rememberDesktopImageIntake(core, navigator.selectedDestination == DesktopDestination.Conversations),
+        modelPicker = remember(core, navigator) { desktopModelPicker(core, navigator) },
     )
 }
 

@@ -22,14 +22,14 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
-import com.letta.mobile.ui.shell.workspace.ShellCanvasOwner
-import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSessionPort
 import com.letta.mobile.desktop.chat.DesktopSharedChatPage
@@ -37,6 +37,7 @@ import com.letta.mobile.desktop.chat.DesktopSharedChatPageNavigation
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageState
 import com.letta.mobile.desktop.chat.FakeDesktopChatGateway
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
+import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
 import com.letta.mobile.ui.devfixtures.FixtureChatSessionPort
@@ -45,13 +46,15 @@ import com.letta.mobile.ui.devfixtures.PhoneFixtures
 import com.letta.mobile.ui.devfixtures.PhoneScene
 import com.letta.mobile.ui.devfixtures.PhoneSceneSurface
 import com.letta.mobile.ui.devfixtures.PhoneScenes
+import com.letta.mobile.ui.shell.workspace.ShellCanvasOwner
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.TestScope
 import java.io.File
 import javax.imageio.ImageIO
 import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlinx.coroutines.test.TestScope
 
 /**
  * The phone preview's shell (docs/development/phone-preview.md): its simulated insets reach the
@@ -157,7 +160,7 @@ class DesktopPhoneShellTest {
                                 canvasOwner = ShellCanvasOwner(conversationId = null, agentId = null, agentName = "Meridian"),
                                 dockGeometry = mutableStateOf(ChatDockGeometry.Default),
                             ),
-                            navigation = DesktopSharedChatPageNavigation(openCanvas = {}, openAgent = {}, openModelPicker = {}),
+                            navigation = DesktopSharedChatPageNavigation(openCanvas = {}, openAgent = {}, modelPicker = noModelPicker()),
                         )
                     }
                 }
@@ -242,3 +245,13 @@ class DesktopPhoneShellTest {
         const val TOUCH_HEAD_TAG = "chat-touch-head"
     }
 }
+
+/** A picker over no models: the phone shell's chat does not open it here. */
+private fun noModelPicker() = ModelPickerBinding(
+    source = ModelPickerSource.of(flowOf(emptyList())) {},
+    onModelSelected = {},
+    onEffortSelected = null,
+    editor = null,
+    onAddProvider = null,
+    onModelsEdited = {},
+)

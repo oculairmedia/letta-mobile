@@ -5,10 +5,13 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.RecentModelsStore
+import com.letta.mobile.data.model.SettingsStoreRecentModels
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelChange
 import com.letta.mobile.data.repository.modelcontrol.ModelHandle
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.data.runtime.PermissionModeRegistry
+import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -79,6 +82,20 @@ class TimelineChatComposerChipsTest {
     }
 
     @Test
+    fun aConfirmedSwitchBecomesRecentAndARefusedOneDoesNot() = runTest {
+        val recents = RecentModelsStore(SettingsStoreRecentModels(InMemorySecureSettingsStore()))
+        val confirmed = assertNotNull(chips(FakeModelBackend(recordedModel = MINIMAX), recents = recents).models)
+        val refused = assertNotNull(chips(FakeModelBackend(recordedModel = SOL, refuse = true), recents = recents).models)
+        runCurrent()
+
+        refused.selectModel(ChatModelHandle(MINIMAX), ReasoningEffortChoice.Unchanged)
+        confirmed.selectModel(ChatModelHandle(SOL), ReasoningEffortChoice.Unchanged)
+        runCurrent()
+
+        assertEquals(listOf(SOL), recents.recent.value)
+    }
+
+    @Test
     fun theModeChipFollowsTheSessionsRegistryAndIsOffWithoutOne() = runTest {
         val registry = PermissionModeRegistry(MutableStateFlow(AppServerPermissionMode.Unrestricted))
         val permissions = EnginePermissionModes(engine = null, permissionModes = registry)
@@ -101,11 +118,17 @@ class TimelineChatComposerChipsTest {
         backend: FakeModelBackend,
         agentModel: String? = null,
         permissions: EnginePermissionModes? = null,
+        recents: RecentModelsStore? = null,
     ): TimelineChatSessionOptions = TimelineChatSessionOptions().withChips(
         backgroundScope,
         target,
         TimelineChipSources(
-            models = TimelineModelSource(backend.backend, conversation = { backend.recorded(it) }, agentModel = agentModel),
+            models = TimelineModelSource(
+                backend.backend,
+                conversation = { backend.recorded(it) },
+                agentModel = agentModel,
+                recents = recents,
+            ),
             permissionModes = permissions,
         ),
     )

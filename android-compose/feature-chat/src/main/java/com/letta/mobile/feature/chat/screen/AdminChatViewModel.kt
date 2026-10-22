@@ -579,8 +579,8 @@ internal class AdminChatViewModel @Inject constructor(
         sessionManager.currentGraph.flatMapLatest { it.contextTokenReadings.readings }
     }
 
-    /** letta-mobile-3io8k: what the drawer's context card reads, per session graph. */
-    internal val contextCardSession: StateFlow<ContextCardSession> by lazy { contextCardSessions(sessionManager.currentGraph, viewModelScope) }
+    /** The session graph whose readings, breakdown and admin_rpc the context card and meter read. */
+    internal val sessionGraph: StateFlow<com.letta.mobile.data.session.SessionGraph> get() = sessionManager.currentGraph
 
     fun refreshModels() = modelCoordinator.refreshModels()
 
@@ -595,13 +595,10 @@ internal class AdminChatViewModel @Inject constructor(
         ),
     )
 
-    fun modelPickerSource(): com.letta.mobile.data.repository.modelcontrol.ModelPickerSource? = modelCoordinator.pickerSource()
+    /** The chat's one model picker; [onAddProvider] is its Models sheet's "Add provider…". */
+    fun modelPicker(onAddProvider: (() -> Unit)?) = modelCoordinator.modelPicker(onAddProvider)
 
     fun modelPicksTargetConversation(): Boolean = modelCoordinator.picksTargetConversation()
-
-    fun modelsEditController(
-        scope: kotlinx.coroutines.CoroutineScope,
-    ): com.letta.mobile.data.repository.modelcontrol.ProviderManagementController? = modelCoordinator.modelsEditController(scope)
 
     fun reasoningEffortsFor(handle: String?): List<String> =
         modelCoordinator.reasoningEffortsFor(handle?.let { com.letta.mobile.data.repository.modelcontrol.ModelHandle(it) })

@@ -48,6 +48,7 @@ import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigation
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceNavigationActions
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceOverlayData
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import com.letta.mobile.ui.context.FocusedAgentContextCard
 
 /**
  * Plugin elements render live through the shared plugin-view renderer on the JCEF host
@@ -154,7 +155,10 @@ private fun DesktopSwingShortcuts() {
 private fun desktopWorkspaceSlots(context: DesktopShellContext, frame: DesktopShellFrame) = LettaShellWorkspaceSlots(
     main = { modifier -> Row(modifier) { DesktopShellMainPane(context, frame) } },
     // letta-mobile-3io8k: model, context meter and Compact under the agent's name.
-    agentCard = { DesktopAgentContextCard(context, frame) },
+    agentCard = {
+        val window = rememberDesktopContextWindow(context, frame)
+        FocusedAgentContextCard(rememberDesktopContextCard(context), frame.contextFocus(), window, frame.chatState.composerModelLabel)
+    },
     sidePane = { DesktopShellBackgroundTasks(context, frame) },
     overlays = {
         com.letta.mobile.ui.canvas.library.CanvasLibraryNotice(context.core.canvasShell.library)
@@ -254,7 +258,6 @@ private fun DesktopShellOverlays(context: DesktopShellContext, frame: DesktopShe
     DesktopAppOverlays(
         visibility = context.overlays,
         data = DesktopOverlayData(
-            composerModelLabel = frame.chatState.composerModelLabel,
             workspace = ShellWorkspaceOverlayData(
                 searchSources = frame.lists.search,
                 railAgents = focus.railAgents,
@@ -265,12 +268,9 @@ private fun DesktopShellOverlays(context: DesktopShellContext, frame: DesktopShe
         ),
         actions = createDesktopOverlayActions(
             CreateDesktopOverlayActionsParams(
-                chatController = core.chatController,
-                onSelectDestination = { context.navigator.selectedDestination = it },
                 onOpenAgent = { context.router.openAgent(AgentId(it)) },
                 onNewCanvas = { core.canvasShell.createNew(focus.selectedAgentId) },
                 onOpenSearchHit = { context.router.openSearchHit(it) },
-                dataBindings = core.bootstrap.dataBindings,
                 onNewAgent = context.navigator::openNewAgent,
                 onIrohIdentityReset = {
                     DesktopIrohIdentity.reset()

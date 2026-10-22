@@ -2,7 +2,6 @@
 
 package com.letta.mobile.ui.chat.surface.composer
 
-import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -41,12 +40,13 @@ import com.letta.mobile.data.chat.send.QueuedChatSend
 import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.composer.MentionKind
 import com.letta.mobile.data.composer.Mentionable
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerCatalog
+import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.QueuedSendsPanelTestTags
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
-import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.ui.chat.session.ChatModelOption
 import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
@@ -55,9 +55,15 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectoryUiState
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
+import com.letta.mobile.ui.chat.surface.RecordingChatActions
+import com.letta.mobile.ui.modelcontrol.ModelPickerTags
+import com.letta.mobile.ui.modelcontrol.RecordedPicks
+import com.letta.mobile.ui.modelcontrol.pickerModel
+import com.letta.mobile.ui.modelcontrol.testModelPicker
 import kotlinx.collections.immutable.persistentListOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -303,8 +309,8 @@ class ChatComposerPanelUiTest {
     }
 
     @Test
-    fun modelChipPrefersTheHostPickerAndHidesWithoutTheCapability() = runComposeUiTest {
-        var hostPicker = 0
+    fun modelChipOpensTheSharedPickerAndHidesWithoutTheCapability() = runComposeUiTest {
+        val picker = testModelPicker()
         var capabilities by mutableStateOf(ChatSurfaceCapabilities.Default)
         setContent {
             Panel(
@@ -312,19 +318,29 @@ class ChatComposerPanelUiTest {
                     composer = ready(),
                     actions = RecordingChatActions(),
                     capabilities = capabilities,
-                    host = ChatSurfaceHost(openModelPicker = { hostPicker++ }),
+                    host = ChatSurfaceHost(modelPicker = picker),
                 ),
             )
         }
 
         onNodeWithTag(ComposerTestTags.MODEL_CHIP).performClick()
-        runOnIdle { assertEquals(1, hostPicker) }
+        runOnIdle { assertTrue(picker.pickerOpen) }
+        onNodeWithTag(ModelPickerTags.PANE).assertExists()
+        picker.close()
         capabilities = ChatSurfaceCapabilities(modelSwitch = false)
         onNodeWithTag(ComposerTestTags.MODEL_CHIP).assertDoesNotExist()
     }
 
     @Test
-    fun sharedModelSheetAndEffortChipSelectThroughChatActions() = runComposeUiTest {
+    fun withoutAHostPickerTheChipOpensNothing() = runComposeUiTest {
+        setContent { Panel(ComposerInputs(composer = ready(), actions = RecordingChatActions(), host = ChatSurfaceHost())) }
+
+        onNodeWithTag(ComposerTestTags.MODEL_CHIP).assertIsNotEnabled()
+        onNodeWithTag(ModelPickerTags.PANE).assertDoesNotExist()
+    }
+
+    @Test
+    fun sharedPickerListsRecentsAndProvidersAndPicksOnceThroughTheHost() = runComposeUiTest {
         val model = ChatModelUiState(
             currentHandle = "openai/a",
             currentLabel = "Model A",
@@ -333,23 +349,31 @@ class ChatComposerPanelUiTest {
                 ChatModelOption(handle = "anthropic/b", label = "Model B", provider = "Anthropic"),
             ),
         )
+        val picks = RecordedPicks()
+        val picker = testModelPicker(
+            models = listOf(pickerModel("openai/a", "Model A"), pickerModel("anthropic/b", "Model B")),
+            picks = picks,
+            recents = listOf("anthropic/b"),
+        )
         val actions = RecordingChatActions()
-        setContent { Panel(ComposerInputs(composer = ready().copy(model = model), actions = actions)) }
+        val inputs = ComposerInputs(composer = ready().copy(model = model), actions = actions, host = ChatSurfaceHost(modelPicker = picker))
+        setContent { Panel(inputs) }
 
         onNodeWithTag(ComposerTestTags.MODEL_CHIP).performClick()
-        onNodeWithTag(ComposerTestTags.MODEL_SHEET).assertExists()
-        onNodeWithText("Model B").performClick()
+        onNodeWithTag(ModelPickerTags.PANE).assertExists()
+        onNodeWithTag(ModelPickerTags.GROUP_PREFIX + ModelPickerCatalog.RECENTS_GROUP_KEY).assertExists()
+        onNodeWithTag(ModelPickerTags.REFRESH).assertExists()
+        // "Model B" is listed under Recent and under its provider: the first pick closes the picker.
+        onAllNodesWithTag(ModelPickerTags.ROW_PREFIX + "anthropic/b")[0].performClick()
+        runOnIdle {
+            assertEquals(listOf("anthropic/b"), picks.models)
+            assertFalse(picker.pickerOpen)
+        }
+        onNodeWithTag(ModelPickerTags.PANE).assertDoesNotExist()
         onNodeWithTag(ComposerTestTags.EFFORT_CHIP).performClick()
         onNodeWithText("High").performClick()
-        runOnIdle {
-            assertEquals(
-                listOf(
-                    "anthropic/b" to ReasoningEffortChoice.Unchanged,
-                    "openai/a" to ReasoningEffortChoice.Named("high"),
-                ),
-                actions.models,
-            )
-        }
+        val expected: List<Pair<String, ReasoningEffortChoice>> = listOf("openai/a" to ReasoningEffortChoice.Named("high"))
+        runOnIdle { assertEquals(expected, actions.models) }
     }
 
     @Test

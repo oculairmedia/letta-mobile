@@ -36,6 +36,10 @@ class AgentEditorController(
     private val _state = MutableStateFlow(AgentEditorState(mode = mode, loading = mode is AgentEditorMode.Edit))
     val state: StateFlow<AgentEditorState> = _state.asStateFlow()
 
+    override val llmModels: StateFlow<List<LlmModel>> get() = backend.models
+
+    override suspend fun reloadModels() = backend.refreshCatalogs()
+
     /** The agent a new one starts from, once picked and loaded. */
     private var starterAgent: Agent? = null
 

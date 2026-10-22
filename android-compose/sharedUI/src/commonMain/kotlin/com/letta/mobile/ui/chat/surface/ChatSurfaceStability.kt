@@ -31,7 +31,7 @@ internal fun rememberLatestIntent(onIntent: (ChatSurfaceIntent) -> Unit): (ChatS
 @Composable
 internal fun rememberStableHost(host: ChatSurfaceHost): ChatSurfaceHost {
     val current = rememberUpdatedState(host)
-    return remember(host.affordanceShape(), host.resolveAgentName) { forwardingHost(current) }
+    return remember(host.affordanceShape(), host.resolveAgentName, host.modelPicker) { forwardingHost(current) }
 }
 
 @Composable
@@ -46,7 +46,7 @@ internal fun rememberStablePlatform(platform: ChatSurfacePlatform): ChatSurfaceP
 internal fun ChatSurfaceHost.affordanceShape(): Int {
     return presenceMask(
         listOf(
-            openCanvas, openAgent, resolveAgentName, openSubagent, openModelPicker, pickWorkingDirectory, openAgentPane, editAgent,
+            openCanvas, openAgent, resolveAgentName, openSubagent, pickWorkingDirectory, openAgentPane, editAgent,
             showOnCanvas,
             openAgentSwitcher,
         ),
@@ -74,7 +74,7 @@ internal fun forwardingHost(current: State<ChatSurfaceHost>): ChatSurfaceHost {
                 current.value.openSubagent?.invoke(toolCallId, subagentAgentId, description)
             }
         },
-        openModelPicker = forwardIfSet<() -> Unit>(host.openModelPicker) { { current.value.openModelPicker?.invoke() } },
+        modelPicker = host.modelPicker,
         pickWorkingDirectory = forwardIfSet<() -> Unit>(host.pickWorkingDirectory) { { current.value.pickWorkingDirectory?.invoke() } },
         openAgentPane = forwardIfSet<() -> Unit>(host.openAgentPane) { { current.value.openAgentPane?.invoke() } },
         editAgent = forwardIfSet<() -> Unit>(host.editAgent) { { current.value.editAgent?.invoke() } },

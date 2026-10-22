@@ -4,108 +4,39 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.letta.mobile.data.compaction.AdminRpcCompactionRepository
-import com.letta.mobile.data.compaction.CompactionController
-import com.letta.mobile.data.context.ContextBreakdownLoader
-import com.letta.mobile.data.context.ConversationModelView
-import com.letta.mobile.data.context.limit.AdminRpcContextLimitRepository
-import com.letta.mobile.data.context.limit.ContextLimitController
+import com.letta.mobile.data.context.limit.AgentContextRoutes
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
-import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
-import com.letta.mobile.data.session.SessionGraph
-import com.letta.mobile.feature.chat.coordination.EffortSelection
-import com.letta.mobile.ui.context.AgentContextCardActions
 import com.letta.mobile.ui.context.AgentContextCardBinding
-import com.letta.mobile.ui.context.AgentContextCardDeps
-import com.letta.mobile.ui.context.AgentContextCardHost
-import com.letta.mobile.ui.context.AgentContextFocus
+import com.letta.mobile.ui.context.AgentContextSession
+import com.letta.mobile.ui.context.ContextConversationFocus
+import com.letta.mobile.ui.context.ContextWindowSources
+import com.letta.mobile.ui.context.FocusedAgentContextCard
 import com.letta.mobile.ui.notify.LocalAttentionPrefs
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 
 /**
- * letta-mobile-3io8k: the session pieces the drawer's context card reads — the streamed readings,
- * the breakdown loader, compaction and the context limit — rebuilt with each session graph so a
- * backend switch never shows the previous backend's numbers. Compaction and the limit go through
- * the host's `conversation.compact` / `conversation.context_limit`; a session with no admin_rpc
- * (the embedded runtime) answers Unsupported, so the button hides and the slider gives its reason.
+ * The shared model-and-context card under the agent's name in the hamburger
+ * drawer. Android binds the session graph's readings and breakdown, compaction and the context limit
+ * over its `admin_rpc` (the embedded runtime answers Unsupported), and the chat's one model picker;
+ * a backend switch is a new graph, so the card never shows the previous backend's numbers.
  */
-internal data class ContextCardSession(
-    val readings: com.letta.mobile.data.context.ContextTokenReadings,
-    val breakdown: ContextBreakdownLoader,
-    val compaction: CompactionController,
-    val contextLimit: ContextLimitController,
-)
-
-internal fun SessionGraph.toContextCardSession(): ContextCardSession {
-    val rpc = AdminRpcInvoker.overTransport { channelTransport }
-    return ContextCardSession(
-        readings = contextTokenReadings,
-        breakdown = ContextBreakdownLoader(agentRepository),
-        compaction = CompactionController(AdminRpcCompactionRepository(rpc), contextTokenReadings),
-        contextLimit = ContextLimitController(AdminRpcContextLimitRepository(rpc)),
-    )
-}
-
-internal fun contextCardSessions(graphs: StateFlow<SessionGraph>, scope: CoroutineScope): StateFlow<ContextCardSession> =
-    perGraph(graphs, scope, SessionGraph::toContextCardSession)
-
-/**
- * letta-mobile-by4vm.47: [build] runs once per graph. The StateFlow replays its current graph to
- * every (re)subscription; without the memo that replay rebuilt the initial value's controllers and
- * dropped whatever the card had already started (a running compaction).
- */
-internal fun <G : Any, S> perGraph(graphs: StateFlow<G>, scope: CoroutineScope, build: (G) -> S): StateFlow<S> {
-    val initialGraph = graphs.value
-    var last: Pair<G, S> = initialGraph to build(initialGraph)
-    return graphs.map { graph ->
-        last.takeIf { it.first === graph }?.second ?: build(graph).also { last = graph to it }
-    }.stateIn(scope, SharingStarted.WhileSubscribed(SESSION_STOP_TIMEOUT_MS), last.second)
-}
-
-private const val SESSION_STOP_TIMEOUT_MS = 5_000L
-
-/** The card under the agent's name in the hamburger drawer; its sheet is a bottom sheet. */
 @Composable
 internal fun AndroidAgentContextCard(state: AgentScaffoldRuntimeState) {
     val viewModel = state.params.viewModel
-    val session by viewModel.contextCardSession.collectAsStateWithLifecycle()
+    val graph by viewModel.sessionGraph.collectAsStateWithLifecycle()
     val agent by viewModel.activeAgent.collectAsStateWithLifecycle()
     val selections by viewModel.conversationModelSelections.collectAsStateWithLifecycle()
-    val pickerSource = remember(viewModel) {
-        val fallback = ModelPickerSource.of(viewModel.llmModels) { viewModel.refreshModels() }
-        viewModel.modelPickerSource()?.let { ModelPickerSource.withFallback(it, fallback) } ?: fallback
+    val attention = LocalAttentionPrefs.current
+    val picker = state.params.modelPicker
+    val binding = remember(graph, picker, attention) {
+        val routes = AgentContextRoutes(AdminRpcInvoker.overTransport { graph.channelTransport }) { null }
+        AgentContextCardBinding(AgentContextSession(graph.contextTokenReadings, graph.contextBreakdown, routes).cardDeps(attention), picker)
     }
-    val attentionPrefs = LocalAttentionPrefs.current
-    val deps = remember(session, pickerSource, attentionPrefs) {
-        AgentContextCardDeps(session.readings, session.breakdown, session.compaction, pickerSource, session.contextLimit, attentionPrefs)
-    }
-    val binding = remember(deps, viewModel) {
-        AgentContextCardBinding(
-            deps = deps,
-            actions = AgentContextCardActions(
-                onModelSelected = { entry -> viewModel.updateActiveAgentModel(entry.handle.value) },
-                onEffortSelected = { entry, effort -> viewModel.updateActiveAgentModel(entry.handle.value, EffortSelection.Set(effort)) },
-            ),
-        )
-    }
-    // letta-mobile-dxz5s: the same resolution desktop uses — the conversation's own model and window first.
-    val view = ConversationModelView.of(selections, state.conversationId, agent, state.availableModels)
-    AgentContextCardHost(
-        binding = binding,
-        focus = AgentContextFocus(
-            agentId = state.agentIdValue,
-            conversationId = state.conversationId,
-            modelLabel = view.label,
-            modelValue = view.model,
-            effort = view.effort,
-            windowTokens = view.windowTokens,
-            modelWindowTokens = view.modelWindowTokens,
-            turnRunning = state.uiState.isStreaming || state.uiState.isAgentTyping,
-            picksTargetConversation = viewModel.modelPicksTargetConversation(),
-        ),
+    val focus = ContextConversationFocus(
+        agentId = state.agentIdValue,
+        conversationId = state.conversationId,
+        turnRunning = state.uiState.isStreaming || state.uiState.isAgentTyping,
+        picksTargetConversation = viewModel.modelPicksTargetConversation(),
     )
+    val window = ContextWindowSources(listOfNotNull(agent), state.availableModels, selections)
+    FocusedAgentContextCard(binding, focus, window, modelLabel = null)
 }

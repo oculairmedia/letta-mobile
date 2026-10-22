@@ -33,7 +33,6 @@
     <ID>LoopWithTooManyJumpStatements:StreamingMarkdownFence.kt$while</ID>
     <ID>LoopWithTooManyJumpStatements:StreamingMarkdownMathClamp.kt$while</ID>
     <ID>MatchingDeclarationName:AdminChatContextUsage.kt$AdminChatContextSources</ID>
-    <ID>MatchingDeclarationName:AgentContextCardSession.kt$ContextCardSession</ID>
     <ID>MatchingDeclarationName:AgentScaffold.kt$AgentScaffoldTestTags</ID>
     <ID>MatchingDeclarationName:AgentScaffoldBodyState.kt$AgentScaffoldRuntimeState</ID>
     <ID>MatchingDeclarationName:AgentScaffoldSearch.kt$ChatMessageSearch</ID>
@@ -51,7 +50,6 @@
     <ID>MaxLineLength:AgentScaffoldAgentPickerTest.kt$AgentScaffoldAgentPickerTest$val agent2 = Agent(id = AgentId("agent-2"), name = "Agent Two", description = "Second agent", createdAt = "2023-01-01T00:00:00Z", updatedAt = "2023-01-01T00:00:00Z")</ID>
     <ID>MaxLineLength:AgentScaffoldDrawer.kt$CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Control.iconButtonSm), strokeWidth = LettaDimens.Space.hair)</ID>
     <ID>MaxLineLength:AgentScaffoldDrawer.kt$label = { Text(stringResource(R.string.screen_project_bug_report_title), style = MaterialTheme.typography.listItemHeadline) }</ID>
-    <ID>MaxLineLength:AgentScaffoldHiltTest.kt$AgentScaffoldHiltTest$breakdown = com.letta.mobile.data.context.ContextBreakdownLoader(mockk&lt;com.letta.mobile.data.repository.api.IAgentRepository&gt;(relaxed = true))</ID>
     <ID>MaxLineLength:AgentScaffoldHiltTest.kt$AgentScaffoldHiltTest$every { viewModel.conversationModelSelections } returns MutableStateFlow(com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices())</ID>
     <ID>MaxLineLength:ChatApprovalCoordinatorTest.kt$ChatApprovalCoordinatorTest$answer = ChatApprovalAnswer("perm-tool-1", listOf("tool-1"), approve = true, reason = null, selectedSuggestionIds = listOf("rule-1"))</ID>
     <ID>MaxLineLength:ChatHistoryPagerTest.kt$ChatHistoryPagerTest$coEvery { harness.messageRepository.fetchOlderMessagesPage(AgentId("agent-1"), ConversationId("conv-1"), any()) } coAnswers { a.await() }</ID>

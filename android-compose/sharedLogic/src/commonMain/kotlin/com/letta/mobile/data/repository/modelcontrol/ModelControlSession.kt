@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.modelcontrol
 
+import com.letta.mobile.data.model.RecentModelsStore
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -13,6 +14,8 @@ import kotlinx.coroutines.CoroutineScope
 class ModelControlSession(
     rpc: AdminRpcInvoker,
     private val oauthHttp: ProviderOAuthHttp? = defaultProviderOAuthHttp(),
+    /** Where this client keeps the models switched to most recently (the picker's "Recent" group); null keeps none. */
+    val recents: RecentModelsStore? = null,
 ) {
     val providers: ProviderConnectionRepository = ProviderConnectionRepository(rpc)
     val catalog: ModelCatalogRepository = ModelCatalogRepository(rpc)

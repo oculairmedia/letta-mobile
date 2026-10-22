@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.screen
 
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
 import com.letta.mobile.ui.search.LettaSearchOpenRequest
 
 internal data class AgentScaffoldNavigationCallbacks(
@@ -27,24 +28,11 @@ internal data class AgentScaffoldNavigationCallbacks(
     val onNavigateToSkills: ((agentId: String) -> Unit)? = null,
 )
 
-/** What the chat's model picker sheet reports back (letta-mobile-w4q4p.6.1). */
-internal data class ModelPickerSheetCallbacks(
-    val onDismiss: () -> Unit,
-    /** The picked model's handle. */
-    val onModelSelected: (String) -> Unit,
-    /** Re-reads the chat's own model list (the picker's fallback when the host has no admin catalog). */
-    val onRefresh: () -> Unit,
-    /** Opens the Models sheet; null hides "Edit Models…". */
-    val onEditModels: (() -> Unit)? = null,
-)
-
 internal data class AgentScaffoldSheetVisibility(
     val showBugReportSheet: Boolean,
     val onShowBugReportSheetChange: (Boolean) -> Unit,
     val showAgentSwitcher: Boolean,
     val onShowAgentSwitcherChange: (Boolean) -> Unit,
-    val showModelPicker: Boolean,
-    val onShowModelPickerChange: (Boolean) -> Unit,
 )
 
 /** The header's message search: `/search` asks [openRequest] to open the pane, which takes it once. */
@@ -67,4 +55,6 @@ internal data class AgentScaffoldBodyParams(
     val searchUi: AgentScaffoldSearchUiState,
     val projectUi: AgentScaffoldProjectUiState,
     val conversationRepository: IConversationRepository?,
+    /** The chat's one model picker (composer chip, `/models`, the drawer's card). */
+    val modelPicker: ModelPickerBinding,
 )

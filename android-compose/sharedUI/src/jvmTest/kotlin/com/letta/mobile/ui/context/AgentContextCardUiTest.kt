@@ -38,7 +38,6 @@ class AgentContextCardUiTest {
         windowTokens = 200_000,
         turnRunning = false,
     )
-    private val actions = AgentContextCardActions(onModelSelected = {})
 
     private fun readings(total: Long) = ContextTokenReadings().also {
         runBlocking { it.record(ServerFrame.UsageStatistics(agentId = "agent-1", conversationId = "default", contextTokens = total)) }
@@ -54,16 +53,16 @@ class AgentContextCardUiTest {
 
     @Test
     fun theCardShowsTheModelEffortAndHowFullTheWindowIs() = runComposeUiTest {
-        val deps = AgentContextCardDeps(readings(84_000), breakdown = null, compaction = null, pickerSource = null)
-        setContent { PointerCard(deps, actions, focus) }
+        val deps = AgentContextCardDeps(readings(84_000), breakdown = null, compaction = null)
+        setContent { PointerCard(deps, focus) }
         onNodeWithTag(AgentContextTags.CARD_MODEL, useUnmergedTree = true).assertTextEquals("Claude Opus · High")
         onNodeWithTag(AgentContextTags.CARD_USAGE, useUnmergedTree = true).assertTextEquals("42% of 200k used")
     }
 
     @Test
     fun theSheetIsTotalOnlyWithoutABreakdownAndHidesCompactWithoutARoute() = runComposeUiTest {
-        val deps = AgentContextCardDeps(readings(84_000), breakdown = null, compaction = null, pickerSource = null)
-        setContent { PointerCard(deps, actions, focus) }
+        val deps = AgentContextCardDeps(readings(84_000), breakdown = null, compaction = null)
+        setContent { PointerCard(deps, focus) }
         onNodeWithTag(AgentContextTags.CARD).performClick()
         onNodeWithTag(AgentContextTags.SCOPE).assertTextEquals("Changes the agent's model")
         onNodeWithTag(AgentContextTags.PROVENANCE).assertTextEquals("Total only")
@@ -81,8 +80,8 @@ class AgentContextCardUiTest {
             source = "estimate",
             calibrated = false,
         )
-        val deps = AgentContextCardDeps(readings(84_000), ContextBreakdownLoader { overview }, compaction = null, pickerSource = null)
-        setContent { PointerCard(deps, actions, focus) }
+        val deps = AgentContextCardDeps(readings(84_000), ContextBreakdownLoader { overview }, compaction = null)
+        setContent { PointerCard(deps, focus) }
         onNodeWithTag(AgentContextTags.CARD).performClick()
         waitForIdle()
         onNodeWithTag(AgentContextTags.PROVENANCE).assertTextEquals("Estimated, matched to provider total")
@@ -95,8 +94,8 @@ class AgentContextCardUiTest {
         val result = ConversationCompactResult("execute_command", messagesBefore = 48, messagesAfter = 12, contextTokensBefore = 60_000, contextTokensAfter = 10_000)
         val repository = repository(CompactionOutcome.Compacted(result))
         val readings = readings(84_000)
-        val deps = AgentContextCardDeps(readings, breakdown = null, compaction = CompactionController(repository, readings), pickerSource = null)
-        setContent { PointerCard(deps, actions, focus) }
+        val deps = AgentContextCardDeps(readings, breakdown = null, compaction = CompactionController(repository, readings))
+        setContent { PointerCard(deps, focus) }
         onNodeWithTag(AgentContextTags.CARD).performClick()
         onNodeWithTag(AgentContextTags.COMPACT).assertIsEnabled().performClick()
         waitForIdle()
@@ -109,8 +108,8 @@ class AgentContextCardUiTest {
     @Test
     fun anUnsupportedBackendHidesCompactAfterTheFirstTry() = runComposeUiTest {
         val readings = readings(84_000)
-        val deps = AgentContextCardDeps(readings, null, CompactionController(repository(CompactionOutcome.Unsupported), readings), null)
-        setContent { PointerCard(deps, actions, focus) }
+        val deps = AgentContextCardDeps(readings, null, CompactionController(repository(CompactionOutcome.Unsupported), readings))
+        setContent { PointerCard(deps, focus) }
         onNodeWithTag(AgentContextTags.CARD).performClick()
         onNodeWithTag(AgentContextTags.COMPACT).performClick()
         waitForIdle()
@@ -120,8 +119,10 @@ class AgentContextCardUiTest {
 
 /** The card under the desktop pointer host, with no inspector frame: its detail opens as the host's dialog. */
 @Composable
-private fun PointerCard(deps: AgentContextCardDeps, actions: AgentContextCardActions, focus: AgentContextFocus) {
+private fun PointerCard(deps: AgentContextCardDeps, focus: AgentContextFocus) {
     MaterialTheme {
-        CompositionLocalProvider(LocalLettaHost provides LettaHost.Pointer) { AgentContextCardHost(AgentContextCardBinding(deps, actions), focus) }
+        CompositionLocalProvider(LocalLettaHost provides LettaHost.Pointer) {
+            AgentContextCardHost(AgentContextCardBinding(deps, picker = null), focus)
+        }
     }
 }

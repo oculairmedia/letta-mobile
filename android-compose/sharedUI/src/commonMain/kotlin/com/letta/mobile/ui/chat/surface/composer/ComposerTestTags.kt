@@ -19,7 +19,6 @@ internal object ComposerTestTags {
     const val COMMAND_ROW = "composer-command-"
     const val ATTACHMENTS = "composer-attachments"
     const val MODEL_CHIP = "composer-model"
-    const val MODEL_SHEET = "composer-model-sheet"
     const val EFFORT_CHIP = "composer-effort"
     /** The context indicator: a plain reading (no chip, no chevron) that opens its breakdown. */
     const val CONTEXT_CHIP = "composer-context"

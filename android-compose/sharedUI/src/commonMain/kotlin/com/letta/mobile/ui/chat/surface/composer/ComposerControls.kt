@@ -51,6 +51,7 @@ import com.letta.mobile.sharedui.resources.composer_stopping
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
+import com.letta.mobile.ui.context.ModelPickerHost
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -88,6 +89,8 @@ internal fun ComposerControlRow(model: ComposerModel, onAttachImage: () -> Unit)
             }
             if (narrow && secondary != null) WrappedControlsRow { secondary() }
         }
+        // The one model picker: the chip, `/models` and a run error's "Switch model" open it.
+        model.host.modelPicker?.let { ModelPickerHost(it, selectedValue = model.composer.model?.currentHandle) }
     }
 }
 

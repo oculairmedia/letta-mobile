@@ -1,10 +1,14 @@
 package com.letta.mobile.ui.chat.session
 
+import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.PermissionModeGateway
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.RecentModelsStore
+import com.letta.mobile.data.repository.appserver.AppServerLocalAdminGateway
 import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
+import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
@@ -31,7 +35,37 @@ class TimelineModelSource(
     val agentModel: String?,
     /** The host catalog whose rows name each model's reasoning efforts (the effort chip); null leaves it off. */
     val catalog: ModelCatalogRepository? = null,
+    /** Where a confirmed switch becomes recent (the picker's "Recent" group); null keeps none. */
+    val recents: RecentModelsStore? = null,
 )
+
+/**
+ * Where a one-conversation page lists and switches models. An Iroh host's control channel answers no
+ * native `list_models` / `conversation_update`, so there the chat goes through the host's chat
+ * gateway ([iroh]: `model.list`, and `model.update` with the effort [modelControl]'s catalog advertises),
+ * as desktop does; a ws:// App Server keeps its own commands ([admin]). A confirmed switch becomes
+ * recent in the recents [modelControl] keeps.
+ */
+fun timelineModelSource(
+    iroh: ChatGateway?,
+    admin: AppServerLocalAdminGateway,
+    agentModel: String?,
+    modelControl: ModelControlSession,
+): TimelineModelSource {
+    val gateway = iroh ?: return TimelineModelSource(
+        backend = ConversationModelBackend.of(admin),
+        conversation = { admin.getConversation(it) },
+        agentModel = agentModel,
+        recents = modelControl.recents,
+    )
+    return TimelineModelSource(
+        backend = checkNotNull(ConversationModelBackend.of(gateway)),
+        conversation = { gateway.getConversation(it.value) },
+        agentModel = agentModel,
+        catalog = modelControl.catalog,
+        recents = modelControl.recents,
+    )
+}
 
 /** The sources of a one-conversation host's model and permission-mode chips. */
 class TimelineChipSources(
@@ -64,7 +98,7 @@ internal fun timelineConversationModels(
     source: TimelineModelSource,
 ): ConversationModels {
     val conversation = ConversationId(target.conversationId)
-    val host = TargetConversationModelHost(conversation, AgentId(target.agentId), source.backend)
+    val host = TargetConversationModelHost(conversation, AgentId(target.agentId), source.backend, source.recents)
     return ConversationModels(scope, host).also { models ->
         models.load(source.backend)
         models.bindCatalog(source.catalog, scope)
@@ -100,6 +134,7 @@ private class TargetConversationModelHost(
     private val conversation: ConversationId,
     agent: AgentId,
     override val backend: ConversationModelBackend,
+    private val recents: RecentModelsStore?,
 ) : ConversationModelHost {
     private val state = MutableStateFlow(ConversationModelFocus(conversationId = conversation, agentId = agent))
 
@@ -110,6 +145,10 @@ private class TargetConversationModelHost(
         if (update.conversationId != conversation) return
         update.label?.let { label -> state.update { it.copy(label = label) } }
         update.error?.let { Telemetry.event(TELEMETRY_TAG, "conversationModel.switchFailed", "error" to it, level = Telemetry.Level.WARN) }
+    }
+
+    override suspend fun recordModel(model: String) {
+        recents?.record(model)
     }
 }
 

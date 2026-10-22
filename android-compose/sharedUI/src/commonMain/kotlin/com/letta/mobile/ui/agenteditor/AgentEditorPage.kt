@@ -62,7 +62,6 @@ object AgentEditorPageTags {
     const val LOADING = "agent-editor-loading"
     const val HERO = "agent-editor-hero"
     const val MASCOT_PANE = "agent-editor-mascot-pane"
-    const val MODEL_PANE = "agent-editor-model-pane"
     const val TOOLS_PANE = "agent-editor-tools-pane"
     const val PANEL_PANE = "agent-editor-panel-pane"
 }

@@ -12,6 +12,7 @@ ChatSurfaceHost
 HostSessionBinding
 LettaShellWorkspaceHost
 LettaShellWorkspaceSlots
+ModelPickerBinding conversationModelPicker chatModelPicker rememberOpenConversationModelPicker rememberOpenConversationChat
 PluginsPageBinding
 SettingsPageServices
 ShellAgentEditorHost

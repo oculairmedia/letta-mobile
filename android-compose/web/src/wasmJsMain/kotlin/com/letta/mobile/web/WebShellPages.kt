@@ -16,8 +16,9 @@ import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.shell.workspace.OpenConversation
 import com.letta.mobile.ui.shell.workspace.OpenConversationAgentContextCard
-import com.letta.mobile.ui.shell.workspace.OpenConversationContextMeter
 import com.letta.mobile.ui.shell.workspace.OpenConversationContextSession
+import com.letta.mobile.ui.context.AgentContextCardBinding
+import com.letta.mobile.ui.shell.workspace.rememberOpenConversationChat
 import com.letta.mobile.ui.chat.surface.rememberChatDockGeometry
 import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
 import com.letta.mobile.ui.settings.BackendConnectionStatusRow
@@ -91,14 +92,12 @@ internal fun webWorkspace(shell: WebShell, page: WebPageInputs, header: ShellWor
                     val deps = rememberShellPageDeps(page.session.graph, page.session.controllers, webPageHost(shell, page))
                     ShellPage(destination = workspace.destination, deps = deps, modifier = modifier)
                 },
-                // The shared model and context card desktop shows, over the connection's status.
                 agentCard = {
                     Column {
-                        OpenConversationAgentContextCard(
-                            session = webContextSession(shell, page),
-                            focusedAgent = shell.workspace.focusedAgentId,
-                            conversation = page.openConversation(),
-                        )
+                        val session = webContextSession(shell, page)
+                        OpenConversationAgentContextCard(session, shell.workspace.focusedAgentId, page.openConversation()) { picker ->
+                            AgentContextCardBinding(session.context.cardDeps(attention = null), picker)
+                        }
                         BackendConnectionStatusRow(page.connection)
                     }
                 },
@@ -175,9 +174,11 @@ private fun webChatPage(shell: WebShell, page: WebPageInputs, port: WebChatSessi
     val agentNames = shell.backend.roster.toMap()
     // letta-mobile-zxk2n.8: subagents open in the dual view; the web has no registry, so a row opens its child's default conversation.
     val subagentViews = rememberSubagentDualView(ConversationId(target.conversationId), webSubagentViewSessions(page))
-    val base = remember(agentNames, shell) { ChatSurfaceHost(resolveAgentName = agentNames::get, openAgentPane = shell::showNavigation) }
+    val modelPicker = rememberOpenConversationChat(webContextSession(shell, page), port.openConversation(), port::updateContextUsage)
+    val base = remember(agentNames, shell, modelPicker) {
+        ChatSurfaceHost(resolveAgentName = agentNames::get, openAgentPane = shell::showNavigation, modelPicker = modelPicker)
+    }
     val host = rememberSubagentDualViewHost(base, subagentViews, emptyList())
-    OpenConversationContextMeter(webContextSession(shell, page), port.openConversation(), onUsage = port::updateContextUsage)
     ShellChatDestination(
         page = ShellChatPage(
             port = port,
@@ -209,12 +210,13 @@ private fun webWaitingPage(shell: WebShell, page: WebPageInputs) = ShellPageCont
     )
 }
 
-/** What the shared context meter and card read: the live graph, the gateway's routes and the roster. */
+/** What the shared context meter, card and model picker read: the live graph, the gateway's routes and the roster. */
 private fun webContextSession(shell: WebShell, page: WebPageInputs) = OpenConversationContextSession(
     graph = page.session.graph,
     routes = page.session.services.gateway.contextRoutes,
     modelControl = page.session.services.gateway.modelControl,
     agents = shell.backend.agents.value,
+    onAddProvider = { shell.workspace.navigate(ShellDestination.Providers) },
 )
 
 private fun WebChatSessionPort.openConversation() = OpenConversation(target.agentId, target.conversationId, this, models)

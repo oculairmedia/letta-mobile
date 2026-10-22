@@ -6,6 +6,7 @@ import com.letta.mobile.data.chat.projection.CanvasArtifactReceipt
 import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 
@@ -212,7 +213,11 @@ data class ChatSurfaceHost(
      * dispatch's description for the sheet's title. Null hides the affordance.
      */
     val openSubagent: ((toolCallId: String, subagentAgentId: String?, description: String) -> Unit)? = null,
-    val openModelPicker: (() -> Unit)? = null,
+    /**
+     * The shared model picker: the composer chip, `/models` and a run error's
+     * "Switch model" open it ([ModelPickerBinding.open]). Null hides the chip's picker and the error action.
+     */
+    val modelPicker: ModelPickerBinding? = null,
     val pickWorkingDirectory: (() -> Unit)? = null,
     /**
      * Shows the conversation's agent pane (desktop: the sidebar). The agent's mascot beside the

@@ -21,12 +21,7 @@
     <string name="composer_attach_not_an_image">not a readable image</string>
     <string name="composer_attach_too_large">larger than %1$d MB</string>
     <string name="composer_model_fallback">Model</string>
-    <string name="composer_model_search">Search models</string>
-    <string name="composer_model_no_match">No models match “%1$s”</string>
-    <string name="composer_model_none">No models available yet</string>
-    <string name="composer_model_none_hint">Download an on-device model or add a provider in Settings.</string>
     <string name="composer_model_selected">Selected</string>
-    <string name="composer_model_other_provider">Other</string>
     <string name="composer_effort_header">Effort</string>
     <string name="composer_effort_default">Default</string>
     <string name="composer_context_label">Context %1$s</string>

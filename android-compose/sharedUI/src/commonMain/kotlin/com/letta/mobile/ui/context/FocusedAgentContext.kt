@@ -24,7 +24,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
-import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
+import kotlinx.coroutines.flow.StateFlow
 
 /*
  * The composer's context meter and the panel's agent
@@ -39,6 +39,8 @@ data class ContextConversationFocus(
     val conversationId: String?,
     /** A turn is in flight: the meter holds its reading, the card fetches no breakdown. */
     val turnRunning: Boolean,
+    /** False where this host's model pick always changes the agent (see [AgentContextFocus.picksTargetConversation]). */
+    val picksTargetConversation: Boolean = true,
 )
 
 /** What the model window is sized from: all cached, no extra call. */
@@ -51,6 +53,21 @@ data class ContextWindowSources(
 ) {
     /** The roster's entry for [focus]'s agent. */
     fun agentOf(focus: ContextConversationFocus): Agent? = agents.firstOrNull { it.id.value == focus.agentId }
+}
+
+/**
+ * The [agents], the session's [models] and the chat's per-conversation [selections]: the windows of a
+ * host whose chat lists the session's models (desktop).
+ */
+@Composable
+fun rememberContextWindowSources(
+    agents: List<Agent>,
+    models: StateFlow<List<LlmModel>>,
+    selections: StateFlow<ConversationModelChoices>,
+): ContextWindowSources {
+    val list by models.collectAsState()
+    val choices by selections.collectAsState()
+    return ContextWindowSources(agents, list, choices)
 }
 
 /**
@@ -90,22 +107,21 @@ class AgentContextSession(
     val breakdown: ContextBreakdownLoader,
     val routes: AgentContextRoutes,
 ) {
-    /** The card's deps over this session, with the host's model [pickerSource] and notification [attention]. */
-    fun cardDeps(pickerSource: ModelPickerSource?, attention: AttentionPrefsRepository? = null): AgentContextCardDeps =
+    /** The card's deps over this session, with the host's notification [attention]. */
+    fun cardDeps(attention: AttentionPrefsRepository?): AgentContextCardDeps =
         AgentContextCardDeps(
             readings = readings,
             breakdown = breakdown,
             compaction = CompactionController(routes.compaction, readings),
-            pickerSource = pickerSource,
             contextLimit = ContextLimitController(routes.contextLimit),
             attention = attention,
         )
 }
 
 /**
- * The panel's model-and-context card for the focused agent, opening as a
- * popover under it; nothing while no agent is focused. The conversation's own model and window
- * come first, as Android resolves them.
+ * The one model-and-context card of every platform: the panel's (desktop, web)
+ * and the drawer's (Android) card for the focused agent, opening its sheet over it; nothing while
+ * no agent is focused. The conversation's own model and window come first.
  */
 @Composable
 fun FocusedAgentContextCard(
@@ -128,6 +144,7 @@ fun FocusedAgentContextCard(
             windowTokens = view.windowTokens,
             modelWindowTokens = view.modelWindowTokens,
             turnRunning = focus.turnRunning,
+            picksTargetConversation = focus.picksTargetConversation,
         ),
     )
 }

@@ -17,20 +17,25 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.context.ContextBreakdownLoader
+import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ParsedSearchMessage
+import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
+import com.letta.mobile.data.session.SessionGraph
 import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.coordination.ChatProjectBindings
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.feature.chat.screen.AgentScaffoldContent
 import com.letta.mobile.feature.chat.screen.AgentScaffoldNavigationCallbacks
 import com.letta.mobile.feature.chat.screen.AgentScaffoldTestTags
-import com.letta.mobile.feature.chat.screen.ContextCardSession
 import com.letta.mobile.feature.chat.screen.LocalSharedNavDrawer
 import com.letta.mobile.feature.chat.screen.SharedNavDrawerViewModel
 import com.letta.mobile.testutil.FakeSettingsRepository
@@ -120,6 +125,14 @@ class AgentScaffoldHiltTest {
         every { viewModel.agentId } returns AgentId("agent-hilt-1")
         every { viewModel.conversationId } returns null
         every { viewModel.projectContext } returns null
+        every { viewModel.modelPicker(any()) } returns ModelPickerBinding(
+            source = ModelPickerSource.of(flowOf(emptyList())) {},
+            onModelSelected = {},
+            onEffortSelected = null,
+            editor = null,
+            onAddProvider = null,
+            onModelsEdited = {},
+        )
         every { conversationRepository.getConversations(any<AgentId>()) } returns flowOf(emptyList())
         coEvery { conversationRepository.refreshConversations(any<AgentId>()) } returns Unit
         coEvery { conversationRepository.refreshConversationsIfStale(any<AgentId>(), any()) } returns false
@@ -154,16 +167,10 @@ class AgentScaffoldHiltTest {
 
     @Test
     fun menuClickOpensTheSharedDrawerWithoutLoadingTheContextWindow() {
-        val readings = com.letta.mobile.data.context.ContextTokenReadings()
-        every { viewModel.contextCardSession } returns MutableStateFlow(
-            ContextCardSession(
-                readings = readings,
-                breakdown = com.letta.mobile.data.context.ContextBreakdownLoader(mockk<com.letta.mobile.data.repository.api.IAgentRepository>(relaxed = true)),
-                compaction = com.letta.mobile.data.compaction.CompactionController(mockk(relaxed = true), readings),
-                contextLimit = com.letta.mobile.data.context.limit.ContextLimitController(mockk(relaxed = true)),
-            ),
-        )
-        every { viewModel.modelPickerSource() } returns null
+        val graph = mockk<SessionGraph>(relaxed = true)
+        every { graph.contextTokenReadings } returns ContextTokenReadings()
+        every { graph.contextBreakdown } returns ContextBreakdownLoader(mockk<IAgentRepository>(relaxed = true))
+        every { viewModel.sessionGraph } returns MutableStateFlow(graph)
         every { viewModel.modelPicksTargetConversation() } returns false
         showScaffold(withDrawer = true)
         composeRule.onNodeWithTag(AgentScaffoldTestTags.MENU_BUTTON).performClick()
