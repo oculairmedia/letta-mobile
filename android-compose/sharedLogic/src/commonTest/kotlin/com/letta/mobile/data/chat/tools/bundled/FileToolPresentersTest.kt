@@ -89,6 +89,32 @@ class FileToolPresentersTest {
     }
 
     @Test
+    fun grepReadsWindowsDrivePathsAsTheFileAndLine() {
+        val result = "C:\\src\\a.kt:3:// TODO one\nD:/repo/b.kt:12-context\nC:\\src\\c.kt"
+        val facts = call("Grep", """{"pattern":"TODO"}""", result)
+        assertEquals(
+            listOf(
+                ToolPreviewTarget.File("C:\\src\\a.kt", 3..3),
+                ToolPreviewTarget.File("D:/repo/b.kt", 12..12),
+                ToolPreviewTarget.File("C:\\src\\c.kt"),
+            ),
+            registry.line(facts).previews,
+        )
+        assertEquals(ToolInset.Text("C:\\src\\a.kt\n   3  // TODO one\nD:/repo/b.kt\n  12  context\nC:\\src\\c.kt"), registry.inset(facts))
+    }
+
+    @Test
+    fun aFailedSearchSaysNothingAboutWhatItFound() {
+        val error = "Error: ENOENT: no such file or directory, scandir 'src'"
+        val glob = registry.line(ToolCallFacts("Glob", """{"pattern":"**/*.kt","path":"src"}""", error, failed = true))
+        assertEquals("**/*.kt in src", glob.target)
+        assertEquals(emptyList(), glob.previews)
+        val grep = registry.line(ToolCallFacts("Grep", """{"pattern":"TODO","path":"src"}""", error, failed = true))
+        assertEquals("\"TODO\" in src", grep.target)
+        assertEquals(emptyList(), grep.previews)
+    }
+
+    @Test
     fun grepListingOnlyFilesReadsAsThoseFiles() {
         val facts = call("Grep", """{"pattern":"TODO"}""", "src/a.kt\nsrc/b.kt")
         assertEquals(listOf(ToolPreviewTarget.File("src/a.kt"), ToolPreviewTarget.File("src/b.kt")), registry.line(facts).previews)

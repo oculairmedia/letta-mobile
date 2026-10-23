@@ -23,7 +23,7 @@ object GrepToolPresenter : ToolPresenter {
     override fun line(call: ToolCallFacts, scope: ToolPresenterScope): ToolStepLine {
         val hits = hitsOf(call)
         val searched = call.string("pattern")?.let { inRoot("\"$it\"", call.searchRoot()) }
-        val count = hits.size.takeIf { call.result != null }?.let { if (it == 1) "1 match" else "$it matches" }
+        val count = hits.size.takeIf { call.ran() }?.let { if (it == 1) "1 match" else "$it matches" }
         return ToolStepLine(
             verb = ToolVerb.Searched,
             target = listOfNotNull(searched, count).joinToString(SEPARATOR),
@@ -43,9 +43,12 @@ object GrepToolPresenter : ToolPresenter {
         return ToolInset.Text(grouped)
     }
 
-    /** The result's matches, in order: `path:line:text` (or `path:line-text`) lines, or bare paths. */
+    /**
+     * The result's matches, in order: `path:line:text` (or `path:line-text`) lines, or bare paths; a
+     * path may start with a Windows drive (`C:\src\a.kt:3:text`). A failed grep matched nothing.
+     */
     private fun hitsOf(call: ToolCallFacts): List<Hit> =
-        call.resultText()?.lineSequence()?.mapNotNull(::hitOf)?.toList().orEmpty()
+        call.resultText()?.takeUnless { call.failed }?.lineSequence()?.mapNotNull(::hitOf)?.toList().orEmpty()
 
     private fun hitOf(raw: String): Hit? {
         val line = raw.trimEnd()
@@ -58,5 +61,5 @@ object GrepToolPresenter : ToolPresenter {
     private class Hit(val path: String, val line: Int?, val text: String)
 
     private const val MAX_CHIPS = 12
-    private val HIT = Regex("""^([^:\s][^:]*?):(\d+)[:-](.*)$""")
+    private val HIT = Regex("""^((?:[A-Za-z]:[\\/])?[^:\s][^:]*?):(\d+)[:-](.*)$""")
 }

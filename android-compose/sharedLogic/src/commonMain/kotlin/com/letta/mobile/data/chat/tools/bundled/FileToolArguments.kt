@@ -19,6 +19,9 @@ internal fun inRoot(pattern: String, root: String?): String = if (root.isNullOrB
 /** A call's result when it has one worth reading, as plain text. */
 internal fun ToolCallFacts.resultText(): String? = result?.takeIf { it.isNotBlank() }
 
+/** Whether the call ran and returned what it found: it has a result and did not fail. */
+internal fun ToolCallFacts.ran(): Boolean = result != null && !failed
+
 private val FILE_PATH_KEYS = listOf("file_path", "absolute_path", "filePath", "path")
 private val SEARCH_ROOT_KEYS = listOf("path", "dir_path", "directory")
 

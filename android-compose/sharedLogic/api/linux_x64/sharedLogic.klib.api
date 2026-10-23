@@ -30068,10 +30068,12 @@ final class com.letta.mobile.data.chat.tools/ToolArgumentField { // com.letta.mo
 }
 
 final class com.letta.mobile.data.chat.tools/ToolCallFacts { // com.letta.mobile.data.chat.tools/ToolCallFacts|null[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin/String?) // com.letta.mobile.data.chat.tools/ToolCallFacts.<init>|<init>(kotlin.String;kotlin.String;kotlin.String?){}[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String?, kotlin/Boolean = ...) // com.letta.mobile.data.chat.tools/ToolCallFacts.<init>|<init>(kotlin.String;kotlin.String;kotlin.String?;kotlin.Boolean){}[0]
 
     final val arguments // com.letta.mobile.data.chat.tools/ToolCallFacts.arguments|{}arguments[0]
         final fun <get-arguments>(): kotlinx.serialization.json/JsonObject? // com.letta.mobile.data.chat.tools/ToolCallFacts.arguments.<get-arguments>|<get-arguments>(){}[0]
+    final val failed // com.letta.mobile.data.chat.tools/ToolCallFacts.failed|{}failed[0]
+        final fun <get-failed>(): kotlin/Boolean // com.letta.mobile.data.chat.tools/ToolCallFacts.failed.<get-failed>|<get-failed>(){}[0]
     final val name // com.letta.mobile.data.chat.tools/ToolCallFacts.name|{}name[0]
         final fun <get-name>(): kotlin/String // com.letta.mobile.data.chat.tools/ToolCallFacts.name.<get-name>|<get-name>(){}[0]
     final val rawArguments // com.letta.mobile.data.chat.tools/ToolCallFacts.rawArguments|{}rawArguments[0]

@@ -2,6 +2,8 @@ package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import com.letta.mobile.data.chat.projection.ToolTimelineState
+import com.letta.mobile.data.chat.projection.classifyToolCallState
 import com.letta.mobile.data.chat.tools.ToolCallFacts
 import com.letta.mobile.data.chat.tools.ToolStepLine
 import com.letta.mobile.data.model.UiMessage
@@ -29,7 +31,11 @@ internal fun ChatRowContext.isStreaming(message: UiMessage): Boolean =
     streamingMessageId != null && streamingMessageId == message.id
 
 /** [this] call as a tool presenter reads it. */
-internal fun UiToolCall.facts(): ToolCallFacts = ToolCallFacts(name, arguments, result)
+internal fun UiToolCall.facts(): ToolCallFacts =
+    ToolCallFacts(name, arguments, result, failed = classifyToolCallState(this).isFailure())
+
+/** A step that failed or was turned down: its line says so and it opens to what went wrong. */
+internal fun ToolTimelineState.isFailure(): Boolean = this == ToolTimelineState.Failed || this == ToolTimelineState.Rejected
 
 /** [call]'s step line from the provided presenters, worked out again only when the call or the presenters change. */
 @Composable

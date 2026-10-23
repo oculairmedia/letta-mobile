@@ -25,7 +25,7 @@ object GlobToolPresenter : ToolPresenter {
         val root = call.searchRoot()
         val found = foundPaths(call)
         val searched = pattern?.let { inRoot(it, root) } ?: root.orEmpty()
-        val count = found.size.takeIf { call.result != null }?.let { if (it == 1) "1 file" else "$it files" }
+        val count = found.size.takeIf { call.ran() }?.let { if (it == 1) "1 file" else "$it files" }
         return ToolStepLine(
             verb = ToolVerb.Searched,
             target = listOfNotNull(searched.ifBlank { null }, count).joinToString(SEPARATOR),
@@ -37,9 +37,13 @@ object GlobToolPresenter : ToolPresenter {
     // The approved mockup: what a glob found is its chips, not a text dump.
     override fun inset(call: ToolCallFacts, scope: ToolPresenterScope): ToolInset? = null
 
-    /** The paths the result lists, one per line; prose lines (a "No files found" note) are not paths. */
+    /**
+     * The paths the result lists, one per line; prose lines (a "No files found" note) are not paths, and
+     * a failed glob found nothing.
+     */
     private fun foundPaths(call: ToolCallFacts): List<String> =
-        call.resultText()?.lineSequence()?.map { it.trim() }?.filter { it.isNotEmpty() && ' ' !in it }?.toList().orEmpty()
+        call.resultText()?.takeUnless { call.failed }?.lineSequence()
+            ?.map { it.trim() }?.filter { it.isNotEmpty() && ' ' !in it }?.toList().orEmpty()
 
     private const val MAX_CHIPS = 24
 }
