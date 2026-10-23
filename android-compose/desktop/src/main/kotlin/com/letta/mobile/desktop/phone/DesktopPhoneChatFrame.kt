@@ -20,7 +20,6 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.flow.StateFlow
@@ -52,7 +51,6 @@ internal fun DesktopPhoneChrome?.chatAppearance(desktop: ChatSurfaceAppearance):
 
 private val PhoneChatAppearance = ChatSurfaceAppearance(
     platformStyle = ChatPlatformStyle.Touch,
-    toolDetails = ChatToolDetails.Sheet,
     fontScaleRange = DefaultFontScaleRange,
 )
 

@@ -60,7 +60,7 @@ class ChatCanvasArtifactSnapshotTest {
                                     onIntent = {},
                                     host = ChatSurfaceHost(openCanvas = {}, showOnCanvas = {}),
                                     appearance = if (shot.phone) {
-                                        ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch, toolDetails = ChatToolDetails.Sheet)
+                                        ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch)
                                     } else {
                                         ChatSurfaceAppearance()
                                     },

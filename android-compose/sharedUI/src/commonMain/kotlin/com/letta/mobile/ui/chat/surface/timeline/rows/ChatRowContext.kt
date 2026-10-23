@@ -11,7 +11,6 @@ import com.letta.mobile.ui.chat.render.ChatRenderItemState
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.persistentMapOf
 
@@ -35,8 +34,6 @@ internal data class ChatRowContext(
      * time, as the Android timeline does for its newest item.
      */
     val newestMessageId: String? = null,
-    /** Where a tool summary line shows its calls: in place (desktop) or in a sheet (Android). */
-    val toolDetails: ChatToolDetails = ChatToolDetails.Inline,
     /** Rows these options hide draw nothing (reasoning, compactions, usage). */
     val displayOptions: ChatDisplayOptions = ChatDisplayOptions.Default,
 ) {

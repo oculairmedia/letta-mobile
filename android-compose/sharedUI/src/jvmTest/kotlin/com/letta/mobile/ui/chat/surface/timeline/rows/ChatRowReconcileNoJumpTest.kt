@@ -23,7 +23,6 @@ import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.runtime.PendingApprovalDetails
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.common.GroupPosition
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -99,7 +98,7 @@ class ChatRowReconcileNoJumpTest {
         setContent {
             MaterialTheme {
                 Box(Modifier.width(400.dp).testTag(ROW)) {
-                    RenderRow(item = shown, context = rowContext(newestMessageId = newestId, toolDetails = ChatToolDetails.Sheet))
+                    RenderRow(item = shown, context = rowContext(newestMessageId = newestId))
                 }
             }
         }

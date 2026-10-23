@@ -112,14 +112,12 @@ private fun AssistantMessageColumn(
         MessageImages(message, callbacks)
         val toolCalls = message.toolCalls.orEmpty()
         if (toolCalls.isNotEmpty()) {
-            // letta-mobile-sieej: the line carries its request, so it reads "Approval needed" and the
-            // card shows right under it.
+            // The calls read as step lines, the same as a run's; a request they wait on keeps its card under them.
             val approval = message.approvalRequest
-            ToolRunGroup(
+            RunToolSteps(
                 calls = ToolRunCalls(
                     toolCalls = remember(toolCalls) { toolCalls.toImmutableList() },
                     approvals = remember(approval) { listOfNotNull(approval).toImmutableList() },
-                    startedAtTimestamp = message.timestamp.takeIf { it.isNotBlank() },
                 ),
                 context = context,
                 callbacks = callbacks,

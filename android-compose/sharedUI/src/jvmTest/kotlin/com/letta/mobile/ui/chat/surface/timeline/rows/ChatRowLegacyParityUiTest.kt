@@ -16,7 +16,6 @@ import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.runtime.PendingApprovalDetails
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import com.letta.mobile.ui.common.GroupPosition
 import kotlin.test.Test
@@ -67,7 +66,6 @@ class ChatRowLegacyParityUiTest {
         setContent { MaterialTheme { RenderRow(runOf(reasoning, tools, reply), opened) } }
         awaitText("Fixed it.")
         // ckmub.1.2: the calls list as step rows under the line (no "2 ran - 1 failed" group row).
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
         assertEquals(2, onAllNodesWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).fetchSemanticsNodes().size)
         onNodeWithTag(ChatRowTestTags.TOOL_STEP_NOTE, useUnmergedTree = true).assertExists()
         onNodeWithText("Fixed it.", substring = true).assertExists()
@@ -109,13 +107,12 @@ class ChatRowLegacyParityUiTest {
             ),
         )
         setContent {
-            MaterialTheme { RenderRow(runOf(approval), rowContext(newestMessageId = "ap", toolDetails = ChatToolDetails.Inline)) }
+            MaterialTheme { RenderRow(runOf(approval), rowContext(newestMessageId = "ap")) }
         }
         onNodeWithText("Approval requested").assertExists()
         onNodeWithText("Approve").assertExists()
         // ckmub.1.2: the call is a step row straight under the run's line; opening it shows the
         // call's details, never a second card.
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
         waitForIdle()
         assertEquals(1, onAllNodesWithText("Approval requested").fetchSemanticsNodes().size)

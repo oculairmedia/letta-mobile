@@ -32,7 +32,6 @@ import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.composer.ComposerThinkingSnapshot
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimelineSnapshot
 import com.letta.mobile.ui.theme.LettaTheme
@@ -241,9 +240,8 @@ class RowParityScreenshotTest {
         const val STABLE_WAIT_MILLIS = 60L
         const val MAX_NOTE = 160
 
-        /** SharedChatPage's appearance: tool calls open in a sheet, the phone's Touch idiom. */
+        /** SharedChatPage's appearance: the phone's Touch idiom. */
         val AndroidAppearance = ChatSurfaceAppearance(
-            toolDetails = ChatToolDetails.Sheet,
             platformStyle = ChatPlatformStyle.Touch,
         )
     }

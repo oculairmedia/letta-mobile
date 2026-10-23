@@ -438,7 +438,6 @@ private fun runToolCallGroup(messages: List<UiMessage>): RunStep.ToolCalls? {
         calls = ToolRunCalls(
             toolCalls = calls.flatMap { it.toolCalls.orEmpty() }.toImmutableList(),
             approvals = calls.mapNotNull { it.approvalRequest }.distinctBy { it.requestId }.toImmutableList(),
-            startedAtTimestamp = calls.first().timestamp.takeIf { it.isNotBlank() },
         ),
     )
 }

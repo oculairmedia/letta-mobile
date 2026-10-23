@@ -19,7 +19,6 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -74,7 +73,7 @@ class ChatRowRunResponseGapUiTest {
                 MaterialTheme {
                     Box(Modifier.width(400.dp).testTag(ROW)) {
                         val state = renderState(collapsedRunIds = if (opened) setOf(RUN_ID) else emptySet())
-                        RenderRow(item, rowContext(itemState = state, newestMessageId = newest, toolDetails = ChatToolDetails.Inline))
+                        RenderRow(item, rowContext(itemState = state, newestMessageId = newest))
                     }
                 }
             }

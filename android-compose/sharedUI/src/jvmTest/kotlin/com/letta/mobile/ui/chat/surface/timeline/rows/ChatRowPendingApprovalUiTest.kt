@@ -21,7 +21,6 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import com.letta.mobile.ui.common.GroupPosition
@@ -69,7 +68,7 @@ class ChatRowPendingApprovalUiTest {
         setContent {
             CompositionLocalProvider(LocalChatPlatformStyle provides ChatPlatformStyle.Touch) {
                 MaterialTheme {
-                    RenderRow(item, rowContext(itemState = renderState(collapsedRunIds = setOf(RUN_ID)), toolDetails = ChatToolDetails.Sheet))
+                    RenderRow(item, rowContext(itemState = renderState(collapsedRunIds = setOf(RUN_ID))))
                 }
             }
         }
@@ -92,7 +91,6 @@ class ChatRowPendingApprovalUiTest {
         onNodeWithText("Waiting for your approval").assertDoesNotExist()
         // letta-mobile-zxk2n.37: nothing holds it open, so it folds under its one summary line.
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertExists()
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
     }
 
     private fun ComposeUiTest.assertCardShownAndActionable(actions: RecordingChatActions) {
@@ -101,11 +99,9 @@ class ChatRowPendingApprovalUiTest {
         // ckmub.1.2: the parked call is a step row straight under the line, its glyph saying it waits.
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).assertIsDisplayed()
         onNodeWithTag(ChatRowTestTags.TOOL_STEP_NOTE, useUnmergedTree = true).assertTextEquals("awaiting approval")
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
         onNodeWithText("Approval requested").assertIsDisplayed()
         onNodeWithText("Reject").assertIsDisplayed()
         onNodeWithText("Always allow Bash(ls:*)").assertIsDisplayed()
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_DETAILS).assertDoesNotExist()
 
         onNodeWithText("Approve").performClick()
         runOnIdle {
@@ -125,7 +121,7 @@ class ChatRowPendingApprovalUiTest {
         val state = renderState(collapsedRunIds = if (collapsed) setOf(RUN_ID) else emptySet())
         setContent {
             CompositionLocalProvider(LocalChatPlatformStyle provides host.style) {
-                MaterialTheme { RenderRow(item, rowContext(itemState = state, toolDetails = host.details), rowCallbacks(actions)) }
+                MaterialTheme { RenderRow(item, rowContext(itemState = state), rowCallbacks(actions)) }
             }
         }
     }
@@ -158,10 +154,10 @@ class ChatRowPendingApprovalUiTest {
         return ChatRenderItem.RunBlock(runId = RUN_ID, messages = messages.map { it to GroupPosition.None })
     }
 
-    /** How a host draws the row: the phone (Touch, details in a sheet) or desktop (Pointer, inline). */
-    private enum class RowHost(val style: ChatPlatformStyle, val details: ChatToolDetails) {
-        Phone(ChatPlatformStyle.Touch, ChatToolDetails.Sheet),
-        Desktop(ChatPlatformStyle.Pointer, ChatToolDetails.Inline),
+    /** How a host draws the row: the phone (Touch) or desktop (Pointer). */
+    private enum class RowHost(val style: ChatPlatformStyle) {
+        Phone(ChatPlatformStyle.Touch),
+        Desktop(ChatPlatformStyle.Pointer),
     }
 
     private companion object {
