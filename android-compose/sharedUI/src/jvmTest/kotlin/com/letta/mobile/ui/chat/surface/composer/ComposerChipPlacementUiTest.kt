@@ -41,7 +41,7 @@ import kotlin.test.assertTrue
 /**
  * Where the permission-mode and context chips sit: the mode chip in the card's control row beside
  * the model and effort chips, the context chip at the right end of the keyboard-hint footer (or in
- * the control row where there is no footer), and the Touch bar's mode chip above the bar.
+ * the control row where there is no footer); the Touch bar has no mode chip (its "+" sheet offers the mode).
  */
 class ComposerChipPlacementUiTest {
     private val composer = ChatComposerUiState(
@@ -187,14 +187,12 @@ class ComposerChipPlacementUiTest {
         assertTrue(mode.top >= send.bottom, "mode chip $mode did not wrap below Send $send")
     }
 
+    /** The Touch bar carries no mode chip: its "+" sheet offers the mode (TouchComposerBarUiTest). */
     @Test
-    fun theTouchBarKeepsTheModeChipAboveIt() = runComposeUiTest {
+    fun theTouchBarHasNoModeChipAboveIt() = runComposeUiTest {
         showPanel(width = 360.dp, keyboardHints = false, style = ChatPlatformStyle.Touch)
 
-        waitUntilExactlyOneExists(hasTestTag(ComposerTestTags.PERMISSION_MODE_CHIP))
-        waitUntilDoesNotExist(chipIn(ComposerTestTags.PERMISSION_MODE_CHIP, ComposerTestTags.TOUCH_BAR))
-        val bar = onNodeWithTag(ComposerTestTags.TOUCH_BAR).getUnclippedBoundsInRoot()
-        val mode = onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).getUnclippedBoundsInRoot()
-        assertTrue(mode.bottom <= bar.top, "mode chip $mode is not above the Touch bar $bar")
+        waitUntilExactlyOneExists(hasTestTag(ComposerTestTags.TOUCH_BAR))
+        waitUntilDoesNotExist(hasTestTag(ComposerTestTags.PERMISSION_MODE_CHIP))
     }
 }

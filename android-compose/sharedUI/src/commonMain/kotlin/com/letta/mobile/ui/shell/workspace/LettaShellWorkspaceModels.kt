@@ -22,6 +22,8 @@ object LettaShellWorkspaceTags {
     const val WIDE = "shell-workspace-wide"
     const val COMPACT = "shell-workspace-compact"
     const val INLINE_HEADER = "shell-workspace-inline-header"
+    /** The compact inline window's minimal header, floating over the page. */
+    const val FLOATING_HEADER = "shell-workspace-floating-header"
 }
 
 /** The workspace's navigation: the agent rail (with its library) and the focused agent's panel. */

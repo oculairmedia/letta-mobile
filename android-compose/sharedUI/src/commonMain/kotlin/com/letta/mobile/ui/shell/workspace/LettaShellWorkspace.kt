@@ -29,12 +29,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.ui.host.InspectorFrame
@@ -45,6 +48,7 @@ import com.letta.mobile.ui.host.rememberInspectorHost
 import com.letta.mobile.ui.host.rememberOverlayHost
 import com.letta.mobile.ui.mascot.DriveMascotStage
 import com.letta.mobile.ui.mascot.MascotTransportLayer
+import com.letta.mobile.ui.shell.LocalShellFloatingChromeInset
 import com.letta.mobile.ui.shell.ShellNavDrawerSheet
 import com.letta.mobile.ui.shell.rail.ShellLibraryRail
 import com.letta.mobile.ui.shell.rail.railLightDismiss
@@ -65,7 +69,8 @@ import kotlinx.coroutines.flow.drop
  *
  * At or above [LettaDimens.Pane.wideBreakpoint] the rail and panel sit beside the page (the panel
  * folds away under the layout's width rule or when collapsed); below it, or with
- * [ShellWorkspaceLayout.forceCompact], they fold into a modal drawer the header's menu opens.
+ * [ShellWorkspaceLayout.forceCompact], they fold into a modal drawer and the header turns minimal
+ * ([ShellMinimalHeader]: the agent pill, the search, and the menu that opens the drawer).
  * Hosts only bind: their state into [LettaShellWorkspaceState], their verbs and content into
  * [LettaShellWorkspaceHost].
  */
@@ -118,27 +123,51 @@ private class WorkspaceFrame(
 /** Where the agent pane's mascot stands: the open drawer when compact, the visible sidebar when wide. */
 private fun WorkspaceFrame.agentPaneVisible(): Boolean = if (fit.compact) drawer.open else fit.sidebarVisible
 
-/** In a compact window the header's sidebar control opens the drawer. */
+/**
+ * A compact window's header is the minimal one (every host, the desktop's small window too): the
+ * focused agent's pill, the search and the drawer's menu, with no tabs or sidebar control.
+ */
 private fun WorkspaceFrame.header(): ShellWorkspaceHeaderState {
     if (!fit.compact) return state.header
-    return state.header.copy(sidebar = ShellSidebarControl(collapsed = true, onToggle = { drawer.open = true }, opensDrawer = true))
+    val openDrawer = { drawer.open = true }
+    return state.header.copy(
+        sidebar = null,
+        tabs = ShellConversationTabs(),
+        minimal = ShellMinimalHeader(
+            identity = state.navigation.focusedIdentity(host.actions.rail, onSwitch = openDrawer),
+            onOpenNavigation = openDrawer,
+        ),
+    )
 }
+
 /**
  * The workspace owns the window's insets once, for every host: the side cutouts here, the
- * status bar under the inline header (its colour runs up behind it), and the body below takes the
- * top as consumed so no page pads for it again. The bottom bar and the keyboard stay the pages'
- * (the composer rides the keyboard). A window without insets (desktop, browser) sees none.
+ * status bar under the inline header (its colour runs up behind it), and the page below takes the
+ * top as consumed so no page pads for it again (the compact drawer pads its own content for it).
+ * A compact inline window has no header bar: the body runs up under the status bar, the minimal
+ * header floats over it, and the pages get the band they lie under as
+ * [LocalShellFloatingChromeInset] instead. The bottom bar and the keyboard stay
+ * the pages' (the composer rides the keyboard). A window without insets (desktop, browser) sees none.
  */
 @Composable
 private fun WorkspaceColumn(frame: WorkspaceFrame) {
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))) {
         val header = frame.header()
+        val floating = frame.floatingChrome(header)
         when (val chrome = frame.host.chrome) {
-            ShellWindowChrome.Inline -> InlineHeader(header)
+            ShellWindowChrome.Inline -> if (floating == null) InlineHeader(header)
             is ShellWindowChrome.Hoisted -> SideEffect { chrome.onHeader(header) }
         }
-        WorkspaceBody(frame, Modifier.weight(1f).consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)))
+        WorkspaceBody(frame, floating, Modifier.weight(1f))
     }
+}
+
+/** A compact window drawn inline floats its minimal header over the page instead of drawing a bar. */
+@Composable
+private fun WorkspaceFrame.floatingChrome(header: ShellWorkspaceHeaderState): FloatingChrome? {
+    if (!fit.compact || host.chrome != ShellWindowChrome.Inline) return null
+    val statusBar = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }
+    return FloatingChrome(header, statusBar)
 }
 
 /**
@@ -155,18 +184,14 @@ private fun InlineHeader(header: ShellWorkspaceHeaderState) {
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-            .height(inlineHeaderHeight(tabbed))
+            .height(header.barHeight(plain = LettaDimens.Control.minTouchTarget))
             .testTag(LettaShellWorkspaceTags.INLINE_HEADER),
     )
     if (!tabbed) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
 
-/** The bar's height: browser-thin with tabs (one line per tab), else room for the identity block. */
-internal fun inlineHeaderHeight(tabbed: Boolean): Dp =
-    if (tabbed) LettaDimens.Control.actionButton else LettaDimens.Control.minTouchTarget
-
 @Composable
-private fun WorkspaceBody(frame: WorkspaceFrame, modifier: Modifier) {
+private fun WorkspaceBody(frame: WorkspaceFrame, floating: FloatingChrome?, modifier: Modifier) {
     // The panel's card and the page's panels open their detail in the frame around the page.
     val inspectors = rememberInspectorHost()
     DriveMascotStage(frame.state.navigation.rail.focus.selectedAgentId?.let(::AgentId), frame.agentPaneVisible())
@@ -174,7 +199,9 @@ private fun WorkspaceBody(frame: WorkspaceFrame, modifier: Modifier) {
         // Every seated mascot draws here, over the shell, and travels between seats (wbin4.4).
         MascotTransportLayer {
             ProvideInspectorHost(inspectors) {
-                if (frame.fit.compact) CompactBody(frame, inspectors) else WideBody(frame, inspectors)
+                CompositionLocalProvider(LocalShellFloatingChromeInset provides (floating?.inset ?: 0.dp)) {
+                    if (frame.fit.compact) CompactBody(frame, inspectors, floating) else WideBody(frame, inspectors)
+                }
             }
         }
     }
@@ -185,7 +212,9 @@ private fun WideBody(frame: WorkspaceFrame, inspectors: InspectorHost) {
     val navigation = frame.state.navigation
     val actions = frame.host.actions
     val slots = frame.host.slots
-    Row(Modifier.fillMaxSize().testTag(LettaShellWorkspaceTags.WIDE)) {
+    // The page, rail and panel sit under the inline header, which padded for the status bar.
+    val underHeader = Modifier.consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+    Row(Modifier.fillMaxSize().then(underHeader).testTag(LettaShellWorkspaceTags.WIDE)) {
         ShellLibraryRail(
             state = navigation.rail,
             actions = actions.rail,
@@ -214,7 +243,7 @@ private fun WideBody(frame: WorkspaceFrame, inspectors: InspectorHost) {
 }
 
 @Composable
-private fun CompactBody(frame: WorkspaceFrame, inspectors: InspectorHost) {
+private fun CompactBody(frame: WorkspaceFrame, inspectors: InspectorHost, floating: FloatingChrome?) {
     val drawer = frame.drawer
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     LaunchedEffect(drawer.open) { if (drawer.open) drawerState.open() else drawerState.close() }
@@ -234,9 +263,15 @@ private fun CompactBody(frame: WorkspaceFrame, inspectors: InspectorHost) {
         },
         modifier = Modifier.testTag(LettaShellWorkspaceTags.COMPACT),
     ) {
-        Row(Modifier.fillMaxSize()) {
-            InspectorFrame(Modifier.weight(1f).fillMaxHeight(), host = inspectors) { slots.main(Modifier.fillMaxSize()) }
-            slots.sidePane()
+        // The page under the floating header, inside the drawer's content so the open drawer covers both.
+        // The page takes the top inset as consumed (it gets the floating band instead); the drawer is
+        // not under that, so its sheet still pads its rail and panel below the status bar.
+        Box(Modifier.fillMaxSize().consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))) {
+            Row(Modifier.fillMaxSize()) {
+                InspectorFrame(Modifier.weight(1f).fillMaxHeight(), host = inspectors) { slots.main(Modifier.fillMaxSize()) }
+                slots.sidePane()
+            }
+            floating?.let { ShellFloatingHeader(it) }
         }
     }
 }

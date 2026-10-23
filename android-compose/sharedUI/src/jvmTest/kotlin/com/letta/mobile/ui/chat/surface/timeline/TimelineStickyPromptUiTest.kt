@@ -163,9 +163,24 @@ class TimelineStickyPromptUiTest {
 
     @Test
     fun thePromptPinsAtTheInsetWithoutAJumpAndNeverGoesUnderTheChrome() = runComposeUiTest {
+        assertPinsWithoutAJump(TOP_INSET)
+    }
+
+    /**
+     * With no chrome over the list (the shared shell's header sits above it, on every platform) the
+     * prompt is the same sticky header, held at the list's own top edge: it never scrolls away and
+     * snaps back once out of view.
+     */
+    @Test
+    fun withoutChromeThePromptIsAStickyHeaderAtTheListTop() = runComposeUiTest {
+        assertPinsWithoutAJump(0.dp)
+    }
+
+    /** Scrolls toward the newest: the prompt rides up, holds at [topInset] without a jump, never above it. */
+    private fun ComposeUiTest.assertPinsWithoutAJump(topInset: Dp) {
         val listState = LazyListState()
-        show(listState, TOP_INSET)
-        val line = stickLinePx(TOP_INSET)
+        show(listState, topInset)
+        val line = stickLinePx(topInset)
         var previous: Float? = null
         var heldSteps = 0
         var steps = 0
@@ -231,23 +246,6 @@ class TimelineStickyPromptUiTest {
     private fun near(argb: Int, other: Int): Boolean {
         fun channel(c: Int, shift: Int) = (c shr shift) and 0xFF
         return listOf(0, 8, 16).all { abs(channel(argb, it) - channel(other, it)) <= PIXEL_TOLERANCE }
-    }
-
-    @Test
-    fun withoutChromeThePromptPinsOnlyOnceItsRowHasLeft() = runComposeUiTest {
-        val listState = LazyListState()
-        show(listState, 0.dp)
-        // Without chrome nothing pins while the prompt's row is on screen (the desktop's rule).
-        while (promptRowTop(listState) != null) {
-            onAllNodesWithTag(ChatTimelineTags.PINNED_PROMPT).fetchSemanticsNodes().let {
-                assertTrue(it.isEmpty(), "pinned while the prompt's row is on screen")
-            }
-            runOnIdle { listState.dispatchRawDelta(-STEP_PX) }
-            waitForIdle()
-        }
-        waitUntil(timeoutMillis = 5_000L) {
-            onAllNodesWithTag(ChatTimelineTags.PINNED_PROMPT).fetchSemanticsNodes().isNotEmpty()
-        }
     }
 
     /** build/chat-surface-snapshots/timeline-sticky-prompt.png: the prompt held under a header band. */

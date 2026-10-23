@@ -12,15 +12,19 @@ import com.letta.mobile.data.home.FleetConversation
 import com.letta.mobile.data.home.FleetOverviewParams
 import com.letta.mobile.data.home.HomePageController
 import com.letta.mobile.data.home.buildFleetOverview
+import com.letta.mobile.data.home.toFleetConversation
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.presence.runningAgentIds
 import com.letta.mobile.data.session.agentRosterOrEmpty
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellHomePrompt
 import com.letta.mobile.data.shell.ShellHomeShortcuts
 import com.letta.mobile.data.shell.ShellSkillsSection
+import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.pages.home.HomeConnectionPanel
 import com.letta.mobile.ui.shell.pages.home.HomeConnectionState
@@ -55,6 +59,34 @@ class ShellHomeFleet(
     /** The roster fetch was cut short; counts then read as lower bounds. */
     val rosterTruncated: Boolean = false,
 )
+
+/**
+ * The fleet from backend [conversations] (hosts that list them straight from the backend: Android,
+ * the browser): hidden ones dropped, and a conversation without an agent name named from [roster].
+ */
+fun shellHomeFleet(
+    conversations: List<Conversation>,
+    roster: List<Agent>,
+    runningAgentIds: Set<String> = emptySet(),
+): ShellHomeFleet {
+    val names = roster.associate { it.id.value to it.name }
+    val fleet = conversations.mapNotNull { conversation ->
+        conversation.toFleetConversation()?.let { row ->
+            if (row.agentName.isNotBlank()) row else row.copy(agentName = names[row.agentId].orEmpty())
+        }
+    }
+    return ShellHomeFleet(conversations = fleet, roster = roster, runningAgentIds = runningAgentIds)
+}
+
+/**
+ * [ShellHomeFleetEffect] over backend [conversations] and the [roster] ([shellHomeFleet]), with who is
+ * mid-run read from the mascot registry's run presence (Android, the browser).
+ */
+@Composable
+fun ShellHomeBackendFleetEffect(controller: HomePageController, conversations: List<Conversation>, roster: List<Agent>) {
+    val running = LocalMascotRegistry.current.presence.toMap().runningAgentIds()
+    ShellHomeFleetEffect(controller, remember(conversations, roster, running) { shellHomeFleet(conversations, roster, running) })
+}
 
 /** Feeds [fleet] to Home's controller, refolded once a minute so its relative times stay current. */
 @Composable

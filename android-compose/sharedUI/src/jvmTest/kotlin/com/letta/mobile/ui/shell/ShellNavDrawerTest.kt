@@ -162,6 +162,21 @@ class ShellNavDrawerTest {
         assertEquals(listOf("home", "agent:lester", "section:Schedules", "open:c-active", "canvas:k-meridian"), events)
     }
 
+    /** The panel lists the newest conversation first whatever order the host's list arrives in. */
+    @Test
+    fun theNewestConversationIsListedFirst() {
+        val unordered = input.copy(
+            conversations = listOf(
+                conversation("c-week", "Last week", archived = false, at = "2026-10-01T12:00:00Z"),
+                conversation("c-now", "Just now", archived = false, at = "2026-10-07T11:59:00Z"),
+                conversation("c-day", "Yesterday", archived = false, at = "2026-10-06T12:00:00Z"),
+            ),
+            openConversationId = null,
+        )
+        val rows = ShellNavDrawerMapping.state(unordered, now).panel.conversations
+        assertEquals(listOf("c-now", "c-day", "c-week"), rows.map { it.id })
+    }
+
     private fun conversation(id: String, summary: String, archived: Boolean, at: String) = Conversation(
         id = ConversationId(id),
         agentId = AgentId("meridian"),

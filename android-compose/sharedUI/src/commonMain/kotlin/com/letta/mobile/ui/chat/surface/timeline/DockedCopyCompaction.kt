@@ -10,9 +10,6 @@ import com.letta.mobile.ui.chat.surface.timeline.rows.DockedPromptCompaction
 
 /** How a pinned prompt's images shrink as it docks. */
 internal enum class DockedCopyMotion {
-    /** The desktop's pinned card: it only shows once the prompt has left, always compact. */
-    AlwaysCompact,
-
     /** A sticky copy: the images shrink one to one with the scroll that docks it. */
     FollowScroll,
 
@@ -21,11 +18,7 @@ internal enum class DockedCopyMotion {
     ;
 
     companion object {
-        fun of(sticky: Boolean, reducedMotion: Boolean): DockedCopyMotion = when {
-            !sticky -> AlwaysCompact
-            reducedMotion -> Snap
-            else -> FollowScroll
-        }
+        fun of(reducedMotion: Boolean): DockedCopyMotion = if (reducedMotion) Snap else FollowScroll
     }
 }
 
@@ -54,7 +47,6 @@ internal class DockedCopyCompaction(
     private var reportedKey: String? = null
 
     override fun shrinkPx(): Int {
-        if (motion == DockedCopyMotion.AlwaysCompact) return Int.MAX_VALUE
         val travel = dockTravel()
         return when {
             travel <= 0 -> 0

@@ -21,6 +21,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.unit.Dp
 import com.letta.mobile.data.canvas.CanvasConversationOptions
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasOpLog
@@ -52,6 +53,7 @@ import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
+import com.letta.mobile.ui.shell.LocalShellFloatingChromeInset
 import org.jetbrains.compose.resources.stringResource
 
 /** Where a conversation's board is kept, and how its edits and presence reach other devices. */
@@ -130,10 +132,12 @@ fun ShellChatDestination(
             onDispose { report(null) }
         }
     }
+    // The page draws under the workspace's floating chrome and rests its content below it.
+    val platform = look.platform.underFloatingChrome(LocalShellFloatingChromeInset.current)
     // letta-mobile-zxk2n.8: a subagent's conversation opens beside this one (in its place on a narrow page), read-only.
-    val dualViewOptions = SubagentDualViewOptions(look.appearance, page.host, look.platform.topChromeInset)
+    val dualViewOptions = SubagentDualViewOptions(look.appearance, page.host, platform.topChromeInset)
     SubagentDualViewFrame(look.subagentViews, modifier, dualViewOptions) { parentModifier ->
-        ParentChatPage(ParentChatInputs(page, presentation, look, session), parentModifier)
+        ParentChatPage(ParentChatInputs(page, presentation, look, session, platform), parentModifier)
     }
 }
 
@@ -142,6 +146,8 @@ private class ParentChatInputs(
     val presentation: ShellChatPresentation,
     val look: ShellChatLook,
     val session: CanvasSession?,
+    /** The look's platform with the floating chrome folded in. */
+    val platform: ChatSurfacePlatform,
 )
 
 /** The conversation's own page: the shared chat surface over its board. */
@@ -167,11 +173,11 @@ private fun ParentChatPage(inputs: ParentChatInputs, modifier: Modifier) {
                 collapse
             },
         appearance = look.appearance,
-        platform = look.platform,
+        platform = inputs.platform,
         pagedTimeline = look.pagedTimeline,
         canvas = { actions ->
             if (page.owner.conversationId != null) {
-                ConversationBoard(BoardInputs(session, page.board, look), actions)
+                ConversationBoard(BoardInputs(session, page.board, look, inputs.platform.topChromeInset), actions)
             } else {
                 ChatCanvasPlaceholder()
             }
@@ -210,7 +216,7 @@ private fun rememberConversationBoard(board: ShellChatBoard, owner: ShellCanvasO
     return session
 }
 
-private class BoardInputs(val session: CanvasSession?, val board: ShellChatBoard, val look: ShellChatLook)
+private class BoardInputs(val session: CanvasSession?, val board: ShellChatBoard, val look: ShellChatLook, val chromeTopInset: Dp)
 
 @Composable
 private fun ConversationBoard(inputs: BoardInputs, actions: ChatCanvasActions) {
@@ -232,6 +238,6 @@ private fun ConversationBoard(inputs: BoardInputs, actions: ChatCanvasActions) {
         // A chat card's "Show on canvas" frames its artifact here (letta-mobile-bglj6.13).
         cameraRequest = actions.camera,
         // The host's chrome over the board's top edge (the phone's status bar and header).
-        chromeTopInset = inputs.look.platform.topChromeInset,
+        chromeTopInset = inputs.chromeTopInset,
     )
 }

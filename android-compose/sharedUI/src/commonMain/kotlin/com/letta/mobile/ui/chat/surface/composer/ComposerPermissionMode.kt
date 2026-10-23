@@ -36,6 +36,7 @@ import com.letta.mobile.sharedui.resources.composer_permission_mode_accept_edits
 import com.letta.mobile.sharedui.resources.composer_permission_mode_accept_edits_hint
 import com.letta.mobile.sharedui.resources.composer_permission_mode_changing
 import com.letta.mobile.sharedui.resources.composer_permission_mode_failed
+import com.letta.mobile.sharedui.resources.composer_permission_mode_item
 import com.letta.mobile.sharedui.resources.composer_permission_mode_not_saved
 import com.letta.mobile.sharedui.resources.composer_permission_mode_on_start
 import com.letta.mobile.sharedui.resources.composer_permission_mode_runtime_host
@@ -54,11 +55,11 @@ import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
 
-// letta-mobile-bzvro.13 (F13): the permission-mode chip, in the pointer composer's control row (above
-// the Touch bar, which has no control row). It shows the mode the
-// server confirmed (or, while a change waits for the server's echo, that the change is pending) and
-// opens a popover of the modes. Where the owner cannot change the mode it stays, disabled, with the
-// reason beside it.
+// letta-mobile-bzvro.13 (F13): the permission-mode chip, in the pointer composer's control row; the
+// Touch bar, which has no control row, offers the same choice as a row of its "+" sheet. Both show
+// the mode the server confirmed (or, while a change waits for the server's echo, that the change is
+// pending) and open the one popover of the modes. Where the owner cannot change the mode the chip and
+// the row stay, disabled, with the reason in the note above the composer.
 
 /** The mode's name as the picker and the settings show it. */
 @Composable
@@ -83,26 +84,6 @@ fun AppServerPermissionMode.description(): String = stringResource(
 )
 
 /**
- * The chip with its note line (the reason it is locked, or that the last change was not confirmed),
- * as one block above the Touch bar, which has no control row to carry the chip.
- */
-@Composable
-internal fun ComposerPermissionModeRow(
-    state: ChatPermissionModeUiState,
-    onSelect: (AppServerPermissionMode) -> Unit,
-) {
-    Column(
-        modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
-    ) {
-        Row(modifier = Modifier.padding(horizontal = LettaDimens.Space.sm)) {
-            ComposerPermissionModeChip(state, onSelect)
-        }
-        ComposerPermissionModeNote(state)
-    }
-}
-
-/**
  * The chip and its picker. On the pointer page it sits in the card's control row beside the
  * model and effort chips; its note stays above the card ([ComposerPermissionModeNoteRow]).
  */
@@ -112,8 +93,7 @@ internal fun ComposerPermissionModeChip(
     onSelect: (AppServerPermissionMode) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
-    val shown = state.pending ?: state.unconfirmed ?: state.selected
-    val label = shown.displayName()
+    val label = state.shown().displayName()
     val runtimeLabel = state.runtime?.let { permissionModeRuntimeLabel(it) }
     Box {
         ComposerActionChip(
@@ -127,13 +107,38 @@ internal fun ComposerPermissionModeChip(
                 .testTag(ComposerTestTags.PERMISSION_MODE_CHIP)
                 .semantics { contentDescription = runtimeLabel?.let { "$label, $it" } ?: label },
         )
-        if (open && state.canChange) {
-            PermissionModePopover(state, onSelect = { open = false; onSelect(it) }, onDismiss = { open = false })
-        }
+        ComposerPermissionModePicker(state, open, onSelect, onDismiss = { open = false })
     }
 }
 
-/** The chip's note on its own, above the pointer page's card, when there is one to show. */
+/**
+ * The modes' popover, above whatever it is composed beside (the chip, or the Touch bar's "+"), while
+ * [open] and the owner can change the mode. A pick closes it before it is applied.
+ */
+@Composable
+internal fun ComposerPermissionModePicker(
+    state: ChatPermissionModeUiState,
+    open: Boolean,
+    onSelect: (AppServerPermissionMode) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    if (!open || !state.canChange) return
+    PermissionModePopover(state, onSelect = { mode -> onDismiss(); onSelect(mode) }, onDismiss = onDismiss)
+}
+
+/** The Touch "+" sheet's row for the mode: it names the mode as the chip would and opens the picker. */
+@Composable
+internal fun permissionModeSheetItem(state: ChatPermissionModeUiState, onOpenPicker: () -> Unit): TouchSheetItem = TouchSheetItem(
+    label = stringResource(Res.string.composer_permission_mode_item, chipText(state, state.shown().displayName())),
+    icon = Lucide.Shield,
+    onClick = onOpenPicker,
+    enabled = state.canChange,
+)
+
+/** The mode to name: the requested one while it is pending or unconfirmed, else the confirmed one. */
+private fun ChatPermissionModeUiState.shown(): AppServerPermissionMode = pending ?: unconfirmed ?: selected
+
+/** The mode's note on its own, above the pointer card or the Touch bar, when there is one to show. */
 @Composable
 internal fun ComposerPermissionModeNoteRow(state: ChatPermissionModeUiState) {
     if (permissionModeNote(state) == null) return

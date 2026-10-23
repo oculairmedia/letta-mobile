@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -57,7 +58,6 @@ import kotlinx.coroutines.launch
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.input.pointerInputPassThrough
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LocalReducedMotion
 
 /**
  * The places an agent's mascot can stand. One character per agent, in one place at a time: it
@@ -616,18 +616,9 @@ private fun MascotTransport.seatedMascots(registry: MascotIdentityRegistry): Lis
     }
 }
 
-/**
- * Draws, over [content], one live mascot per seated agent at its active seat, and springs it
- * between seats when the active seat changes - the whole transport animation, in one place. Mount
- * once at the window root, inside the mascot host and registry providers. [reducedMotion] (the
- * shell's [LocalReducedMotion] by default) snaps every hop and keeps only a short entrance fade.
- */
+/** The layer that draws: the outermost [MascotTransportLayer]. */
 @Composable
-fun MascotTransportLayer(
-    reducedMotion: Boolean = LocalReducedMotion.current,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
+internal fun DrawingMascotLayer(reducedMotion: Boolean, modifier: Modifier, content: @Composable () -> Unit) {
     val transport = LocalMascotTransport.current
     val registry = LocalMascotRegistry.current
     var origin by remember { mutableStateOf(Offset.Zero) }
@@ -636,7 +627,7 @@ fun MascotTransportLayer(
         onDispose { transport.layerMounted = false }
     }
     Box(modifier.onGloballyPositioned { origin = it.boundsInWindow().topLeft }) {
-        content()
+        CompositionLocalProvider(LocalMascotLayerAbove provides true, content = content)
         // Keyed by slot, not by agent: the focused character is one scene that is re-skinned when
         // the focused agent changes, so agent A morphs into agent B where it stands instead of a
         // fresh scene loading in with a flash.
