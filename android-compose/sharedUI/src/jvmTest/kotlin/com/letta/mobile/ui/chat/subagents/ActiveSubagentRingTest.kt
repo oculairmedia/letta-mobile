@@ -44,21 +44,28 @@ class ActiveSubagentRingTest {
     }
 
     @Test
-    fun `terminal success settles to a full ring`() {
+    fun `terminal success preserves authored todo fraction`() {
         val done = running(SubagentTodoProgress(1, 4))
             .copy(status = ActiveSubagent.Status.COMPLETED)
-        assertEquals(1f, done.ringFraction)
+        assertEquals(0.25f, done.ringFraction)
+        assertEquals(90f, done.todoSweep())
     }
 
     @Test
-    fun `hasDeterminateProgress is false without todos and true with them or terminal`() {
+    fun `hasDeterminateProgress requires a nonempty plan regardless of lifecycle`() {
         assertFalse(running(progress = null).hasDeterminateProgress)
         assertTrue(running(SubagentTodoProgress(0, 3)).hasDeterminateProgress)
-        assertTrue(
+        assertFalse(
             running(progress = null)
                 .copy(status = ActiveSubagent.Status.COMPLETED)
                 .hasDeterminateProgress,
         )
+        for (status in ActiveSubagent.Status.entries) {
+            val unknown = running().copy(status = status)
+            assertFalse(unknown.hasDeterminateProgress)
+            assertEquals(SLIVER_SWEEP, unknown.todoSweep())
+            assertFalse(running(SubagentTodoProgress(0, 0)).copy(status = status).hasDeterminateProgress)
+        }
     }
 
     // ---- BEAD 1: state -> color (ring state) ------------------------------

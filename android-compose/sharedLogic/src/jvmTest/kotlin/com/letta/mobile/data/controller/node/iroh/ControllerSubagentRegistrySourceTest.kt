@@ -245,7 +245,7 @@ class ControllerSubagentRegistrySourceTest {
     }
 
     @Test
-    fun controllerActivityFeedsBoundedChipMenuWithoutTranscriptReplay() = runTest {
+    fun controllerActivityNeverBecomesTodoProgress() = runTest {
         val source = ControllerSubagentRegistrySource()
         source.ingest(
             AppServerInboundFrame.UpdateSubagentState(
@@ -269,14 +269,14 @@ class ControllerSubagentRegistrySourceTest {
         )
 
         val snapshot = source.todos("conv-a", "tool/1")!!
-        assertTrue(snapshot.todosFound)
-        assertEquals(2, snapshot.todos.size)
-        assertEquals("Running focused tests", snapshot.todos.last().activeForm)
-        assertEquals("in_progress", snapshot.todos.last().status)
+        assertFalse(snapshot.todosFound)
+        assertEquals(emptyList(), snapshot.todos)
+        assertEquals(null, snapshot.subagent.todoProgress)
+        assertEquals(2, snapshot.subagent.activity!!.lines.size)
     }
 
     @Test
-    fun terminalActivityDoesNotRemainInProgress() = runTest {
+    fun terminalActivityDoesNotInventCompletedTodos() = runTest {
         val source = ControllerSubagentRegistrySource()
         source.replaceConversation(
             "conv-a",
@@ -290,7 +290,9 @@ class ControllerSubagentRegistrySourceTest {
             ),
         )
 
-        assertEquals("completed", source.todos("conv-a", "done")!!.todos.single().status)
+        assertFalse(source.todos("conv-a", "done")!!.todosFound)
+        assertEquals(emptyList(), source.todos("conv-a", "done")!!.todos)
+        assertEquals(null, source.todos("conv-a", "done")!!.subagent.todoProgress)
     }
 
     @Test

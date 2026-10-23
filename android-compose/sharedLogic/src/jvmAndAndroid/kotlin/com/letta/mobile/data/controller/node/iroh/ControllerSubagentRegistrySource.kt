@@ -11,6 +11,7 @@ import com.letta.mobile.data.subagents.DurableSubagentRegistry
 import com.letta.mobile.data.subagents.SubagentChipObservation
 import com.letta.mobile.data.subagents.SubagentChipRecord
 import com.letta.mobile.data.subagents.SubagentChipSource
+import com.letta.mobile.data.subagents.withNativeTodos
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.util.Telemetry
@@ -43,25 +44,11 @@ class ControllerSubagentRegistrySource(
         registry.snapshot(conversationId, includeTerminal).map { it.toEntry() }
 
     override suspend fun todos(conversationId: String, toolCallId: String): SubagentTodosSnapshot? {
-        // Todo snapshots are not yet projected from App Server events (m6oa1).
         val record = registry.findByToolCall(conversationId, toolCallId) ?: return null
-        val entry = record.toEntry()
-        val activity = entry.activity
-        val activityLines = activity?.lines.orEmpty()
-        val activityTodos = activityLines.mapIndexed { index, line ->
-            com.letta.mobile.data.model.SubagentTodo(
-                content = line,
-                status = activityTodoStatus(
-                    entry,
-                    ActivityTodoPosition(index, activityLines.lastIndex, activity?.truncated == true),
-                ),
-                activeForm = line,
-            )
-        }
         return SubagentTodosSnapshot(
-            subagent = entry,
-            todos = activityTodos,
-            todosFound = activityTodos.isNotEmpty(),
+            subagent = record.toEntry(),
+            todos = record.todos.orEmpty(),
+            todosFound = record.todos != null,
         )
     }
 
@@ -230,7 +217,7 @@ class ControllerSubagentRegistrySource(
                     agentId = agentId,
                     source = SubagentChipSource.CONTROLLER_NATIVE,
                     generation = frame.eventSeq,
-                ),
+                ).withNativeTodos(raw),
             )
         }
         // Snapshots can omit background tasks; absence is not terminal evidence.
@@ -285,18 +272,6 @@ class ControllerSubagentRegistrySource(
             entries = entries,
             source = SubagentChipSource.CONTROLLER_NATIVE,
         )
-    }
-
-    private data class ActivityTodoPosition(
-        val index: Int,
-        val lastIndex: Int,
-        val truncated: Boolean,
-    )
-
-    private fun activityTodoStatus(entry: SubagentEntry, position: ActivityTodoPosition): String {
-        if (entry.status != SubagentStatus.RUNNING) return "completed"
-        if (position.truncated) return "completed"
-        return if (position.index == position.lastIndex) "in_progress" else "completed"
     }
 
     companion object {

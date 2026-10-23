@@ -156,3 +156,9 @@ data class SubagentTodo(
     val status: String = "",
     val activeForm: String = "",
 )
+
+/** Counts only authored checklist items; lifecycle and tool activity never affect this value. */
+fun List<SubagentTodo>.todoProgress(): SubagentTodoProgressWire = SubagentTodoProgressWire(
+    completed = count { it.status.trim().lowercase() == "completed" },
+    total = size,
+)

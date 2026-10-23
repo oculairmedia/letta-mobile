@@ -14,13 +14,13 @@ import kotlin.test.Test
  * LIFECYCLE TESTS (consolidated from xm8qk + q6v8b + od488 + i2f23):
  *  - RUNNING rings are visible
  *  - FAILED rings persist (visible)
- *  - COMPLETED rings briefly visible (fill-to-100% hold), then collapse
+ *  - COMPLETED rings briefly visible at the authored fraction, then collapse
  *
  * FILL TESTS (i2f23):
  *  - fraction → sweep mapping (determinate from todo_progress)
  *  - null progress → sliver (~8% arc)
  *  - failed → frozen at reached fill
- *  - completed → animate to 100% then release hold
+ *  - completed → preserve todo progress then release hold
  *
  * ROUTING TESTS (xm8qk + ww9iu):
  *  - Tap always opens TodoWrite sheet
@@ -406,13 +406,14 @@ class ActiveSubagentRingsTest {
         assertEquals(RingState.ERROR, entry.ringState(now = 0L))
     }
 
-    // ── i2f23: completed → fill to 100% briefly ──────────────────────────
+    // Completed workers retain their authored todo fraction until hidden.
 
     @Test
-    fun `completed ring fraction is always 1 point 0`() {
+    fun `completed ring fraction retains incomplete authored plan`() {
         val done = completed(progress = SubagentTodoProgress(2, 5))
-        assertEquals(1f, done.ringFraction)
-        assertEquals(COMPLETED_SWEEP, done.ringFraction * COMPLETED_SWEEP)
+        assertEquals(0.4f, done.ringFraction)
+        assertEquals(144f, done.todoSweep())
+        assertEquals(144f, done.ringFraction * COMPLETED_SWEEP)
     }
 
     @Test

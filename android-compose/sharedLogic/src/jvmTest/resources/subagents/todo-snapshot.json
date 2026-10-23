@@ -1,0 +1,60 @@
+{
+  "provenance": "Source-derived fixture, not a live capture. Letta Code 0.34.14 letta.js buildSubagentSnapshot (223254), addToolCall (221408), tools/schemas/TodoWrite.json and UpdatePlan.json. Tool args are complete JSON strings; the cumulative list is append-only. Identities and task text are synthetic.",
+  "frame": {
+    "type": "update_subagent_state",
+    "runtime": {
+      "agent_id": "parent-1",
+      "conversation_id": "parent-conversation"
+    },
+    "event_seq": 50,
+    "emitted_at": "2026-10-09T18:17:33.470Z",
+    "idempotency_key": "update_subagent_state:50:fixture",
+    "subagents": [
+      {
+        "subagent_id": "subagent-1791641853470-1",
+        "tool_call_id": "dispatch-1",
+        "subagent_type": "general-purpose",
+        "description": "Implement todo progress",
+        "status": "running",
+        "agent_url": "agent-local-child-1",
+        "conversation_id": "default",
+        "parent_agent_id": "parent-1",
+        "parent_conversation_id": "parent-conversation",
+        "start_time": 1791641853470,
+        "is_background": true,
+        "tool_calls": [
+          {
+            "id": "read-1",
+            "name": "Read",
+            "args": "{\"file_path\":\"src/Progress.kt\"}"
+          },
+          {
+            "id": "todo-1",
+            "name": "TodoWrite",
+            "args": "{\"todos\":[{\"content\":\"Inspect source\",\"status\":\"completed\",\"activeForm\":\"Inspecting source\"},{\"content\":\"Implement projection\",\"status\":\"completed\",\"activeForm\":\"Implementing projection\"},{\"content\":\"Run tests\",\"status\":\"in_progress\",\"activeForm\":\"Running tests\"}]}"
+          }
+        ]
+      },
+      {
+        "subagent_id": "subagent-1791641853470-2",
+        "tool_call_id": "dispatch-2",
+        "subagent_type": "general-purpose",
+        "description": "Implement todo progress",
+        "status": "running",
+        "agent_url": "agent-local-child-2",
+        "conversation_id": "default",
+        "parent_agent_id": "parent-1",
+        "parent_conversation_id": "parent-conversation",
+        "start_time": 1791641853470,
+        "is_background": true,
+        "tool_calls": [
+          {
+            "id": "bash-1",
+            "name": "Bash",
+            "args": "{\"command\":\"./gradlew test\"}"
+          }
+        ]
+      }
+    ]
+  }
+}

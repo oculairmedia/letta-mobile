@@ -171,35 +171,31 @@ data class ActiveSubagent(
 
     /**
      * The ring FILL fraction in [0f, 1f]. Driven by the
-     * TodoWrite completion fraction; terminal-success settles to a fully
-     * filled ring (1f) and terminal-failure to whatever fraction it reached
-     * (the red ring is the signal, not the fill). Null [progress] (no todos
+     * authored todo completion fraction, independently of worker lifecycle.
+     * Null [progress] (no todos
      * yet, or a background task with no checklist) reads as 0f — the bar then
      * renders the ring as indeterminate activity rather than a 0% determinate
      * arc.
      */
     val ringFraction: Float
-        get() = when {
-            status == Status.COMPLETED -> 1f
-            else -> progress?.fraction ?: 0f
-        }
+        get() = progress?.fraction ?: 0f
 
     /**
      * Whether the ring has determinate progress to show.
      * False when there is no todo checklist yet (or the task carries none) —
      * the bar then renders an empty/indeterminate ring (respecting reduced
-     * motion) until the first TodoWrite arrives. Always determinate once
-     * terminal (the outcome is known).
+     * motion) until a non-empty authored plan arrives. A terminal worker
+     * without a plan still has unknown todo progress.
      */
     val hasDeterminateProgress: Boolean
-        get() = isTerminal || (progress != null && progress.total > 0)
+        get() = progress != null && progress.total > 0
 
     /**
      * Derive the ring COLOR state from lifecycle + the
      * stuck heuristic. Pure (clock injected) so the state->color mapping is
      * unit-testable.
      *  - [Status.FAILED] -> [RingState.ERROR] (red).
-     *  - [Status.COMPLETED] -> [RingState.SUCCESS] (filled green / check).
+     *  - [Status.COMPLETED] -> [RingState.SUCCESS] (success color at the authored fraction).
      *  - running + no todo-state change for [STUCK_THRESHOLD_MS] -> [RingState.STUCK] (yellow).
      *  - running + progressing/healthy -> [RingState.RUNNING] (green).
      */
@@ -382,6 +378,6 @@ fun String.toActiveSubagentStatus(): ActiveSubagent.Status = when (SubagentStatu
  *  - [RUNNING]  -> green (running and progressing/healthy)
  *  - [STUCK]    -> yellow (running but no todo-state change for ~30-45s)
  *  - [ERROR]    -> red (terminal failure)
- *  - [SUCCESS]  -> filled green / check (terminal success)
+ *  - [SUCCESS]  -> success color (terminal worker success; todo fill is independent)
  */
 enum class RingState { RUNNING, STUCK, ERROR, SUCCESS }

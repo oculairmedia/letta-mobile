@@ -1,5 +1,6 @@
 package com.letta.mobile.data.subagents
 
+import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.util.Telemetry
 import kotlin.time.Clock
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -221,6 +222,8 @@ class DurableSubagentRegistry(
             lastSeenEpochMs = now,
             terminalAtEpochMs = if (observation.state.isTerminal) now else null,
             progress = observation.progress,
+            todos = observation.todos,
+            todoRevision = observation.todoRevision,
             lastActivityEpochMs = now,
         )
         entries[observation.key] = record
@@ -249,8 +252,16 @@ class DurableSubagentRegistry(
             lastSeenEpochMs = now,
             terminalAtEpochMs = firstTerminalAt,
             progress = progress.mergedWith(observation.progress),
+            todos = authoredTodosAfter(observation),
+            todoRevision = maxOf(todoRevision, observation.todoRevision),
             lastActivityEpochMs = activityAt,
         )
+    }
+
+    /** Only a newer authored plan replaces the retained snapshot; missing plans preserve it. */
+    private fun SubagentChipRecord.authoredTodosAfter(observation: SubagentChipObservation): List<SubagentTodo>? {
+        if (observation.todoRevision <= todoRevision) return todos
+        return observation.todos ?: todos
     }
 
     /** Provenance only fills gaps: a populated value is never replaced. */
@@ -293,10 +304,12 @@ class DurableSubagentRegistry(
      *  (RC4): a re-delivered identical snapshot is not
      * progress. A new tool call, new activity lines or a lifecycle change is.
      */
-    private fun SubagentChipRecord.madeProgress(observation: SubagentChipObservation): Boolean =
-        observation.state != state ||
+    private fun SubagentChipRecord.madeProgress(observation: SubagentChipObservation): Boolean {
+        return observation.state != state ||
+            (observation.todoRevision > todoRevision && observation.todos != todos) ||
             progress.advancedBy(observation.progress) ||
             (observation.activity != null && observation.activity.lines != activity?.lines)
+    }
 
     private fun newerActivity(
         current: com.letta.mobile.data.model.SubagentActivitySnapshot?,
@@ -456,10 +469,10 @@ class DurableSubagentRegistry(
     fun record(conversationId: String, agentId: String?, toolCallId: String): SubagentChipRecord? =
         synchronized(lock) { entries[SubagentChipKey(conversationId, agentId, toolCallId)] }
 
-    /** First chip matching (conversation, toolCallId) regardless of agent scope. */
+    /** Unique chip matching (conversation, toolCallId); ambiguous parent scope fails closed. */
     fun findByToolCall(conversationId: String, toolCallId: String): SubagentChipRecord? =
         synchronized(lock) {
-            entries.values.firstOrNull {
+            entries.values.singleOrNull {
                 it.conversationId == conversationId && it.toolCallId == toolCallId
             }
         }
