@@ -10175,6 +10175,11 @@ public final class com/letta/mobile/ui/shell/workspace/ShellConversationTabs {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/ui/shell/workspace/ShellFleetListsKt {
+	public static final fun fleetSearchSources-UXop7r8 (Ljava/util/List;Ljava/util/List;Ljava/lang/String;)Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;
+	public static final fun fleetTabFor (Ljava/util/List;)Lkotlin/jvm/functions/Function1;
+}
+
 public final class com/letta/mobile/ui/shell/workspace/ShellFloatingChromeKt {
 	public static final fun underFloatingChrome-3ABfNKs (Lcom/letta/mobile/ui/chat/surface/ChatSurfacePlatform;F)Lcom/letta/mobile/ui/chat/surface/ChatSurfacePlatform;
 }

@@ -39,6 +39,8 @@ import com.letta.mobile.ui.shell.shortcuts.ShortcutPlatform
 import com.letta.mobile.ui.shell.shortcuts.ShortcutStepping
 import com.letta.mobile.ui.shell.shortcuts.WorkspaceShortcuts
 import com.letta.mobile.ui.shell.shortcuts.handleShortcut
+import com.letta.mobile.ui.shell.workspace.fleetSearchSources
+import com.letta.mobile.ui.shell.workspace.fleetTabFor
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspace
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceHost
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceSlots
@@ -126,8 +128,8 @@ internal fun AndroidShellWorkspace(start: ShellDestination, config: LettaConfig?
         ShellWorkspaceHeaderBinding(
             navigator = shell.navigator,
             layout = shell.layout,
-            search = ShellWorkspaceSearch(shell.controllers.home, searchSources(shell, agents, fleet)),
-            tabFor = tabFor(fleet),
+            search = ShellWorkspaceSearch(shell.controllers.home, fleetSearchSources(agents, fleet, workspace.focusedAgentId)),
+            tabFor = fleetTabFor(fleet),
         ),
     )
     LettaShellWorkspace(
