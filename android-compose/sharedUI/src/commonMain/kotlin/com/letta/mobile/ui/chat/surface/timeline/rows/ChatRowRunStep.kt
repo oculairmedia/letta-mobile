@@ -34,7 +34,7 @@ import com.letta.mobile.sharedui.resources.rows_collapse
 import com.letta.mobile.sharedui.resources.rows_expand
 import com.letta.mobile.sharedui.resources.rows_state_collapsed
 import com.letta.mobile.sharedui.resources.rows_state_expanded
-import com.letta.mobile.data.chat.tools.activity
+import com.letta.mobile.data.chat.tools.steps.activity
 import com.letta.mobile.ui.chat.tools.LocalToolPresenters
 import com.letta.mobile.ui.chat.tools.groupLabel
 import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated

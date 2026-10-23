@@ -2,7 +2,6 @@ package com.letta.mobile.data.workspace
 
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerFileCommand
-import com.letta.mobile.data.transport.appserver.AppServerMemfsCommand
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRequestTimeoutException
 import com.letta.mobile.data.transport.appserver.AppServerWorkspaceCommand
@@ -26,24 +25,13 @@ class AppServerWorkspaceFileSource(
         call(AppServerFileCommand.SearchFiles(requestId("search-files"), query, maxResults = limit, cwd = cwd), SearchResponse.serializer())
             .files.map { it.path.replace('\\', '/') }
 
-    override suspend fun read(path: String): WorkspaceFileContent =
-        readVia(AppServerFileCommand.ReadFile(requestId("read-file"), path))
-
-    /** `read_memory_file`: the server joins [path] to [agentId]'s memory root. */
-    override suspend fun readMemory(agentId: String, path: String): WorkspaceFileContent =
-        readVia(AppServerMemfsCommand.ReadMemoryFile(requestId("read-memory-file"), agentId, path))
-
-    private suspend fun readVia(command: AppServerWorkspaceCommand): WorkspaceFileContent {
+    override suspend fun read(path: String): WorkspaceFileContent {
+        val command = AppServerFileCommand.ReadFile(requestId("read-file"), path)
         val frame = guarded { client().workspaceRequest(command) }.single()
-        return content(command, decode(frame, ReadResponse.serializer(), command))
+        return content(path, decode(frame, ReadResponse.serializer(), command))
     }
 
-    private fun content(command: AppServerWorkspaceCommand, response: ReadResponse): WorkspaceFileContent {
-        val path = when (command) {
-            is AppServerMemfsCommand.ReadMemoryFile -> command.path
-            is AppServerFileCommand.ReadFile -> command.path
-            else -> ""
-        }
+    private fun content(path: String, response: ReadResponse): WorkspaceFileContent {
         val text = response.content
         return when {
             !response.success && response.error.orEmpty().startsWith(NOT_UTF8) -> WorkspaceFileContent.Binary(path)

@@ -38,6 +38,10 @@ enum class ToolVerb {
     @SerialName("stopped")
     Stopped,
 
+    /** A background task's output followed while it runs: "Watching". */
+    @SerialName("watching")
+    Watching,
+
     /** A list or record brought up to date (the todo list): "Updated". */
     @SerialName("updated")
     Updated,
@@ -100,6 +104,12 @@ data class ToolStepLine(
     val failure: ToolFailure? = null,
     /** Which presenter drew this; a contributed one is `<pluginId>/<presenter>`. */
     val presenterId: String,
+    /**
+     * Whether the step opens at all: the presenter's cheap answer from the call's facts, given
+     * before any inset is built. False for a step that is all line (a stopped task); a failed
+     * step still opens to what went wrong.
+     */
+    val expandable: Boolean = true,
 )
 
 /** What an opened step shows, in one of the shapes every host knows how to draw. */
@@ -123,6 +133,16 @@ sealed interface ToolInset {
 
     /** A whole value rewritten (a memory block's rethink): the new [value], said to replace all of it. */
     data class Rewrite(val value: String) : ToolInset
+
+    /**
+     * A checklist (a todo list): its [items] in order, the one at [current] in progress (null when
+     * none is). Done items read struck through and muted, the current one with a small spinner, the
+     * rest as `○`.
+     */
+    data class Checklist(val items: List<Item>, val current: Int? = null) : ToolInset {
+        /** One item: its [text], and whether it is [done]. */
+        data class Item(val text: String, val done: Boolean)
+    }
 
     /** Any other call: its arguments as `key: value` lines, then its result. */
     data class Arguments(val fields: List<ToolArgumentField>, val result: String?) : ToolInset
@@ -166,31 +186,3 @@ sealed interface ToolPreviewTarget {
 /** A failure the step line says out loud; success is quiet. [exitCode] is non-zero when known. */
 @Immutable
 data class ToolFailure(val exitCode: Int?)
-
-/**
- * What a kind of step adds up to when several are grouped ("Explored files, ran commands"):
- * reading and searching are both exploring, writing and editing both edit files.
- */
-enum class ToolActivity {
-    Explored,
-    Ran,
-    Edited,
-    Fetched,
-    Delegated,
-    Remembered,
-    Drew,
-    Called,
-}
-
-/** The activity a step of this verb adds to its group. */
-val ToolVerb.activity: ToolActivity
-    get() = when (this) {
-        ToolVerb.Read, ToolVerb.Searched -> ToolActivity.Explored
-        ToolVerb.Ran, ToolVerb.Stopped -> ToolActivity.Ran
-        ToolVerb.Wrote, ToolVerb.Edited -> ToolActivity.Edited
-        ToolVerb.Fetched -> ToolActivity.Fetched
-        ToolVerb.Delegated -> ToolActivity.Delegated
-        ToolVerb.Called, ToolVerb.Updated, ToolVerb.Planned, ToolVerb.Used -> ToolActivity.Called
-        ToolVerb.EditedMemory, ToolVerb.AddedToMemory, ToolVerb.RewroteMemory, ToolVerb.WroteMemfs -> ToolActivity.Remembered
-        ToolVerb.ComposedCanvas, ToolVerb.EditedCanvas, ToolVerb.ReadCanvas, ToolVerb.CreatedCanvas -> ToolActivity.Drew
-    }

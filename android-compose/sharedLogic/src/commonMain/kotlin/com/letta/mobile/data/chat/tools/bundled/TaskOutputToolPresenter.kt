@@ -10,9 +10,10 @@ import com.letta.mobile.data.chat.tools.ToolStepLine
 import com.letta.mobile.data.chat.tools.ToolVerb
 
 /**
- * letta-code's `TaskOutput` (formerly `BashOutput`): "task bash_3 · running", the task's status as the
- * result reports it, opening to the live tail of its output (the last [TAIL_LINES] lines, following
- * the result as it grows). Its chip opens the task's output where the host can show one.
+ * letta-code's `TaskOutput` (formerly `BashOutput`): "Watching task bash_3 · running 1m 12s", the task's
+ * status as the result reports it (and, while it runs, how long the host has watched), opening to the
+ * live tail of its output (the last [TAIL_LINES] lines, following the result as it grows). Its chip
+ * opens the task's output where the host can show one.
  */
 object TaskOutputToolPresenter : ToolPresenter {
     override val id: String = "task-output"
@@ -23,7 +24,7 @@ object TaskOutputToolPresenter : ToolPresenter {
         val task = call.taskId() ?: tagged(call.result, "task_id")
         val status = statusOf(call)
         return ToolStepLine(
-            verb = ToolVerb.Read,
+            verb = ToolVerb.Watching,
             target = listOfNotNull(taskLabel(task), status).joinToString(SEPARATOR),
             previews = listOfNotNull(task?.let(ToolPreviewTarget::TaskOutput)),
             presenterId = id,
@@ -47,9 +48,28 @@ object TaskOutputToolPresenter : ToolPresenter {
         return when {
             status == null -> null
             exit != null -> "$status, exit $exit"
+            status.equals(RUNNING, ignoreCase = true) -> listOfNotNull(RUNNING, call.elapsedMillis?.let(::duration)).joinToString(" ")
             else -> status.lowercase()
         }
     }
 
+    /** "1m 12s", "45s", "1h 3m"; null under a second. */
+    private fun duration(millis: Long): String? {
+        val seconds = millis / MILLIS_PER_SECOND
+        if (seconds < 1) return null
+        val hours = seconds / SECONDS_PER_HOUR
+        val minutes = seconds % SECONDS_PER_HOUR / SECONDS_PER_MINUTE
+        val rest = seconds % SECONDS_PER_MINUTE
+        return when {
+            hours > 0 -> "${hours}h ${minutes}m"
+            minutes > 0 -> "${minutes}m ${rest}s"
+            else -> "${rest}s"
+        }
+    }
+
     private const val TAIL_LINES = 20
+    private const val RUNNING = "running"
+    private const val MILLIS_PER_SECOND = 1_000L
+    private const val SECONDS_PER_MINUTE = 60L
+    private const val SECONDS_PER_HOUR = 3_600L
 }

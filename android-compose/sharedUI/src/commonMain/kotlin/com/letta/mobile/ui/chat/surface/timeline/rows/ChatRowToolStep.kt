@@ -41,6 +41,7 @@ import com.letta.mobile.avatar.core.AttentionKind
 import com.letta.mobile.data.chat.projection.ToolTimelineState
 import com.letta.mobile.data.chat.projection.classifyToolCallState
 import com.letta.mobile.data.chat.tools.ToolInset
+import com.letta.mobile.data.chat.tools.ToolVerb
 import com.letta.mobile.data.chat.tools.bundled.PlanModeToolPresenter
 import com.letta.mobile.data.subagents.SubagentIdentity
 import com.letta.mobile.data.subagents.subagentIdentityOf
@@ -63,7 +64,7 @@ import com.letta.mobile.sharedui.resources.rows_tool_result_preview
 import com.letta.mobile.sharedui.resources.rows_tool_status_running
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceMetadata
 import com.letta.mobile.ui.chat.session.ChatMessageId
-import com.letta.mobile.data.chat.tools.ToolStepExpansions
+import com.letta.mobile.data.chat.tools.steps.ToolStepExpansions
 import com.letta.mobile.ui.chat.subagents.ExternalAgentBadge
 import com.letta.mobile.ui.chat.tools.LocalToolPresenters
 import com.letta.mobile.ui.chat.tools.LocalToolStepExpansions
@@ -108,7 +109,9 @@ internal fun ToolStep(
     val running = resolved == ToolTimelineState.Running
     // A running step is where a working mascot looks (te3n1.2).
     Column(modifier = Modifier.fillMaxWidth().mascotAttention(AttentionKey("tool:$disclosureKey"), AttentionKind.TOOL, enabled = running)) {
-        val disclosure = if (!toolCall.hasDetails()) null else RunStepDisclosure(isExpanded) {
+        // The presenter says whether the step opens at all (a stopped task does not); a failed one always does.
+        val opens = toolCall.hasDetails() && (rememberToolStepLine(toolCall).expandable || resolved.isFailure())
+        val disclosure = if (!opens) null else RunStepDisclosure(isExpanded) {
             haptics.play(LettaHapticCue.SegmentTick)
             expansions.toggle(disclosureKey)
         }
@@ -119,7 +122,7 @@ internal fun ToolStep(
             ToolStepLineRow(spec = stepLineSpec(toolCall, resolved, callbacks), disclosure = disclosure)
         }
         AnimatedVisibility(
-            visible = isExpanded && toolCall.hasDetails(),
+            visible = isExpanded && opens,
             enter = ChatRowMotion(LocalReducedMotion.current).expansionEnter(),
             exit = ChatRowMotion(LocalReducedMotion.current).expansionExit(),
             label = "toolStepInset",
@@ -157,7 +160,10 @@ private fun stepLineSpec(toolCall: UiToolCall, state: ToolTimelineState, callbac
             running = running,
         )
     }
-    val line = rememberToolStepLine(toolCall)
+    // A watched task's line says how long it has run ("running 1m 12s"), ticking while it does; no other line ticks.
+    val watching = running && rememberToolStepLine(toolCall).verb == ToolVerb.Watching
+    val elapsed = if (watching) rememberElapsedSeconds(active = true, startedAtEpochMs = null).value * MILLIS_PER_SECOND else null
+    val line = rememberToolStepLine(toolCall, elapsed ?: toolCall.executionTimeMs)
     val agent = toolCall.subagentDispatch?.let { subagentIdentityOf(it.subagentType, listOf(it.subagentAgentId)) }
     return StepLineSpec(line.title(), line.target, noteOf(line, state), running, agent)
 }
@@ -328,6 +334,7 @@ private fun ToolGeneratedImages(toolCall: UiToolCall, callbacks: ChatRowCallback
 }
 
 private const val TARGET_ALPHA = 0.8f
+private const val MILLIS_PER_SECOND = 1_000L
 
 /** A call whose output may still grow: no terminal status yet, and not read back settled from the ledger. */
 private fun UiToolCall.isStreaming(): Boolean = status == null && !settled

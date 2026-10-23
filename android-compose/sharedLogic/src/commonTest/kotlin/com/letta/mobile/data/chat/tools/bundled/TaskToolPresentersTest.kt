@@ -15,8 +15,11 @@ import kotlin.test.assertTrue
 class TaskToolPresentersTest {
     private val registry = BundledToolPresenters.registry
 
-    private fun call(name: String, arguments: String, result: String? = null, failed: Boolean = false) =
-        ToolCallFacts(name, arguments, result, failed)
+    private fun call(name: String, arguments: String, result: String? = null, failed: Boolean = false, elapsedMillis: Long? = null) =
+        ToolCallFacts(name, arguments, result, failed, elapsedMillis)
+
+    private fun watched(result: String, elapsedMillis: Long) =
+        registry.line(call("TaskOutput", """{"task_id":"bash_3"}""", result, elapsedMillis = elapsedMillis)).target
 
     @Test
     fun taskOutputSaysTheTaskAndItsStatusAndTailsItsOutput() {
@@ -24,8 +27,11 @@ class TaskToolPresentersTest {
         val result = "<task_id>bash_3</task_id>\n<status>running</status>\n<output>\n$output\n</output>"
         val facts = call("TaskOutput", """{"task_id":"bash_3"}""", result)
         val line = registry.line(facts)
-        assertEquals(ToolVerb.Read, line.verb)
+        assertEquals(ToolVerb.Watching, line.verb)
         assertEquals("task bash_3 · running", line.target)
+        assertEquals("task bash_3 · running 1m 12s", watched(result, 72_000))
+        assertEquals("task bash_3 · running 1h 3m", watched(result, 3_780_000))
+        assertEquals("task bash_3 · running", watched(result, 400))
         assertEquals(listOf(ToolPreviewTarget.TaskOutput("bash_3")), line.previews)
         val tail = assertIs<ToolInset.Text>(registry.inset(facts)).text
         assertTrue(tail.startsWith("… 5 earlier lines\nline 6\n"), tail)
@@ -46,6 +52,7 @@ class TaskToolPresentersTest {
         val line = registry.line(facts)
         assertEquals(ToolVerb.Stopped, line.verb)
         assertEquals("task bash_3", line.target)
+        assertFalse(line.expandable, "a stopped task is all line")
         assertNull(registry.inset(facts))
     }
 
@@ -57,7 +64,17 @@ class TaskToolPresentersTest {
         val line = registry.line(facts)
         assertEquals(ToolVerb.Updated, line.verb)
         assertEquals("todos · 2 of 4 done", line.target)
-        assertEquals(ToolInset.Text("✓ Read\n✓ Plan\n▸ Build\n○ Ship"), registry.inset(facts))
+        val checklist = ToolInset.Checklist(
+            items = listOf(
+                ToolInset.Checklist.Item("Read", done = true),
+                ToolInset.Checklist.Item("Plan", done = true),
+                ToolInset.Checklist.Item("Build", done = false),
+                ToolInset.Checklist.Item("Ship", done = false),
+            ),
+            current = 2,
+        )
+        assertEquals(checklist, registry.inset(facts))
+        assertTrue(line.expandable)
     }
 
     @Test

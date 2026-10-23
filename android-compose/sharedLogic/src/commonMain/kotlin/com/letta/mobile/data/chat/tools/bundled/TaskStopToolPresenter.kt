@@ -15,7 +15,7 @@ object TaskStopToolPresenter : ToolPresenter {
     override val matcher: ToolMatcher = ToolMatcher(listOf("TaskStop", "KillBash", "KillShell", "task_stop"))
 
     override fun line(call: ToolCallFacts, scope: ToolPresenterScope): ToolStepLine =
-        ToolStepLine(verb = ToolVerb.Stopped, target = taskLabel(call.taskId()), presenterId = id)
+        ToolStepLine(verb = ToolVerb.Stopped, target = taskLabel(call.taskId()), presenterId = id, expandable = false)
 
     // The approved mockup: stopping a task is its line.
     override fun inset(call: ToolCallFacts, scope: ToolPresenterScope): ToolInset? = null

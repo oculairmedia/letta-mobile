@@ -102,6 +102,9 @@
     <string name="rows_tool_verb_delegated">Delegated</string>
     <string name="rows_tool_verb_called">Called</string>
     <string name="rows_tool_verb_stopped">Stopped</string>
+    <string name="rows_tool_verb_watching">Watching</string>
+    <string name="rows_checklist_done">Done: %1$s</string>
+    <string name="rows_checklist_current">In progress: %1$s</string>
     <string name="rows_tool_verb_updated">Updated</string>
     <string name="rows_tool_verb_planned">Planned</string>
     <string name="rows_tool_verb_used">Used</string>

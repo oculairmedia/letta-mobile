@@ -2,13 +2,13 @@ package com.letta.mobile.data.chat.tools.bundled
 
 import com.letta.mobile.data.canvas.CanvasToolContract
 import com.letta.mobile.data.canvas.names.CanvasToolNames
-import com.letta.mobile.data.chat.tools.ToolActivity
+import com.letta.mobile.data.chat.tools.steps.ToolActivity
 import com.letta.mobile.data.chat.tools.ToolCallFacts
 import com.letta.mobile.data.chat.tools.ToolFailure
 import com.letta.mobile.data.chat.tools.ToolInset
 import com.letta.mobile.data.chat.tools.ToolPreviewTarget
 import com.letta.mobile.data.chat.tools.ToolVerb
-import com.letta.mobile.data.chat.tools.activity
+import com.letta.mobile.data.chat.tools.steps.activity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

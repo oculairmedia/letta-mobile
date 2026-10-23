@@ -7,7 +7,7 @@ import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
-import com.letta.mobile.data.chat.tools.ToolStepExpansions
+import com.letta.mobile.data.chat.tools.steps.ToolStepExpansions
 import com.letta.mobile.ui.chat.tools.LocalToolStepExpansions
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.foundation.layout.Box

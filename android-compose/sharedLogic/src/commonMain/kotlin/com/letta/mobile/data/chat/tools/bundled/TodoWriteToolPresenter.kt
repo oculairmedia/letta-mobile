@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * letta-code's `TodoWrite` (and Codex's `update_plan`): "Updated todos · 2 of 4 done", opening to the
- * whole list as a checklist: `✓` done, `▸` in progress, `○` to do.
+ * whole list as a checklist: done items struck through, the one in progress with a spinner, the rest `○`.
  */
 object TodoWriteToolPresenter : ToolPresenter {
     override val id: String = "todo-write"
@@ -29,7 +29,10 @@ object TodoWriteToolPresenter : ToolPresenter {
     override fun inset(call: ToolCallFacts, scope: ToolPresenterScope): ToolInset? {
         val items = itemsOf(call)
         if (items.isEmpty()) return call.resultInset()
-        return ToolInset.Text(items.joinToString("\n") { "${mark(it.status)} ${it.text}" })
+        return ToolInset.Checklist(
+            items = items.map { ToolInset.Checklist.Item(it.text, done = it.status == DONE) },
+            current = items.indexOfFirst { it.status == IN_PROGRESS }.takeIf { it >= 0 },
+        )
     }
 
     /** The list's items in order: their text (`content`, Codex's `step`) and status. */
@@ -43,12 +46,6 @@ object TodoWriteToolPresenter : ToolPresenter {
             ?: return null
         val status = (item[STATUS] as? JsonPrimitive)?.content.orEmpty()
         return TodoItem(text, status)
-    }
-
-    private fun mark(status: String): String = when (status) {
-        DONE -> "✓"
-        IN_PROGRESS -> "▸"
-        else -> "○"
     }
 
     /** One item of the list. */
