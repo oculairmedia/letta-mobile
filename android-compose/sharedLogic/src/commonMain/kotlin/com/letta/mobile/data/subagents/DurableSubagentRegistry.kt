@@ -221,6 +221,8 @@ class DurableSubagentRegistry(
             lastSeenEpochMs = now,
             terminalAtEpochMs = if (observation.state.isTerminal) now else null,
             progress = observation.progress,
+            todos = observation.todos,
+            todoRevision = observation.todoRevision,
             lastActivityEpochMs = now,
         )
         entries[observation.key] = record
@@ -249,6 +251,8 @@ class DurableSubagentRegistry(
             lastSeenEpochMs = now,
             terminalAtEpochMs = firstTerminalAt,
             progress = progress.mergedWith(observation.progress),
+            todos = if (observation.todoRevision > todoRevision) observation.todos ?: todos else todos,
+            todoRevision = maxOf(todoRevision, observation.todoRevision),
             lastActivityEpochMs = activityAt,
         )
     }
@@ -295,6 +299,7 @@ class DurableSubagentRegistry(
      */
     private fun SubagentChipRecord.madeProgress(observation: SubagentChipObservation): Boolean =
         observation.state != state ||
+            (observation.todoRevision > todoRevision && observation.todos != todos) ||
             progress.advancedBy(observation.progress) ||
             (observation.activity != null && observation.activity.lines != activity?.lines)
 
@@ -456,10 +461,10 @@ class DurableSubagentRegistry(
     fun record(conversationId: String, agentId: String?, toolCallId: String): SubagentChipRecord? =
         synchronized(lock) { entries[SubagentChipKey(conversationId, agentId, toolCallId)] }
 
-    /** First chip matching (conversation, toolCallId) regardless of agent scope. */
+    /** Unique chip matching (conversation, toolCallId); ambiguous parent scope fails closed. */
     fun findByToolCall(conversationId: String, toolCallId: String): SubagentChipRecord? =
         synchronized(lock) {
-            entries.values.firstOrNull {
+            entries.values.singleOrNull {
                 it.conversationId == conversationId && it.toolCallId == toolCallId
             }
         }

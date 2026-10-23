@@ -39,6 +39,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -61,7 +63,7 @@ import kotlin.time.Clock
  *    subagent's own conversation only when the actual
  *    SubagentEntry.subagentConversationId is present or resolved. Missing ids
  *    fall back to the TodoWrite sheet; mobile never guesses parent/default.
- *  - COMPLETED: animate fill to 100% briefly (~300ms) then collapse away
+ *  - COMPLETED: retain the authored todo fraction briefly then collapse away
  *    (silent success — NO lingering green checkmark)
  *  - FAILED: ring turns red (error color token), FROZEN at whatever fill it
  *    reached, persists until tapped/acknowledged
@@ -89,8 +91,8 @@ fun ActiveSubagentRings(
     onViewConversation: (ActiveSubagent) -> Unit = {},
     now: Long = Clock.System.now().toEpochMilliseconds(),
 ) {
-    // letta-mobile-i2f23: briefly hold COMPLETED rings so the fill animates
-    // to 100% (~300ms tween) before the ring collapses away. RUNNING and
+    // Briefly hold COMPLETED rings at their authored todo fraction
+    // before the ring collapses away. RUNNING and
     // FAILED rings are always visible.
     val completedRingHolds = remember { mutableStateMapOf<String, Long>() }
 
@@ -176,7 +178,7 @@ fun ActiveSubagentRings(
  * [animateFloatAsState] between updates. When no todo_progress has arrived
  * yet the ring shows a small (~8%) "started" sliver with an optional slow
  * arc-LENGTH pulse (NO rotation). FAILED rings are frozen at whatever fill
- * they reached; COMPLETED rings briefly animate to 100% before collapsing.
+ * they reached; COMPLETED rings retain the same fraction before collapsing.
  */
 @Composable
 private fun ActivityRing(
@@ -194,18 +196,7 @@ private fun ActivityRing(
     // i2f23: sweep tracks the TodoWrite completion fraction. The target
     // sweep is cheap to compute; animateFloatAsState handles the smooth
     // interpolation between updates with zero per-frame allocs.
-    val targetSweep = when {
-        subagent.status == ActiveSubagent.Status.COMPLETED -> COMPLETED_SWEEP
-        subagent.status == ActiveSubagent.Status.FAILED -> {
-            // Frozen at whatever fill it reached — ringFraction already
-            // captures the last-known progress.
-            subagent.ringFraction * COMPLETED_SWEEP
-        }
-        subagent.hasDeterminateProgress -> {
-            subagent.ringFraction * COMPLETED_SWEEP
-        }
-        else -> SLIVER_SWEEP
-    }
+    val targetSweep = subagent.todoSweep()
 
     val animatedSweep by animateFloatAsState(
         targetValue = targetSweep,
@@ -262,6 +253,11 @@ private fun ActivityRing(
             )
             .semantics {
                 contentDescription = subagent.chipSemanticLabel()
+                progressBarRangeInfo = if (subagent.hasDeterminateProgress) {
+                    ProgressBarRangeInfo(targetSweep / COMPLETED_SWEEP, 0f..1f)
+                } else {
+                    ProgressBarRangeInfo.Indeterminate
+                }
             }
             .testTag(ActiveSubagentRingsTags.ring(subagent.id)),
         contentAlignment = Alignment.Center,
@@ -269,6 +265,10 @@ private fun ActivityRing(
         RingCanvas(color = color, sweep = drawSweep, modifier = Modifier.size(ringSize), strokeWidth = strokeWidth)
     }
 }
+
+/** Lifecycle changes color and visibility; only authored todos determine the sweep. */
+internal fun ActiveSubagent.todoSweep(): Float =
+    if (hasDeterminateProgress) ringFraction * COMPLETED_SWEEP else SLIVER_SWEEP
 
 /**
  * The ring itself: a faint full track, then the [sweep] arc from 12 o'clock (-90°). The sweep is
@@ -355,8 +355,7 @@ object ActiveSubagentRingsTags {
 // ── i2f23 constants ──────────────────────────────────────────────────────
 
 /**
- * How long a COMPLETED ring stays visible so its fill can
- * animate from the reached fraction to 100% (~300ms tween) before the
+ * How long a COMPLETED ring stays visible at its authored fraction before the
  * collapse animation. After this window the ring is removed from the visible
  * set and AnimatedVisibility collapses it out.
  */

@@ -3,6 +3,8 @@ package com.letta.mobile.data.subagents
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentActivitySnapshot
 import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.data.model.SubagentTodo
+import com.letta.mobile.data.model.todoProgress
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -182,6 +184,10 @@ data class SubagentChipRecord(
      * is the honest baseline for "quiet for a while".
      */
     @SerialName("last_activity_epoch_ms") val lastActivityEpochMs: Long? = null,
+    /** Latest agent-authored replacement plan. Null means no plan was observed. */
+    val todos: List<SubagentTodo>? = null,
+    /** Position of its tool call in the child's append-only native tool_calls history. */
+    @SerialName("todo_revision") val todoRevision: Int = 0,
 ) {
     val key: SubagentChipKey get() = SubagentChipKey(conversationId, agentId, toolCallId)
 
@@ -198,6 +204,7 @@ data class SubagentChipRecord(
         parentConversationId = conversationId,
         startedAt = startedAt,
         activity = activity,
+        todoProgress = todos?.todoProgress()?.takeIf { it.total > 0 },
         terminalAtEpochMs = terminalAtEpochMs,
         toolCallCount = progress.toolCallCount,
         lastActivityAtMs = lastActivityEpochMs,
@@ -289,6 +296,8 @@ data class SubagentChipObservation(
     val activity: SubagentActivitySnapshot? = null,
     val generation: Long = 0,
     val progress: SubagentProgress = SubagentProgress(),
+    val todos: List<SubagentTodo>? = null,
+    val todoRevision: Int = 0,
 ) {
     val key: SubagentChipKey get() = SubagentChipKey(conversationId, agentId, toolCallId)
 

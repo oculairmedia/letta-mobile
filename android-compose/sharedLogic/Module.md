@@ -273,6 +273,8 @@ Inter-agent delivery routing and structured provenance. Stable sender/recipient 
 
 Shared dispatch and task-notification wire parsers live here so controller ingestion and chat projection consume the same interpretation without depending on each other.
 
+`parseAgentTodos` reads authored TodoWrite and update_plan replacement plans for foreground and child agents; `todoProgress` counts those items without inferring progress from activity or worker lifecycle.
+
 Shared models for agents, conversations, messages, models, tools and related resources, with normalization/compatibility helpers. A model's existence does not imply that every backend serves that resource. Keep network access and storage effects outside resource values; repository adapters map backend data to models such as [LettaMessage](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.model/-letta-message/index.html) and bind recency persistence through [RecentModelsPersistence](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.model/-recent-models-persistence/index.html).
 
 # Package com.letta.mobile.data.model.provider
@@ -454,6 +456,8 @@ SSE framing and incremental UTF-8 line parsing. These low-level utilities suppor
 # Package com.letta.mobile.data.subagents
 
 Durable keyed subagent registry, roster projections and stale-state reconciliation. Parent/child lifecycle records remain independent of display chips; supported hosts supply file-backed registry storage. Keep text-inferred relationships and platform UI outside durable child identity; provide persistence through [SubagentRegistryStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.subagents/-subagent-registry-store/index.html) to [DurableSubagentRegistry](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.subagents/-durable-subagent-registry/index.html).
+
+The durable dispatch record also owns its latest authored todo snapshot. `withNativeTodos` reads the child's cumulative native tool-call history, using the plan call's position to reject stale replay. The checklist and streamed entry counts derive from that same snapshot; absent or empty plans leave progress unknown, regardless of worker lifecycle.
 
 # Package com.letta.mobile.data.swarm
 

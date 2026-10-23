@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDecoration
 import com.letta.mobile.data.model.SubagentTodo
+import com.letta.mobile.data.model.todoProgress
 import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
@@ -120,7 +121,7 @@ data class SubagentTodoProgress(val completed: Int, val total: Int) {
     val label: String get() = "$completed/$total done"
 
     /** Fraction in [0f, 1f]; 0f when there are no items (avoids NaN). */
-    val fraction: Float get() = if (total == 0) 0f else completed.toFloat() / total.toFloat()
+    val fraction: Float get() = if (total <= 0) 0f else completed.coerceIn(0, total).toFloat() / total.toFloat()
 }
 
 /**
@@ -156,10 +157,10 @@ fun subagentTodoSheetStateFrom(result: Result<List<SubagentTodo>>): SubagentTodo
                 SubagentTodoSheetState.Empty
             } else {
                 val items = todos.map { it.toItem() }
-                val completed = items.count { it.status == SubagentTodoStatus.COMPLETED }
+                val progress = todos.todoProgress()
                 SubagentTodoSheetState.Content(
                     items = items,
-                    progress = SubagentTodoProgress(completed = completed, total = items.size),
+                    progress = SubagentTodoProgress(completed = progress.completed, total = progress.total),
                 )
             }
         },
