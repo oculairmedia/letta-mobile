@@ -195,6 +195,9 @@ internal class ConversationViewerSubscription(
     private val viewer: ViewerHandle = registration.viewer
     private var viewed: String? = null
 
+    /** Bumped by every subscribe and unsubscribe; lets a rollback tell whether a later change happened. */
+    private var changes: Long = 0
+
     /** The conversation currently viewed (test/telemetry). */
     val currentConversation: String? get() = viewed
 
@@ -203,27 +206,60 @@ internal class ConversationViewerSubscription(
      * conversation. No-op when already viewing [conversationId].
      */
     suspend fun subscribe(conversationId: String) {
-        mutex.withLock {
+        mutex.withLock { subscribeLocked(conversationId) }
+    }
+
+    /**
+     * [subscribe], returning a rollback that restores the conversation viewed before it. The
+     * previous conversation and the change count are captured under the same lock as the
+     * change itself, so a concurrent observation cannot slip between them.
+     */
+    // letta-mobile-wisqe.2 F2: rollback guard for concurrent admin_rpc streams.
+    suspend fun observe(conversationId: String): suspend () -> Unit {
+        val (previous, observedAt) = mutex.withLock {
             val previous = viewed
-            // De-scope only a DIFFERENT prior conversation (Option A) — unchanged.
-            if (previous != null && previous != conversationId) {
-                runCatching { registry.unregister(previous, viewer) }
-            }
-            // ALWAYS (re-)register while this connection still owns the endpoint
-            // claim. A stale generation is rejected atomically, so late polling
-            // from an overlapped reconnect cannot reclaim or evict its successor.
-            val registered = runCatching { registry.register(conversationId, registration) }.getOrDefault(false)
-            viewed = conversationId.takeIf { registered }
+            subscribeLocked(conversationId)
+            previous to changes
+        }
+        return { rollbackIfCurrent(previous, observedAt) }
+    }
+
+    /**
+     * Restore [previous] (or view nothing) only when no subscribe or unsubscribe happened after
+     * the observation at [observedAt]: a later, successful request's subscription must survive an
+     * earlier request's failure.
+     */
+    private suspend fun rollbackIfCurrent(previous: String?, observedAt: Long) {
+        mutex.withLock {
+            if (changes != observedAt) return
+            if (previous == null) unsubscribeLocked() else subscribeLocked(previous)
         }
     }
 
     /** Remove this connection from its current conversation, if any. */
     suspend fun unsubscribe() {
-        mutex.withLock {
-            val previous = viewed ?: return
+        mutex.withLock { unsubscribeLocked() }
+    }
+
+    private suspend fun subscribeLocked(conversationId: String) {
+        val previous = viewed
+        // De-scope only a DIFFERENT prior conversation (Option A) — unchanged.
+        if (previous != null && previous != conversationId) {
             runCatching { registry.unregister(previous, viewer) }
-            viewed = null
         }
+        // ALWAYS (re-)register while this connection still owns the endpoint
+        // claim. A stale generation is rejected atomically, so late polling
+        // from an overlapped reconnect cannot reclaim or evict its successor.
+        val registered = runCatching { registry.register(conversationId, registration) }.getOrDefault(false)
+        viewed = conversationId.takeIf { registered }
+        changes += 1
+    }
+
+    private suspend fun unsubscribeLocked() {
+        val previous = viewed ?: return
+        runCatching { registry.unregister(previous, viewer) }
+        viewed = null
+        changes += 1
     }
 }
 

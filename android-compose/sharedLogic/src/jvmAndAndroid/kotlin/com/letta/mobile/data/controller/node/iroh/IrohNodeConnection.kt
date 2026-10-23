@@ -403,13 +403,16 @@ class IrohNodeConnection(
         if (conversationId.isNullOrEmpty()) return null
         val subscription = viewerSubscription ?: return null
         val previous = subscription.currentConversation
-        registerAsViewer(conversationId)
+        val rollback = subscription.observe(conversationId)
+        Telemetry.event(
+            "IrohNode", "viewer.registered",
+            "remoteEndpointId" to remoteEndpointId,
+            "conversationId" to conversationId,
+            "deregistered" to (previous?.takeIf { it != conversationId } ?: ""),
+        )
         return {
-            if (previous == null) {
-                subscription.unsubscribe()
-            } else {
-                subscription.subscribe(previous)
-            }
+            // A later subscribe wins: the rollback is a no-op once another request changed the view.
+            rollback()
             Telemetry.event(
                 "IrohNode", "viewer.registration_rolled_back",
                 "remoteEndpointId" to remoteEndpointId,

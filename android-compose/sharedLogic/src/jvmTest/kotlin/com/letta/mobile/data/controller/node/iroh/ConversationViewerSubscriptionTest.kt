@@ -54,6 +54,41 @@ class ConversationViewerSubscriptionTest {
         viewer: ViewerHandle,
     ): ConversationViewerSubscription = ConversationViewerSubscription(registry, registry.claim(viewer))
 
+    /**
+     * letta-mobile-wisqe.2 F2: two admin_rpc message.list calls run on separate streams. When the
+     * older one (X) fails AFTER a newer one (Y) succeeded, its rollback must not undo Y.
+     */
+    @Test
+    fun anOlderFailedObservationDoesNotUndoANewerOne() = runTest {
+        val registry = ConnectionRegistry()
+        val connViewer = viewer("conn-A")
+        val subscription = subscription(registry, connViewer)
+        subscription.subscribe("convA")
+
+        val rollbackX = subscription.observe("convX")
+        subscription.observe("convY")
+        rollbackX()
+
+        assertEquals("convY", subscription.currentConversation, "the newer observation survives")
+        assertEquals(setOf<ViewerHandle>(connViewer), registry.viewersFor("convY"))
+        assertTrue(registry.viewersFor("convX").isEmpty())
+        assertTrue(registry.viewersFor("convA").isEmpty())
+    }
+
+    @Test
+    fun aFailedObservationWithNoLaterChangeRestoresThePreviousConversation() = runTest {
+        val registry = ConnectionRegistry()
+        val connViewer = viewer("conn-A")
+        val subscription = subscription(registry, connViewer)
+        subscription.subscribe("convA")
+
+        subscription.observe("convX")()
+
+        assertEquals("convA", subscription.currentConversation)
+        assertEquals(setOf<ViewerHandle>(connViewer), registry.viewersFor("convA"))
+        assertTrue(registry.viewersFor("convX").isEmpty())
+    }
+
     @Test
     fun runtimeStartThenMessageListDeScopesToTheNewConversation() = runTest {
         val registry = ConnectionRegistry()
