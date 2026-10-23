@@ -378,13 +378,16 @@ private fun ChatHead(content: TouchHeadContent, place: HeadPlace, onTap: () -> U
             },
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            Modifier
-                .matchParentSize()
-                .shadow(ChatHeadDimens.elevation, CircleShape, clip = false)
-                .background(scheme.surfaceContainerHigh, CircleShape)
-                .border(LettaDimens.Stroke.hairline, scheme.outlineVariant, CircleShape),
-        )
+        // The mascot stands on the canvas by itself; only the avatar fallback sits on a disc.
+        if (!mascot) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .shadow(ChatHeadDimens.elevation, CircleShape, clip = false)
+                    .background(scheme.surfaceContainerHigh, CircleShape)
+                    .border(LettaDimens.Stroke.hairline, scheme.outlineVariant, CircleShape),
+            )
+        }
         if (mascot && anchors != null) {
             CompanionSeatAnchor(anchors, size = ChatHeadDimens.seat)
         } else {
