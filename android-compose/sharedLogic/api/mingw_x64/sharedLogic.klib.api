@@ -720,6 +720,7 @@ final enum class com.letta.mobile.data.chat.send/ServerQueueBlocker : kotlin/Enu
 final enum class com.letta.mobile.data.chat.tools/ToolActivity : kotlin/Enum<com.letta.mobile.data.chat.tools/ToolActivity> { // com.letta.mobile.data.chat.tools/ToolActivity|null[0]
     enum entry Called // com.letta.mobile.data.chat.tools/ToolActivity.Called|null[0]
     enum entry Delegated // com.letta.mobile.data.chat.tools/ToolActivity.Delegated|null[0]
+    enum entry Drew // com.letta.mobile.data.chat.tools/ToolActivity.Drew|null[0]
     enum entry Edited // com.letta.mobile.data.chat.tools/ToolActivity.Edited|null[0]
     enum entry Explored // com.letta.mobile.data.chat.tools/ToolActivity.Explored|null[0]
     enum entry Fetched // com.letta.mobile.data.chat.tools/ToolActivity.Fetched|null[0]
@@ -773,13 +774,17 @@ final enum class com.letta.mobile.data.chat.tools/ToolPreviewKind : kotlin/Enum<
 final enum class com.letta.mobile.data.chat.tools/ToolVerb : kotlin/Enum<com.letta.mobile.data.chat.tools/ToolVerb> { // com.letta.mobile.data.chat.tools/ToolVerb|null[0]
     enum entry AddedToMemory // com.letta.mobile.data.chat.tools/ToolVerb.AddedToMemory|null[0]
     enum entry Called // com.letta.mobile.data.chat.tools/ToolVerb.Called|null[0]
+    enum entry ComposedCanvas // com.letta.mobile.data.chat.tools/ToolVerb.ComposedCanvas|null[0]
+    enum entry CreatedCanvas // com.letta.mobile.data.chat.tools/ToolVerb.CreatedCanvas|null[0]
     enum entry Delegated // com.letta.mobile.data.chat.tools/ToolVerb.Delegated|null[0]
     enum entry Edited // com.letta.mobile.data.chat.tools/ToolVerb.Edited|null[0]
+    enum entry EditedCanvas // com.letta.mobile.data.chat.tools/ToolVerb.EditedCanvas|null[0]
     enum entry EditedMemory // com.letta.mobile.data.chat.tools/ToolVerb.EditedMemory|null[0]
     enum entry Fetched // com.letta.mobile.data.chat.tools/ToolVerb.Fetched|null[0]
     enum entry Planned // com.letta.mobile.data.chat.tools/ToolVerb.Planned|null[0]
     enum entry Ran // com.letta.mobile.data.chat.tools/ToolVerb.Ran|null[0]
     enum entry Read // com.letta.mobile.data.chat.tools/ToolVerb.Read|null[0]
+    enum entry ReadCanvas // com.letta.mobile.data.chat.tools/ToolVerb.ReadCanvas|null[0]
     enum entry RewroteMemory // com.letta.mobile.data.chat.tools/ToolVerb.RewroteMemory|null[0]
     enum entry Searched // com.letta.mobile.data.chat.tools/ToolVerb.Searched|null[0]
     enum entry Stopped // com.letta.mobile.data.chat.tools/ToolVerb.Stopped|null[0]
@@ -8863,6 +8868,12 @@ sealed interface com.letta.mobile.data.chat.tools/ToolPreviewTarget { // com.let
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.tools/ToolPreviewTarget.TaskOutput.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.tools/ToolPreviewTarget.TaskOutput.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools/ToolPreviewTarget.TaskOutput.toString|toString(){}[0]
+    }
+
+    final object Canvas : com.letta.mobile.data.chat.tools/ToolPreviewTarget { // com.letta.mobile.data.chat.tools/ToolPreviewTarget.Canvas|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.tools/ToolPreviewTarget.Canvas.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.tools/ToolPreviewTarget.Canvas.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools/ToolPreviewTarget.Canvas.toString|toString(){}[0]
     }
 }
 
@@ -64642,6 +64653,32 @@ final object com.letta.mobile.data.canvas.compose/CanvasComposeService { // com.
     final suspend fun compose(kotlinx.serialization.json/JsonElement, com.letta.mobile.data.canvas.compose/ComposeTarget, kotlin/Function1<kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp>, com.letta.mobile.data.canvas/CanvasBatchCheck> = ..., kotlin.coroutines/SuspendFunction1<kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp>, kotlin/Long>): com.letta.mobile.data.canvas.compose/ComposeOutcome // com.letta.mobile.data.canvas.compose/CanvasComposeService.compose|compose(kotlinx.serialization.json.JsonElement;com.letta.mobile.data.canvas.compose.ComposeTarget;kotlin.Function1<kotlin.collections.List<com.letta.mobile.data.canvas.CanvasOp>,com.letta.mobile.data.canvas.CanvasBatchCheck>;kotlin.coroutines.SuspendFunction1<kotlin.collections.List<com.letta.mobile.data.canvas.CanvasOp>,kotlin.Long>){}[0]
 }
 
+final object com.letta.mobile.data.canvas.names/CanvasToolNames { // com.letta.mobile.data.canvas.names/CanvasToolNames|null[0]
+    final const val APPLY_OPS // com.letta.mobile.data.canvas.names/CanvasToolNames.APPLY_OPS|{}APPLY_OPS[0]
+        final fun <get-APPLY_OPS>(): kotlin/String // com.letta.mobile.data.canvas.names/CanvasToolNames.APPLY_OPS.<get-APPLY_OPS>|<get-APPLY_OPS>(){}[0]
+    final const val COMPOSE // com.letta.mobile.data.canvas.names/CanvasToolNames.COMPOSE|{}COMPOSE[0]
+        final fun <get-COMPOSE>(): kotlin/String // com.letta.mobile.data.canvas.names/CanvasToolNames.COMPOSE.<get-COMPOSE>|<get-COMPOSE>(){}[0]
+    final const val COMPOSE_GUIDE // com.letta.mobile.data.canvas.names/CanvasToolNames.COMPOSE_GUIDE|{}COMPOSE_GUIDE[0]
+        final fun <get-COMPOSE_GUIDE>(): kotlin/String // com.letta.mobile.data.canvas.names/CanvasToolNames.COMPOSE_GUIDE.<get-COMPOSE_GUIDE>|<get-COMPOSE_GUIDE>(){}[0]
+    final const val CREATE // com.letta.mobile.data.canvas.names/CanvasToolNames.CREATE|{}CREATE[0]
+        final fun <get-CREATE>(): kotlin/String // com.letta.mobile.data.canvas.names/CanvasToolNames.CREATE.<get-CREATE>|<get-CREATE>(){}[0]
+    final const val EXPORT_SVG // com.letta.mobile.data.canvas.names/CanvasToolNames.EXPORT_SVG|{}EXPORT_SVG[0]
+        final fun <get-EXPORT_SVG>(): kotlin/String // com.letta.mobile.data.canvas.names/CanvasToolNames.EXPORT_SVG.<get-EXPORT_SVG>|<get-EXPORT_SVG>(){}[0]
+    final const val GET_LAYOUT // com.letta.mobile.data.canvas.names/CanvasToolNames.GET_LAYOUT|{}GET_LAYOUT[0]
+        final fun <get-GET_LAYOUT>(): kotlin/String // com.letta.mobile.data.canvas.names/CanvasToolNames.GET_LAYOUT.<get-GET_LAYOUT>|<get-GET_LAYOUT>(){}[0]
+    final const val GET_SCENE // com.letta.mobile.data.canvas.names/CanvasToolNames.GET_SCENE|{}GET_SCENE[0]
+        final fun <get-GET_SCENE>(): kotlin/String // com.letta.mobile.data.canvas.names/CanvasToolNames.GET_SCENE.<get-GET_SCENE>|<get-GET_SCENE>(){}[0]
+    final const val LIST // com.letta.mobile.data.canvas.names/CanvasToolNames.LIST|{}LIST[0]
+        final fun <get-LIST>(): kotlin/String // com.letta.mobile.data.canvas.names/CanvasToolNames.LIST.<get-LIST>|<get-LIST>(){}[0]
+    final const val RENDER_PREVIEW // com.letta.mobile.data.canvas.names/CanvasToolNames.RENDER_PREVIEW|{}RENDER_PREVIEW[0]
+        final fun <get-RENDER_PREVIEW>(): kotlin/String // com.letta.mobile.data.canvas.names/CanvasToolNames.RENDER_PREVIEW.<get-RENDER_PREVIEW>|<get-RENDER_PREVIEW>(){}[0]
+    final const val REPLACE_SCENE // com.letta.mobile.data.canvas.names/CanvasToolNames.REPLACE_SCENE|{}REPLACE_SCENE[0]
+        final fun <get-REPLACE_SCENE>(): kotlin/String // com.letta.mobile.data.canvas.names/CanvasToolNames.REPLACE_SCENE.<get-REPLACE_SCENE>|<get-REPLACE_SCENE>(){}[0]
+
+    final val ALL // com.letta.mobile.data.canvas.names/CanvasToolNames.ALL|{}ALL[0]
+        final fun <get-ALL>(): kotlin.collections/List<kotlin/String> // com.letta.mobile.data.canvas.names/CanvasToolNames.ALL.<get-ALL>|<get-ALL>(){}[0]
+}
+
 final object com.letta.mobile.data.canvas.plugin/CanvasPluginElementSchema { // com.letta.mobile.data.canvas.plugin/CanvasPluginElementSchema|null[0]
     final const val MAX_PROPS_ARRAY_ITEMS // com.letta.mobile.data.canvas.plugin/CanvasPluginElementSchema.MAX_PROPS_ARRAY_ITEMS|{}MAX_PROPS_ARRAY_ITEMS[0]
         final fun <get-MAX_PROPS_ARRAY_ITEMS>(): kotlin/Int // com.letta.mobile.data.canvas.plugin/CanvasPluginElementSchema.MAX_PROPS_ARRAY_ITEMS.<get-MAX_PROPS_ARRAY_ITEMS>|<get-MAX_PROPS_ARRAY_ITEMS>(){}[0]
@@ -65123,6 +65160,16 @@ final object com.letta.mobile.data.chat.tools.bundled/BashToolPresenter : com.le
 final object com.letta.mobile.data.chat.tools.bundled/BundledToolPresenters { // com.letta.mobile.data.chat.tools.bundled/BundledToolPresenters|null[0]
     final val registry // com.letta.mobile.data.chat.tools.bundled/BundledToolPresenters.registry|{}registry[0]
         final fun <get-registry>(): com.letta.mobile.data.chat.tools/ToolPresenterRegistry // com.letta.mobile.data.chat.tools.bundled/BundledToolPresenters.registry.<get-registry>|<get-registry>(){}[0]
+}
+
+final object com.letta.mobile.data.chat.tools.bundled/CanvasToolPresenter : com.letta.mobile.data.chat.tools/ToolPresenter { // com.letta.mobile.data.chat.tools.bundled/CanvasToolPresenter|null[0]
+    final val id // com.letta.mobile.data.chat.tools.bundled/CanvasToolPresenter.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.letta.mobile.data.chat.tools.bundled/CanvasToolPresenter.id.<get-id>|<get-id>(){}[0]
+    final val matcher // com.letta.mobile.data.chat.tools.bundled/CanvasToolPresenter.matcher|{}matcher[0]
+        final fun <get-matcher>(): com.letta.mobile.data.chat.tools/ToolMatcher // com.letta.mobile.data.chat.tools.bundled/CanvasToolPresenter.matcher.<get-matcher>|<get-matcher>(){}[0]
+
+    final fun inset(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools.bundled/CanvasToolPresenter.inset|inset(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
+    final fun line(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools.bundled/CanvasToolPresenter.line|line(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
 }
 
 final object com.letta.mobile.data.chat.tools.bundled/EditToolPresenter : com.letta.mobile.data.chat.tools/ToolPresenter { // com.letta.mobile.data.chat.tools.bundled/EditToolPresenter|null[0]

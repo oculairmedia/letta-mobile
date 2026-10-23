@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.compose.CanvasComposeContract
 import com.letta.mobile.data.canvas.compose.CanvasComposeSchema
+import com.letta.mobile.data.canvas.names.CanvasToolNames
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -33,16 +34,16 @@ data class CanvasToolDefinition(val name: String, val description: String, val i
  * calls mean the same thing on either.
  */
 object CanvasToolContract {
-    const val CREATE = "canvas_create"
-    const val GET_SCENE = "canvas_get_scene"
-    const val GET_LAYOUT = "canvas_get_layout"
-    const val REPLACE_SCENE = "canvas_replace_scene"
-    const val APPLY_OPS = "canvas_apply_ops"
-    const val EXPORT_SVG = "canvas_export_svg"
-    const val LIST = "canvas_list"
-    const val RENDER_PREVIEW = "canvas_render_preview"
-    const val COMPOSE = "canvas_compose"
-    const val COMPOSE_GUIDE = "canvas_compose_guide"
+    const val CREATE = CanvasToolNames.CREATE
+    const val GET_SCENE = CanvasToolNames.GET_SCENE
+    const val GET_LAYOUT = CanvasToolNames.GET_LAYOUT
+    const val REPLACE_SCENE = CanvasToolNames.REPLACE_SCENE
+    const val APPLY_OPS = CanvasToolNames.APPLY_OPS
+    const val EXPORT_SVG = CanvasToolNames.EXPORT_SVG
+    const val LIST = CanvasToolNames.LIST
+    const val RENDER_PREVIEW = CanvasToolNames.RENDER_PREVIEW
+    const val COMPOSE = CanvasToolNames.COMPOSE
+    const val COMPOSE_GUIDE = CanvasToolNames.COMPOSE_GUIDE
 
     /** The upper bound on [compose]'s description: the format itself is [composeGuide]'s answer. */
     const val COMPOSE_DESCRIPTION_MAX_CHARS = 700

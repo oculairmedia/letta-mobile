@@ -50,6 +50,22 @@ enum class ToolVerb {
     @SerialName("used")
     Used,
 
+    /** Notes, checklists or cards put on a canvas: "Composed canvas". */
+    @SerialName("composed_canvas")
+    ComposedCanvas,
+
+    /** A canvas's drawing changed (ops applied, the scene replaced): "Edited canvas". */
+    @SerialName("edited_canvas")
+    EditedCanvas,
+
+    /** A canvas read, listed, previewed or exported: "Read canvas". */
+    @SerialName("read_canvas")
+    ReadCanvas,
+
+    /** A new canvas: "Created canvas". */
+    @SerialName("created_canvas")
+    CreatedCanvas,
+
     /** A memory block's text replaced in place: "Edited memory". */
     @SerialName("edited_memory")
     EditedMemory,
@@ -142,6 +158,9 @@ sealed interface ToolPreviewTarget {
 
     /** A background task's output. */
     data class TaskOutput(val taskId: String) : ToolPreviewTarget
+
+    /** The conversation's canvas, which the call drew on or read. */
+    data object Canvas : ToolPreviewTarget
 }
 
 /** A failure the step line says out loud; success is quiet. [exitCode] is non-zero when known. */
@@ -159,6 +178,7 @@ enum class ToolActivity {
     Fetched,
     Delegated,
     Remembered,
+    Drew,
     Called,
 }
 
@@ -172,4 +192,5 @@ val ToolVerb.activity: ToolActivity
         ToolVerb.Delegated -> ToolActivity.Delegated
         ToolVerb.Called, ToolVerb.Updated, ToolVerb.Planned, ToolVerb.Used -> ToolActivity.Called
         ToolVerb.EditedMemory, ToolVerb.AddedToMemory, ToolVerb.RewroteMemory, ToolVerb.WroteMemfs -> ToolActivity.Remembered
+        ToolVerb.ComposedCanvas, ToolVerb.EditedCanvas, ToolVerb.ReadCanvas, ToolVerb.CreatedCanvas -> ToolActivity.Drew
     }

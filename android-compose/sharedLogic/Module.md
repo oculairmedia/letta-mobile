@@ -55,6 +55,10 @@ The versioned semantic canvas composer: validation, Markdown conversion, geometr
 
 Canvas library state and operations shared by hosts. `CanvasLibraryController` retains loaded boards when storage fails, reports a retryable error and serializes library operations; `CanvasLibraryState` is its observable content and loading state. Hosts supply storage, archive and synchronization bindings and present the error. Keep windowing and platform storage construction outside this package; retries reload state rather than repeating mutations.
 
+# Package com.letta.mobile.data.canvas.names
+
+The `canvas_*` tool names on their own, for code that only names the tools (a tool step's presenter) without depending on the canvas model. Keep tool definitions and schemas in the canvas contract; read the names through [CanvasToolNames](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas.names/-canvas-tool-names/index.html).
+
 # Package com.letta.mobile.data.canvas.plugin
 
 Plugin element schemas, kind catalogs and property checks within canvas scenes. Clients can preserve, edit and show fallback elements without loading plugin implementation code. Keep plugin execution outside element interpretation; provide installed kind metadata through [PluginKindCatalog](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas.plugin/-plugin-kind-catalog/index.html) while retaining fallback representations for unknown kinds.
