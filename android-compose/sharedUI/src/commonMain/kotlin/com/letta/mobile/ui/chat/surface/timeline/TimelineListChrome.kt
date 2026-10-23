@@ -74,21 +74,18 @@ internal data class TimelineFadeAlphas(val top: Float, val bottom: Float, val pi
 
 /**
  * Edge fades for a REVERSED list: "can scroll forward" is toward older rows (the top) and "can
- * scroll backward" toward the newest (the bottom). The top fade stands down while a prompt is
- * pinned there as a card ([promptPinned], the desktop): the opaque card already terminates the
- * content (desktop rememberChatListFadeAlphas). A sticky prompt under floating chrome
- * ([stickyPromptPinned], the phone) keeps the top fade, and adds the pinned band below it, so the
- * rows dissolve before they reach the prompt instead of running hard under it and the chrome.
+ * scroll backward" toward the newest (the bottom). A sticky pinned prompt ([stickyPromptPinned])
+ * keeps the top fade and adds the pinned band below it, so the rows dissolve before they reach the
+ * prompt instead of running hard under it and the chrome.
  */
 @Composable
 internal fun rememberTimelineFadeAlphas(
     canScrollTowardOlder: Boolean,
     canScrollTowardNewer: Boolean,
-    promptPinned: Boolean,
     stickyPromptPinned: Boolean = false,
 ): TimelineFadeAlphas {
     val top by animateFloatAsState(
-        targetValue = if (canScrollTowardOlder && !promptPinned) 1f else 0f,
+        targetValue = if (canScrollTowardOlder) 1f else 0f,
         animationSpec = tween(ChatTimelineDimens.fadeAnimationMillis),
         label = "timelineTopFade",
     )

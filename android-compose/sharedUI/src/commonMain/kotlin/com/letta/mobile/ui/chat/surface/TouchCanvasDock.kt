@@ -50,6 +50,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
@@ -379,15 +380,7 @@ private fun ChatHead(content: TouchHeadContent, place: HeadPlace, onTap: () -> U
         contentAlignment = Alignment.Center,
     ) {
         // The mascot stands on the canvas by itself; only the avatar fallback sits on a disc.
-        if (!mascot) {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .shadow(ChatHeadDimens.elevation, CircleShape, clip = false)
-                    .background(scheme.surfaceContainerHigh, CircleShape)
-                    .border(LettaDimens.Stroke.hairline, scheme.outlineVariant, CircleShape),
-            )
-        }
+        Box(Modifier.matchParentSize().chatHeadDisc(shown = !mascot, scheme.surfaceContainerHigh, scheme.outlineVariant))
         if (mascot && anchors != null) {
             CompanionSeatAnchor(anchors, size = ChatHeadDimens.seat)
         } else {
@@ -718,3 +711,11 @@ internal const val TOUCH_POPUP_TAG = "chat-touch-popup"
 internal const val TOUCH_POPUP_DISMISS_TAG = "chat-touch-popup-dismiss"
 internal const val TOUCH_POPUP_TEXT_TAG = "chat-touch-popup-text"
 internal const val TOUCH_INPUT_TRAY_TAG = "chat-touch-input-tray"
+
+/** The chat head's disc (fill, hairline rim, shadow) where [shown]; nothing where the mascot stands alone. */
+private fun Modifier.chatHeadDisc(shown: Boolean, fill: Color, rim: Color): Modifier {
+    if (!shown) return this
+    return shadow(ChatHeadDimens.elevation, CircleShape, clip = false)
+        .background(fill, CircleShape)
+        .border(LettaDimens.Stroke.hairline, rim, CircleShape)
+}

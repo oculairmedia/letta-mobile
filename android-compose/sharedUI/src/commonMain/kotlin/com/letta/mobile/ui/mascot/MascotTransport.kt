@@ -23,7 +23,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -59,7 +58,6 @@ import kotlinx.coroutines.launch
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.input.pointerInputPassThrough
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LocalReducedMotion
 
 /**
  * The places an agent's mascot can stand. One character per agent, in one place at a time: it
@@ -618,29 +616,9 @@ private fun MascotTransport.seatedMascots(registry: MascotIdentityRegistry): Lis
     }
 }
 
-/** True below a [MascotTransportLayer] that draws: a layer nested in it draws no mascots. */
-private val LocalMascotLayerAbove = staticCompositionLocalOf { false }
-
-/**
- * Draws, over [content], one live mascot per seated agent at its active seat, and springs it
- * between seats when the active seat changes - the whole transport animation, in one place. Mount
- * once at the window root, inside the mascot host and registry providers. [reducedMotion] (the
- * shell's [LocalReducedMotion] by default) snaps every hop and keeps only a short entrance fade.
- *
- * Inside another layer this one only lays out [content]: Android mounts a layer at the window root
- * around the shared workspace, which mounts its own for desktop and web, and two drawing layers
- * put two animated copies of every character on the same seat.
- */
+/** The layer that draws: the outermost [MascotTransportLayer]. */
 @Composable
-fun MascotTransportLayer(
-    reducedMotion: Boolean = LocalReducedMotion.current,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    if (LocalMascotLayerAbove.current) {
-        Box(modifier) { content() }
-        return
-    }
+internal fun DrawingMascotLayer(reducedMotion: Boolean, modifier: Modifier, content: @Composable () -> Unit) {
     val transport = LocalMascotTransport.current
     val registry = LocalMascotRegistry.current
     var origin by remember { mutableStateOf(Offset.Zero) }

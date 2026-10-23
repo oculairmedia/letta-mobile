@@ -494,7 +494,6 @@ internal fun BubbleText(
         val fades = rememberTimelineFadeAlphas(
             canScrollTowardOlder = scroll.canScrollBackward,
             canScrollTowardNewer = scroll.canScrollForward,
-            promptPinned = false,
         )
         Modifier.timelineFadingEdges(fades, fadeLength, fadeLength)
     }

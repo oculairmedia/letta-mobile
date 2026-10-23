@@ -302,11 +302,11 @@ class ChatTimelineUiTest {
     }
 
     /**
-     * The owning prompt pins over a long answer only while no prompt is on screen: with a newer
-     * prompt in view, a pinned copy would sit over it (two "You" bubbles overlapping).
+     * The prompt owning a long answer stays pinned over it as a sticky header, and is never drawn
+     * twice: while the copy stands in for its row, the row itself is hidden.
      */
     @Test
-    fun theOwningPromptPinsOnlyWhileNoPromptIsOnScreen() = runComposeUiTest {
+    fun theOwningPromptStaysPinnedOverItsLongAnswer() = runComposeUiTest {
         val longAnswer = (1..120).joinToString("\n\n") { "Paragraph $it of a long answer." }
         val messages = listOf(
             UiMessage(id = "q1", role = "user", content = "First question", timestamp = "2026-09-12T12:00:00Z"),
@@ -318,7 +318,6 @@ class ChatTimelineUiTest {
 
         // At the newest edge the second prompt is in view under the long answer's tail.
         onNodeWithText("Second question").assertExists()
-        onNodeWithTag(ChatTimelineTags.PINNED_PROMPT).assertDoesNotExist()
 
         // Reversed list: index 2 is the long answer, which alone fills the viewport.
         // The markdown lays out off the main thread: wait for the answer's full height first.
@@ -326,8 +325,7 @@ class ChatTimelineUiTest {
             onAllNodesWithText("Paragraph 120", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
         onNodeWithTag(ChatTimelineTags.LIST).performScrollToIndex(2)
-        // That leaves the second prompt peeking through the list's bottom padding (still on
-        // screen, so still no pin); a short drag toward older history takes it off screen.
+        // A short drag toward older history: the first prompt owns the rows at the top.
         onNodeWithTag(ChatTimelineTags.LIST).performTouchInput {
             swipe(start = center, end = center.copy(y = center.y + 200f), durationMillis = 400L)
         }
