@@ -11209,6 +11209,14 @@ public final class com/letta/mobile/data/chat/tools/ToolVerb$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/letta/mobile/data/chat/tools/bundled/AgentToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/AgentToolPresenter;
+	public fun getId ()Ljava/lang/String;
+	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/ToolMatcher;
+	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+}
+
 public final class com/letta/mobile/data/chat/tools/bundled/BashToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
 	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/BashToolPresenter;
 	public fun getId ()Ljava/lang/String;
@@ -11270,8 +11278,50 @@ public final class com/letta/mobile/data/chat/tools/bundled/MemoryBlockToolPrese
 	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
 }
 
+public final class com/letta/mobile/data/chat/tools/bundled/PlanModeToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/PlanModeToolPresenter;
+	public fun getId ()Ljava/lang/String;
+	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/ToolMatcher;
+	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public final fun isLeaving (Ljava/lang/String;)Z
+	public final fun isPlanModeChange (Ljava/lang/String;)Z
+	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+}
+
 public final class com/letta/mobile/data/chat/tools/bundled/ReadToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
 	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/ReadToolPresenter;
+	public fun getId ()Ljava/lang/String;
+	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/ToolMatcher;
+	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+}
+
+public final class com/letta/mobile/data/chat/tools/bundled/SkillToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/SkillToolPresenter;
+	public fun getId ()Ljava/lang/String;
+	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/ToolMatcher;
+	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+}
+
+public final class com/letta/mobile/data/chat/tools/bundled/TaskOutputToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/TaskOutputToolPresenter;
+	public fun getId ()Ljava/lang/String;
+	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/ToolMatcher;
+	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+}
+
+public final class com/letta/mobile/data/chat/tools/bundled/TaskStopToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/TaskStopToolPresenter;
+	public fun getId ()Ljava/lang/String;
+	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/ToolMatcher;
+	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+}
+
+public final class com/letta/mobile/data/chat/tools/bundled/TodoWriteToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/TodoWriteToolPresenter;
 	public fun getId ()Ljava/lang/String;
 	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/ToolMatcher;
 	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolInset;

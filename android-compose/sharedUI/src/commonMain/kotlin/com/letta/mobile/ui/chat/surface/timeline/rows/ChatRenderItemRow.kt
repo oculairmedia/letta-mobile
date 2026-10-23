@@ -88,6 +88,7 @@ internal object ChatRowTestTags {
     const val TOOL_STATUS_GLYPH = "tool-status-glyph"
     /** A step line's muted note: "exited N" / "failed" in amber, "awaiting approval" while parked. */
     const val TOOL_STEP_NOTE = "tool-step-note"
+    const val PLAN_MODE_DIVIDER = "plan-mode-divider"
     /** An open command step's `dir $ command` line. */
     const val TOOL_COMMAND = "tool-command"
     /** An open step's bounded, scrolling viewport. */

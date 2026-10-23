@@ -410,9 +410,17 @@ private fun ApprovalActionRow(approval: UiApprovalRequest, decider: ApprovalDeci
     ApprovalDecisionButtons(toolCallIds, decider)
 }
 
-/** What the reject flow's dialog says: its title and the reason field's placeholder. */
+/**
+ * What the decision says: the reject flow's dialog title and reason placeholder, and the two
+ * buttons' labels ("Approve" / "Reject"; a plan's "Approve plan" / "Keep planning").
+ */
 @Immutable
-internal class RejectCopy(val title: StringResource, val placeholder: StringResource) {
+internal class RejectCopy(
+    val title: StringResource,
+    val placeholder: StringResource,
+    val approve: StringResource = Res.string.rows_approve,
+    val reject: StringResource = Res.string.rows_reject,
+) {
     companion object {
         val Approval = RejectCopy(Res.string.rows_reject_title, Res.string.rows_reject_reason_placeholder)
     }
@@ -450,7 +458,7 @@ internal fun ApprovalDecisionButtons(
             },
             enabled = decider.enabled,
         ) {
-            Text(stringResource(Res.string.rows_reject))
+            Text(stringResource(rejectCopy.reject))
         }
         Button(
             onClick = {
@@ -459,7 +467,7 @@ internal fun ApprovalDecisionButtons(
             },
             enabled = decider.enabled,
         ) {
-            Text(stringResource(if (decider.isSubmitting) Res.string.rows_sending else Res.string.rows_approve))
+            Text(stringResource(if (decider.isSubmitting) Res.string.rows_sending else rejectCopy.approve))
         }
     }
 }

@@ -95,7 +95,10 @@ private fun ToolPreviewChip(toolCall: UiToolCall, line: ToolStepLine, target: To
             val open = callbacks.openSubagent ?: return
             val callId = toolCall.toolCallId ?: return
             AssistChip(
-                onClick = { open(ChatSubagentTarget(callId, line.target.ifBlank { toolCall.name }, target.agentId)) },
+                onClick = {
+                    val agentId = target.agentId.ifBlank { toolCall.subagentDispatch?.subagentAgentId }
+                    open(ChatSubagentTarget(callId, subagentTitle(toolCall, line), agentId))
+                },
                 label = { Text(stringResource(Res.string.rows_tool_open_subagent)) },
                 modifier = Modifier.testTag(ChatRowTestTags.TOOL_PREVIEW_CHIP),
             )
@@ -112,6 +115,10 @@ private fun ToolPreviewChip(toolCall: UiToolCall, line: ToolStepLine, target: To
         }
     }
 }
+
+/** What the subagent view is titled: the task the dispatch gave it, else the step's target. */
+private fun subagentTitle(toolCall: UiToolCall, line: ToolStepLine): String =
+    toolCall.subagentDispatch?.description ?: line.target.ifBlank { toolCall.name }
 
 /** "Open full output", which shows all of [text] in a detail pane titled with the step's name. */
 @Composable
