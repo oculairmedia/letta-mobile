@@ -1,7 +1,10 @@
 package com.letta.mobile.ui.shell.pages
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.backend.SessionRoute
@@ -20,6 +23,7 @@ import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPageOptions
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPageSlots
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceBinding
+import com.letta.mobile.ui.chat.surface.timeline.rows.LocalMemoryPreview
 import com.letta.mobile.ui.shell.pages.memory.rememberMemoryWorkspaceView
 import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageActions
 import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageState
@@ -87,10 +91,13 @@ fun shellPageDeps(
     controllers: ShellLibraryControllers,
     host: ShellPageHost,
 ): ShellPageDeps {
-    // The chat remembers which tool steps the person opened, across reloads, in the device's settings.
+    // The chat remembers which tool steps the person opened, across reloads, in the device's settings,
+    // and its memory steps open the shell's own Memory view.
     val chat = host.pages.chat?.let { page ->
         ShellPageContent<ShellDestination.Chat> { destination, modifier ->
-            ProvideToolStepExpansions(host.settings) { page.Content(destination, modifier) }
+            ProvideToolStepExpansions(host.settings) {
+                ProvideShellMemoryPreview(controllers, host.focus) { page.Content(destination, modifier) }
+            }
         }
     }
     return ShellPageDeps(
@@ -108,6 +115,23 @@ fun shellPageDeps(
         admin = shellAdminPages(graph, host),
         fallback = host.pages.fallback,
     )
+}
+
+/** [content] whose memory tool steps open the Memory view over [controllers], for the focused agent. */
+@Composable
+private fun ProvideShellMemoryPreview(controllers: ShellLibraryControllers, focus: ShellPageFocus, content: @Composable () -> Unit) {
+    val agent by rememberUpdatedState(focus.agentId)
+    val preview = remember(controllers.memory, controllers.memfs) {
+        val sources = ShellMemorySources(
+            memory = controllers.memory.state,
+            memoryActions = controllers.memory,
+            files = controllers.memfs.state,
+            filesActions = controllers.memfs,
+            selectFilesAgent = { agent -> controllers.memfs.selectAgent(agent?.value) },
+        )
+        ShellMemoryPreview(sources) { agent }
+    }
+    CompositionLocalProvider(LocalMemoryPreview provides preview, content = content)
 }
 
 /** The shared Memory page over the memory graph and MemFS controllers. */

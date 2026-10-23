@@ -120,8 +120,8 @@ internal fun ChatTimeline(
                     ),
                     Modifier.weight(1f).fillMaxWidth(),
                 )
-                // The file a tool step's chip or a path in its output opens, in the window's detail pane.
-                ToolPreviewPanes()
+                // The file or memory entry a tool step's chip or a path in its output opens, in the window's detail pane.
+                ToolPreviewPanes { latestState.value.messages.flatMap { it.toolCalls.orEmpty() } }
             }
             if (goal != null && goalAtBottom) {
                 GoalStatusCard(goal, state.isGoalStatusLoading, goalActions, Modifier.align(Alignment.CenterHorizontally))

@@ -45,16 +45,15 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 internal fun SharedChatWorkspaceFilesBox(
     files: WorkspaceFilesViewModel?,
     port: ChatSessionPort,
-    agentId: String,
     modifier: Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    // The phone knows no working directory: a memory tool's relative path is the agent's memory
-    // file; any other relative path cannot be opened.
-    val workspace = remember(files, agentId) {
+    // The phone knows no working directory: a relative path cannot be opened (a memory tool's
+    // entries open in the Memory view instead).
+    val workspace = remember(files) {
         files?.let {
             val opener = WorkspaceFileOpener { request ->
-                it.viewer.open(request.path, cwd = null, memoryAgentId = agentId.takeIf { request.memoryTool }, lines = request.lines)
+                it.viewer.open(request.path, cwd = null, lines = request.lines)
             }
             WorkspaceFiles(opener, it.viewer.state, it.viewer)
         }

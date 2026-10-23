@@ -317,6 +317,8 @@ sealed interface MemoryParityItem {
         val readOnly: Boolean,
         /** Raw block label (the MemFS file name); [title] falls back to a display name. */
         val label: String? = null,
+        /** How many characters the block's value holds, against its [limit]. */
+        val length: Int = 0,
     ) : MemoryParityItem
 
     @Serializable
@@ -485,6 +487,7 @@ object MemoryParityMapper {
                     limit = block.limit,
                     readOnly = block.readOnly == true,
                     label = block.label?.takeIf { it.isNotBlank() },
+                    length = block.value.length,
                 )
             },
         )

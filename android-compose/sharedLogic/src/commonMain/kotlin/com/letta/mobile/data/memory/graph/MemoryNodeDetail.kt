@@ -44,6 +44,17 @@ object MemoryNodeDetails {
         }
     }
 
+    /** The core memory block labelled [label] among the selected agent's, or null. */
+    fun block(memory: MemoryParityState, label: String): MemoryParityItem.MemoryBlock? =
+        memory.sections.firstOrNull { it.kind == MemoryParitySectionKind.Memory }
+            ?.items?.firstOrNull { it is MemoryParityItem.MemoryBlock && it.label == label } as? MemoryParityItem.MemoryBlock
+
+    /** The graph node of the block labelled [label] (what a memory tool step opens), or null. */
+    fun blockNodeId(memory: MemoryParityState, label: String): String? {
+        val block = block(memory, label) ?: return null
+        return memory.graph.nodes.firstOrNull { it.kind == MemoryGraphNodeKind.Memory && it.sourceItemId == block.id }?.id
+    }
+
     private fun itemFor(memory: MemoryParityState, node: MemoryGraphNode): MemoryParityItem? {
         val sectionKind = node.kind.sectionKind() ?: return null
         val section = memory.sections.firstOrNull { it.kind == sectionKind } ?: return null

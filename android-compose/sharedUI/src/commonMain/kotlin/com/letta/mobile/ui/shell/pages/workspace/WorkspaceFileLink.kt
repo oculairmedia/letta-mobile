@@ -121,12 +121,8 @@ private fun outputLink(
     }
 }
 
-/** A tool step's file or memory preview target as its chip; nothing for any other target. */
+/** A tool step's file preview target as its chip. */
 @Composable
-fun ToolPreviewFileChip(target: ToolPreviewTarget) {
-    when (target) {
-        is ToolPreviewTarget.File -> WorkspaceFileChip(WorkspaceFileRequest(target.path, lines = target.lines))
-        is ToolPreviewTarget.Memory -> WorkspaceFileChip(WorkspaceFileRequest(target.path, memoryTool = true))
-        is ToolPreviewTarget.Subagent, is ToolPreviewTarget.TaskOutput -> Unit
-    }
+fun ToolPreviewFileChip(target: ToolPreviewTarget.File) {
+    WorkspaceFileChip(WorkspaceFileRequest(target.path, lines = target.lines))
 }

@@ -85,6 +85,7 @@
     <string name="rows_steps_fetched">fetched pages</string>
     <string name="rows_steps_delegated">delegated work</string>
     <string name="rows_steps_called">called tools</string>
+    <string name="rows_steps_remembered">updated memory</string>
     <string name="rows_steps_join">%1$s, %2$s</string>
     <string name="rows_copy_command">Copy command</string>
     <string name="rows_tool_open_full_output">Open full output</string>
@@ -99,6 +100,18 @@
     <string name="rows_tool_verb_fetched">Fetched</string>
     <string name="rows_tool_verb_delegated">Delegated</string>
     <string name="rows_tool_verb_called">Called</string>
+    <string name="rows_tool_verb_edited_memory">Edited memory</string>
+    <string name="rows_tool_verb_added_to_memory">Added to memory</string>
+    <string name="rows_tool_verb_rewrote_memory">Rewrote memory</string>
+    <string name="rows_tool_verb_wrote_memfs">Wrote memfs</string>
+    <string name="rows_tool_replaced_whole_block">replaced whole block</string>
+    <!-- A memory step's chip and the Memory view it opens in the detail pane. -->
+    <string name="rows_memory_chip_usage">%1$s · %2$d/%3$d</string>
+    <string name="rows_memory_preview_title">Memory</string>
+    <string name="rows_memory_preview_this_edit">This edit</string>
+    <string name="rows_memory_preview_usage">%1$d of %2$d characters</string>
+    <string name="rows_memory_preview_usage_unlimited">%1$d characters</string>
+    <string name="rows_memory_preview_earlier">Earlier edits in this conversation</string>
     <string name="rows_tool_output_truncated">Showing %1$d of %2$d lines · Copy includes all output</string>
     <string name="rows_tool_result_preview">Showing a preview · loading the full output…</string>
 
