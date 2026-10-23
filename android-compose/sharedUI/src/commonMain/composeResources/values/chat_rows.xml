@@ -87,6 +87,9 @@
     <string name="rows_steps_called">called tools</string>
     <string name="rows_steps_join">%1$s, %2$s</string>
     <string name="rows_copy_command">Copy command</string>
+    <string name="rows_tool_open_full_output">Open full output</string>
+    <string name="rows_tool_full_output">Full output</string>
+    <string name="rows_tool_open_subagent">Open subagent</string>
     <string name="rows_tool_step_label">%1$s %2$s</string>
     <string name="rows_tool_verb_ran">Ran</string>
     <string name="rows_tool_verb_read">Read</string>

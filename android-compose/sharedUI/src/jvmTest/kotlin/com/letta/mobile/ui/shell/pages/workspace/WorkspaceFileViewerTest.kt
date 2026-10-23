@@ -10,16 +10,19 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.chat.tools.ToolPreviewTarget
+
 import com.letta.mobile.data.workspace.WorkspaceFileContent
 import com.letta.mobile.data.workspace.WorkspaceFileOpener
+import com.letta.mobile.data.workspace.WorkspaceFileRequest
 import com.letta.mobile.data.workspace.WorkspaceFileViewerActions
 import com.letta.mobile.data.workspace.WorkspaceFileViewerState
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -59,7 +62,7 @@ class WorkspaceFileViewerTest {
         val actions = RecordingActions()
         show(WorkspaceFileViewerState(path = "/gone.kt", error = "ENOENT"), actions)
         onNodeWithTag(WorkspaceFileViewerTags.RETRY).performClick()
-        onNodeWithTag(WorkspaceFileViewerTags.CLOSE).performClick()
+        onNodeWithContentDescription("Close").performClick()
         assertEquals(listOf("retry", "close"), actions.calls)
     }
 
@@ -70,23 +73,32 @@ class WorkspaceFileViewerTest {
     }
 
     @Test
-    fun aToolCardLinkOpensTheFileOnlyWhenTheHostCanReadFiles() = runComposeUiTest {
-        val opened = mutableListOf<String>()
+    fun aChipOpensItsFileAtItsLinesOnlyWhenTheHostReadsFiles() = runComposeUiTest {
+        val opened = mutableListOf<WorkspaceFileRequest>()
+        val files = WorkspaceFiles(WorkspaceFileOpener { opened += it }, MutableStateFlow(WorkspaceFileViewerState()), RecordingActions())
         setContent {
             MaterialTheme {
-                CompositionLocalProvider(LocalWorkspaceFileOpener provides WorkspaceFileOpener { path, _ -> opened += path }) {
-                    ToolCallFileLink(ToolPreviewTarget.File("/repo/a.kt"))
+                CompositionLocalProvider(LocalWorkspaceFiles provides files) {
+                    WorkspaceFileChip(WorkspaceFileRequest("/repo/a.kt", lines = 3..4))
                 }
             }
         }
-        onNodeWithText("a.kt").performClick()
-        assertEquals(listOf("/repo/a.kt"), opened)
+        onNodeWithText("a.kt #L3-4").performClick()
+        assertEquals(listOf(WorkspaceFileRequest("/repo/a.kt", lines = 3..4)), opened)
     }
 
     @Test
-    fun withoutAnOpenerThereIsNoLink() = runComposeUiTest {
-        setContent { MaterialTheme { ToolCallFileLink(ToolPreviewTarget.File("/repo/a.kt")) } }
+    fun withoutAHostThatReadsFilesThereIsNoChip() = runComposeUiTest {
+        setContent { MaterialTheme { WorkspaceFileChip(WorkspaceFileRequest("/repo/a.kt")) } }
         onNodeWithTag(WorkspaceFileLinkTags.LINK).assertDoesNotExist()
+    }
+
+    @Test
+    fun theLinesAFileWasOpenedAtAreFoundInItsText() {
+        val text = "one\ntwo\nthree\nfour"
+        assertEquals(4 to 14, lineSpan(text, 2..3))
+        assertEquals(14 to 18, lineSpan(text, 4..4))
+        assertEquals(null, lineSpan(text, 9..9))
     }
 
     private class RecordingActions : WorkspaceFileViewerActions {

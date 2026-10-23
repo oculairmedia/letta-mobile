@@ -8,16 +8,14 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.data.workspace.WorkspaceFileOpener
 import com.letta.mobile.ui.chat.session.ChatSessionPort
-import com.letta.mobile.ui.shell.pages.workspace.LocalWorkspaceFileOpener
-import com.letta.mobile.ui.shell.pages.workspace.WorkspaceFileViewer
+import com.letta.mobile.ui.shell.pages.workspace.LocalWorkspaceFiles
+import com.letta.mobile.ui.shell.pages.workspace.WorkspaceFiles
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -40,8 +38,8 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 }
 
 /**
- * The page's box with workspace files wired in: tool cards' file links open the shared read-only
- * viewer drawn over [content], and the composer's draft drives the `@` file search.
+ * The page's box with workspace files wired in: tool steps' file chips and paths open the shared
+ * read-only viewer the chat draws, and the composer's draft drives the `@` file search.
  */
 @Composable
 internal fun SharedChatWorkspaceFilesBox(
@@ -53,26 +51,25 @@ internal fun SharedChatWorkspaceFilesBox(
 ) {
     // The phone knows no working directory: a memory tool's relative path is the agent's memory
     // file; any other relative path cannot be opened.
-    val opener = remember(files, agentId) {
+    val workspace = remember(files, agentId) {
         files?.let {
-            WorkspaceFileOpener { path, memoryTool ->
-                it.viewer.open(path, cwd = null, memoryAgentId = agentId.takeIf { memoryTool })
+            val opener = WorkspaceFileOpener { request ->
+                it.viewer.open(request.path, cwd = null, memoryAgentId = agentId.takeIf { request.memoryTool }, lines = request.lines)
             }
+            WorkspaceFiles(opener, it.viewer.state, it.viewer)
         }
     }
-    CompositionLocalProvider(LocalWorkspaceFileOpener provides opener) {
+    CompositionLocalProvider(LocalWorkspaceFiles provides workspace) {
         Box(modifier) {
             content()
-            if (files != null) WorkspaceFiles(files, port)
+            if (files != null) DraftFileSearch(files, port)
         }
     }
 }
 
 @Composable
-private fun WorkspaceFiles(files: WorkspaceFilesViewModel, port: ChatSessionPort) {
+private fun DraftFileSearch(files: WorkspaceFilesViewModel, port: ChatSessionPort) {
     LaunchedEffect(files, port) {
         port.composer.map { it.text }.distinctUntilChanged().collect(files::onDraftChanged)
     }
-    val viewer by files.viewer.state.collectAsStateWithLifecycle()
-    WorkspaceFileViewer(state = viewer, actions = files.viewer)
 }

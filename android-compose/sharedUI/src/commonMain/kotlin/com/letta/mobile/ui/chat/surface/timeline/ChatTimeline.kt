@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import com.letta.mobile.data.chat.tools.ToolStepExpansions
 import com.letta.mobile.ui.chat.tools.LocalToolStepExpansions
+import com.letta.mobile.ui.chat.surface.timeline.rows.ToolPreviewPanes
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -119,6 +120,8 @@ internal fun ChatTimeline(
                     ),
                     Modifier.weight(1f).fillMaxWidth(),
                 )
+                // The file a tool step's chip or a path in its output opens, in the window's detail pane.
+                ToolPreviewPanes()
             }
             if (goal != null && goalAtBottom) {
                 GoalStatusCard(goal, state.isGoalStatusLoading, goalActions, Modifier.align(Alignment.CenterHorizontally))

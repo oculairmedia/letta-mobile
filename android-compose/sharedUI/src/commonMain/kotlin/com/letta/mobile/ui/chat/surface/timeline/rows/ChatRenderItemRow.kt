@@ -96,6 +96,11 @@ internal object ChatRowTestTags {
     const val TOOL_OUTPUT_TRUNCATED = "tool-output-truncated"
     const val TOOL_OUTPUT = "tool-output"
     const val TOOL_RESULT_PREVIEW = "tool-result-preview"
+    /** A step's chip that opens something other than a file (a subagent). */
+    const val TOOL_PREVIEW_CHIP = "tool-preview-chip"
+    /** "Open full output" under a truncated output, and the detail pane it opens. */
+    const val TOOL_OPEN_FULL_OUTPUT = "tool-open-full-output"
+    const val TOOL_FULL_OUTPUT = "tool-full-output"
     const val CANVAS_ARTIFACT = "chat-canvas-artifact"
     const val CANVAS_ARTIFACT_SHOW = "chat-canvas-artifact-show"
     const val CANVAS_ARTIFACT_STATUS = "chat-canvas-artifact-status"

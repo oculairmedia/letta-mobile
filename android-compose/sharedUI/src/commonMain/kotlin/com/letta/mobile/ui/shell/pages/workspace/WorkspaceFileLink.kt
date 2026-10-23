@@ -8,43 +8,70 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
-import com.letta.mobile.data.chat.tools.ToolPreviewTarget
 import com.letta.mobile.data.workspace.WorkspaceFileOpener
+import com.letta.mobile.data.workspace.WorkspaceFileRequest
+import com.letta.mobile.data.workspace.WorkspaceFileViewerActions
+import com.letta.mobile.data.workspace.WorkspaceFileViewerState
 import com.letta.mobile.data.workspace.WorkspacePaths
+import kotlinx.coroutines.flow.StateFlow
 
 /**
- * How a host opens workspace files from inside the timeline. Null, the
- * default, means the host cannot read files, and tool cards show no file link.
+ * What a host binds for workspace files: how a path opens ([opener], resolving it against the
+ * conversation's working directory or the agent's memory), and the viewer that shows it. The
+ * shared chat draws the viewer itself, where the window keeps its detail panes, so the host never
+ * places a viewer of its own.
  */
-val LocalWorkspaceFileOpener = staticCompositionLocalOf<WorkspaceFileOpener?> { null }
+@Immutable
+class WorkspaceFiles(
+    val opener: WorkspaceFileOpener,
+    val viewer: StateFlow<WorkspaceFileViewerState>,
+    val actions: WorkspaceFileViewerActions,
+)
 
-/** Test tags for the tool card's file link. */
+/** The host's [WorkspaceFiles]; null where it cannot read files, and no file chip or path link shows. */
+val LocalWorkspaceFiles = staticCompositionLocalOf<WorkspaceFiles?> { null }
+
+/** The host's viewer, open on what its chips and links asked for; nothing where the host reads no files. */
+@Composable
+fun WorkspaceFilePreview() {
+    val files = LocalWorkspaceFiles.current ?: return
+    val state by files.viewer.collectAsState()
+    WorkspaceFileViewer(state = state, actions = files.actions)
+}
+
+/** Test tags for a step's file chip. */
 object WorkspaceFileLinkTags {
     const val LINK = "workspace_file_link"
 }
 
 /**
- * What a tool step's chip opens, as a chip; nothing when the host provides no
- * [LocalWorkspaceFileOpener] or the target is not a file or memory entry it can show.
+ * A file a tool step touched, as a chip ("Main.kt #L3-4") that opens it in the viewer, scrolled to
+ * the lines it names; nothing when the host reads no files.
  */
 @Composable
-fun ToolCallFileLink(target: ToolPreviewTarget, modifier: Modifier = Modifier) {
-    val opener = LocalWorkspaceFileOpener.current ?: return
-    val (path, memory) = when (target) {
-        is ToolPreviewTarget.File -> target.path to false
-        is ToolPreviewTarget.Memory -> target.path to true
-        is ToolPreviewTarget.Subagent, is ToolPreviewTarget.TaskOutput -> return
-    }
+fun WorkspaceFileChip(request: WorkspaceFileRequest, modifier: Modifier = Modifier) {
+    val files = LocalWorkspaceFiles.current ?: return
     AssistChip(
-        onClick = { opener.open(path, memoryTool = memory) },
-        label = { Text(WorkspacePaths.fileName(path), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        onClick = { files.opener.open(request) },
+        label = { Text(chipLabel(request), maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingIcon = {
             Icon(Icons.Outlined.Description, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize))
         },
         modifier = modifier.testTag(WorkspaceFileLinkTags.LINK),
     )
+}
+
+/** "Main.kt", or with the lines it names "Main.kt #L3" / "Main.kt #L3-4". */
+internal fun chipLabel(request: WorkspaceFileRequest): String {
+    val name = WorkspacePaths.fileName(request.path)
+    val lines = request.lines ?: return name
+    val span = if (lines.first == lines.last) "L${lines.first}" else "L${lines.first}-${lines.last}"
+    return "$name #$span"
 }

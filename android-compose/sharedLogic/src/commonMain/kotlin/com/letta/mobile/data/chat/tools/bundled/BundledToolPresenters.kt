@@ -3,10 +3,18 @@ package com.letta.mobile.data.chat.tools.bundled
 import com.letta.mobile.data.chat.tools.ToolPresenterRegistry
 
 /**
- * What every host ships: one presenter per bundled tool (and per bundled CLI), each its own unit,
- * registered through the same [ToolPresenterRegistry] calls a plugin's contributions go through.
+ * What every host ships: the presenters of every area (shell, files, tasks and agents, memory, and
+ * the CLIs shell tools run), registered through the same [ToolPresenterRegistry] calls a plugin's
+ * contributions go through. Each area keeps its own registration list, so adding a presenter
+ * never edits this file.
  */
 object BundledToolPresenters {
     val registry: ToolPresenterRegistry = ToolPresenterRegistry.Empty
-        .register(BashToolPresenter)
+        .registerAll(
+            ShellToolPresenters.tools +
+                FileToolPresenters.tools +
+                TaskToolPresenters.tools +
+                MemoryToolPresenters.tools,
+        )
+        .registerCommands(CanvasCommandPresenters.commands)
 }

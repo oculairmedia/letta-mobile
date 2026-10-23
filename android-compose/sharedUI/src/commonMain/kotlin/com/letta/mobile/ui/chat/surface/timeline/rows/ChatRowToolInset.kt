@@ -18,7 +18,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -151,20 +153,26 @@ private fun ArgumentLine(field: ToolArgumentField) {
     Text(text = text, style = monoStyle(), color = MaterialTheme.colorScheme.onSurface)
 }
 
-/** [text]'s last lines, wrapped, in [ink]; says how many lines it left out above them. */
+/**
+ * [text]'s last lines, wrapped, in [ink], their URLs and paths as links. Above them it says how
+ * many lines it left out, with "Open full output", which shows all of them in a detail pane.
+ */
 @Composable
 private fun OutputText(text: String, ink: InsetInk) {
     val window = remember(text) { OutputWindow.tail(text) }
     if (window.hiddenLines > 0) {
+        var full by remember { mutableStateOf(false) }
         Text(
             text = stringResource(Res.string.rows_tool_output_truncated, window.visibleLines, window.visibleLines + window.hiddenLines),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag(ChatRowTestTags.TOOL_OUTPUT_TRUNCATED),
         )
+        FullOutputLink { full = true }
+        if (full) FullOutputPane(text) { full = false }
     }
     val shown = remember(window, ink) { ink.marked(window.text) }
-    Text(text = shown, style = monoStyle(), color = ink.color())
+    Text(text = rememberLinkedText(shown), style = monoStyle(), color = ink.color())
 }
 
 /** [content] with a copy action for [text], named [label], that shows while the pointer is over it. */
