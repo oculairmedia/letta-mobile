@@ -34,6 +34,22 @@ enum class ToolVerb {
     @SerialName("called")
     Called,
 
+    /** A background task or process stopped: "Stopped". */
+    @SerialName("stopped")
+    Stopped,
+
+    /** A list or record brought up to date (the todo list): "Updated". */
+    @SerialName("updated")
+    Updated,
+
+    /** A plan entered or proposed: "Planned". */
+    @SerialName("planned")
+    Planned,
+
+    /** A skill or other capability put to use: "Used". */
+    @SerialName("used")
+    Used,
+
     /** A memory block's text replaced in place: "Edited memory". */
     @SerialName("edited_memory")
     EditedMemory,
@@ -150,10 +166,10 @@ enum class ToolActivity {
 val ToolVerb.activity: ToolActivity
     get() = when (this) {
         ToolVerb.Read, ToolVerb.Searched -> ToolActivity.Explored
-        ToolVerb.Ran -> ToolActivity.Ran
+        ToolVerb.Ran, ToolVerb.Stopped -> ToolActivity.Ran
         ToolVerb.Wrote, ToolVerb.Edited -> ToolActivity.Edited
         ToolVerb.Fetched -> ToolActivity.Fetched
         ToolVerb.Delegated -> ToolActivity.Delegated
-        ToolVerb.Called -> ToolActivity.Called
+        ToolVerb.Called, ToolVerb.Updated, ToolVerb.Planned, ToolVerb.Used -> ToolActivity.Called
         ToolVerb.EditedMemory, ToolVerb.AddedToMemory, ToolVerb.RewroteMemory, ToolVerb.WroteMemfs -> ToolActivity.Remembered
     }

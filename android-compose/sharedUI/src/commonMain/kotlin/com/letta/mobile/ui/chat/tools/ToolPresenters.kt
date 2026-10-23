@@ -27,10 +27,14 @@ import com.letta.mobile.sharedui.resources.rows_tool_verb_delegated
 import com.letta.mobile.sharedui.resources.rows_tool_verb_edited
 import com.letta.mobile.sharedui.resources.rows_tool_verb_edited_memory
 import com.letta.mobile.sharedui.resources.rows_tool_verb_fetched
+import com.letta.mobile.sharedui.resources.rows_tool_verb_planned
 import com.letta.mobile.sharedui.resources.rows_tool_verb_ran
 import com.letta.mobile.sharedui.resources.rows_tool_verb_read
 import com.letta.mobile.sharedui.resources.rows_tool_verb_rewrote_memory
 import com.letta.mobile.sharedui.resources.rows_tool_verb_searched
+import com.letta.mobile.sharedui.resources.rows_tool_verb_stopped
+import com.letta.mobile.sharedui.resources.rows_tool_verb_updated
+import com.letta.mobile.sharedui.resources.rows_tool_verb_used
 import com.letta.mobile.sharedui.resources.rows_tool_verb_wrote
 import com.letta.mobile.sharedui.resources.rows_tool_verb_wrote_memfs
 import org.jetbrains.compose.resources.StringResource
@@ -67,6 +71,10 @@ private val ToolVerb.resource: StringResource
         ToolVerb.AddedToMemory -> Res.string.rows_tool_verb_added_to_memory
         ToolVerb.RewroteMemory -> Res.string.rows_tool_verb_rewrote_memory
         ToolVerb.WroteMemfs -> Res.string.rows_tool_verb_wrote_memfs
+        ToolVerb.Stopped -> Res.string.rows_tool_verb_stopped
+        ToolVerb.Updated -> Res.string.rows_tool_verb_updated
+        ToolVerb.Planned -> Res.string.rows_tool_verb_planned
+        ToolVerb.Used -> Res.string.rows_tool_verb_used
     }
 
 /** Which tool steps the person flipped open or closed; null where no host keeps them (each step then keeps its own). */
