@@ -59,6 +59,8 @@ _DECLARATION_START = re.compile(r"(?:fun|val|var|class|interface|object|typealia
 _HEADER_STOP = re.compile(r"[()\[\]{};=\n]")
 _NESTING = {"(": 1, "[": 1, ")": -1, "]": -1}
 NEWLINE = "\n"
+_REVISION = re.compile(r"[\w./@^~{}-]+")
+_SHA = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 _PLANNED_EDGE = re.compile(r"\s*([\w.]+)\s*->\s*([\w.]+)\s*")
 
 
@@ -310,18 +312,37 @@ def compare(report: dict, ci_report: dict) -> list[str]:
     return problems
 
 
-def changed_packages(repo: Path, base: str, structure: Structure) -> list[str]:
-    def git(*args: str) -> list[str]:
-        return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, check=True).stdout.split("\n")
+def _git(repo: Path, *args: str) -> list[str]:
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, check=True).stdout.split("\n")
 
-    merge_base = git("merge-base", base, "HEAD")[0].strip()
-    paths = set(git("diff", "--name-only", merge_base)) | set(git("ls-files", "--others", "--exclude-standard"))
+
+def merge_base(repo: Path, base: str) -> str:
+    """The commit where HEAD left [base], as a full SHA; [base] must be a plain revision name."""
+    if _REVISION.fullmatch(base) is None:
+        raise ValueError(f"not a revision name: {base!r}")
+    commit = _git(repo, "merge-base", "--end-of-options", base, "HEAD")[0].strip()
+    if _SHA.fullmatch(commit) is None:
+        raise ValueError(f"no merge base with {base!r}")
+    return commit
+
+
+def changed_packages(repo: Path, base: str, structure: Structure) -> list[str]:
+    commit = merge_base(repo, base)
+    paths = set(_git(repo, "diff", "--name-only", commit, "--")) | set(_git(repo, "ls-files", "--others", "--exclude-standard"))
     by_path = {row["path"]: row["package"] for row in structure.files}
     return sorted({by_path[path] for path in paths if path in by_path})
 
 
-def _report_compare(report: dict, path: Path) -> bool:
-    problems = compare(report, json.loads(path.read_text(encoding="utf-8")))
+def ci_report(repo: Path, path: Path) -> dict:
+    """A CI report.json to compare against; it must live in the checkout (e.g. under android-compose/build)."""
+    resolved = path.resolve()
+    if not resolved.is_relative_to(repo) or resolved.suffix != ".json":
+        raise ValueError(f"--compare needs a .json report inside {repo}, got {path}")
+    return json.loads(resolved.read_text(encoding="utf-8"))
+
+
+def _report_compare(report: dict, ci: dict, path: Path) -> bool:
+    problems = compare(report, ci)
     print("\n".join(problems) or f"Parity with {path}: {len(report['packages'])} packages and "
                                  f"{len(report['cyclicImportEdges'])} cyclic edges identical")
     return bool(problems)
@@ -373,7 +394,7 @@ def main(argv: list[str] | None = None) -> int:
     report = structure.report()
     baseline = load_baseline(repo)
 
-    failed = bool(args.compare) and _report_compare(report, args.compare)
+    failed = bool(args.compare) and _report_compare(report, ci_report(repo, args.compare), args.compare)
     contract_failed = _report_contract(report, baseline)
     packages = sorted(set(args.package + (changed_packages(repo, args.base, structure) if args.changed else [])))
     if packages:
@@ -388,4 +409,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except ValueError as error:
+        sys.exit(f"package_headroom.py: {error}")

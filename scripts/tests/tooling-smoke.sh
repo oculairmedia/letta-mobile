@@ -139,8 +139,10 @@ stack_allowlist_pattern='^(\.github/workflows/.*|\.gitignore|\.serena/.*|android
 # a module needs its isolation test in the same PR, so they never count as a
 # stack touch. Nor do the duplicate-code ratchet and its fixture (letta-mobile-ewtaq):
 # a parity guardrail that ships with the gates it feeds, not code-intelligence tooling.
+# Nor does StructureExportFixtureTest: it pins the structure export to the golden that
+# scripts/ci/package_headroom.py (quick-check.sh) also matches (letta-mobile-ivqlv).
 stack_candidates=$(printf '%s\n' "$changed_files" \
-  | rg -v '^android-compose/architecture-tests/src/.*(IsolationTest|DuplicateCode(Ratchet|Fixture)Test|DuplicateCodeScan)\.kt$' || true)
+  | rg -v '^android-compose/architecture-tests/src/.*(IsolationTest|DuplicateCode(Ratchet|Fixture)Test|DuplicateCodeScan|StructureExportFixtureTest)\.kt$' || true)
 if ! printf '%s\n' "$stack_candidates" | rg -q "$stack_touch_pattern"; then
   pass 'Code-intelligence stack changes stay within declared boundaries'
 elif printf '%s\n' "$changed_files" | rg -v "$stack_allowlist_pattern" | rg -q .; then
