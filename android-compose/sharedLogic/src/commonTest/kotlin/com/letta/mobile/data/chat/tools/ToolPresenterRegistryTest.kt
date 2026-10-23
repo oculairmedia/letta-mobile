@@ -76,7 +76,7 @@ class ToolPresenterRegistryTest {
         val registry = BundledToolPresenters.registry
         val file = registry.line(call("open_thing", """{"file_path":"/repo/a.kt"}""")).previews
         assertEquals(listOf(ToolPreviewTarget.File("/repo/a.kt")), file)
-        val memory = registry.line(call("memory_insert", """{"path":"system/human.md"}""")).previews
+        val memory = registry.line(call("memory_view", """{"path":"system/human.md"}""")).previews
         assertEquals(listOf(ToolPreviewTarget.Memory("system/human.md")), memory)
         assertEquals(emptyList(), registry.line(call("x", """{"command":"ls"}""")).previews)
     }

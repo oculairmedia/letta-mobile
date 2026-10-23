@@ -19,15 +19,24 @@ import com.letta.mobile.sharedui.resources.rows_steps_explored
 import com.letta.mobile.sharedui.resources.rows_steps_fetched
 import com.letta.mobile.sharedui.resources.rows_steps_join
 import com.letta.mobile.sharedui.resources.rows_steps_ran
+import com.letta.mobile.sharedui.resources.rows_steps_remembered
 import com.letta.mobile.sharedui.resources.rows_tool_step_label
+import com.letta.mobile.sharedui.resources.rows_tool_verb_added_to_memory
 import com.letta.mobile.sharedui.resources.rows_tool_verb_called
 import com.letta.mobile.sharedui.resources.rows_tool_verb_delegated
 import com.letta.mobile.sharedui.resources.rows_tool_verb_edited
+import com.letta.mobile.sharedui.resources.rows_tool_verb_edited_memory
 import com.letta.mobile.sharedui.resources.rows_tool_verb_fetched
+import com.letta.mobile.sharedui.resources.rows_tool_verb_planned
 import com.letta.mobile.sharedui.resources.rows_tool_verb_ran
 import com.letta.mobile.sharedui.resources.rows_tool_verb_read
+import com.letta.mobile.sharedui.resources.rows_tool_verb_rewrote_memory
 import com.letta.mobile.sharedui.resources.rows_tool_verb_searched
+import com.letta.mobile.sharedui.resources.rows_tool_verb_stopped
+import com.letta.mobile.sharedui.resources.rows_tool_verb_updated
+import com.letta.mobile.sharedui.resources.rows_tool_verb_used
 import com.letta.mobile.sharedui.resources.rows_tool_verb_wrote
+import com.letta.mobile.sharedui.resources.rows_tool_verb_wrote_memfs
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -58,6 +67,14 @@ private val ToolVerb.resource: StringResource
         ToolVerb.Fetched -> Res.string.rows_tool_verb_fetched
         ToolVerb.Delegated -> Res.string.rows_tool_verb_delegated
         ToolVerb.Called -> Res.string.rows_tool_verb_called
+        ToolVerb.EditedMemory -> Res.string.rows_tool_verb_edited_memory
+        ToolVerb.AddedToMemory -> Res.string.rows_tool_verb_added_to_memory
+        ToolVerb.RewroteMemory -> Res.string.rows_tool_verb_rewrote_memory
+        ToolVerb.WroteMemfs -> Res.string.rows_tool_verb_wrote_memfs
+        ToolVerb.Stopped -> Res.string.rows_tool_verb_stopped
+        ToolVerb.Updated -> Res.string.rows_tool_verb_updated
+        ToolVerb.Planned -> Res.string.rows_tool_verb_planned
+        ToolVerb.Used -> Res.string.rows_tool_verb_used
     }
 
 /** Which tool steps the person flipped open or closed; null where no host keeps them (each step then keeps its own). */
@@ -86,4 +103,5 @@ private val ToolActivity.phrase: StringResource
         ToolActivity.Fetched -> Res.string.rows_steps_fetched
         ToolActivity.Delegated -> Res.string.rows_steps_delegated
         ToolActivity.Called -> Res.string.rows_steps_called
+        ToolActivity.Remembered -> Res.string.rows_steps_remembered
     }

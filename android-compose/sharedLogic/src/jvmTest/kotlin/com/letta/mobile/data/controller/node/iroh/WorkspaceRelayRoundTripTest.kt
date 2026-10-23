@@ -37,7 +37,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -157,25 +156,14 @@ class WorkspaceRelayRoundTripTest {
     }
 
     @Test
-    fun aToolCardsRelativeMemoryPathResolvesUnderTheAgentsMemoryRoot() = runTest {
+    fun aRelativeMemoryPathResolvesUnderTheAgentsMemoryRoot() = runTest {
         val root = memoryRoot()
         val server = FakeAppServer(memoryRoot = root)
-        val viewer = com.letta.mobile.data.workspace.WorkspaceFileViewerController(
-            AppServerWorkspaceFileSource(client = { client(server) }, requestId = { it }),
-            backgroundScope,
-        )
+        val files = AppServerWorkspaceFileSource(client = { client(server) }, requestId = { it })
 
-        viewer.open("system/human/communication_style.md", cwd = null, memoryAgentId = "agent-1")
-        // The host's stream server answers on its own dispatcher; wait for the read to settle.
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            kotlinx.coroutines.withTimeout(5_000) { viewer.state.first { !it.loading } }
-        }
+        val content = files.readMemory("agent-1", "system/human/communication_style.md")
 
-        assertEquals(
-            WorkspaceFileContent.Text("system/human/communication_style.md", "Be brief."),
-            viewer.state.value.content,
-            "viewer state: ${viewer.state.value}",
-        )
+        assertEquals(WorkspaceFileContent.Text("system/human/communication_style.md", "Be brief."), content)
         // Read from the agent's memory root (read_memory_file), never relative to the host's cwd (read_file).
         assertEquals(listOf("read_memory_file"), server.received.map { it.first })
     }

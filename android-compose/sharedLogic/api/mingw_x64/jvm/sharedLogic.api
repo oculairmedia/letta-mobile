@@ -10707,6 +10707,7 @@ public final class com/letta/mobile/data/chat/tools/ToolActivity : java/lang/Enu
 	public static final field Explored Lcom/letta/mobile/data/chat/tools/ToolActivity;
 	public static final field Fetched Lcom/letta/mobile/data/chat/tools/ToolActivity;
 	public static final field Ran Lcom/letta/mobile/data/chat/tools/ToolActivity;
+	public static final field Remembered Lcom/letta/mobile/data/chat/tools/ToolActivity;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolActivity;
 	public static fun values ()[Lcom/letta/mobile/data/chat/tools/ToolActivity;
@@ -10812,6 +10813,17 @@ public final class com/letta/mobile/data/chat/tools/ToolInset$Diff : com/letta/m
 	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolInset$Diff;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolInset$Diff;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getUnified ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/data/chat/tools/ToolInset$Rewrite : com/letta/mobile/data/chat/tools/ToolInset {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolInset$Rewrite;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolInset$Rewrite;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolInset$Rewrite;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -11072,6 +11084,17 @@ public final class com/letta/mobile/data/chat/tools/ToolPreviewTarget$Memory : c
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/chat/tools/ToolPreviewTarget$MemoryBlock : com/letta/mobile/data/chat/tools/ToolPreviewTarget {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$MemoryBlock;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$MemoryBlock;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$MemoryBlock;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLabel ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/chat/tools/ToolPreviewTarget$Subagent : com/letta/mobile/data/chat/tools/ToolPreviewTarget {
 	public fun <init> (Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
@@ -11133,15 +11156,23 @@ public final class com/letta/mobile/data/chat/tools/ToolStepLine {
 }
 
 public final class com/letta/mobile/data/chat/tools/ToolVerb : java/lang/Enum {
+	public static final field AddedToMemory Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Called Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Companion Lcom/letta/mobile/data/chat/tools/ToolVerb$Companion;
 	public static final field Delegated Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Edited Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field EditedMemory Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Fetched Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field Planned Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Ran Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Read Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field RewroteMemory Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Searched Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field Stopped Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field Updated Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field Used Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Wrote Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field WroteMemfs Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static fun values ()[Lcom/letta/mobile/data/chat/tools/ToolVerb;
@@ -11182,6 +11213,22 @@ public final class com/letta/mobile/data/chat/tools/bundled/GlobToolPresenter : 
 
 public final class com/letta/mobile/data/chat/tools/bundled/GrepToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
 	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/GrepToolPresenter;
+	public fun getId ()Ljava/lang/String;
+	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/ToolMatcher;
+	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+}
+
+public final class com/letta/mobile/data/chat/tools/bundled/MemfsToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/MemfsToolPresenter;
+	public fun getId ()Ljava/lang/String;
+	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/ToolMatcher;
+	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
+}
+
+public final class com/letta/mobile/data/chat/tools/bundled/MemoryBlockToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/MemoryBlockToolPresenter;
 	public fun getId ()Ljava/lang/String;
 	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/ToolMatcher;
 	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolInset;
@@ -18393,10 +18440,11 @@ public final class com/letta/mobile/data/memory/MemoryParityItem$Companion {
 
 public final class com/letta/mobile/data/memory/MemoryParityItem$MemoryBlock : com/letta/mobile/data/memory/MemoryParityItem {
 	public static final field Companion Lcom/letta/mobile/data/memory/MemoryParityItem$MemoryBlock$Companion;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;I)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Ljava/lang/String;
+	public final fun component11 ()I
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Ljava/lang/String;
@@ -18405,12 +18453,13 @@ public final class com/letta/mobile/data/memory/MemoryParityItem$MemoryBlock : c
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()Ljava/lang/Integer;
 	public final fun component9 ()Z
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;)Lcom/letta/mobile/data/memory/MemoryParityItem$MemoryBlock;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/memory/MemoryParityItem$MemoryBlock;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/data/memory/MemoryParityItem$MemoryBlock;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;I)Lcom/letta/mobile/data/memory/MemoryParityItem$MemoryBlock;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/memory/MemoryParityItem$MemoryBlock;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Integer;ZLjava/lang/String;IILjava/lang/Object;)Lcom/letta/mobile/data/memory/MemoryParityItem$MemoryBlock;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getDetailText ()Ljava/lang/String;
 	public fun getId ()Ljava/lang/String;
 	public final fun getLabel ()Ljava/lang/String;
+	public final fun getLength ()I
 	public final fun getLimit ()Ljava/lang/Integer;
 	public fun getLinks ()Ljava/util/List;
 	public fun getMetadataLabels ()Ljava/util/List;
@@ -19238,6 +19287,8 @@ public final class com/letta/mobile/data/memory/graph/MemoryNodeDetail {
 
 public final class com/letta/mobile/data/memory/graph/MemoryNodeDetails {
 	public static final field INSTANCE Lcom/letta/mobile/data/memory/graph/MemoryNodeDetails;
+	public final fun block (Lcom/letta/mobile/data/memory/MemoryParityState;Ljava/lang/String;)Lcom/letta/mobile/data/memory/MemoryParityItem$MemoryBlock;
+	public final fun blockNodeId (Lcom/letta/mobile/data/memory/MemoryParityState;Ljava/lang/String;)Ljava/lang/String;
 	public final fun resolve (Lcom/letta/mobile/data/memory/MemoryParityState;Ljava/lang/String;)Lcom/letta/mobile/data/memory/graph/MemoryNodeDetail;
 }
 
@@ -62632,16 +62683,14 @@ public abstract interface class com/letta/mobile/data/workspace/WorkspaceFileOpe
 }
 
 public final class com/letta/mobile/data/workspace/WorkspaceFileRequest {
-	public fun <init> (Ljava/lang/String;ZLkotlin/ranges/IntRange;)V
-	public synthetic fun <init> (Ljava/lang/String;ZLkotlin/ranges/IntRange;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Lkotlin/ranges/IntRange;)V
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/ranges/IntRange;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Z
-	public final fun component3 ()Lkotlin/ranges/IntRange;
-	public final fun copy (Ljava/lang/String;ZLkotlin/ranges/IntRange;)Lcom/letta/mobile/data/workspace/WorkspaceFileRequest;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/workspace/WorkspaceFileRequest;Ljava/lang/String;ZLkotlin/ranges/IntRange;ILjava/lang/Object;)Lcom/letta/mobile/data/workspace/WorkspaceFileRequest;
+	public final fun component2 ()Lkotlin/ranges/IntRange;
+	public final fun copy (Ljava/lang/String;Lkotlin/ranges/IntRange;)Lcom/letta/mobile/data/workspace/WorkspaceFileRequest;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/workspace/WorkspaceFileRequest;Ljava/lang/String;Lkotlin/ranges/IntRange;ILjava/lang/Object;)Lcom/letta/mobile/data/workspace/WorkspaceFileRequest;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getLines ()Lkotlin/ranges/IntRange;
-	public final fun getMemoryTool ()Z
 	public final fun getPath ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -62666,8 +62715,8 @@ public final class com/letta/mobile/data/workspace/WorkspaceFileViewerController
 	public fun <init> (Lcom/letta/mobile/data/workspace/WorkspaceFileSource;Lkotlinx/coroutines/CoroutineScope;)V
 	public fun close ()V
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
-	public final fun open (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/ranges/IntRange;)V
-	public static synthetic fun open$default (Lcom/letta/mobile/data/workspace/WorkspaceFileViewerController;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/ranges/IntRange;ILjava/lang/Object;)V
+	public final fun open (Ljava/lang/String;Ljava/lang/String;Lkotlin/ranges/IntRange;)V
+	public static synthetic fun open$default (Lcom/letta/mobile/data/workspace/WorkspaceFileViewerController;Ljava/lang/String;Ljava/lang/String;Lkotlin/ranges/IntRange;ILjava/lang/Object;)V
 	public fun retry ()V
 }
 

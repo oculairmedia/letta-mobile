@@ -724,6 +724,7 @@ final enum class com.letta.mobile.data.chat.tools/ToolActivity : kotlin/Enum<com
     enum entry Explored // com.letta.mobile.data.chat.tools/ToolActivity.Explored|null[0]
     enum entry Fetched // com.letta.mobile.data.chat.tools/ToolActivity.Fetched|null[0]
     enum entry Ran // com.letta.mobile.data.chat.tools/ToolActivity.Ran|null[0]
+    enum entry Remembered // com.letta.mobile.data.chat.tools/ToolActivity.Remembered|null[0]
 
     final val entries // com.letta.mobile.data.chat.tools/ToolActivity.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.chat.tools/ToolActivity> // com.letta.mobile.data.chat.tools/ToolActivity.entries.<get-entries>|<get-entries>#static(){}[0]
@@ -770,14 +771,22 @@ final enum class com.letta.mobile.data.chat.tools/ToolPreviewKind : kotlin/Enum<
 }
 
 final enum class com.letta.mobile.data.chat.tools/ToolVerb : kotlin/Enum<com.letta.mobile.data.chat.tools/ToolVerb> { // com.letta.mobile.data.chat.tools/ToolVerb|null[0]
+    enum entry AddedToMemory // com.letta.mobile.data.chat.tools/ToolVerb.AddedToMemory|null[0]
     enum entry Called // com.letta.mobile.data.chat.tools/ToolVerb.Called|null[0]
     enum entry Delegated // com.letta.mobile.data.chat.tools/ToolVerb.Delegated|null[0]
     enum entry Edited // com.letta.mobile.data.chat.tools/ToolVerb.Edited|null[0]
+    enum entry EditedMemory // com.letta.mobile.data.chat.tools/ToolVerb.EditedMemory|null[0]
     enum entry Fetched // com.letta.mobile.data.chat.tools/ToolVerb.Fetched|null[0]
+    enum entry Planned // com.letta.mobile.data.chat.tools/ToolVerb.Planned|null[0]
     enum entry Ran // com.letta.mobile.data.chat.tools/ToolVerb.Ran|null[0]
     enum entry Read // com.letta.mobile.data.chat.tools/ToolVerb.Read|null[0]
+    enum entry RewroteMemory // com.letta.mobile.data.chat.tools/ToolVerb.RewroteMemory|null[0]
     enum entry Searched // com.letta.mobile.data.chat.tools/ToolVerb.Searched|null[0]
+    enum entry Stopped // com.letta.mobile.data.chat.tools/ToolVerb.Stopped|null[0]
+    enum entry Updated // com.letta.mobile.data.chat.tools/ToolVerb.Updated|null[0]
+    enum entry Used // com.letta.mobile.data.chat.tools/ToolVerb.Used|null[0]
     enum entry Wrote // com.letta.mobile.data.chat.tools/ToolVerb.Wrote|null[0]
+    enum entry WroteMemfs // com.letta.mobile.data.chat.tools/ToolVerb.WroteMemfs|null[0]
 
     final val entries // com.letta.mobile.data.chat.tools/ToolVerb.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.chat.tools/ToolVerb> // com.letta.mobile.data.chat.tools/ToolVerb.entries.<get-entries>|<get-entries>#static(){}[0]
@@ -8760,6 +8769,19 @@ sealed interface com.letta.mobile.data.chat.tools/ToolInset { // com.letta.mobil
         final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools/ToolInset.Diff.toString|toString(){}[0]
     }
 
+    final class Rewrite : com.letta.mobile.data.chat.tools/ToolInset { // com.letta.mobile.data.chat.tools/ToolInset.Rewrite|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.data.chat.tools/ToolInset.Rewrite.<init>|<init>(kotlin.String){}[0]
+
+        final val value // com.letta.mobile.data.chat.tools/ToolInset.Rewrite.value|{}value[0]
+            final fun <get-value>(): kotlin/String // com.letta.mobile.data.chat.tools/ToolInset.Rewrite.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.chat.tools/ToolInset.Rewrite.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.data.chat.tools/ToolInset.Rewrite // com.letta.mobile.data.chat.tools/ToolInset.Rewrite.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.tools/ToolInset.Rewrite.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.tools/ToolInset.Rewrite.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools/ToolInset.Rewrite.toString|toString(){}[0]
+    }
+
     final class Text : com.letta.mobile.data.chat.tools/ToolInset { // com.letta.mobile.data.chat.tools/ToolInset.Text|null[0]
         constructor <init>(kotlin/String) // com.letta.mobile.data.chat.tools/ToolInset.Text.<init>|<init>(kotlin.String){}[0]
 
@@ -8802,6 +8824,19 @@ sealed interface com.letta.mobile.data.chat.tools/ToolPreviewTarget { // com.let
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.tools/ToolPreviewTarget.Memory.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.tools/ToolPreviewTarget.Memory.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools/ToolPreviewTarget.Memory.toString|toString(){}[0]
+    }
+
+    final class MemoryBlock : com.letta.mobile.data.chat.tools/ToolPreviewTarget { // com.letta.mobile.data.chat.tools/ToolPreviewTarget.MemoryBlock|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.data.chat.tools/ToolPreviewTarget.MemoryBlock.<init>|<init>(kotlin.String){}[0]
+
+        final val label // com.letta.mobile.data.chat.tools/ToolPreviewTarget.MemoryBlock.label|{}label[0]
+            final fun <get-label>(): kotlin/String // com.letta.mobile.data.chat.tools/ToolPreviewTarget.MemoryBlock.label.<get-label>|<get-label>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.chat.tools/ToolPreviewTarget.MemoryBlock.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.data.chat.tools/ToolPreviewTarget.MemoryBlock // com.letta.mobile.data.chat.tools/ToolPreviewTarget.MemoryBlock.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.tools/ToolPreviewTarget.MemoryBlock.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.tools/ToolPreviewTarget.MemoryBlock.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools/ToolPreviewTarget.MemoryBlock.toString|toString(){}[0]
     }
 
     final class Subagent : com.letta.mobile.data.chat.tools/ToolPreviewTarget { // com.letta.mobile.data.chat.tools/ToolPreviewTarget.Subagent|null[0]
@@ -9751,7 +9786,7 @@ sealed interface com.letta.mobile.data.memory/MemoryParityItem { // com.letta.mo
     }
 
     final class MemoryBlock : com.letta.mobile.data.memory/MemoryParityItem { // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock|null[0]
-        constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin.collections/List<kotlin/String>, kotlin.collections/List<com.letta.mobile.data.memory/MemoryTextLink>, kotlin/String, kotlin/Int?, kotlin/Boolean, kotlin/String? = ...) // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.collections.List<com.letta.mobile.data.memory.MemoryTextLink>;kotlin.String;kotlin.Int?;kotlin.Boolean;kotlin.String?){}[0]
+        constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin.collections/List<kotlin/String>, kotlin.collections/List<com.letta.mobile.data.memory/MemoryTextLink>, kotlin/String, kotlin/Int?, kotlin/Boolean, kotlin/String? = ..., kotlin/Int = ...) // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.collections.List<com.letta.mobile.data.memory.MemoryTextLink>;kotlin.String;kotlin.Int?;kotlin.Boolean;kotlin.String?;kotlin.Int){}[0]
 
         final val detailText // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.detailText|{}detailText[0]
             final fun <get-detailText>(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.detailText.<get-detailText>|<get-detailText>(){}[0]
@@ -9759,6 +9794,8 @@ sealed interface com.letta.mobile.data.memory/MemoryParityItem { // com.letta.mo
             final fun <get-id>(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.id.<get-id>|<get-id>(){}[0]
         final val label // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.label|{}label[0]
             final fun <get-label>(): kotlin/String? // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.label.<get-label>|<get-label>(){}[0]
+        final val length // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.length|{}length[0]
+            final fun <get-length>(): kotlin/Int // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.length.<get-length>|<get-length>(){}[0]
         final val limit // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.limit|{}limit[0]
             final fun <get-limit>(): kotlin/Int? // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.limit.<get-limit>|<get-limit>(){}[0]
         final val links // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.links|{}links[0]
@@ -9776,6 +9813,7 @@ sealed interface com.letta.mobile.data.memory/MemoryParityItem { // com.letta.mo
 
         final fun component1(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component1|component1(){}[0]
         final fun component10(): kotlin/String? // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component10|component10(){}[0]
+        final fun component11(): kotlin/Int // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component11|component11(){}[0]
         final fun component2(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component2|component2(){}[0]
         final fun component3(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component3|component3(){}[0]
         final fun component4(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component4|component4(){}[0]
@@ -9784,7 +9822,7 @@ sealed interface com.letta.mobile.data.memory/MemoryParityItem { // com.letta.mo
         final fun component7(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component7|component7(){}[0]
         final fun component8(): kotlin/Int? // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component8|component8(){}[0]
         final fun component9(): kotlin/Boolean // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.component9|component9(){}[0]
-        final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<com.letta.mobile.data.memory/MemoryTextLink> = ..., kotlin/String = ..., kotlin/Int? = ..., kotlin/Boolean = ..., kotlin/String? = ...): com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.collections.List<com.letta.mobile.data.memory.MemoryTextLink>;kotlin.String;kotlin.Int?;kotlin.Boolean;kotlin.String?){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<com.letta.mobile.data.memory/MemoryTextLink> = ..., kotlin/String = ..., kotlin/Int? = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin/Int = ...): com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.collections.List<com.letta.mobile.data.memory.MemoryTextLink>;kotlin.String;kotlin.Int?;kotlin.Boolean;kotlin.String?;kotlin.Int){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock.toString|toString(){}[0]
@@ -59895,19 +59933,16 @@ final class com.letta.mobile.data.workspace/WorkspaceFileException : kotlin/Exce
 }
 
 final class com.letta.mobile.data.workspace/WorkspaceFileRequest { // com.letta.mobile.data.workspace/WorkspaceFileRequest|null[0]
-    constructor <init>(kotlin/String, kotlin/Boolean = ..., kotlin.ranges/IntRange? = ...) // com.letta.mobile.data.workspace/WorkspaceFileRequest.<init>|<init>(kotlin.String;kotlin.Boolean;kotlin.ranges.IntRange?){}[0]
+    constructor <init>(kotlin/String, kotlin.ranges/IntRange? = ...) // com.letta.mobile.data.workspace/WorkspaceFileRequest.<init>|<init>(kotlin.String;kotlin.ranges.IntRange?){}[0]
 
     final val lines // com.letta.mobile.data.workspace/WorkspaceFileRequest.lines|{}lines[0]
         final fun <get-lines>(): kotlin.ranges/IntRange? // com.letta.mobile.data.workspace/WorkspaceFileRequest.lines.<get-lines>|<get-lines>(){}[0]
-    final val memoryTool // com.letta.mobile.data.workspace/WorkspaceFileRequest.memoryTool|{}memoryTool[0]
-        final fun <get-memoryTool>(): kotlin/Boolean // com.letta.mobile.data.workspace/WorkspaceFileRequest.memoryTool.<get-memoryTool>|<get-memoryTool>(){}[0]
     final val path // com.letta.mobile.data.workspace/WorkspaceFileRequest.path|{}path[0]
         final fun <get-path>(): kotlin/String // com.letta.mobile.data.workspace/WorkspaceFileRequest.path.<get-path>|<get-path>(){}[0]
 
     final fun component1(): kotlin/String // com.letta.mobile.data.workspace/WorkspaceFileRequest.component1|component1(){}[0]
-    final fun component2(): kotlin/Boolean // com.letta.mobile.data.workspace/WorkspaceFileRequest.component2|component2(){}[0]
-    final fun component3(): kotlin.ranges/IntRange? // com.letta.mobile.data.workspace/WorkspaceFileRequest.component3|component3(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/Boolean = ..., kotlin.ranges/IntRange? = ...): com.letta.mobile.data.workspace/WorkspaceFileRequest // com.letta.mobile.data.workspace/WorkspaceFileRequest.copy|copy(kotlin.String;kotlin.Boolean;kotlin.ranges.IntRange?){}[0]
+    final fun component2(): kotlin.ranges/IntRange? // com.letta.mobile.data.workspace/WorkspaceFileRequest.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin.ranges/IntRange? = ...): com.letta.mobile.data.workspace/WorkspaceFileRequest // com.letta.mobile.data.workspace/WorkspaceFileRequest.copy|copy(kotlin.String;kotlin.ranges.IntRange?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.workspace/WorkspaceFileRequest.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.workspace/WorkspaceFileRequest.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.workspace/WorkspaceFileRequest.toString|toString(){}[0]
@@ -59920,7 +59955,7 @@ final class com.letta.mobile.data.workspace/WorkspaceFileViewerController : com.
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.workspace/WorkspaceFileViewerState> // com.letta.mobile.data.workspace/WorkspaceFileViewerController.state.<get-state>|<get-state>(){}[0]
 
     final fun close() // com.letta.mobile.data.workspace/WorkspaceFileViewerController.close|close(){}[0]
-    final fun open(kotlin/String, kotlin/String?, kotlin/String? = ..., kotlin.ranges/IntRange? = ...) // com.letta.mobile.data.workspace/WorkspaceFileViewerController.open|open(kotlin.String;kotlin.String?;kotlin.String?;kotlin.ranges.IntRange?){}[0]
+    final fun open(kotlin/String, kotlin/String?, kotlin.ranges/IntRange? = ...) // com.letta.mobile.data.workspace/WorkspaceFileViewerController.open|open(kotlin.String;kotlin.String?;kotlin.ranges.IntRange?){}[0]
     final fun retry() // com.letta.mobile.data.workspace/WorkspaceFileViewerController.retry|retry(){}[0]
 }
 
@@ -65120,6 +65155,26 @@ final object com.letta.mobile.data.chat.tools.bundled/GrepToolPresenter : com.le
     final fun line(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools.bundled/GrepToolPresenter.line|line(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
 }
 
+final object com.letta.mobile.data.chat.tools.bundled/MemfsToolPresenter : com.letta.mobile.data.chat.tools/ToolPresenter { // com.letta.mobile.data.chat.tools.bundled/MemfsToolPresenter|null[0]
+    final val id // com.letta.mobile.data.chat.tools.bundled/MemfsToolPresenter.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.letta.mobile.data.chat.tools.bundled/MemfsToolPresenter.id.<get-id>|<get-id>(){}[0]
+    final val matcher // com.letta.mobile.data.chat.tools.bundled/MemfsToolPresenter.matcher|{}matcher[0]
+        final fun <get-matcher>(): com.letta.mobile.data.chat.tools/ToolMatcher // com.letta.mobile.data.chat.tools.bundled/MemfsToolPresenter.matcher.<get-matcher>|<get-matcher>(){}[0]
+
+    final fun inset(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools.bundled/MemfsToolPresenter.inset|inset(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
+    final fun line(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools.bundled/MemfsToolPresenter.line|line(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
+}
+
+final object com.letta.mobile.data.chat.tools.bundled/MemoryBlockToolPresenter : com.letta.mobile.data.chat.tools/ToolPresenter { // com.letta.mobile.data.chat.tools.bundled/MemoryBlockToolPresenter|null[0]
+    final val id // com.letta.mobile.data.chat.tools.bundled/MemoryBlockToolPresenter.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.letta.mobile.data.chat.tools.bundled/MemoryBlockToolPresenter.id.<get-id>|<get-id>(){}[0]
+    final val matcher // com.letta.mobile.data.chat.tools.bundled/MemoryBlockToolPresenter.matcher|{}matcher[0]
+        final fun <get-matcher>(): com.letta.mobile.data.chat.tools/ToolMatcher // com.letta.mobile.data.chat.tools.bundled/MemoryBlockToolPresenter.matcher.<get-matcher>|<get-matcher>(){}[0]
+
+    final fun inset(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools.bundled/MemoryBlockToolPresenter.inset|inset(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
+    final fun line(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools.bundled/MemoryBlockToolPresenter.line|line(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
+}
+
 final object com.letta.mobile.data.chat.tools.bundled/ReadToolPresenter : com.letta.mobile.data.chat.tools/ToolPresenter { // com.letta.mobile.data.chat.tools.bundled/ReadToolPresenter|null[0]
     final val id // com.letta.mobile.data.chat.tools.bundled/ReadToolPresenter.id|{}id[0]
         final fun <get-id>(): kotlin/String // com.letta.mobile.data.chat.tools.bundled/ReadToolPresenter.id.<get-id>|<get-id>(){}[0]
@@ -65481,6 +65536,8 @@ final object com.letta.mobile.data.memory.graph/MemoryGraphViews { // com.letta.
 }
 
 final object com.letta.mobile.data.memory.graph/MemoryNodeDetails { // com.letta.mobile.data.memory.graph/MemoryNodeDetails|null[0]
+    final fun block(com.letta.mobile.data.memory/MemoryParityState, kotlin/String): com.letta.mobile.data.memory/MemoryParityItem.MemoryBlock? // com.letta.mobile.data.memory.graph/MemoryNodeDetails.block|block(com.letta.mobile.data.memory.MemoryParityState;kotlin.String){}[0]
+    final fun blockNodeId(com.letta.mobile.data.memory/MemoryParityState, kotlin/String): kotlin/String? // com.letta.mobile.data.memory.graph/MemoryNodeDetails.blockNodeId|blockNodeId(com.letta.mobile.data.memory.MemoryParityState;kotlin.String){}[0]
     final fun resolve(com.letta.mobile.data.memory/MemoryParityState, kotlin/String): com.letta.mobile.data.memory.graph/MemoryNodeDetail? // com.letta.mobile.data.memory.graph/MemoryNodeDetails.resolve|resolve(com.letta.mobile.data.memory.MemoryParityState;kotlin.String){}[0]
 }
 

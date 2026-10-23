@@ -33,6 +33,38 @@ enum class ToolVerb {
 
     @SerialName("called")
     Called,
+
+    /** A background task or process stopped: "Stopped". */
+    @SerialName("stopped")
+    Stopped,
+
+    /** A list or record brought up to date (the todo list): "Updated". */
+    @SerialName("updated")
+    Updated,
+
+    /** A plan entered or proposed: "Planned". */
+    @SerialName("planned")
+    Planned,
+
+    /** A skill or other capability put to use: "Used". */
+    @SerialName("used")
+    Used,
+
+    /** A memory block's text replaced in place: "Edited memory". */
+    @SerialName("edited_memory")
+    EditedMemory,
+
+    /** Text inserted into or appended to a memory block: "Added to memory". */
+    @SerialName("added_to_memory")
+    AddedToMemory,
+
+    /** A memory block's whole value rewritten: "Rewrote memory". */
+    @SerialName("rewrote_memory")
+    RewroteMemory,
+
+    /** A MemFS entry created, edited, renamed or deleted: "Wrote memfs". */
+    @SerialName("wrote_memfs")
+    WroteMemfs,
 }
 
 /**
@@ -73,6 +105,9 @@ sealed interface ToolInset {
     /** Plain monospace text: a file read, search hits, a fetched page. */
     data class Text(val text: String) : ToolInset
 
+    /** A whole value rewritten (a memory block's rethink): the new [value], said to replace all of it. */
+    data class Rewrite(val value: String) : ToolInset
+
     /** Any other call: its arguments as `key: value` lines, then its result. */
     data class Arguments(val fields: List<ToolArgumentField>, val result: String?) : ToolInset
 }
@@ -96,8 +131,11 @@ sealed interface ToolPreviewTarget {
     /** A working-directory file, with the [lines] (1-based, inclusive) the call touched. */
     data class File(val path: String, val lines: IntRange? = null) : ToolPreviewTarget
 
-    /** An entry of the agent's memory (a block label or a MemFS path), opened in the Memory view. */
+    /** A MemFS entry of the agent's memory (`system/human.md`), opened in the Memory view's Files. */
     data class Memory(val path: String) : ToolPreviewTarget
+
+    /** A core memory block by its [label] (`persona`), opened focused in the Memory view's graph. */
+    data class MemoryBlock(val label: String) : ToolPreviewTarget
 
     /** A subagent the call dispatched, opened in the dual view. */
     data class Subagent(val agentId: String) : ToolPreviewTarget
@@ -120,6 +158,7 @@ enum class ToolActivity {
     Edited,
     Fetched,
     Delegated,
+    Remembered,
     Called,
 }
 
@@ -127,9 +166,10 @@ enum class ToolActivity {
 val ToolVerb.activity: ToolActivity
     get() = when (this) {
         ToolVerb.Read, ToolVerb.Searched -> ToolActivity.Explored
-        ToolVerb.Ran -> ToolActivity.Ran
+        ToolVerb.Ran, ToolVerb.Stopped -> ToolActivity.Ran
         ToolVerb.Wrote, ToolVerb.Edited -> ToolActivity.Edited
         ToolVerb.Fetched -> ToolActivity.Fetched
         ToolVerb.Delegated -> ToolActivity.Delegated
-        ToolVerb.Called -> ToolActivity.Called
+        ToolVerb.Called, ToolVerb.Updated, ToolVerb.Planned, ToolVerb.Used -> ToolActivity.Called
+        ToolVerb.EditedMemory, ToolVerb.AddedToMemory, ToolVerb.RewroteMemory, ToolVerb.WroteMemfs -> ToolActivity.Remembered
     }
