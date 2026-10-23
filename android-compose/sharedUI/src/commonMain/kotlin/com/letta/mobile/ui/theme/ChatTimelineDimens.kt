@@ -20,6 +20,12 @@ object ChatTimelineDimens {
      */
     val stickyPromptExitFadeLength: Dp = 24.dp
 
+    /**
+     * Below an edge that hides the rows (floating chrome, a held sticky prompt), the rows grade back
+     * in over this much only, so the text just under it reads at full strength.
+     */
+    val coveredEdgeGradeLength: Dp = 16.dp
+
     /** Bottom fade ramp into the composer. */
     val bottomFadeLength: Dp = 44.dp
 

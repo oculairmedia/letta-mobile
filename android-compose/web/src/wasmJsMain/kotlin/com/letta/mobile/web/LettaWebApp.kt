@@ -17,8 +17,7 @@ import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.ProvideLettaHost
 import com.letta.mobile.ui.mascot.frame.ProvideFrameMascots
 import com.letta.mobile.ui.mascot.rememberMascotRegistry
-import com.letta.mobile.ui.shell.pages.ShellHomeFleet
-import com.letta.mobile.ui.shell.pages.ShellHomeFleetEffect
+import com.letta.mobile.ui.shell.pages.ShellHomeBackendFleetEffect
 import com.letta.mobile.ui.shell.pages.rememberShellLibraryControllers
 import com.letta.mobile.ui.shell.rememberShellWorkspaceState
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspace
@@ -66,7 +65,7 @@ fun LettaWebApp() {
     // letta-mobile-ckmub.17.5: the shared pages over the live session graph, as desktop binds them.
     val graph by app.gateway.sessionGraphProvider.currentGraph.collectAsState()
     val controllers = rememberShellLibraryControllers(app.gateway.sessionGraphProvider, app.services.sources, scope)
-    ShellHomeFleetEffect(controllers.home, ShellHomeFleet(conversations = emptyList(), roster = backend.agents.value))
+    ShellHomeBackendFleetEffect(controllers.home, chat.list.state.conversations, backend.agents.value)
     val onRosterChanged: () -> Unit = { scope.launch { backend.reloadRoster(graph, workspace) } }
     val pairing = remember(backend, workspace) {
         WebPairingPorts(backend, workspace, WebPairedHostStore(backend.config, app.settingsStore), app.gateway.adminRpc)

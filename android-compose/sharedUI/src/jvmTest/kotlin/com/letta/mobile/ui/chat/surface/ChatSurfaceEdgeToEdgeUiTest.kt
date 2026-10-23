@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
@@ -32,6 +33,8 @@ import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimelineTags
+import com.letta.mobile.ui.shell.LocalShellFloatingChromeInset
+import com.letta.mobile.ui.shell.workspace.underFloatingChrome
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -71,26 +74,34 @@ class ChatSurfaceEdgeToEdgeUiTest {
         override val actions: ChatActions = RecordingChatActions()
     }
 
+    /**
+     * The page with the host's chrome as [ChatSurfacePlatform.topChromeInset], or (with [floating])
+     * as the shell workspace's floating chrome, which the shell's chat page folds into its platform.
+     */
     private fun ComposeUiTest.show(
         presentation: ChatSurfacePresentation,
+        floating: Boolean = false,
         canvas: (@androidx.compose.runtime.Composable (ChatCanvasActions) -> Unit)? = null,
     ) {
         setContent {
+            val platform = ChatSurfacePlatform(
+                showKeyboardHints = false,
+                timelineOverlay = { Box(Modifier.size(1.dp).testTag(OVERLAY_PROBE)) },
+                topChromeInset = if (floating) 0.dp else TOP_CHROME,
+            )
             MaterialTheme {
-                ChatSurface(
-                    port = Port(messages),
-                    presentation = presentation,
-                    onIntent = {},
-                    host = ChatSurfaceHost(openCanvas = {}),
-                    modifier = Modifier.fillMaxSize(),
-                    appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                    platform = ChatSurfacePlatform(
-                        showKeyboardHints = false,
-                        timelineOverlay = { Box(Modifier.size(1.dp).testTag(OVERLAY_PROBE)) },
-                        topChromeInset = TOP_CHROME,
-                    ),
-                    canvas = canvas,
-                )
+                CompositionLocalProvider(LocalShellFloatingChromeInset provides if (floating) TOP_CHROME else 0.dp) {
+                    ChatSurface(
+                        port = Port(messages),
+                        presentation = presentation,
+                        onIntent = {},
+                        host = ChatSurfaceHost(openCanvas = {}),
+                        modifier = Modifier.fillMaxSize(),
+                        appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
+                        platform = platform.underFloatingChrome(LocalShellFloatingChromeInset.current),
+                        canvas = canvas,
+                    )
+                }
             }
         }
         waitForIdle()
@@ -99,7 +110,17 @@ class ChatSurfaceEdgeToEdgeUiTest {
     @Test
     fun theTimelineScrollsUnderTheChromeAndItsOldestRowRestsBelowIt() = runComposeUiTest {
         show(ChatSurfacePresentation.ChatFirst)
+        assertTheTimelineRestsBelowTheChrome()
+    }
 
+    /** The phone shell's floating header (pill, search, menu) is chrome the timeline rests below too. */
+    @Test
+    fun theWorkspacesFloatingChromeRestsTheTimelineBelowIt() = runComposeUiTest {
+        show(ChatSurfacePresentation.ChatFirst, floating = true)
+        assertTheTimelineRestsBelowTheChrome()
+    }
+
+    private fun ComposeUiTest.assertTheTimelineRestsBelowTheChrome() {
         // The list itself reaches the top edge: rows scroll behind the status bar and header.
         assertEquals(0.dp, onNodeWithTag(ChatTimelineTags.LIST).getBoundsInRoot().top)
         // Scrolled all the way back, the oldest row rests below the chrome, not under it.

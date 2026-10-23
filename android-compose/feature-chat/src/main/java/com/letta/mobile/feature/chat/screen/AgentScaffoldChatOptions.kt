@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.data.chat.display.ChatTextSize
@@ -45,11 +46,15 @@ internal fun rememberAndroidChatOptionsActions(
     drawer: SharedNavDrawerViewModel,
 ): ShellChatOptionsActions {
     val context = LocalContext.current
-    return remember(state, drawer, context) {
+    // Not keyed on [state]: it is rebuilt on every composition, so actions keyed on it were new each
+    // time, and the workspace panel built from them was republished, recomposing the whole shell,
+    // which recomposed this page again - a loop that redrew the phone on every frame at rest.
+    val latest by rememberUpdatedState(state)
+    return remember(drawer, context) {
         ShellChatOptionsActions(
             onDisplayChange = drawer::setDisplayOptions,
-            onTextSizeChange = { size -> state.params.viewModel.setChatFontScale(size.fontScale) },
-            onDownloadTranscript = { shareTranscript(context, transcriptOf(state, drawer)) },
+            onTextSizeChange = { size -> latest.params.viewModel.setChatFontScale(size.fontScale) },
+            onDownloadTranscript = { shareTranscript(context, transcriptOf(latest, drawer)) },
         )
     }
 }

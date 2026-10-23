@@ -41,9 +41,9 @@ import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.TouchComposerDimens
 import org.jetbrains.compose.resources.stringResource
 
-/** One row of the Touch composer's "+" sheet. */
+/** One row of the Touch composer's "+" sheet; a row that cannot act now stays, greyed ([enabled]). */
 @Immutable
-internal class TouchSheetItem(val label: String, val icon: ImageVector, val onClick: () -> Unit)
+internal class TouchSheetItem(val label: String, val icon: ImageVector, val onClick: () -> Unit, val enabled: Boolean = true)
 
 /**
  * The "+" sheet, "Add to message". A port of the legacy Android composer's
@@ -83,6 +83,7 @@ private fun TouchSheetRow(item: TouchSheetItem, onClick: () -> Unit) {
             haptics.play(LettaHapticCue.ContextClick)
             onClick()
         },
+        enabled = item.enabled,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs)

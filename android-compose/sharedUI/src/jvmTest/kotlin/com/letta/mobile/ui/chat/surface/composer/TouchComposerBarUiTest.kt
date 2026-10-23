@@ -8,6 +8,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -15,9 +18,12 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
+import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
+import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
@@ -59,6 +65,54 @@ class TouchComposerBarUiTest {
             )
         }
         onNodeWithContentDescription("Add to message").assertExists()
+    }
+
+    /** The permission mode is a row of the "+" sheet, not a chip floating above the bar. */
+    @Test
+    fun thePlusSheetOffersThePermissionModeAndItsPicker() = runComposeUiTest {
+        val actions = RecordingChatActions()
+        val mode = ChatPermissionModeUiState(selected = AppServerPermissionMode.Unrestricted)
+        setContent { TouchPanel(ComposerInputs(composer = ready().copy(permissionMode = mode), actions = actions)) }
+
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertDoesNotExist()
+        onNodeWithContentDescription("Add to message").performClick()
+        onNodeWithText("Permission mode: Approve all").performClick()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_POPOVER).assertExists()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_OPTION + AppServerPermissionMode.Standard.name).performClick()
+
+        runOnIdle { assertEquals(listOf(AppServerPermissionMode.Standard), actions.permissionModes) }
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_POPOVER).assertDoesNotExist()
+    }
+
+    @Test
+    fun aLockedModeStaysInTheSheetGreyedWithItsReasonAboveTheBar() = runComposeUiTest {
+        val locked = ChatPermissionModeUiState(
+            selected = AppServerPermissionMode.Standard,
+            unavailableReason = "Not supported over Iroh yet",
+        )
+        setContent { TouchPanel(ComposerInputs(composer = ready().copy(permissionMode = locked), actions = RecordingChatActions())) }
+
+        onNodeWithText("Not supported over Iroh yet").assertExists()
+        onNodeWithContentDescription("Add to message").performClick()
+        onNodeWithText("Permission mode: Ask for approval").assertExists()
+        onNode(hasTestTag(ComposerTestTags.TOUCH_SHEET_ROW) and hasAnyDescendant(hasText("Permission mode: Ask for approval")))
+            .assertIsNotEnabled()
+    }
+
+    @Test
+    fun theCanvasDockLeavesThePermissionModeOutOfThePlus() = runComposeUiTest {
+        val mode = ChatPermissionModeUiState(selected = AppServerPermissionMode.Unrestricted)
+        setContent {
+            TouchPanel(
+                ComposerInputs(
+                    composer = ready().copy(permissionMode = mode),
+                    actions = RecordingChatActions(),
+                    mode = ChatSurfaceMode.Docked,
+                ),
+            )
+        }
+        // With the mode left out the "+" is attach-only again.
+        onNodeWithContentDescription("Attach image").assertExists()
     }
 
     @Test

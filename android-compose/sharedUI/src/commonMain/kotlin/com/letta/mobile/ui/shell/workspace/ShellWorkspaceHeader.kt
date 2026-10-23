@@ -22,7 +22,6 @@ import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.shell_new_conversation_tab
-import com.letta.mobile.sharedui.resources.shell_open_navigation
 import com.letta.mobile.sharedui.resources.shell_sidebar_hide
 import com.letta.mobile.sharedui.resources.shell_sidebar_show
 import com.letta.mobile.sharedui.resources.shell_workspace_title
@@ -37,6 +36,7 @@ import com.letta.mobile.ui.shell.header.HeaderNav
 import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.SearchSlot
 import com.letta.mobile.ui.shell.header.ShellHeader
+import com.letta.mobile.ui.shell.header.ShellHeaderDefaults
 import com.letta.mobile.ui.shell.nowactive.NowActiveBarActions
 import com.letta.mobile.ui.shell.nowactive.NowActiveBarState
 import com.letta.mobile.ui.shell.nowactive.NowActiveIdentity
@@ -55,7 +55,8 @@ data class ShellSidebarOverflow(
 
 /**
  * The header's sidebar control: the one control that survives collapse, so it also
- * anchors focus when the sidebar closes ([focusRequester]). In a compact window it opens the drawer.
+ * anchors focus when the sidebar closes ([focusRequester]). A compact window has none: its minimal
+ * header ([ShellMinimalHeader]) opens the drawer instead.
  */
 @Immutable
 data class ShellSidebarControl(
@@ -63,8 +64,6 @@ data class ShellSidebarControl(
     val onToggle: () -> Unit,
     val focusRequester: FocusRequester? = null,
     val overflow: ShellSidebarOverflow? = null,
-    /** The compact window's control: it opens the navigation drawer instead of toggling a sidebar. */
-    val opensDrawer: Boolean = false,
 )
 
 /** The conversation tabs and the strip's "+" (a new chat with the focused agent). */
@@ -89,18 +88,31 @@ data class ShellWorkspaceHeaderState(
     val sidebar: ShellSidebarControl? = null,
     val search: SearchSlot? = null,
     val tabs: ShellConversationTabs = ShellConversationTabs(),
+    /**
+     * The compact window's header in place of the sidebar control, tabs and identity block: the
+     * agent pill, the search and the drawer's menu. The workspace sets it whenever it lays out compact.
+     */
+    val minimal: ShellMinimalHeader? = null,
 )
 
 object ShellWorkspaceHeaderTags {
     const val SIDEBAR_TOGGLE = "shell-sidebar-toggle"
+    /** The minimal header's drawer menu, on its right. */
+    const val MENU_BUTTON = "shell-header-menu"
 }
 
 /**
- * The shared [ShellHeader] with the workspace's pieces. [dragLaneWidth] is the blank lane the tab
+ * The shared [ShellHeader] with the workspace's pieces, or with [ShellWorkspaceHeaderState.minimal]
+ * the compact window's minimal header. [dragLaneWidth] is the blank lane the tab
  * strip leaves for a window that drags by its title bar; the browser leaves none.
  */
 @Composable
 fun ShellWorkspaceHeader(state: ShellWorkspaceHeaderState, modifier: Modifier = Modifier, dragLaneWidth: Dp = 0.dp) {
+    val minimal = state.minimal
+    if (minimal != null) {
+        ShellMinimalWorkspaceHeader(minimal, title = state.title, search = state.search, modifier = modifier)
+        return
+    }
     ShellHeader(
         title = headerTitle(state.labelled(), dragLaneWidth),
         modifier = modifier,
@@ -114,6 +126,16 @@ fun ShellWorkspaceHeader(state: ShellWorkspaceHeaderState, modifier: Modifier = 
     )
 }
 
+/**
+ * The height a bar gives this header: the phone app bar's for the minimal header (room for the agent
+ * pill), browser-thin with tabs (one line per tab), else [plain] (room for the identity block).
+ */
+fun ShellWorkspaceHeaderState.barHeight(plain: Dp): Dp = when {
+    minimal != null -> ShellHeaderDefaults.TouchMinHeight
+    tabs.tabs.isNotEmpty() -> LettaDimens.Control.actionButton
+    else -> plain
+}
+
 /** The header's own words: the app's name as the fallback title, and the strip's "+" label. */
 @Composable
 private fun ShellWorkspaceHeaderState.labelled(): ShellWorkspaceHeaderState = copy(
@@ -124,7 +146,7 @@ private fun ShellWorkspaceHeaderState.labelled(): ShellWorkspaceHeaderState = co
 @Composable
 private fun ShellSidebarControls(control: ShellSidebarControl) {
     ShellSidebarToggleButton(control)
-    control.overflow?.takeIf { control.collapsed && !control.opensDrawer }?.let { ShellSidebarOverflowMenu(it) }
+    control.overflow?.takeIf { control.collapsed }?.let { ShellSidebarOverflowMenu(it) }
     Box(modifier = Modifier.width(LettaDimens.Space.xs))
 }
 
@@ -154,21 +176,11 @@ private fun headerTitle(state: ShellWorkspaceHeaderState, dragLaneWidth: Dp): He
     }
 }
 
-/** The sidebar toggle (a panel glyph, not a hamburger); in a compact window, the drawer's menu. */
+/** The sidebar toggle (a panel glyph, not a hamburger). */
 @Composable
 fun ShellSidebarToggleButton(control: ShellSidebarControl, modifier: Modifier = Modifier) {
-    val label = stringResource(
-        when {
-            control.opensDrawer -> Res.string.shell_open_navigation
-            control.collapsed -> Res.string.shell_sidebar_show
-            else -> Res.string.shell_sidebar_hide
-        },
-    )
-    val icon = when {
-        control.opensDrawer -> LettaIcons.Menu
-        control.collapsed -> LettaIcons.PanelLeftOpen
-        else -> LettaIcons.PanelLeftClose
-    }
+    val label = stringResource(if (control.collapsed) Res.string.shell_sidebar_show else Res.string.shell_sidebar_hide)
+    val icon = if (control.collapsed) LettaIcons.PanelLeftOpen else LettaIcons.PanelLeftClose
     LocalLettaHost.current.tooltip(label) {
         IconButton(
             onClick = control.onToggle,

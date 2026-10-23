@@ -45,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -115,15 +116,13 @@ internal fun TouchComposerBar(
     leading: (@Composable () -> Unit)? = null,
 ) {
     var sheetOpen by remember { mutableStateOf(false) }
-    val sheetItems = touchSheetItems(model, onAttachImage)
+    val modePicker = remember { TouchModePicker() }
+    val sheetItems = touchSheetItems(model, onAttachImage, onPermissionMode = { modePicker.open = true })
     Column(modifier.fillMaxWidth().then(touchBarSwipe(model))) {
         TouchAttachments(model)
         TouchBarSurface(model) {
             leading?.invoke()
-            TouchPlusButton(
-                items = sheetItems,
-                onClick = { if (sheetItems.size == 1) sheetItems.single().onClick() else sheetOpen = true },
-            )
+            TouchPlus(model, sheetItems, modePicker, onOpenSheet = { sheetOpen = true })
             Box(Modifier.weight(1f).padding(horizontal = TouchComposerDimens.fieldPadding, vertical = TouchComposerDimens.fieldPadding)) {
                 ComposerTextField(model = model, style = touchFieldStyle(model))
             }
@@ -242,6 +241,26 @@ internal fun touchBarVerticalPadding(imePx: Int): Dp {
     return lerp(TouchComposerDimens.restingVerticalPadding, TouchComposerDimens.compactVerticalPadding, compact)
 }
 
+/** Whether the modes' popover the "+" sheet's mode row opens is showing. */
+@Stable
+private class TouchModePicker {
+    var open: Boolean by mutableStateOf(false)
+}
+
+/**
+ * The "+" with the modes' popover the sheet's mode row opens, above the "+" it came from. With one
+ * item the "+" does that item directly (when it can act); with more it opens the sheet.
+ */
+@Composable
+private fun TouchPlus(model: ComposerModel, items: List<TouchSheetItem>, modePicker: TouchModePicker, onOpenSheet: () -> Unit) {
+    Box {
+        TouchPlusButton(items = items, onClick = { items.singleOrNull()?.let { if (it.enabled) it.onClick() } ?: onOpenSheet() })
+        model.composer.permissionMode?.let { state ->
+            ComposerPermissionModePicker(state, modePicker.open, model.actions::setPermissionMode, onDismiss = { modePicker.open = false })
+        }
+    }
+}
+
 /**
  * The round tonal "+": the action sheet, or (with one thing to do) that thing directly. It is
  * announced as what it does: "Add to message" when it opens the sheet,
@@ -291,14 +310,21 @@ private fun TouchPlusButton(items: List<TouchSheetItem>, onClick: () -> Unit) {
     }
 }
 
-/** What the "+" offers: attach an image; open the canvas where the page has one to open. */
+/**
+ * What the "+" offers: attach an image; open the canvas where the page has one to open; and on the
+ * full page (not the compact dock), the permission mode, which the Touch bar has no control row for.
+ */
 @Composable
-private fun touchSheetItems(model: ComposerModel, onAttachImage: () -> Unit): List<TouchSheetItem> {
+private fun touchSheetItems(model: ComposerModel, onAttachImage: () -> Unit, onPermissionMode: () -> Unit): List<TouchSheetItem> {
     val attach = stringResource(Res.string.composer_attach_image)
     val canvas = stringResource(Res.string.composer_open_canvas)
+    val mode = model.composer.permissionMode
+        ?.takeIf { model.mode != ChatSurfaceMode.Docked }
+        ?.let { permissionModeSheetItem(it, onPermissionMode) }
     return buildList {
         if (model.capabilities.attachImages) add(TouchSheetItem(attach, LettaIcons.Add, onAttachImage))
-        if (model.offersOpenCanvas) add(TouchSheetItem(canvas, LettaIcons.Edit) { model.onIntent(ChatSurfaceIntent.OpenCanvas) })
+        if (model.offersOpenCanvas) add(TouchSheetItem(canvas, LettaIcons.Edit, onClick = { model.onIntent(ChatSurfaceIntent.OpenCanvas) }))
+        mode?.let(::add)
     }
 }
 

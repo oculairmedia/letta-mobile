@@ -12,13 +12,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.shell.LocalShellFloatingChromeInset
 
 @Composable
 internal fun AgentScaffoldMainContent(
     state: AgentScaffoldRuntimeState,
     paddingValues: PaddingValues,
 ) {
-    val topPadding = paddingValues.calculateTopPadding()
+    // The page draws under the workspace's floating header (compact) and rests its content below it.
+    val topPadding = maxOf(paddingValues.calculateTopPadding(), LocalShellFloatingChromeInset.current)
     Column(modifier = Modifier.fillMaxSize()) {
         AgentScaffoldProjectInfoSection(state, topPadding)
         AgentScaffoldChatSection(state, topPadding)

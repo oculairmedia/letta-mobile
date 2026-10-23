@@ -88,7 +88,6 @@ internal fun DockedReplyCard(params: DockedReplyParams, modifier: Modifier = Mod
     val fades = rememberTimelineFadeAlphas(
         canScrollTowardOlder = listState.canScrollForward,
         canScrollTowardNewer = listState.canScrollBackward,
-        promptPinned = false,
     )
     // The full page's elastic bounce (letta-mobile-bglj6.1.20); the docked list holds no pinch.
     val overscroll = rememberTimelineElasticOverscroll(

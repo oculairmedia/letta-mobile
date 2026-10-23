@@ -12,12 +12,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
+import com.letta.mobile.data.agents.RecentAgents
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.shell.ShellDestination
@@ -25,11 +24,10 @@ import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.feature.chat.screen.SharedNavDrawerViewModel
 import com.letta.mobile.feature.chat.screen.WorkspaceChatPanel
-import com.letta.mobile.ui.components.tabs.LettaTab
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.shell.ShellDrawerConversations
 import com.letta.mobile.ui.shell.ShellDrawerLibrary
-import com.letta.mobile.ui.shell.header.UnifiedSearchSources
+import com.letta.mobile.ui.shell.pages.ShellHomeBackendFleetEffect
 import com.letta.mobile.ui.shell.pages.ShellLibraryControllers
 import com.letta.mobile.ui.shell.pages.rememberShellLibraryControllers
 import com.letta.mobile.ui.shell.rememberShellWorkspaceState
@@ -41,6 +39,8 @@ import com.letta.mobile.ui.shell.shortcuts.ShortcutPlatform
 import com.letta.mobile.ui.shell.shortcuts.ShortcutStepping
 import com.letta.mobile.ui.shell.shortcuts.WorkspaceShortcuts
 import com.letta.mobile.ui.shell.shortcuts.handleShortcut
+import com.letta.mobile.ui.shell.workspace.fleetSearchSources
+import com.letta.mobile.ui.shell.workspace.fleetTabFor
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspace
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceHost
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspaceSlots
@@ -118,6 +118,7 @@ internal fun AndroidShellWorkspace(start: ShellDestination, config: LettaConfig?
     LaunchedEffect(config?.id) { drawerModel.refresh(workspace.focusedAgentId, roster = true) }
     LaunchedEffect(shell.drawer.open, workspace.focusedAgentId) { if (shell.drawer.open) drawerModel.refresh(workspace.focusedAgentId) }
     AndroidShellLaunchEffect(shell, launch)
+    ShellHomeBackendFleetEffect(shell.controllers.home, fleet, agents)
     ShellFailures(drawerModel)
     // Back closes the drawer, then returns to Home; on Home it leaves the app.
     BackHandler(enabled = shell.drawer.open || workspace.page != ShellDestination.Home) {
@@ -127,14 +128,14 @@ internal fun AndroidShellWorkspace(start: ShellDestination, config: LettaConfig?
         ShellWorkspaceHeaderBinding(
             navigator = shell.navigator,
             layout = shell.layout,
-            search = ShellWorkspaceSearch(shell.controllers.home, searchSources(shell, agents, fleet)),
-            tabFor = tabFor(fleet),
+            search = ShellWorkspaceSearch(shell.controllers.home, fleetSearchSources(agents, fleet, workspace.focusedAgentId)),
+            tabFor = fleetTabFor(fleet),
         ),
     )
     LettaShellWorkspace(
         state = LettaShellWorkspaceState(
             header = header,
-            navigation = rememberAndroidNavigation(shell, agents.map { it.id.value to it.name }),
+            navigation = rememberAndroidNavigation(shell, agents),
             layout = ShellWorkspaceLayout(
                 sidebarVisible = shell.layout.state.isSidebarVisible,
                 reducedMotion = rememberReducedMotionEnabled(),
@@ -161,9 +162,9 @@ private fun androidSlots(shell: WorkspaceShell, agents: List<Agent>) = LettaShel
     overlays = { AndroidShellOverlays(shell, agents) },
 )
 
-/** The rail over the roster and the focused agent's panel: its conversations, marks, canvases and Chat options. */
+/** The rail over the roster (most recent first) and the focused agent's panel: conversations, marks, canvases, Chat options. */
 @Composable
-private fun rememberAndroidNavigation(shell: WorkspaceShell, roster: List<Pair<String, String>>): ShellWorkspaceNavigation {
+private fun rememberAndroidNavigation(shell: WorkspaceShell, agents: List<Agent>): ShellWorkspaceNavigation {
     val model = shell.drawerModel
     val focused = shell.workspace.focusedAgentId
     val conversations by remember(focused) { focused?.let(model::conversationsOf) ?: kotlinx.coroutines.flow.flowOf(emptyList()) }
@@ -181,10 +182,11 @@ private fun rememberAndroidNavigation(shell: WorkspaceShell, roster: List<Pair<S
         chatOptions = shell.chatPanel.value?.chatOptions,
         canvases = model.canvases.collectAsStateWithLifecycle().value,
         pinnedAgentIds = model.pinnedAgentIds.collectAsStateWithLifecycle().value,
+        agentLastActiveAt = RecentAgents.merge(model.agentActivity.collectAsStateWithLifecycle().value, RecentAgents.lastActiveAt(agents)),
     )
     // Relative times are taken when the drawer opens; they do not tick while it is open.
     val now = remember(shell.drawer.open) { Clock.System.now() }
-    return shell.workspace.workspaceNavigation(roster, now, drawer, library)
+    return shell.workspace.workspaceNavigation(agents.map { it.id.value to it.name }, now, drawer, library)
 }
 
 /** The shared verbs, with the rows' conversation actions and the agent pins written through Android's stores. */
@@ -209,19 +211,6 @@ private fun androidNavigationActions(shell: WorkspaceShell): ShellWorkspaceNavig
             chatOptions = shell.chatPanel.value?.chatOptionsActions ?: base.panel.chatOptions,
         ),
     )
-}
-
-private fun searchSources(shell: WorkspaceShell, agents: List<Agent>, fleet: List<Conversation>) = UnifiedSearchSources(
-    conversations = fleet.toChatConversationSummaries(agents.associate { it.id.value to it.name }),
-    agents = agents,
-    agentId = shell.workspace.focusedAgentId?.value,
-)
-
-/** A tab's title: the conversation's summary, else its agent's name. */
-private fun tabFor(fleet: List<Conversation>): (String) -> LettaTab? = { id ->
-    fleet.firstOrNull { it.id.value == id }?.let {
-        LettaTab(key = id, title = it.summary?.takeIf(String::isNotBlank) ?: it.agentName.orEmpty().ifBlank { "Chat" })
-    }
 }
 
 /** The shared keymap on Android's hardware keyboards: the workspace's verbs, without the rename dialog. */

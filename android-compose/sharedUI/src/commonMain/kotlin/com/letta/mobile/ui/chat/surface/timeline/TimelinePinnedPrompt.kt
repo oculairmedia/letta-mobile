@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
-import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
@@ -10,6 +9,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -45,15 +45,13 @@ internal data class PinnedOwner(
 )
 
 /**
- * The prompt pinned over the list (desktop rememberPinnedPrompt),.
- *
- * With no chrome over the list ([stickLinePx] 0, the desktop) it pins once its row has left the
- * screen, while no prompt is on screen. Under floating chrome (the phone's status bar and header,
- * ChatSurfacePlatform.topChromeInset) the list draws up under the chrome, so the visible top is
- * [stickLinePx] down: there the prompt is a sticky header. Its copy rides its own row until the row
- * reaches the visible top, then holds there, never travelling up under the chrome, and the next
+ * The prompt pinned over the list, on every platform a sticky header: its copy rides its own row
+ * until the row reaches the visible top ([stickLinePx] down, below any chrome floating over the
+ * list, ChatSurfacePlatform.topChromeInset; the list's own top edge where the header sits above it,
+ * as in the shared shell), then holds there, never travelling up under the chrome, and the next
  * prompt coming up pushes it out from below. The row it stands in for is hidden meanwhile. The copy
- * is the prompt's bubble alone, without the row's leading space, so it holds snug under the chrome.
+ * is the prompt's bubble alone, without the row's leading space, so it holds snug at the top.
+ * (A pin that waited for the row to leave the screen let the prompt scroll away and snap back.)
  */
 @Stable
 internal class PinnedPrompt(
@@ -63,14 +61,20 @@ internal class PinnedPrompt(
     val stickLinePx: Int,
     /** How the copy's images shrink as it docks. */
     val compaction: DockedCopyCompaction,
+    /** The top of the prompt row riding up to the line (not the owner); see [ridingPromptTop]. */
+    private val riding: State<Int?> = mutableStateOf(null),
 ) {
     val item: ChatRenderItem? get() = owner.value?.item
 
-    /** The copy is a sticky header that holds at [stickLinePx] (floating chrome over the list). */
-    val sticky: Boolean get() = stickLinePx > 0
+    /**
+     * The top of the highest prompt row still riding up to the line, px from the list's top edge;
+     * null when none is in view. The list's fades end above it, so a prompt is never shaded while it
+     * rides up or pushes the held copy out (read at draw time only).
+     */
+    val ridingPromptTopPx: Int? get() = riding.value
 
     /** The row keyed [key] is the one the sticky copy stands in for. */
-    fun standsInFor(key: String): Boolean = sticky && owner.value?.item?.key == key
+    fun standsInFor(key: String): Boolean = owner.value?.item?.key == key
 
     /**
      * The sticky copy's bottom edge as last placed, in px from the list's top edge: the timeline's
@@ -96,7 +100,7 @@ internal class PinnedPrompt(
 
 /**
  * The prompt pinned over [listState]'s list. [topReserve] is the chrome floating over its top edge
- * (TimelineFrameOverlays.topReserve): zero keeps the desktop's pin, more makes it a sticky header.
+ * (TimelineFrameOverlays.topReserve), where the sticky copy holds; zero holds it at the list's top edge.
  */
 @Composable
 internal fun rememberPinnedPrompt(
@@ -113,12 +117,18 @@ internal fun rememberPinnedPrompt(
         derivedStateOf {
             val rows = PromptRows(currentCount.value, currentItemAt.value)
             val info = listState.layoutInfo
-            if (stickLinePx > 0) stickyOwner(info, stickLinePx, rows) else offScreenOwner(info.visibleItemsInfo, rows)
+            stickyOwner(info, stickLinePx, rows)
         }
     }
-    return remember(listState, owner, stickLinePx, reducedMotion) {
-        val motion = DockedCopyMotion.of(sticky = stickLinePx > 0, reducedMotion = reducedMotion)
-        PinnedPrompt(listState, owner, stickLinePx, DockedCopyCompaction(listState, owner, stickLinePx, motion))
+    val riding = remember(listState, owner, stickLinePx) {
+        derivedStateOf {
+            val rows = PromptRows(currentCount.value, currentItemAt.value)
+            ridingPromptTop(listState.layoutInfo, stickLinePx, rows, owner.value)
+        }
+    }
+    return remember(listState, owner, stickLinePx, reducedMotion, riding) {
+        val motion = DockedCopyMotion.of(reducedMotion = reducedMotion)
+        PinnedPrompt(listState, owner, stickLinePx, DockedCopyCompaction(listState, owner, stickLinePx, motion), riding)
     }
 }
 
@@ -134,34 +144,35 @@ internal class PromptRows(val count: Int, val itemAt: (Int) -> ChatRenderItem?) 
 }
 
 /**
- * The desktop's owner: in a reversed list the visual top is the HIGHEST visible index, and a
- * prompt's answer (newer) sits at a LOWER index beneath it, so the owner is the first prompt at or
- * above the topmost visible row. Compose's stickyHeader cannot express this: in a reversed list it
- * pins to the bottom. Null while the prompt's own row is on screen, so it is never drawn twice, and
- * null while ANY prompt is on screen: the pinned copy would sit over it (two "You" bubbles
- * overlapping), and a prompt in view already says what the rows below it answer.
- */
-internal fun offScreenOwner(visible: List<LazyListItemInfo>, rows: PromptRows): PinnedOwner? {
-    val top = visible.maxOfOrNull { it.index } ?: return null
-    if (visible.any { rows.isPrompt(it.index) }) return null
-    val index = rows.firstPromptFrom(top) ?: return null
-    return rows.itemAt(index)?.let { PinnedOwner(index, it) }
-}
-
-/**
- * The sticky owner under floating chrome: the first prompt at or above the row at the visible top
+ * The sticky owner: the first prompt at or above the row at the visible top
  * ([stickLinePx] down), once that prompt's row has reached it. A row's offset counts up from the
  * list's bottom in a reversed list, so its top is [LazyListLayoutInfo.viewportEndOffset] less its
- * offset and size from the top edge; the rows whose top is above the line have crossed it.
+ * offset and size from the top edge; the rows whose top is at or above the line have reached it.
  */
 internal fun stickyOwner(info: LazyListLayoutInfo, stickLinePx: Int, rows: PromptRows): PinnedOwner? {
     val line = info.viewportEndOffset - stickLinePx
     val visible = info.visibleItemsInfo
-    val atLine = visible.filter { it.offset + it.size > line }.minOfOrNull { it.index } ?: return null
+    // At or past: with the line at the list's own top edge (no chrome over it) a row can reach the
+    // viewport's end but never pass it, and a strict test then found no owner at all.
+    val atLine = visible.filter { it.offset + it.size >= line }.minOfOrNull { it.index } ?: return null
     val index = rows.firstPromptFrom(atLine) ?: return null
     val item = rows.itemAt(index) ?: return null
     val next = visible.filter { it.index < index && rows.isPrompt(it.index) }.maxOfOrNull { it.index }
     return PinnedOwner(index, item, next)
+}
+
+/**
+ * The top of the highest prompt row at or below the visible top ([stickLinePx] down) other than the
+ * sticky [owner]'s, px from the list's top edge: the prompt riding up to the line, or
+ * the next prompt pushing the held copy out. Null when no such row is in view.
+ */
+internal fun ridingPromptTop(info: LazyListLayoutInfo, stickLinePx: Int, rows: PromptRows, owner: PinnedOwner?): Int? {
+    val end = info.viewportEndOffset
+    return info.visibleItemsInfo
+        .filter { it.index != owner?.index && rows.isPrompt(it.index) }
+        .map { end - it.offset - it.size }
+        .filter { it >= stickLinePx }
+        .minOrNull()
 }
 
 /**

@@ -180,12 +180,10 @@ private fun ComposerAboveCard(model: ComposerModel) {
     if (model.showWorkingDirectory && model.mode != ChatSurfaceMode.Docked) {
         model.composer.workingDirectory?.let { ComposerWorkingDirectoryRow(it, model.host.pickWorkingDirectory) }
     }
-    // The mode chip is chrome of the full page, not of the compact dock. On the pointer page it rides
-    // the card's control row (only its note stays here); the Touch bar has no control row to carry it.
+    // The mode is chrome of the full page, not of the compact dock. The pointer card's control row
+    // carries its chip, the Touch bar's "+" sheet its row; only its note stays here.
     if (model.mode != ChatSurfaceMode.Docked) {
-        model.composer.permissionMode?.let { state ->
-            if (touchStyle()) ComposerPermissionModeRow(state, actions::setPermissionMode) else ComposerPermissionModeNoteRow(state)
-        }
+        model.composer.permissionMode?.let { state -> ComposerPermissionModeNoteRow(state) }
         ComposerAgentMentionChips(model.composer.text, actions::updateComposerText)
     }
     if (model.composer.backgroundProcesses.isNotEmpty()) {

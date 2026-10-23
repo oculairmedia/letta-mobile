@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_scroll_to_latest
 import com.letta.mobile.sharedui.resources.timeline_today
@@ -74,21 +75,18 @@ internal data class TimelineFadeAlphas(val top: Float, val bottom: Float, val pi
 
 /**
  * Edge fades for a REVERSED list: "can scroll forward" is toward older rows (the top) and "can
- * scroll backward" toward the newest (the bottom). The top fade stands down while a prompt is
- * pinned there as a card ([promptPinned], the desktop): the opaque card already terminates the
- * content (desktop rememberChatListFadeAlphas). A sticky prompt under floating chrome
- * ([stickyPromptPinned], the phone) keeps the top fade, and adds the pinned band below it, so the
- * rows dissolve before they reach the prompt instead of running hard under it and the chrome.
+ * scroll backward" toward the newest (the bottom). A sticky pinned prompt ([stickyPromptPinned])
+ * keeps the top fade and adds the pinned band below it, so the rows dissolve before they reach the
+ * prompt instead of running hard under it and the chrome.
  */
 @Composable
 internal fun rememberTimelineFadeAlphas(
     canScrollTowardOlder: Boolean,
     canScrollTowardNewer: Boolean,
-    promptPinned: Boolean,
     stickyPromptPinned: Boolean = false,
 ): TimelineFadeAlphas {
     val top by animateFloatAsState(
-        targetValue = if (canScrollTowardOlder && !promptPinned) 1f else 0f,
+        targetValue = if (canScrollTowardOlder) 1f else 0f,
         animationSpec = tween(ChatTimelineDimens.fadeAnimationMillis),
         label = "timelineTopFade",
     )
@@ -110,31 +108,46 @@ internal fun rememberTimelineFadeAlphas(
  * list grades into the surrounding chrome instead of hard-clipping. Lifted from desktop's
  * fadingEdges (Android's chatFadingEdges is the same idea). No-op when every alpha is 0.
  *
- * [pinnedEdgePx] is the sticky pinned prompt's bottom edge, read at draw time: while
- * [TimelineFadeAlphas.pinned] is up the content is gone down to it and grades back in over
- * [topLength]'s fade length below it.
+ * [sticky] is the pinned prompt the bands keep clear of, read at draw time: while
+ * [TimelineFadeAlphas.pinned] is up the content is gone down to its copy's bottom edge and grades
+ * back in over a short grade below it ([ChatTimelineDimens.coveredEdgeGradeLength]), as the rows do
+ * below floating [chrome]; and the top and pinned bands end above a prompt
+ * riding up to the visible top (or pushing the held copy out), so a prompt is never shaded on its
+ * way up. Only the copy, once pushed above the line, dissolves (stickyCopyHeaderFade).
  */
 internal fun Modifier.timelineFadingEdges(
     alphas: TimelineFadeAlphas,
     topLength: Dp = ChatTimelineDimens.topFadeLength,
     bottomLength: Dp = ChatTimelineDimens.bottomFadeLength,
-    pinnedEdgePx: () -> Float = { 0f },
+    sticky: PinnedPrompt? = null,
+    chrome: Dp = 0.dp,
 ): Modifier {
     if (!alphas.anyShown) return this
     return this
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
             drawContent()
-            drawFadeBand(topLength.toPx(), alphas.top, fromTop = true)
+            val guard = sticky?.ridingPromptTopPx?.toFloat() ?: Float.MAX_VALUE
+            val grade = ChatTimelineDimens.coveredEdgeGradeLength.toPx()
+            // Under floating chrome the rows clear behind it and are back in just below it.
+            if (chrome > 0.dp) {
+                drawPinnedBand(chrome.toPx(), grade, alphas.top, guard)
+            } else {
+                drawFadeBand(minOf(topLength.toPx(), guard), alphas.top, fromTop = true)
+            }
             drawFadeBand(bottomLength.toPx(), alphas.bottom, fromTop = false)
-            drawPinnedBand(pinnedEdgePx(), ChatTimelineDimens.topFadeLength.toPx(), alphas.pinned)
+            val edge = sticky?.copyBottomPx?.toFloat() ?: 0f
+            drawPinnedBand(edge, grade, alphas.pinned, guard)
         }
 }
 
-/** Clears the content down to [edgePx] at [alpha]'s strength, then grades it back in over [lengthPx]. */
-private fun DrawScope.drawPinnedBand(edgePx: Float, lengthPx: Float, alpha: Float) {
+/**
+ * Clears the content down to [edgePx] at [alpha]'s strength, then grades it back in over [lengthPx],
+ * never past [guardPx] (a prompt riding up under it is not shaded).
+ */
+private fun DrawScope.drawPinnedBand(edgePx: Float, lengthPx: Float, alpha: Float, guardPx: Float) {
     if (alpha <= 0f || edgePx <= 0f) return
-    val end = (edgePx + lengthPx).coerceAtMost(size.height)
+    val end = minOf(edgePx + lengthPx, size.height, maxOf(guardPx, edgePx))
     if (end <= 0f) return
     val faded = Color.Black.copy(alpha = 1f - alpha)
     val solidUntil = (edgePx / end).coerceIn(0f, 1f)

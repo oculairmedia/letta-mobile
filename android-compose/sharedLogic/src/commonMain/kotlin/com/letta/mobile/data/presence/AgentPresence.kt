@@ -40,3 +40,7 @@ data class AgentPresence(
         val IDLE = AgentPresence()
     }
 }
+
+/** The agents mid-turn (thinking, working, delegating or speaking), for the fleet's running counts. */
+fun Map<String, AgentPresence>.runningAgentIds(): Set<String> =
+    filterValues { it.activity != AgentActivityKind.IDLE }.keys

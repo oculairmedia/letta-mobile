@@ -69,7 +69,7 @@ internal class TimelineFrameOverlays(
 /**
  * The reversed LazyColumn both timelines draw into, with the edge fades,
  * the pinned prompt and the scroll-to-latest button. The fade wraps ONLY the list, so the button
- * and the pinned card are never dimmed (desktop MessageList). The button is desktop's quiet
+ * and the pinned prompt are never dimmed (desktop MessageList). The button is desktop's quiet
  * squircle centred over the reading area on Pointer, and Android's round FAB at the bottom end,
  * just above the composer, on Touch (feature-chat ChatMessageList).
  */
@@ -94,16 +94,14 @@ internal fun TimelineListFrame(
     val fades = rememberTimelineFadeAlphas(
         canScrollTowardOlder = listState.canScrollForward,
         canScrollTowardNewer = listState.canScrollBackward,
-        // The desktop's pinned card stands the top fade down; a sticky copy keeps it on.
-        promptPinned = pinned.item != null && !pinned.sticky,
-        stickyPromptPinned = pinned.item != null && pinned.sticky,
+        stickyPromptPinned = pinned.item != null,
     )
     val selectionColors = TextSelectionColors(
         handleColor = MaterialTheme.colorScheme.primary,
         backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = ChatTimelineDimens.Alpha.selection),
     )
-    // Under floating chrome the prompt's sticky copy stands in for its row, which hides meanwhile.
-    val sticky = pinned.takeIf { it.sticky }
+    // The prompt's sticky copy stands in for its row, which hides meanwhile.
+    val sticky = pinned
     Box(modifier = modifier.fillMaxWidth()) {
         CompositionLocalProvider(LocalTextSelectionColors provides selectionColors, LocalStickyPrompt provides sticky) {
             LazyColumn(
@@ -119,11 +117,7 @@ internal fun TimelineListFrame(
                     // chat list fades over its top padding, ChatMessageListBody).
                     // A sticky prompt runs the rows out above its bottom edge, so they never pass
                     // hard under it or the chrome.
-                    .timelineFadingEdges(
-                        fades,
-                        topLength = ChatTimelineDimens.topFadeLength + overlays.topReserve,
-                        pinnedEdgePx = { pinned.copyBottomPx.toFloat() },
-                    )
+                    .timelineFadingEdges(fades, sticky = pinned, chrome = overlays.topReserve)
                     .graphicsLayer {
                         translationY = overlays.glide.overshootPx
                         // A pinch in progress, read here only: it redraws the rows, never re-lays them out.
@@ -179,22 +173,17 @@ internal fun TimelineListFrame(
 }
 
 /**
- * The pinned prompt's copy over the list. On the desktop it rests in a card's inset below the top
- * edge. Under floating chrome ([PinnedPrompt.sticky]) it is the prompt's bubble exactly (the list's
- * gutter, no leading space), placed by [PinnedPrompt.copyTop]: on its row, then held right at the
- * visible top, so it never travels up under the chrome, never jumps, and leaves no gap below it.
+ * The pinned prompt's copy over the list: the prompt's bubble exactly (the list's gutter, no
+ * leading space), placed by [PinnedPrompt.copyTop]: on its row, then held right at the visible top,
+ * so it never travels up under the chrome, never jumps, and leaves no gap below it.
  */
 @Composable
 private fun PinnedPromptCopy(prompt: ChatRenderItem, pinned: PinnedPrompt, bindings: TimelineRowBindings, modifier: Modifier) {
-    val frame = if (pinned.sticky) {
-        Modifier
-            .padding(horizontal = ChatRowSpacing.contentPaddingHorizontal)
-            .stickyCopyPlacement(pinned)
-            // Pushed out past the visible top, it dissolves instead of running under the header.
-            .stickyCopyHeaderFade(pinned)
-    } else {
-        Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)
-    }
+    val frame = Modifier
+        .padding(horizontal = ChatRowSpacing.contentPaddingHorizontal)
+        .stickyCopyPlacement(pinned)
+        // Pushed out past the visible top, it dissolves instead of running under the header.
+        .stickyCopyHeaderFade(pinned)
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -214,7 +203,7 @@ private fun PinnedPromptCopy(prompt: ChatRenderItem, pinned: PinnedPrompt, bindi
 
 /**
  * One render item, at the chat column's width, through the shared row seam. In the list it
- * carries its own leading space ([timelineLeadingSpace]); the desktop's pinned copy does not.
+ * carries its own leading space ([timelineLeadingSpace]); the pinned copy does not.
  */
 @Composable
 internal fun TimelineItemRow(

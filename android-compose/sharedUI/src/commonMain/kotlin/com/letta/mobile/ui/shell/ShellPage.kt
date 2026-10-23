@@ -148,11 +148,14 @@ val EmptyShellPage = ShellPageContent<ShellDestination> { _, modifier ->
 /**
  * The only page switch of the shell: [destination] -> its page. Platform navigation hosts map their
  * routes, deep links and back stack to a [ShellDestination] and call this; they never pick a page.
+ * Every page but the chat rests below the workspace's floating chrome
+ * ([LocalShellFloatingChromeInset]); the chat draws under it and rests its own content below it.
  */
 @Composable
 fun ShellPage(destination: ShellDestination, deps: ShellPageDeps, modifier: Modifier = Modifier) {
+    val pageModifier = if (destination.kind == ShellPageKind.Chat) modifier else modifier.belowFloatingChrome()
     // One state scope per kind of page: leaving Memory for Channels never hands Memory's saved view to Channels.
-    key(destination.kind) { deps.pageFor(destination).Content(destination, modifier) }
+    key(destination.kind) { deps.pageFor(destination).Content(destination, pageModifier) }
 }
 
 // --- the shared pages ---------------------------------------------------------------------------
@@ -205,13 +208,14 @@ fun shellMemoryPage(binding: MemoryWorkspaceBinding) = ShellPageContent<ShellDes
 
 /**
  * A chat destination without an agent: the fleet conversations page. A host
- * whose chat page is its own container registers this only where a chat route has no agent.
+ * whose chat page is its own container registers this only where a chat route has no agent. It is
+ * a list, not the chat surface, so it rests below the floating chrome itself.
  */
 fun shellConversationsPage(
     state: ConversationsPageState,
     actions: ConversationsPageActions,
 ) = ShellPageContent<ShellDestination.Chat> { _, modifier ->
-    ConversationsPage(state = state, actions = actions, modifier = modifier)
+    ConversationsPage(state = state, actions = actions, modifier = modifier.belowFloatingChrome())
 }
 
 /** The shared Settings page, opened on the destination's section (Pairing, About). */
