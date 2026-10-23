@@ -16,6 +16,15 @@ const STORE = 'keys';
 const RECORD = 'device';
 const KEY_BYTES = 32;
 
+/** [bytes] as lowercase hex: how the identity crosses the JS/Wasm boundary (wisqe S1b). */
+export const toHex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+
+/** The bytes of lowercase or uppercase [hex]; anything that is not whole hex pairs is refused. */
+export const fromHex = (hex) => {
+    if (!/^(?:[0-9a-fA-F]{2})*$/.test(hex)) throw new Error('identity key is not hex');
+    return Uint8Array.from(hex.match(/../g) ?? [], (pair) => parseInt(pair, 16));
+};
+
 /** Thin promise wrapper over one IndexedDB object store. */
 export const indexedDbStore = (indexedDB = globalThis.indexedDB) => {
     const open = () => new Promise((resolve, reject) => {

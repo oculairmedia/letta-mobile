@@ -1772,7 +1772,6 @@
     <ID>TooGenericExceptionCaught:IrohNodeConnection.kt$IrohNodeConnection$e: Exception</ID>
     <ID>TooGenericExceptionCaught:IrohNodeConnection.kt$IrohNodeConnection$error: Exception</ID>
     <ID>TooGenericExceptionCaught:IrohNodeEndpoint.kt$IrohNodeEndpoint$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:IrohPairingRedeemer.kt$IrohPairingRedeemer$error: Exception</ID>
     <ID>TooGenericExceptionCaught:IrohQueueControlRelay.kt$IrohQueueControlRelay$error: Exception</ID>
     <ID>TooGenericExceptionCaught:IrohRelayedTurnProtocol.kt$IrohRelayedTurnProtocol$error: Exception</ID>
     <ID>TooGenericExceptionCaught:IrohSubagentRpcClient.kt$IrohSubagentRpcClient$error: Exception</ID>

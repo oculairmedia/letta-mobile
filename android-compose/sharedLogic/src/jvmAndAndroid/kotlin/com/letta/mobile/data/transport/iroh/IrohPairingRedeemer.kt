@@ -10,28 +10,14 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
-import com.letta.mobile.util.Telemetry
 import computer.iroh.Endpoint
 import computer.iroh.EndpointOptions
 import computer.iroh.RelayMode
 import java.util.UUID
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.supervisorScope
-import kotlinx.coroutines.withTimeout
-
-/** One invite presentation: where to dial and what to say (the token is secret). */
-class InviteAuthRequest(val dialAddress: String, val inviteToken: String, val peerName: String) {
-    override fun toString(): String = "InviteAuthRequest(dial=$dialAddress, <redacted>)"
-}
-
-/** Network seam: dial with [secretKey] and send the auth frame; returns the host's answer. */
-fun interface InviteAuthenticator {
-    suspend fun authenticate(secretKey: ByteArray, request: InviteAuthRequest): AppServerInboundFrame.AuthResponse
-}
 
 /**
  * Presents a scanned invite to its host over Iroh.
@@ -51,35 +37,17 @@ class IrohPairingRedeemer(
         val dial = PairingDialAddress.resolve(invite.nodeId, invite.dial)
             ?: return RedeemOutcome.Failed(PairingError.HOST_MISMATCH)
         val request = InviteAuthRequest(dial, invite.inviteToken, deviceName)
-        val response = try {
-            withTimeout(timeoutMs) { authenticator.authenticate(secretKeyStore.loadOrCreate(), request) }
-        } catch (timeout: TimeoutCancellationException) {
-            Telemetry.event("IrohPairing", "redeem.timeout", "host" to invite.hostFingerprint)
-            return RedeemOutcome.Failed(PairingError.HOST_UNREACHABLE)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            Telemetry.event("IrohPairing", "redeem.unreachable", "host" to invite.hostFingerprint, "class" to error::class.simpleName)
-            return RedeemOutcome.Failed(PairingError.HOST_UNREACHABLE)
+        return presentInvite(invite, PairedHost(invite.nodeId, dial), timeoutMs) {
+            authenticator.authenticate(secretKeyStore.loadOrCreate(), request)
         }
-        return outcomeOf(response, PairedHost(invite.nodeId, dial))
     }
 
     companion object {
         const val DEFAULT_TIMEOUT_MS = 30_000L
 
         /** Map the host's fixed reason labels (never secret-derived) to user-facing errors. */
-        fun outcomeOf(response: AppServerInboundFrame.AuthResponse, host: PairedHost): RedeemOutcome {
-            if (response.success) return RedeemOutcome.Paired(host, alreadyPaired = response.alreadyPaired == true)
-            val error = when (response.error) {
-                "invite_expired" -> PairingError.EXPIRED
-                "invite_invalid" -> PairingError.INVITE_INVALID
-                "rate_limited" -> PairingError.RATE_LIMITED
-                else -> PairingError.DENIED
-            }
-            Telemetry.event("IrohPairing", "redeem.rejected", "reason" to error.name)
-            return RedeemOutcome.Failed(error)
-        }
+        fun outcomeOf(response: AppServerInboundFrame.AuthResponse, host: PairedHost): RedeemOutcome =
+            inviteOutcomeOf(response, host)
     }
 }
 

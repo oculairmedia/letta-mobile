@@ -72,12 +72,15 @@ internal class IrohWasmBridge private constructor(
 
     companion object {
         /**
-         * Dials [address] by its endpoint id (through the relay; a browser has no direct UDP). A
+         * Dials [address] by its endpoint id (through the relay; a browser has no direct UDP), as the
+         * identity [secretKeyHex] when given, else as this browser's persistent one. A
          * rejection from the JS side (a JS `Error`) comes back as an [IllegalStateException] with a
          * readable message, never the raw JS value.
          */
-        suspend fun connect(address: IrohServerAddress): IrohWasmBridge {
-            val session = rejectedAsState("Could not connect over Iroh") { callConnect(address.endpointUrl.toJsString()).await<JsNumber>() }
+        suspend fun connect(address: IrohServerAddress, secretKeyHex: String? = null): IrohWasmBridge {
+            val session = rejectedAsState("Could not connect over Iroh") {
+                callConnect(address.endpointUrl.toJsString(), secretKeyHex?.toJsString()).await<JsNumber>()
+            }
             return IrohWasmBridge(IrohSessionHandle(session))
         }
     }
@@ -106,8 +109,8 @@ private suspend fun <T> rejectedAsState(what: String, block: suspend () -> T): T
     throw IllegalStateException("$what: ${failure.displayMessage("unknown error")}", failure)
 }
 
-private fun callConnect(ticket: JsString): kotlin.js.Promise<JsNumber> =
-    js("window.irohConnect(ticket)")
+private fun callConnect(ticket: JsString, secret: JsString?): kotlin.js.Promise<JsNumber> =
+    js("window.irohConnect(ticket, secret)")
 
 private fun callSendControl(session: JsNumber, payload: JsString): kotlin.js.Promise<JsAny?> =
     js("window.irohSendControl(session, payload)")
