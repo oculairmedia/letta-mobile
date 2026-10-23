@@ -14,6 +14,7 @@ import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_steps_called
 import com.letta.mobile.sharedui.resources.rows_steps_delegated
+import com.letta.mobile.sharedui.resources.rows_steps_drew
 import com.letta.mobile.sharedui.resources.rows_steps_edited
 import com.letta.mobile.sharedui.resources.rows_steps_explored
 import com.letta.mobile.sharedui.resources.rows_steps_fetched
@@ -23,13 +24,17 @@ import com.letta.mobile.sharedui.resources.rows_steps_remembered
 import com.letta.mobile.sharedui.resources.rows_tool_step_label
 import com.letta.mobile.sharedui.resources.rows_tool_verb_added_to_memory
 import com.letta.mobile.sharedui.resources.rows_tool_verb_called
+import com.letta.mobile.sharedui.resources.rows_tool_verb_composed_canvas
+import com.letta.mobile.sharedui.resources.rows_tool_verb_created_canvas
 import com.letta.mobile.sharedui.resources.rows_tool_verb_delegated
 import com.letta.mobile.sharedui.resources.rows_tool_verb_edited
+import com.letta.mobile.sharedui.resources.rows_tool_verb_edited_canvas
 import com.letta.mobile.sharedui.resources.rows_tool_verb_edited_memory
 import com.letta.mobile.sharedui.resources.rows_tool_verb_fetched
 import com.letta.mobile.sharedui.resources.rows_tool_verb_planned
 import com.letta.mobile.sharedui.resources.rows_tool_verb_ran
 import com.letta.mobile.sharedui.resources.rows_tool_verb_read
+import com.letta.mobile.sharedui.resources.rows_tool_verb_read_canvas
 import com.letta.mobile.sharedui.resources.rows_tool_verb_rewrote_memory
 import com.letta.mobile.sharedui.resources.rows_tool_verb_searched
 import com.letta.mobile.sharedui.resources.rows_tool_verb_stopped
@@ -75,6 +80,10 @@ private val ToolVerb.resource: StringResource
         ToolVerb.Updated -> Res.string.rows_tool_verb_updated
         ToolVerb.Planned -> Res.string.rows_tool_verb_planned
         ToolVerb.Used -> Res.string.rows_tool_verb_used
+        ToolVerb.ComposedCanvas -> Res.string.rows_tool_verb_composed_canvas
+        ToolVerb.EditedCanvas -> Res.string.rows_tool_verb_edited_canvas
+        ToolVerb.ReadCanvas -> Res.string.rows_tool_verb_read_canvas
+        ToolVerb.CreatedCanvas -> Res.string.rows_tool_verb_created_canvas
     }
 
 /** Which tool steps the person flipped open or closed; null where no host keeps them (each step then keeps its own). */
@@ -104,4 +113,5 @@ private val ToolActivity.phrase: StringResource
         ToolActivity.Delegated -> Res.string.rows_steps_delegated
         ToolActivity.Called -> Res.string.rows_steps_called
         ToolActivity.Remembered -> Res.string.rows_steps_remembered
+        ToolActivity.Drew -> Res.string.rows_steps_drew
     }

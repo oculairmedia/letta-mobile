@@ -4,7 +4,7 @@ import com.letta.mobile.data.chat.tools.ToolPresenterRegistry
 
 /**
  * What every host ships: the presenters of every area (shell, files, tasks and agents, memory, and
- * the CLIs shell tools run), registered through the same [ToolPresenterRegistry] calls a plugin's
+ * the canvas), registered through the same [ToolPresenterRegistry] calls a plugin's
  * contributions go through. Each area keeps its own registration list, so adding a presenter
  * never edits this file.
  */
@@ -14,7 +14,7 @@ object BundledToolPresenters {
             ShellToolPresenters.tools +
                 FileToolPresenters.tools +
                 TaskToolPresenters.tools +
-                MemoryToolPresenters.tools,
+                MemoryToolPresenters.tools +
+                CanvasToolPresenters.tools,
         )
-        .registerCommands(CanvasCommandPresenters.commands)
 }

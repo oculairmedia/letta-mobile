@@ -24,6 +24,7 @@ import com.letta.mobile.data.chat.tools.ToolStepLine
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_tool_full_output
+import com.letta.mobile.sharedui.resources.rows_tool_open_canvas
 import com.letta.mobile.sharedui.resources.rows_tool_open_full_output
 import com.letta.mobile.sharedui.resources.rows_tool_open_subagent
 import com.letta.mobile.ui.chat.tools.LocalToolPresenters
@@ -101,6 +102,14 @@ private fun ToolPreviewChip(toolCall: UiToolCall, line: ToolStepLine, target: To
         }
         // No host opens a task's output from a step yet; its presenter's chip waits for one.
         is ToolPreviewTarget.TaskOutput -> Unit
+        ToolPreviewTarget.Canvas -> {
+            val open = callbacks.host.openCanvas ?: return
+            AssistChip(
+                onClick = open,
+                label = { Text(stringResource(Res.string.rows_tool_open_canvas)) },
+                modifier = Modifier.testTag(ChatRowTestTags.TOOL_PREVIEW_CHIP),
+            )
+        }
     }
 }
 

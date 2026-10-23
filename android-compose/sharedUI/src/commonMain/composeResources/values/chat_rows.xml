@@ -86,6 +86,7 @@
     <string name="rows_steps_delegated">delegated work</string>
     <string name="rows_steps_called">called tools</string>
     <string name="rows_steps_remembered">updated memory</string>
+    <string name="rows_steps_drew">worked on the canvas</string>
     <string name="rows_steps_join">%1$s, %2$s</string>
     <string name="rows_copy_command">Copy command</string>
     <string name="rows_tool_open_full_output">Open full output</string>
@@ -104,6 +105,11 @@
     <string name="rows_tool_verb_updated">Updated</string>
     <string name="rows_tool_verb_planned">Planned</string>
     <string name="rows_tool_verb_used">Used</string>
+    <string name="rows_tool_verb_composed_canvas">Composed canvas</string>
+    <string name="rows_tool_verb_edited_canvas">Edited canvas</string>
+    <string name="rows_tool_verb_read_canvas">Read canvas</string>
+    <string name="rows_tool_verb_created_canvas">Created canvas</string>
+    <string name="rows_tool_open_canvas">Open canvas</string>
     <string name="rows_tool_verb_edited_memory">Edited memory</string>
     <string name="rows_tool_verb_added_to_memory">Added to memory</string>
     <string name="rows_tool_verb_rewrote_memory">Rewrote memory</string>
