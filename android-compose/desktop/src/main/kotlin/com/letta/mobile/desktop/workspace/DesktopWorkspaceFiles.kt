@@ -14,8 +14,8 @@ import com.letta.mobile.data.workspace.MentionDraft
 import com.letta.mobile.data.workspace.WorkspaceFileOpener
 import com.letta.mobile.data.workspace.WorkspaceFileSource
 import com.letta.mobile.data.workspace.WorkspaceFileViewerController
-import com.letta.mobile.ui.shell.pages.workspace.LocalWorkspaceFileOpener
-import com.letta.mobile.ui.shell.pages.workspace.WorkspaceFileViewer
+import com.letta.mobile.ui.shell.pages.workspace.LocalWorkspaceFiles
+import com.letta.mobile.ui.shell.pages.workspace.WorkspaceFiles
 import kotlinx.coroutines.CoroutineScope
 
 /** letta-mobile-bzvro.26: workspace files on the desktop's direct App Server session. */
@@ -23,7 +23,7 @@ internal fun DesktopWorkspaceSources.files(): WorkspaceFileSource =
     AppServerWorkspaceFileSource(client = ::client, requestId = ::requestId)
 
 /**
- * Lets tool cards in [content] open the files they name, and shows the read-only viewer over it.
+ * Lets the chat in [content] open the files its tool steps name, in the shared viewer it draws.
  * Relative paths resolve against [workingDirectory], the selected conversation's cwd.
  */
 @Composable
@@ -34,10 +34,10 @@ internal fun DesktopWorkspaceFileViewerHost(
 ) {
     val viewer = remember(scope) { WorkspaceFileViewerController(DesktopWorkspaceSources().files(), scope) }
     DisposableEffect(viewer) { onDispose { viewer.close() } }
-    val opener = remember(viewer, workingDirectory) { WorkspaceFileOpener { path, _ -> viewer.open(path, workingDirectory) } }
-    CompositionLocalProvider(LocalWorkspaceFileOpener provides opener) { content() }
-    val state by viewer.state.collectAsState()
-    WorkspaceFileViewer(state = state, actions = viewer)
+    val files = remember(viewer, workingDirectory) {
+        WorkspaceFiles(WorkspaceFileOpener { viewer.open(it.path, workingDirectory, lines = it.lines) }, viewer.state, viewer)
+    }
+    CompositionLocalProvider(LocalWorkspaceFiles provides files) { content() }
 }
 
 /**

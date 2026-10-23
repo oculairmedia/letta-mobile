@@ -17,6 +17,8 @@ data class WorkspaceFileViewerState(
     val loading: Boolean = false,
     val content: WorkspaceFileContent? = null,
     val error: String? = null,
+    /** The lines (1-based, inclusive) the file was opened to show, highlighted and scrolled to. */
+    val lines: IntRange? = null,
 ) {
     val isOpen: Boolean get() = path != null
 }
@@ -29,17 +31,22 @@ interface WorkspaceFileViewerActions {
 }
 
 /**
- * Opens a workspace file by path; hosts hand [open] to tool cards and other path affordances.
- * [memoryTool] is true when the path comes from a memory tool call, whose relative paths are the
- * agent's memory files; any other relative path needs a working directory.
+ * Opens a workspace file; hosts hand [open] to tool step chips, clickable paths and other path affordances.
+ * A request whose [WorkspaceFileRequest.memoryTool] is set comes from a memory tool call, whose relative
+ * paths are the agent's memory files; any other relative path needs a working directory.
  */
 fun interface WorkspaceFileOpener {
-    fun open(path: String, memoryTool: Boolean)
+    fun open(request: WorkspaceFileRequest)
 }
+
+/** A file to open: its [path], whether a memory tool named it, and the [lines] (1-based, inclusive) to show. */
+@Immutable
+data class WorkspaceFileRequest(val path: String, val memoryTool: Boolean = false, val lines: IntRange? = null)
 
 /** Pure transitions of [WorkspaceFileViewerState]; a read for a file no longer open is dropped. */
 object WorkspaceFileViewerReducer {
-    fun opening(path: String): WorkspaceFileViewerState = WorkspaceFileViewerState(path = path, loading = true)
+    fun opening(path: String, lines: IntRange? = null): WorkspaceFileViewerState =
+        WorkspaceFileViewerState(path = path, loading = true, lines = lines)
 
     fun read(state: WorkspaceFileViewerState, content: WorkspaceFileContent): WorkspaceFileViewerState =
         if (state.path != content.path) state else state.copy(loading = false, content = content, error = null)
@@ -66,14 +73,15 @@ class WorkspaceFileViewerController(
      * `system/human/…`); any other relative path cannot be opened, and is
      * never read from the host's own working directory.
      */
-    fun open(path: String, cwd: String?, memoryAgentId: String? = null) {
+    fun open(path: String, cwd: String?, memoryAgentId: String? = null, lines: IntRange? = null) {
         val inMemory = cwd.isNullOrBlank() && !WorkspacePaths.isAbsolute(path) && !memoryAgentId.isNullOrBlank()
         this.memoryAgentId = memoryAgentId.takeIf { inMemory }
-        load(if (inMemory) path.removePrefix("./") else WorkspacePaths.resolve(path, cwd))
+        load(if (inMemory) path.removePrefix("./") else WorkspacePaths.resolve(path, cwd), lines)
     }
 
     override fun retry() {
-        stateFlow.value.path?.let(::load)
+        val shown = stateFlow.value
+        shown.path?.let { load(it, shown.lines) }
     }
 
     override fun close() {
@@ -82,9 +90,9 @@ class WorkspaceFileViewerController(
         stateFlow.value = WorkspaceFileViewerState()
     }
 
-    private fun load(path: String) {
+    private fun load(path: String, lines: IntRange?) {
         readJob?.cancel()
-        stateFlow.value = WorkspaceFileViewerReducer.opening(path)
+        stateFlow.value = WorkspaceFileViewerReducer.opening(path, lines)
         val agentId = memoryAgentId
         if (agentId == null && !WorkspacePaths.isAbsolute(path)) {
             stateFlow.update { WorkspaceFileViewerReducer.failed(it, path, WorkspaceFileErrors.NO_WORKING_DIRECTORY) }

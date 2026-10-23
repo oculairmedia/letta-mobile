@@ -66,7 +66,6 @@ import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.mascot.mascotAttention
-import com.letta.mobile.ui.shell.pages.workspace.ToolCallFileLink
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.LettaDimens
@@ -270,7 +269,7 @@ private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, l
             AgentMessageProvenanceMetadata(provenance, if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary)
         }
         ToolStepInset(toolCall, callbacks, live)
-        rememberToolStepLine(toolCall).previews.firstOrNull()?.let { ToolCallFileLink(it) }
+        ToolPreviewChips(toolCall, rememberToolStepLine(toolCall), callbacks)
         ToolGeneratedImages(toolCall, callbacks)
     }
 }

@@ -115,7 +115,11 @@ The tool presenter plugin contract: how a tool call reads as a timeline step on 
 
 # Package com.letta.mobile.data.chat.tools.bundled
 
-The presenters every host ships, one unit per tool or CLI, registered into [BundledToolPresenters](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.bundled/-bundled-tool-presenters/index.html) through the same registry calls a plugin's contributions use. Keep each presenter to its own tool and leave rendering to `sharedUI`; start a new one from [BashToolPresenter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.bundled/-bash-tool-presenter/index.html).
+The presenters every host ships, one file per tool or CLI, each listed in its area's registration file (shell, files, tasks and agents, memory, canvas CLI) that [BundledToolPresenters](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.bundled/-bundled-tool-presenters/index.html) combines through the same registry calls a plugin's contributions use, so adding a presenter never edits a list another area owns. Keep each presenter to its own tool and leave rendering to `sharedUI`; start a new one from [BashToolPresenter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.bundled/-bash-tool-presenter/index.html).
+
+# Package com.letta.mobile.data.chat.tools.links
+
+The URLs and file paths in a tool's output, found so a step's inset can make them links: a URL to open in the browser, a path (and the line it names) to open in the file preview. Plain words, numbers and bare file names never read as links; find them with [OutputLinks](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.links/-output-links/index.html).
 
 # Package com.letta.mobile.data.chat.tools.shell
 

@@ -30,6 +30,14 @@ class ToolPresenterRegistry private constructor(
     /** These presenters with [presenter] bundled; an id registered before is replaced. */
     fun register(presenter: ToolPresenter): ToolPresenterRegistry = with(RankedPresenter(presenter, PresenterTier.Bundled))
 
+    /** These presenters with every one of [presenters] bundled, in order. */
+    fun registerAll(presenters: List<ToolPresenter>): ToolPresenterRegistry =
+        presenters.fold(this) { registry, presenter -> registry.register(presenter) }
+
+    /** These presenters with every one of [commands] bundled for the commands shell tools run. */
+    fun registerCommands(commands: List<CommandPresenter>): ToolPresenterRegistry =
+        commands.fold(this) { registry, command -> registry.register(command) }
+
     /** These presenters with [command] bundled for the commands shell tools run. */
     fun register(command: CommandPresenter): ToolPresenterRegistry = ToolPresenterRegistry(entries, commands.register(command))
 

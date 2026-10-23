@@ -2167,6 +2167,13 @@ public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSing
 	public final fun getLambda$-1451332564$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
+public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowToolPreviewKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowToolPreviewKt;
+	public fun <init> ()V
+	public final fun getLambda$-1321150667$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$598866409$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
 public final class com/letta/mobile/ui/chat/tools/ToolPresentersKt {
 	public static final fun ProvideToolPresenters (Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 	public static final fun ProvideToolStepExpansions (Lcom/letta/mobile/data/storage/SecureSettingsStore;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
@@ -8737,7 +8744,7 @@ public final class com/letta/mobile/ui/shell/pages/workspace/ComposableSingleton
 public final class com/letta/mobile/ui/shell/pages/workspace/ComposableSingletons$WorkspaceFileLinkKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/workspace/ComposableSingletons$WorkspaceFileLinkKt;
 	public fun <init> ()V
-	public final fun getLambda$1119187009$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$2036942693$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/shell/pages/workspace/ComposableSingletons$WorkspaceFileViewerKt {
@@ -8745,7 +8752,6 @@ public final class com/letta/mobile/ui/shell/pages/workspace/ComposableSingleton
 	public fun <init> ()V
 	public final fun getLambda$-1914604163$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-676852416$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$1818379482$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 }
 
 public final class com/letta/mobile/ui/shell/pages/workspace/WorkingDirectoryPickerHost {
@@ -8794,8 +8800,11 @@ public final class com/letta/mobile/ui/shell/pages/workspace/WorkingDirectoryPic
 }
 
 public final class com/letta/mobile/ui/shell/pages/workspace/WorkspaceFileLinkKt {
-	public static final fun ToolCallFileLink (Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
-	public static final fun getLocalWorkspaceFileOpener ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun ToolPreviewFileChip (Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget;Landroidx/compose/runtime/Composer;I)V
+	public static final fun WorkspaceFileChip (Lcom/letta/mobile/data/workspace/WorkspaceFileRequest;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+	public static final fun WorkspaceFilePreview (Landroidx/compose/runtime/Composer;I)V
+	public static final fun getLocalWorkspaceFiles ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun rememberWorkspaceLinkedText (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/AnnotatedString;
 }
 
 public final class com/letta/mobile/ui/shell/pages/workspace/WorkspaceFileLinkTags {
@@ -8810,12 +8819,19 @@ public final class com/letta/mobile/ui/shell/pages/workspace/WorkspaceFileViewer
 
 public final class com/letta/mobile/ui/shell/pages/workspace/WorkspaceFileViewerTags {
 	public static final field $stable I
-	public static final field CLOSE Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/workspace/WorkspaceFileViewerTags;
 	public static final field PLACEHOLDER Ljava/lang/String;
 	public static final field RETRY Ljava/lang/String;
 	public static final field TEXT Ljava/lang/String;
 	public static final field VIEWER Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/shell/pages/workspace/WorkspaceFiles {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/data/workspace/WorkspaceFileOpener;Lkotlinx/coroutines/flow/StateFlow;Lcom/letta/mobile/data/workspace/WorkspaceFileViewerActions;)V
+	public final fun getActions ()Lcom/letta/mobile/data/workspace/WorkspaceFileViewerActions;
+	public final fun getOpener ()Lcom/letta/mobile/data/workspace/WorkspaceFileOpener;
+	public final fun getViewer ()Lkotlinx/coroutines/flow/StateFlow;
 }
 
 public final class com/letta/mobile/ui/shell/palette/CommandPalettePaneKt {
