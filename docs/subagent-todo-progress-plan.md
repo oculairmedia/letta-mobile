@@ -31,6 +31,17 @@ isolation, replay, and agreement between list and details responses. Tool activi
 without a todo plan must never produce a checklist or determinate percentage.
 Reverting the production fix must fail the relevant regressions.
 
+## Ordering contract
+
+Positional revisions rely on the inspected Letta Code 0.34.14 producer: addToolCall
+deduplicates call IDs and appends immutable entries; buildSubagentSnapshot forwards
+that cumulative array. Remote array replacement is not evidence of truncation.
+Controller rehydration is supported while this producer history is retained.
+Producer process reconstruction, reordered histories and new plans at equal or
+lower positions are not supported ordering contracts. A shorter history cannot
+be distinguished reliably from stale replay using arrival time or a local counter.
+Supporting truncation requires a producer-authored durable comparable revision.
+
 ## External worker limitation
 
 The pinned Letta Code 0.34.14 Codex adapter handles item/started, item/completed

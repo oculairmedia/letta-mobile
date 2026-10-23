@@ -99,6 +99,37 @@ class SubagentAuthoredTodosTest {
     }
 
     @Test
+    fun duplicateSnapshotRefreshesObservationButNotActivityOrPlan() = runTest {
+        var now = 1_000L
+        val source = ControllerSubagentRegistrySource(DurableSubagentRegistry(clock = { now }))
+        source.ingest(frame)
+        val before = source.registry.replaySnapshot(CONVERSATION).first()
+        now = 2_000L
+        source.ingest(frame.copy(eventSeq = frame.eventSeq + 100))
+        val after = source.registry.replaySnapshot(CONVERSATION).first()
+        assertEquals(before.todos, after.todos)
+        assertEquals(before.todoRevision, after.todoRevision)
+        assertEquals(before.lastActivityEpochMs, after.lastActivityEpochMs)
+        assertEquals(now, after.lastSeenEpochMs)
+    }
+
+    @Test
+    fun appendedPlanWithSameTodoCountReplacesContentsAndOldPrefixCannotRewindIt() = runTest {
+        val source = source()
+        source.ingest(frame)
+        val plan = """{"todos":[
+            {"content":"One","status":"pending"},
+            {"content":"Two","status":"pending"},
+            {"content":"Three","status":"pending"}
+        ]}"""
+        source.ingest(updated(call(plan)))
+        source.ingest(frame.copy(eventSeq = frame.eventSeq + 200))
+        val sheet = source.todos(CONVERSATION, "dispatch-1")!!
+        assertEquals(listOf("One", "Two", "Three"), sheet.todos.map { it.content })
+        assertEquals(SubagentTodoProgressWire(0, 3), sheet.subagent.todoProgress)
+    }
+
+    @Test
     fun replayAndRestartPreserveNewestPlanEvenWhenEventSequenceRestarts() = runTest {
         val source = source()
         source.ingest(frame)
