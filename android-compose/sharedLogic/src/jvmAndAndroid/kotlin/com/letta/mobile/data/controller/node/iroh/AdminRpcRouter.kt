@@ -7,6 +7,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
@@ -104,11 +106,15 @@ class AdminRpcRouter(
     }
 
     /**
-     * Dispatches an RPC call to the registered handler.
-     * Returns the JSON response frame or an error frame if the method is unknown
-     * or the handler throws.
+     * Checks whether [invocation] may reach its handler without invoking it or
+     * changing connection state. Returns the same failure response [dispatch]
+     * would return, or null when handler dispatch may proceed.
+     *
+     * Transport paths use this before attaching connection-local observation
+     * state. F1 may extend this pre-handler boundary with conversation-owner
+     * resolution without moving that authorization work into observers.
      */
-    suspend fun dispatch(invocation: AdminRpcInvocation): String {
+    internal fun preauthorize(invocation: AdminRpcInvocation): String? {
         val handler = handlers[invocation.method]
         if (handler == null) {
             Telemetry.event("AdminRpc", "method.not_found", "method" to invocation.method)
@@ -119,6 +125,20 @@ class AdminRpcRouter(
             Telemetry.event("AdminRpc", "authz.agent_scope_denied", "method" to invocation.method)
             return encodeFailure(invocation.requestId, AgentScopeGuard.DENIED)
         }
+        return null
+    }
+
+    /**
+     * Dispatches an RPC call to the registered handler.
+     * Returns the JSON response frame or an error frame if the method is unknown
+     * or the handler throws.
+     */
+    suspend fun dispatch(invocation: AdminRpcInvocation): String {
+        preauthorize(invocation)?.let { return it }
+        // Handler registration completes before the connection starts serving.
+        // [preauthorize] above is the single source of the unknown-method check.
+        val handler = checkNotNull(handlers[invocation.method])
+        val agentScope = invocation.context.authorizedAgentIds
         val startedNs = System.nanoTime()
         return try {
             val result = AgentScopeGuard.filterResult(
@@ -159,3 +179,9 @@ class AdminRpcRouter(
             },
         )
 }
+
+/** Whether a router response is a failure envelope that must roll observer state back. */
+internal fun isAdminRpcFailureEnvelope(response: String): Boolean =
+    runCatching {
+        Json.parseToJsonElement(response).jsonObject["success"]?.jsonPrimitive?.content == "false"
+    }.getOrDefault(false)

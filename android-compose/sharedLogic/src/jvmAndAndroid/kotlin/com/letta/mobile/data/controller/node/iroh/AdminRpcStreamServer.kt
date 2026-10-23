@@ -2,14 +2,17 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.runCatchingCancellable
 import computer.iroh.BiStream
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -94,11 +97,12 @@ internal class AdminRpcStreamServer(
      * carry NO connection identity. This hook lets the owning [IrohNodeConnection]
      * associate a method call with ITS OWN selfViewer — e.g. register the
      * connection as a conversation viewer when method == "message.list". Invoked
-     * best-effort AFTER the frame is parsed and BEFORE dispatch, only for an
-     * authenticated admin_rpc frame with a non-null method. A throwing hook must
-     * never break the request — the caller swallows failures.
+     * best-effort AFTER preauthorization and BEFORE dispatch, only for an
+     * authenticated admin_rpc frame with a non-null method. It may return a
+     * settle callback, invoked once with whether dispatch succeeded. A throwing hook must never
+     * break the request — the caller swallows failures.
      */
-    private val onMethodObserved: (suspend (method: String, params: JsonObject?) -> Unit)? = null,
+    private val onMethodObserved: (suspend (method: String, params: JsonObject?) -> (suspend (Boolean) -> Unit)?)? = null,
     private val requestContextProvider: () -> AdminRpcRequestContext = {
         AdminRpcRequestContext(authenticated = authenticated.get())
     },
@@ -310,9 +314,9 @@ internal class AdminRpcStreamServer(
     /**
      * P0.4: per-method capability gate BEFORE dispatch. A denial is terminal and
      * must have NO proxy side effects (no notifyMethodObserved, no router.dispatch)
-     * — it only emits the forbidden envelope. An allow observes the method and
-     * dispatches. Split out of [handleFrame] purely to flatten the frame's
-     * validation chain; the deny/allow semantics are unchanged.
+     * — it only emits the forbidden envelope. Router preauthorization runs before
+     * observation too; only an allowed call observes, then dispatches. Split out
+     * of [handleFrame] purely to flatten the frame's validation chain.
      */
     private suspend fun authorizeAndDispatch(method: String, requestId: String, obj: JsonObject): String {
         val deniedCapability = capabilityGate(method)
@@ -326,15 +330,40 @@ internal class AdminRpcStreamServer(
             return forbiddenEnvelope(requestId, deniedCapability)
         }
         val params = obj["params"]?.jsonObject
-        notifyMethodObserved(method, params)
-        return router.dispatch(
-            AdminRpcInvocation(
-                requestId = requestId,
-                method = method,
-                params = params,
-                context = requestContextProvider(),
-            ),
+        val invocation = AdminRpcInvocation(
+            requestId = requestId,
+            method = method,
+            params = params,
+            context = requestContextProvider(),
         )
+        router.preauthorize(invocation)?.let { return it }
+        val settle = notifyMethodObserved(method, params)
+        val settleObservation: suspend (Boolean) -> Unit = { succeeded ->
+            if (settle != null) {
+                withContext(NonCancellable) {
+                    runCatchingCancellable { settle(succeeded) }.onFailure { rollbackError ->
+                        Telemetry.event(
+                            "IrohNode", "admin_rpc.method_observer.rollback_failed",
+                            "remoteEndpointId" to remoteEndpointId,
+                            "method" to method,
+                            "error" to (rollbackError.message ?: rollbackError.toString()),
+                            level = Telemetry.Level.WARN,
+                        )
+                    }
+                }
+            }
+        }
+        val response = try {
+            router.dispatch(invocation.copy(context = requestContextProvider()))
+        } catch (cancelled: CancellationException) {
+            settleObservation(false)
+            throw cancelled
+        } catch (error: Exception) {
+            settleObservation(false)
+            throw error
+        }
+        settleObservation(!isAdminRpcFailureEnvelope(response))
+        return response
     }
 
     /**
@@ -342,10 +371,10 @@ internal class AdminRpcStreamServer(
      * (e.g. subscribe as a viewer on message.list) before dispatch.
      * Best-effort: a failing hook must never break the RPC.
      */
-    private suspend fun notifyMethodObserved(method: String, params: JsonObject?) {
-        val observe = onMethodObserved ?: return
+    private suspend fun notifyMethodObserved(method: String, params: JsonObject?): (suspend (Boolean) -> Unit)? {
+        val observe = onMethodObserved ?: return null
         try {
-            observe(method, params)
+            return observe(method, params)
         } catch (ce: CancellationException) {
             throw ce
         } catch (hookError: Exception) {
@@ -356,6 +385,7 @@ internal class AdminRpcStreamServer(
                 "error" to (hookError.message ?: hookError.toString()),
                 level = Telemetry.Level.WARN,
             )
+            return null
         }
     }
 

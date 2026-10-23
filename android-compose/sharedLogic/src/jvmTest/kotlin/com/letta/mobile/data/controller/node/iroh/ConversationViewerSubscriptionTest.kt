@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -53,6 +54,86 @@ class ConversationViewerSubscriptionTest {
         registry: ConnectionRegistry,
         viewer: ViewerHandle,
     ): ConversationViewerSubscription = ConversationViewerSubscription(registry, registry.claim(viewer))
+
+    /**
+     * letta-mobile-wisqe.2 F2: two admin_rpc message.list calls run on separate streams. When the
+     * older one (X) fails AFTER a newer one (Y) succeeded, settling X must not undo Y.
+     */
+    @Test
+    fun anOlderFailedObservationDoesNotUndoANewerSuccess() = runTest {
+        val (registry, connViewer, subscription) = viewingA()
+
+        val settleX = subscription.observe(ConversationId("convX"))
+        subscription.observe(ConversationId("convY"))(true)
+        settleX(false)
+
+        assertViewing(registry, connViewer, subscription, "convY", gone = listOf("convA", "convX"))
+    }
+
+    @Test
+    fun aFailedObservationRestoresThePreviousConversation() = runTest {
+        val (registry, connViewer, subscription) = viewingA()
+
+        subscription.observe(ConversationId("convX"))(false)
+
+        assertViewing(registry, connViewer, subscription, "convA", gone = listOf("convX"))
+    }
+
+    /** CodeRabbit on #2201: two concurrent failures must never leave either failed conversation viewed. */
+    @Test
+    fun twoFailedObservationsRestoreTheLastConfirmedViewOlderFirst() = runTest {
+        val (registry, connViewer, subscription) = viewingA()
+
+        val settleX = subscription.observe(ConversationId("convX"))
+        val settleY = subscription.observe(ConversationId("convY"))
+        settleX(false)
+        settleY(false)
+
+        assertViewing(registry, connViewer, subscription, "convA", gone = listOf("convX", "convY"))
+    }
+
+    @Test
+    fun twoFailedObservationsRestoreTheLastConfirmedViewNewerFirst() = runTest {
+        val (registry, connViewer, subscription) = viewingA()
+
+        val settleX = subscription.observe(ConversationId("convX"))
+        val settleY = subscription.observe(ConversationId("convY"))
+        settleY(false)
+        settleX(false)
+
+        assertViewing(registry, connViewer, subscription, "convA", gone = listOf("convX", "convY"))
+    }
+
+    @Test
+    fun aNewerRequestStillRunningStaysViewedWhenAnOlderOneFails() = runTest {
+        val (registry, connViewer, subscription) = viewingA()
+
+        val settleX = subscription.observe(ConversationId("convX"))
+        subscription.observe(ConversationId("convY"))
+        settleX(false)
+
+        assertViewing(registry, connViewer, subscription, "convY", gone = listOf("convA", "convX"))
+    }
+
+    private suspend fun viewingA(): Triple<ConnectionRegistry, IrohViewerHandle, ConversationViewerSubscription> {
+        val registry = ConnectionRegistry()
+        val connViewer = viewer("conn-A")
+        val subscription = subscription(registry, connViewer)
+        subscription.subscribe("convA")
+        return Triple(registry, connViewer, subscription)
+    }
+
+    private suspend fun assertViewing(
+        registry: ConnectionRegistry,
+        connViewer: IrohViewerHandle,
+        subscription: ConversationViewerSubscription,
+        expected: String,
+        gone: List<String>,
+    ) {
+        assertEquals(expected, subscription.currentConversation)
+        assertEquals(setOf<ViewerHandle>(connViewer), registry.viewersFor(expected))
+        gone.forEach { assertTrue(registry.viewersFor(it).isEmpty(), "$it must not stay viewed") }
+    }
 
     @Test
     fun runtimeStartThenMessageListDeScopesToTheNewConversation() = runTest {
@@ -170,10 +251,11 @@ class ConversationViewerSubscriptionTest {
                 firstFrameTimeoutMs = 1_000,
             ),
             onMethodObserved = { method, params ->
-                if (method == "message.list") {
-                    val convId = params?.get("conversation_id")?.jsonPrimitive?.content
-                    if (!convId.isNullOrEmpty()) subscription.subscribe(convId)
+                val conversationId = params?.get("conversation_id")?.jsonPrimitive?.content
+                if (method == "message.list" && !conversationId.isNullOrEmpty()) {
+                    subscription.subscribe(conversationId)
                 }
+                null
             },
         )
 
@@ -190,6 +272,82 @@ class ConversationViewerSubscriptionTest {
         // The hook subscribed the connection as a viewer of convB.
         assertEquals("convB", subscription.currentConversation)
         assertEquals(setOf<ViewerHandle>(connViewer), registry.viewersFor("convB"))
+    }
+
+    @Test
+    fun agentScopeDenialDoesNotObserveTheConversation() = runTest {
+        val registry = ConnectionRegistry()
+        val connViewer = viewer("conn-A")
+        val subscription = subscription(registry, connViewer)
+        subscription.subscribe("convA")
+        val router = AdminRpcRouter().apply {
+            register("message.list") { kotlinx.serialization.json.JsonPrimitive("[]") }
+        }
+        val server = AdminRpcStreamServer(
+            router = router,
+            authenticated = AtomicBoolean(true),
+            limits = AdminRpcStreamLimits(firstFrameTimeoutMs = 1_000),
+            onMethodObserved = { method, params ->
+                val conversationId = params?.get("conversation_id")?.jsonPrimitive?.content
+                if (method == "message.list" && !conversationId.isNullOrEmpty()) {
+                    subscription.subscribe(conversationId)
+                }
+                null
+            },
+            requestContextProvider = {
+                AdminRpcRequestContext(authenticated = true, authorizedAgentIds = setOf("agent-A"))
+            },
+        )
+        val stream = FakeBiStream()
+        val job = with(server) { launch { handleStream(stream) } }
+        stream.sendFrame(
+            """{"type":"admin_rpc","request_id":"r1","method":"message.list","params":{"conversation_id":"convB","agent_id":"agent-B"}}""",
+        )
+        val response = stream.awaitFrame()
+        job.join()
+
+        assertEquals("false", response["success"]?.jsonPrimitive?.content)
+        assertEquals(AgentScopeGuard.DENIED, response["error"]?.jsonPrimitive?.content)
+        assertEquals("convA", subscription.currentConversation)
+        assertEquals(setOf<ViewerHandle>(connViewer), registry.viewersFor("convA"))
+        assertTrue(registry.viewersFor("convB").isEmpty(), "denied conversation must not gain a viewer")
+    }
+
+    @Test
+    fun failedMessageListRestoresThePreviousViewerSubscription() = runTest {
+        val registry = ConnectionRegistry()
+        val connViewer = viewer("conn-A")
+        val subscription = subscription(registry, connViewer)
+        subscription.subscribe("convA")
+        val router = AdminRpcRouter().apply {
+            register("message.list") { throw IllegalStateException("native message list failed") }
+        }
+        val server = AdminRpcStreamServer(
+            router = router,
+            authenticated = AtomicBoolean(true),
+            limits = AdminRpcStreamLimits(firstFrameTimeoutMs = 1_000),
+            onMethodObserved = { method, params ->
+                val conversationId = params?.get("conversation_id")?.jsonPrimitive?.content
+                if (method == "message.list" && !conversationId.isNullOrEmpty()) {
+                    subscription.observe(ConversationId(conversationId))
+                } else {
+                    null
+                }
+            },
+        )
+        val stream = FakeBiStream()
+        val job = with(server) { launch { handleStream(stream) } }
+        stream.sendFrame(
+            """{"type":"admin_rpc","request_id":"r1","method":"message.list","params":{"conversation_id":"convB"}}""",
+        )
+        val response = stream.awaitFrame()
+        job.join()
+
+        assertEquals("false", response["success"]?.jsonPrimitive?.content)
+        assertEquals("native message list failed", response["error"]?.jsonPrimitive?.content)
+        assertEquals("convA", subscription.currentConversation)
+        assertEquals(setOf<ViewerHandle>(connViewer), registry.viewersFor("convA"))
+        assertTrue(registry.viewersFor("convB").isEmpty(), "failed hydration must roll back its viewer")
     }
 
     @Test

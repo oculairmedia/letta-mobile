@@ -369,27 +369,77 @@ class IrohNodeConnection(
             return """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"forbidden","capability":"$requiredCapability"}"""
         }
         val params = obj["params"]?.jsonObject
-        // A client whose admin_rpc rides the control channel (the browser over iroh-wasm) hydrates
-        // through here, so it becomes the conversation's viewer the same way.
-        observeAdminMethod(method, params)
-        return adminRpcRouter.dispatch(
-            AdminRpcInvocation(
-                requestId = requestId,
-                method = method,
-                params = params,
-                context = currentAdminRpcRequestContext(),
-            ),
+        val invocation = AdminRpcInvocation(
+            requestId = requestId,
+            method = method,
+            params = params,
+            context = currentAdminRpcRequestContext(),
         )
+        // Authorize before the observer can add this connection as a viewer.
+        // Dispatch still receives a fresh context after observation so a successful
+        // message.list keeps its established conversation-scope behaviour.
+        adminRpcRouter.preauthorize(invocation)?.let { return it }
+        val settle = observeAdminMethod(method, params)
+        val response = try {
+            adminRpcRouter.dispatch(invocation.copy(context = currentAdminRpcRequestContext()))
+        } catch (cancelled: CancellationException) {
+            settleObservedAdminMethod(settle, succeeded = false)
+            throw cancelled
+        } catch (error: Exception) {
+            settleObservedAdminMethod(settle, succeeded = false)
+            throw error
+        }
+        settleObservedAdminMethod(settle, succeeded = !isAdminRpcFailureEnvelope(response))
+        return response
     }
 
     /**
      * The OBSERVER signal: a connection that hydrates conversation X with `message.list`
      * becomes X's viewer (de-scoping any prior conversation), on either admin_rpc path.
      */
-    private suspend fun observeAdminMethod(method: String, params: JsonObject?) {
-        if (method != "message.list") return
+    private suspend fun observeAdminMethod(method: String, params: JsonObject?): (suspend (Boolean) -> Unit)? {
+        if (method != "message.list") return null
         val conversationId = params?.get("conversation_id")?.let { (it as? JsonPrimitive)?.contentOrNull }
-        if (!conversationId.isNullOrEmpty()) registerAsViewer(conversationId)
+        if (conversationId.isNullOrEmpty()) return null
+        val subscription = viewerSubscription ?: return null
+        val previous = subscription.currentConversation
+        val settle = subscription.observe(ConversationId(conversationId))
+        Telemetry.event(
+            "IrohNode", "viewer.registered",
+            "remoteEndpointId" to remoteEndpointId,
+            "conversationId" to conversationId,
+            "deregistered" to (previous?.takeIf { it != conversationId } ?: ""),
+        )
+        return { succeeded ->
+            settle(succeeded)
+            if (!succeeded) {
+                Telemetry.event(
+                    "IrohNode", "viewer.registration_rolled_back",
+                    "remoteEndpointId" to remoteEndpointId,
+                    "failedConversationId" to conversationId,
+                    "nowViewing" to (subscription.currentConversation ?: ""),
+                )
+            }
+        }
+    }
+
+    /** Settle an observation with its request's outcome; cancellation cannot skip it. */
+    private suspend fun settleObservedAdminMethod(settle: (suspend (Boolean) -> Unit)?, succeeded: Boolean) {
+        if (settle == null) return
+        withContext(NonCancellable) {
+            try {
+                settle(succeeded)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Telemetry.event(
+                    "IrohNode", "admin_rpc.method_observer.rollback_failed",
+                    "remoteEndpointId" to remoteEndpointId,
+                    "error" to (error.message ?: error.toString()),
+                    level = Telemetry.Level.WARN,
+                )
+            }
+        }
     }
 
     /** Control-channel sync frame — kept out of [handleControlFrame] for complexity. */

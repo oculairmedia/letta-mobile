@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.fanout.StreamIntegrityMonitor
+import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -195,26 +196,92 @@ internal class ConversationViewerSubscription(
     private val viewer: ViewerHandle = registration.viewer
     private var viewed: String? = null
 
+    /** Order of every subscription signal; a higher number is a newer signal. */
+    private var signals: Long = 0
+
+    /** The newest view a completed request confirmed (or a direct [subscribe] set), and its signal number. */
+    private var confirmed: String? = null
+    private var confirmedAt: Long = 0
+
+    /** Observations whose request has not finished yet, by signal number. */
+    private val inFlight = mutableMapOf<Long, String>()
+
     /** The conversation currently viewed (test/telemetry). */
     val currentConversation: String? get() = viewed
 
     /**
      * Register [viewer] as a viewer of [conversationId], de-scoping any prior
-     * conversation. No-op when already viewing [conversationId].
+     * conversation. No-op when already viewing [conversationId]. A direct subscribe
+     * (runtime_start) is confirmed at once.
      */
     suspend fun subscribe(conversationId: String) {
         mutex.withLock {
-            val previous = viewed
-            // De-scope only a DIFFERENT prior conversation (Option A) — unchanged.
-            if (previous != null && previous != conversationId) {
-                runCatching { registry.unregister(previous, viewer) }
-            }
-            // ALWAYS (re-)register while this connection still owns the endpoint
-            // claim. A stale generation is rejected atomically, so late polling
-            // from an overlapped reconnect cannot reclaim or evict its successor.
-            val registered = runCatching { registry.register(conversationId, registration) }.getOrDefault(false)
-            viewed = conversationId.takeIf { registered }
+            signals += 1
+            confirmed = conversationId
+            confirmedAt = signals
+            applyLocked(conversationId)
         }
+    }
+
+    /**
+     * View [conversationId] while its request runs, returning a settle callback the caller
+     * invokes once with whether the request succeeded. The connection always views the
+     * newest view still in good standing: the newest confirmed view, or a newer request
+     * that is still running. A failed request never leaves its conversation viewed, even
+     * when several requests fail concurrently.
+     */
+    // letta-mobile-wisqe.2 F2: rollback guard for concurrent admin_rpc streams.
+    suspend fun observe(conversationId: ConversationId): suspend (Boolean) -> Unit {
+        val signal = mutex.withLock {
+            signals += 1
+            inFlight[signals] = conversationId.value
+            applyLocked(conversationId.value)
+            signals
+        }
+        return { succeeded -> settle(signal, succeeded) }
+    }
+
+    private suspend fun settle(signal: Long, succeeded: Boolean) {
+        mutex.withLock {
+            val target = inFlight.remove(signal) ?: return
+            if (succeeded && signal > confirmedAt) {
+                confirmed = target
+                confirmedAt = signal
+            }
+            val newest = inFlight.filterKeys { it > confirmedAt }.maxByOrNull { it.key }?.value
+            val view = newest ?: confirmed
+            if (view == null) unsubscribeLocked() else if (view != viewed) applyLocked(view)
+        }
+    }
+
+    /** Remove this connection from its current conversation, if any. */
+    suspend fun unsubscribe() {
+        mutex.withLock {
+            signals += 1
+            confirmed = null
+            confirmedAt = signals
+            inFlight.clear()
+            unsubscribeLocked()
+        }
+    }
+
+    private suspend fun applyLocked(target: String) {
+        val previous = viewed
+        // De-scope only a DIFFERENT prior conversation (Option A) — unchanged.
+        if (previous != null && previous != target) {
+            runCatching { registry.unregister(previous, viewer) }
+        }
+        // ALWAYS (re-)register while this connection still owns the endpoint
+        // claim. A stale generation is rejected atomically, so late polling
+        // from an overlapped reconnect cannot reclaim or evict its successor.
+        val registered = runCatching { registry.register(target, registration) }.getOrDefault(false)
+        viewed = target.takeIf { registered }
+    }
+
+    private suspend fun unsubscribeLocked() {
+        val previous = viewed ?: return
+        runCatching { registry.unregister(previous, viewer) }
+        viewed = null
     }
 }
 
