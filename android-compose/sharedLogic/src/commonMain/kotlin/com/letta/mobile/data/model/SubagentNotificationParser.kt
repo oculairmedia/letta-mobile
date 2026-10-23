@@ -8,11 +8,12 @@ fun extractSubagentNotification(raw: String): UiSubagentNotification? {
     val block = raw.substring(blockStart, xmlEnd)
     val tail = raw.substring(xmlEnd)
     val usage = block.xmlTag("usage")
+    val result = block.xmlTag("result")
     return UiSubagentNotification(
         toolCallId = block.xmlTag("tool_call_id") ?: block.xmlTag("toolCallId"),
         status = block.xmlTag("status") ?: block.xmlTag("state") ?: "completed",
         summary = block.xmlTag("summary"),
-        result = block.xmlTag("result"),
+        result = result,
         usage = usage,
         durationMs = usage?.durationMillisFromUsage(),
         transcriptUri = block.xmlTag("transcript")
@@ -23,9 +24,15 @@ fun extractSubagentNotification(raw: String): UiSubagentNotification? {
             ?: block.lineAfter("Full transcript at")
             ?: block.lineAfter("Full transcript:"),
         taskId = block.xmlTag("task-id") ?: block.xmlTag("task_id") ?: block.xmlTag("taskId"),
-        subagentAgentId = block.xmlTag("agent_id") ?: block.xmlTag("agentId"),
+        subagentAgentId = block.notificationAgentId(result),
     )
 }
+
+private fun String.notificationAgentId(result: String?): String? =
+    xmlTag("agent_id") ?: xmlTag("agentId")
+        // Only the labelled result header is identity evidence, never later prose.
+        ?: Regex("(?:^|\\s)agent_id=(\\S+)")
+            .find(result?.lineSequence()?.firstOrNull().orEmpty())?.groupValues?.get(1)
 
 private fun String.xmlTag(name: String): String? {
     val match = Regex("<$name(?:\\s[^>]*)?>([\\s\\S]*?)</$name>", RegexOption.IGNORE_CASE)
