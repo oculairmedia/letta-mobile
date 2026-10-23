@@ -8,6 +8,7 @@ import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import computer.iroh.Connection
 import computer.iroh.NoHandle
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -176,6 +177,8 @@ private suspend fun IrohNodeConnection.invokeRuntimeStart(frame: JsonObject): St
             }
         } catch (failure: InvocationTargetException) {
             continuation.resumeWithException(failure.targetException)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (failure: Exception) {
             continuation.resumeWithException(failure)
         }
