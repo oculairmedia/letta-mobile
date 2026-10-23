@@ -40,6 +40,22 @@ class StructureExportFixtureTest {
         assertTrue(public.none { it.contains("hidden") || it.contains("method") })
     }
 
+    /**
+     * scripts/ci/package_headroom.py rebuilds this export without Gradle so builders see package
+     * type headroom and new import cycles in seconds. Both readers must produce the golden lines
+     * for the shared fixture (scripts/tests/test_package_headroom.py checks the Python side).
+     */
+    @Test
+    fun `export of the shared parity fixture equals the golden the python scan also matches`(@TempDir root: Path) {
+        val fixture = Path.of(requireNotNull(System.getProperty("architecture.projectRoot")))
+            .resolve("scripts/tests/fixtures/structure-parity")
+        fixture.resolve("android-compose").toFile().copyRecursively(root.resolve("android-compose").toFile())
+        StructureSourceExport.write(root, KotlinSourcePolicy.productionScope(root).files)
+        val exported = root.resolve("android-compose/build/reports/structure/sources.jsonl").readLines()
+            .filterNot { it.startsWith("{\"type\":\"public\"") }
+        assertEquals(fixture.resolve("expected-export.jsonl").readLines().sorted(), exported.sorted())
+    }
+
     @Test
     fun `record escapes path and content characters`() {
         assertEquals("{\"type\":\"file\",\"path\":\"a\\\\b\\n\\\"\"}", StructureSourceExport.record("file", "path" to "a\\b\n\""))

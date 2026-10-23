@@ -100,4 +100,7 @@ tasks.test {
     ).withPropertyName("jsonRatchetSources").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file("json-instances-baseline.txt")
         .withPropertyName("jsonRatchetBaseline").withPathSensitivity(PathSensitivity.RELATIVE)
+    // StructureExportFixtureTest pins the export to the golden package_headroom.py also matches.
+    inputs.dir(rootProject.projectDir.resolve("../scripts/tests/fixtures/structure-parity"))
+        .withPropertyName("structureParityFixture").withPathSensitivity(PathSensitivity.RELATIVE)
 }

@@ -7,6 +7,7 @@
 #      compile/build does not fail mysteriously).
 #   3. Optional CodeScene delta (advisory) — skips when `cs` / token absent.
 #   4. OPTIONAL Kotlin compile. Off by default.
+#   5. OPTIONAL scripts/ci/quick-check.sh (PRE_PUSH_QUICK_CHECK=1). Off by default.
 #
 # Why the compile is opt-in (2026-08-05):
 #   `:app:compileRootDebugKotlin` cold-starts Gradle + Kotlin daemons and
@@ -70,6 +71,13 @@ if [ "${PRE_PUSH_COMPILE:-0}" = "1" ]; then
   ./gradlew :app:compileRootDebugKotlin
 else
   printf '%s\n' "[pre-push] skipping :app:compileRootDebugKotlin (set PRE_PUSH_COMPILE=1 to enable; CI owns the compile gate)." >&2
+fi
+
+# Optional source guardrails (parity, platform UI, KDoc, API packages, baseline ratchet, package
+# type caps and import cycles) in seconds, without Gradle. Opt in with PRE_PUSH_QUICK_CHECK=1;
+# a failure blocks the push.
+if [ "${PRE_PUSH_QUICK_CHECK:-0}" = "1" ]; then
+  bash "$repo_root/scripts/ci/quick-check.sh" || exit 1
 fi
 
 # CodeScene delta (advisory) — surfaces the code-health findings the
