@@ -9832,6 +9832,12 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellSidebarMapping {
 	public final fun panelState (Lcom/letta/mobile/ui/shell/sidebar/ShellSidebarInput;Lkotlin/time/Instant;)Lcom/letta/mobile/ui/shell/sidebar/ShellAgentPanelState;
 }
 
+public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellMinimalHeaderKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellMinimalHeaderKt;
+	public fun <init> ()V
+	public final fun getLambda$-694910148$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+}
+
 public final class com/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellSidebarOverflowMenuKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/workspace/ComposableSingletons$ShellSidebarOverflowMenuKt;
 	public fun <init> ()V
@@ -10033,6 +10039,20 @@ public final class com/letta/mobile/ui/shell/workspace/ShellLayoutControllerKt {
 	public static final fun shellLayoutStore (Lcom/letta/mobile/data/model/LettaConfig;Lcom/letta/mobile/data/storage/SecureSettingsStore;)Lcom/letta/mobile/data/desktopshell/ShellLayoutStore;
 }
 
+public final class com/letta/mobile/ui/shell/workspace/ShellMinimalHeader {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/ui/chat/AgentIdentity;Lkotlin/jvm/functions/Function0;)V
+	public final fun component1 ()Lcom/letta/mobile/ui/chat/AgentIdentity;
+	public final fun component2 ()Lkotlin/jvm/functions/Function0;
+	public final fun copy (Lcom/letta/mobile/ui/chat/AgentIdentity;Lkotlin/jvm/functions/Function0;)Lcom/letta/mobile/ui/shell/workspace/ShellMinimalHeader;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/workspace/ShellMinimalHeader;Lcom/letta/mobile/ui/chat/AgentIdentity;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellMinimalHeader;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIdentity ()Lcom/letta/mobile/ui/chat/AgentIdentity;
+	public final fun getOnOpenNavigation ()Lkotlin/jvm/functions/Function0;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/ui/shell/workspace/ShellOpenConversationContextKt {
 	public static final fun OpenConversationAgentContextCard-qIMhX-4 (Lcom/letta/mobile/ui/shell/workspace/OpenConversationContextSession;Ljava/lang/String;Lcom/letta/mobile/ui/shell/workspace/OpenConversation;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;I)V
 	public static final fun OpenConversationContextMeter (Lcom/letta/mobile/ui/shell/workspace/OpenConversationContextSession;Lcom/letta/mobile/ui/shell/workspace/OpenConversation;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;I)V
@@ -10042,20 +10062,18 @@ public final class com/letta/mobile/ui/shell/workspace/ShellOpenConversationCont
 
 public final class com/letta/mobile/ui/shell/workspace/ShellSidebarControl {
 	public static final field $stable I
-	public fun <init> (ZLkotlin/jvm/functions/Function0;Landroidx/compose/ui/focus/FocusRequester;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarOverflow;Z)V
-	public synthetic fun <init> (ZLkotlin/jvm/functions/Function0;Landroidx/compose/ui/focus/FocusRequester;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarOverflow;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ZLkotlin/jvm/functions/Function0;Landroidx/compose/ui/focus/FocusRequester;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarOverflow;)V
+	public synthetic fun <init> (ZLkotlin/jvm/functions/Function0;Landroidx/compose/ui/focus/FocusRequester;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarOverflow;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
 	public final fun component2 ()Lkotlin/jvm/functions/Function0;
 	public final fun component3 ()Landroidx/compose/ui/focus/FocusRequester;
 	public final fun component4 ()Lcom/letta/mobile/ui/shell/workspace/ShellSidebarOverflow;
-	public final fun component5 ()Z
-	public final fun copy (ZLkotlin/jvm/functions/Function0;Landroidx/compose/ui/focus/FocusRequester;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarOverflow;Z)Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;ZLkotlin/jvm/functions/Function0;Landroidx/compose/ui/focus/FocusRequester;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarOverflow;ZILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;
+	public final fun copy (ZLkotlin/jvm/functions/Function0;Landroidx/compose/ui/focus/FocusRequester;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarOverflow;)Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;ZLkotlin/jvm/functions/Function0;Landroidx/compose/ui/focus/FocusRequester;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarOverflow;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCollapsed ()Z
 	public final fun getFocusRequester ()Landroidx/compose/ui/focus/FocusRequester;
 	public final fun getOnToggle ()Lkotlin/jvm/functions/Function0;
-	public final fun getOpensDrawer ()Z
 	public final fun getOverflow ()Lcom/letta/mobile/ui/shell/workspace/ShellSidebarOverflow;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -10134,24 +10152,27 @@ public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderBindi
 public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderKt {
 	public static final fun ShellSidebarToggleButton (Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun ShellWorkspaceHeader-6a0pyJM (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderState;Landroidx/compose/ui/Modifier;FLandroidx/compose/runtime/Composer;II)V
+	public static final fun barHeight-3ABfNKs (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderState;F)F
 }
 
 public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderState {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarState;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarActions;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;Lcom/letta/mobile/ui/shell/header/SearchSlot;Lcom/letta/mobile/ui/shell/workspace/ShellConversationTabs;)V
-	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarState;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarActions;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;Lcom/letta/mobile/ui/shell/header/SearchSlot;Lcom/letta/mobile/ui/shell/workspace/ShellConversationTabs;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarState;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarActions;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;Lcom/letta/mobile/ui/shell/header/SearchSlot;Lcom/letta/mobile/ui/shell/workspace/ShellConversationTabs;Lcom/letta/mobile/ui/shell/workspace/ShellMinimalHeader;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarState;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarActions;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;Lcom/letta/mobile/ui/shell/header/SearchSlot;Lcom/letta/mobile/ui/shell/workspace/ShellConversationTabs;Lcom/letta/mobile/ui/shell/workspace/ShellMinimalHeader;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarState;
 	public final fun component3 ()Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarActions;
 	public final fun component4 ()Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;
 	public final fun component5 ()Lcom/letta/mobile/ui/shell/header/SearchSlot;
 	public final fun component6 ()Lcom/letta/mobile/ui/shell/workspace/ShellConversationTabs;
-	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarState;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarActions;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;Lcom/letta/mobile/ui/shell/header/SearchSlot;Lcom/letta/mobile/ui/shell/workspace/ShellConversationTabs;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderState;
-	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderState;Ljava/lang/String;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarState;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarActions;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;Lcom/letta/mobile/ui/shell/header/SearchSlot;Lcom/letta/mobile/ui/shell/workspace/ShellConversationTabs;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderState;
+	public final fun component7 ()Lcom/letta/mobile/ui/shell/workspace/ShellMinimalHeader;
+	public final fun copy (Ljava/lang/String;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarState;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarActions;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;Lcom/letta/mobile/ui/shell/header/SearchSlot;Lcom/letta/mobile/ui/shell/workspace/ShellConversationTabs;Lcom/letta/mobile/ui/shell/workspace/ShellMinimalHeader;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderState;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderState;Ljava/lang/String;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarState;Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarActions;Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;Lcom/letta/mobile/ui/shell/header/SearchSlot;Lcom/letta/mobile/ui/shell/workspace/ShellConversationTabs;Lcom/letta/mobile/ui/shell/workspace/ShellMinimalHeader;ILjava/lang/Object;)Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderState;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getIdentity ()Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarState;
 	public final fun getIdentityActions ()Lcom/letta/mobile/ui/shell/nowactive/NowActiveBarActions;
+	public final fun getMinimal ()Lcom/letta/mobile/ui/shell/workspace/ShellMinimalHeader;
 	public final fun getSearch ()Lcom/letta/mobile/ui/shell/header/SearchSlot;
 	public final fun getSidebar ()Lcom/letta/mobile/ui/shell/workspace/ShellSidebarControl;
 	public final fun getTabs ()Lcom/letta/mobile/ui/shell/workspace/ShellConversationTabs;
@@ -10163,6 +10184,7 @@ public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderState
 public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderTags {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceHeaderTags;
+	public static final field MENU_BUTTON Ljava/lang/String;
 	public static final field SIDEBAR_TOGGLE Ljava/lang/String;
 }
 

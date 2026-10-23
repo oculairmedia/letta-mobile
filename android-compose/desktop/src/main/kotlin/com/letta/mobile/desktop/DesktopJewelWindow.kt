@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowState
 import com.letta.mobile.ui.canvas.LocalCanvasPenTarget
@@ -19,6 +20,7 @@ import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.host.desktopPointer
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeader
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState
+import com.letta.mobile.ui.shell.workspace.barHeight
 import com.letta.mobile.ui.theme.LettaDimens
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import dev.nucleusframework.window.AwtDecoratedWindowScope
@@ -39,9 +41,6 @@ private val TitleBarHeight = 48.dp
 
 /** Text-selection handles at twice the mouse-sized default, so a fingertip can take hold of them. */
 private const val TOUCH_HANDLE_SCALE = 2f
-
-/** With tabs the strip is one line per tab (title, then agent), so the bar can be browser-thin. */
-private val TabbedTitleBarHeight = LettaDimens.Control.actionButton
 
 /**
  * Main desktop window chrome.
@@ -90,7 +89,9 @@ internal fun DesktopJewelWindow(
                 // so the title bar's hairline is dropped — the tab-vs-strip
                 // contrast carries the separation instead (browser behaviour).
                 val tabbed = header?.tabs?.tabs?.isNotEmpty() == true
-                val titleBarStyle = remember(colorScheme, tabbed) { titleBarStyle(colorScheme, tabbed) }
+                // Browser-thin with tabs; the phone bar's height for a small window's minimal header.
+                val barHeight = header?.barHeight(plain = TitleBarHeight) ?: TitleBarHeight
+                val titleBarStyle = remember(colorScheme, tabbed, barHeight) { titleBarStyle(colorScheme, tabbed, barHeight) }
                 val windowStyle = remember(colorScheme) { decoratedWindowStyle(colorScheme) }
                 NucleusDecoratedWindowTheme(
                     isDark = dark,
@@ -159,14 +160,14 @@ private fun DesktopTitleBarHeader(title: String, header: ShellWorkspaceHeaderSta
     )
 }
 
-private fun titleBarStyle(colorScheme: ColorScheme, tabbed: Boolean) = TitleBarStyle(
+private fun titleBarStyle(colorScheme: ColorScheme, tabbed: Boolean, height: Dp) = TitleBarStyle(
     colors = TitleBarColors(
         background = colorScheme.surfaceContainerLow,
         inactiveBackground = colorScheme.surfaceContainerLow,
         content = colorScheme.onSurface,
         border = if (tabbed) Color.Transparent else colorScheme.outlineVariant,
     ),
-    metrics = TitleBarMetrics(height = if (tabbed) TabbedTitleBarHeight else TitleBarHeight),
+    metrics = TitleBarMetrics(height = height),
 )
 
 private fun decoratedWindowStyle(colorScheme: ColorScheme) = DecoratedWindowStyle(

@@ -10,18 +10,29 @@ import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTopPositionInRootIsEqualTo
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.chat.AgentIdentityPillTestTags
+import com.letta.mobile.ui.components.tabs.LettaTab
+import com.letta.mobile.ui.shell.header.ShellHeaderDefaults
+import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
 import com.letta.mobile.ui.shell.rail.ShellRailFocus
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelState
 import com.letta.mobile.ui.shell.sidebar.ShellPanelAgent
 import kotlin.test.Test
+import com.letta.mobile.ui.theme.LettaDimens
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 private const val PageTag = "workspace-page"
@@ -34,17 +45,25 @@ private val Navigation = ShellWorkspaceNavigation(
     panel = ShellAgentPanelState(agent = ShellPanelAgent(name = "Ada", agentId = "agent-a")),
 )
 
-private fun workspaceState(title: String = "Window title", forceCompact: Boolean = false) = LettaShellWorkspaceState(
-    header = ShellWorkspaceHeaderState(title = title, sidebar = ShellSidebarControl(collapsed = false, onToggle = {})),
-    navigation = Navigation,
+private val OpenTabs = ShellConversationTabs(tabs = listOf(LettaTab(key = "conv-1", title = "Open chat")), activeKey = "conv-1")
+
+private fun workspaceState(
+    title: String = "Window title",
+    forceCompact: Boolean = false,
+    tabs: ShellConversationTabs = ShellConversationTabs(),
+    navigation: ShellWorkspaceNavigation = Navigation,
+) = LettaShellWorkspaceState(
+    header = ShellWorkspaceHeaderState(title = title, sidebar = ShellSidebarControl(collapsed = false, onToggle = {}), tabs = tabs),
+    navigation = navigation,
     layout = ShellWorkspaceLayout(forceCompact = forceCompact),
 )
 
 private fun workspaceHost(
     chrome: ShellWindowChrome = ShellWindowChrome.Inline,
     drawer: ShellWorkspaceDrawer = ShellWorkspaceDrawer(),
+    actions: ShellWorkspaceNavigationActions = ShellWorkspaceNavigationActions(),
 ) = LettaShellWorkspaceHost(
-    actions = ShellWorkspaceNavigationActions(),
+    actions = actions,
     slots = LettaShellWorkspaceSlots(
         main = { modifier -> Text("The page", modifier.testTag(PageTag)) },
         agentCard = {},
@@ -79,7 +98,7 @@ class LettaShellWorkspaceTest {
     fun inlineHeaderKeepsItsBarHeightAndTheBodyTakesTheRest() = runComposeUiTest {
         setContent { LettaShellWorkspace(workspaceState(), workspaceHost(), sized(1440.dp)) }
 
-        onNodeWithTag(LettaShellWorkspaceTags.INLINE_HEADER).assertHeightIsEqualTo(inlineHeaderHeight(tabbed = false))
+        onNodeWithTag(LettaShellWorkspaceTags.INLINE_HEADER).assertHeightIsEqualTo(LettaDimens.Control.minTouchTarget)
         onNodeWithTag(LettaShellWorkspaceTags.INLINE_HEADER).assertTopPositionInRootIsEqualTo(0.dp)
         onNodeWithTag(PageTag).assertIsDisplayed()
         onNodeWithTag(LettaShellWorkspaceTags.WIDE).assertHeightIsAtLeast(700.dp)
@@ -89,7 +108,8 @@ class LettaShellWorkspaceTest {
     fun compactInlineHeaderLeavesTheBodyItsHeightToo() = runComposeUiTest {
         setContent { LettaShellWorkspace(workspaceState(), workspaceHost(), sized(500.dp)) }
 
-        onNodeWithTag(LettaShellWorkspaceTags.INLINE_HEADER).assertHeightIsEqualTo(inlineHeaderHeight(tabbed = false))
+        // The minimal header keeps the phone app bar's height, room for the agent pill.
+        onNodeWithTag(LettaShellWorkspaceTags.INLINE_HEADER).assertHeightIsEqualTo(ShellHeaderDefaults.TouchMinHeight)
         onNodeWithTag(PageTag).assertIsDisplayed()
     }
 
@@ -100,7 +120,7 @@ class LettaShellWorkspaceTest {
 
         onNodeWithTag(LettaShellWorkspaceTags.COMPACT).assertExists()
         onNodeWithTag(LettaShellWorkspaceTags.WIDE).assertDoesNotExist()
-        onNodeWithTag(ShellWorkspaceHeaderTags.SIDEBAR_TOGGLE).performClick()
+        onNodeWithTag(ShellWorkspaceHeaderTags.MENU_BUTTON).performClick()
         waitForIdle()
         assertTrue(drawer.open)
     }
@@ -135,9 +155,73 @@ class LettaShellWorkspaceTest {
         }
 
         waitForIdle()
-        val control = hoisted?.sidebar
-        assertTrue(control?.opensDrawer == true)
-        control?.onToggle?.invoke()
+        val minimal = hoisted?.minimal
+        // A small desktop window's title bar gets the minimal header too: no tabs, no sidebar control.
+        assertEquals("Ada", minimal?.identity?.name)
+        assertNull(hoisted?.sidebar)
+        minimal?.onOpenNavigation?.invoke()
         assertTrue(drawer.open)
+    }
+
+    @Test
+    fun aCompactHeaderIsTheAgentPillTheSearchAndTheMenuWithNoTabStrip() = runComposeUiTest {
+        setContent { LettaShellWorkspace(workspaceState(tabs = OpenTabs), workspaceHost(), sized(400.dp)) }
+
+        onNodeWithTag(AgentIdentityPillTestTags.PILL).assertIsDisplayed()
+        onNode(hasTestTag(AgentIdentityPillTestTags.TRIGGER) and hasText("Ada")).assertIsDisplayed()
+        onNodeWithTag(ShellWorkspaceHeaderTags.MENU_BUTTON).assertIsDisplayed()
+        onNodeWithText("Open chat").assertDoesNotExist()
+        onNodeWithTag(ShellWorkspaceHeaderTags.SIDEBAR_TOGGLE).assertDoesNotExist()
+        // The menu sits on the right, after the pill.
+        val pill = onNodeWithTag(AgentIdentityPillTestTags.PILL).getUnclippedBoundsInRoot()
+        val menu = onNodeWithTag(ShellWorkspaceHeaderTags.MENU_BUTTON).getUnclippedBoundsInRoot()
+        assertTrue(menu.left >= pill.right, "menu $menu is not right of the pill $pill")
+    }
+
+    @Test
+    fun aWideHeaderKeepsTheTabStripAndTheSidebarControl() = runComposeUiTest {
+        setContent { LettaShellWorkspace(workspaceState(tabs = OpenTabs), workspaceHost(), sized(1440.dp)) }
+
+        onNodeWithText("Open chat").assertExists()
+        onNodeWithTag(ShellWorkspaceHeaderTags.SIDEBAR_TOGGLE).assertExists()
+        onNodeWithTag(ShellWorkspaceHeaderTags.MENU_BUTTON).assertDoesNotExist()
+        onNodeWithTag(AgentIdentityPillTestTags.PILL).assertDoesNotExist()
+    }
+
+    @Test
+    fun thePillOpensTheDrawerOnTapAndPinsOnLongPress() = runComposeUiTest {
+        val drawer = ShellWorkspaceDrawer()
+        val pins = mutableListOf<Pair<String, Boolean>>()
+        val actions = ShellWorkspaceNavigationActions(
+            rail = ShellAgentRailActions(onAgentPinnedChange = { id, pinned -> pins += id to pinned }),
+        )
+        setContent { LettaShellWorkspace(workspaceState(), workspaceHost(drawer = drawer, actions = actions), sized(400.dp)) }
+
+        onNodeWithTag(AgentIdentityPillTestTags.TRIGGER).performTouchInput { longClick() }
+        runOnIdle { assertEquals(listOf("agent-a" to true), pins) }
+        onNodeWithTag(AgentIdentityPillTestTags.TRIGGER).performClick()
+        runOnIdle { assertTrue(drawer.open) }
+    }
+
+    @Test
+    fun aPinnedAgentsLongPressUnpinsIt() {
+        val pinned = Navigation.copy(rail = Navigation.rail.copy(focus = Navigation.rail.focus.copy(pinnedAgentIds = setOf("agent-a"))))
+        val pins = mutableListOf<Pair<String, Boolean>>()
+        val actions = ShellAgentRailActions(onAgentPinnedChange = { id, p -> pins += id to p })
+        val identity = checkNotNull(pinned.focusedIdentity(actions, onSwitch = {}))
+
+        assertTrue(identity.isPinned)
+        identity.onLongClick()
+        assertEquals(listOf("agent-a" to false), pins)
+    }
+
+    @Test
+    fun withoutAFocusedAgentTheMinimalHeaderShowsTheTitle() = runComposeUiTest {
+        val unfocused = Navigation.copy(rail = Navigation.rail.copy(focus = ShellRailFocus()))
+        setContent { LettaShellWorkspace(workspaceState(navigation = unfocused), workspaceHost(), sized(400.dp)) }
+
+        onNodeWithTag(AgentIdentityPillTestTags.PILL).assertDoesNotExist()
+        onNodeWithText("Window title").assertExists()
+        onNodeWithTag(ShellWorkspaceHeaderTags.MENU_BUTTON).assertExists()
     }
 }

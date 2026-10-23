@@ -65,7 +65,8 @@ import kotlinx.coroutines.flow.drop
  *
  * At or above [LettaDimens.Pane.wideBreakpoint] the rail and panel sit beside the page (the panel
  * folds away under the layout's width rule or when collapsed); below it, or with
- * [ShellWorkspaceLayout.forceCompact], they fold into a modal drawer the header's menu opens.
+ * [ShellWorkspaceLayout.forceCompact], they fold into a modal drawer and the header turns minimal
+ * ([ShellMinimalHeader]: the agent pill, the search, and the menu that opens the drawer).
  * Hosts only bind: their state into [LettaShellWorkspaceState], their verbs and content into
  * [LettaShellWorkspaceHost].
  */
@@ -118,11 +119,23 @@ private class WorkspaceFrame(
 /** Where the agent pane's mascot stands: the open drawer when compact, the visible sidebar when wide. */
 private fun WorkspaceFrame.agentPaneVisible(): Boolean = if (fit.compact) drawer.open else fit.sidebarVisible
 
-/** In a compact window the header's sidebar control opens the drawer. */
+/**
+ * A compact window's header is the minimal one (every host, the desktop's small window too): the
+ * focused agent's pill, the search and the drawer's menu, with no tabs or sidebar control.
+ */
 private fun WorkspaceFrame.header(): ShellWorkspaceHeaderState {
     if (!fit.compact) return state.header
-    return state.header.copy(sidebar = ShellSidebarControl(collapsed = true, onToggle = { drawer.open = true }, opensDrawer = true))
+    val openDrawer = { drawer.open = true }
+    return state.header.copy(
+        sidebar = null,
+        tabs = ShellConversationTabs(),
+        minimal = ShellMinimalHeader(
+            identity = state.navigation.focusedIdentity(host.actions.rail, onSwitch = openDrawer),
+            onOpenNavigation = openDrawer,
+        ),
+    )
 }
+
 /**
  * The workspace owns the window's insets once, for every host: the side cutouts here, the
  * status bar under the inline header (its colour runs up behind it), and the body below takes the
@@ -155,15 +168,11 @@ private fun InlineHeader(header: ShellWorkspaceHeaderState) {
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-            .height(inlineHeaderHeight(tabbed))
+            .height(header.barHeight(plain = LettaDimens.Control.minTouchTarget))
             .testTag(LettaShellWorkspaceTags.INLINE_HEADER),
     )
     if (!tabbed) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
-
-/** The bar's height: browser-thin with tabs (one line per tab), else room for the identity block. */
-internal fun inlineHeaderHeight(tabbed: Boolean): Dp =
-    if (tabbed) LettaDimens.Control.actionButton else LettaDimens.Control.minTouchTarget
 
 @Composable
 private fun WorkspaceBody(frame: WorkspaceFrame, modifier: Modifier) {
