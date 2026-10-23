@@ -27,7 +27,7 @@ internal class RelayInviteAuthenticator : InviteAuthenticator {
         // The transport's pumps and the client's router are children of this exchange, so none
         // outlives it.
         val address = IrohServerAddress.parse(request.dialAddress)
-        val transport = IrohWasmAppServerTransport.connect(address, this, IdentityHex.encode(secretKey))
+        val transport = IrohWasmAppServerTransport.connect(address, this, secretKey.toHexString())
         try {
             transport.isConnected.first { it }
             DefaultAppServerClient(transport, parentScope = this).auth(
