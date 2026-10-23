@@ -9593,6 +9593,12 @@ public final class com/letta/mobile/ui/shell/sidebar/ComposableSingletons$ShellA
 	public final fun getLambda$1211308747$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
+public final class com/letta/mobile/ui/shell/sidebar/ComposableSingletons$ShellChatOptionsKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/shell/sidebar/ComposableSingletons$ShellChatOptionsKt;
+	public fun <init> ()V
+	public final fun getLambda$1504641410$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+}
+
 public final class com/letta/mobile/ui/shell/sidebar/ShellAgentPanelActions {
 	public static final field $stable I
 	public fun <init> ()V
@@ -9780,6 +9786,7 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellChatOptionsTags {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsTags;
 	public static final field REASONING Ljava/lang/String;
 	public static final field USAGE Ljava/lang/String;
+	public final fun glow (Lcom/letta/mobile/ui/ambient/ThinkingGlowStyle;)Ljava/lang/String;
 	public final fun restore (Ljava/lang/String;)Ljava/lang/String;
 	public final fun textSize (Lcom/letta/mobile/data/chat/display/ChatTextSize;)Ljava/lang/String;
 }

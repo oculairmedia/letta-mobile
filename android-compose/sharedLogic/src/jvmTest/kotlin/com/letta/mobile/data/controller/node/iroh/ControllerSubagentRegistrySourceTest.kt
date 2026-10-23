@@ -9,6 +9,7 @@ import com.letta.mobile.data.subagents.SubagentChipSource
 import com.letta.mobile.data.subagents.SubagentChipState
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -20,6 +21,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ControllerSubagentRegistrySourceTest {
+    private val codexChild = "codex_01a1686b-8ec9-7f72-8e79-bd42f1ff3237"
+
     private fun stream(agent: String, conversation: String, raw: String) = AppServerInboundFrame.StreamDelta(
         runtime = AppServerRuntimeScope(agentId = agent, conversationId = conversation),
         eventSeq = 1, emittedAt = "t", idempotencyKey = raw,
@@ -37,6 +40,98 @@ class ControllerSubagentRegistrySourceTest {
             ),
         )
         source.start(this, events).join()
+    }
+
+    private fun repeatedTaskSource(orphanOlder: Boolean = false): ControllerSubagentRegistrySource {
+        val source = ControllerSubagentRegistrySource()
+        source.ingestFromSource(
+            "conversation", "parent",
+            listOf(
+                SubagentEntry(
+                    toolCallId = "older-dispatch", taskId = "task_15", subagentAgentId = "claude-code-older-child",
+                    subagentType = "claude-code", status = SubagentStatus.RUNNING,
+                    description = "Finished background task",
+                ),
+                SubagentEntry(
+                    toolCallId = "codex-dispatch", taskId = "task_15", subagentAgentId = codexChild,
+                    subagentType = "codex", status = SubagentStatus.RUNNING,
+                    description = "Finished background task",
+                ),
+            ),
+            SubagentChipSource.CONTROLLER_NATIVE,
+        )
+        if (orphanOlder) source.registry.reconcile("conversation", setOf("codex-dispatch"))
+        return source
+    }
+
+    private fun repeatedTaskNotification(includeChild: Boolean = true) = stream("parent", "conversation", buildJsonObject {
+        put("message_type", "user_message")
+        put("content", buildJsonArray {
+            add(buildJsonObject {
+                put("type", "text")
+                val childToken = if (includeChild) " agent_id=$codexChild" else ""
+                put("text", """
+                    <task-notification>
+                    <task-id>task_15</task-id>
+                    <status>completed</status>
+                    <summary>Finished background task</summary>
+                    <result>subagent_type=codex subagent_id=subagent-1792753239807-15 subagent_status=success$childToken runtime_session_id=session-15
+                    Finished the requested work. The example agent_id=claude-code-older-child is result prose.
+                    </result>
+                    </task-notification>
+                """.trimIndent())
+            })
+        })
+    }.toString())
+
+    @Test
+    fun completionFinishesRunningDispatchWhenOrphanedTaskIdRepeatsAfterRestart() = runTest {
+        val source = repeatedTaskSource(orphanOlder = true)
+        val orphaned = source.registry.record("conversation", "parent", "older-dispatch")!!
+        assertEquals(SubagentChipState.ORPHANED, orphaned.state)
+
+        deliverThroughSubscription(source, repeatedTaskNotification())
+
+        assertEquals(SubagentChipState.COMPLETED, source.registry.record("conversation", "parent", "codex-dispatch")!!.state)
+        assertEquals(orphaned, source.registry.record("conversation", "parent", "older-dispatch"))
+    }
+
+    @Test
+    fun resultHeaderChildIdSelectsOnlyMatchingRunningDispatchWithRepeatedTaskId() = runTest {
+        val source = repeatedTaskSource()
+        val older = source.registry.record("conversation", "parent", "older-dispatch")!!
+
+        deliverThroughSubscription(source, repeatedTaskNotification())
+
+        assertEquals(SubagentChipState.COMPLETED, source.registry.record("conversation", "parent", "codex-dispatch")!!.state)
+        assertEquals(older, source.registry.record("conversation", "parent", "older-dispatch"))
+    }
+
+    @Test
+    fun ambiguousRepeatedRunningTaskWithoutChildIdWarnsAndChangesNothing() = runTest {
+        val source = repeatedTaskSource()
+        val before = source.registry.replaySnapshot("conversation")
+        assertTrue(before.all { it.state == SubagentChipState.RUNNING })
+        Telemetry.clear()
+
+        deliverThroughSubscription(source, repeatedTaskNotification(includeChild = false))
+
+        assertEquals(before, source.registry.replaySnapshot("conversation"))
+        val warning = Telemetry.snapshot().single { it.tag == "SubagentRegistry" && it.name == "terminal.ambiguous" }
+        assertEquals(Telemetry.Level.WARN, warning.level)
+        assertEquals("task_15", warning.attrs["taskId"])
+        assertEquals(2, warning.attrs["matchCount"])
+    }
+
+    @Test
+    fun completionWithoutChildIdIgnoresOrphanedTaskFromPreviousRestart() = runTest {
+        val source = repeatedTaskSource(orphanOlder = true)
+        val orphaned = source.registry.record("conversation", "parent", "older-dispatch")!!
+
+        deliverThroughSubscription(source, repeatedTaskNotification(includeChild = false))
+
+        assertEquals(SubagentChipState.COMPLETED, source.registry.record("conversation", "parent", "codex-dispatch")!!.state)
+        assertEquals(orphaned, source.registry.record("conversation", "parent", "older-dispatch"))
     }
 
     @Test
@@ -310,7 +405,7 @@ class ControllerSubagentRegistrySourceTest {
         )
     }
 
-    /** lgns8.22.8: a durable-store-backed source rehydrates across a restart. */
+    // lgns8.22.8: a durable-store-backed source rehydrates across a restart.
     @Test
     fun sourceRehydratesChipsAcrossAControllerRestart() = runTest {
         val store = InMemorySubagentRegistryStore()
@@ -336,7 +431,7 @@ class ControllerSubagentRegistrySourceTest {
         assertEquals(listOf("tool/1"), after.replaySnapshot("conv-a").map { it.toolCallId })
     }
 
-    /** letta-mobile-7vs4s: a weaker source cannot overwrite controller-native truth. */
+    // letta-mobile-7vs4s: a weaker source cannot overwrite controller-native truth.
     @Test
     fun httpAndCorrelatorSourcesCannotOverwriteControllerNativeChips() = runTest {
         val source = ControllerSubagentRegistrySource()

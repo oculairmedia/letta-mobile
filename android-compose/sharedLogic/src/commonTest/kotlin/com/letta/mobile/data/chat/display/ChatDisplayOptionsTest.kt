@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.ambient.ThinkingGlowStyle
 
 /** letta-mobile-zxk2n.5 (G91): display toggles hide rows, persist, and drive the transcript. */
 class ChatDisplayOptionsTest {
@@ -44,6 +45,27 @@ class ChatDisplayOptionsTest {
         val restarted = ChatDisplayPrefs(store).options.value
 
         assertEquals(ChatDisplayOptions(showReasoning = false, showCompactions = true, showTokenUsage = false), restarted)
+    }
+
+    @Test
+    fun theThinkingGlowStyleSurvivesARestart() {
+        val store = MemoryStore()
+        assertEquals(ThinkingGlowStyle.Aurora, ChatDisplayPrefs(store).options.value.thinkingGlow)
+
+        ChatDisplayPrefs(store).update { it.copy(thinkingGlow = ThinkingGlowStyle.Sparkle) }
+
+        assertEquals(ThinkingGlowStyle.Sparkle, ChatDisplayPrefs(store).options.value.thinkingGlow)
+        assertEquals("Sparkle", store.getString("chat.display.thinkingGlow"))
+    }
+
+    @Test
+    fun anUnknownStoredGlowStyleFallsBackToTheDefault() {
+        val store = MemoryStore()
+        store.putString("chat.display.thinkingGlow", "Plasma")
+
+        assertEquals(ThinkingGlowStyle.Default, ChatDisplayPrefs(store).options.value.thinkingGlow)
+        assertEquals(ThinkingGlowStyle.Default, ThinkingGlowStyle.fromName(null))
+        ThinkingGlowStyle.entries.forEach { assertEquals(it, ThinkingGlowStyle.fromName(it.name)) }
     }
 
     @Test
