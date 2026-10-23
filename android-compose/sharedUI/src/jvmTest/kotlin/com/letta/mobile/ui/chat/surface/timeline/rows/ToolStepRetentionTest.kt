@@ -22,7 +22,7 @@ import com.letta.mobile.data.chat.tools.ToolInset
 import com.letta.mobile.data.chat.tools.ToolMatcher
 import com.letta.mobile.data.chat.tools.ToolPresenter
 import com.letta.mobile.data.chat.tools.ToolPresenterScope
-import com.letta.mobile.data.chat.tools.ToolStepExpansions
+import com.letta.mobile.data.chat.tools.steps.ToolStepExpansions
 import com.letta.mobile.data.chat.tools.ToolStepLine
 import com.letta.mobile.data.chat.tools.ToolVerb
 import com.letta.mobile.data.chat.tools.bundled.BundledToolPresenters

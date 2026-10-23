@@ -30,9 +30,6 @@ object ChatRowDimens {
     val thumbnailWidth: Dp = 56.dp
     val thumbnailHeight: Dp = 40.dp
 
-    /** Expanded subagent prompt line cap. */
-    const val dispatchPromptMaxLines: Int = 12
-
     /** Clamped user prompt line count. */
     const val promptCollapsedMaxLines: Int = 3
 

@@ -126,26 +126,18 @@ class WorkspaceFilesControllersTest {
     }
 
     @Test
-    fun aRelativeNonMemoryPathWithoutAWorkingDirectoryIsNeverRead() = runTest {
+    fun aRelativePathWithoutAWorkingDirectoryIsNeverRead() = runTest {
         val source = FakeWorkspace()
         val viewer = WorkspaceFileViewerController(source, backgroundScope)
 
-        // A Read of src/foo.kt on the phone: no cwd, not a memory tool, so no read at all.
-        viewer.open("src/foo.kt", cwd = null, memoryAgentId = null)
+        // A Read of src/foo.kt on the phone: no cwd, so no read at all.
+        viewer.open("src/foo.kt", cwd = null)
         runCurrent()
         assertEquals(WorkspaceFileErrors.NO_WORKING_DIRECTORY, viewer.state.value.error)
         viewer.retry()
         runCurrent()
         assertEquals(WorkspaceFileErrors.NO_WORKING_DIRECTORY, viewer.state.value.error)
         assertEquals(emptyList(), source.reads)
-    }
-
-    @Test
-    fun aSourceWithoutMemoryReadsSaysNotSupportedNotNotFound() = runTest {
-        val viewer = WorkspaceFileViewerController(FakeWorkspace(), backgroundScope)
-        viewer.open("system/human/x.md", cwd = null, memoryAgentId = "agent-1")
-        runCurrent()
-        assertEquals(WorkspaceFileErrors.NOT_SUPPORTED, viewer.state.value.error)
     }
 
     @Test

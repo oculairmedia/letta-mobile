@@ -85,6 +85,8 @@
     <string name="rows_steps_fetched">fetched pages</string>
     <string name="rows_steps_delegated">delegated work</string>
     <string name="rows_steps_called">called tools</string>
+    <string name="rows_steps_remembered">updated memory</string>
+    <string name="rows_steps_drew">worked on the canvas</string>
     <string name="rows_steps_join">%1$s, %2$s</string>
     <string name="rows_copy_command">Copy command</string>
     <string name="rows_tool_open_full_output">Open full output</string>
@@ -99,6 +101,30 @@
     <string name="rows_tool_verb_fetched">Fetched</string>
     <string name="rows_tool_verb_delegated">Delegated</string>
     <string name="rows_tool_verb_called">Called</string>
+    <string name="rows_tool_verb_stopped">Stopped</string>
+    <string name="rows_tool_verb_watching">Watching</string>
+    <string name="rows_checklist_done">Done: %1$s</string>
+    <string name="rows_checklist_current">In progress: %1$s</string>
+    <string name="rows_tool_verb_updated">Updated</string>
+    <string name="rows_tool_verb_planned">Planned</string>
+    <string name="rows_tool_verb_used">Used</string>
+    <string name="rows_tool_verb_composed_canvas">Composed canvas</string>
+    <string name="rows_tool_verb_edited_canvas">Edited canvas</string>
+    <string name="rows_tool_verb_read_canvas">Read canvas</string>
+    <string name="rows_tool_verb_created_canvas">Created canvas</string>
+    <string name="rows_tool_open_canvas">Open canvas</string>
+    <string name="rows_tool_verb_edited_memory">Edited memory</string>
+    <string name="rows_tool_verb_added_to_memory">Added to memory</string>
+    <string name="rows_tool_verb_rewrote_memory">Rewrote memory</string>
+    <string name="rows_tool_verb_wrote_memfs">Wrote memfs</string>
+    <string name="rows_tool_replaced_whole_block">replaced whole block</string>
+    <!-- A memory step's chip and the Memory view it opens in the detail pane. -->
+    <string name="rows_memory_chip_usage">%1$s · %2$d/%3$d</string>
+    <string name="rows_memory_preview_title">Memory</string>
+    <string name="rows_memory_preview_this_edit">This edit</string>
+    <string name="rows_memory_preview_usage">%1$d of %2$d characters</string>
+    <string name="rows_memory_preview_usage_unlimited">%1$d characters</string>
+    <string name="rows_memory_preview_earlier">Earlier edits in this conversation</string>
     <string name="rows_tool_output_truncated">Showing %1$d of %2$d lines · Copy includes all output</string>
     <string name="rows_tool_result_preview">Showing a preview · loading the full output…</string>
 
@@ -136,7 +162,11 @@
     <string name="rows_other">Other</string>
     <string name="rows_option_description">%1$s: %2$s</string>
     <string name="rows_plan_title">Ready to code? Here is your plan:</string>
-    <string name="rows_plan_reject_title">Reject plan</string>
+    <string name="rows_plan_reject_title">What should change in the plan?</string>
+    <string name="rows_plan_approve">Approve plan</string>
+    <string name="rows_plan_keep_planning">Keep planning</string>
+    <string name="rows_plan_mode_entered">Entered plan mode</string>
+    <string name="rows_plan_mode_left">Left plan mode</string>
     <string name="rows_plan_feedback_placeholder">Tell the agent what to do differently</string>
 
     <!-- Images -->
@@ -151,13 +181,6 @@
     <string name="rows_more_count">+%1$d</string>
 
     <!-- Subagents -->
-    <string name="rows_subagent_dispatched">Dispatched: %1$s</string>
-    <string name="rows_subagent_background">background</string>
-    <string name="rows_show_prompt">Show prompt</string>
-    <string name="rows_hide_prompt">Hide prompt</string>
-    <string name="rows_dispatch_done">Sub-agent dispatched</string>
-    <string name="rows_dispatch_failed">Dispatch failed</string>
-    <string name="rows_dispatch_running">Sub-agent dispatching</string>
     <string name="rows_activity_command">Command</string>
     <string name="rows_activity_subagent">Subagent</string>
     <string name="rows_activity_task">Task</string>

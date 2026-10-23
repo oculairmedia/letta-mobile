@@ -7,7 +7,7 @@ import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
-import com.letta.mobile.data.chat.tools.ToolStepExpansions
+import com.letta.mobile.data.chat.tools.steps.ToolStepExpansions
 import com.letta.mobile.ui.chat.tools.LocalToolStepExpansions
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.foundation.layout.Box
@@ -454,7 +454,14 @@ class ChatRowInteractionUiTest {
         )
         val msg = message("m-1", "assistant", "").copy(
             toolCalls = listOf(
-                UiToolCall(name = "Agent", arguments = "{}", result = null, status = "running", subagentDispatch = dispatch),
+                UiToolCall(
+                    name = "Agent",
+                    arguments = """{"description":"Audit the build","subagent_type":"general-purpose","prompt":"Look at gradle"}""",
+                    result = null,
+                    status = "running",
+                    toolCallId = "agent-call-1",
+                    subagentDispatch = dispatch,
+                ),
             ),
         )
         setContent {
@@ -463,11 +470,12 @@ class ChatRowInteractionUiTest {
             }
         }
 
-        // The call reads as its card among the message's steps: no summary line or sheet to open first.
-        onNodeWithText("Dispatched: Audit the build").performClick()
+        // The call reads as its step line; opened, it shows the prompt it gave and a chip to the subagent.
+        onNodeWithText("Delegated").assertExists()
+        onNodeWithText("to general-purpose · \"Audit the build\"").performClick()
+        onNodeWithText("Look at gradle", substring = true, useUnmergedTree = true).assertExists()
+        onNodeWithText("Open subagent").performClick()
         runOnIdle { assertEquals(ChatSubagentTarget("agent-call-1", "Audit the build", "agent-sub"), opened) }
-        onNodeWithText("Show prompt").performClick()
-        onNodeWithText("Look at gradle").assertExists()
     }
 
     @Test

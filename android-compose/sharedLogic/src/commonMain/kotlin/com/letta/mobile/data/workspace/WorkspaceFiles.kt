@@ -12,24 +12,16 @@ interface WorkspaceFileSource {
     /** Up to [limit] paths containing [query], relative to [cwd] (the server's directory when null). */
     suspend fun search(query: String, cwd: String?, limit: Int): List<String>
 
-    /** The file at absolute [path] as text, or a reason it cannot be shown. */
-    suspend fun read(path: String): WorkspaceFileContent
-
     /**
-     * [path] relative to [agentId]'s memory root (a memory tool's
-     * `system/human/…`). The server joins it to that agent's MemFS root; it never resolves
-     * against the host process's working directory.
+     * The file at absolute [path] as text, or a reason it cannot be shown. An agent's memory files
+     * are read through its MemFS source ([com.letta.mobile.data.memory.memfs.MemfsSource]), not here.
      */
-    suspend fun readMemory(agentId: String, path: String): WorkspaceFileContent =
-        throw WorkspaceFileException(WorkspaceFileErrors.NOT_SUPPORTED)
+    suspend fun read(path: String): WorkspaceFileContent
 }
 
 /** Messages the viewer shows instead of a host's raw error text. */
 object WorkspaceFileErrors {
     const val NOT_FOUND: String = "This file does not exist."
-
-    /** A source that cannot read an agent's memory files at all. */
-    const val NOT_SUPPORTED: String = "This connection cannot read memory files."
 
     /** A relative path from a tool that is not a memory tool, with no working directory to resolve it. */
     const val NO_WORKING_DIRECTORY: String = "This path cannot be opened without a working directory."

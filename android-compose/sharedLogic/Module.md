@@ -55,6 +55,10 @@ The versioned semantic canvas composer: validation, Markdown conversion, geometr
 
 Canvas library state and operations shared by hosts. `CanvasLibraryController` retains loaded boards when storage fails, reports a retryable error and serializes library operations; `CanvasLibraryState` is its observable content and loading state. Hosts supply storage, archive and synchronization bindings and present the error. Keep windowing and platform storage construction outside this package; retries reload state rather than repeating mutations.
 
+# Package com.letta.mobile.data.canvas.names
+
+The `canvas_*` tool names on their own, for code that only names the tools (a tool step's presenter) without depending on the canvas model. Keep tool definitions and schemas in the canvas contract; read the names through [CanvasToolNames](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas.names/-canvas-tool-names/index.html).
+
 # Package com.letta.mobile.data.canvas.plugin
 
 Plugin element schemas, kind catalogs and property checks within canvas scenes. Clients can preserve, edit and show fallback elements without loading plugin implementation code. Keep plugin execution outside element interpretation; provide installed kind metadata through [PluginKindCatalog](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.canvas.plugin/-plugin-kind-catalog/index.html) while retaining fallback representations for unknown kinds.
@@ -124,6 +128,10 @@ The URLs and file paths in a tool's output, found so a step's inset can make the
 # Package com.letta.mobile.data.chat.tools.shell
 
 A lenient reader of the shell scripts agents pass to their shell tools: quotes, separators, heredocs and `bash -lc` wrappers, never expanding or throwing. Tool presenters and the meridian recogniser read shell calls through it so they agree on what ran; read a call's script with [ShellTools](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.shell/-shell-tools/index.html) and its commands as [ShellCommandLine](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.shell/-shell-command-line/index.html).
+
+# Package com.letta.mobile.data.chat.tools.steps
+
+What the timeline does with steps once presenters have drawn them: which kind of work a run of steps adds up to ("Explored files, ran commands"), and which steps the person opened or closed against their default, remembered across reloads in a bounded set. Keep per-tool reading in the presenters; group steps with [ToolActivity](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.steps/-tool-activity/index.html) and keep disclosure state in [ToolStepExpansions](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.steps/-tool-step-expansions/index.html).
 
 # Package com.letta.mobile.data.commands
 

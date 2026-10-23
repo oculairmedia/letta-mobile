@@ -1,4 +1,4 @@
-package com.letta.mobile.data.chat.tools
+package com.letta.mobile.data.chat.tools.steps
 
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import kotlin.test.Test

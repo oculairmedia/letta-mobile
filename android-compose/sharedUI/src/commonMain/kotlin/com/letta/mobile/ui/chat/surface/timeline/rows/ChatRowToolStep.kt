@@ -40,6 +40,12 @@ import com.letta.mobile.avatar.core.AttentionKey
 import com.letta.mobile.avatar.core.AttentionKind
 import com.letta.mobile.data.chat.projection.ToolTimelineState
 import com.letta.mobile.data.chat.projection.classifyToolCallState
+import com.letta.mobile.data.chat.tools.ToolInset
+import com.letta.mobile.data.chat.tools.ToolVerb
+import com.letta.mobile.data.chat.tools.bundled.PlanModeToolPresenter
+import com.letta.mobile.data.subagents.SubagentIdentity
+import com.letta.mobile.data.subagents.subagentIdentityOf
+import com.letta.mobile.data.chat.tools.ToolOutputStream
 import com.letta.mobile.data.chat.tools.ToolStepLine
 import com.letta.mobile.data.messaging.AgentMessageDeliveryState
 import com.letta.mobile.data.messaging.compactLabel
@@ -58,7 +64,8 @@ import com.letta.mobile.sharedui.resources.rows_tool_result_preview
 import com.letta.mobile.sharedui.resources.rows_tool_status_running
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceMetadata
 import com.letta.mobile.ui.chat.session.ChatMessageId
-import com.letta.mobile.data.chat.tools.ToolStepExpansions
+import com.letta.mobile.data.chat.tools.steps.ToolStepExpansions
+import com.letta.mobile.ui.chat.subagents.ExternalAgentBadge
 import com.letta.mobile.ui.chat.tools.LocalToolPresenters
 import com.letta.mobile.ui.chat.tools.LocalToolStepExpansions
 import com.letta.mobile.ui.chat.tools.title
@@ -83,7 +90,7 @@ import org.jetbrains.compose.resources.stringResource
  *
  * A step starts collapsed (one that generated images starts open); the disclosure is keyed on the
  * call's [disclosureKey], so it survives the running -> settled refresh and scrolling away.
- * A subagent dispatch draws as its [SubagentDispatchCard].
+ * Entering or leaving plan mode draws as a thin divider ([PlanModeDivider]), still opening to its plan.
  */
 @Composable
 internal fun ToolStep(
@@ -93,11 +100,6 @@ internal fun ToolStep(
     /** The call's state read with the run's approvals; classified from the call alone when null. */
     state: ToolTimelineState? = null,
 ) {
-    val dispatch = toolCall.subagentDispatch
-    if (dispatch != null) {
-        SubagentDispatchCard(dispatch = dispatch, toolCall = toolCall, callbacks = callbacks)
-        return
-    }
     val resolved = state ?: remember(toolCall) { classifyToolCallState(toolCall) }
     val expansions = LocalToolStepExpansions.current ?: remember { ToolStepExpansions() }
     val toggled by expansions.toggled.collectAsState()
@@ -107,27 +109,49 @@ internal fun ToolStep(
     val running = resolved == ToolTimelineState.Running
     // A running step is where a working mascot looks (te3n1.2).
     Column(modifier = Modifier.fillMaxWidth().mascotAttention(AttentionKey("tool:$disclosureKey"), AttentionKind.TOOL, enabled = running)) {
-        ToolStepLineRow(
-            spec = stepLineSpec(toolCall, resolved, callbacks),
-            disclosure = if (!toolCall.hasDetails()) null else RunStepDisclosure(isExpanded) {
-                haptics.play(LettaHapticCue.SegmentTick)
-                expansions.toggle(disclosureKey)
-            },
-        )
+        val opens = stepOpens(toolCall, resolved)
+        val disclosure = if (!opens) null else RunStepDisclosure(isExpanded) {
+            haptics.play(LettaHapticCue.SegmentTick)
+            expansions.toggle(disclosureKey)
+        }
+        ToolStepHeader(toolCall, resolved, callbacks, disclosure)
         AnimatedVisibility(
-            visible = isExpanded && toolCall.hasDetails(),
+            visible = isExpanded && opens,
             enter = ChatRowMotion(LocalReducedMotion.current).expansionEnter(),
             exit = ChatRowMotion(LocalReducedMotion.current).expansionExit(),
             label = "toolStepInset",
         ) {
-            ToolStepDetails(toolCall, callbacks, live = running || toolCall.isStreaming())
+            ToolStepDetails(toolCall, callbacks, live = running || toolCall.isStreaming(), failed = resolved.isFailure())
         }
+    }
+}
+
+/** Whether a step opens at all: the presenter's cheap answer (a stopped task does not); a failed one always does. */
+@Composable
+private fun stepOpens(toolCall: UiToolCall, state: ToolTimelineState): Boolean =
+    toolCall.hasDetails() && (rememberToolStepLine(toolCall).expandable || state.isFailure())
+
+/** The step's line, or the thin divider entering or leaving plan mode draws instead (only leaving opens, to its plan). */
+@Composable
+private fun ToolStepHeader(toolCall: UiToolCall, state: ToolTimelineState, callbacks: ChatRowCallbacks, disclosure: RunStepDisclosure?) {
+    if (PlanModeToolPresenter.isPlanModeChange(toolCall.name)) {
+        val leaving = PlanModeToolPresenter.isLeaving(toolCall.name)
+        PlanModeDivider(leaving = leaving, disclosure = disclosure.takeIf { leaving })
+    } else {
+        ToolStepLineRow(spec = stepLineSpec(toolCall, state, callbacks), disclosure = disclosure)
     }
 }
 
 /** What a step's line shows: the presenter's line, or an agent message's sender -> recipient over its delivery state. */
 @Immutable
-private class StepLineSpec(val title: String, val target: String, val note: StepNote?, val running: Boolean)
+private class StepLineSpec(
+    val title: String,
+    val target: String,
+    val note: StepNote?,
+    val running: Boolean,
+    /** Who a subagent dispatch went to, badged when it is an external coding agent (Claude Code, Codex). */
+    val agent: SubagentIdentity? = null,
+)
 
 /** A step line's muted note: a failure in amber, or that it waits on the person. */
 @Immutable
@@ -146,8 +170,12 @@ private fun stepLineSpec(toolCall: UiToolCall, state: ToolTimelineState, callbac
             running = running,
         )
     }
-    val line = rememberToolStepLine(toolCall)
-    return StepLineSpec(line.title(), line.target, noteOf(line, state), running)
+    // A watched task's line says how long it has run ("running 1m 12s"), ticking while it does; no other line ticks.
+    val watching = running && rememberToolStepLine(toolCall).verb == ToolVerb.Watching
+    val elapsed = if (watching) rememberElapsedSeconds(active = true, startedAtEpochMs = null).value * MILLIS_PER_SECOND else null
+    val line = rememberToolStepLine(toolCall, elapsed ?: toolCall.executionTimeMs)
+    val agent = toolCall.subagentDispatch?.let { subagentIdentityOf(it.subagentType, listOf(it.subagentAgentId)) }
+    return StepLineSpec(line.title(), line.target, noteOf(line, state), running, agent)
 }
 
 /** "exited 2" for a non-zero exit, "failed" for a failure naming no code, "awaiting approval" while parked; else nothing. */
@@ -162,7 +190,6 @@ private fun noteOf(line: ToolStepLine, state: ToolTimelineState): StepNote? {
     }
 }
 
-private fun ToolTimelineState.isFailure(): Boolean = this == ToolTimelineState.Failed || this == ToolTimelineState.Rejected
 
 /**
  * The step line: the whole row is the toggle when there is something to open. Its height never
@@ -203,6 +230,7 @@ private fun RowScope.StepLineWords(spec: StepLineSpec) {
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.weight(1f),
     )
+    spec.agent?.let { ExternalAgentBadge(it) }
     spec.note?.let { note ->
         Text(
             text = note.text,
@@ -219,7 +247,7 @@ private fun RowScope.StepLineWords(spec: StepLineSpec) {
  * closes it, and the arrow keys move to the step above or below.
  */
 @Composable
-private fun Modifier.stepToggle(disclosure: RunStepDisclosure): Modifier {
+internal fun Modifier.stepToggle(disclosure: RunStepDisclosure): Modifier {
     val stateText = stringResource(if (disclosure.expanded) Res.string.rows_state_expanded else Res.string.rows_state_collapsed)
     val action = stringResource(disclosure.actionLabel())
     val focus = LocalFocusManager.current
@@ -240,7 +268,7 @@ private fun stepKey(key: Key, disclosure: RunStepDisclosure, focus: FocusManager
     else -> false
 }
 
-private fun RunStepDisclosure.actionLabel() = if (expanded) Res.string.rows_collapse else Res.string.rows_expand
+internal fun RunStepDisclosure.actionLabel() = if (expanded) Res.string.rows_collapse else Res.string.rows_expand
 
 /** Something to open: the command or arguments, the output, images or an agent message's details. */
 private fun UiToolCall.hasDetails(): Boolean =
@@ -256,7 +284,7 @@ private fun warningInk(): Color {
 
 /** An open step: its agent-message metadata, its inset (built now, not before), its file chips and its images. */
 @Composable
-private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean) {
+private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean, failed: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -268,21 +296,26 @@ private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, l
             val failed = provenance.deliveryState == AgentMessageDeliveryState.FAILED
             AgentMessageProvenanceMetadata(provenance, if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary)
         }
-        ToolStepInset(toolCall, callbacks, live)
+        ToolStepInset(toolCall, callbacks, live, failed)
         ToolPreviewChips(toolCall, rememberToolStepLine(toolCall), callbacks)
         ToolGeneratedImages(toolCall, callbacks)
     }
 }
 
 @Composable
-private fun ToolStepInset(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean) {
+private fun ToolStepInset(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean, failed: Boolean) {
     val notification = remember(toolCall.result) { toolCall.result?.let(::extractSubagentNotification) }
     if (notification != null) {
         SubagentNotificationCard(notification, callbacks.openSubagent, toolCall.toolCallId)
         return
     }
     val presenters = LocalToolPresenters.current
-    val inset = remember(toolCall, presenters) { presenters.inset(toolCall.facts()) }
+    // A failed call shows what went wrong (muted red), unless its presenter read the failure itself
+    // (a shell's exit code keeps its command over its stderr).
+    val ownFailure = rememberToolStepLine(toolCall).failure != null
+    val inset = remember(toolCall, presenters, failed, ownFailure) {
+        failureInset(toolCall).takeIf { failed && !ownFailure } ?: presenters.inset(toolCall.facts())
+    }
     inset?.let { ToolInsetView(it, live = live) }
     if (toolCall.resultTruncation != null) {
         Text(
@@ -311,6 +344,13 @@ private fun ToolGeneratedImages(toolCall: UiToolCall, callbacks: ChatRowCallback
 }
 
 private const val TARGET_ALPHA = 0.8f
+private const val MILLIS_PER_SECOND = 1_000L
 
 /** A call whose output may still grow: no terminal status yet, and not read back settled from the ledger. */
 private fun UiToolCall.isStreaming(): Boolean = status == null && !settled
+
+/** What a failed call said, as stderr in an inset of its own; null when it said nothing. */
+private fun failureInset(toolCall: UiToolCall): ToolInset? =
+    toolCall.result?.takeIf { it.isNotBlank() }?.let { error ->
+        ToolInset.Command(workingDirectory = null, command = "", output = listOf(ToolOutputStream(ToolOutputStream.Kind.Stderr, error)))
+    }

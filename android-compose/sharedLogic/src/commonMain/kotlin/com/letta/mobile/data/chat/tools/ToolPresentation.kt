@@ -33,6 +33,58 @@ enum class ToolVerb {
 
     @SerialName("called")
     Called,
+
+    /** A background task or process stopped: "Stopped". */
+    @SerialName("stopped")
+    Stopped,
+
+    /** A background task's output followed while it runs: "Watching". */
+    @SerialName("watching")
+    Watching,
+
+    /** A list or record brought up to date (the todo list): "Updated". */
+    @SerialName("updated")
+    Updated,
+
+    /** A plan entered or proposed: "Planned". */
+    @SerialName("planned")
+    Planned,
+
+    /** A skill or other capability put to use: "Used". */
+    @SerialName("used")
+    Used,
+
+    /** Notes, checklists or cards put on a canvas: "Composed canvas". */
+    @SerialName("composed_canvas")
+    ComposedCanvas,
+
+    /** A canvas's drawing changed (ops applied, the scene replaced): "Edited canvas". */
+    @SerialName("edited_canvas")
+    EditedCanvas,
+
+    /** A canvas read, listed, previewed or exported: "Read canvas". */
+    @SerialName("read_canvas")
+    ReadCanvas,
+
+    /** A new canvas: "Created canvas". */
+    @SerialName("created_canvas")
+    CreatedCanvas,
+
+    /** A memory block's text replaced in place: "Edited memory". */
+    @SerialName("edited_memory")
+    EditedMemory,
+
+    /** Text inserted into or appended to a memory block: "Added to memory". */
+    @SerialName("added_to_memory")
+    AddedToMemory,
+
+    /** A memory block's whole value rewritten: "Rewrote memory". */
+    @SerialName("rewrote_memory")
+    RewroteMemory,
+
+    /** A MemFS entry created, edited, renamed or deleted: "Wrote memfs". */
+    @SerialName("wrote_memfs")
+    WroteMemfs,
 }
 
 /**
@@ -52,6 +104,12 @@ data class ToolStepLine(
     val failure: ToolFailure? = null,
     /** Which presenter drew this; a contributed one is `<pluginId>/<presenter>`. */
     val presenterId: String,
+    /**
+     * Whether the step opens at all: the presenter's cheap answer from the call's facts, given
+     * before any inset is built. False for a step that is all line (a stopped task); a failed
+     * step still opens to what went wrong.
+     */
+    val expandable: Boolean = true,
 )
 
 /** What an opened step shows, in one of the shapes every host knows how to draw. */
@@ -72,6 +130,19 @@ sealed interface ToolInset {
 
     /** Plain monospace text: a file read, search hits, a fetched page. */
     data class Text(val text: String) : ToolInset
+
+    /** A whole value rewritten (a memory block's rethink): the new [value], said to replace all of it. */
+    data class Rewrite(val value: String) : ToolInset
+
+    /**
+     * A checklist (a todo list): its [items] in order, the one at [current] in progress (null when
+     * none is). Done items read struck through and muted, the current one with a small spinner, the
+     * rest as `○`.
+     */
+    data class Checklist(val items: List<Item>, val current: Int? = null) : ToolInset {
+        /** One item: its [text], and whether it is [done]. */
+        data class Item(val text: String, val done: Boolean)
+    }
 
     /** Any other call: its arguments as `key: value` lines, then its result. */
     data class Arguments(val fields: List<ToolArgumentField>, val result: String?) : ToolInset
@@ -96,40 +167,22 @@ sealed interface ToolPreviewTarget {
     /** A working-directory file, with the [lines] (1-based, inclusive) the call touched. */
     data class File(val path: String, val lines: IntRange? = null) : ToolPreviewTarget
 
-    /** An entry of the agent's memory (a block label or a MemFS path), opened in the Memory view. */
+    /** A MemFS entry of the agent's memory (`system/human.md`), opened in the Memory view's Files. */
     data class Memory(val path: String) : ToolPreviewTarget
+
+    /** A core memory block by its [label] (`persona`), opened focused in the Memory view's graph. */
+    data class MemoryBlock(val label: String) : ToolPreviewTarget
 
     /** A subagent the call dispatched, opened in the dual view. */
     data class Subagent(val agentId: String) : ToolPreviewTarget
 
     /** A background task's output. */
     data class TaskOutput(val taskId: String) : ToolPreviewTarget
+
+    /** The conversation's canvas, which the call drew on or read. */
+    data object Canvas : ToolPreviewTarget
 }
 
 /** A failure the step line says out loud; success is quiet. [exitCode] is non-zero when known. */
 @Immutable
 data class ToolFailure(val exitCode: Int?)
-
-/**
- * What a kind of step adds up to when several are grouped ("Explored files, ran commands"):
- * reading and searching are both exploring, writing and editing both edit files.
- */
-enum class ToolActivity {
-    Explored,
-    Ran,
-    Edited,
-    Fetched,
-    Delegated,
-    Called,
-}
-
-/** The activity a step of this verb adds to its group. */
-val ToolVerb.activity: ToolActivity
-    get() = when (this) {
-        ToolVerb.Read, ToolVerb.Searched -> ToolActivity.Explored
-        ToolVerb.Ran -> ToolActivity.Ran
-        ToolVerb.Wrote, ToolVerb.Edited -> ToolActivity.Edited
-        ToolVerb.Fetched -> ToolActivity.Fetched
-        ToolVerb.Delegated -> ToolActivity.Delegated
-        ToolVerb.Called -> ToolActivity.Called
-    }

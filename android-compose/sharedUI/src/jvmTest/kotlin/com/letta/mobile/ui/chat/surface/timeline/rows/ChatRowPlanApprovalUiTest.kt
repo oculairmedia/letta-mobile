@@ -33,7 +33,7 @@ class ChatRowPlanApprovalUiTest {
         onNodeWithTag(ChatRowTestTags.APPROVAL_PLAN).assertExists()
         awaitText("Add the card")
         onNodeWithText("Approval requested").assertDoesNotExist()
-        onNodeWithText("Approve").performClick()
+        onNodeWithText("Approve plan").performClick()
         runOnIdle {
             val decision = actions.approvals.single()
             assertEquals("req-plan", decision.requestId)
@@ -49,8 +49,8 @@ class ChatRowPlanApprovalUiTest {
         val actions = RecordingChatActions()
         setContent { MaterialTheme { RenderRow(single(planMessage()), rowContext(), rowCallbacks(actions)) } }
 
-        onNodeWithText("Reject").performClick()
-        onNodeWithText("Reject plan").assertExists()
+        onNodeWithText("Keep planning").performClick()
+        onNodeWithText("What should change in the plan?").assertExists()
         onNodeWithTag(ChatRowTestTags.APPROVAL_REASON).performTextInput("Add a rollback step")
         onNodeWithTag(ChatRowTestTags.APPROVAL_REJECT_CONFIRM).performClick()
         runOnIdle {
@@ -70,7 +70,7 @@ class ChatRowPlanApprovalUiTest {
         }
 
         onNodeWithTag(ChatRowTestTags.APPROVAL_PLAN).assertExists()
-        onNodeWithText("Approve").assertDoesNotExist()
+        onNodeWithText("Approve plan").assertDoesNotExist()
     }
 
     @Test

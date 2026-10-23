@@ -4,9 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
-import com.letta.mobile.data.chat.tools.ToolActivity
+import com.letta.mobile.data.chat.tools.steps.ToolActivity
 import com.letta.mobile.data.chat.tools.ToolPresenterRegistry
-import com.letta.mobile.data.chat.tools.ToolStepExpansions
+import com.letta.mobile.data.chat.tools.steps.ToolStepExpansions
 import com.letta.mobile.data.chat.tools.ToolStepLine
 import com.letta.mobile.data.chat.tools.ToolVerb
 import com.letta.mobile.data.chat.tools.bundled.BundledToolPresenters
@@ -14,20 +14,35 @@ import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_steps_called
 import com.letta.mobile.sharedui.resources.rows_steps_delegated
+import com.letta.mobile.sharedui.resources.rows_steps_drew
 import com.letta.mobile.sharedui.resources.rows_steps_edited
 import com.letta.mobile.sharedui.resources.rows_steps_explored
 import com.letta.mobile.sharedui.resources.rows_steps_fetched
 import com.letta.mobile.sharedui.resources.rows_steps_join
 import com.letta.mobile.sharedui.resources.rows_steps_ran
+import com.letta.mobile.sharedui.resources.rows_steps_remembered
 import com.letta.mobile.sharedui.resources.rows_tool_step_label
+import com.letta.mobile.sharedui.resources.rows_tool_verb_added_to_memory
 import com.letta.mobile.sharedui.resources.rows_tool_verb_called
+import com.letta.mobile.sharedui.resources.rows_tool_verb_composed_canvas
+import com.letta.mobile.sharedui.resources.rows_tool_verb_created_canvas
 import com.letta.mobile.sharedui.resources.rows_tool_verb_delegated
 import com.letta.mobile.sharedui.resources.rows_tool_verb_edited
+import com.letta.mobile.sharedui.resources.rows_tool_verb_edited_canvas
+import com.letta.mobile.sharedui.resources.rows_tool_verb_edited_memory
 import com.letta.mobile.sharedui.resources.rows_tool_verb_fetched
+import com.letta.mobile.sharedui.resources.rows_tool_verb_planned
 import com.letta.mobile.sharedui.resources.rows_tool_verb_ran
 import com.letta.mobile.sharedui.resources.rows_tool_verb_read
+import com.letta.mobile.sharedui.resources.rows_tool_verb_read_canvas
+import com.letta.mobile.sharedui.resources.rows_tool_verb_rewrote_memory
 import com.letta.mobile.sharedui.resources.rows_tool_verb_searched
+import com.letta.mobile.sharedui.resources.rows_tool_verb_stopped
+import com.letta.mobile.sharedui.resources.rows_tool_verb_watching
+import com.letta.mobile.sharedui.resources.rows_tool_verb_updated
+import com.letta.mobile.sharedui.resources.rows_tool_verb_used
 import com.letta.mobile.sharedui.resources.rows_tool_verb_wrote
+import com.letta.mobile.sharedui.resources.rows_tool_verb_wrote_memfs
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -58,6 +73,19 @@ private val ToolVerb.resource: StringResource
         ToolVerb.Fetched -> Res.string.rows_tool_verb_fetched
         ToolVerb.Delegated -> Res.string.rows_tool_verb_delegated
         ToolVerb.Called -> Res.string.rows_tool_verb_called
+        ToolVerb.EditedMemory -> Res.string.rows_tool_verb_edited_memory
+        ToolVerb.AddedToMemory -> Res.string.rows_tool_verb_added_to_memory
+        ToolVerb.RewroteMemory -> Res.string.rows_tool_verb_rewrote_memory
+        ToolVerb.WroteMemfs -> Res.string.rows_tool_verb_wrote_memfs
+        ToolVerb.Stopped -> Res.string.rows_tool_verb_stopped
+        ToolVerb.Watching -> Res.string.rows_tool_verb_watching
+        ToolVerb.Updated -> Res.string.rows_tool_verb_updated
+        ToolVerb.Planned -> Res.string.rows_tool_verb_planned
+        ToolVerb.Used -> Res.string.rows_tool_verb_used
+        ToolVerb.ComposedCanvas -> Res.string.rows_tool_verb_composed_canvas
+        ToolVerb.EditedCanvas -> Res.string.rows_tool_verb_edited_canvas
+        ToolVerb.ReadCanvas -> Res.string.rows_tool_verb_read_canvas
+        ToolVerb.CreatedCanvas -> Res.string.rows_tool_verb_created_canvas
     }
 
 /** Which tool steps the person flipped open or closed; null where no host keeps them (each step then keeps its own). */
@@ -86,4 +114,6 @@ private val ToolActivity.phrase: StringResource
         ToolActivity.Fetched -> Res.string.rows_steps_fetched
         ToolActivity.Delegated -> Res.string.rows_steps_delegated
         ToolActivity.Called -> Res.string.rows_steps_called
+        ToolActivity.Remembered -> Res.string.rows_steps_remembered
+        ToolActivity.Drew -> Res.string.rows_steps_drew
     }

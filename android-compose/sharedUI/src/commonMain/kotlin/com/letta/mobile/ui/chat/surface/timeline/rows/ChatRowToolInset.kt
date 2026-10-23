@@ -29,6 +29,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import com.letta.mobile.data.chat.tools.ToolArgumentField
 import com.letta.mobile.data.chat.tools.ToolInset
@@ -37,6 +38,7 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_copy_command
 import com.letta.mobile.sharedui.resources.rows_copy_output
 import com.letta.mobile.sharedui.resources.rows_tool_output_truncated
+import com.letta.mobile.sharedui.resources.rows_tool_replaced_whole_block
 import com.letta.mobile.ui.shell.pages.workspace.rememberWorkspaceLinkedText
 import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowDimens
@@ -57,7 +59,9 @@ internal fun ToolInsetView(inset: ToolInset, modifier: Modifier = Modifier, live
         is ToolInset.Command -> InsetPanel(modifier, live) { CommandInset(inset) }
         is ToolInset.Text -> InsetPanel(modifier, live) { OutputText(inset.text, InsetInk.Plain) }
         is ToolInset.BeforeAfter -> InsetPanel(modifier, live) { BeforeAfterInset(inset) }
+        is ToolInset.Rewrite -> InsetPanel(modifier, live) { RewriteInset(inset) }
         is ToolInset.Arguments -> InsetPanel(modifier, live) { ArgumentsInset(inset) }
+        is ToolInset.Checklist -> InsetPanel(modifier, live) { ChecklistInset(inset) }
     }
 }
 
@@ -133,6 +137,17 @@ private fun BeforeAfterInset(inset: ToolInset.BeforeAfter) {
     if (inset.after.isNotEmpty()) OutputText(inset.after, InsetInk.Added)
 }
 
+/** The new value, then a muted note that it replaced all of what was there. */
+@Composable
+private fun RewriteInset(inset: ToolInset.Rewrite) {
+    OutputText(inset.value, InsetInk.Plain)
+    Text(
+        text = stringResource(Res.string.rows_tool_replaced_whole_block),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
 @Composable
 private fun ArgumentsInset(inset: ToolInset.Arguments) {
     inset.fields.forEach { ArgumentLine(it) }
@@ -173,7 +188,7 @@ private fun OutputText(text: String, ink: InsetInk) {
         if (full) FullOutputPane(text) { full = false }
     }
     val shown = remember(window, ink) { ink.marked(window.text) }
-    Text(text = rememberWorkspaceLinkedText(shown), style = monoStyle(), color = ink.color())
+    Text(text = rememberWorkspaceLinkedText(shown), style = monoStyle().copy(textDecoration = ink.decoration), color = ink.color())
 }
 
 /** [content] with a copy action for [text], named [label], that shows while the pointer is over it. */
@@ -204,6 +219,9 @@ private enum class InsetInk(private val marker: String?) {
     Added("+ "),
     ;
 
+    /** Removed text is struck through, as in every diff. */
+    val decoration: TextDecoration? get() = RemovedTextDecoration.takeIf { this == Removed }
+
     fun marked(text: String): String = marker?.let { prefix -> text.lines().joinToString("\n") { prefix + it } } ?: text
 
     @Composable
@@ -232,6 +250,9 @@ internal class OutputWindow private constructor(val text: String, val visibleLin
         }
     }
 }
+
+/** How removed text reads in every diff and replacement: struck through, besides its muted red. */
+internal val RemovedTextDecoration: TextDecoration = TextDecoration.LineThrough
 
 /** A shell prompt's sigil, not words: the same in every language. */
 private const val PROMPT = "$ "

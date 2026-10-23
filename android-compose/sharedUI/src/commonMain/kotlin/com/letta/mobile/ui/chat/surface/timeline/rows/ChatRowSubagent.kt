@@ -24,17 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.chat.display.isCommand
 import com.letta.mobile.data.chat.display.parseBackgroundCommandReport
 import com.letta.mobile.data.chat.display.toInset
 import com.letta.mobile.data.chat.display.TaskActivity
 import com.letta.mobile.data.chat.display.activity
-import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiSubagentNotification
-import com.letta.mobile.data.model.UiToolCall
-import com.letta.mobile.data.model.extractSubagentNotification
 import com.letta.mobile.data.subagents.SubagentIdentity
 import com.letta.mobile.data.subagents.subagentIdentityOf
 import com.letta.mobile.sharedui.resources.Res
@@ -43,21 +39,14 @@ import com.letta.mobile.sharedui.resources.rows_activity_subagent
 import com.letta.mobile.sharedui.resources.rows_activity_task
 import com.letta.mobile.sharedui.resources.rows_completed
 import com.letta.mobile.sharedui.resources.rows_copy_transcript_path
-import com.letta.mobile.sharedui.resources.rows_dispatch_done
-import com.letta.mobile.sharedui.resources.rows_dispatch_failed
-import com.letta.mobile.sharedui.resources.rows_dispatch_running
 import com.letta.mobile.sharedui.resources.rows_hide_details
 import com.letta.mobile.sharedui.resources.rows_hide_full_report
-import com.letta.mobile.sharedui.resources.rows_hide_prompt
 import com.letta.mobile.sharedui.resources.rows_hide_transcript
 import com.letta.mobile.sharedui.resources.rows_notification_headline
 import com.letta.mobile.sharedui.resources.rows_show_details
 import com.letta.mobile.sharedui.resources.rows_show_full_report
-import com.letta.mobile.sharedui.resources.rows_show_prompt
 import com.letta.mobile.sharedui.resources.rows_show_transcript
 import com.letta.mobile.sharedui.resources.rows_status_unknown
-import com.letta.mobile.sharedui.resources.rows_subagent_background
-import com.letta.mobile.sharedui.resources.rows_subagent_dispatched
 import com.letta.mobile.sharedui.resources.rows_task_id
 import com.letta.mobile.sharedui.resources.rows_transcript
 import com.letta.mobile.sharedui.resources.rows_view_conversation
@@ -69,106 +58,13 @@ import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.theme.ChatRowAlpha
-import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
-// letta-mobile-bglj6.1: Android's SubagentDispatchCard / SubagentNotificationCard
+// letta-mobile-bglj6.1: Android's SubagentNotificationCard
 // (ChatToolCallCards.kt), without haptics, opening the subagent through the host
 // (ChatRowCallbacks.openSubagent) instead of LocalSubagentTodoSheetOpener.
-
-/** The outbound half: an Agent tool call that dispatched a subagent. */
-@Composable
-internal fun SubagentDispatchCard(
-    dispatch: UiSubagentDispatch,
-    toolCall: UiToolCall,
-    callbacks: ChatRowCallbacks,
-) {
-    val open = callbacks.openSubagent
-    val callId = dispatch.toolCallId?.takeIf { it.isNotBlank() }
-    val headerModifier = if (open != null && callId != null) {
-        Modifier.clickable {
-            open(ChatSubagentTarget(callId, dispatch.description, dispatch.subagentAgentId))
-        }
-    } else {
-        Modifier
-    }
-    Column(
-        modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.SUBAGENT_DISPATCH).padding(vertical = LettaDimens.Space.sm),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
-        DispatchHeader(dispatch, headerModifier)
-        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-            toolCall.status?.let { MetaChip(stringResource(dispatchStatus(it))) }
-            toolCall.executionTimeMs?.let { MetaChip(formatDuration(it)) }
-            dispatch.taskId?.let { MetaChip(it) }
-        }
-        if (dispatch.prompt.isNotBlank()) DispatchPrompt(dispatch)
-        val notification = remember(toolCall.result) { toolCall.result?.let(::extractSubagentNotification) }
-        notification?.let { SubagentNotificationCard(it, open, dispatch.toolCallId) }
-    }
-}
-
-@Composable
-private fun DispatchHeader(dispatch: UiSubagentDispatch, modifier: Modifier) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
-        Icon(
-            imageVector = LettaIcons.Agent,
-            contentDescription = null,
-            modifier = Modifier.size(LettaDimens.Control.icon),
-            tint = MaterialTheme.colorScheme.tertiary,
-        )
-        Text(
-            text = stringResource(Res.string.rows_subagent_dispatched, dispatch.description),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        if (dispatch.runInBackground) MetaChip(stringResource(Res.string.rows_subagent_background))
-        // letta-mobile-zxk2n.8 (G40): an external coding agent's dispatch names it.
-        ExternalAgentBadge(subagentIdentityOf(dispatch.subagentType, listOf(dispatch.subagentAgentId)))
-        MetaChip(dispatch.subagentType)
-    }
-}
-
-@Composable
-private fun DispatchPrompt(dispatch: UiSubagentDispatch) {
-    var expanded by remember(dispatch.toolCallId, dispatch.prompt) { mutableStateOf(false) }
-    val label = stringResource(if (expanded) Res.string.rows_hide_prompt else Res.string.rows_show_prompt)
-    val haptics = LocalHaptics.current
-    DisclosureLink(label = label, expanded = expanded) {
-        haptics.play(LettaHapticCue.SegmentTick)
-        expanded = !expanded
-    }
-    if (expanded) {
-        Text(
-            text = dispatch.prompt,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = ChatRowDimens.dispatchPromptMaxLines,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-private fun dispatchStatus(toolStatus: String): StringResource {
-    val status = toolStatus.lowercase()
-    return when {
-        status in DISPATCH_DONE_STATUSES -> Res.string.rows_dispatch_done
-        status in DISPATCH_FAILED_STATUSES -> Res.string.rows_dispatch_failed
-        else -> Res.string.rows_dispatch_running
-    }
-}
-
-private val DISPATCH_DONE_STATUSES = setOf("success", "succeeded", "completed", "complete", "done")
-private val DISPATCH_FAILED_STATUSES = setOf("error", "failed")
 
 /** The return half: a subagent's `<task-notification>`. */
 @Immutable

@@ -163,7 +163,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     // chat page's cues (send flight, disclosures, approvals, scroll glide) route through
     // HapticPolicy to the designsystem Android realization, gated by the haptics setting.
     SharedChatPageLocals(hapticsEnabled = params.hapticsEnabled) {
-        SharedChatWorkspaceFilesBox(workspaceFiles, port, target.agentId, modifier) {
+        SharedChatWorkspaceFilesBox(workspaceFiles, port, modifier) {
             SubagentDualViewFrame(dualView, Modifier.fillMaxSize(), params.dualViewOptions(appearance, host)) { parentModifier ->
                 ChatSurface(
                     port = surfacePort,

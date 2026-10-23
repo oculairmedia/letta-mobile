@@ -9,7 +9,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import com.letta.mobile.data.chat.tools.ToolStepExpansions
+import com.letta.mobile.data.chat.tools.steps.ToolStepExpansions
 import com.letta.mobile.ui.chat.tools.LocalToolStepExpansions
 import com.letta.mobile.ui.chat.surface.timeline.rows.ToolPreviewPanes
 import androidx.compose.runtime.Immutable
@@ -120,8 +120,8 @@ internal fun ChatTimeline(
                     ),
                     Modifier.weight(1f).fillMaxWidth(),
                 )
-                // The file a tool step's chip or a path in its output opens, in the window's detail pane.
-                ToolPreviewPanes()
+                // The file or memory entry a tool step's chip or a path in its output opens, in the window's detail pane.
+                ToolPreviewPanes { latestState.value.messages.flatMap { it.toolCalls.orEmpty() } }
             }
             if (goal != null && goalAtBottom) {
                 GoalStatusCard(goal, state.isGoalStatusLoading, goalActions, Modifier.align(Alignment.CenterHorizontally))

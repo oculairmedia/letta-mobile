@@ -19,5 +19,32 @@ internal fun inRoot(pattern: String, root: String?): String = if (root.isNullOrB
 /** A call's result when it has one worth reading, as plain text. */
 internal fun ToolCallFacts.resultText(): String? = result?.takeIf { it.isNotBlank() }
 
+/** Whether the call ran and returned what it found: it has a result and did not fail. */
+internal fun ToolCallFacts.ran(): Boolean = result != null && !failed
+
 private val FILE_PATH_KEYS = listOf("file_path", "absolute_path", "filePath", "path")
 private val SEARCH_ROOT_KEYS = listOf("path", "dir_path", "directory")
+
+/** [text]'s line count, a trailing newline not counting as a line of its own. */
+internal fun lineCount(text: String): Int = text.trimEnd('\n').count { it == '\n' } + 1
+
+/** "1 line", "12 lines". */
+internal fun linesLabel(count: Int): String = if (count == 1) "1 line" else "$count lines"
+
+/** [text]'s first [count] lines, each led by its number, then "… N more lines" when there are more. */
+internal fun numberedHead(text: String, count: Int): String {
+    val lines = text.trimEnd('\n').lineSequence().take(count + 1).toList()
+    val shown = lines.take(count)
+    val width = shown.size.toString().length
+    val numbered = shown.mapIndexed { index, line -> "${(index + 1).toString().padStart(width)}  $line" }
+    val more = lineCount(text) - shown.size
+    val tail = when {
+        more <= 0 -> emptyList()
+        more == 1 -> listOf("… 1 more line")
+        else -> listOf("… $more more lines")
+    }
+    return (numbered + tail).joinToString("\n")
+}
+
+/** Between a step target's parts: "notes.md · 12 lines". */
+internal const val SEPARATOR = " · "

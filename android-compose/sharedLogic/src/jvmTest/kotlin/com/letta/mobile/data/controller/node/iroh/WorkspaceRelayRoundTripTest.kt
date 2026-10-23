@@ -37,7 +37,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -157,25 +156,14 @@ class WorkspaceRelayRoundTripTest {
     }
 
     @Test
-    fun aToolCardsRelativeMemoryPathResolvesUnderTheAgentsMemoryRoot() = runTest {
+    fun aRelativeMemoryPathResolvesUnderTheAgentsMemoryRoot() = runTest {
         val root = memoryRoot()
         val server = FakeAppServer(memoryRoot = root)
-        val viewer = com.letta.mobile.data.workspace.WorkspaceFileViewerController(
-            AppServerWorkspaceFileSource(client = { client(server) }, requestId = { it }),
-            backgroundScope,
-        )
+        val memfs = AppServerMemfsSource(client = { client(server) }, events = emptyFlow(), requestId = { it })
 
-        viewer.open("system/human/communication_style.md", cwd = null, memoryAgentId = "agent-1")
-        // The host's stream server answers on its own dispatcher; wait for the read to settle.
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            kotlinx.coroutines.withTimeout(5_000) { viewer.state.first { !it.loading } }
-        }
+        val content = memfs.read(MemfsFileRef("agent-1", "system/human/communication_style.md"))
 
-        assertEquals(
-            WorkspaceFileContent.Text("system/human/communication_style.md", "Be brief."),
-            viewer.state.value.content,
-            "viewer state: ${viewer.state.value}",
-        )
+        assertEquals("Be brief.", content)
         // Read from the agent's memory root (read_memory_file), never relative to the host's cwd (read_file).
         assertEquals(listOf("read_memory_file"), server.received.map { it.first })
     }
@@ -184,9 +172,10 @@ class WorkspaceRelayRoundTripTest {
     fun memoryPathsThatEscapeTheRootNeverReachTheAppServer() = runTest {
         val server = FakeAppServer(memoryRoot = memoryRoot())
         val files = AppServerWorkspaceFileSource(client = { client(server) }, requestId = { it })
+        val memfs = AppServerMemfsSource(client = { client(server) }, events = emptyFlow(), requestId = { it })
 
         listOf("../../etc/passwd", "/etc/passwd", "%2e%2e/%2e%2e/etc/passwd", "system/../../../etc/passwd", "C:\\Windows\\win.ini").forEach { path ->
-            val error = assertFailsWith<com.letta.mobile.data.workspace.WorkspaceFileException>(path) { files.readMemory("agent-1", path) }
+            val error = assertFailsWith<MemfsException>(path) { memfs.read(MemfsFileRef("agent-1", path)) }
             assertTrue(error.message.orEmpty().contains("not allowed"), "$path: ${error.message}")
         }
         // A relative read_file would resolve against the host process's cwd: refused too.
@@ -195,13 +184,13 @@ class WorkspaceRelayRoundTripTest {
     }
 
     @Test
-    fun aMissingMemoryFileIsATypedNotFoundWithoutTheHostPath() = runTest {
+    fun aMissingMemoryFileFailsWithoutTheHostPath() = runTest {
         val root = memoryRoot()
-        val files = AppServerWorkspaceFileSource(client = { client(FakeAppServer(memoryRoot = root)) }, requestId = { it })
+        val memfs = AppServerMemfsSource(client = { client(FakeAppServer(memoryRoot = root)) }, events = emptyFlow(), requestId = { it })
 
-        val error = assertFailsWith<com.letta.mobile.data.workspace.WorkspaceFileException> { files.readMemory("agent-1", "system/missing.md") }
+        val error = assertFailsWith<MemfsException> { memfs.read(MemfsFileRef("agent-1", "system/missing.md")) }
 
-        assertEquals(com.letta.mobile.data.workspace.WorkspaceFileErrors.NOT_FOUND, error.message)
+        assertTrue(error.message.orEmpty().contains(WorkspaceRelay.NOT_FOUND_MESSAGE, ignoreCase = true), "${error.message}")
         assertFalse(error.toString().contains("ENOENT") || error.toString().contains(root.toString()))
     }
 
@@ -209,7 +198,6 @@ class WorkspaceRelayRoundTripTest {
     fun gitInternalsAndUnsafeAgentIdsNeverReachTheAppServer() = runTest {
         val server = FakeAppServer(memoryRoot = memoryRoot())
         val memfs = AppServerMemfsSource(client = { client(server) }, events = emptyFlow(), requestId = { it })
-        val files = AppServerWorkspaceFileSource(client = { client(server) }, requestId = { it })
         val readPaths = listOf(
             ".git/config", ".GIT/config", ".git./config", ".git /config", "sub/.git/hooks/x", ".git\\config", "sub\\.git\\hooks\\x", ".Git...\\config",
             "GIT~1/config", "git~1/config", "GIT~2/hooks/x", "sub\\GIT~1\\config",
@@ -219,7 +207,6 @@ class WorkspaceRelayRoundTripTest {
             assertFailsWith<MemfsException>(path) { memfs.write(MemfsFileRef("agent-1", path), "[filter \"x\"]") }
             assertFailsWith<MemfsException>(path) { memfs.history(com.letta.mobile.data.memory.memfs.MemfsHistoryScope("agent-1", path)) }
             assertFailsWith<MemfsException>(path) { memfs.fileAtRef(MemfsFileRef("agent-1", path), "HEAD") }
-            assertFailsWith<com.letta.mobile.data.workspace.WorkspaceFileException>(path) { files.readMemory("agent-1", path) }
         }
         listOf(".gitattributes", ".GITATTRIBUTES", "sub/.gitmodules", "sub\\.gitattributes.", ".gitmodules ", "GITATT~1", "GITMOD~1").forEach { path ->
             assertFailsWith<MemfsException>(path) { memfs.write(MemfsFileRef("agent-1", path), "* filter=x") }

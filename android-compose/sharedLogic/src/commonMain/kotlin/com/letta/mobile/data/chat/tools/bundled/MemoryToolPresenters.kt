@@ -9,5 +9,5 @@ import com.letta.mobile.data.chat.tools.ToolPresenter
  * a line here, and [BundledToolPresenters] combines the areas, so no two areas share a list.
  */
 internal object MemoryToolPresenters {
-    val tools: List<ToolPresenter> = listOf()
+    val tools: List<ToolPresenter> = listOf(MemoryBlockToolPresenter, MemfsToolPresenter)
 }

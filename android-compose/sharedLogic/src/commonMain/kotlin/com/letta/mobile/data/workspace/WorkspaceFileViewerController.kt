@@ -32,16 +32,15 @@ interface WorkspaceFileViewerActions {
 
 /**
  * Opens a workspace file; hosts hand [open] to tool step chips, clickable paths and other path affordances.
- * A request whose [WorkspaceFileRequest.memoryTool] is set comes from a memory tool call, whose relative
- * paths are the agent's memory files; any other relative path needs a working directory.
+ * A relative path needs a working directory. (A memory tool's entries open in the Memory view instead.)
  */
 fun interface WorkspaceFileOpener {
     fun open(request: WorkspaceFileRequest)
 }
 
-/** A file to open: its [path], whether a memory tool named it, and the [lines] (1-based, inclusive) to show. */
+/** A file to open: its [path] and the [lines] (1-based, inclusive) to show. */
 @Immutable
-data class WorkspaceFileRequest(val path: String, val memoryTool: Boolean = false, val lines: IntRange? = null)
+data class WorkspaceFileRequest(val path: String, val lines: IntRange? = null)
 
 /** Pure transitions of [WorkspaceFileViewerState]; a read for a file no longer open is dropped. */
 object WorkspaceFileViewerReducer {
@@ -64,19 +63,12 @@ class WorkspaceFileViewerController(
 
     private var readJob: Job? = null
 
-    /** The open file's memory agent, when it is read from that agent's MemFS (see [open]). */
-    private var memoryAgentId: String? = null
-
     /**
-     * Opens [path]; a relative one resolves against [cwd]. With no [cwd], a relative path is
-     * [memoryAgentId]'s memory file only when the caller passes it (a memory tool's
-     * `system/human/…`); any other relative path cannot be opened, and is
-     * never read from the host's own working directory.
+     * Opens [path]; a relative one resolves against [cwd]. With no [cwd] a relative path cannot be
+     * opened, and is never read from the host's own working directory.
      */
-    fun open(path: String, cwd: String?, memoryAgentId: String? = null, lines: IntRange? = null) {
-        val inMemory = cwd.isNullOrBlank() && !WorkspacePaths.isAbsolute(path) && !memoryAgentId.isNullOrBlank()
-        this.memoryAgentId = memoryAgentId.takeIf { inMemory }
-        load(if (inMemory) path.removePrefix("./") else WorkspacePaths.resolve(path, cwd), lines)
+    fun open(path: String, cwd: String?, lines: IntRange? = null) {
+        load(WorkspacePaths.resolve(path, cwd), lines)
     }
 
     override fun retry() {
@@ -86,21 +78,19 @@ class WorkspaceFileViewerController(
 
     override fun close() {
         readJob?.cancel()
-        memoryAgentId = null
         stateFlow.value = WorkspaceFileViewerState()
     }
 
     private fun load(path: String, lines: IntRange?) {
         readJob?.cancel()
         stateFlow.value = WorkspaceFileViewerReducer.opening(path, lines)
-        val agentId = memoryAgentId
-        if (agentId == null && !WorkspacePaths.isAbsolute(path)) {
+        if (!WorkspacePaths.isAbsolute(path)) {
             stateFlow.update { WorkspaceFileViewerReducer.failed(it, path, WorkspaceFileErrors.NO_WORKING_DIRECTORY) }
             return
         }
         readJob = scope.launch {
             try {
-                val content = if (agentId != null) source.readMemory(agentId, path) else source.read(path)
+                val content = source.read(path)
                 stateFlow.update { WorkspaceFileViewerReducer.read(it, content) }
             } catch (cancelled: CancellationException) {
                 throw cancelled

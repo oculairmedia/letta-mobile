@@ -94,7 +94,7 @@ private fun DiffBlockRow(line: DiffLine) {
         Text(text = style.marker, style = mono, color = style.text, modifier = Modifier.width(LettaDimens.Space.md))
         Text(
             text = line.text,
-            style = mono,
+            style = if (line.kind == DiffLineKind.Removed) mono.copy(textDecoration = RemovedTextDecoration) else mono,
             color = style.text,
             modifier = Modifier.weight(1f),
         )
