@@ -4542,8 +4542,11 @@ public final class com/letta/mobile/ui/mascot/MascotTransport$Companion {
 }
 
 public final class com/letta/mobile/ui/mascot/MascotTransportKt {
-	public static final fun MascotTransportLayer (ZLandroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun getLocalMascotTransport ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
+public final class com/letta/mobile/ui/mascot/MascotTransportLayerKt {
+	public static final fun MascotTransportLayer (ZLandroidx/compose/ui/Modifier;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/mascot/NoMascotHost : com/letta/mobile/ui/mascot/MascotHost {
@@ -6888,6 +6891,11 @@ public final class com/letta/mobile/ui/shell/ShellDrawerLibrary {
 	public final fun getPinnedAgentIds ()Ljava/util/Set;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/shell/ShellFloatingChromeInsetKt {
+	public static final fun belowFloatingChrome (Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/Modifier;
+	public static final fun getLocalShellFloatingChromeInset ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public final class com/letta/mobile/ui/shell/ShellHold {
@@ -10022,6 +10030,7 @@ public final class com/letta/mobile/ui/shell/workspace/LettaShellWorkspaceState 
 public final class com/letta/mobile/ui/shell/workspace/LettaShellWorkspaceTags {
 	public static final field $stable I
 	public static final field COMPACT Ljava/lang/String;
+	public static final field FLOATING_HEADER Ljava/lang/String;
 	public static final field INLINE_HEADER Ljava/lang/String;
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceTags;
 	public static final field WIDE Ljava/lang/String;
@@ -10159,6 +10168,10 @@ public final class com/letta/mobile/ui/shell/workspace/ShellConversationTabs {
 	public final fun getTabs ()Ljava/util/List;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/shell/workspace/ShellFloatingChromeKt {
+	public static final fun underFloatingChrome-3ABfNKs (Lcom/letta/mobile/ui/chat/surface/ChatSurfacePlatform;F)Lcom/letta/mobile/ui/chat/surface/ChatSurfacePlatform;
 }
 
 public final class com/letta/mobile/ui/shell/workspace/ShellLayoutController {

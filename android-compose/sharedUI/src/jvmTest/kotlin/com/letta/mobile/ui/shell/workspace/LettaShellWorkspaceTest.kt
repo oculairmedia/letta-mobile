@@ -2,8 +2,12 @@
 
 package com.letta.mobile.ui.shell.workspace
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsAtLeast
@@ -13,6 +17,7 @@ import androidx.compose.ui.test.assertTopPositionInRootIsEqualTo
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.onNodeWithTag
@@ -22,7 +27,9 @@ import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.chat.AgentIdentityPillTestTags
+import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.components.tabs.LettaTab
+import com.letta.mobile.ui.shell.LocalShellFloatingChromeInset
 import com.letta.mobile.ui.shell.header.ShellHeaderDefaults
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
@@ -62,10 +69,11 @@ private fun workspaceHost(
     chrome: ShellWindowChrome = ShellWindowChrome.Inline,
     drawer: ShellWorkspaceDrawer = ShellWorkspaceDrawer(),
     actions: ShellWorkspaceNavigationActions = ShellWorkspaceNavigationActions(),
+    main: @Composable (Modifier) -> Unit = { modifier -> Text("The page", modifier.testTag(PageTag)) },
 ) = LettaShellWorkspaceHost(
     actions = actions,
     slots = LettaShellWorkspaceSlots(
-        main = { modifier -> Text("The page", modifier.testTag(PageTag)) },
+        main = main,
         agentCard = {},
         sidePane = {},
         overlays = {},
@@ -104,13 +112,81 @@ class LettaShellWorkspaceTest {
         onNodeWithTag(LettaShellWorkspaceTags.WIDE).assertHeightIsAtLeast(700.dp)
     }
 
+    /**
+     * The phone has no header bar: the page runs up to the top edge, the minimal header's controls
+     * float over it in the phone app bar's height, and the page is told the band they float over.
+     */
     @Test
-    fun compactInlineHeaderLeavesTheBodyItsHeightToo() = runComposeUiTest {
-        setContent { LettaShellWorkspace(workspaceState(), workspaceHost(), sized(500.dp)) }
+    fun aCompactInlineHeaderFloatsOverThePageWhichStartsAtTheTop() = runComposeUiTest {
+        var inset: Dp? = null
+        val host = workspaceHost(main = { modifier ->
+            inset = LocalShellFloatingChromeInset.current
+            Text("The page", modifier.testTag(PageTag))
+        })
+        setContent { LettaShellWorkspace(workspaceState(), host, sized(400.dp)) }
 
-        // The minimal header keeps the phone app bar's height, room for the agent pill.
-        onNodeWithTag(LettaShellWorkspaceTags.INLINE_HEADER).assertHeightIsEqualTo(ShellHeaderDefaults.TouchMinHeight)
-        onNodeWithTag(PageTag).assertIsDisplayed()
+        onNodeWithTag(LettaShellWorkspaceTags.INLINE_HEADER).assertDoesNotExist()
+        onNodeWithTag(PageTag).assertTopPositionInRootIsEqualTo(0.dp)
+        onNodeWithTag(LettaShellWorkspaceTags.FLOATING_HEADER)
+            .assertTopPositionInRootIsEqualTo(0.dp)
+            .assertHeightIsEqualTo(ShellHeaderDefaults.TouchMinHeight)
+        val page = onNodeWithTag(PageTag).getUnclippedBoundsInRoot()
+        val menu = onNodeWithTag(ShellWorkspaceHeaderTags.MENU_BUTTON).getUnclippedBoundsInRoot()
+        assertTrue(menu.top >= page.top && menu.bottom <= ShellHeaderDefaults.TouchMinHeight, "menu $menu is not over the page $page")
+        runOnIdle { assertEquals(ShellHeaderDefaults.TouchMinHeight, inset) }
+    }
+
+    @Test
+    fun theFloatingBandPassesTouchesToThePageWhileItsControlsKeepTheirs() = runComposeUiTest {
+        var pageTaps = 0
+        val drawer = ShellWorkspaceDrawer()
+        val host = workspaceHost(drawer = drawer, main = { modifier ->
+            Box(modifier.testTag(PageTag).clickable { pageTaps++ })
+        })
+        setContent { LettaShellWorkspace(workspaceState(), host, sized(400.dp)) }
+
+        // Between the pill and the search, in the band: the page takes it.
+        onNodeWithTag(PageTag).performTouchInput { click(Offset(width * 0.55f, ShellHeaderDefaults.TouchMinHeight.toPx() / 2)) }
+        runOnIdle { assertEquals(1, pageTaps) }
+        onNodeWithTag(ShellWorkspaceHeaderTags.MENU_BUTTON).performClick()
+        runOnIdle {
+            assertTrue(drawer.open)
+            assertEquals(1, pageTaps)
+        }
+    }
+
+    @Test
+    fun aWideWindowsPageHasNoFloatingChrome() = runComposeUiTest {
+        var inset: Dp? = null
+        val host = workspaceHost(main = { modifier ->
+            inset = LocalShellFloatingChromeInset.current
+            Text("The page", modifier.testTag(PageTag))
+        })
+        setContent { LettaShellWorkspace(workspaceState(), host, sized(1440.dp)) }
+
+        onNodeWithTag(LettaShellWorkspaceTags.FLOATING_HEADER).assertDoesNotExist()
+        onNodeWithTag(LettaShellWorkspaceTags.INLINE_HEADER).assertExists()
+        runOnIdle { assertEquals(0.dp, inset) }
+    }
+
+    @Test
+    fun aCompactHoistedHeaderFloatsNothingOverThePage() = runComposeUiTest {
+        var inset: Dp? = null
+        val host = workspaceHost(chrome = ShellWindowChrome.Hoisted {}, main = { modifier ->
+            inset = LocalShellFloatingChromeInset.current
+            Text("The page", modifier.testTag(PageTag))
+        })
+        setContent { LettaShellWorkspace(workspaceState(), host, sized(400.dp)) }
+
+        onNodeWithTag(LettaShellWorkspaceTags.FLOATING_HEADER).assertDoesNotExist()
+        runOnIdle { assertEquals(0.dp, inset) }
+    }
+
+    @Test
+    fun theChatPlatformTakesTheFloatingInsetUnlessItsOwnIsLarger() {
+        assertEquals(64.dp, ChatSurfacePlatform().underFloatingChrome(64.dp).topChromeInset)
+        assertEquals(80.dp, ChatSurfacePlatform(topChromeInset = 80.dp).underFloatingChrome(64.dp).topChromeInset)
+        assertEquals(0.dp, ChatSurfacePlatform().underFloatingChrome(0.dp).topChromeInset)
     }
 
     @Test
