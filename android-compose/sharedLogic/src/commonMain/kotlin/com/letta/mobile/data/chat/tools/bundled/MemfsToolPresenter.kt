@@ -27,7 +27,7 @@ object MemfsToolPresenter : ToolPresenter {
             verb = ToolVerb.WroteMemfs,
             target = path.orEmpty(),
             previews = listOfNotNull(path?.let(ToolPreviewTarget::Memory)),
-            failure = MemoryEdits.failure(call),
+            failure = call.memoryFailure(),
             presenterId = id,
         )
     }
@@ -35,9 +35,9 @@ object MemfsToolPresenter : ToolPresenter {
     override fun inset(call: ToolCallFacts, scope: ToolPresenterScope): ToolInset? {
         if (call.name.equals(APPLY_PATCH, ignoreCase = true)) return call.string(PATCH)?.let(ToolInset::Diff)
         return when (call.string(COMMAND)) {
-            "str_replace" -> MemoryEdits.changed(call.string("old_string").orEmpty(), call.string("new_string").orEmpty())
-            "insert" -> MemoryEdits.added(call.string("insert_text"))
-            "create" -> MemoryEdits.added(call.string("file_text"))
+            "str_replace" -> ToolInset.BeforeAfter(call.string("old_string").orEmpty(), call.string("new_string").orEmpty()).changedOnly()
+            "insert" -> call.string("insert_text")?.let(::addedText)
+            "create" -> call.string("file_text")?.let(::addedText)
             else -> GenericToolPresenter.argumentsInset(call)
         }
     }

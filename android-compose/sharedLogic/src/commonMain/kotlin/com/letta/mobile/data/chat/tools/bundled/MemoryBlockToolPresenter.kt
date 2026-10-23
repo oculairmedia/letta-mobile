@@ -28,17 +28,17 @@ object MemoryBlockToolPresenter : ToolPresenter {
             verb = verbOf(call.name),
             target = label.orEmpty(),
             previews = listOfNotNull(label?.let(ToolPreviewTarget::MemoryBlock)),
-            failure = MemoryEdits.failure(call),
+            failure = call.memoryFailure(),
             presenterId = id,
         )
     }
 
     override fun inset(call: ToolCallFacts, scope: ToolPresenterScope): ToolInset? = when (verbOf(call.name)) {
-        ToolVerb.EditedMemory -> MemoryEdits.changed(
+        ToolVerb.EditedMemory -> ToolInset.BeforeAfter(
             before = call.firstString("old_str", "old_content").orEmpty(),
             after = call.firstString("new_str", "new_content").orEmpty(),
-        )
-        ToolVerb.AddedToMemory -> MemoryEdits.added(call.firstString("new_str", "content"))
+        ).changedOnly()
+        ToolVerb.AddedToMemory -> call.firstString("new_str", "content")?.takeIf { it.isNotEmpty() }?.let(::addedText)
         else -> call.string("new_memory")?.let(ToolInset::Rewrite)
     }
 
