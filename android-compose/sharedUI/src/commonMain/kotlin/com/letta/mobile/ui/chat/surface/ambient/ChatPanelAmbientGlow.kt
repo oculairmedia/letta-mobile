@@ -45,6 +45,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
+import com.letta.mobile.ui.ambient.ThinkingGlowStyle
 import com.letta.mobile.ui.ambient.AmbientBand
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
@@ -218,6 +220,9 @@ internal fun ChatPanelAmbientGlow(
     }
     val visible by remember(tint) { derivedStateOf { tint.value.alpha > HIDDEN_ALPHA } }
     if (!visible) return
+    // Compiled the first time a glow of this style shows (AmbientGlowShaders), not before.
+    val style = LocalThinkingGlowStyle.current
+    val shader = remember(shaders, style) { shaders.get(style) }
     GlowLayer(
         inputs = GlowInputs(
             tint = tint,
@@ -228,7 +233,7 @@ internal fun ChatPanelAmbientGlow(
         ),
         animate = !reducedMotion,
         placement = placement,
-        shaders = shaders,
+        shader = shader,
         modifier = modifier,
     )
 }
@@ -248,11 +253,10 @@ private fun GlowLayer(
     inputs: GlowInputs,
     animate: Boolean,
     placement: AmbientGlowPlacement,
-    shaders: AmbientGlowShaders,
+    shader: AmbientGlowShader?,
     modifier: Modifier,
 ) {
     val motion = rememberGlowMotion(animate, inputs.speed, inputs.streamPulse)
-    val shader = remember(shaders) { shaders.get() }
     val settledFrames = rememberSettledRedraw(inputs, motion)
     Spacer(
         modifier
@@ -424,27 +428,28 @@ internal interface AmbientGlowShader {
 }
 
 /**
- * The shared ambient shader compiled for this platform (Skia RuntimeEffect on desktop and web, AGSL
- * RuntimeShader on Android 13+), or null where it cannot run; the gradient fallback draws then.
- * Compiling is the expensive part: see [AmbientGlowShaders].
+ * The shared ambient shader for [style] compiled for this platform (Skia RuntimeEffect on desktop
+ * and web, AGSL RuntimeShader on Android 13+), or null where it cannot run; the gradient fallback
+ * draws then. Compiling is the expensive part: see [AmbientGlowShaders].
  */
-internal expect fun createAmbientGlowShader(): AmbientGlowShader?
+internal expect fun createAmbientGlowShader(style: ThinkingGlowStyle): AmbientGlowShader?
 
 /**
  * The page's ambient shader, compiled the first time a glow shows and kept until the page goes,
  * so a run starting does not compile it again (the glow itself leaves composition when idle).
- * Released with the composition that remembers it: Skia's native objects are not left to the
- * cleaner.
+ * Picking another style releases the old one and compiles the new one on its next glow. Released
+ * with the composition that remembers it: Skia's native objects are not left to the cleaner.
  */
 @Stable
 internal class AmbientGlowShaders {
-    private var compiled = false
+    private var compiledStyle: ThinkingGlowStyle? = null
     private var shader: AmbientGlowShader? = null
 
-    fun get(): AmbientGlowShader? {
-        if (!compiled) {
-            compiled = true
-            shader = createAmbientGlowShader()
+    fun get(style: ThinkingGlowStyle = ThinkingGlowStyle.Default): AmbientGlowShader? {
+        if (compiledStyle != style) {
+            release()
+            compiledStyle = style
+            shader = createAmbientGlowShader(style)
         }
         return shader
     }
@@ -452,7 +457,7 @@ internal class AmbientGlowShaders {
     fun release() {
         shader?.release()
         shader = null
-        compiled = false
+        compiledStyle = null
     }
 }
 
