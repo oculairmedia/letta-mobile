@@ -7081,6 +7081,21 @@ public final class com/letta/mobile/data/canvas/library/CanvasLibraryState {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/letta/mobile/data/canvas/names/CanvasToolNames {
+	public static final field APPLY_OPS Ljava/lang/String;
+	public static final field COMPOSE Ljava/lang/String;
+	public static final field COMPOSE_GUIDE Ljava/lang/String;
+	public static final field CREATE Ljava/lang/String;
+	public static final field EXPORT_SVG Ljava/lang/String;
+	public static final field GET_LAYOUT Ljava/lang/String;
+	public static final field GET_SCENE Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/data/canvas/names/CanvasToolNames;
+	public static final field LIST Ljava/lang/String;
+	public static final field RENDER_PREVIEW Ljava/lang/String;
+	public static final field REPLACE_SCENE Ljava/lang/String;
+	public final fun getALL ()Ljava/util/List;
+}
+
 public final class com/letta/mobile/data/canvas/plugin/CanvasPluginElement {
 	public static final field Companion Lcom/letta/mobile/data/canvas/plugin/CanvasPluginElement$Companion;
 	public static final field TYPE_PREFIX Ljava/lang/String;
@@ -10664,6 +10679,7 @@ public final class com/letta/mobile/data/chat/tools/SpecToolPresenter : com/lett
 public final class com/letta/mobile/data/chat/tools/ToolActivity : java/lang/Enum {
 	public static final field Called Lcom/letta/mobile/data/chat/tools/ToolActivity;
 	public static final field Delegated Lcom/letta/mobile/data/chat/tools/ToolActivity;
+	public static final field Drew Lcom/letta/mobile/data/chat/tools/ToolActivity;
 	public static final field Edited Lcom/letta/mobile/data/chat/tools/ToolActivity;
 	public static final field Explored Lcom/letta/mobile/data/chat/tools/ToolActivity;
 	public static final field Fetched Lcom/letta/mobile/data/chat/tools/ToolActivity;
@@ -11020,6 +11036,13 @@ public final class com/letta/mobile/data/chat/tools/ToolPreviewSpec$Companion {
 public abstract interface class com/letta/mobile/data/chat/tools/ToolPreviewTarget {
 }
 
+public final class com/letta/mobile/data/chat/tools/ToolPreviewTarget$Canvas : com/letta/mobile/data/chat/tools/ToolPreviewTarget {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$Canvas;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/letta/mobile/data/chat/tools/ToolPreviewTarget$File : com/letta/mobile/data/chat/tools/ToolPreviewTarget {
 	public fun <init> (Ljava/lang/String;Lkotlin/ranges/IntRange;)V
 	public synthetic fun <init> (Ljava/lang/String;Lkotlin/ranges/IntRange;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -11120,13 +11143,17 @@ public final class com/letta/mobile/data/chat/tools/ToolVerb : java/lang/Enum {
 	public static final field AddedToMemory Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Called Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Companion Lcom/letta/mobile/data/chat/tools/ToolVerb$Companion;
+	public static final field ComposedCanvas Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field CreatedCanvas Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Delegated Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Edited Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field EditedCanvas Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field EditedMemory Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Fetched Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Planned Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Ran Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Read Lcom/letta/mobile/data/chat/tools/ToolVerb;
+	public static final field ReadCanvas Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field RewroteMemory Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Searched Lcom/letta/mobile/data/chat/tools/ToolVerb;
 	public static final field Stopped Lcom/letta/mobile/data/chat/tools/ToolVerb;
@@ -11154,6 +11181,14 @@ public final class com/letta/mobile/data/chat/tools/bundled/BashToolPresenter : 
 public final class com/letta/mobile/data/chat/tools/bundled/BundledToolPresenters {
 	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/BundledToolPresenters;
 	public final fun getRegistry ()Lcom/letta/mobile/data/chat/tools/ToolPresenterRegistry;
+}
+
+public final class com/letta/mobile/data/chat/tools/bundled/CanvasToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {
+	public static final field INSTANCE Lcom/letta/mobile/data/chat/tools/bundled/CanvasToolPresenter;
+	public fun getId ()Ljava/lang/String;
+	public fun getMatcher ()Lcom/letta/mobile/data/chat/tools/ToolMatcher;
+	public fun inset (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolInset;
+	public fun line (Lcom/letta/mobile/data/chat/tools/ToolCallFacts;Lcom/letta/mobile/data/chat/tools/ToolPresenterScope;)Lcom/letta/mobile/data/chat/tools/ToolStepLine;
 }
 
 public final class com/letta/mobile/data/chat/tools/bundled/EditToolPresenter : com/letta/mobile/data/chat/tools/ToolPresenter {

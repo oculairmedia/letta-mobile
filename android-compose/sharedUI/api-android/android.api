@@ -2176,6 +2176,7 @@ public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSing
 	public fun <init> ()V
 	public final fun getLambda$-1035601529$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$-1666066412$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$1939069394$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$598866409$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
