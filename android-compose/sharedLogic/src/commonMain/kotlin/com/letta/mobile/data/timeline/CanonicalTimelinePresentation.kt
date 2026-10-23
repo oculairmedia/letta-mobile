@@ -48,7 +48,7 @@ class CanonicalTimelinePresentation private constructor(
      * What the list holds, published as ONE value. The live projection drains the prompt by otid and
      * the reply by server id; held in separate flows, a combine could see the new otids before the
      * new rows and draw a frame with the prompt drained but its run-less reply still live, ungrouped
-     * beside the settled run that already holds it (letta-mobile-b2puc).
+     * beside the settled run that already holds it.
      */
     private val resident = MutableStateFlow(ResidentState())
     // Written by the live projection and read by paging's projection; guarded by its own lock.
