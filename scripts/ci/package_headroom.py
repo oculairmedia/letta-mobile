@@ -59,6 +59,7 @@ _DECLARATION_START = re.compile(r"(?:fun|val|var|class|interface|object|typealia
 _HEADER_STOP = re.compile(r"[()\[\]{};=\n]")
 _NESTING = {"(": 1, "[": 1, ")": -1, "]": -1}
 NEWLINE = "\n"
+_PLANNED_EDGE = re.compile(r"\s*([\w.]+)\s*->\s*([\w.]+)\s*")
 
 
 # --- export: the same records StructureSourceExport writes ------------------------------------
@@ -263,10 +264,10 @@ def contract_errors(report: dict, baseline: dict) -> list[str]:
 
 
 def parse_edge(text: str) -> tuple[str, str]:
-    source, arrow, target = text.partition("->")
-    if not arrow or not source.strip() or not target.strip():
+    match = _PLANNED_EDGE.fullmatch(text)
+    if match is None:
         raise argparse.ArgumentTypeError(f"expected PKG_A->PKG_B, got {text!r}")
-    return source.strip(), target.strip()
+    return match.group(1), match.group(2)
 
 
 def would_import(structure: Structure, baseline: dict, planned: list[tuple[str, str]]) -> list[str]:
