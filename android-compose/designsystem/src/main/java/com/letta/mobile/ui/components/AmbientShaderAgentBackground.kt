@@ -31,7 +31,7 @@ import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_UNPREMULTIPLIED
-import com.letta.mobile.ui.chat.surface.ambient.LocalThinkingGlowStyle
+import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.ambient.ambientGlowShaderSource

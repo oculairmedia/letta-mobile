@@ -35,7 +35,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.LocalAmbientGlowShaders
-import com.letta.mobile.ui.chat.surface.ambient.LocalThinkingGlowStyle
+import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
 import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.chat.surface.ambient.rememberAmbientGlowShaders
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbient

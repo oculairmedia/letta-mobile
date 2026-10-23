@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.updateAndGet
 import kotlin.math.abs
+import com.letta.mobile.ui.ambient.ThinkingGlowStyle
 
 /**
  *  (G91): what the chat timeline shows besides the conversation itself. The

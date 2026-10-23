@@ -8624,19 +8624,19 @@ public final class com/letta/mobile/data/chat/display/BackgroundCommandReportKt 
 public final class com/letta/mobile/data/chat/display/ChatDisplayOptions {
 	public static final field Companion Lcom/letta/mobile/data/chat/display/ChatDisplayOptions$Companion;
 	public fun <init> ()V
-	public fun <init> (ZZZLcom/letta/mobile/data/chat/display/ThinkingGlowStyle;)V
-	public synthetic fun <init> (ZZZLcom/letta/mobile/data/chat/display/ThinkingGlowStyle;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ZZZLcom/letta/mobile/ui/ambient/ThinkingGlowStyle;)V
+	public synthetic fun <init> (ZZZLcom/letta/mobile/ui/ambient/ThinkingGlowStyle;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
 	public final fun component2 ()Z
 	public final fun component3 ()Z
-	public final fun component4 ()Lcom/letta/mobile/data/chat/display/ThinkingGlowStyle;
-	public final fun copy (ZZZLcom/letta/mobile/data/chat/display/ThinkingGlowStyle;)Lcom/letta/mobile/data/chat/display/ChatDisplayOptions;
-	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/display/ChatDisplayOptions;ZZZLcom/letta/mobile/data/chat/display/ThinkingGlowStyle;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/display/ChatDisplayOptions;
+	public final fun component4 ()Lcom/letta/mobile/ui/ambient/ThinkingGlowStyle;
+	public final fun copy (ZZZLcom/letta/mobile/ui/ambient/ThinkingGlowStyle;)Lcom/letta/mobile/data/chat/display/ChatDisplayOptions;
+	public static synthetic fun copy$default (Lcom/letta/mobile/data/chat/display/ChatDisplayOptions;ZZZLcom/letta/mobile/ui/ambient/ThinkingGlowStyle;ILjava/lang/Object;)Lcom/letta/mobile/data/chat/display/ChatDisplayOptions;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getShowCompactions ()Z
 	public final fun getShowReasoning ()Z
 	public final fun getShowTokenUsage ()Z
-	public final fun getThinkingGlow ()Lcom/letta/mobile/data/chat/display/ThinkingGlowStyle;
+	public final fun getThinkingGlow ()Lcom/letta/mobile/ui/ambient/ThinkingGlowStyle;
 	public fun hashCode ()I
 	public final fun hides (Lcom/letta/mobile/data/model/UiMessage;)Z
 	public fun toString ()Ljava/lang/String;
@@ -8732,23 +8732,6 @@ public final class com/letta/mobile/data/chat/display/TaskActivity : java/lang/E
 
 public final class com/letta/mobile/data/chat/display/TaskActivityKt {
 	public static final fun activity (Lcom/letta/mobile/data/model/UiSubagentNotification;)Lcom/letta/mobile/data/chat/display/TaskActivity;
-}
-
-public final class com/letta/mobile/data/chat/display/ThinkingGlowStyle : java/lang/Enum {
-	public static final field Aurora Lcom/letta/mobile/data/chat/display/ThinkingGlowStyle;
-	public static final field Companion Lcom/letta/mobile/data/chat/display/ThinkingGlowStyle$Companion;
-	public static final field Ribbons Lcom/letta/mobile/data/chat/display/ThinkingGlowStyle;
-	public static final field Sparkle Lcom/letta/mobile/data/chat/display/ThinkingGlowStyle;
-	public static final field Tide Lcom/letta/mobile/data/chat/display/ThinkingGlowStyle;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public final fun getLabel ()Ljava/lang/String;
-	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/data/chat/display/ThinkingGlowStyle;
-	public static fun values ()[Lcom/letta/mobile/data/chat/display/ThinkingGlowStyle;
-}
-
-public final class com/letta/mobile/data/chat/display/ThinkingGlowStyle$Companion {
-	public final fun fromName (Ljava/lang/String;)Lcom/letta/mobile/data/chat/display/ThinkingGlowStyle;
-	public final fun getDefault ()Lcom/letta/mobile/data/chat/display/ThinkingGlowStyle;
 }
 
 public final class com/letta/mobile/data/chat/display/TranscriptInput {
@@ -61694,7 +61677,28 @@ public final class com/letta/mobile/ui/ambient/AmbientShaderSourceKt {
 }
 
 public final class com/letta/mobile/ui/ambient/AmbientShaderStylesKt {
-	public static final fun ambientGlowShaderSource (Lcom/letta/mobile/data/chat/display/ThinkingGlowStyle;)Ljava/lang/String;
+	public static final fun ambientGlowShaderSource (Lcom/letta/mobile/ui/ambient/ThinkingGlowStyle;)Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/ambient/ThinkingGlowStyle : java/lang/Enum {
+	public static final field Aurora Lcom/letta/mobile/ui/ambient/ThinkingGlowStyle;
+	public static final field Companion Lcom/letta/mobile/ui/ambient/ThinkingGlowStyle$Companion;
+	public static final field Ribbons Lcom/letta/mobile/ui/ambient/ThinkingGlowStyle;
+	public static final field Sparkle Lcom/letta/mobile/ui/ambient/ThinkingGlowStyle;
+	public static final field Tide Lcom/letta/mobile/ui/ambient/ThinkingGlowStyle;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getLabel ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lcom/letta/mobile/ui/ambient/ThinkingGlowStyle;
+	public static fun values ()[Lcom/letta/mobile/ui/ambient/ThinkingGlowStyle;
+}
+
+public final class com/letta/mobile/ui/ambient/ThinkingGlowStyle$Companion {
+	public final fun fromName (Ljava/lang/String;)Lcom/letta/mobile/ui/ambient/ThinkingGlowStyle;
+	public final fun getDefault ()Lcom/letta/mobile/ui/ambient/ThinkingGlowStyle;
+}
+
+public final class com/letta/mobile/ui/ambient/ThinkingGlowStyleKt {
+	public static final fun getLocalThinkingGlowStyle ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public final class com/letta/mobile/ui/ambient/VisibleAssistantStreamPulseKt {

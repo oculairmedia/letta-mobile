@@ -1,9 +1,12 @@
-package com.letta.mobile.data.chat.display
+package com.letta.mobile.ui.ambient
+
+import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.staticCompositionLocalOf
 
 /**
  * The look of the ambient glow the chat shows while the agent works. One global preference, kept
  * with the other [ChatDisplayOptions]; every style takes the same status, tint and motion inputs
- * (com.letta.mobile.ui.ambient.ambientGlowShaderSource), so only the picture changes.
+ * ([ambientGlowShaderSource]), so only the picture changes.
  *
  * @property label The short name the chat options show for the style.
  */
@@ -29,3 +32,10 @@ enum class ThinkingGlowStyle(val label: String) {
         fun fromName(name: String?): ThinkingGlowStyle = entries.firstOrNull { it.name == name } ?: Default
     }
 }
+
+/**
+ * The thinking glow's look on a chat page: the chat's display options (ChatDisplayOptions.thinkingGlow),
+ * provided by ChatSurface. The docked panel's glow and the hosts' full-page glows (composed as
+ * the page background, inside it) all read it, so one setting changes every glow.
+ */
+val LocalThinkingGlowStyle: ProvidableCompositionLocal<ThinkingGlowStyle> = staticCompositionLocalOf { ThinkingGlowStyle.Default }

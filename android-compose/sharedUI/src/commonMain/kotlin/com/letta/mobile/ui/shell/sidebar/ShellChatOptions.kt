@@ -20,7 +20,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.display.ChatTextSize
-import com.letta.mobile.data.chat.display.ThinkingGlowStyle
+import com.letta.mobile.ui.ambient.ThinkingGlowStyle
 import com.letta.mobile.ui.components.LettaSectionLabel
 import com.letta.mobile.ui.host.LettaAlertPane
 import com.letta.mobile.ui.host.LettaAlertSpec

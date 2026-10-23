@@ -29,7 +29,7 @@ import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_PREMULTIPLIED
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.ambient.ambientGlowShaderSource
-import com.letta.mobile.ui.chat.surface.ambient.LocalThinkingGlowStyle
+import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
 import com.letta.mobile.util.Telemetry
 import org.jetbrains.skia.Paint as SkiaPaint
 import org.jetbrains.skia.Rect as SkiaRect

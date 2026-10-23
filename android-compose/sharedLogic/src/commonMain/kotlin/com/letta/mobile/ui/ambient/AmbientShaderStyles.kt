@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.ambient
 
-import com.letta.mobile.data.chat.display.ThinkingGlowStyle
 
 /**
  * The full shader source for [style]: the shared prelude (uniforms, palette, dither) and the

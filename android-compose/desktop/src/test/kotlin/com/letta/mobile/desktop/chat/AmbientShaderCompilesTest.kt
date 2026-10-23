@@ -2,7 +2,7 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_PREMULTIPLIED
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_UNPREMULTIPLIED
-import com.letta.mobile.data.chat.display.ThinkingGlowStyle
+import com.letta.mobile.ui.ambient.ThinkingGlowStyle
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_SHADER_SOURCE
 import com.letta.mobile.ui.ambient.ambientGlowShaderSource
 import org.jetbrains.skia.RuntimeEffect

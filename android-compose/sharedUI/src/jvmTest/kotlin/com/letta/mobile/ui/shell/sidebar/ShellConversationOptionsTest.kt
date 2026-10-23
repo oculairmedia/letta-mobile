@@ -21,7 +21,7 @@ import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.display.ChatTextSize
-import com.letta.mobile.data.chat.display.ThinkingGlowStyle
+import com.letta.mobile.ui.ambient.ThinkingGlowStyle
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.host.LettaHost

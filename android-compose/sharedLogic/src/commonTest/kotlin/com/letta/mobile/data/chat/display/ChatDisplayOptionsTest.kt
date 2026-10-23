@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.ambient.ThinkingGlowStyle
 
 /** letta-mobile-zxk2n.5 (G91): display toggles hide rows, persist, and drive the transcript. */
 class ChatDisplayOptionsTest {

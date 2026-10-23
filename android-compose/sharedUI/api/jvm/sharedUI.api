@@ -1886,7 +1886,6 @@ public final class com/letta/mobile/ui/chat/surface/PersistedLayoutPrefsKt {
 }
 
 public final class com/letta/mobile/ui/chat/surface/ambient/ChatPanelAmbientGlowKt {
-	public static final fun getLocalThinkingGlowStyle ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun rememberChatAmbientStatus (ZZLandroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/ambient/AmbientMotionStatus;
 }
 
@@ -9774,7 +9773,7 @@ public final class com/letta/mobile/ui/shell/sidebar/ShellChatOptionsTags {
 	public static final field INSTANCE Lcom/letta/mobile/ui/shell/sidebar/ShellChatOptionsTags;
 	public static final field REASONING Ljava/lang/String;
 	public static final field USAGE Ljava/lang/String;
-	public final fun glow (Lcom/letta/mobile/data/chat/display/ThinkingGlowStyle;)Ljava/lang/String;
+	public final fun glow (Lcom/letta/mobile/ui/ambient/ThinkingGlowStyle;)Ljava/lang/String;
 	public final fun restore (Ljava/lang/String;)Ljava/lang/String;
 	public final fun textSize (Lcom/letta/mobile/data/chat/display/ChatTextSize;)Ljava/lang/String;
 }

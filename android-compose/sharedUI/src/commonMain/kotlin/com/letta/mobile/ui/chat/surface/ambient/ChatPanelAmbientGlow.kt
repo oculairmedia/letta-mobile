@@ -45,7 +45,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.chat.display.ThinkingGlowStyle
+import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
+import com.letta.mobile.ui.ambient.ThinkingGlowStyle
 import com.letta.mobile.ui.ambient.AmbientBand
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
@@ -459,13 +460,6 @@ internal class AmbientGlowShaders {
         compiledStyle = null
     }
 }
-
-/**
- * The thinking glow's look on a chat page: the chat's display options (ChatDisplayOptions.thinkingGlow),
- * provided by ChatSurface. The docked panel's glow and the hosts' full-page glows (composed as
- * the page background, inside it) all read it, so one setting changes every glow.
- */
-val LocalThinkingGlowStyle: ProvidableCompositionLocal<ThinkingGlowStyle> = staticCompositionLocalOf { ThinkingGlowStyle.Default }
 
 /** The page's [AmbientGlowShaders]; null outside a chat page, where each glow keeps its own. */
 internal val LocalAmbientGlowShaders = staticCompositionLocalOf<AmbientGlowShaders?> { null }

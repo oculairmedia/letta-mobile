@@ -23,7 +23,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.chat.display.ThinkingGlowStyle
+import com.letta.mobile.ui.ambient.ThinkingGlowStyle
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -41,7 +41,7 @@ import com.letta.mobile.ui.chat.surface.ambient.CHAT_AMBIENT_GLOW_TAG
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.ChatPanelAmbientGlow
 import com.letta.mobile.ui.chat.surface.ambient.LocalAmbientGlowShaders
-import com.letta.mobile.ui.chat.surface.ambient.LocalThinkingGlowStyle
+import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbientStatus
 import com.letta.mobile.ui.theme.LocalReducedMotion
