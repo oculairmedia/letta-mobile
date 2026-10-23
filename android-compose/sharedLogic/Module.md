@@ -173,6 +173,10 @@ Node identity, client/server contracts and relay configuration. These abstractio
 
 A bounded, change-aware view of the local backend's agent records on disk. Admin reads such as the agent count, the hidden-agent set and the block index use it so they stat each record and parse only the ones that changed, instead of re-reading the whole store on every request. Keep record parsing for a served page in the readers; this package holds only the few fields kept per file and never covers more than its entry cap.
 
+# Package com.letta.mobile.data.controller.node.listcache
+
+Full App Server lists the host holds and reuses while the files they are built from are unchanged, so a client paging a list or reading it agent by agent costs one App Server fetch per change rather than one per request. A held list is dropped by a host write, by a change in its files' signature or after a short age bound; a list too large to hold falls back to the request's own fetch. Keep the per-request slicing, which must match the App Server's own paging, with the admin handlers that serve it.
+
 # Package com.letta.mobile.data.controller.node.iroh
 
 JVM/Android Iroh controller hosting: authentication, pairing, viewer fanout and explicit admin-RPC handlers. Native App Server commands and read-only local storage are separate ownership tiers; sensitive workspace/plugin operations use dedicated handlers. Keep product UI and direct backend-file mutation outside protocol handling; add routes through [AdminRpcRoutes](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh/-admin-rpc-routes/index.html) and inject trust/storage policy through [IrohAuthPolicy](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh.auth/-iroh-auth-policy/index.html) and [PairedPeerStore](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.controller.node.iroh/-paired-peer-store/index.html).

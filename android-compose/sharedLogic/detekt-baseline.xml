@@ -9,7 +9,6 @@
     <ID>CyclomaticComplexMethod:AppServerRuntimeEventMapper.kt$AppServerRuntimeEventMapper$private fun AppServerInboundFrame.StreamDelta.toStreamDeltaDraft( command: TurnCommand, raw: JsonObject, ): List&lt;RuntimeEventDraft&gt;</ID>
     <ID>CyclomaticComplexMethod:BoundedTranscriptReader.kt$BoundedTranscriptReader$fun readLines(file: File, maxInlineValueChars: Int = DEFAULT_MAX_INLINE_VALUE_CHARS): List&lt;BoundedLine&gt;</ID>
     <ID>CyclomaticComplexMethod:ChatTimelineProjector.kt$ChatTimelineProjector$private fun tailProjectionFastPath( timeline: Timeline, prefix: List&lt;UiMessage&gt;, isActiveRunStreaming: Boolean, scope: ProjectionScope, ): TimelineProjection?</ID>
-    <ID>CyclomaticComplexMethod:ConversationAdminHandlers.kt$ConversationAdminHandlers$private fun registerConversationWriteRoutes( router: AdminRpcRouter, nativeClient: AppServerClient?, controller: com.letta.mobile.data.controller.AppServerController?, changes: ConversationChangeNotifier?, )</ID>
     <ID>CyclomaticComplexMethod:CronAdminHandlers.kt$CronAdminHandlers$fun register(router: AdminRpcRouter, nativeClient: AppServerClient?)</ID>
     <ID>CyclomaticComplexMethod:CronSchedule.kt$CronSchedule$fun describe(expr: CronExpr): String</ID>
     <ID>CyclomaticComplexMethod:ErrorMapper.kt$fun mapErrorToUserMessage(e: Throwable, fallback: String = "Something went wrong"): String</ID>
@@ -68,7 +67,6 @@
     <ID>LongMethod:ChatSendCoordinator.kt$ChatSendCoordinator$private suspend fun sendInternalLocked( text: String, attachments: List&lt;MessageContentPart.Image&gt;, targetConversationId: String?, )</ID>
     <ID>LongMethod:ChatTimelineProjector.kt$ChatTimelineProjector$fun project( timeline: Timeline, prefix: List&lt;UiMessage&gt;, previousState: ChatUiState, isActiveRunStreaming: Boolean, ownAgentId: String? = null, ): TimelineProjection</ID>
     <ID>LongMethod:ChatTimelineProjector.kt$ChatTimelineProjector$private fun tailProjectionFastPath( timeline: Timeline, prefix: List&lt;UiMessage&gt;, isActiveRunStreaming: Boolean, scope: ProjectionScope, ): TimelineProjection?</ID>
-    <ID>LongMethod:ConversationAdminHandlers.kt$ConversationAdminHandlers$private fun registerConversationWriteRoutes( router: AdminRpcRouter, nativeClient: AppServerClient?, controller: com.letta.mobile.data.controller.AppServerController?, changes: ConversationChangeNotifier?, )</ID>
     <ID>LongMethod:ConversationAdminHandlers.kt$ConversationAdminHandlers$private fun registerMessageRoutes( router: AdminRpcRouter, nativeClient: AppServerClient?, localStore: LocalBackendAdminStore?, turnIdentity: TurnIdentityLedger?, )</ID>
     <ID>LongMethod:ConversationTurnFanoutTest.kt$ConversationTurnFanoutTest$@Test fun twoPeerBusyRejectionTerminatesRejectedPeerWhileOwnerTurnContinues()</ID>
     <ID>LongMethod:CronAdminHandlers.kt$CronAdminHandlers$fun register(router: AdminRpcRouter, nativeClient: AppServerClient?)</ID>

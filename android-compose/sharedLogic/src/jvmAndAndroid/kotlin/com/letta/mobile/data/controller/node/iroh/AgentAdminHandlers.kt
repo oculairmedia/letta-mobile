@@ -1,7 +1,8 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
-import com.letta.mobile.data.controller.node.agentfiles.AgentRosterCache
+import com.letta.mobile.data.controller.node.listcache.HeldListCache
+import com.letta.mobile.data.controller.node.listcache.HeldListLimits
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -26,7 +27,12 @@ object AgentAdminHandlers {
     ) {
         // Without a local store there is no cheap change signal, so every page is fetched as before.
         val roster = tiers.localBackendStore?.let { store ->
-            AgentRosterCache(signature = store::agentFilesSignature, onTooLarge = ::reportAgentRosterTooLarge)
+            HeldListCache(
+                signature = store::agentFilesSignature,
+                // A roster sweep is a handful of pages, so the agent files are re-read on every one.
+                limits = HeldListLimits(maxItems = MAX_HELD_AGENTS, recheckMs = 0L),
+                onTooLarge = { agents, max -> reportHeldListTooLarge("agent.list", agents, max) },
+            )
         }
         registerAgentList(router, tiers, roster)
         registerAgentGet(router, tiers)
@@ -44,7 +50,7 @@ object AgentAdminHandlers {
     // The App Server drops agent `metadata`; Meridian keeps it (see AgentMetadataSidecar), so every
     // agent returned below goes through [overlaid] and every write through the sidecar.
 
-    private fun registerAgentList(router: AdminRpcRouter, tiers: NativeReadTiers, roster: AgentRosterCache?) {
+    private fun registerAgentList(router: AdminRpcRouter, tiers: NativeReadTiers, roster: HeldListCache?) {
         router.register("agent.list") { params ->
             val limit = param(params, AdminParamKey("limit"))?.toLongOrNull()?.coerceAtLeast(1L)
             val offset = param(params, AdminParamKey("offset"))?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
@@ -60,15 +66,16 @@ object AgentAdminHandlers {
                 // the whole roster is fetched once and every page sliced from it.
                 val pageSize = limit ?: DEFAULT_AGENT_LIST_LIMIT
                 val window = (offset + pageSize).coerceAtMost(MAX_AGENT_LIST_FETCH)
-                val agents = if (roster != null) {
-                    roster.roster(
+                val pageFrom = { agents: JsonArray -> pageOf(agents, offset, pageSize) }
+                val page = if (roster != null) {
+                    roster.serve(
                         fetchAll = { fetchAgents(c, MAX_AGENT_LIST_FETCH) },
-                        fetchWindow = { fetchAgents(c, window) },
+                        fromFull = pageFrom,
+                        fetchOwn = { fetchAgents(c, window)?.let(pageFrom) },
                     )
                 } else {
-                    fetchAgents(c, window)
+                    fetchAgents(c, window)?.let(pageFrom)
                 } ?: return@require null
-                val page = pageOf(agents, offset, pageSize)
                 tiers.agentMetadata?.overlayAll(page) ?: page
             }
         }
@@ -104,7 +111,7 @@ object AgentAdminHandlers {
             }
         }
 
-    private fun registerAgentCreate(router: AdminRpcRouter, tiers: NativeReadTiers, roster: AgentRosterCache?) {
+    private fun registerAgentCreate(router: AdminRpcRouter, tiers: NativeReadTiers, roster: HeldListCache?) {
         router.register("agent.create") { params ->
             val body = params.withDefaultContextWindow()
             NativeAdmin.require(tiers.nativeClient, NativeAdminOp.AgentCreate) { c ->
@@ -130,7 +137,7 @@ object AgentAdminHandlers {
         router: AdminRpcRouter,
         controller: AppServerController?,
         tiers: NativeReadTiers,
-        roster: AgentRosterCache?,
+        roster: HeldListCache?,
     ) {
         router.register("agent.update") { params ->
             val id = params.requireParam(AdminParamKey("agent_id"))
@@ -187,7 +194,7 @@ object AgentAdminHandlers {
         return sidecar.overlaid(response.agent)
     }
 
-    private fun registerAgentDelete(router: AdminRpcRouter, tiers: NativeReadTiers, roster: AgentRosterCache?) =
+    private fun registerAgentDelete(router: AdminRpcRouter, tiers: NativeReadTiers, roster: HeldListCache?) =
         router.registerById("agent.delete") { id ->
             NativeAdmin.require(tiers.nativeClient, NativeAdminOp.AgentDelete) { c ->
                 val response = c.agentDelete(AppServerCommand.AgentDelete(requestId = NativeAdmin.requestId(), agentId = id))
@@ -276,5 +283,8 @@ object AgentAdminHandlers {
      * (~100 agents in production stores).
      */
     private const val MAX_AGENT_LIST_FETCH = 10_000L
+
+    /** Rosters past this are not held: about 17 KB per agent row, so roughly 34 MB at the cap. */
+    private const val MAX_HELD_AGENTS = 2_000
 
 }
