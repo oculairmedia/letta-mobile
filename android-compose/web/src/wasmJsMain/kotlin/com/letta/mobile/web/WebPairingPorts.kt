@@ -11,6 +11,7 @@ import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.ui.pairing.AgentChoice
 import com.letta.mobile.ui.pairing.composition.PairingShellPorts
+import com.letta.mobile.web.data.IdentityHex
 import com.letta.mobile.web.data.RelayInviteAuthenticator
 import com.letta.mobile.web.data.WebPairedHostStore
 import kotlinx.coroutines.await
@@ -33,9 +34,12 @@ internal class WebPairingPorts(
     override suspend fun loadIdentityKey(): ByteArray =
         checkNotNull(irohLoadOrCreateIdentity().await<JsString?>()) {
             "This browser cannot keep an Iroh identity (private window or insecure origin), so it cannot stay paired"
-        }.toString().hexToByteArray()
+        }.toString().let(IdentityHex::decode)
 
-    override val network: PairingNetwork = RelayPairingNetwork(RelayInviteAuthenticator(), nodeIds = { irohNodeIdOf(it.toHexString()) })
+    override val network: PairingNetwork = RelayPairingNetwork(
+        RelayInviteAuthenticator(),
+        nodeIds = { irohNodeIdOf(IdentityHex.encode(it)) },
+    )
 
     override val deviceName: String = "Browser"
 
