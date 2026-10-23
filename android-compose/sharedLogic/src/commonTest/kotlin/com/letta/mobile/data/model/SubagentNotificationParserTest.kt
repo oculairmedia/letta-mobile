@@ -7,6 +7,29 @@ import kotlin.test.assertNull
 class SubagentNotificationParserTest {
 
     @Test
+    fun resultHeaderAgentIdIgnoresLaterProseAndPreservesTagPrecedence() {
+        val child = "codex_01a1686b-8ec9-7f72-8e79-bd42f1ff3237"
+        val raw = """
+            <task-notification>
+            <task-id>task_15</task-id>
+            <status>completed</status>
+            <summary>Finished background task</summary>
+            <result>subagent_type=codex subagent_id=subagent-1792753239807-15 subagent_status=success agent_id=$child runtime_session_id=session-15
+            Result prose mentions agent_id=claude-code-older-child as an example.
+            </result>
+            </task-notification>
+        """.trimIndent()
+
+        assertEquals(child, extractSubagentNotification(raw)?.subagentAgentId)
+        assertNull(extractSubagentNotification(raw.replace(" agent_id=$child", ""))?.subagentAgentId)
+        assertNull(extractSubagentNotification(raw.replace(" agent_id=$child", " parent_agent_id=$child"))?.subagentAgentId)
+        for (tag in listOf("agent_id", "agentId")) {
+            val tagged = raw.replace("<task-id>", "<$tag>tagged-child</$tag>\n<task-id>")
+            assertEquals("tagged-child", extractSubagentNotification(tagged)?.subagentAgentId)
+        }
+    }
+
+    @Test
     fun transcriptLineInsideLegacyNotificationIsPreserved() {
         val raw = """
             <task-notification>
