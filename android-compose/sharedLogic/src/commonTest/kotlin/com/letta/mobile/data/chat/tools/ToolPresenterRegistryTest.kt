@@ -72,12 +72,16 @@ class ToolPresenterRegistryTest {
     }
 
     @Test
-    fun theFallbackOpensTheFileACallNamesAndAMemoryToolsPathInMemory() {
+    fun theFallbackOpensTheFileACallNamesAndOnlyTheMemoryPresentersOpenMemory() {
         val registry = BundledToolPresenters.registry
         val file = registry.line(call("open_thing", """{"file_path":"/repo/a.kt"}""")).previews
         assertEquals(listOf(ToolPreviewTarget.File("/repo/a.kt")), file)
-        val memory = registry.line(call("memory_view", """{"path":"system/human.md"}""")).previews
-        assertEquals(listOf(ToolPreviewTarget.Memory("system/human.md")), memory)
+        // A memory-sounding tool no memory presenter claims is not routed to the Memory view.
+        val unknown = registry.line(call("memory_view", """{"path":"system/human.md"}"""))
+        assertEquals("generic", unknown.presenterId)
+        assertEquals(listOf(ToolPreviewTarget.File("system/human.md")), unknown.previews)
+        val memory = registry.line(call("memory", """{"command":"view","path":"system/human.md"}""")).previews
+        assertTrue(memory.all { it is ToolPreviewTarget.Memory }, "$memory")
         assertEquals(emptyList(), registry.line(call("x", """{"command":"ls"}""")).previews)
     }
 
@@ -111,13 +115,6 @@ class ToolPresenterRegistryTest {
         assertEquals("echo hi", ToolArguments.primary("""{"command":"echo hi","timeout":5}"""))
         assertEquals("file_path: a.kt\nold_string: x", ToolArguments.primary("""{"file_path":"a.kt","old_string":"x"}"""))
         assertEquals("not json", ToolArguments.primary("not json"))
-    }
-
-    @Test
-    fun memoryToolsAreRecognisedByName() {
-        listOf("memory", "memory_insert", "memory_replace", "core_memory_append", "Memory")
-            .forEach { assertTrue(ToolArguments.isMemoryTool(it), it) }
-        listOf("Read", "Edit", "Write", "read_file", "", "shell").forEach { assertFalse(ToolArguments.isMemoryTool(it), it) }
     }
 
     @Test

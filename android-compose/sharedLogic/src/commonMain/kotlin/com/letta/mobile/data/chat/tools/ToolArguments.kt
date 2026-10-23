@@ -31,15 +31,13 @@ object ToolArguments {
     fun fields(obj: JsonObject): List<ToolArgumentField> =
         obj.mapNotNull { (key, value) -> readable(value)?.let { ToolArgumentField(key, it) } }
 
-    /** The file a call names (`file_path`, `path`…), as a preview: a memory tool's paths are its memory's. */
+    /**
+     * The file a call names (`file_path`, `path`…), as a working-directory file preview. Only the
+     * memory presenters open the agent's memory; a call no presenter knows names a file.
+     */
     fun pathPreview(call: ToolCallFacts): ToolPreviewTarget? {
         val path = PATH_KEYS.firstNotNullOfOrNull(call::string)?.takeIf { '\n' !in it } ?: return null
-        return if (isMemoryTool(call.name)) ToolPreviewTarget.Memory(path) else ToolPreviewTarget.File(path)
-    }
-
-    /** Letta's memory tools (`memory`, `memory_insert`, `core_memory_append`…): their paths are MemFS paths. */
-    fun isMemoryTool(toolName: String): Boolean = toolName.lowercase().let {
-        it == "memory" || it.startsWith("memory_") || it.endsWith("_memory") || "core_memory" in it
+        return ToolPreviewTarget.File(path)
     }
 
     /**

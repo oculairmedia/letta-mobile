@@ -40,12 +40,18 @@ class ExternalAgentRowBadgeUiTest {
         )
         val msg = message("m-1", "assistant", "").copy(
             toolCalls = listOf(
-                UiToolCall(name = "Agent", arguments = "{}", result = null, status = "running", subagentDispatch = dispatch),
+                UiToolCall(
+                    name = "Agent",
+                    arguments = """{"description":"Refactor the parser","subagent_type":"claude-code","prompt":"Split the parser"}""",
+                    result = null,
+                    status = "running",
+                    subagentDispatch = dispatch,
+                ),
             ),
         )
         setContent { MaterialTheme { RenderRow(single(msg), rowContext()) } }
 
-        awaitText("Dispatched: Refactor the parser")
+        awaitText("to claude-code · \"Refactor the parser\"")
         onNodeWithTag(EXTERNAL_AGENT_BADGE_TAG, useUnmergedTree = true).assertTextEquals("Claude Code")
     }
 

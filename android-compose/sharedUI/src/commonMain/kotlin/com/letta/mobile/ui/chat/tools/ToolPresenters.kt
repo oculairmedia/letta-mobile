@@ -4,9 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
-import com.letta.mobile.data.chat.tools.ToolActivity
+import com.letta.mobile.data.chat.tools.steps.ToolActivity
 import com.letta.mobile.data.chat.tools.ToolPresenterRegistry
-import com.letta.mobile.data.chat.tools.ToolStepExpansions
+import com.letta.mobile.data.chat.tools.steps.ToolStepExpansions
 import com.letta.mobile.data.chat.tools.ToolStepLine
 import com.letta.mobile.data.chat.tools.ToolVerb
 import com.letta.mobile.data.chat.tools.bundled.BundledToolPresenters
@@ -38,6 +38,7 @@ import com.letta.mobile.sharedui.resources.rows_tool_verb_read_canvas
 import com.letta.mobile.sharedui.resources.rows_tool_verb_rewrote_memory
 import com.letta.mobile.sharedui.resources.rows_tool_verb_searched
 import com.letta.mobile.sharedui.resources.rows_tool_verb_stopped
+import com.letta.mobile.sharedui.resources.rows_tool_verb_watching
 import com.letta.mobile.sharedui.resources.rows_tool_verb_updated
 import com.letta.mobile.sharedui.resources.rows_tool_verb_used
 import com.letta.mobile.sharedui.resources.rows_tool_verb_wrote
@@ -77,6 +78,7 @@ private val ToolVerb.resource: StringResource
         ToolVerb.RewroteMemory -> Res.string.rows_tool_verb_rewrote_memory
         ToolVerb.WroteMemfs -> Res.string.rows_tool_verb_wrote_memfs
         ToolVerb.Stopped -> Res.string.rows_tool_verb_stopped
+        ToolVerb.Watching -> Res.string.rows_tool_verb_watching
         ToolVerb.Updated -> Res.string.rows_tool_verb_updated
         ToolVerb.Planned -> Res.string.rows_tool_verb_planned
         ToolVerb.Used -> Res.string.rows_tool_verb_used

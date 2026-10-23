@@ -20,7 +20,9 @@ import com.letta.mobile.data.model.PlanPreview
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.rows_plan_approve
 import com.letta.mobile.sharedui.resources.rows_plan_feedback_placeholder
+import com.letta.mobile.sharedui.resources.rows_plan_keep_planning
 import com.letta.mobile.sharedui.resources.rows_plan_reject_title
 import com.letta.mobile.sharedui.resources.rows_plan_title
 import com.letta.mobile.ui.icons.LettaIcons
@@ -31,15 +33,21 @@ import org.jetbrains.compose.resources.stringResource
 // letta-mobile-8fq4j: ExitPlanMode's plan card, and the plan a write to a plans file proposes,
 // for every host from this one renderer (the timeline row's approval slot and the Touch canvas's
 // input tray both draw ApprovalRequestCard). Mirrors the official Letta desktop app (0.34.10):
-// "Ready to code? Here is your plan:" over the rendered markdown, decided with Approve, or Reject
-// with optional feedback for the agent. The reference offers no other choice (no "approve and
-// switch permission mode"), so neither does this card.
+// "Ready to code? Here is your plan:" over the rendered markdown, decided with "Approve plan", or
+// "Keep planning" with optional feedback for the agent (the owner-approved mockup's labels for the
+// reference's Approve / Reject). The reference offers no other choice (no "approve and switch
+// permission mode"), so neither does this card.
 
-private val PlanRejectCopy = RejectCopy(Res.string.rows_plan_reject_title, Res.string.rows_plan_feedback_placeholder)
+private val PlanRejectCopy = RejectCopy(
+    title = Res.string.rows_plan_reject_title,
+    placeholder = Res.string.rows_plan_feedback_placeholder,
+    approve = Res.string.rows_plan_approve,
+    reject = Res.string.rows_plan_keep_planning,
+)
 
 /**
- * The plan card for a parked ExitPlanMode call: the plan, then Approve (closing the call with its
- * own arguments as `updated_input`, [PlanApproval.approveReason]) or Reject with optional
+ * The plan card for a parked ExitPlanMode call: the plan, then "Approve plan" (closing the call with its
+ * own arguments as `updated_input`, [PlanApproval.approveReason]) or "Keep planning" with optional
  * feedback. Returns false (renders nothing) when [approval] holds no ExitPlanMode call.
  */
 @Composable

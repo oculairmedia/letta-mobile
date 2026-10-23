@@ -129,6 +129,10 @@ The URLs and file paths in a tool's output, found so a step's inset can make the
 
 A lenient reader of the shell scripts agents pass to their shell tools: quotes, separators, heredocs and `bash -lc` wrappers, never expanding or throwing. Tool presenters and the meridian recogniser read shell calls through it so they agree on what ran; read a call's script with [ShellTools](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.shell/-shell-tools/index.html) and its commands as [ShellCommandLine](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.shell/-shell-command-line/index.html).
 
+# Package com.letta.mobile.data.chat.tools.steps
+
+What the timeline does with steps once presenters have drawn them: which kind of work a run of steps adds up to ("Explored files, ran commands"), and which steps the person opened or closed against their default, remembered across reloads in a bounded set. Keep per-tool reading in the presenters; group steps with [ToolActivity](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.steps/-tool-activity/index.html) and keep disclosure state in [ToolStepExpansions](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.steps/-tool-step-expansions/index.html).
+
 # Package com.letta.mobile.data.commands
 
 Slash-command contracts and commands answered by the client itself. Navigation/local actions remain distinct from commands requiring active backend support. Keep arbitrary shell execution outside slash-command discovery; provide backend command capabilities through [SlashCommandsApi](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.commands/-slash-commands-api/index.html) and client commands through [ClientSlashCommands](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.commands/-client-slash-commands/index.html).

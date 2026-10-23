@@ -12,7 +12,14 @@ import kotlinx.serialization.json.intOrNull
  * result is then what went wrong, not what it produced).
  */
 @Immutable
-class ToolCallFacts(val name: String, val rawArguments: String, val result: String?, val failed: Boolean = false) {
+class ToolCallFacts(
+    val name: String,
+    val rawArguments: String,
+    val result: String?,
+    val failed: Boolean = false,
+    /** How long the call has run (or ran), in milliseconds, when the host knows; null otherwise. */
+    val elapsedMillis: Long? = null,
+) {
     /** Parsed on first read, so a step whose presenter never looks at its arguments never parses them. */
     val arguments: JsonObject? get() = parsed.value
 

@@ -285,7 +285,15 @@ class ChatTimelineUiTest {
             prompt = "Look at gradle",
             subagentAgentId = "agent-sub",
         )
-        val call = UiToolCall(name = "Agent", arguments = "{}", result = null, status = "running", subagentDispatch = dispatch)
+        val arguments = """{"description":"Audit the build","subagent_type":"general-purpose","prompt":"Look at gradle"}"""
+        val call = UiToolCall(
+            name = "Agent",
+            arguments = arguments,
+            result = null,
+            status = "running",
+            toolCallId = "agent-call-1",
+            subagentDispatch = dispatch,
+        )
         val messages = conversation(1) + UiMessage(
             id = "m-dispatch",
             role = "assistant",
@@ -296,8 +304,9 @@ class ChatTimelineUiTest {
         val host = ChatSurfaceHost(openSubagent = { callId, agentId, description -> opened += Triple(callId, agentId, description) })
         show(ready.copy(messages = messages.toPersistentList()), RecordingChatActions(), host)
 
-        // The dispatch reads as its own card among the message's steps, no summary line to open first.
-        onNodeWithText("Dispatched: Audit the build").performClick()
+        // The dispatch reads as its step among the message's steps, its chip opening the subagent.
+        onNodeWithText("to general-purpose · \"Audit the build\"").performClick()
+        onNodeWithText("Open subagent").performClick()
         runOnIdle { assertEquals(listOf<Triple<String, String?, String>>(Triple("agent-call-1", "agent-sub", "Audit the build")), opened) }
     }
 

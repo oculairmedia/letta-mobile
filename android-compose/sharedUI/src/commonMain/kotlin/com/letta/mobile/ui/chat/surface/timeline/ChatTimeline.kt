@@ -9,7 +9,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import com.letta.mobile.data.chat.tools.ToolStepExpansions
+import com.letta.mobile.data.chat.tools.steps.ToolStepExpansions
 import com.letta.mobile.ui.chat.tools.LocalToolStepExpansions
 import com.letta.mobile.ui.chat.surface.timeline.rows.ToolPreviewPanes
 import androidx.compose.runtime.Immutable

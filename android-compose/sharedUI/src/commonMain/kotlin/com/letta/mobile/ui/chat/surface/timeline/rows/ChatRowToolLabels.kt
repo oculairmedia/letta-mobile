@@ -31,15 +31,18 @@ internal fun ChatRowContext.isStreaming(message: UiMessage): Boolean =
     streamingMessageId != null && streamingMessageId == message.id
 
 /** [this] call as a tool presenter reads it. */
-internal fun UiToolCall.facts(): ToolCallFacts =
-    ToolCallFacts(name, arguments, result, failed = classifyToolCallState(this).isFailure())
+internal fun UiToolCall.facts(elapsedMillis: Long? = executionTimeMs): ToolCallFacts =
+    ToolCallFacts(name, arguments, result, failed = classifyToolCallState(this).isFailure(), elapsedMillis = elapsedMillis)
 
 /** A step that failed or was turned down: its line says so and it opens to what went wrong. */
 internal fun ToolTimelineState.isFailure(): Boolean = this == ToolTimelineState.Failed || this == ToolTimelineState.Rejected
 
-/** [call]'s step line from the provided presenters, worked out again only when the call or the presenters change. */
+/**
+ * [call]'s step line from the provided presenters, worked out again only when the call, the
+ * presenters or [elapsedMillis] (how long a running call has run, when the line shows it) change.
+ */
 @Composable
-internal fun rememberToolStepLine(call: UiToolCall): ToolStepLine {
+internal fun rememberToolStepLine(call: UiToolCall, elapsedMillis: Long? = call.executionTimeMs): ToolStepLine {
     val presenters = LocalToolPresenters.current
-    return remember(call, presenters) { presenters.line(call.facts()) }
+    return remember(call, presenters, elapsedMillis) { presenters.line(call.facts(elapsedMillis)) }
 }

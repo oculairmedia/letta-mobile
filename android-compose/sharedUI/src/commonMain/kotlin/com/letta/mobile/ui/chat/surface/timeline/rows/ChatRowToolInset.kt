@@ -61,6 +61,7 @@ internal fun ToolInsetView(inset: ToolInset, modifier: Modifier = Modifier, live
         is ToolInset.BeforeAfter -> InsetPanel(modifier, live) { BeforeAfterInset(inset) }
         is ToolInset.Rewrite -> InsetPanel(modifier, live) { RewriteInset(inset) }
         is ToolInset.Arguments -> InsetPanel(modifier, live) { ArgumentsInset(inset) }
+        is ToolInset.Checklist -> InsetPanel(modifier, live) { ChecklistInset(inset) }
     }
 }
 
