@@ -11,17 +11,19 @@ import kotlinx.serialization.json.JsonPrimitive
  * not evidence of a plan. Malformed or partial arguments leave the prior snapshot intact.
  */
 fun parseAgentTodos(toolName: String, arguments: String): List<SubagentTodo>? {
-    val textKey = when (toolName) {
-        "TodoWrite", "todo_write" -> "content"
-        "update_plan" -> "step"
-        else -> return null
-    }
+    val textKey = agentTodoTextKey(toolName) ?: return null
     return runCatching {
         val root = Json.parseToJsonElement(arguments) as? JsonObject ?: return null
         val items = root[if (textKey == "step") "plan" else "todos"] as? JsonArray ?: return null
         val todos = items.mapNotNull { (it as? JsonObject)?.authoredTodo(textKey) }
         todos.takeIf { it.size == items.size }
     }.getOrNull()
+}
+
+internal fun agentTodoTextKey(toolName: String): String? = when (toolName) {
+    "TodoWrite", "todo_write" -> "content"
+    "update_plan" -> "step"
+    else -> null
 }
 
 private fun JsonObject.authoredTodo(textKey: String): SubagentTodo? {

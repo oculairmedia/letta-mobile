@@ -1,6 +1,7 @@
 package com.letta.mobile.data.subagents
 
 import com.letta.mobile.data.model.parseAgentTodos
+import com.letta.mobile.data.model.agentTodoTextKey
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -17,6 +18,7 @@ fun SubagentChipObservation.withNativeTodos(snapshot: JsonObject): SubagentChipO
     calls.forEachIndexed { index, element ->
         val call = element as? JsonObject ?: return@forEachIndexed
         val name = (call["name"] as? JsonPrimitive)?.content ?: return@forEachIndexed
+        if (agentTodoTextKey(name) == null) return@forEachIndexed
         val arguments = when (val args = call["args"]) {
             is JsonPrimitive -> args.takeIf { it.isString }?.content
             is JsonObject -> args.toString()
