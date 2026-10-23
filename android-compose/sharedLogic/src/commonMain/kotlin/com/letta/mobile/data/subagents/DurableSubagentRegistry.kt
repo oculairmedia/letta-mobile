@@ -1,5 +1,6 @@
 package com.letta.mobile.data.subagents
 
+import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.util.Telemetry
 import kotlin.time.Clock
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -258,8 +259,10 @@ class DurableSubagentRegistry(
     }
 
     /** Only a newer authored plan replaces the retained snapshot; missing plans preserve it. */
-    private fun SubagentChipRecord.authoredTodosAfter(observation: SubagentChipObservation) =
-        if (observation.todoRevision > todoRevision) observation.todos ?: todos else todos
+    private fun SubagentChipRecord.authoredTodosAfter(observation: SubagentChipObservation): List<SubagentTodo>? {
+        if (observation.todoRevision <= todoRevision) return todos
+        return observation.todos ?: todos
+    }
 
     /** Provenance only fills gaps: a populated value is never replaced. */
     private fun SubagentChipRecord.backfilledFrom(observation: SubagentChipObservation): SubagentChipRecord {
