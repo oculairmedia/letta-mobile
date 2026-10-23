@@ -2170,7 +2170,7 @@ public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSing
 public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowToolPreviewKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowToolPreviewKt;
 	public fun <init> ()V
-	public final fun getLambda$-1666066412$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-1321150667$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$598866409$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
@@ -8800,9 +8800,11 @@ public final class com/letta/mobile/ui/shell/pages/workspace/WorkingDirectoryPic
 }
 
 public final class com/letta/mobile/ui/shell/pages/workspace/WorkspaceFileLinkKt {
+	public static final fun ToolPreviewFileChip (Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget;Landroidx/compose/runtime/Composer;I)V
 	public static final fun WorkspaceFileChip (Lcom/letta/mobile/data/workspace/WorkspaceFileRequest;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun WorkspaceFilePreview (Landroidx/compose/runtime/Composer;I)V
 	public static final fun getLocalWorkspaceFiles ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun rememberWorkspaceLinkedText (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/AnnotatedString;
 }
 
 public final class com/letta/mobile/ui/shell/pages/workspace/WorkspaceFileLinkTags {

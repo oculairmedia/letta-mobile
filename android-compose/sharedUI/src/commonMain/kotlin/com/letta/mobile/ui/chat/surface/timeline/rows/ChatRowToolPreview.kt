@@ -16,27 +16,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withLink
-import com.letta.mobile.data.chat.tools.links.OutputLinks
 import com.letta.mobile.data.chat.tools.ToolPreviewTarget
 import com.letta.mobile.data.chat.tools.ToolStepLine
 import com.letta.mobile.data.model.UiToolCall
-import com.letta.mobile.data.workspace.WorkspaceFileOpener
-import com.letta.mobile.data.workspace.WorkspaceFileRequest
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_tool_full_output
 import com.letta.mobile.sharedui.resources.rows_tool_open_full_output
 import com.letta.mobile.sharedui.resources.rows_tool_open_subagent
 import com.letta.mobile.ui.host.InspectorPane
-import com.letta.mobile.ui.shell.pages.workspace.LocalWorkspaceFiles
-import com.letta.mobile.ui.shell.pages.workspace.WorkspaceFileChip
+import com.letta.mobile.ui.shell.pages.workspace.ToolPreviewFileChip
 import com.letta.mobile.ui.shell.pages.workspace.WorkspaceFilePreview
 import com.letta.mobile.ui.theme.LettaDimens
 import org.jetbrains.compose.resources.stringResource
@@ -67,8 +56,7 @@ internal fun ToolPreviewChips(toolCall: UiToolCall, line: ToolStepLine, callback
 @Composable
 private fun ToolPreviewChip(toolCall: UiToolCall, line: ToolStepLine, target: ToolPreviewTarget, callbacks: ChatRowCallbacks) {
     when (target) {
-        is ToolPreviewTarget.File -> WorkspaceFileChip(WorkspaceFileRequest(target.path, lines = target.lines))
-        is ToolPreviewTarget.Memory -> WorkspaceFileChip(WorkspaceFileRequest(target.path, memoryTool = true))
+        is ToolPreviewTarget.File, is ToolPreviewTarget.Memory -> ToolPreviewFileChip(target)
         is ToolPreviewTarget.Subagent -> {
             val open = callbacks.openSubagent ?: return
             val callId = toolCall.toolCallId ?: return
@@ -109,36 +97,3 @@ internal fun FullOutputPane(text: String, onClose: () -> Unit) {
     }
 }
 
-/**
- * [text] with its URLs and file paths as links: a URL opens in the browser, a path (with an
- * optional `:line`) in the file preview. Only a step's kept window is linked, never a whole output.
- */
-@Composable
-internal fun rememberLinkedText(text: String): AnnotatedString {
-    val files = LocalWorkspaceFiles.current
-    val linkColor = MaterialTheme.colorScheme.primary
-    return remember(text, files, linkColor) {
-        val styles = TextLinkStyles(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline))
-        buildAnnotatedString {
-            var at = 0
-            for (match in OutputLinks.find(text)) {
-                append(text, at, match.range.first)
-                val link = outputLink(match, files?.opener, styles)
-                if (link == null) append(match.value) else withLink(link) { append(match.value) }
-                at = match.range.last + 1
-            }
-            append(text, at, text.length)
-        }
-    }
-}
-
-private fun outputLink(
-    match: OutputLinks.Match,
-    opener: WorkspaceFileOpener?,
-    styles: TextLinkStyles,
-): LinkAnnotation? = when (match) {
-    is OutputLinks.Match.Url -> LinkAnnotation.Url(match.value, styles)
-    is OutputLinks.Match.Path -> opener?.let { files ->
-        LinkAnnotation.Clickable(match.value, styles) { files.open(WorkspaceFileRequest(match.path, lines = match.line?.let { it..it })) }
-    }
-}

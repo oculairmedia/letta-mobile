@@ -37,6 +37,7 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_copy_command
 import com.letta.mobile.sharedui.resources.rows_copy_output
 import com.letta.mobile.sharedui.resources.rows_tool_output_truncated
+import com.letta.mobile.ui.shell.pages.workspace.rememberWorkspaceLinkedText
 import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -172,7 +173,7 @@ private fun OutputText(text: String, ink: InsetInk) {
         if (full) FullOutputPane(text) { full = false }
     }
     val shown = remember(window, ink) { ink.marked(window.text) }
-    Text(text = rememberLinkedText(shown), style = monoStyle(), color = ink.color())
+    Text(text = rememberWorkspaceLinkedText(shown), style = monoStyle(), color = ink.color())
 }
 
 /** [content] with a copy action for [text], named [label], that shows while the pointer is over it. */

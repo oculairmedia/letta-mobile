@@ -24,9 +24,9 @@ object OutputLinks {
     private fun matchOf(found: MatchResult): Match {
         val url = found.groups[URL_GROUP]
         if (url != null) {
-            // A sentence's closing punctuation is not part of the URL it ends on.
+            // A sentence's closing punctuation is not part of the URL it ends on. The URL alternative is the whole match.
             val trimmed = url.value.trimEnd { it in TRAILING_PUNCTUATION }
-            return Match.Url(trimmed, url.range.first until url.range.first + trimmed.length)
+            return Match.Url(trimmed, found.range.first until found.range.first + trimmed.length)
         }
         val path = found.groupValues[PATH_GROUP]
         val line = found.groups[LINE_GROUP]?.value?.toIntOrNull()
