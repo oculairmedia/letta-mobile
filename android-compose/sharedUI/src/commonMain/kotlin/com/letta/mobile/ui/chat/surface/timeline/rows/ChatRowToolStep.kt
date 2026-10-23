@@ -164,7 +164,6 @@ private fun noteOf(line: ToolStepLine, state: ToolTimelineState): StepNote? {
     }
 }
 
-private fun ToolTimelineState.isFailure(): Boolean = this == ToolTimelineState.Failed || this == ToolTimelineState.Rejected
 
 /**
  * The step line: the whole row is the toggle when there is something to open. Its height never

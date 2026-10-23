@@ -10699,8 +10699,10 @@ public final class com/letta/mobile/data/chat/tools/ToolArguments {
 }
 
 public final class com/letta/mobile/data/chat/tools/ToolCallFacts {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getArguments ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getFailed ()Z
 	public final fun getName ()Ljava/lang/String;
 	public final fun getRawArguments ()Ljava/lang/String;
 	public final fun getResult ()Ljava/lang/String;

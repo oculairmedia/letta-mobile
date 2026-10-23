@@ -8,10 +8,11 @@ import kotlinx.serialization.json.intOrNull
 
 /**
  * One tool call as a presenter reads it: its name, its arguments (parsed once; null when they are
- * not a JSON object, still streaming or malformed) and its result so far.
+ * not a JSON object, still streaming or malformed), its result so far, and whether it [failed] (its
+ * result is then what went wrong, not what it produced).
  */
 @Immutable
-class ToolCallFacts(val name: String, val rawArguments: String, val result: String?) {
+class ToolCallFacts(val name: String, val rawArguments: String, val result: String?, val failed: Boolean = false) {
     /** Parsed on first read, so a step whose presenter never looks at its arguments never parses them. */
     val arguments: JsonObject? get() = parsed.value
 
