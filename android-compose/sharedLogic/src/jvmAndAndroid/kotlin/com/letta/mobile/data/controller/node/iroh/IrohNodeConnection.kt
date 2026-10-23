@@ -379,17 +379,17 @@ class IrohNodeConnection(
         // Dispatch still receives a fresh context after observation so a successful
         // message.list keeps its established conversation-scope behaviour.
         adminRpcRouter.preauthorize(invocation)?.let { return it }
-        val rollback = observeAdminMethod(method, params)
+        val settle = observeAdminMethod(method, params)
         val response = try {
             adminRpcRouter.dispatch(invocation.copy(context = currentAdminRpcRequestContext()))
         } catch (cancelled: CancellationException) {
-            rollbackObservedAdminMethod(rollback)
+            settleObservedAdminMethod(settle, succeeded = false)
             throw cancelled
         } catch (error: Exception) {
-            rollbackObservedAdminMethod(rollback)
+            settleObservedAdminMethod(settle, succeeded = false)
             throw error
         }
-        if (isAdminRpcFailureEnvelope(response)) rollbackObservedAdminMethod(rollback)
+        settleObservedAdminMethod(settle, succeeded = !isAdminRpcFailureEnvelope(response))
         return response
     }
 
@@ -397,36 +397,38 @@ class IrohNodeConnection(
      * The OBSERVER signal: a connection that hydrates conversation X with `message.list`
      * becomes X's viewer (de-scoping any prior conversation), on either admin_rpc path.
      */
-    private suspend fun observeAdminMethod(method: String, params: JsonObject?): (suspend () -> Unit)? {
+    private suspend fun observeAdminMethod(method: String, params: JsonObject?): (suspend (Boolean) -> Unit)? {
         if (method != "message.list") return null
         val conversationId = params?.get("conversation_id")?.let { (it as? JsonPrimitive)?.contentOrNull }
         if (conversationId.isNullOrEmpty()) return null
         val subscription = viewerSubscription ?: return null
         val previous = subscription.currentConversation
-        val rollback = subscription.observe(ConversationId(conversationId))
+        val settle = subscription.observe(ConversationId(conversationId))
         Telemetry.event(
             "IrohNode", "viewer.registered",
             "remoteEndpointId" to remoteEndpointId,
             "conversationId" to conversationId,
             "deregistered" to (previous?.takeIf { it != conversationId } ?: ""),
         )
-        return {
-            // A later subscribe wins: the rollback is a no-op once another request changed the view.
-            rollback()
-            Telemetry.event(
-                "IrohNode", "viewer.registration_rolled_back",
-                "remoteEndpointId" to remoteEndpointId,
-                "restoredConversationId" to (previous ?: ""),
-            )
+        return { succeeded ->
+            settle(succeeded)
+            if (!succeeded) {
+                Telemetry.event(
+                    "IrohNode", "viewer.registration_rolled_back",
+                    "remoteEndpointId" to remoteEndpointId,
+                    "failedConversationId" to conversationId,
+                    "nowViewing" to (subscription.currentConversation ?: ""),
+                )
+            }
         }
     }
 
-    /** Restore observer state after a handler failure without delaying cancellation cleanup. */
-    private suspend fun rollbackObservedAdminMethod(rollback: (suspend () -> Unit)?) {
-        if (rollback == null) return
+    /** Settle an observation with its request's outcome; cancellation cannot skip it. */
+    private suspend fun settleObservedAdminMethod(settle: (suspend (Boolean) -> Unit)?, succeeded: Boolean) {
+        if (settle == null) return
         withContext(NonCancellable) {
             try {
-                rollback()
+                settle(succeeded)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {

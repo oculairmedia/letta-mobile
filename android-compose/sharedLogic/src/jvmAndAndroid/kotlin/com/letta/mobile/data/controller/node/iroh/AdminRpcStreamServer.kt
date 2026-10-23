@@ -99,10 +99,10 @@ internal class AdminRpcStreamServer(
      * connection as a conversation viewer when method == "message.list". Invoked
      * best-effort AFTER preauthorization and BEFORE dispatch, only for an
      * authenticated admin_rpc frame with a non-null method. It may return a
-     * rollback action, invoked when dispatch fails. A throwing hook must never
+     * settle callback, invoked once with whether dispatch succeeded. A throwing hook must never
      * break the request — the caller swallows failures.
      */
-    private val onMethodObserved: (suspend (method: String, params: JsonObject?) -> (suspend () -> Unit)?)? = null,
+    private val onMethodObserved: (suspend (method: String, params: JsonObject?) -> (suspend (Boolean) -> Unit)?)? = null,
     private val requestContextProvider: () -> AdminRpcRequestContext = {
         AdminRpcRequestContext(authenticated = authenticated.get())
     },
@@ -337,11 +337,11 @@ internal class AdminRpcStreamServer(
             context = requestContextProvider(),
         )
         router.preauthorize(invocation)?.let { return it }
-        val rollback = notifyMethodObserved(method, params)
-        val rollbackObservation: suspend () -> Unit = {
-            if (rollback != null) {
+        val settle = notifyMethodObserved(method, params)
+        val settleObservation: suspend (Boolean) -> Unit = { succeeded ->
+            if (settle != null) {
                 withContext(NonCancellable) {
-                    runCatchingCancellable { rollback() }.onFailure { rollbackError ->
+                    runCatchingCancellable { settle(succeeded) }.onFailure { rollbackError ->
                         Telemetry.event(
                             "IrohNode", "admin_rpc.method_observer.rollback_failed",
                             "remoteEndpointId" to remoteEndpointId,
@@ -356,13 +356,13 @@ internal class AdminRpcStreamServer(
         val response = try {
             router.dispatch(invocation.copy(context = requestContextProvider()))
         } catch (cancelled: CancellationException) {
-            rollbackObservation()
+            settleObservation(false)
             throw cancelled
         } catch (error: Exception) {
-            rollbackObservation()
+            settleObservation(false)
             throw error
         }
-        if (isAdminRpcFailureEnvelope(response)) rollbackObservation()
+        settleObservation(!isAdminRpcFailureEnvelope(response))
         return response
     }
 
@@ -371,7 +371,7 @@ internal class AdminRpcStreamServer(
      * (e.g. subscribe as a viewer on message.list) before dispatch.
      * Best-effort: a failing hook must never break the RPC.
      */
-    private suspend fun notifyMethodObserved(method: String, params: JsonObject?): (suspend () -> Unit)? {
+    private suspend fun notifyMethodObserved(method: String, params: JsonObject?): (suspend (Boolean) -> Unit)? {
         val observe = onMethodObserved ?: return null
         try {
             return observe(method, params)

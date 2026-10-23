@@ -57,37 +57,82 @@ class ConversationViewerSubscriptionTest {
 
     /**
      * letta-mobile-wisqe.2 F2: two admin_rpc message.list calls run on separate streams. When the
-     * older one (X) fails AFTER a newer one (Y) succeeded, its rollback must not undo Y.
+     * older one (X) fails AFTER a newer one (Y) succeeded, settling X must not undo Y.
      */
     @Test
-    fun anOlderFailedObservationDoesNotUndoANewerOne() = runTest {
-        val registry = ConnectionRegistry()
-        val connViewer = viewer("conn-A")
-        val subscription = subscription(registry, connViewer)
-        subscription.subscribe("convA")
+    fun anOlderFailedObservationDoesNotUndoANewerSuccess() = runTest {
+        val (registry, connViewer, subscription) = viewingA()
 
-        val rollbackX = subscription.observe(ConversationId("convX"))
-        subscription.observe(ConversationId("convY"))
-        rollbackX()
+        val settleX = subscription.observe(ConversationId("convX"))
+        subscription.observe(ConversationId("convY"))(true)
+        settleX(false)
 
-        assertEquals("convY", subscription.currentConversation, "the newer observation survives")
-        assertEquals(setOf<ViewerHandle>(connViewer), registry.viewersFor("convY"))
-        assertTrue(registry.viewersFor("convX").isEmpty())
-        assertTrue(registry.viewersFor("convA").isEmpty())
+        assertViewing(registry, connViewer, subscription, "convY", gone = listOf("convA", "convX"))
     }
 
     @Test
-    fun aFailedObservationWithNoLaterChangeRestoresThePreviousConversation() = runTest {
+    fun aFailedObservationRestoresThePreviousConversation() = runTest {
+        val (registry, connViewer, subscription) = viewingA()
+
+        subscription.observe(ConversationId("convX"))(false)
+
+        assertViewing(registry, connViewer, subscription, "convA", gone = listOf("convX"))
+    }
+
+    /** CodeRabbit on #2201: two concurrent failures must never leave either failed conversation viewed. */
+    @Test
+    fun twoFailedObservationsRestoreTheLastConfirmedViewOlderFirst() = runTest {
+        val (registry, connViewer, subscription) = viewingA()
+
+        val settleX = subscription.observe(ConversationId("convX"))
+        val settleY = subscription.observe(ConversationId("convY"))
+        settleX(false)
+        settleY(false)
+
+        assertViewing(registry, connViewer, subscription, "convA", gone = listOf("convX", "convY"))
+    }
+
+    @Test
+    fun twoFailedObservationsRestoreTheLastConfirmedViewNewerFirst() = runTest {
+        val (registry, connViewer, subscription) = viewingA()
+
+        val settleX = subscription.observe(ConversationId("convX"))
+        val settleY = subscription.observe(ConversationId("convY"))
+        settleY(false)
+        settleX(false)
+
+        assertViewing(registry, connViewer, subscription, "convA", gone = listOf("convX", "convY"))
+    }
+
+    @Test
+    fun aNewerRequestStillRunningStaysViewedWhenAnOlderOneFails() = runTest {
+        val (registry, connViewer, subscription) = viewingA()
+
+        val settleX = subscription.observe(ConversationId("convX"))
+        subscription.observe(ConversationId("convY"))
+        settleX(false)
+
+        assertViewing(registry, connViewer, subscription, "convY", gone = listOf("convA", "convX"))
+    }
+
+    private suspend fun viewingA(): Triple<ConnectionRegistry, IrohViewerHandle, ConversationViewerSubscription> {
         val registry = ConnectionRegistry()
         val connViewer = viewer("conn-A")
         val subscription = subscription(registry, connViewer)
         subscription.subscribe("convA")
+        return Triple(registry, connViewer, subscription)
+    }
 
-        subscription.observe(ConversationId("convX"))()
-
-        assertEquals("convA", subscription.currentConversation)
-        assertEquals(setOf<ViewerHandle>(connViewer), registry.viewersFor("convA"))
-        assertTrue(registry.viewersFor("convX").isEmpty())
+    private suspend fun assertViewing(
+        registry: ConnectionRegistry,
+        connViewer: IrohViewerHandle,
+        subscription: ConversationViewerSubscription,
+        expected: String,
+        gone: List<String>,
+    ) {
+        assertEquals(expected, subscription.currentConversation)
+        assertEquals(setOf<ViewerHandle>(connViewer), registry.viewersFor(expected))
+        gone.forEach { assertTrue(registry.viewersFor(it).isEmpty(), "$it must not stay viewed") }
     }
 
     @Test
@@ -284,8 +329,7 @@ class ConversationViewerSubscriptionTest {
             onMethodObserved = { method, params ->
                 val conversationId = params?.get("conversation_id")?.jsonPrimitive?.content
                 if (method == "message.list" && !conversationId.isNullOrEmpty()) {
-                    subscription.subscribe(conversationId)
-                    suspend { subscription.subscribe("convA") }
+                    subscription.observe(ConversationId(conversationId))
                 } else {
                     null
                 }
