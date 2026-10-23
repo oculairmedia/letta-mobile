@@ -21,6 +21,7 @@ import com.letta.mobile.ui.shell.sidebar.ShellConversationMarks
 import com.letta.mobile.ui.shell.sidebar.ShellPanelAgent
 import com.letta.mobile.ui.shell.sidebar.ShellRelativeTime
 import com.letta.mobile.ui.shell.sidebar.ShellSidebarMapping
+import com.letta.mobile.data.home.conversationRecency
 import kotlin.time.Instant
 
 /** What a host knows about navigation, in platform-neutral terms: the drawer's input. */
@@ -74,7 +75,8 @@ object ShellNavDrawerMapping {
         val rail = ShellAgentRailState(
             entries = ShellRailMapping.entries(ShellRailMapping.groups(recents.agents, agentId), focus),
         )
-        val summaries = input.conversations.toChatConversationSummaries()
+        // Newest first whatever order the host's list arrives in (pins and settled are arranged on top of it).
+        val summaries = input.conversations.toChatConversationSummaries().sortedByDescending { conversationRecency(it.updatedAtLabel) }
         val marks = ShellConversationMarks(
             selectedId = input.openConversationId,
             pinnedIds = input.pinnedConversationIds,

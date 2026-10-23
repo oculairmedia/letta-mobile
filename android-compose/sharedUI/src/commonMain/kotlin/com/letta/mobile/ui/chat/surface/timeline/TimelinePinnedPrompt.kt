@@ -9,6 +9,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -60,8 +61,17 @@ internal class PinnedPrompt(
     val stickLinePx: Int,
     /** How the copy's images shrink as it docks. */
     val compaction: DockedCopyCompaction,
+    /** The top of the prompt row riding up to the line (not the owner); see [ridingPromptTop]. */
+    private val riding: State<Int?> = mutableStateOf(null),
 ) {
     val item: ChatRenderItem? get() = owner.value?.item
+
+    /**
+     * The top of the highest prompt row still riding up to the line, px from the list's top edge;
+     * null when none is in view. The list's fades end above it, so a prompt is never shaded while it
+     * rides up or pushes the held copy out (read at draw time only).
+     */
+    val ridingPromptTopPx: Int? get() = riding.value
 
     /** The row keyed [key] is the one the sticky copy stands in for. */
     fun standsInFor(key: String): Boolean = owner.value?.item?.key == key
@@ -110,9 +120,15 @@ internal fun rememberPinnedPrompt(
             stickyOwner(info, stickLinePx, rows)
         }
     }
-    return remember(listState, owner, stickLinePx, reducedMotion) {
+    val riding = remember(listState, owner, stickLinePx) {
+        derivedStateOf {
+            val rows = PromptRows(currentCount.value, currentItemAt.value)
+            ridingPromptTop(listState.layoutInfo, stickLinePx, rows, owner.value)
+        }
+    }
+    return remember(listState, owner, stickLinePx, reducedMotion, riding) {
         val motion = DockedCopyMotion.of(reducedMotion = reducedMotion)
-        PinnedPrompt(listState, owner, stickLinePx, DockedCopyCompaction(listState, owner, stickLinePx, motion))
+        PinnedPrompt(listState, owner, stickLinePx, DockedCopyCompaction(listState, owner, stickLinePx, motion), riding)
     }
 }
 
@@ -143,6 +159,20 @@ internal fun stickyOwner(info: LazyListLayoutInfo, stickLinePx: Int, rows: Promp
     val item = rows.itemAt(index) ?: return null
     val next = visible.filter { it.index < index && rows.isPrompt(it.index) }.maxOfOrNull { it.index }
     return PinnedOwner(index, item, next)
+}
+
+/**
+ * The top of the highest prompt row at or below the visible top ([stickLinePx] down) other than the
+ * sticky [owner]'s, px from the list's top edge: the prompt riding up to the line, or
+ * the next prompt pushing the held copy out. Null when no such row is in view.
+ */
+internal fun ridingPromptTop(info: LazyListLayoutInfo, stickLinePx: Int, rows: PromptRows, owner: PinnedOwner?): Int? {
+    val end = info.viewportEndOffset
+    return info.visibleItemsInfo
+        .filter { it.index != owner?.index && rows.isPrompt(it.index) }
+        .map { end - it.offset - it.size }
+        .filter { it >= stickLinePx }
+        .minOrNull()
 }
 
 /**

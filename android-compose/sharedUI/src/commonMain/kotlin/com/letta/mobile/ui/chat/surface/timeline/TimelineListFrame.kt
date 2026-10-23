@@ -120,7 +120,7 @@ internal fun TimelineListFrame(
                     .timelineFadingEdges(
                         fades,
                         topLength = ChatTimelineDimens.topFadeLength + overlays.topReserve,
-                        pinnedEdgePx = { pinned.copyBottomPx.toFloat() },
+                        sticky = pinned,
                     )
                     .graphicsLayer {
                         translationY = overlays.glide.overshootPx

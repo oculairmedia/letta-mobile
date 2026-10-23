@@ -1,6 +1,9 @@
 package com.letta.mobile.ui.shell.workspace
 
 import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.data.agents.RecentAgents
+import com.letta.mobile.data.agents.RecentAgentsInput
+import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
@@ -20,7 +23,8 @@ import com.letta.mobile.ui.shell.rail.ShellRailFocus
 import kotlin.time.Instant
 /**
  * The workspace's navigation over the workspace and its roster [agents] as
- * (id, name): the whole roster on the rail (its library lists them all), the focused agent's panel.
+ * (id, name): the whole roster on the rail (its library lists them all), most recently used first
+ * by the [conversations] list's activity, and the focused agent's panel.
  */
 fun ShellWorkspaceState.workspaceNavigation(
     agents: List<Pair<String, String>>,
@@ -32,7 +36,10 @@ fun ShellWorkspaceState.workspaceNavigation(
         agents = agents,
         now = now,
         conversations = conversations?.drawer(focusedAgentId) ?: ShellDrawerConversations(),
-        library = ShellDrawerLibrary(identities = identities),
+        library = ShellDrawerLibrary(
+            identities = identities,
+            agentLastActiveAt = conversations?.state?.conversations?.let(RecentAgents::lastActiveAtFromConversations).orEmpty(),
+        ),
     )
 
 /**
@@ -45,18 +52,34 @@ fun ShellWorkspaceState.workspaceNavigation(
     conversations: ShellDrawerConversations,
     library: ShellDrawerLibrary = ShellDrawerLibrary(),
 ): ShellWorkspaceNavigation {
-    val drawer = navDrawerState(agents, now, conversations, library)
+    val ordered = recentFirst(agents, library, now)
+    val drawer = navDrawerState(ordered, now, conversations, library)
     val identities = library.identities
     return ShellWorkspaceNavigation(
         rail = ShellLibraryRailState(
-            agents = agents,
-            focus = ShellRailFocus(selectedAgentId = focusedAgentId?.value, identityByAgentId = identities),
+            agents = ordered,
+            focus = ShellRailFocus(
+                selectedAgentId = focusedAgentId?.value,
+                identityByAgentId = identities,
+                pinnedAgentIds = library.pinnedAgentIds,
+            ),
             expanded = railExpanded,
             homeSelected = drawer.rail.homeSelected,
         ),
         panel = drawer.panel.copy(agent = drawer.panel.agent.copy(identity = drawer.panel.agent.agentId?.let(identities::get))),
     )
 }
+
+/**
+ * The whole roster in rail order, by the shared recents rule ([RecentAgents.cut]) with nothing cut:
+ * pinned agents first, then the most recently active, then the rest in roster order.
+ */
+internal fun recentFirst(agents: List<Pair<String, String>>, library: ShellDrawerLibrary, now: Instant): List<Pair<String, String>> =
+    RecentAgents.cut(
+        RecentAgentsInput(directory = agents, lastActiveAt = library.agentLastActiveAt, pinnedAgentIds = library.pinnedAgentIds),
+        now,
+        RecentAgentsPolicy(window = RecentAgentsPolicy.EVERY_AGENT_WINDOW, maxAgents = agents.size, fillToCap = true),
+    ).agents
 
 /**
  * The workspace's navigation verbs: the drawer's, with the rail's "+" opening the New conversation

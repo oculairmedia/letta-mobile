@@ -142,10 +142,11 @@ private fun WorkspaceFrame.header(): ShellWorkspaceHeaderState {
 
 /**
  * The workspace owns the window's insets once, for every host: the side cutouts here, the
- * status bar under the inline header (its colour runs up behind it), and the body below takes the
- * top as consumed so no page pads for it again. A compact inline window has no header bar: the body
- * runs up under the status bar, the minimal header floats over it, and the pages get the band
- * they lie under as [LocalShellFloatingChromeInset] instead. The bottom bar and the keyboard stay
+ * status bar under the inline header (its colour runs up behind it), and the page below takes the
+ * top as consumed so no page pads for it again (the compact drawer pads its own content for it).
+ * A compact inline window has no header bar: the body runs up under the status bar, the minimal
+ * header floats over it, and the pages get the band they lie under as
+ * [LocalShellFloatingChromeInset] instead. The bottom bar and the keyboard stay
  * the pages' (the composer rides the keyboard). A window without insets (desktop, browser) sees none.
  */
 @Composable
@@ -157,7 +158,7 @@ private fun WorkspaceColumn(frame: WorkspaceFrame) {
             ShellWindowChrome.Inline -> if (floating == null) InlineHeader(header)
             is ShellWindowChrome.Hoisted -> SideEffect { chrome.onHeader(header) }
         }
-        WorkspaceBody(frame, floating, Modifier.weight(1f).consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)))
+        WorkspaceBody(frame, floating, Modifier.weight(1f))
     }
 }
 
@@ -211,7 +212,9 @@ private fun WideBody(frame: WorkspaceFrame, inspectors: InspectorHost) {
     val navigation = frame.state.navigation
     val actions = frame.host.actions
     val slots = frame.host.slots
-    Row(Modifier.fillMaxSize().testTag(LettaShellWorkspaceTags.WIDE)) {
+    // The page, rail and panel sit under the inline header, which padded for the status bar.
+    val underHeader = Modifier.consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+    Row(Modifier.fillMaxSize().then(underHeader).testTag(LettaShellWorkspaceTags.WIDE)) {
         ShellLibraryRail(
             state = navigation.rail,
             actions = actions.rail,
@@ -261,7 +264,9 @@ private fun CompactBody(frame: WorkspaceFrame, inspectors: InspectorHost, floati
         modifier = Modifier.testTag(LettaShellWorkspaceTags.COMPACT),
     ) {
         // The page under the floating header, inside the drawer's content so the open drawer covers both.
-        Box(Modifier.fillMaxSize()) {
+        // The page takes the top inset as consumed (it gets the floating band instead); the drawer is
+        // not under that, so its sheet still pads its rail and panel below the status bar.
+        Box(Modifier.fillMaxSize().consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))) {
             Row(Modifier.fillMaxSize()) {
                 InspectorFrame(Modifier.weight(1f).fillMaxHeight(), host = inspectors) { slots.main(Modifier.fillMaxSize()) }
                 slots.sidePane()

@@ -37203,6 +37203,10 @@ public final class com/letta/mobile/data/presence/AgentPresence$Companion {
 	public final fun getIDLE ()Lcom/letta/mobile/data/presence/AgentPresence;
 }
 
+public final class com/letta/mobile/data/presence/AgentPresenceKt {
+	public static final fun runningAgentIds (Ljava/util/Map;)Ljava/util/Set;
+}
+
 public final class com/letta/mobile/data/presence/ConversationRunPhasePublisher {
 	public fun <init> (Lcom/letta/mobile/data/presence/ConversationRunRegistry;Lkotlin/jvm/functions/Function0;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/presence/ConversationRunRegistry;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V

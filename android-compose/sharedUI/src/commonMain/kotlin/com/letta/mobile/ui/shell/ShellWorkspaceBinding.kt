@@ -98,6 +98,7 @@ fun ShellWorkspaceState.navDrawerInput(
         canvases = library.canvases,
         archivedCanvasIds = library.archivedCanvasIds,
         pinnedAgentIds = library.pinnedAgentIds,
+        agentLastActiveAt = library.agentLastActiveAt,
         identities = library.identities,
     )
 }
@@ -176,4 +177,6 @@ data class ShellDrawerLibrary(
     val canvases: List<CanvasDocument> = emptyList(),
     val archivedCanvasIds: Set<CanvasId> = emptySet(),
     val pinnedAgentIds: Set<String> = emptySet(),
+    /** Each agent's latest activity (its newest conversation or run); the rail lists the most recent first. */
+    val agentLastActiveAt: Map<String, Instant> = emptyMap(),
 )
