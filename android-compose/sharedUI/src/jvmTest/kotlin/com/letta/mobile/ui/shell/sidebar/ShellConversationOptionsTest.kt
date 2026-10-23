@@ -21,6 +21,7 @@ import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.display.ChatTextSize
+import com.letta.mobile.data.chat.display.ThinkingGlowStyle
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.host.LettaHost
@@ -91,6 +92,21 @@ class ShellConversationOptionsTest {
         assertEquals(listOf(ChatTextSize.Large), sizes)
         assertEquals(listOf(true), autoPin)
         assertEquals(1, downloads)
+    }
+
+    @Test
+    fun theThinkingGlowIsPickedFromTheChatOptions() = runComposeUiTest {
+        val display = mutableListOf<ChatDisplayOptions>()
+        setContent {
+            MaterialTheme {
+                val actions = ShellChatOptionsActions(onDisplayChange = { display += it })
+                ShellChatOptionsDialog(ShellChatOptionsState(), actions, onDismiss = {})
+            }
+        }
+        onNodeWithTag(ShellChatOptionsTags.glow(ThinkingGlowStyle.Aurora)).assertIsSelected()
+        onNodeWithTag(ShellChatOptionsTags.glow(ThinkingGlowStyle.Sparkle)).performClick()
+
+        assertEquals(listOf(ChatDisplayOptions(thinkingGlow = ThinkingGlowStyle.Sparkle)), display)
     }
 
     @Test

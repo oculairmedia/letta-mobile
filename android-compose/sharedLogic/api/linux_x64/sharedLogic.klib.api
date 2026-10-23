@@ -517,6 +517,28 @@ final enum class com.letta.mobile.data.chat.display/TaskActivity : kotlin/Enum<c
     final fun values(): kotlin/Array<com.letta.mobile.data.chat.display/TaskActivity> // com.letta.mobile.data.chat.display/TaskActivity.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.chat.display/ThinkingGlowStyle : kotlin/Enum<com.letta.mobile.data.chat.display/ThinkingGlowStyle> { // com.letta.mobile.data.chat.display/ThinkingGlowStyle|null[0]
+    enum entry Aurora // com.letta.mobile.data.chat.display/ThinkingGlowStyle.Aurora|null[0]
+    enum entry Ribbons // com.letta.mobile.data.chat.display/ThinkingGlowStyle.Ribbons|null[0]
+    enum entry Sparkle // com.letta.mobile.data.chat.display/ThinkingGlowStyle.Sparkle|null[0]
+    enum entry Tide // com.letta.mobile.data.chat.display/ThinkingGlowStyle.Tide|null[0]
+
+    final val entries // com.letta.mobile.data.chat.display/ThinkingGlowStyle.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.chat.display/ThinkingGlowStyle> // com.letta.mobile.data.chat.display/ThinkingGlowStyle.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val label // com.letta.mobile.data.chat.display/ThinkingGlowStyle.label|{}label[0]
+        final fun <get-label>(): kotlin/String // com.letta.mobile.data.chat.display/ThinkingGlowStyle.label.<get-label>|<get-label>(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.chat.display/ThinkingGlowStyle // com.letta.mobile.data.chat.display/ThinkingGlowStyle.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.chat.display/ThinkingGlowStyle> // com.letta.mobile.data.chat.display/ThinkingGlowStyle.values|values#static(){}[0]
+
+    final object Companion { // com.letta.mobile.data.chat.display/ThinkingGlowStyle.Companion|null[0]
+        final val Default // com.letta.mobile.data.chat.display/ThinkingGlowStyle.Companion.Default|{}Default[0]
+            final fun <get-Default>(): com.letta.mobile.data.chat.display/ThinkingGlowStyle // com.letta.mobile.data.chat.display/ThinkingGlowStyle.Companion.Default.<get-Default>|<get-Default>(){}[0]
+
+        final fun fromName(kotlin/String?): com.letta.mobile.data.chat.display/ThinkingGlowStyle // com.letta.mobile.data.chat.display/ThinkingGlowStyle.Companion.fromName|fromName(kotlin.String?){}[0]
+    }
+}
+
 final enum class com.letta.mobile.data.chat.projection/CanvasArtifactStatus : kotlin/Enum<com.letta.mobile.data.chat.projection/CanvasArtifactStatus> { // com.letta.mobile.data.chat.projection/CanvasArtifactStatus|null[0]
     enum entry DryRun // com.letta.mobile.data.chat.projection/CanvasArtifactStatus.DryRun|null[0]
     enum entry Failed // com.letta.mobile.data.chat.projection/CanvasArtifactStatus.Failed|null[0]
@@ -28681,7 +28703,7 @@ final class com.letta.mobile.data.chat.display/BackgroundCommandReport { // com.
 }
 
 final class com.letta.mobile.data.chat.display/ChatDisplayOptions { // com.letta.mobile.data.chat.display/ChatDisplayOptions|null[0]
-    constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.letta.mobile.data.chat.display/ChatDisplayOptions.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.letta.mobile.data.chat.display/ThinkingGlowStyle = ...) // com.letta.mobile.data.chat.display/ChatDisplayOptions.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.chat.display.ThinkingGlowStyle){}[0]
 
     final val showCompactions // com.letta.mobile.data.chat.display/ChatDisplayOptions.showCompactions|{}showCompactions[0]
         final fun <get-showCompactions>(): kotlin/Boolean // com.letta.mobile.data.chat.display/ChatDisplayOptions.showCompactions.<get-showCompactions>|<get-showCompactions>(){}[0]
@@ -28689,11 +28711,14 @@ final class com.letta.mobile.data.chat.display/ChatDisplayOptions { // com.letta
         final fun <get-showReasoning>(): kotlin/Boolean // com.letta.mobile.data.chat.display/ChatDisplayOptions.showReasoning.<get-showReasoning>|<get-showReasoning>(){}[0]
     final val showTokenUsage // com.letta.mobile.data.chat.display/ChatDisplayOptions.showTokenUsage|{}showTokenUsage[0]
         final fun <get-showTokenUsage>(): kotlin/Boolean // com.letta.mobile.data.chat.display/ChatDisplayOptions.showTokenUsage.<get-showTokenUsage>|<get-showTokenUsage>(){}[0]
+    final val thinkingGlow // com.letta.mobile.data.chat.display/ChatDisplayOptions.thinkingGlow|{}thinkingGlow[0]
+        final fun <get-thinkingGlow>(): com.letta.mobile.data.chat.display/ThinkingGlowStyle // com.letta.mobile.data.chat.display/ChatDisplayOptions.thinkingGlow.<get-thinkingGlow>|<get-thinkingGlow>(){}[0]
 
     final fun component1(): kotlin/Boolean // com.letta.mobile.data.chat.display/ChatDisplayOptions.component1|component1(){}[0]
     final fun component2(): kotlin/Boolean // com.letta.mobile.data.chat.display/ChatDisplayOptions.component2|component2(){}[0]
     final fun component3(): kotlin/Boolean // com.letta.mobile.data.chat.display/ChatDisplayOptions.component3|component3(){}[0]
-    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.letta.mobile.data.chat.display/ChatDisplayOptions // com.letta.mobile.data.chat.display/ChatDisplayOptions.copy|copy(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    final fun component4(): com.letta.mobile.data.chat.display/ThinkingGlowStyle // com.letta.mobile.data.chat.display/ChatDisplayOptions.component4|component4(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.letta.mobile.data.chat.display/ThinkingGlowStyle = ...): com.letta.mobile.data.chat.display/ChatDisplayOptions // com.letta.mobile.data.chat.display/ChatDisplayOptions.copy|copy(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.chat.display.ThinkingGlowStyle){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.display/ChatDisplayOptions.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.display/ChatDisplayOptions.hashCode|hashCode(){}[0]
     final fun hides(com.letta.mobile.data.model/UiMessage): kotlin/Boolean // com.letta.mobile.data.chat.display/ChatDisplayOptions.hides|hides(com.letta.mobile.data.model.UiMessage){}[0]
@@ -68329,6 +68354,7 @@ final fun com.letta.mobile.data.timeline/turnFailureNoticeId(kotlin/String): kot
 final fun com.letta.mobile.data.transport.appserver/appServerAdminRpcParams(kotlin/String, kotlin/String?): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.transport.appserver/appServerAdminRpcParams|appServerAdminRpcParams(kotlin.String;kotlin.String?){}[0]
 final fun com.letta.mobile.data.transport.appserver/isFinalWorkspaceFrame(kotlinx.serialization.json/JsonObject): kotlin/Boolean // com.letta.mobile.data.transport.appserver/isFinalWorkspaceFrame|isFinalWorkspaceFrame(kotlinx.serialization.json.JsonObject){}[0]
 final fun com.letta.mobile.data.workspace.directory/devicePathOrNull(kotlin/String?): com.letta.mobile.data.workspace.directory/DevicePath? // com.letta.mobile.data.workspace.directory/devicePathOrNull|devicePathOrNull(kotlin.String?){}[0]
+final fun com.letta.mobile.ui.ambient/ambientGlowShaderSource(com.letta.mobile.data.chat.display/ThinkingGlowStyle): kotlin/String // com.letta.mobile.ui.ambient/ambientGlowShaderSource|ambientGlowShaderSource(com.letta.mobile.data.chat.display.ThinkingGlowStyle){}[0]
 final fun com.letta.mobile.ui.ambient/reduceVisibleAssistantStreamPulse(com.letta.mobile.ui.ambient/VisibleAssistantStreamPulseState, kotlin/Boolean, kotlin/String?, kotlin/Int): com.letta.mobile.ui.ambient/VisibleAssistantStreamPulseState // com.letta.mobile.ui.ambient/reduceVisibleAssistantStreamPulse|reduceVisibleAssistantStreamPulse(com.letta.mobile.ui.ambient.VisibleAssistantStreamPulseState;kotlin.Boolean;kotlin.String?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.chat.session/chatModelEfforts(com.letta.mobile.ui.chat.session/ChatModelEffortInputs): com.letta.mobile.ui.chat.session/ChatModelEfforts // com.letta.mobile.ui.chat.session/chatModelEfforts|chatModelEfforts(com.letta.mobile.ui.chat.session.ChatModelEffortInputs){}[0]
 final fun com.letta.mobile.ui.chat.session/chatModelOptions(kotlin.collections/List<com.letta.mobile.data.model/LlmModel>): kotlin.collections/List<kotlin/Pair<kotlin/String, kotlin/String>> // com.letta.mobile.ui.chat.session/chatModelOptions|chatModelOptions(kotlin.collections.List<com.letta.mobile.data.model.LlmModel>){}[0]

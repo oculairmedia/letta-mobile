@@ -31,9 +31,10 @@ import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_UNPREMULTIPLIED
-import com.letta.mobile.ui.ambient.AMBIENT_GLOW_SHADER_SOURCE
+import com.letta.mobile.ui.chat.surface.ambient.LocalThinkingGlowStyle
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
+import com.letta.mobile.ui.ambient.ambientGlowShaderSource
 import androidx.compose.ui.graphics.toArgb
 import com.google.android.material.color.utilities.Hct
 import com.letta.mobile.ui.theme.HctColorHarmonizer
@@ -214,17 +215,17 @@ private fun AmbientCanvas(
     composerHeight: () -> androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
 ) {
+    // The clock is read only inside the draw lambdas below: a frame redraws, never recomposes.
     val motion = rememberAmbientMotion(animate, speed, streamActivityPulse)
     val shader = rememberAmbientShader()
-
     if (shader != null) {
         val shaderBrush = remember(shader) { ShaderBrush(shader) }
         Canvas(modifier = modifier.fillMaxSize()) {
-            shader.setFloatUniform("uTime", motion.phase)
+            shader.setFloatUniform("uTime", motion.phase.floatValue)
             shader.setFloatUniform("uSize", size.width, size.height)
             shader.setFloatUniform("uAgitation", agitation)
             shader.setFloatUniform("uEnvelope", envelope.value)
-            shader.setFloatUniform("uStreamEnergy", motion.streamEnergy)
+            shader.setFloatUniform("uStreamEnergy", motion.streamEnergy.floatValue)
             shader.setFloatUniform("uPalettePull", AmbientMotion.PALETTE_HUE_PULL)
             val composer = composerHeight()
             val band = AmbientMotion.bandAboveComposer(
@@ -241,17 +242,20 @@ private fun AmbientCanvas(
             // the two paths stay in step by construction.
             drawAmbientFallback(
                 tint = tint,
-                phase = motion.phase,
+                phase = motion.phase.floatValue,
                 agitation = agitation,
                 envelope = envelope.value,
-                streamEnergy = motion.streamEnergy,
+                streamEnergy = motion.streamEnergy.floatValue,
             )
         }
     }
 }
 
-@Immutable
-private data class AmbientCanvasMotion(val phase: Float, val streamEnergy: Float)
+/** Phase and stream energy, written per frame and read only at draw time. */
+private class AmbientCanvasMotion {
+    val phase = mutableFloatStateOf(0f)
+    val streamEnergy = mutableFloatStateOf(0f)
+}
 
 @Composable
 private fun rememberAmbientMotion(
@@ -259,8 +263,9 @@ private fun rememberAmbientMotion(
     speed: () -> Float,
     streamActivityPulse: Long,
 ): AmbientCanvasMotion {
-    var phase by remember { mutableFloatStateOf(0f) }
-    var energy by remember { mutableFloatStateOf(0f) }
+    val motion = remember { AmbientCanvasMotion() }
+    var phase by motion.phase
+    var energy by motion.streamEnergy
     val pulse by rememberUpdatedState(streamActivityPulse)
     var observed by remember { androidx.compose.runtime.mutableLongStateOf(streamActivityPulse) }
     LaunchedEffect(animate, pulse) {
@@ -284,13 +289,15 @@ private fun rememberAmbientMotion(
             last = now
         }
     }
-    return AmbientCanvasMotion(phase, energy)
+    return motion
 }
 
 @Composable
-private fun rememberAmbientShader(): RuntimeShader? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-    remember {
-        runCatching { RuntimeShader(AMBIENT_GLOW_SHADER_SOURCE + AMBIENT_GLOW_MAIN_UNPREMULTIPLIED) }
+private fun rememberAmbientShader(): RuntimeShader? {
+    val style = LocalThinkingGlowStyle.current
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return null
+    return remember(style) {
+        runCatching { RuntimeShader(ambientGlowShaderSource(style) + AMBIENT_GLOW_MAIN_UNPREMULTIPLIED) }
             .onFailure { failure ->
                 Telemetry.event(
                     AMBIENT_TELEMETRY_TAG,
@@ -300,8 +307,6 @@ private fun rememberAmbientShader(): RuntimeShader? = if (Build.VERSION.SDK_INT 
                 )
             }.getOrNull()
     }
-} else {
-    null
 }
 
 private fun DrawScope.drawAmbientFallback(

@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.LocalAmbientGlowShaders
+import com.letta.mobile.ui.chat.surface.ambient.LocalThinkingGlowStyle
 import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.chat.surface.ambient.rememberAmbientGlowShaders
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbient
@@ -188,6 +189,7 @@ fun ChatSurface(
             LocalComposerFocusHandoff provides focusHandoff,
             LocalChatPlatformStyle provides appearance.platformStyle,
             LocalAmbientGlowShaders provides glowShaders,
+            LocalThinkingGlowStyle provides appearance.displayOptions.thinkingGlow,
             LocalChatImageActions provides stablePlatform.imageActions,
         ) {
             // letta-mobile-ckmub.1 (S4): the page's insets are owned once, by its LettaPageScaffold.

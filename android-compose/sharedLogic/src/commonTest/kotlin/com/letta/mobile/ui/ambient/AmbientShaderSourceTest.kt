@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.ambient
 
+import com.letta.mobile.data.chat.display.ThinkingGlowStyle
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -75,5 +76,29 @@ class AmbientShaderSourceTest {
         }
         // The phone's composer covers about the bottom tenth; its glow must peak above it.
         kotlin.test.assertTrue(AmbientMotion.ABOVE_COMPOSER_BAND.peak <= 0.90f)
+    }
+
+    /**
+     * Every style keeps the default's contract: the same uniforms (the hosts set all of them, and
+     * AGSL throws on a uniform the source does not declare), an `ambientColor`, and time rates that
+     * are whole multiples of F so the phase wraps without a seam.
+     */
+    @Test
+    fun everyStyleKeepsTheUniformContractAndWholeCycleRates() {
+        val uniforms = listOf(
+            "uSize", "uTime", "uAgitation", "uEnvelope", "uStreamEnergy", "uPalettePull", "uBandTop", "uBandPeak", "uColor",
+        )
+        ThinkingGlowStyle.entries.forEach { style ->
+            val source = ambientGlowShaderSource(style)
+            uniforms.forEach { name -> assertTrue(Regex("uniform \\w+ $name;").containsMatchIn(source), "$style declares $name") }
+            assertContains(source, "half4 ambientColor(float2 fragCoord)")
+            assertEquals(1, Regex("half4 ambientColor\\(").findAll(source).count(), "$style defines one ambientColor")
+            Regex("""([0-9]+\.[0-9]+)\s*\*\s*F\b""").findAll(source).map { it.groupValues[1].toFloat() }.forEach { multiple ->
+                assertEquals(multiple.toInt().toFloat(), multiple, "$style: $multiple cycles per period would seam at the wrap")
+            }
+            val scalesTime = source.contains("uStreamEnergy) * t") || source.contains("uStreamEnergy * t")
+            assertTrue(!scalesTime, "$style: stream energy must not scale time")
+        }
+        assertEquals(AMBIENT_GLOW_SHADER_SOURCE, ambientGlowShaderSource(ThinkingGlowStyle.Default))
     }
 }

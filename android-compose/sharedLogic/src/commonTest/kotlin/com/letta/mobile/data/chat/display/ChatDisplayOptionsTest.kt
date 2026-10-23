@@ -47,6 +47,27 @@ class ChatDisplayOptionsTest {
     }
 
     @Test
+    fun theThinkingGlowStyleSurvivesARestart() {
+        val store = MemoryStore()
+        assertEquals(ThinkingGlowStyle.Aurora, ChatDisplayPrefs(store).options.value.thinkingGlow)
+
+        ChatDisplayPrefs(store).update { it.copy(thinkingGlow = ThinkingGlowStyle.Sparkle) }
+
+        assertEquals(ThinkingGlowStyle.Sparkle, ChatDisplayPrefs(store).options.value.thinkingGlow)
+        assertEquals("Sparkle", store.getString("chat.display.thinkingGlow"))
+    }
+
+    @Test
+    fun anUnknownStoredGlowStyleFallsBackToTheDefault() {
+        val store = MemoryStore()
+        store.putString("chat.display.thinkingGlow", "Plasma")
+
+        assertEquals(ThinkingGlowStyle.Default, ChatDisplayPrefs(store).options.value.thinkingGlow)
+        assertEquals(ThinkingGlowStyle.Default, ThinkingGlowStyle.fromName(null))
+        ThinkingGlowStyle.entries.forEach { assertEquals(it, ThinkingGlowStyle.fromName(it.name)) }
+    }
+
+    @Test
     fun textSizeStepsMapToTheNearestScale() {
         assertEquals(ChatTextSize.Small, ChatTextSize.nearest(0.7f))
         assertEquals(ChatTextSize.Medium, ChatTextSize.nearest(1.04f))

@@ -2,7 +2,9 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_PREMULTIPLIED
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_UNPREMULTIPLIED
+import com.letta.mobile.data.chat.display.ThinkingGlowStyle
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_SHADER_SOURCE
+import com.letta.mobile.ui.ambient.ambientGlowShaderSource
 import org.jetbrains.skia.RuntimeEffect
 import kotlin.test.Test
 
@@ -22,6 +24,17 @@ class AmbientShaderCompilesTest {
             val effect = runCatching { RuntimeEffect.makeForShader(AMBIENT_GLOW_SHADER_SOURCE + main) }
             check(effect.isSuccess) { "$name main failed to compile: ${effect.exceptionOrNull()?.message}" }
             effect.getOrThrow().close()
+        }
+    }
+
+    @Test
+    fun everyThinkingGlowStyleCompilesForBothPlatformMains() {
+        ThinkingGlowStyle.entries.forEach { style ->
+            listOf(AMBIENT_GLOW_MAIN_PREMULTIPLIED, AMBIENT_GLOW_MAIN_UNPREMULTIPLIED).forEach { main ->
+                val effect = runCatching { RuntimeEffect.makeForShader(ambientGlowShaderSource(style) + main) }
+                check(effect.isSuccess) { "$style failed to compile: ${effect.exceptionOrNull()?.message}" }
+                effect.getOrThrow().close()
+            }
         }
     }
 }

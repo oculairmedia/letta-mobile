@@ -4,9 +4,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import com.letta.mobile.data.chat.display.ThinkingGlowStyle
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_PREMULTIPLIED
-import com.letta.mobile.ui.ambient.AMBIENT_GLOW_SHADER_SOURCE
 import com.letta.mobile.ui.ambient.AmbientMotion
+import com.letta.mobile.ui.ambient.ambientGlowShaderSource
 import com.letta.mobile.util.Telemetry
 import kotlin.math.ceil
 import org.jetbrains.skia.Canvas as SkiaCanvas
@@ -22,7 +23,8 @@ import org.jetbrains.skia.Surface as SkiaSurface
  * DesktopAmbientChatBackground compiles it (Skia expects a premultiplied result, hence that main). Compiled once per page
  * (AmbientGlowShaders); the builder and paint are reused across frames and released with it.
  */
-internal actual fun createAmbientGlowShader(): AmbientGlowShader? = SkiaAmbientGlowShader.compile()
+internal actual fun createAmbientGlowShader(style: ThinkingGlowStyle): AmbientGlowShader? =
+    SkiaAmbientGlowShader.compile(ambientGlowShaderSource(style))
 
 private class SkiaAmbientGlowShader(private val builder: RuntimeShaderBuilder) : AmbientGlowShader {
     private val paint = SkiaPaint()
@@ -101,10 +103,10 @@ private class SkiaAmbientGlowShader(private val builder: RuntimeShaderBuilder) :
 
     companion object {
         /** Null when the SkSL does not compile here: loud, so a broken edit cannot ship as a flatter glow. */
-        fun compile(): SkiaAmbientGlowShader? =
+        fun compile(source: String): SkiaAmbientGlowShader? =
             runCatching {
                 SkiaAmbientGlowShader(
-                    RuntimeShaderBuilder(RuntimeEffect.makeForShader(AMBIENT_GLOW_SHADER_SOURCE + AMBIENT_GLOW_MAIN_PREMULTIPLIED)),
+                    RuntimeShaderBuilder(RuntimeEffect.makeForShader(source + AMBIENT_GLOW_MAIN_PREMULTIPLIED)),
                 )
             }.onFailure { failure ->
                 Telemetry.event(

@@ -5,9 +5,10 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import com.letta.mobile.data.chat.display.ThinkingGlowStyle
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_UNPREMULTIPLIED
-import com.letta.mobile.ui.ambient.AMBIENT_GLOW_SHADER_SOURCE
 import com.letta.mobile.ui.ambient.AmbientMotion
+import com.letta.mobile.ui.ambient.ambientGlowShaderSource
 import com.letta.mobile.util.Telemetry
 
 /**
@@ -15,9 +16,9 @@ import com.letta.mobile.util.Telemetry
  * AmbientShaderAgentBackground compiles it (AGSL expects an unpremultiplied result). Runtime
  * shaders arrived in Android 13; below that this is null and the shared gradient fallback draws.
  */
-internal actual fun createAmbientGlowShader(): AmbientGlowShader? =
+internal actual fun createAmbientGlowShader(style: ThinkingGlowStyle): AmbientGlowShader? =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        AgslAmbientGlowShader.compile()
+        AgslAmbientGlowShader.compile(ambientGlowShaderSource(style))
     } else {
         null
     }
@@ -42,8 +43,8 @@ private class AgslAmbientGlowShader(private val shader: RuntimeShader) : Ambient
 
     companion object {
         /** Null when the AGSL does not compile on this device: loud, so it cannot pass as a flatter glow. */
-        fun compile(): AgslAmbientGlowShader? =
-            runCatching { AgslAmbientGlowShader(RuntimeShader(AMBIENT_GLOW_SHADER_SOURCE + AMBIENT_GLOW_MAIN_UNPREMULTIPLIED)) }
+        fun compile(source: String): AgslAmbientGlowShader? =
+            runCatching { AgslAmbientGlowShader(RuntimeShader(source + AMBIENT_GLOW_MAIN_UNPREMULTIPLIED)) }
                 .onFailure { failure ->
                     Telemetry.event(
                         AMBIENT_GLOW_TELEMETRY_TAG,
