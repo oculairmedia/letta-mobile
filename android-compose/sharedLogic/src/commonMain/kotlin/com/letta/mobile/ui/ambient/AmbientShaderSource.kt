@@ -1,34 +1,11 @@
 package com.letta.mobile.ui.ambient
 
 /**
- * The ambient agent-status glow shader — "mesh-flow", chosen via lookdev
- * (desktop/lookdev-shaders carries the full candidate family): five color
- * fields stretched into wide ellipses shearing slowly sideways, so the glow
- * reads as a horizontal current under the conversation. Color comes from a curated
- * indigo→teal→gold cosine palette whose hues are rotated toward the tint (uPalettePull)
- * so the field speaks the theme's colour language rather than fighting it, and is then
- * mixed with the tint itself.
- *
- * ONE source for both platforms: Android compiles it as AGSL
- * (`android.graphics.RuntimeShader`), desktop as SkSL
- * (`org.jetbrains.skia.RuntimeEffect`) — this stays in the common subset
- * (constant-bound loops only; Skia runtime effects reject dynamic loops).
- *
- * Uniform contract (all driven from [AmbientMotion] specs):
- * - uTime: speed-integrated phase in TURNS (NOT wall time — the renderer integrates
- *   dt * speed so status speed changes glide, and wraps at AmbientMotion.PHASE_WRAP_TURNS,
- *   which every frequency here is commensurate with)
- * - uAgitation: energy multiplier on the field intensity
- * - uEnvelope: intensity envelope (bloom→settle for transient states)
- * - uStreamEnergy: smoothed visible assistant-delta activity in [0,1]; amplitude only
- * - uPalettePull: how far the palette's hues rotate toward the tint, 0..1
- * - uColor: RGBA tint; alpha scales the whole effect
- *
- * Output of [ambientColor] is UNPREMULTIPLIED; the two runtimes disagree on
- * what a shader must return, so each platform appends its own one-line main
- * (SkSL has no preprocessor to switch on).
+ * What every style's source shares: the uniform contract ([AMBIENT_GLOW_SHADER_SOURCE]), the
+ * time base F, the hue-pulled palette, the dither, and `glowOver`/`glowFinish` for laying two layers together and writing the
+ * result. A style appends its own `ambientColor` (AmbientShaderStyles.kt).
  */
-const val AMBIENT_GLOW_SHADER_SOURCE: String =
+internal const val AMBIENT_SHADER_PRELUDE: String =
     """
 uniform float2 uSize;
 uniform float uTime;
@@ -103,6 +80,29 @@ float dither(float2 fragCoord) {
     return (hash(fragCoord * 0.7131) - 0.5) * (1.6 / 255.0);
 }
 
+// [front] over [back], both unpremultiplied: rgb and alpha of the pair.
+float4 glowOver(float3 front, float frontA, float3 back, float backA) {
+    float a = frontA + backA * (1.0 - frontA);
+    float3 rgb = (front * frontA + back * backA * (1.0 - frontA)) / max(a, 0.0001);
+    return float4(rgb, a);
+}
+
+// The style's colour and raw alpha, scaled by the envelope and tint alpha, capped and dithered.
+half4 glowFinish(float3 rgb, float a, float2 fragCoord) {
+    float alpha = clamp(a * uEnvelope * uColor.a, 0.0, 0.8);
+    alpha = max(alpha + dither(fragCoord), 0.0);
+    return half4(clamp(rgb, 0.0, 1.0), alpha);
+}
+"""
+
+/**
+ * Aurora, the default: the mesh-flow field ([AMBIENT_GLOW_SHADER_SOURCE]), now with depth. A
+ * broad, dim current drifts behind the five fields the other way at a fraction of their pace and reaches a little higher,
+ * and slow curtain folds lift and dim the front band along its width, so the light has a back
+ * and a front without getting any brighter.
+ */
+private const val AURORA_BODY: String =
+    """
 half4 ambientColor(float2 fragCoord) {
     float2 uv = fragCoord / max(uSize, float2(1.0, 1.0));
     float aspect = uSize.x / max(uSize.y, 1.0);
@@ -158,18 +158,66 @@ half4 ambientColor(float2 fragCoord) {
     float3 rgb = mix(lit, fieldColor, season);
 
     float energy = clamp(wsum * (0.8 + 0.2 * uAgitation), 0.0, 1.4);
+    // Curtain folds: a slow ripple along the width that lifts the band where it brightens and
+    // lowers it where it dims, like the folds of an aurora. It averages below 1, so the front
+    // band is no louder than before for the back layer it now sits on.
+    float fold = sin(TAU * (uv.x * 2.7 + 24.0 * F * t) + 1.6 * sin(TAU * (uv.x * 1.3 - 16.0 * F * t)));
+    float curtain = 0.9 + 0.1 * fold;
+    float lift = fold * 0.12 * (uBandPeak - uBandTop);
     // Alpha curve narrowed to the uBandTop..uBandPeak strip so the visible glow
     // occupies less vertical real estate — a thin glow rising from the pane's
     // bottom edge instead of a broad mid-screen band.
     // Shortening the band also dims it, because the ramp now has less height to climb.
     // The amplitude comes up to keep the same presence in less space.
-    float aRaw = energy * smoothstep(uBandTop, uBandPeak, uv.y) *
+    float aRaw = energy * smoothstep(uBandTop - lift, uBandPeak, uv.y) *
         (BAND_OPACITY + scan * 0.020 * uStreamEnergy);
-    float alpha = clamp(aRaw * uEnvelope * uColor.a, 0.0, 0.78);
-    alpha = max(alpha + dither(fragCoord), 0.0);
-    return half4(clamp(rgb, 0.0, 1.0), alpha);
+    float alpha = clamp(aRaw * curtain * uEnvelope * uColor.a, 0.0, 0.78);
+
+    // Depth: the back current, broad and dim, under the front field.
+    float backY = 0.99 + 0.02 * sin(TAU * 3.0 * F * t + uv.x * 2.1);
+    float backD = (uv.y - backY) * 2.6;
+    float back = exp(-backD * backD) * (0.6 + 0.4 * sin(TAU * (uv.x * 0.8 - 3.0 * F * t)));
+    float backReach = smoothstep(uBandTop - 0.35 * (uBandPeak - uBandTop), uBandPeak, uv.y);
+    float backA = clamp(back * backReach * 0.05 * uEnvelope * uColor.a, 0.0, 0.3);
+    float3 backRgb = mix(uColor.rgb, palB(0.5 + uv.x * 0.2 - 3.0 * F * t), 0.25) * 0.85;
+    float4 layered = glowOver(rgb, alpha, backRgb, backA);
+    float outA = max(clamp(layered.a, 0.0, 0.78) + dither(fragCoord), 0.0);
+    return half4(clamp(layered.rgb, 0.0, 1.0), outA);
 }
 """
+
+/**
+ * The ambient agent-status glow shader — "mesh-flow", chosen via lookdev
+ * (desktop/lookdev-shaders carries the full candidate family): five color
+ * fields stretched into wide ellipses shearing slowly sideways, so the glow
+ * reads as a horizontal current under the conversation. Color comes from a curated
+ * indigo→teal→gold cosine palette whose hues are rotated toward the tint (uPalettePull)
+ * so the field speaks the theme's colour language rather than fighting it, and is then
+ * mixed with the tint itself.
+ *
+ * ONE source for both platforms: Android compiles it as AGSL
+ * (`android.graphics.RuntimeShader`), desktop as SkSL
+ * (`org.jetbrains.skia.RuntimeEffect`) — this stays in the common subset
+ * (constant-bound loops only; Skia runtime effects reject dynamic loops).
+ *
+ * Uniform contract (all driven from [AmbientMotion] specs):
+ * - uTime: speed-integrated phase in TURNS (NOT wall time — the renderer integrates
+ *   dt * speed so status speed changes glide, and wraps at AmbientMotion.PHASE_WRAP_TURNS,
+ *   which every frequency here is commensurate with)
+ * - uAgitation: energy multiplier on the field intensity
+ * - uEnvelope: intensity envelope (bloom→settle for transient states)
+ * - uStreamEnergy: smoothed visible assistant-delta activity in [0,1]; amplitude only
+ * - uPalettePull: how far the palette's hues rotate toward the tint, 0..1
+ * - uColor: RGBA tint; alpha scales the whole effect
+ *
+ * Output of [ambientColor] is UNPREMULTIPLIED; the two runtimes disagree on
+ * what a shader must return, so each platform appends its own one-line main
+ * (SkSL has no preprocessor to switch on).
+ *
+ * This is the default style (ThinkingGlowStyle.Aurora); [ambientGlowShaderSource] picks a
+ * style's full source.
+ */
+const val AMBIENT_GLOW_SHADER_SOURCE: String = AMBIENT_SHADER_PRELUDE + AURORA_BODY
 
 /**
  * Platform `main` suffixes. [ambientColor] returns an UNPREMULTIPLIED color;

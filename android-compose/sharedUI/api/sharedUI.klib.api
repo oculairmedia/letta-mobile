@@ -10384,6 +10384,7 @@ final object com.letta.mobile.ui.shell.sidebar/ShellChatOptionsTags { // com.let
     final const val USAGE // com.letta.mobile.ui.shell.sidebar/ShellChatOptionsTags.USAGE|{}USAGE[0]
         final fun <get-USAGE>(): kotlin/String // com.letta.mobile.ui.shell.sidebar/ShellChatOptionsTags.USAGE.<get-USAGE>|<get-USAGE>(){}[0]
 
+    final fun glow(com.letta.mobile.ui.ambient/ThinkingGlowStyle): kotlin/String // com.letta.mobile.ui.shell.sidebar/ShellChatOptionsTags.glow|glow(com.letta.mobile.ui.ambient.ThinkingGlowStyle){}[0]
     final fun restore(kotlin/String): kotlin/String // com.letta.mobile.ui.shell.sidebar/ShellChatOptionsTags.restore|restore(kotlin.String){}[0]
     final fun textSize(com.letta.mobile.data.chat.display/ChatTextSize): kotlin/String // com.letta.mobile.ui.shell.sidebar/ShellChatOptionsTags.textSize|textSize(com.letta.mobile.data.chat.display.ChatTextSize){}[0]
 }

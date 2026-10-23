@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.updateAndGet
 import kotlin.math.abs
+import com.letta.mobile.ui.ambient.ThinkingGlowStyle
 
 /**
  *  (G91): what the chat timeline shows besides the conversation itself. The
@@ -16,12 +17,15 @@ import kotlin.math.abs
  *
  * [showTokenUsage] covers the usage readout the chat draws (the composer's context meter); the
  * timeline has no per-turn usage row to hide.
+ *
+ * @property thinkingGlow The look of the ambient glow while the agent works.
  */
 @Immutable
 data class ChatDisplayOptions(
     val showReasoning: Boolean = true,
     val showCompactions: Boolean = true,
     val showTokenUsage: Boolean = true,
+    val thinkingGlow: ThinkingGlowStyle = ThinkingGlowStyle.Default,
 ) {
     /** Whether [message] is left out of the timeline under these options. */
     fun hides(message: UiMessage): Boolean =
@@ -70,12 +74,14 @@ class ChatDisplayPrefs(
         store.putString(key(REASONING), next.showReasoning.toString())
         store.putString(key(COMPACTIONS), next.showCompactions.toString())
         store.putString(key(USAGE), next.showTokenUsage.toString())
+        store.putString(key(GLOW), next.thinkingGlow.name)
     }
 
     private fun load(): ChatDisplayOptions = ChatDisplayOptions(
         showReasoning = flag(REASONING),
         showCompactions = flag(COMPACTIONS),
         showTokenUsage = flag(USAGE),
+        thinkingGlow = ThinkingGlowStyle.fromName(store.getString(key(GLOW))),
     )
 
     private fun flag(name: String): Boolean = store.getString(key(name))?.toBooleanStrictOrNull() ?: true
@@ -87,5 +93,6 @@ class ChatDisplayPrefs(
         private const val REASONING = "showReasoning"
         private const val COMPACTIONS = "showCompactions"
         private const val USAGE = "showTokenUsage"
+        private const val GLOW = "thinkingGlow"
     }
 }
