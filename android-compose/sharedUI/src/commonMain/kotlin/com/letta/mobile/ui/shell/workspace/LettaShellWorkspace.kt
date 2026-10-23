@@ -42,7 +42,10 @@ import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.ui.host.InspectorFrame
 import com.letta.mobile.ui.host.InspectorHost
+import com.letta.mobile.ui.host.LocalPaneWindowClass
 import com.letta.mobile.ui.host.OverlayHostRoot
+import com.letta.mobile.ui.host.PaneWindowClass
+import com.letta.mobile.ui.host.ProvideLettaIdiom
 import com.letta.mobile.ui.host.ProvideInspectorHost
 import com.letta.mobile.ui.host.rememberInspectorHost
 import com.letta.mobile.ui.host.rememberOverlayHost
@@ -94,9 +97,12 @@ fun LettaShellWorkspace(state: LettaShellWorkspaceState, host: LettaShellWorkspa
                     BoxWithConstraints(Modifier.fillMaxSize()) {
                         val width = maxWidth
                         LaunchedEffect(width) { host.events.onWidthChanged(width.value) }
-                        WorkspaceColumn(WorkspaceFrame(state, host, drawer, workspaceFit(state.layout, width)))
+                        val fit = workspaceFit(state.layout, width)
+                        ProvideWorkspaceIdiom(fit) {
+                            WorkspaceColumn(WorkspaceFrame(state, host, drawer, fit))
+                            host.slots.overlays()
+                        }
                     }
-                    host.slots.overlays()
                 }
             }
         }
@@ -111,6 +117,20 @@ private fun workspaceFit(layout: ShellWorkspaceLayout, width: Dp): WorkspaceFit 
     // The person's choice, removed (not shrunk) below the layout's width rule.
     sidebarVisible = layout.sidebarVisible && !ShellLayoutReducer.defaultCollapsedForWidth(width.value),
 )
+
+// letta-mobile-ckmub.17.36: the workspace is where the root's pointer becomes the idiom.
+/**
+ * Everything the workspace draws reads the idiom its fit implies
+ * ([lettaIdiom]: a compact window is Touch on every platform), and panes resolve against the same
+ * fold, so a modal in a narrow desktop window is the phone's sheet.
+ */
+@Composable
+private fun ProvideWorkspaceIdiom(fit: WorkspaceFit, content: @Composable () -> Unit) {
+    val windowClass = if (fit.compact) PaneWindowClass.Compact else PaneWindowClass.Wide
+    CompositionLocalProvider(LocalPaneWindowClass provides windowClass) {
+        ProvideLettaIdiom(compact = fit.compact, content = content)
+    }
+}
 
 /** One composition's view of the workspace: what it draws and how it fits. */
 private class WorkspaceFrame(

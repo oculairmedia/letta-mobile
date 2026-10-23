@@ -12,8 +12,6 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatModelUiState
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
-import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import java.awt.GradientPaint
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
@@ -37,10 +35,6 @@ object PhoneFixtures {
     const val AGENT_ID: String = "agent-1"
     const val AGENT_NAME: String = "Meridian"
     const val CONVERSATION_ID: String = "conv-1"
-
-    /** The phone's idiom, exactly as Android's SharedChatPage sets it. */
-    val touchAppearance: ChatSurfaceAppearance =
-        ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch)
 
     /** A small gradient PNG standing in for a screenshot the person attached. */
     val screenshot: UiImageAttachment by lazy { UiImageAttachment(base64 = sampleImageBase64(), mediaType = "image/png") }

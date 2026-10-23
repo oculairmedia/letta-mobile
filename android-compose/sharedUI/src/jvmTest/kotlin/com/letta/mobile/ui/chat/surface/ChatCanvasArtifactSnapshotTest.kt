@@ -30,6 +30,8 @@ import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 
 /**
  * letta-mobile-bglj6.13: the canvas_compose cards on the full-screen page, at a desktop size in the
@@ -54,18 +56,18 @@ class ChatCanvasArtifactSnapshotTest {
                     MaterialTheme(colorScheme = if (shot.dark) darkColorScheme() else lightColorScheme()) {
                         WithMascot {
                             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                                ChatSurface(
-                                    port = FixtureChatSessionPort(PhoneFixtures.canvasArtifactState, ChatComposerUiState(canSend = true)),
-                                    presentation = ChatSurfacePresentation.ChatFirst,
-                                    onIntent = {},
-                                    host = ChatSurfaceHost(openCanvas = {}, showOnCanvas = {}),
-                                    appearance = if (shot.phone) {
-                                        ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch)
-                                    } else {
-                                        ChatSurfaceAppearance()
-                                    },
-                                    platform = ChatSurfacePlatform(showKeyboardHints = !shot.phone),
-                                )
+                                ProvideLettaHost(if (shot.phone) LettaHost.Touch else LettaHost.Pointer) {
+                                    ChatSurface(
+                                        port = FixtureChatSessionPort(
+                                            PhoneFixtures.canvasArtifactState,
+                                            ChatComposerUiState(canSend = true),
+                                        ),
+                                        presentation = ChatSurfacePresentation.ChatFirst,
+                                        onIntent = {},
+                                        host = ChatSurfaceHost(openCanvas = {}, showOnCanvas = {}),
+                                        platform = ChatSurfacePlatform(showKeyboardHints = !shot.phone),
+                                    )
+                                }
                             }
                         }
                     }

@@ -29,7 +29,6 @@ import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.composer.ComposerThinkingSnapshot
@@ -240,9 +239,7 @@ class RowParityScreenshotTest {
         const val STABLE_WAIT_MILLIS = 60L
         const val MAX_NOTE = 160
 
-        /** SharedChatPage's appearance: the phone's Touch idiom. */
-        val AndroidAppearance = ChatSurfaceAppearance(
-            platformStyle = ChatPlatformStyle.Touch,
-        )
+        /** SharedChatPage's appearance; the phone's Touch idiom is the default host's. */
+        val AndroidAppearance = ChatSurfaceAppearance()
     }
 }

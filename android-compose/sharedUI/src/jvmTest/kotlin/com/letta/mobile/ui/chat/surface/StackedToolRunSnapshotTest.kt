@@ -110,7 +110,7 @@ class StackedToolRunSnapshotTest {
         // glow still (its tint, no breath), so the CPU renderer draws a few shader frames, not one
         // per animation frame.
         mainClock.autoAdvance = false
-        setContent {
+        setPointerContent {
             CompositionLocalProvider(LocalReducedMotion provides true) {
                 MaterialTheme(colorScheme = darkColorScheme()) {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {

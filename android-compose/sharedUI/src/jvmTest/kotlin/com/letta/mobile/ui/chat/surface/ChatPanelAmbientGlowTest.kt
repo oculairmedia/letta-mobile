@@ -71,7 +71,7 @@ class ChatPanelAmbientGlowTest {
     @Test
     fun docked_panel_glows_while_the_agent_thinks_and_not_at_rest() = runComposeUiTest {
         val port = MutablePort(idle)
-        setContent {
+        setPointerContent {
             StillTheme {
                 ChatSurface(
                     port = port,
@@ -99,7 +99,7 @@ class ChatPanelAmbientGlowTest {
 
     @Test
     fun a_failed_run_keeps_the_glow_on() = runComposeUiTest {
-        setContent {
+        setPointerContent {
             StillTheme {
                 ChatSurface(
                     port = MutablePort(idle.copy(error = "boom")),
@@ -116,7 +116,7 @@ class ChatPanelAmbientGlowTest {
 
     @Test
     fun the_minimised_dock_draws_no_glow_while_thinking() = runComposeUiTest {
-        setContent {
+        setPointerContent {
             StillTheme {
                 ChatSurface(
                     port = MutablePort(idle.copy(isAgentTyping = true)),
@@ -138,7 +138,7 @@ class ChatPanelAmbientGlowTest {
     @Test
     fun the_glow_moves_unless_motion_is_reduced() = runComposeUiTest {
         var reduced by mutableStateOf(false)
-        setContent {
+        setPointerContent {
             CompositionLocalProvider(LocalReducedMotion provides reduced) {
                 MaterialTheme(colorScheme = darkColorScheme()) {
                     ChatPanelAmbientGlow(
@@ -160,7 +160,7 @@ class ChatPanelAmbientGlowTest {
 
     @Test
     fun reduced_motion_holds_a_still_tint() = runComposeUiTest {
-        setContent {
+        setPointerContent {
             CompositionLocalProvider(LocalReducedMotion provides true) {
                 MaterialTheme(colorScheme = darkColorScheme()) {
                     Box(Modifier.size(GLOW_SIZE).background(MaterialTheme.colorScheme.surfaceContainer)) {
@@ -198,7 +198,7 @@ class ChatPanelAmbientGlowTest {
     fun the_page_compiles_its_glow_shader_once_across_runs() = runComposeUiTest {
         val shaders = AmbientGlowShaders()
         var ambient by mutableStateOf(ChatAmbient(AmbientMotionStatus.Running))
-        setContent {
+        setPointerContent {
             StillTheme {
                 CompositionLocalProvider(LocalAmbientGlowShaders provides shaders) {
                     ChatPanelAmbientGlow(ambient, AmbientGlowPlacement.Halo, Modifier.size(GLOW_SIZE))
@@ -221,7 +221,7 @@ class ChatPanelAmbientGlowTest {
     fun every_glow_style_compiles_and_draws_its_own_picture() = runComposeUiTest {
         val shaders = AmbientGlowShaders()
         var style by mutableStateOf(ThinkingGlowStyle.Default)
-        setContent {
+        setPointerContent {
             StillTheme {
                 CompositionLocalProvider(LocalAmbientGlowShaders provides shaders, LocalThinkingGlowStyle provides style) {
                     Box(Modifier.size(GLOW_SIZE).background(MaterialTheme.colorScheme.surfaceContainer)) {
@@ -250,7 +250,7 @@ class ChatPanelAmbientGlowTest {
     fun an_acknowledged_failure_is_not_a_completion() = runComposeUiTest {
         var state by mutableStateOf(ChatUiState(isStreaming = true))
         var status = AmbientMotionStatus.Idle
-        setContent { status = rememberChatAmbient(state).status }
+        setPointerContent { status = rememberChatAmbient(state).status }
         waitForIdle()
         assertEquals(AmbientMotionStatus.Running, status)
         state = ChatUiState(error = "boom", runFailed = true)
@@ -271,7 +271,7 @@ class ChatPanelAmbientGlowTest {
         var thinking by mutableStateOf(true)
         var failed by mutableStateOf(false)
         var status = AmbientMotionStatus.Idle
-        setContent { status = rememberChatAmbientStatus(thinking, failed) }
+        setPointerContent { status = rememberChatAmbientStatus(thinking, failed) }
         waitForIdle()
         thinking = false
         failed = true
@@ -287,7 +287,7 @@ class ChatPanelAmbientGlowTest {
         var thinking by mutableStateOf(false)
         var error by mutableStateOf<String?>(null)
         var status = AmbientMotionStatus.Idle
-        setContent { status = rememberChatAmbientStatus(thinking, failed = error != null) }
+        setPointerContent { status = rememberChatAmbientStatus(thinking, failed = error != null) }
         waitForIdle()
         assertEquals(AmbientMotionStatus.Idle, status)
         thinking = true

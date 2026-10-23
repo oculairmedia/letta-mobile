@@ -90,7 +90,7 @@ class CollapsedDockUiTest {
     private fun ComposeUiTest.show(port: Port, shell: FakeMascotShell = FakeMascotShell(agent)): Harness {
         val harness = Harness()
         mainClock.autoAdvance = false
-        setContent {
+        setPointerContent {
             shell.Provide {
                 MaterialTheme {
                     ChatSurface(

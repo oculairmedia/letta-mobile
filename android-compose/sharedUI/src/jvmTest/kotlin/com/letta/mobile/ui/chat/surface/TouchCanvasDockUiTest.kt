@@ -47,6 +47,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 
 /**
  * letta-mobile-bglj6.1.9: the Touch idiom. On the canvas there is no panel and (letta-mobile-y5q9z)
@@ -102,17 +104,18 @@ class TouchCanvasDockUiTest {
         val harness = Harness()
         setContent {
             MaterialTheme {
-                ChatSurface(
-                    port = port,
-                    presentation = presentation,
-                    onIntent = { harness.intents += it },
-                    host = ChatSurfaceHost(openCanvas = {}),
-                    modifier = Modifier.fillMaxSize(),
-                    appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                    platform = ChatSurfacePlatform(showKeyboardHints = false),
-                    canvas = if (withCanvas) ({ _ -> Box(Modifier.fillMaxSize()) }) else null,
-                    onDockGeometryChange = { harness.geometries += it },
-                )
+                ProvideLettaHost(LettaHost.Touch) {
+                    ChatSurface(
+                        port = port,
+                        presentation = presentation,
+                        onIntent = { harness.intents += it },
+                        host = ChatSurfaceHost(openCanvas = {}),
+                        modifier = Modifier.fillMaxSize(),
+                        platform = ChatSurfacePlatform(showKeyboardHints = false),
+                        canvas = if (withCanvas) ({ _ -> Box(Modifier.fillMaxSize()) }) else null,
+                        onDockGeometryChange = { harness.geometries += it },
+                    )
+                }
             }
         }
         waitForIdle()
@@ -188,19 +191,20 @@ class TouchCanvasDockUiTest {
         var presentation by mutableStateOf(ChatSurfacePresentation.CanvasFirst)
         setContent {
             MaterialTheme {
-                ChatSurface(
-                    port = Port(),
-                    presentation = presentation,
-                    onIntent = {},
-                    host = ChatSurfaceHost(openCanvas = {}),
-                    modifier = Modifier.fillMaxSize(),
-                    appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                    platform = ChatSurfacePlatform(
-                        showKeyboardHints = false,
-                        canvasOverlay = { Box(Modifier.fillMaxSize().testTag(RINGS_TAG)) },
-                    ),
-                    canvas = { _ -> Box(Modifier.fillMaxSize()) },
-                )
+                ProvideLettaHost(LettaHost.Touch) {
+                    ChatSurface(
+                        port = Port(),
+                        presentation = presentation,
+                        onIntent = {},
+                        host = ChatSurfaceHost(openCanvas = {}),
+                        modifier = Modifier.fillMaxSize(),
+                        platform = ChatSurfacePlatform(
+                            showKeyboardHints = false,
+                            canvasOverlay = { Box(Modifier.fillMaxSize().testTag(RINGS_TAG)) },
+                        ),
+                        canvas = { _ -> Box(Modifier.fillMaxSize()) },
+                    )
+                }
             }
         }
         waitForIdle()
@@ -258,16 +262,17 @@ class TouchCanvasDockUiTest {
         var opened = 0
         setContent {
             MaterialTheme {
-                ChatSurface(
-                    port = Port(),
-                    presentation = ChatSurfacePresentation.CanvasFirst,
-                    onIntent = {},
-                    host = host,
-                    modifier = Modifier.fillMaxSize(),
-                    appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                    platform = ChatSurfacePlatform(showKeyboardHints = false),
-                    canvas = { _ -> Box(Modifier.fillMaxSize()) },
-                )
+                ProvideLettaHost(LettaHost.Touch) {
+                    ChatSurface(
+                        port = Port(),
+                        presentation = ChatSurfacePresentation.CanvasFirst,
+                        onIntent = {},
+                        host = host,
+                        modifier = Modifier.fillMaxSize(),
+                        platform = ChatSurfacePlatform(showKeyboardHints = false),
+                        canvas = { _ -> Box(Modifier.fillMaxSize()) },
+                    )
+                }
             }
         }
         waitForIdle()
@@ -289,17 +294,18 @@ class TouchCanvasDockUiTest {
         setContent {
             shell.Provide {
                 MaterialTheme {
-                    ChatSurface(
-                        port = Port(),
-                        presentation = ChatSurfacePresentation.CanvasFirst,
-                        onIntent = { harness.intents += it },
-                        host = ChatSurfaceHost(openCanvas = {}, openAgentPane = { harness.agentPaneOpened++ }),
-                        modifier = Modifier.fillMaxSize(),
-                        appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                        platform = ChatSurfacePlatform(showKeyboardHints = false),
-                        canvas = { _ -> Box(Modifier.fillMaxSize()) },
-                        onDockGeometryChange = { harness.geometries += it },
-                    )
+                    ProvideLettaHost(LettaHost.Touch) {
+                        ChatSurface(
+                            port = Port(),
+                            presentation = ChatSurfacePresentation.CanvasFirst,
+                            onIntent = { harness.intents += it },
+                            host = ChatSurfaceHost(openCanvas = {}, openAgentPane = { harness.agentPaneOpened++ }),
+                            modifier = Modifier.fillMaxSize(),
+                            platform = ChatSurfacePlatform(showKeyboardHints = false),
+                            canvas = { _ -> Box(Modifier.fillMaxSize()) },
+                            onDockGeometryChange = { harness.geometries += it },
+                        )
+                    }
                 }
             }
         }
@@ -384,16 +390,17 @@ class TouchCanvasDockUiTest {
         var presentation by mutableStateOf(ChatSurfacePresentation.CanvasFirst)
         setContent {
             MaterialTheme {
-                ChatSurface(
-                    port = port,
-                    presentation = presentation,
-                    onIntent = {},
-                    host = ChatSurfaceHost(openCanvas = {}),
-                    modifier = Modifier.fillMaxSize(),
-                    appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                    platform = ChatSurfacePlatform(showKeyboardHints = false),
-                    canvas = { _ -> Box(Modifier.fillMaxSize()) },
-                )
+                ProvideLettaHost(LettaHost.Touch) {
+                    ChatSurface(
+                        port = port,
+                        presentation = presentation,
+                        onIntent = {},
+                        host = ChatSurfaceHost(openCanvas = {}),
+                        modifier = Modifier.fillMaxSize(),
+                        platform = ChatSurfacePlatform(showKeyboardHints = false),
+                        canvas = { _ -> Box(Modifier.fillMaxSize()) },
+                    )
+                }
             }
         }
         waitForIdle()

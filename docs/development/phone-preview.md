@@ -2,8 +2,8 @@
 
 Iterate on the **mobile** UI of the shared KMP chat page (`sharedUI/.../ui/chat/surface/**`,
 epic letta-mobile-bglj6.1) from Windows, without an Android device or
-emulator. The phone idiom is what `ChatSurfaceAppearance.platformStyle = ChatPlatformStyle.Touch`
-draws: `TouchComposerBar`, `TouchCanvasDock` (chat head, reply popup), the Touch canvas chrome (undo,
+emulator. The phone idiom is what the Touch input (`LettaHost.input`, resolved by `lettaIdiom`:
+a coarse pointer or a compact window) draws: `TouchComposerBar`, `TouchCanvasDock` (chat head, reply popup), the Touch canvas chrome (undo,
 redo and the more menu in the tool rail), the keyboard camera (`CanvasKeyboardCamera`) and the
 edge-to-edge chat page.
 

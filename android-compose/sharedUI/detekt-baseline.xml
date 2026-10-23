@@ -78,7 +78,6 @@
     <ID>MatchingDeclarationName:CanvasSyncStatus.kt$CanvasSyncStatusText</ID>
     <ID>MatchingDeclarationName:ChatApprovalStepper.kt$ApprovalStepperState</ID>
     <ID>MatchingDeclarationName:ChatComposerPanel.kt$ComposerInputs</ID>
-    <ID>MatchingDeclarationName:ChatComposerSnapshot.kt$ComposerSnapshotContent</ID>
     <ID>MatchingDeclarationName:ChatRowCompaction.kt$ChatCompactionTestTags</ID>
     <ID>MatchingDeclarationName:ChatRowCopyButton.kt$CopyAction</ID>
     <ID>MatchingDeclarationName:ChatRowQuietClick.kt$QuietClick</ID>
@@ -495,8 +494,6 @@
     <ID>MaxLineLength:RosterListTest.kt$RosterListTest$val layout = RosterLayout.of(listOf(RosterSection("a", listOf(apple)), RosterSection("fruit", listOf(banana, cherry, apple)))) { it.id }</ID>
     <ID>MaxLineLength:RunStatusLineUiTest.kt$RunStatusLineUiTest$CommandActivity("cmd-9", "git status", slash = false, state = CommandState.Failed, output = "fatal: not a repo", preformatted = true)</ID>
     <ID>MaxLineLength:RunStatusLineUiTest.kt$RunStatusLineUiTest$RuntimeLiveStatus(phase = LoopPhase.ExecutingCommand, notice = LiveNotice("Compacting conversation", NoticeLevel.Warning))</ID>
-    <ID>MaxLineLength:RunSummarySnapshotTest.kt$RunSummarySnapshotTest$Shot("run-summary-desktop-docked", DESKTOP_WIDTH_DP, DESKTOP_HEIGHT_DP, scale = 1, ChatSurfacePresentation.CanvasFirst, ChatPlatformStyle.Pointer)</ID>
-    <ID>MaxLineLength:RunSummarySnapshotTest.kt$RunSummarySnapshotTest$Shot("run-summary-desktop-full", DESKTOP_WIDTH_DP, DESKTOP_HEIGHT_DP, scale = 1, ChatSurfacePresentation.ChatFirst, ChatPlatformStyle.Pointer)</ID>
     <ID>MaxLineLength:RunsPageDetail.kt$ActionButton(RunDetailTags.OPEN_CONVERSATION, "Open conversation", { openConversation(run.agentId, conversationId.orEmpty()) }, primary = true)</ID>
     <ID>MaxLineLength:RunsPageTest.kt$RunsPageTest$show(RunsPageState(monitor = RunMonitorState(loading = false, error = "host down")), RunsPageActions(onRefresh = { calls += "refresh" }))</ID>
     <ID>MaxLineLength:RunsPageTest.kt$RunsPageTest$show(loaded(running, detail = RunDetail(run = running, full = true), canManage = true), RunsPageActions(onCancelRun = { cancelled += it }))</ID>
@@ -626,7 +623,6 @@
     <ID>NestedBlockDepth:StreamingMarkdownParser.kt$internal fun findLastSafeBoundary(text: String): Int</ID>
     <ID>NestedBlockDepth:StreamingMarkdownRepair.kt$private fun findUnclosedInlineCodeMarker(text: String): String?</ID>
     <ID>NestedBlockDepth:ToolOutputSyntaxHighlighter.kt$internal fun highlightShellOutput(text: String): List&lt;ToolOutputHighlightSpan&gt;</ID>
-    <ID>NewLineAtEndOfFile:ChatComposerSnapshot.kt$com.letta.mobile.ui.chat.surface.composer.ChatComposerSnapshot.kt</ID>
     <ID>NewLineAtEndOfFile:ChatHapticCuesTest.kt$com.letta.mobile.ui.chat.surface.composer.ChatHapticCuesTest.kt</ID>
     <ID>NewLineAtEndOfFile:RosterModel.kt$com.letta.mobile.ui.components.list.RosterModel.kt</ID>
     <ID>NewLineAtEndOfFile:SharedMarkdownRendererSeamTest.kt$com.letta.mobile.ui.markdown.SharedMarkdownRendererSeamTest.kt</ID>

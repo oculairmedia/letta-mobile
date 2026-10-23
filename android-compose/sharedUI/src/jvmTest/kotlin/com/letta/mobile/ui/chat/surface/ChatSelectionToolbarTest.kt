@@ -32,6 +32,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 
 /**
  * letta-mobile-bglj6.1: a selection held on a reply in the Touch page, with nothing changing,
@@ -98,16 +100,17 @@ class ChatSelectionToolbarTest {
                     MaterialTheme {
                         CompositionLocalProvider(LocalTextToolbar provides toolbar) {
                             Box(Modifier.size(PHONE_WIDTH.dp, PHONE_HEIGHT.dp)) {
-                                ChatSurface(
-                                    port = Port(),
-                                    presentation = ChatSurfacePresentation.ChatFirst,
-                                    onIntent = {},
-                                    host = ChatSurfaceHost(openCanvas = {}),
-                                    modifier = Modifier.fillMaxSize(),
-                                    appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                                    platform = ChatSurfacePlatform(showKeyboardHints = false),
-                                    canvas = { _ -> Box(Modifier.fillMaxSize()) },
-                                )
+                                ProvideLettaHost(LettaHost.Touch) {
+                                    ChatSurface(
+                                        port = Port(),
+                                        presentation = ChatSurfacePresentation.ChatFirst,
+                                        onIntent = {},
+                                        host = ChatSurfaceHost(openCanvas = {}),
+                                        modifier = Modifier.fillMaxSize(),
+                                        platform = ChatSurfacePlatform(showKeyboardHints = false),
+                                        canvas = { _ -> Box(Modifier.fillMaxSize()) },
+                                    )
+                                }
                             }
                         }
                     }

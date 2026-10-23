@@ -16,14 +16,15 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
-import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimelineSnapshot
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimelineTags
 import kotlinx.collections.immutable.persistentListOf
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 
 /**
  * letta-mobile-ckmub.1 (hard cut S4): on a phone the thinking token sits over the composer bar, as
@@ -40,23 +41,24 @@ class ComposerThinkingPlacementTest {
         messages = persistentListOf(UiMessage(id = "u1", role = "user", content = "update the changelog", timestamp = "2026-10-11T16:06:00Z")),
     )
 
-    private fun ComposeUiTest.page(style: ChatPlatformStyle) = setContent {
+    private fun ComposeUiTest.page(style: LettaInput) = setContent {
         MaterialTheme {
             Column(Modifier.size(400.dp, 600.dp)) {
-                ChatTimelineSnapshot(
-                    state = thinking,
-                    actions = RecordingChatActions(),
-                    appearance = ChatSurfaceAppearance(platformStyle = style),
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                )
-                if (style == ChatPlatformStyle.Touch) ComposerThinkingSnapshot(thinking, Modifier.fillMaxWidth())
+                ProvideLettaHost(LettaHost(input = style)) {
+                    ChatTimelineSnapshot(
+                        state = thinking,
+                        actions = RecordingChatActions(),
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    )
+                }
+                if (style == LettaInput.Touch) ComposerThinkingSnapshot(thinking, Modifier.fillMaxWidth())
             }
         }
     }
 
     @Test
     fun touchComposerCarriesTheThinkingTokenAtThePageFoot() = runComposeUiTest {
-        page(ChatPlatformStyle.Touch)
+        page(LettaInput.Touch)
         mainClock.advanceTimeBy(SETTLE_MILLIS)
         onNodeWithTag(ChatTimelineTags.THINKING).assertDoesNotExist()
         val token = onNodeWithTag(ComposerTestTags.TOUCH_COMPANION_STATUS).assertExists().getBoundsInRoot()
@@ -66,7 +68,7 @@ class ComposerThinkingPlacementTest {
 
     @Test
     fun pointerTimelineKeepsItsThinkingRow() = runComposeUiTest {
-        page(ChatPlatformStyle.Pointer)
+        page(LettaInput.Pointer)
         mainClock.advanceTimeBy(SETTLE_MILLIS)
         onNodeWithTag(ChatTimelineTags.THINKING).assertExists()
     }

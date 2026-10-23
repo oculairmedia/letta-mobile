@@ -31,9 +31,7 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
-import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
 import com.letta.mobile.ui.theme.ChatRowDimens
@@ -45,6 +43,9 @@ import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlinx.collections.immutable.toPersistentList
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.LocalLettaHost
 
 /**
  * letta-mobile-bglj6.1: a prompt docked at the top of the phone's timeline shrinks its attached
@@ -80,7 +81,7 @@ class TimelineDockedPromptImageUiTest {
         setContent {
             MaterialTheme {
                 CompositionLocalProvider(
-                    LocalChatPlatformStyle provides ChatPlatformStyle.Touch,
+                    LocalLettaHost provides LettaHost(input = LettaInput.Touch),
                     LocalReducedMotion provides reducedMotion,
                 ) {
                     Box(Modifier.size(width = 420.dp, height = 720.dp).background(MaterialTheme.colorScheme.background)) {

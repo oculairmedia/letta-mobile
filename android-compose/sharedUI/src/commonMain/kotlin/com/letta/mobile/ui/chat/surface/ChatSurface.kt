@@ -187,7 +187,6 @@ fun ChatSurface(
             LocalComposerImageAttacher provides imageAttacher,
             LocalCompanionSeatAnchors provides companionAnchors,
             LocalComposerFocusHandoff provides focusHandoff,
-            LocalChatPlatformStyle provides appearance.platformStyle,
             LocalAmbientGlowShaders provides glowShaders,
             LocalThinkingGlowStyle provides appearance.displayOptions.thinkingGlow,
             LocalChatImageActions provides stablePlatform.imageActions,
@@ -206,7 +205,7 @@ private fun ChatSurfaceLayers(frame: ChatSurfaceFrame, canvas: (@Composable () -
     // On a phone the last touch is the mascot's cursor for a moment (te3n1.2); the desktop's mouse
     // is captured at its window root instead.
     SendFlightLayer(rememberSendFlightState(), Modifier.fillMaxSize().mascotTouchPresence()) {
-        if (frame.appearance.platformStyle == ChatPlatformStyle.Touch) {
+        if (touchStyle()) {
             // Phones: the canvas over a flush chat bar with a floating chat head, no panel.
             TouchCanvasWithChat(frame, canvas)
         } else if (canvas == null) {

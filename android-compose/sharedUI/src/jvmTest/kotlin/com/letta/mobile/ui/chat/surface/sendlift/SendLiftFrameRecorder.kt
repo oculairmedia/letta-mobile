@@ -24,9 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurface
-import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
 import com.letta.mobile.ui.chat.surface.sendflight.SendFlightTestTags
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimelineTags
@@ -35,6 +33,8 @@ import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
 import com.letta.mobile.ui.mascot.FakeMascotShell
 import java.io.File
 import javax.imageio.ImageIO
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 
 /** How the page under test is mounted. */
 internal data class SendLiftMount(
@@ -70,14 +70,15 @@ internal class SendLiftFrameRecorder(
             FakeMascotShell(SendLiftPort.AGENT).Provide {
                 MaterialTheme {
                     Box(Modifier.size(width = WIDTH.dp, height = HEIGHT.dp).padding(bottom = options.keyboard)) {
-                        ChatSurface(
-                            port = port,
-                            presentation = options.presentation,
-                            onIntent = {},
-                            host = ChatSurfaceHost(),
-                            appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                            pagedTimeline = options.paged,
-                        )
+                        ProvideLettaHost(LettaHost.Touch) {
+                            ChatSurface(
+                                port = port,
+                                presentation = options.presentation,
+                                onIntent = {},
+                                host = ChatSurfaceHost(),
+                                pagedTimeline = options.paged,
+                            )
+                        }
                     }
                 }
             }

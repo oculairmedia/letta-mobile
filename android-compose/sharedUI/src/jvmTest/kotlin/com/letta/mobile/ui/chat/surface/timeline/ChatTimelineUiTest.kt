@@ -31,9 +31,7 @@ import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.render.GoalStatusUi
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
-import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.timeline.rows.awaitText
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -44,6 +42,10 @@ import kotlinx.collections.immutable.toPersistentList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.chat.surface.setPointerContent
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.LocalLettaHost
 
 /** The shared timeline end to end on desktop Compose (letta-mobile-bglj6.1). */
 class ChatTimelineUiTest {
@@ -73,7 +75,7 @@ class ChatTimelineUiTest {
         host: ChatSurfaceHost = ChatSurfaceHost(),
         capabilities: ChatSurfaceCapabilities = ChatSurfaceCapabilities.Default,
     ) {
-        setContent {
+        setPointerContent {
             MaterialTheme {
                 Box(Modifier.size(width = 420.dp, height = 640.dp)) {
                     ChatTimeline(
@@ -225,9 +227,9 @@ class ChatTimelineUiTest {
     @Test
     fun goalCardSitsAtTheBottomOnTouchAndTheTopOtherwise() = runComposeUiTest {
         val goal = GoalStatusUi(objective = "Ship the shared page", status = "active", tokensUsed = 10)
-        var style by mutableStateOf(ChatPlatformStyle.Touch)
+        var style by mutableStateOf(LettaInput.Touch)
         setContent {
-            CompositionLocalProvider(LocalChatPlatformStyle provides style) {
+            CompositionLocalProvider(LocalLettaHost provides LettaHost(input = style)) {
                 MaterialTheme {
                     Box(Modifier.size(width = 420.dp, height = 640.dp)) {
                         ChatTimeline(
@@ -244,7 +246,7 @@ class ChatTimelineUiTest {
         }
         val touch = onNodeWithTag(ChatTimelineTags.GOAL).getBoundsInRoot()
         assertTrue(touch.bottom.value > halfViewportDp, "the goal card is not at the bottom on Touch: $touch")
-        runOnIdle { style = ChatPlatformStyle.Pointer }
+        runOnIdle { style = LettaInput.Pointer }
         val pointer = onNodeWithTag(ChatTimelineTags.GOAL).getBoundsInRoot()
         assertTrue(pointer.top.value < halfViewportDp, "the goal card is not at the top on a pointer host: $pointer")
     }

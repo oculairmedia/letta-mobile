@@ -18,9 +18,7 @@ import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurface
-import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import com.letta.mobile.ui.mascot.FakeMascotShell
@@ -28,6 +26,8 @@ import com.letta.mobile.ui.mascot.MascotTransportLayer
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 
 internal const val COMPANION_TEST_AGENT = "agent-1"
 internal const val COMPANION_TEST_SETTLE_MILLIS = 1_000L
@@ -67,15 +67,16 @@ internal fun ComposeUiTest.setTouchCompanionContent(port: ChatSessionPort, shell
                 MascotTransportLayer(reducedMotion = true) {
                     MaterialTheme {
                         Box(Modifier.size(PHONE_WIDTH.dp, PHONE_HEIGHT.dp)) {
-                            ChatSurface(
-                                port = port,
-                                presentation = ChatSurfacePresentation.ChatFirst,
-                                onIntent = {},
-                                host = ChatSurfaceHost(),
-                                modifier = Modifier.fillMaxSize(),
-                                appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                                platform = ChatSurfacePlatform(showKeyboardHints = false),
-                            )
+                            ProvideLettaHost(LettaHost.Touch) {
+                                ChatSurface(
+                                    port = port,
+                                    presentation = ChatSurfacePresentation.ChatFirst,
+                                    onIntent = {},
+                                    host = ChatSurfaceHost(),
+                                    modifier = Modifier.fillMaxSize(),
+                                    platform = ChatSurfacePlatform(showKeyboardHints = false),
+                                )
+                            }
                         }
                     }
                 }

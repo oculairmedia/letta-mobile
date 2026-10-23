@@ -28,15 +28,16 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
-import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.LocalLettaHost
 
 /**
  * Where the permission-mode and context chips sit: the mode chip in the card's control row beside
@@ -54,11 +55,11 @@ class ComposerChipPlacementUiTest {
     private fun ComposeUiTest.showPanel(
         width: Dp = 800.dp,
         keyboardHints: Boolean = true,
-        style: ChatPlatformStyle = ChatPlatformStyle.Pointer,
+        style: LettaInput = LettaInput.Pointer,
         composer: ChatComposerUiState = this@ComposerChipPlacementUiTest.composer,
     ) = setContent {
         MaterialTheme {
-            CompositionLocalProvider(LocalChatPlatformStyle provides style) {
+            CompositionLocalProvider(LocalLettaHost provides LettaHost(input = style)) {
                 Box(Modifier.width(width)) {
                     ChatComposerPanel(
                         ComposerInputs(
@@ -190,7 +191,7 @@ class ComposerChipPlacementUiTest {
     /** The Touch bar carries no mode chip: its "+" sheet offers the mode (TouchComposerBarUiTest). */
     @Test
     fun theTouchBarHasNoModeChipAboveIt() = runComposeUiTest {
-        showPanel(width = 360.dp, keyboardHints = false, style = ChatPlatformStyle.Touch)
+        showPanel(width = 360.dp, keyboardHints = false, style = LettaInput.Touch)
 
         waitUntilExactlyOneExists(hasTestTag(ComposerTestTags.TOUCH_BAR))
         waitUntilDoesNotExist(hasTestTag(ComposerTestTags.PERMISSION_MODE_CHIP))

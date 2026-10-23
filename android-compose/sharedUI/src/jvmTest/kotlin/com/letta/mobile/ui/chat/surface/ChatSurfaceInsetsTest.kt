@@ -23,6 +23,8 @@ import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 
 /**
  * letta-mobile-ckmub.1 (hard cut S4): the chat page renders in LettaPageScaffold, which owns the
@@ -40,15 +42,16 @@ class ChatSurfaceInsetsTest {
             ) {
                 MaterialTheme {
                     Box(Modifier.size(WIDTH, HEIGHT)) {
-                        ChatSurface(
-                            port = CompanionTestPort(typing = false),
-                            presentation = ChatSurfacePresentation.ChatFirst,
-                            onIntent = {},
-                            host = ChatSurfaceHost(),
-                            modifier = Modifier.fillMaxSize(),
-                            appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                            platform = ChatSurfacePlatform(showKeyboardHints = false),
-                        )
+                        ProvideLettaHost(LettaHost.Touch) {
+                            ChatSurface(
+                                port = CompanionTestPort(typing = false),
+                                presentation = ChatSurfacePresentation.ChatFirst,
+                                onIntent = {},
+                                host = ChatSurfaceHost(),
+                                modifier = Modifier.fillMaxSize(),
+                                platform = ChatSurfacePlatform(showKeyboardHints = false),
+                            )
+                        }
                     }
                 }
             }

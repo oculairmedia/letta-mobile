@@ -67,7 +67,7 @@ class ChatSurfaceMorphUiTest {
         withCanvas: Boolean = true,
     ): Harness {
         val harness = Harness(initial)
-        setContent {
+        setPointerContent {
             CompositionLocalProvider(LocalReducedMotion provides reducedMotion) {
                 MaterialTheme {
                     Box(Modifier.size(width = 1000.dp, height = 800.dp).testTag(ROOT_TAG)) {

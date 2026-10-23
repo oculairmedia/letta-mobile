@@ -78,7 +78,7 @@ class SendFlightChatSurfaceTest {
         val port = SendingPort()
         var bubbleFill = Color.Unspecified
         mainClock.autoAdvance = false
-        setContent {
+        setPointerContent {
             MaterialTheme {
                 bubbleFill = MaterialTheme.colorScheme.primaryContainer
                 ChatSurface(
@@ -121,7 +121,7 @@ class SendFlightChatSurfaceTest {
         val port = SendingPort(promptId = "local-1", clientMessageId = "otid-1")
         var bubbleFill = Color.Unspecified
         mainClock.autoAdvance = false
-        setContent {
+        setPointerContent {
             MaterialTheme {
                 bubbleFill = MaterialTheme.colorScheme.primaryContainer
                 ChatSurface(

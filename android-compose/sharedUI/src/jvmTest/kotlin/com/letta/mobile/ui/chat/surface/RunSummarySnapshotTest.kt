@@ -34,6 +34,9 @@ import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 
 /**
  * letta-mobile-bglj6.1.11: settled runs as the owner reviews them: an older one-command run
@@ -55,7 +58,7 @@ class RunSummarySnapshotTest {
         val heightDp: Int,
         val scale: Int,
         val presentation: ChatSurfacePresentation,
-        val style: ChatPlatformStyle,
+        val style: LettaInput,
         val expandTools: Boolean = false,
     )
 
@@ -103,17 +106,18 @@ class RunSummarySnapshotTest {
             CompositionLocalProvider(LocalDensity provides Density(shot.scale.toFloat(), 1f), LocalReducedMotion provides true) {
                 MaterialTheme(colorScheme = darkColorScheme()) {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                        ChatSurface(
-                            // zxk2n.37: runs fold under their summary line; the expanded shot opens run-2.
-                            port = FixturePort(if (shot.expandTools) settled.copy(collapsedRunIds = persistentSetOf("run-2")) else settled),
-                            presentation = shot.presentation,
-                            onIntent = {},
-                            host = ChatSurfaceHost(openCanvas = {}),
-                            appearance = ChatSurfaceAppearance(
-                                platformStyle = shot.style,
-                            ),
-                            canvas = if (shot.presentation == ChatSurfacePresentation.CanvasFirst) canvas else null,
-                        )
+                        ProvideLettaHost(LettaHost(input = shot.style)) {
+                            ChatSurface(
+                                // zxk2n.37: runs fold under their summary line; the expanded shot opens run-2.
+                                port = FixturePort(
+                                    if (shot.expandTools) settled.copy(collapsedRunIds = persistentSetOf("run-2")) else settled,
+                                ),
+                                presentation = shot.presentation,
+                                onIntent = {},
+                                host = ChatSurfaceHost(openCanvas = {}),
+                                canvas = if (shot.presentation == ChatSurfacePresentation.CanvasFirst) canvas else null,
+                            )
+                        }
                     }
                 }
             }
@@ -132,24 +136,38 @@ class RunSummarySnapshotTest {
 
     @Test
     fun phone() = render(
-        Shot("run-summary-phone", PHONE_WIDTH_DP, PHONE_HEIGHT_DP, scale = 2, ChatSurfacePresentation.ChatFirst, ChatPlatformStyle.Touch),
+        Shot("run-summary-phone", PHONE_WIDTH_DP, PHONE_HEIGHT_DP, scale = 2, ChatSurfacePresentation.ChatFirst, LettaInput.Touch),
     )
 
     @Test
     fun desktopDockedPanel() = render(
-        Shot("run-summary-desktop-docked", DESKTOP_WIDTH_DP, DESKTOP_HEIGHT_DP, scale = 1, ChatSurfacePresentation.CanvasFirst, ChatPlatformStyle.Pointer),
+        Shot(
+            "run-summary-desktop-docked",
+            DESKTOP_WIDTH_DP,
+            DESKTOP_HEIGHT_DP,
+            scale = 1,
+            ChatSurfacePresentation.CanvasFirst,
+            LettaInput.Pointer,
+        ),
     )
 
     @Test
     fun desktopFullPage() = render(
-        Shot("run-summary-desktop-full", DESKTOP_WIDTH_DP, DESKTOP_HEIGHT_DP, scale = 1, ChatSurfacePresentation.ChatFirst, ChatPlatformStyle.Pointer),
+        Shot(
+            "run-summary-desktop-full",
+            DESKTOP_WIDTH_DP,
+            DESKTOP_HEIGHT_DP,
+            scale = 1,
+            ChatSurfacePresentation.ChatFirst,
+            LettaInput.Pointer,
+        ),
     )
 
     @Test
     fun desktopFullPageExpanded() = render(
         Shot(
             "run-summary-desktop-full-expanded", DESKTOP_WIDTH_DP, DESKTOP_HEIGHT_DP, scale = 1,
-            ChatSurfacePresentation.ChatFirst, ChatPlatformStyle.Pointer, expandTools = true,
+            ChatSurfacePresentation.ChatFirst, LettaInput.Pointer, expandTools = true,
         ),
     )
 

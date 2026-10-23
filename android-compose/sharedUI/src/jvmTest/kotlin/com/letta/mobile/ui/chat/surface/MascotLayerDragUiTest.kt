@@ -33,6 +33,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 
 /**
  * letta-mobile-bglj6.1: the page's companion under a REAL mascot transport layer, which draws the
@@ -66,7 +69,7 @@ class MascotLayerDragUiTest {
     private fun ComposeUiTest.show(
         presentation: ChatSurfacePresentation,
         initial: ChatDockGeometry = ChatDockGeometry.Default,
-        style: ChatPlatformStyle = ChatPlatformStyle.Pointer,
+        style: LettaInput = LettaInput.Pointer,
     ): Harness {
         val harness = Harness(initial)
         // The shell starts without a layer; mounting the real one below marks it mounted.
@@ -76,21 +79,22 @@ class MascotLayerDragUiTest {
             shell.Provide {
                 MascotTransportLayer(reducedMotion = true) {
                     MaterialTheme {
-                        ChatSurface(
-                            port = Port(),
-                            presentation = presentation,
-                            onIntent = {},
-                            host = ChatSurfaceHost(openCanvas = {}),
-                            modifier = Modifier.fillMaxSize(),
-                            appearance = ChatSurfaceAppearance(platformStyle = style),
-                            platform = ChatSurfacePlatform(showKeyboardHints = false),
-                            canvas = { _ -> Box(Modifier.fillMaxSize()) },
-                            dockGeometry = harness.geometry,
-                            onDockGeometryChange = {
-                                harness.geometry = it
-                                harness.reported += it
-                            },
-                        )
+                        ProvideLettaHost(LettaHost(input = style)) {
+                            ChatSurface(
+                                port = Port(),
+                                presentation = presentation,
+                                onIntent = {},
+                                host = ChatSurfaceHost(openCanvas = {}),
+                                modifier = Modifier.fillMaxSize(),
+                                platform = ChatSurfacePlatform(showKeyboardHints = false),
+                                canvas = { _ -> Box(Modifier.fillMaxSize()) },
+                                dockGeometry = harness.geometry,
+                                onDockGeometryChange = {
+                                    harness.geometry = it
+                                    harness.reported += it
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -141,7 +145,7 @@ class MascotLayerDragUiTest {
 
     @Test
     fun overTheTouchHeadTheHeadKeepsItsDrag() = runComposeUiTest {
-        val harness = show(ChatSurfacePresentation.CanvasFirst, style = ChatPlatformStyle.Touch)
+        val harness = show(ChatSurfacePresentation.CanvasFirst, style = LettaInput.Touch)
         // The character stands over the head; the drag lands on the head through the layer.
         onNodeWithTag(TOUCH_HEAD_TAG).performTouchInput { swipe(center, center + Offset(-HEAD_DRAG_PX, 0f)) }
         settle()

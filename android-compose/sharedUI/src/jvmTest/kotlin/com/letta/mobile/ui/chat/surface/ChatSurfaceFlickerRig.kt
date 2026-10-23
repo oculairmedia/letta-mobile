@@ -138,7 +138,7 @@ internal class ChatSurfaceFlickerRig(val name: String) {
 
     fun ComposeUiTest.mount(reducedMotion: Boolean = false) {
         mainClock.autoAdvance = false
-        setContent {
+        setPointerContent {
             shell.Provide {
                 CompositionLocalProvider(
                     LocalMascotHost provides paintedHost,

@@ -94,7 +94,7 @@ class CollapsedDockMascotPresenceUiTest {
             it.uiState.value = it.uiState.value.copy(messages = listOf(prompt, reply).toPersistentList())
         }
         mainClock.autoAdvance = false
-        setContent {
+        setPointerContent {
             shell.Provide {
                 MaterialTheme {
                     Box(Modifier.size(WINDOW_WIDTH.dp, WINDOW_HEIGHT.dp)) {

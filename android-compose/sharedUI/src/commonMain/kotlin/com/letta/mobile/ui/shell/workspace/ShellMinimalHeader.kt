@@ -16,6 +16,7 @@ import com.letta.mobile.sharedui.resources.shell_workspace_title
 import com.letta.mobile.ui.chat.AgentIdentity
 import com.letta.mobile.ui.chat.AgentIdentityPill
 import com.letta.mobile.ui.host.LocalLettaHost
+import com.letta.mobile.ui.host.ProvideLettaIdiom
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.shell.header.HeaderAction
 import com.letta.mobile.ui.shell.header.HeaderControls
@@ -44,14 +45,18 @@ internal fun ShellMinimalWorkspaceHeader(
     search: SearchSlot?,
     modifier: Modifier = Modifier,
 ) {
-    ShellHeader(
-        title = minimal.identity
-            ?.let { identity -> HeaderTitle.Custom { AgentIdentityPill(identity) } }
-            ?: HeaderTitle.Text(title ?: stringResource(Res.string.shell_workspace_title)),
-        modifier = modifier,
-        search = search,
-        controls = HeaderControls(actions = listOf(HeaderAction.Custom { ShellDrawerMenuButton(minimal.onOpenNavigation) })),
-    )
+    // The minimal header is the compact window's: hoisted into a desktop title bar it sits outside
+    // the workspace's idiom, so it resolves the same rule itself (ckmub.17.36).
+    ProvideLettaIdiom(compact = true) {
+        ShellHeader(
+            title = minimal.identity
+                ?.let { identity -> HeaderTitle.Custom { AgentIdentityPill(identity) } }
+                ?: HeaderTitle.Text(title ?: stringResource(Res.string.shell_workspace_title)),
+            modifier = modifier,
+            search = search,
+            controls = HeaderControls(actions = listOf(HeaderAction.Custom { ShellDrawerMenuButton(minimal.onOpenNavigation) })),
+        )
+    }
 }
 
 /** The phone header's drawer opener: a black round button with a white menu glyph. */
