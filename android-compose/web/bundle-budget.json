@@ -7,9 +7,9 @@
   "groups": {
     "kotlin-app-and-skiko-wasm": {
       "include": ["*.wasm"],
-      "ceiling_gzip_bytes": 7900000,
+      "ceiling_gzip_bytes": 7980000,
       "measured_gzip_bytes": 7672607,
-      "notes": "The Kotlin/Wasm app (16.1 MiB raw) and the Skiko runtime (8.2 MiB raw), main at 101433a40."
+      "notes": "The Kotlin/Wasm app (16.1 MiB raw) and the Skiko runtime (8.2 MiB raw), main at 101433a40. Raised 7,900,000 -> 7,980,000 on 2026-10-23 by owner decision (Emmanuel) for browser pairing (letta-mobile-wisqe S1b, PR #2188): about 50 KiB gzip after optimisation for about 14 KB of new code before it (measured). Main 7,682.9 KiB at 0e5f262ba; S1b 7,732.9 KiB; the new ceiling keeps about 3% headroom."
     },
     "app-js": {
       "include": ["letta-web.js"],

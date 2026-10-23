@@ -36,7 +36,7 @@
     </style>
     <script type="module">
         import init, { IrohAppServerSession, identityNodeId } from './iroh/letta_iroh_wasm.js';
-        import { loadOrCreateIdentity } from './iroh-identity.js';
+        import { fromHex, loadOrCreateIdentity, toHex } from './iroh-identity.js';
 
         const sessions = new Map();
         const maxQueuedControlFrames = 256;
@@ -79,9 +79,21 @@
             return secret ? identityNodeId(secret) : null;
         };
 
-        window.irohConnect = async (ticket) => {
+        // letta-mobile-wisqe S1b: pairing presents invites with this identity, so the
+        // key crosses to Kotlin as hex (same page, same exposure as the session's own use).
+        window.irohLoadOrCreateIdentity = async () => {
             await initialize();
-            const native = await IrohAppServerSession.connect(ticket, await browserIdentity());
+            const secret = await browserIdentity();
+            return secret ? toHex(secret) : null;
+        };
+        /** The NodeId a hex secret dials as; irohLoadOrCreateIdentity has initialized the module. */
+        window.irohNodeIdOf = (secretHex) => identityNodeId(fromHex(secretHex));
+
+        /** Dials with [secretHex] when given, else this browser's persistent identity. */
+        window.irohConnect = async (ticket, secretHex) => {
+            await initialize();
+            const secret = secretHex ? fromHex(secretHex) : await browserIdentity();
+            const native = await IrohAppServerSession.connect(ticket, secret);
             const id = nextSessionId++;
             const session = {
                 native,

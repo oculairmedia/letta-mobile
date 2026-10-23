@@ -32106,6 +32106,18 @@ public abstract interface class com/letta/mobile/data/pairing/composition/Pairin
 	public abstract fun nowMs ()J
 }
 
+public final class com/letta/mobile/data/pairing/composition/RelayPairingNetwork : com/letta/mobile/data/pairing/composition/PairingNetwork {
+	public static final field Companion Lcom/letta/mobile/data/pairing/composition/RelayPairingNetwork$Companion;
+	public static final field DEFAULT_TIMEOUT_MS J
+	public fun <init> (Lcom/letta/mobile/data/transport/iroh/InviteAuthenticator;Lkotlin/jvm/functions/Function1;J)V
+	public synthetic fun <init> (Lcom/letta/mobile/data/transport/iroh/InviteAuthenticator;Lkotlin/jvm/functions/Function1;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun nodeIdOf ([B)Ljava/lang/String;
+	public fun redeemer (Lkotlin/jvm/functions/Function1;)Lcom/letta/mobile/data/pairing/PairingRedeemer;
+}
+
+public final class com/letta/mobile/data/pairing/composition/RelayPairingNetwork$Companion {
+}
+
 public final class com/letta/mobile/data/platform/HeapPressure {
 	public static final field CRITICAL_RATIO D
 	public static final field INSTANCE Lcom/letta/mobile/data/platform/HeapPressure;

@@ -3827,6 +3827,10 @@ abstract fun interface com.letta.mobile.data.transport.appserver/AppServerAdminC
     abstract suspend fun call(com.letta.mobile.data.transport.appserver/AppServerAdminMethod, kotlinx.serialization.json/JsonObject): kotlinx.serialization.json/JsonElement? // com.letta.mobile.data.transport.appserver/AppServerAdminCall.call|call(com.letta.mobile.data.transport.appserver.AppServerAdminMethod;kotlinx.serialization.json.JsonObject){}[0]
 }
 
+abstract fun interface com.letta.mobile.data.transport.iroh/InviteAuthenticator { // com.letta.mobile.data.transport.iroh/InviteAuthenticator|null[0]
+    abstract suspend fun authenticate(kotlin/ByteArray, com.letta.mobile.data.transport.iroh/InviteAuthRequest): com.letta.mobile.data.transport.appserver/AppServerInboundFrame.AuthResponse // com.letta.mobile.data.transport.iroh/InviteAuthenticator.authenticate|authenticate(kotlin.ByteArray;com.letta.mobile.data.transport.iroh.InviteAuthRequest){}[0]
+}
+
 abstract fun interface com.letta.mobile.data.workspace.directory/DefaultWorkingDirectoryStore { // com.letta.mobile.data.workspace.directory/DefaultWorkingDirectoryStore|null[0]
     abstract fun setCwd(com.letta.mobile.data.model/AgentId, kotlin/String?) // com.letta.mobile.data.workspace.directory/DefaultWorkingDirectoryStore.setCwd|setCwd(com.letta.mobile.data.model.AgentId;kotlin.String?){}[0]
 }
@@ -46210,6 +46214,18 @@ final class com.letta.mobile.data.pairing.composition/PairingComposition { // co
     final suspend fun selfNodeId(): kotlin/String? // com.letta.mobile.data.pairing.composition/PairingComposition.selfNodeId|selfNodeId(){}[0]
 }
 
+final class com.letta.mobile.data.pairing.composition/RelayPairingNetwork : com.letta.mobile.data.pairing.composition/PairingNetwork { // com.letta.mobile.data.pairing.composition/RelayPairingNetwork|null[0]
+    constructor <init>(com.letta.mobile.data.transport.iroh/InviteAuthenticator, kotlin/Function1<kotlin/ByteArray, kotlin/String>, kotlin/Long = ...) // com.letta.mobile.data.pairing.composition/RelayPairingNetwork.<init>|<init>(com.letta.mobile.data.transport.iroh.InviteAuthenticator;kotlin.Function1<kotlin.ByteArray,kotlin.String>;kotlin.Long){}[0]
+
+    final fun nodeIdOf(kotlin/ByteArray): kotlin/String // com.letta.mobile.data.pairing.composition/RelayPairingNetwork.nodeIdOf|nodeIdOf(kotlin.ByteArray){}[0]
+    final fun redeemer(kotlin.coroutines/SuspendFunction0<kotlin/ByteArray>): com.letta.mobile.data.pairing/PairingRedeemer // com.letta.mobile.data.pairing.composition/RelayPairingNetwork.redeemer|redeemer(kotlin.coroutines.SuspendFunction0<kotlin.ByteArray>){}[0]
+
+    final object Companion { // com.letta.mobile.data.pairing.composition/RelayPairingNetwork.Companion|null[0]
+        final const val DEFAULT_TIMEOUT_MS // com.letta.mobile.data.pairing.composition/RelayPairingNetwork.Companion.DEFAULT_TIMEOUT_MS|{}DEFAULT_TIMEOUT_MS[0]
+            final fun <get-DEFAULT_TIMEOUT_MS>(): kotlin/Long // com.letta.mobile.data.pairing.composition/RelayPairingNetwork.Companion.DEFAULT_TIMEOUT_MS.<get-DEFAULT_TIMEOUT_MS>|<get-DEFAULT_TIMEOUT_MS>(){}[0]
+    }
+}
+
 final class com.letta.mobile.data.pairing/MintedPairInvite { // com.letta.mobile.data.pairing/MintedPairInvite|null[0]
     constructor <init>(kotlin/String, kotlin/String, kotlin/Long, kotlin.collections/Set<kotlin/String>?) // com.letta.mobile.data.pairing/MintedPairInvite.<init>|<init>(kotlin.String;kotlin.String;kotlin.Long;kotlin.collections.Set<kotlin.String>?){}[0]
 
@@ -59482,6 +59498,19 @@ final class com.letta.mobile.data.transport.appserver/KtorAppServerWebSocketTran
 
 final class com.letta.mobile.data.transport.appserver/WorkspaceRelayException : kotlin/IllegalArgumentException { // com.letta.mobile.data.transport.appserver/WorkspaceRelayException|null[0]
     constructor <init>(kotlin/String) // com.letta.mobile.data.transport.appserver/WorkspaceRelayException.<init>|<init>(kotlin.String){}[0]
+}
+
+final class com.letta.mobile.data.transport.iroh/InviteAuthRequest { // com.letta.mobile.data.transport.iroh/InviteAuthRequest|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String) // com.letta.mobile.data.transport.iroh/InviteAuthRequest.<init>|<init>(kotlin.String;kotlin.String;kotlin.String){}[0]
+
+    final val dialAddress // com.letta.mobile.data.transport.iroh/InviteAuthRequest.dialAddress|{}dialAddress[0]
+        final fun <get-dialAddress>(): kotlin/String // com.letta.mobile.data.transport.iroh/InviteAuthRequest.dialAddress.<get-dialAddress>|<get-dialAddress>(){}[0]
+    final val inviteToken // com.letta.mobile.data.transport.iroh/InviteAuthRequest.inviteToken|{}inviteToken[0]
+        final fun <get-inviteToken>(): kotlin/String // com.letta.mobile.data.transport.iroh/InviteAuthRequest.inviteToken.<get-inviteToken>|<get-inviteToken>(){}[0]
+    final val peerName // com.letta.mobile.data.transport.iroh/InviteAuthRequest.peerName|{}peerName[0]
+        final fun <get-peerName>(): kotlin/String // com.letta.mobile.data.transport.iroh/InviteAuthRequest.peerName.<get-peerName>|<get-peerName>(){}[0]
+
+    final fun toString(): kotlin/String // com.letta.mobile.data.transport.iroh/InviteAuthRequest.toString|toString(){}[0]
 }
 
 final class com.letta.mobile.data.transport/AgentEventAttachment { // com.letta.mobile.data.transport/AgentEventAttachment|null[0]

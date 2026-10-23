@@ -118,7 +118,8 @@ internal class IrohWasmAppServerTransport private constructor(
         private const val MIN_POLL_INTERVAL_MS = 10L
         private const val MAX_POLL_INTERVAL_MS = 100L
 
-        suspend fun connect(address: IrohServerAddress, scope: CoroutineScope): IrohWasmAppServerTransport =
-            IrohWasmAppServerTransport(IrohWasmBridge.connect(address), scope)
+        /** Dials [address]; with [secretKeyHex] as that identity, else as this browser's persistent one. */
+        suspend fun connect(address: IrohServerAddress, scope: CoroutineScope, secretKeyHex: String? = null): IrohWasmAppServerTransport =
+            IrohWasmAppServerTransport(IrohWasmBridge.connect(address, secretKeyHex), scope)
     }
 }
