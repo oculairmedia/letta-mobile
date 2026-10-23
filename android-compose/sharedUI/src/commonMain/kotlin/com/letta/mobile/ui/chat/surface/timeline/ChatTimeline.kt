@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import com.letta.mobile.data.chat.tools.ToolStepExpansions
+import com.letta.mobile.ui.chat.tools.LocalToolStepExpansions
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -104,7 +106,12 @@ internal fun ChatTimeline(
             // The goal card, when there is one on top, already rests below the chrome; the list starts under it.
             val bodyTopInset = if (goal != null && !goalAtBottom) 0.dp else topInset
             // letta-mobile-bzvro.14: several approvals waiting at once are answered one at a time.
-            CompositionLocalProvider(LocalApprovalStepper provides rememberApprovalStepper(state.messages, actions)) {
+            // A host that keeps no tool step expansions (no shell around it) still keeps them for the timeline's life.
+            val expansions = LocalToolStepExpansions.current ?: remember { ToolStepExpansions() }
+            CompositionLocalProvider(
+                LocalApprovalStepper provides rememberApprovalStepper(state.messages, actions),
+                LocalToolStepExpansions provides expansions,
+            ) {
                 TimelineBody(
                     TimelineBodyParams(
                         state, pagedTimeline, actions, capabilities, appearance, bindings, bottomReserve, listState, host.editAgent,

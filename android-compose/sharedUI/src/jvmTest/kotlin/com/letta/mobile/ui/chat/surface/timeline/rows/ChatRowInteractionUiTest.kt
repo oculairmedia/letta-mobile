@@ -3,10 +3,12 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import com.letta.mobile.data.chat.tools.ToolStepExpansions
+import com.letta.mobile.ui.chat.tools.LocalToolStepExpansions
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
@@ -266,7 +268,6 @@ class ChatRowInteractionUiTest {
         awaitText("All done here.")
         onNodeWithText("Looking into it.").assertExists()
         onNodeWithText("All done here.").assertExists()
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertExists().assert(hasClickAction())
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).performClick()
         runOnIdle { assertEquals(listOf("run-1"), actions.toggledRuns) }
@@ -315,7 +316,6 @@ class ChatRowInteractionUiTest {
         setContent {
             val context = ChatRowContext(
                 newestMessageId = thought.id,
-                toolDetails = ChatToolDetails.Inline,
                 itemState = renderState(),
                 capabilities = ChatSurfaceCapabilities.Default,
                 streamingMessageId = thought.id.takeIf { streaming },
@@ -431,13 +431,13 @@ class ChatRowInteractionUiTest {
             }
         }
 
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertExists()
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).assertExists()
         onNodeWithText("Approval requested").assertDoesNotExist()
         onNodeWithTag(ChatRowTestTags.APPROVAL_TOOL_CALL).assertDoesNotExist()
         onNodeWithTag(ChatRowTestTags.APPROVAL_REQUESTING_INPUT, useUnmergedTree = true).assertDoesNotExist()
         onNodeWithTag(ChatRowTestTags.SPEAKER_HEADER).assertDoesNotExist()
         runOnIdle { style = ChatPlatformStyle.Pointer }
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertExists()
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).assertExists()
         onNodeWithText("Approval requested").assertDoesNotExist()
     }
 
@@ -459,14 +459,11 @@ class ChatRowInteractionUiTest {
         )
         setContent {
             MaterialTheme {
-                RenderRow(single(msg), rowContext(toolDetails = ChatToolDetails.Sheet), rowCallbacks(openSubagent = { opened = it }))
+                RenderRow(single(msg), rowContext(), rowCallbacks(openSubagent = { opened = it }))
             }
         }
 
-        // The call reads as one summary line; on a touch host its cards open in a sheet.
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_DETAILS).assertExists()
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).assertDoesNotExist()
+        // The call reads as its card among the message's steps: no summary line or sheet to open first.
         onNodeWithText("Dispatched: Audit the build").performClick()
         runOnIdle { assertEquals(ChatSubagentTarget("agent-call-1", "Audit the build", "agent-sub"), opened) }
         onNodeWithText("Show prompt").performClick()
@@ -474,50 +471,43 @@ class ChatRowInteractionUiTest {
     }
 
     @Test
-    fun toolSummaryExpandsItsCardsInPlaceOnAPointerHost() = runComposeUiTest {
+    fun aLoneToolMessageReadsAsItsStepLinesWithNoSummaryLine() = runComposeUiTest {
         val msg = message("m-1", "assistant", "").copy(toolCalls = listOf(toolCall(status = "success", result = "hello")))
-        setContent { MaterialTheme { RenderRow(single(msg), rowContext(toolDetails = ChatToolDetails.Inline)) } }
+        setContent { MaterialTheme { RenderRow(single(msg), rowContext()) } }
 
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).assertDoesNotExist()
-        onNodeWithContentDescription("Show command details").assertExists()
-
-        // A disclosure, not a sheet: the cards open under the line, inside the timeline.
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).assertExists()
-        onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).assertExists()
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_DETAILS).assertDoesNotExist()
-        onNodeWithContentDescription("Hide command details").assertExists()
-        val line = onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).fetchSemanticsNode().boundsInRoot
-        val cards = onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).fetchSemanticsNode().boundsInRoot
-        assertTrue(cards.top >= line.bottom, "the cards sit under the line ($cards vs $line)")
-
-        // Tapping the line again folds them away.
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).assertDoesNotExist()
+        // The step line itself is the disclosure: its inset opens under it, inside the timeline.
+        onNodeWithContentDescription("Show command details").assertDoesNotExist()
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertExists()
+        val line = onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).fetchSemanticsNode().boundsInRoot
+        val body = onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).fetchSemanticsNode().boundsInRoot
+        assertTrue(body.top >= line.bottom, "the inset sits under the line ($body vs $line)")
     }
 
     @Test
-    fun anOpenedToolDisclosureSurvivesScrollingAway() = runComposeUiTest {
+    fun anOpenedToolStepSurvivesScrollingAway() = runComposeUiTest {
         val msg = message("m-1", "assistant", "").copy(toolCalls = listOf(toolCall(status = "success", result = "hello")))
         lateinit var focus: FocusManager
         setContent {
             focus = LocalFocusManager.current
-            MaterialTheme {
-                LazyColumn(Modifier.height(SCROLL_VIEWPORT).testTag(SCROLL_LIST_TAG)) {
-                    item(key = "run") { RenderRow(single(msg), rowContext(toolDetails = ChatToolDetails.Inline)) }
-                    items(FILLER_ROWS) { Box(Modifier.height(SCROLL_VIEWPORT)) }
+            // The timeline (or the shell around it) keeps the steps the person opened.
+            CompositionLocalProvider(LocalToolStepExpansions provides remember { ToolStepExpansions() }) {
+                MaterialTheme {
+                    LazyColumn(Modifier.height(SCROLL_VIEWPORT).testTag(SCROLL_LIST_TAG)) {
+                        item(key = "run") { RenderRow(single(msg), rowContext()) }
+                        items(FILLER_ROWS) { Box(Modifier.height(SCROLL_VIEWPORT)) }
+                    }
                 }
             }
         }
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).assertExists()
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertExists()
         // A focused row stays pinned in the list: let go of it first.
         runOnIdle { focus.clearFocus() }
         // Far enough that the row leaves composition, then back.
         onNodeWithTag(SCROLL_LIST_TAG).performScrollToIndex(FILLER_ROWS)
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
         onNodeWithTag(SCROLL_LIST_TAG).performScrollToIndex(0)
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).assertExists()
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertExists()
     }
 
     @Test
@@ -533,17 +523,6 @@ class ChatRowInteractionUiTest {
         waitForIdle()
         assertEquals(minute, almost, "59,950 ms reads as a minute, not \"60.0s\"")
         assertTrue(under.startsWith("59.9"), under)
-    }
-
-    @Test
-    fun toolSummaryOpensASheetOnATouchHost() = runComposeUiTest {
-        val msg = message("m-1", "assistant", "").copy(toolCalls = listOf(toolCall(status = "success", result = "hello")))
-        setContent { MaterialTheme { RenderRow(single(msg), rowContext(toolDetails = ChatToolDetails.Sheet)) } }
-
-        onNodeWithContentDescription("Open command details").assertExists()
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_DETAILS).assertExists()
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_INLINE).assertDoesNotExist()
     }
 
     @Test

@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -19,6 +20,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runComposeUiTest
@@ -143,8 +145,34 @@ class ToolStepUiTest {
         assertEquals(range.maxValue(), range.value(), "the viewport did not follow the output's tail")
     }
 
+    @Test
+    fun scrollingUpStopsFollowingTheTailAndScrollingBackToTheEndResumesIt() = runComposeUiTest {
+        var call by mutableStateOf(bash("tail -f log", lines(50), status = null))
+        show { call }
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
+        val viewport = onNodeWithTag(ChatRowTestTags.TOOL_INSET_VIEWPORT, useUnmergedTree = true)
+        fun range() = viewport.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+
+        // The reader scrolls up: new output no longer pulls them down.
+        viewport.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, -SCROLL_UP_PX) }
+        val readingAt = range().value()
+        runOnIdle { call = call.copy(result = lines(100)) }
+        waitForIdle()
+        assertEquals(readingAt, range().value(), "the viewport moved while the reader was scrolled up")
+        assertTrue(range().value() < range().maxValue())
+
+        // Back at the end: following resumes.
+        viewport.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, range().maxValue()) }
+        runOnIdle { call = call.copy(result = lines(150)) }
+        waitForIdle()
+        assertEquals(range().maxValue(), range().value(), "following did not resume at the end")
+    }
+
+    private fun lines(count: Int) = (1..count).joinToString("\n")
+
     private companion object {
         const val WIDTH = 320
+        const val SCROLL_UP_PX = 300f
         const val LONG_LINE = 400
         const val MIN_WRAPPED_HEIGHT = 40
     }

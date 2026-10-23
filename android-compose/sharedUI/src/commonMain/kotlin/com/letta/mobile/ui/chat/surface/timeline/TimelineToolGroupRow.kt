@@ -7,14 +7,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowCallbacks
+import com.letta.mobile.ui.chat.surface.timeline.rows.RunToolSteps
 import com.letta.mobile.ui.chat.surface.timeline.rows.ToolRunCalls
-import com.letta.mobile.ui.chat.surface.timeline.rows.ToolRunGroup
 import kotlinx.collections.immutable.toImmutableList
 
 /**
- * Consecutive tool-only messages of one run, folded into ONE tool summary
- * line ("Ran 3 commands", "3 ran - 1 failed"), the same line a run block draws for its calls.
- * Tapping it opens the calls in full.
+ * Consecutive tool-only messages of one run, read as ONE group of step lines under the label of what
+ * they add up to, the same steps a run block lists. A request they wait on keeps its card under them.
  */
 @Composable
 internal fun ToolGroupRow(
@@ -25,12 +24,8 @@ internal fun ToolGroupRow(
 ) {
     val toolCalls = remember(group) { group.singles.flatMap { it.message.toolCalls.orEmpty() }.toImmutableList() }
     val approvals = remember(group) { group.singles.mapNotNull { it.message.approvalRequest }.toImmutableList() }
-    ToolRunGroup(
-        calls = ToolRunCalls(
-            toolCalls = toolCalls,
-            approvals = approvals,
-            startedAtTimestamp = group.singles.first().message.timestamp.takeIf { it.isNotBlank() },
-        ),
+    RunToolSteps(
+        calls = ToolRunCalls(toolCalls = toolCalls, approvals = approvals),
         context = contexts.forItem(group.singles.last()),
         callbacks = callbacks,
         modifier = modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),

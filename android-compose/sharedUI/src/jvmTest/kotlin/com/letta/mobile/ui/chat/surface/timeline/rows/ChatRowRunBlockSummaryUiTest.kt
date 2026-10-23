@@ -31,7 +31,6 @@ import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.runtime.PendingApprovalDetails
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -63,7 +62,7 @@ class ChatRowRunBlockSummaryUiTest {
             CompositionLocalProvider(LocalReducedMotion provides reducedMotion) {
                 MaterialTheme {
                     Box(Modifier.width(400.dp).testTag(ROW)) {
-                        RenderRow(item, rowContext(itemState = state, newestMessageId = "a", toolDetails = ChatToolDetails.Sheet), rowCallbacks(actions))
+                        RenderRow(item, rowContext(itemState = state, newestMessageId = "a"), rowCallbacks(actions))
                     }
                 }
             }
@@ -82,7 +81,6 @@ class ChatRowRunBlockSummaryUiTest {
         assertEquals(1, onAllNodesWithTag(ChatRowTestTags.RUN_GLYPH, useUnmergedTree = true).fetchSemanticsNodes().size)
         // No step rows, so no second line and no second chevron.
         assertEquals(0, onAllNodesWithTag(ChatRowTestTags.RUN_WORK_STEP).fetchSemanticsNodes().size)
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
         assertEquals(0, onAllNodesWithContentDescription("command details", substring = true).fetchSemanticsNodes().size)
         // The run's answer still reads under the line.
         onNodeWithText("Fixed it.", substring = true).assertExists()
@@ -97,7 +95,6 @@ class ChatRowRunBlockSummaryUiTest {
         awaitText("Fixed it.")
 
         // ckmub.1.2: the steps list straight under the line; no "Ran 2 commands" group row.
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
         onNodeWithText("Ran 2 commands", useUnmergedTree = true).assertDoesNotExist()
         assertEquals(0, onAllNodesWithContentDescription("command details", substring = true).fetchSemanticsNodes().size)
         val steps = onAllNodesWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).fetchSemanticsNodes()
@@ -132,7 +129,6 @@ class ChatRowRunBlockSummaryUiTest {
         onNodeWithText("Approval requested").assertExists()
         onNodeWithText("Approve").assertExists()
         // The parked call is a step row of the open run, its glyph saying it waits.
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).assertExists()
         onNodeWithTag(ChatRowTestTags.TOOL_STEP_NOTE, useUnmergedTree = true).assertTextEquals("awaiting approval")
     }
@@ -156,7 +152,7 @@ class ChatRowRunBlockSummaryUiTest {
                 MaterialTheme {
                     Box(Modifier.width(400.dp).testTag(ROW)) {
                         val state = renderState(collapsedRunIds = if (opened) setOf(RUN_ID) else emptySet())
-                        RenderRow(run, rowContext(itemState = state, newestMessageId = "a", toolDetails = ChatToolDetails.Sheet))
+                        RenderRow(run, rowContext(itemState = state, newestMessageId = "a"))
                     }
                 }
             }
@@ -179,7 +175,7 @@ class ChatRowRunBlockSummaryUiTest {
         setContent {
             MaterialTheme {
                 Box(Modifier.width(400.dp).testTag(ROW)) {
-                    RenderRow(shown, rowContext(itemState = state, newestMessageId = "a", toolDetails = ChatToolDetails.Sheet))
+                    RenderRow(shown, rowContext(itemState = state, newestMessageId = "a"))
                 }
             }
         }

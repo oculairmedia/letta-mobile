@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DisclosureChevronDefaults
 
@@ -60,11 +59,11 @@ class ChatRowRunStepPrimitivesUiTest {
         ).map { it to GroupPosition.None },
     )
 
-    private fun ComposeUiTest.showOpened(item: ChatRenderItem, details: ChatToolDetails = ChatToolDetails.Inline) {
+    private fun ComposeUiTest.showOpened(item: ChatRenderItem) {
         setContent {
             MaterialTheme {
                 Box(Modifier.width(400.dp)) {
-                    RenderRow(item, rowContext(itemState = renderState(collapsedRunIds = setOf(RUN_ID)), newestMessageId = "a", toolDetails = details))
+                    RenderRow(item, rowContext(itemState = renderState(collapsedRunIds = setOf(RUN_ID)), newestMessageId = "a"))
                 }
             }
         }
@@ -79,20 +78,15 @@ class ChatRowRunStepPrimitivesUiTest {
     private val chevron = hasTestTag(DisclosureChevronDefaults.TestTag)
 
     @Test
-    fun anOpenedRunHasOneChevronPerDisclosableLevelAndNoGroupRow() {
-        for (details in ChatToolDetails.entries) {
-            runComposeUiTest {
-                showOpened(runOf(call("c1"), call("c2", command = "pwd")), details)
+    fun anOpenedRunHasOneChevronPerDisclosableLevelAndNoGroupRow() = runComposeUiTest {
+        showOpened(runOf(call("c1"), call("c2", command = "pwd")))
 
-                onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
-                onNodeWithTag(ChatRowTestTags.RUN_STEP_GROUP_LABEL, useUnmergedTree = true).assertTextEquals("Ran commands")
-                assertEquals(2, onAllNodesWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).fetchSemanticsNodes().size, "$details")
-                // The summary line's one chevron, and one per step: nothing nested.
-                assertEquals(1, count(chevron and under(ChatRowTestTags.RUN_HEADER)), "$details")
-                assertEquals(2, count(chevron and under(ChatRowTestTags.TOOL_CARD_TOGGLE)), "$details")
-                assertEquals(3, count(chevron), "$details")
-            }
-        }
+        onNodeWithTag(ChatRowTestTags.RUN_STEP_GROUP_LABEL, useUnmergedTree = true).assertTextEquals("Ran commands")
+        assertEquals(2, onAllNodesWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).fetchSemanticsNodes().size)
+        // The summary line's one chevron, and one per step: nothing nested.
+        assertEquals(1, count(chevron and under(ChatRowTestTags.RUN_HEADER)))
+        assertEquals(2, count(chevron and under(ChatRowTestTags.TOOL_CARD_TOGGLE)))
+        assertEquals(3, count(chevron))
     }
 
     @Test
@@ -100,7 +94,6 @@ class ChatRowRunStepPrimitivesUiTest {
         showOpened(runOf(call("c1"), call("c2", command = "pwd")))
 
         // Straight under the run's line, no group row between them.
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
         // The presenter's verb, then the command's one-line target.
         assertEquals(2, count(hasText("Ran") and under(ChatRowTestTags.TOOL_CARD_TOGGLE)))
         assertEquals(1, count(hasText("pwd") and under(ChatRowTestTags.TOOL_CARD_TOGGLE)))
@@ -115,7 +108,6 @@ class ChatRowRunStepPrimitivesUiTest {
         subheader.assertTextEquals("Ran commands, called tools")
         subheader.assert(hasClickAction().not())
         assertEquals(0, count(chevron and under(ChatRowTestTags.RUN_STEP_GROUP_LABEL)))
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
         assertEquals(2, count(chevron and under(ChatRowTestTags.TOOL_CARD_TOGGLE)))
     }
 

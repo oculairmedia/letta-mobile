@@ -26,7 +26,6 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.chat.render.ChatRenderItemState
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.toImmutableSet
@@ -154,7 +153,6 @@ class ChatRowMotionUiTest {
                             itemState = state,
                             streamingMessageId = "b",
                             newestMessageId = "b",
-                            toolDetails = ChatToolDetails.Sheet,
                             capabilities = ChatSurfaceCapabilities.Default,
                         ),
                     )

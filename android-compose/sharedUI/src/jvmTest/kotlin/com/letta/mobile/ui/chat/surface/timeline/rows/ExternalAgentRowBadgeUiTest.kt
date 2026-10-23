@@ -6,13 +6,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiSubagentNotification
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.chat.subagents.EXTERNAL_AGENT_BADGE_TAG
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import kotlin.test.Test
 
 /**
@@ -45,9 +43,8 @@ class ExternalAgentRowBadgeUiTest {
                 UiToolCall(name = "Agent", arguments = "{}", result = null, status = "running", subagentDispatch = dispatch),
             ),
         )
-        setContent { MaterialTheme { RenderRow(single(msg), rowContext(toolDetails = ChatToolDetails.Sheet)) } }
+        setContent { MaterialTheme { RenderRow(single(msg), rowContext()) } }
 
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
         awaitText("Dispatched: Refactor the parser")
         onNodeWithTag(EXTERNAL_AGENT_BADGE_TAG, useUnmergedTree = true).assertTextEquals("Claude Code")
     }

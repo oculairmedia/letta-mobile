@@ -10,7 +10,6 @@ import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -19,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.common.GroupPosition
 import kotlin.math.abs
 import kotlin.test.Test
@@ -62,14 +60,13 @@ class ChatRowRunAlignmentUiTest {
     private fun ComposeUiTest.show(
         item: ChatRenderItem,
         newest: String?,
-        details: ChatToolDetails,
         widthDp: Int = 400,
         opened: Set<String> = setOf("run-1"),
     ) {
         setContent {
             MaterialTheme {
                 Box(Modifier.width(widthDp.dp)) {
-                    RenderRow(item, rowContext(itemState = renderState(collapsedRunIds = opened), newestMessageId = newest, toolDetails = details))
+                    RenderRow(item, rowContext(itemState = renderState(collapsedRunIds = opened), newestMessageId = newest))
                 }
             }
         }
@@ -80,7 +77,7 @@ class ChatRowRunAlignmentUiTest {
 
     @Test
     fun theRunHeaderSitsOnItsOwnLineWithTheLegacyInset() = runComposeUiTest {
-        show(run, newest = "b", details = ChatToolDetails.Sheet)
+        show(run, newest = "b")
         val prose = proseLeft()
         val row = onNodeWithTag(ChatRowTestTags.RUN_HEADER).fetchSemanticsNode().boundsInRoot
         val label = onNodeWithText("Worked", substring = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -91,24 +88,20 @@ class ChatRowRunAlignmentUiTest {
     }
 
     @Test
-    fun aRunWithToolsListsOneStepRowPerCallOnEveryHost() {
-        for (details in ChatToolDetails.entries) {
-            for (width in WIDTHS_DP) {
-                runComposeUiTest {
-                    show(run, newest = "b", details = details, widthDp = width)
-                    // ckmub.1.2: no group line; each call is a step row of its own under the summary.
-                    assertEquals(0, onAllNodesWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).fetchSemanticsNodes().size, "$details @ $width")
-                    assertEquals(0, onAllNodesWithContentDescription("command details", substring = true).fetchSemanticsNodes().size, "$details @ $width")
-                    val steps = onAllNodesWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).fetchSemanticsNodes()
-                    assertEquals(2, steps.size, "$details @ $width")
-                    val block = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).fetchSemanticsNode().boundsInRoot
-                    val label = onNodeWithText("Worked", substring = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                    steps.forEach { step ->
-                        val tools = step.boundsInRoot
-                        // The row ends at the run's right edge; the step sits indented under the summary's label.
-                        assertTrue(abs(tools.right - block.right) < TOLERANCE_PX, "the step row is inset: ${tools.right} vs ${block.right}")
-                        assertTrue(abs(tools.left - label.left) < TOLERANCE_PX, "the tool step is not under the summary's label ($details @ $width)")
-                    }
+    fun aRunWithToolsListsOneStepRowPerCallAtEveryWidth() {
+        for (width in WIDTHS_DP) {
+            runComposeUiTest {
+                show(run, newest = "b", widthDp = width)
+                // No group line to open first: each call is a step line of its own under the summary.
+                val steps = onAllNodesWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).fetchSemanticsNodes()
+                assertEquals(2, steps.size, "@ $width")
+                val block = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).fetchSemanticsNode().boundsInRoot
+                val label = onNodeWithText("Worked", substring = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                steps.forEach { step ->
+                    val tools = step.boundsInRoot
+                    // The row ends at the run's right edge; the step sits indented under the summary's label.
+                    assertTrue(abs(tools.right - block.right) < TOLERANCE_PX, "the step row is inset: ${tools.right} vs ${block.right}")
+                    assertTrue(abs(tools.left - label.left) < TOLERANCE_PX, "the tool step is not under the summary's label (@ $width)")
                 }
             }
         }
@@ -116,7 +109,7 @@ class ChatRowRunAlignmentUiTest {
 
     @Test
     fun aSettledRunOfSeveralStepsFoldsFromItsHeader() = runComposeUiTest {
-        show(run, newest = "b", details = ChatToolDetails.Sheet)
+        show(run, newest = "b")
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assert(hasClickAction())
     }
 
@@ -127,14 +120,13 @@ class ChatRowRunAlignmentUiTest {
             GroupPosition.None,
             stableRunId = "run-3",
         )
-        show(lone, newest = "s", details = ChatToolDetails.Sheet)
+        show(lone, newest = "s")
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assert(hasClickAction().not())
-        assertEquals(0, onAllNodesWithContentDescription("command details", substring = true).fetchSemanticsNodes().size)
     }
     @Test
     fun anOlderRunKeepsItsSummaryLineAndFoldsItsToolLine() = runComposeUiTest {
         // Not the newest row: the summary line is the only way to the folded steps, so it stays.
-        show(run, newest = null, details = ChatToolDetails.Inline, opened = emptySet())
+        show(run, newest = null, opened = emptySet())
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assert(hasClickAction())
         onNodeWithText("Ran 2 commands", useUnmergedTree = true).assertDoesNotExist()
         onNodeWithText("All done here.", substring = true).assertExists()
