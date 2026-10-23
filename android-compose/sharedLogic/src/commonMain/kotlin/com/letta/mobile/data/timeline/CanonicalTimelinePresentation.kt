@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.plus
@@ -43,9 +44,13 @@ class CanonicalTimelinePresentation private constructor(
     private val job = SupervisorJob(parentScope.coroutineContext[Job])
     private val scope = parentScope + job
     private val owner = lease.owner
-    private val resident = MutableStateFlow<Map<TimelineMessageId, Long>>(emptyMap())
-    private val residentOtids = MutableStateFlow<Set<String>>(emptySet())
-    private val residentServerIds = MutableStateFlow<Set<String>>(emptySet())
+    /**
+     * What the list holds, published as ONE value. The live projection drains the prompt by otid and
+     * the reply by server id; held in separate flows, a combine could see the new otids before the
+     * new rows and draw a frame with the prompt drained but its run-less reply still live, ungrouped
+     * beside the settled run that already holds it.
+     */
+    private val resident = MutableStateFlow(ResidentState())
     // Written by the live projection and read by paging's projection; guarded by its own lock.
     private val streamedKeyAliasLock = SynchronizedObject()
     private val streamedKeyAliases = HashMap<TimelineMessageId, String>()
@@ -93,7 +98,7 @@ class CanonicalTimelinePresentation private constructor(
             viewport = null
             target.value = identity
             anchor.value = lookup.anchor
-            resident.value = emptyMap()
+            resident.update { it.copy(presented = emptyMap()) }
         } finally {
             withContext(NonCancellable) { coordinator.detach(lookup) }
         }
@@ -126,20 +131,19 @@ class CanonicalTimelinePresentation private constructor(
     private val liveProjection: Flow<List<ChatRenderItem>> = createLiveProjection()
 
     private data class ResidentState(
-        val presented: Map<TimelineMessageId, Long>,
-        val otids: Set<String>,
-        val serverIds: Set<String>,
+        val presented: Map<TimelineMessageId, Long> = emptyMap(),
+        val otids: Set<String> = emptySet(),
+        val serverIds: Set<String> = emptySet(),
     )
 
     private fun createLiveProjection(): Flow<List<ChatRenderItem>> {
         val mergedPublications = combine(owner.session.live, owner.session.settling) { live, settling ->
             settling + listOfNotNull(live)
         }
-        val residentState = combine(resident, residentOtids, residentServerIds, ::ResidentState)
         return combine(
             mergedPublications,
             owner.session.pending,
-            residentState,
+            resident,
         ) { publications, pending, residentSnapshot ->
             projectLiveItems(publications, pending, residentSnapshot)
         }
@@ -218,9 +222,11 @@ class CanonicalTimelinePresentation private constructor(
             }
         }
         val presented = residents.associate { it.identity to it.revision }
-        resident.value = presented
-        residentOtids.value = residents.mapNotNullTo(mutableSetOf()) { it.otid.takeIf(String::isNotBlank) }
-        residentServerIds.value = residents.mapNotNullTo(mutableSetOf()) { it.serverId.takeIf(String::isNotBlank) }
+        resident.value = ResidentState(
+            presented = presented,
+            otids = residents.mapNotNullTo(mutableSetOf()) { it.otid.takeIf(String::isNotBlank) },
+            serverIds = residents.mapNotNullTo(mutableSetOf()) { it.serverId.takeIf(String::isNotBlank) },
+        )
         val fences = owner.session.settling.value.map { it.fence } + listOfNotNull(owner.session.live.value?.fence)
         fences.forEach { fence ->
             scope.launch { coordinator.acknowledgeSettlement(owner, fence, presented) }
