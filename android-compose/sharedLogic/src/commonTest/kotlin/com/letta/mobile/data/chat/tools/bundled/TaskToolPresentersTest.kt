@@ -15,11 +15,10 @@ import kotlin.test.assertTrue
 class TaskToolPresentersTest {
     private val registry = BundledToolPresenters.registry
 
-    private fun call(name: String, arguments: String, result: String? = null, failed: Boolean = false, elapsedMillis: Long? = null) =
-        ToolCallFacts(name, arguments, result, failed, elapsedMillis)
+    private fun call(name: String, arguments: String, result: String? = null) = ToolCallFacts(name, arguments, result)
 
     private fun watched(result: String, elapsedMillis: Long) =
-        registry.line(call("TaskOutput", """{"task_id":"bash_3"}""", result, elapsedMillis = elapsedMillis)).target
+        registry.line(ToolCallFacts("TaskOutput", """{"task_id":"bash_3"}""", result, elapsedMillis = elapsedMillis)).target
 
     @Test
     fun taskOutputSaysTheTaskAndItsStatusAndTailsItsOutput() {
@@ -100,13 +99,15 @@ class TaskToolPresentersTest {
         assertEquals(listOf(ToolPreviewTarget.Subagent("agent-9")), registry.line(facts).previews)
     }
 
+    private val failedSkill get() = registry.line(ToolCallFacts("Skill", """{"skill":"pdf"}""", "Error: unknown skill", failed = true))
+
     @Test
     fun skillSaysWhichSkillAndWhatItDid() {
         val facts = call("Skill", """{"skill":"pdf"}""", "Launching skill: pdf\n\n# PDF\n…")
         val line = registry.line(facts)
         assertEquals(ToolVerb.Used, line.verb)
         assertEquals("skill pdf · Launching skill: pdf", line.target)
-        assertEquals("skill pdf", registry.line(call("Skill", """{"skill":"pdf"}""", "Error: unknown skill", failed = true)).target)
+        assertEquals("skill pdf", failedSkill.target)
     }
 
     @Test

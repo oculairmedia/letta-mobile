@@ -109,18 +109,12 @@ internal fun ToolStep(
     val running = resolved == ToolTimelineState.Running
     // A running step is where a working mascot looks (te3n1.2).
     Column(modifier = Modifier.fillMaxWidth().mascotAttention(AttentionKey("tool:$disclosureKey"), AttentionKind.TOOL, enabled = running)) {
-        // The presenter says whether the step opens at all (a stopped task does not); a failed one always does.
-        val opens = toolCall.hasDetails() && (rememberToolStepLine(toolCall).expandable || resolved.isFailure())
+        val opens = stepOpens(toolCall, resolved)
         val disclosure = if (!opens) null else RunStepDisclosure(isExpanded) {
             haptics.play(LettaHapticCue.SegmentTick)
             expansions.toggle(disclosureKey)
         }
-        if (PlanModeToolPresenter.isPlanModeChange(toolCall.name)) {
-            val leaving = PlanModeToolPresenter.isLeaving(toolCall.name)
-            PlanModeDivider(leaving = leaving, disclosure = disclosure.takeIf { leaving })
-        } else {
-            ToolStepLineRow(spec = stepLineSpec(toolCall, resolved, callbacks), disclosure = disclosure)
-        }
+        ToolStepHeader(toolCall, resolved, callbacks, disclosure)
         AnimatedVisibility(
             visible = isExpanded && opens,
             enter = ChatRowMotion(LocalReducedMotion.current).expansionEnter(),
@@ -129,6 +123,22 @@ internal fun ToolStep(
         ) {
             ToolStepDetails(toolCall, callbacks, live = running || toolCall.isStreaming(), failed = resolved.isFailure())
         }
+    }
+}
+
+/** Whether a step opens at all: the presenter's cheap answer (a stopped task does not); a failed one always does. */
+@Composable
+private fun stepOpens(toolCall: UiToolCall, state: ToolTimelineState): Boolean =
+    toolCall.hasDetails() && (rememberToolStepLine(toolCall).expandable || state.isFailure())
+
+/** The step's line, or the thin divider entering or leaving plan mode draws instead (only leaving opens, to its plan). */
+@Composable
+private fun ToolStepHeader(toolCall: UiToolCall, state: ToolTimelineState, callbacks: ChatRowCallbacks, disclosure: RunStepDisclosure?) {
+    if (PlanModeToolPresenter.isPlanModeChange(toolCall.name)) {
+        val leaving = PlanModeToolPresenter.isLeaving(toolCall.name)
+        PlanModeDivider(leaving = leaving, disclosure = disclosure.takeIf { leaving })
+    } else {
+        ToolStepLineRow(spec = stepLineSpec(toolCall, state, callbacks), disclosure = disclosure)
     }
 }
 
