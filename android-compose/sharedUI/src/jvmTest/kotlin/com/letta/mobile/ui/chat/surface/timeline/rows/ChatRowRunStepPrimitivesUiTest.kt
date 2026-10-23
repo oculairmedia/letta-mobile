@@ -105,7 +105,7 @@ class ChatRowRunStepPrimitivesUiTest {
         showOpened(runOf(call("c1"), call("c2", name = "Read", command = "README.md")))
 
         val subheader = onNodeWithTag(ChatRowTestTags.RUN_STEP_GROUP_LABEL, useUnmergedTree = true)
-        subheader.assertTextEquals("Ran commands, called tools")
+        subheader.assertTextEquals("Ran commands, explored files")
         subheader.assert(hasClickAction().not())
         assertEquals(0, count(chevron and under(ChatRowTestTags.RUN_STEP_GROUP_LABEL)))
         assertEquals(2, count(chevron and under(ChatRowTestTags.TOOL_CARD_TOGGLE)))
