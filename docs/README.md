@@ -82,6 +82,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [Release automation bootstrap](RELEASE-AUTOMATION.md)
 - [Release Gate Ledger](RELEASE-GATE-LEDGER.md)
 - [Release checklist](RELEASE.md)
+- [Single-owner subagent todo progress](subagent-todo-progress-plan.md)
 - [Property-Based Testing with kotest-property](testing-with-kotest-property.md)
 - [Testing Flows with Turbine](testing-with-turbine.md)
 - [PRD: Tool Card Readability + Interaction Polish](tool-card-polish-prd.md)
