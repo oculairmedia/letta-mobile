@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.fanout.StreamIntegrityMonitor
+import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -215,10 +216,10 @@ internal class ConversationViewerSubscription(
      * change itself, so a concurrent observation cannot slip between them.
      */
     // letta-mobile-wisqe.2 F2: rollback guard for concurrent admin_rpc streams.
-    suspend fun observe(conversationId: String): suspend () -> Unit {
+    suspend fun observe(conversationId: ConversationId): suspend () -> Unit {
         val (previous, observedAt) = mutex.withLock {
             val previous = viewed
-            subscribeLocked(conversationId)
+            subscribeLocked(conversationId.value)
             previous to changes
         }
         return { rollbackIfCurrent(previous, observedAt) }
@@ -241,17 +242,17 @@ internal class ConversationViewerSubscription(
         mutex.withLock { unsubscribeLocked() }
     }
 
-    private suspend fun subscribeLocked(conversationId: String) {
+    private suspend fun subscribeLocked(target: String) {
         val previous = viewed
         // De-scope only a DIFFERENT prior conversation (Option A) — unchanged.
-        if (previous != null && previous != conversationId) {
+        if (previous != null && previous != target) {
             runCatching { registry.unregister(previous, viewer) }
         }
         // ALWAYS (re-)register while this connection still owns the endpoint
         // claim. A stale generation is rejected atomically, so late polling
         // from an overlapped reconnect cannot reclaim or evict its successor.
-        val registered = runCatching { registry.register(conversationId, registration) }.getOrDefault(false)
-        viewed = conversationId.takeIf { registered }
+        val registered = runCatching { registry.register(target, registration) }.getOrDefault(false)
+        viewed = target.takeIf { registered }
         changes += 1
     }
 

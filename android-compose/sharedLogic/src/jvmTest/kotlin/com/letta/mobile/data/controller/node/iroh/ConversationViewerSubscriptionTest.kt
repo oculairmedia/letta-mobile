@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -65,8 +66,8 @@ class ConversationViewerSubscriptionTest {
         val subscription = subscription(registry, connViewer)
         subscription.subscribe("convA")
 
-        val rollbackX = subscription.observe("convX")
-        subscription.observe("convY")
+        val rollbackX = subscription.observe(ConversationId("convX"))
+        subscription.observe(ConversationId("convY"))
         rollbackX()
 
         assertEquals("convY", subscription.currentConversation, "the newer observation survives")
@@ -82,7 +83,7 @@ class ConversationViewerSubscriptionTest {
         val subscription = subscription(registry, connViewer)
         subscription.subscribe("convA")
 
-        subscription.observe("convX")()
+        subscription.observe(ConversationId("convX"))()
 
         assertEquals("convA", subscription.currentConversation)
         assertEquals(setOf<ViewerHandle>(connViewer), registry.viewersFor("convA"))

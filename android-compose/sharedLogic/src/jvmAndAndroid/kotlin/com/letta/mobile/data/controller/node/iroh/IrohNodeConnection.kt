@@ -403,7 +403,7 @@ class IrohNodeConnection(
         if (conversationId.isNullOrEmpty()) return null
         val subscription = viewerSubscription ?: return null
         val previous = subscription.currentConversation
-        val rollback = subscription.observe(conversationId)
+        val rollback = subscription.observe(ConversationId(conversationId))
         Telemetry.event(
             "IrohNode", "viewer.registered",
             "remoteEndpointId" to remoteEndpointId,
