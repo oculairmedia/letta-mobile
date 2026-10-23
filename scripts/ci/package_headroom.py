@@ -312,11 +312,21 @@ def compare(report: dict, ci_report: dict) -> list[str]:
     return problems
 
 
-def merge_base(repo: Path, base: str) -> str:
-    """The full SHA where HEAD left [base]; only a validated name reaches git, only a SHA leaves."""
+def resolve_commit(repo: Path, base: str) -> str:
+    """The full SHA of revision [base]; the name reaches git on stdin, never as an argument."""
     if _REVISION.fullmatch(base) is None:
         raise ValueError(f"not a revision name: {base!r}")
-    result = subprocess.run(["git", "-C", str(repo), "merge-base", "--end-of-options", base, "HEAD"],
+    result = subprocess.run(["git", "-C", str(repo), "cat-file", "--batch-check"], input=base + "^{commit}\n",
+                            capture_output=True, text=True, encoding="utf-8")
+    sha, _, kind = result.stdout.partition(" ")
+    if _SHA.fullmatch(sha) is None or not kind.startswith("commit"):
+        raise ValueError(f"not a commit: {base!r}")
+    return sha
+
+
+def merge_base(repo: Path, base: str) -> str:
+    """The full SHA where HEAD left revision [base]."""
+    result = subprocess.run(["git", "-C", str(repo), "merge-base", resolve_commit(repo, base), "HEAD"],
                             capture_output=True, text=True, encoding="utf-8")
     commit = result.stdout.strip()
     if result.returncode != 0 or _SHA.fullmatch(commit) is None:
