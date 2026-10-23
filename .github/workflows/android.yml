@@ -360,6 +360,9 @@ jobs:
           python3 -m unittest discover -s tools/structure_report/tests -v
           base="${STRUCTURE_BASE:-$(git rev-parse HEAD^)}"
           python3 tools/structure_report/structure_report.py --base-ref "$base"
+          # The Gradle-free headroom scan (quick-check.sh) must count exactly what this export did.
+          python3 -m unittest discover -s scripts/tests -p test_package_headroom.py -v
+          python3 scripts/ci/package_headroom.py --compare android-compose/build/reports/structure/report.json
 
       - name: Upload generated structure report
         if: always()

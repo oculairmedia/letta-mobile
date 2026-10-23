@@ -23,7 +23,6 @@ import com.letta.mobile.ui.chat.session.TimelineHostApprovals
 import com.letta.mobile.ui.chat.session.withHostApprovals
 import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.composer.ComposerThinkingSnapshot
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimelineSnapshot
 import com.letta.mobile.ui.theme.LettaTheme
@@ -70,7 +69,7 @@ class RelayedPendingApprovalTimelineTest {
                         ChatTimelineSnapshot(
                             state = state,
                             actions = NoOpChatActions,
-                            appearance = ChatSurfaceAppearance(toolDetails = ChatToolDetails.Sheet, platformStyle = ChatPlatformStyle.Touch),
+                            appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                         )
                         ComposerThinkingSnapshot(state, Modifier.fillMaxWidth())
@@ -91,7 +90,6 @@ class RelayedPendingApprovalTimelineTest {
         composeRule.onAllNodesWithTag(STEP_ROW).assertCountEquals(1)
         composeRule.onNodeWithTag(STEP_ROW).assertIsDisplayed()
         composeRule.onNodeWithText("awaiting approval", useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithTag(GROUP_LINE).assertDoesNotExist()
         // The run's header says it waits, and so does the composer's token (not "Thinking…").
         composeRule.onNodeWithText("Waiting for your approval").assertIsDisplayed()
         composeRule.onNodeWithText("Thinking", substring = true).assertDoesNotExist()
@@ -118,6 +116,5 @@ class RelayedPendingApprovalTimelineTest {
         // slot and the run-level tool line the rebuild removed.
         const val STEP_ROW = "tool-card-toggle"
         const val APPROVAL_SLOT = "chat-approval-slot"
-        const val GROUP_LINE = "tool-run-summary-row"
     }
 }

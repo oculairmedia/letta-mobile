@@ -99,7 +99,6 @@ class RunSummarySnapshotTest {
 
     private fun render(shot: Shot) = runDesktopComposeUiTest(width = shot.widthDp * shot.scale, height = shot.heightDp * shot.scale) {
         mainClock.autoAdvance = false
-        val touch = shot.style == ChatPlatformStyle.Touch
         setContent {
             CompositionLocalProvider(LocalDensity provides Density(shot.scale.toFloat(), 1f), LocalReducedMotion provides true) {
                 MaterialTheme(colorScheme = darkColorScheme()) {
@@ -111,7 +110,6 @@ class RunSummarySnapshotTest {
                             onIntent = {},
                             host = ChatSurfaceHost(openCanvas = {}),
                             appearance = ChatSurfaceAppearance(
-                                toolDetails = if (touch) ChatToolDetails.Sheet else ChatToolDetails.Inline,
                                 platformStyle = shot.style,
                             ),
                             canvas = if (shot.presentation == ChatSurfacePresentation.CanvasFirst) canvas else null,

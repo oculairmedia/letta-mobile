@@ -3852,7 +3852,7 @@ abstract fun interface com.letta.mobile.data.workspace.relay/WorkspaceRelayCall 
 }
 
 abstract fun interface com.letta.mobile.data.workspace/WorkspaceFileOpener { // com.letta.mobile.data.workspace/WorkspaceFileOpener|null[0]
-    abstract fun open(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.workspace/WorkspaceFileOpener.open|open(kotlin.String;kotlin.Boolean){}[0]
+    abstract fun open(com.letta.mobile.data.workspace/WorkspaceFileRequest) // com.letta.mobile.data.workspace/WorkspaceFileOpener.open|open(com.letta.mobile.data.workspace.WorkspaceFileRequest){}[0]
 }
 
 abstract fun interface com.letta.mobile.ui.chat.session/SubagentViewSessions { // com.letta.mobile.ui.chat.session/SubagentViewSessions|null[0]
@@ -30195,6 +30195,8 @@ final class com.letta.mobile.data.chat.tools/ToolPresenterRegistry { // com.lett
     final fun presenterFor(com.letta.mobile.data.chat.tools/ToolCallFacts): com.letta.mobile.data.chat.tools/ToolPresenter // com.letta.mobile.data.chat.tools/ToolPresenterRegistry.presenterFor|presenterFor(com.letta.mobile.data.chat.tools.ToolCallFacts){}[0]
     final fun register(com.letta.mobile.data.chat.tools/CommandPresenter): com.letta.mobile.data.chat.tools/ToolPresenterRegistry // com.letta.mobile.data.chat.tools/ToolPresenterRegistry.register|register(com.letta.mobile.data.chat.tools.CommandPresenter){}[0]
     final fun register(com.letta.mobile.data.chat.tools/ToolPresenter): com.letta.mobile.data.chat.tools/ToolPresenterRegistry // com.letta.mobile.data.chat.tools/ToolPresenterRegistry.register|register(com.letta.mobile.data.chat.tools.ToolPresenter){}[0]
+    final fun registerAll(kotlin.collections/List<com.letta.mobile.data.chat.tools/ToolPresenter>): com.letta.mobile.data.chat.tools/ToolPresenterRegistry // com.letta.mobile.data.chat.tools/ToolPresenterRegistry.registerAll|registerAll(kotlin.collections.List<com.letta.mobile.data.chat.tools.ToolPresenter>){}[0]
+    final fun registerCommands(kotlin.collections/List<com.letta.mobile.data.chat.tools/CommandPresenter>): com.letta.mobile.data.chat.tools/ToolPresenterRegistry // com.letta.mobile.data.chat.tools/ToolPresenterRegistry.registerCommands|registerCommands(kotlin.collections.List<com.letta.mobile.data.chat.tools.CommandPresenter>){}[0]
 
     final object Companion { // com.letta.mobile.data.chat.tools/ToolPresenterRegistry.Companion|null[0]
         final val Empty // com.letta.mobile.data.chat.tools/ToolPresenterRegistry.Companion.Empty|{}Empty[0]
@@ -59890,6 +59892,25 @@ final class com.letta.mobile.data.workspace/WorkspaceFileException : kotlin/Exce
     constructor <init>(kotlin/String, kotlin/Throwable? = ...) // com.letta.mobile.data.workspace/WorkspaceFileException.<init>|<init>(kotlin.String;kotlin.Throwable?){}[0]
 }
 
+final class com.letta.mobile.data.workspace/WorkspaceFileRequest { // com.letta.mobile.data.workspace/WorkspaceFileRequest|null[0]
+    constructor <init>(kotlin/String, kotlin/Boolean = ..., kotlin.ranges/IntRange? = ...) // com.letta.mobile.data.workspace/WorkspaceFileRequest.<init>|<init>(kotlin.String;kotlin.Boolean;kotlin.ranges.IntRange?){}[0]
+
+    final val lines // com.letta.mobile.data.workspace/WorkspaceFileRequest.lines|{}lines[0]
+        final fun <get-lines>(): kotlin.ranges/IntRange? // com.letta.mobile.data.workspace/WorkspaceFileRequest.lines.<get-lines>|<get-lines>(){}[0]
+    final val memoryTool // com.letta.mobile.data.workspace/WorkspaceFileRequest.memoryTool|{}memoryTool[0]
+        final fun <get-memoryTool>(): kotlin/Boolean // com.letta.mobile.data.workspace/WorkspaceFileRequest.memoryTool.<get-memoryTool>|<get-memoryTool>(){}[0]
+    final val path // com.letta.mobile.data.workspace/WorkspaceFileRequest.path|{}path[0]
+        final fun <get-path>(): kotlin/String // com.letta.mobile.data.workspace/WorkspaceFileRequest.path.<get-path>|<get-path>(){}[0]
+
+    final fun component1(): kotlin/String // com.letta.mobile.data.workspace/WorkspaceFileRequest.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.letta.mobile.data.workspace/WorkspaceFileRequest.component2|component2(){}[0]
+    final fun component3(): kotlin.ranges/IntRange? // com.letta.mobile.data.workspace/WorkspaceFileRequest.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Boolean = ..., kotlin.ranges/IntRange? = ...): com.letta.mobile.data.workspace/WorkspaceFileRequest // com.letta.mobile.data.workspace/WorkspaceFileRequest.copy|copy(kotlin.String;kotlin.Boolean;kotlin.ranges.IntRange?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.workspace/WorkspaceFileRequest.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.workspace/WorkspaceFileRequest.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.workspace/WorkspaceFileRequest.toString|toString(){}[0]
+}
+
 final class com.letta.mobile.data.workspace/WorkspaceFileViewerController : com.letta.mobile.data.workspace/WorkspaceFileViewerActions, kotlin/AutoCloseable { // com.letta.mobile.data.workspace/WorkspaceFileViewerController|null[0]
     constructor <init>(com.letta.mobile.data.workspace/WorkspaceFileSource, kotlinx.coroutines/CoroutineScope) // com.letta.mobile.data.workspace/WorkspaceFileViewerController.<init>|<init>(com.letta.mobile.data.workspace.WorkspaceFileSource;kotlinx.coroutines.CoroutineScope){}[0]
 
@@ -59897,12 +59918,12 @@ final class com.letta.mobile.data.workspace/WorkspaceFileViewerController : com.
         final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.workspace/WorkspaceFileViewerState> // com.letta.mobile.data.workspace/WorkspaceFileViewerController.state.<get-state>|<get-state>(){}[0]
 
     final fun close() // com.letta.mobile.data.workspace/WorkspaceFileViewerController.close|close(){}[0]
-    final fun open(kotlin/String, kotlin/String?, kotlin/String? = ...) // com.letta.mobile.data.workspace/WorkspaceFileViewerController.open|open(kotlin.String;kotlin.String?;kotlin.String?){}[0]
+    final fun open(kotlin/String, kotlin/String?, kotlin/String? = ..., kotlin.ranges/IntRange? = ...) // com.letta.mobile.data.workspace/WorkspaceFileViewerController.open|open(kotlin.String;kotlin.String?;kotlin.String?;kotlin.ranges.IntRange?){}[0]
     final fun retry() // com.letta.mobile.data.workspace/WorkspaceFileViewerController.retry|retry(){}[0]
 }
 
 final class com.letta.mobile.data.workspace/WorkspaceFileViewerState { // com.letta.mobile.data.workspace/WorkspaceFileViewerState|null[0]
-    constructor <init>(kotlin/String? = ..., kotlin/Boolean = ..., com.letta.mobile.data.workspace/WorkspaceFileContent? = ..., kotlin/String? = ...) // com.letta.mobile.data.workspace/WorkspaceFileViewerState.<init>|<init>(kotlin.String?;kotlin.Boolean;com.letta.mobile.data.workspace.WorkspaceFileContent?;kotlin.String?){}[0]
+    constructor <init>(kotlin/String? = ..., kotlin/Boolean = ..., com.letta.mobile.data.workspace/WorkspaceFileContent? = ..., kotlin/String? = ..., kotlin.ranges/IntRange? = ...) // com.letta.mobile.data.workspace/WorkspaceFileViewerState.<init>|<init>(kotlin.String?;kotlin.Boolean;com.letta.mobile.data.workspace.WorkspaceFileContent?;kotlin.String?;kotlin.ranges.IntRange?){}[0]
 
     final val content // com.letta.mobile.data.workspace/WorkspaceFileViewerState.content|{}content[0]
         final fun <get-content>(): com.letta.mobile.data.workspace/WorkspaceFileContent? // com.letta.mobile.data.workspace/WorkspaceFileViewerState.content.<get-content>|<get-content>(){}[0]
@@ -59910,6 +59931,8 @@ final class com.letta.mobile.data.workspace/WorkspaceFileViewerState { // com.le
         final fun <get-error>(): kotlin/String? // com.letta.mobile.data.workspace/WorkspaceFileViewerState.error.<get-error>|<get-error>(){}[0]
     final val isOpen // com.letta.mobile.data.workspace/WorkspaceFileViewerState.isOpen|{}isOpen[0]
         final fun <get-isOpen>(): kotlin/Boolean // com.letta.mobile.data.workspace/WorkspaceFileViewerState.isOpen.<get-isOpen>|<get-isOpen>(){}[0]
+    final val lines // com.letta.mobile.data.workspace/WorkspaceFileViewerState.lines|{}lines[0]
+        final fun <get-lines>(): kotlin.ranges/IntRange? // com.letta.mobile.data.workspace/WorkspaceFileViewerState.lines.<get-lines>|<get-lines>(){}[0]
     final val loading // com.letta.mobile.data.workspace/WorkspaceFileViewerState.loading|{}loading[0]
         final fun <get-loading>(): kotlin/Boolean // com.letta.mobile.data.workspace/WorkspaceFileViewerState.loading.<get-loading>|<get-loading>(){}[0]
     final val path // com.letta.mobile.data.workspace/WorkspaceFileViewerState.path|{}path[0]
@@ -59919,7 +59942,8 @@ final class com.letta.mobile.data.workspace/WorkspaceFileViewerState { // com.le
     final fun component2(): kotlin/Boolean // com.letta.mobile.data.workspace/WorkspaceFileViewerState.component2|component2(){}[0]
     final fun component3(): com.letta.mobile.data.workspace/WorkspaceFileContent? // com.letta.mobile.data.workspace/WorkspaceFileViewerState.component3|component3(){}[0]
     final fun component4(): kotlin/String? // com.letta.mobile.data.workspace/WorkspaceFileViewerState.component4|component4(){}[0]
-    final fun copy(kotlin/String? = ..., kotlin/Boolean = ..., com.letta.mobile.data.workspace/WorkspaceFileContent? = ..., kotlin/String? = ...): com.letta.mobile.data.workspace/WorkspaceFileViewerState // com.letta.mobile.data.workspace/WorkspaceFileViewerState.copy|copy(kotlin.String?;kotlin.Boolean;com.letta.mobile.data.workspace.WorkspaceFileContent?;kotlin.String?){}[0]
+    final fun component5(): kotlin.ranges/IntRange? // com.letta.mobile.data.workspace/WorkspaceFileViewerState.component5|component5(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/Boolean = ..., com.letta.mobile.data.workspace/WorkspaceFileContent? = ..., kotlin/String? = ..., kotlin.ranges/IntRange? = ...): com.letta.mobile.data.workspace/WorkspaceFileViewerState // com.letta.mobile.data.workspace/WorkspaceFileViewerState.copy|copy(kotlin.String?;kotlin.Boolean;com.letta.mobile.data.workspace.WorkspaceFileContent?;kotlin.String?;kotlin.ranges.IntRange?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.workspace/WorkspaceFileViewerState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.workspace/WorkspaceFileViewerState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.workspace/WorkspaceFileViewerState.toString|toString(){}[0]
@@ -65064,6 +65088,55 @@ final object com.letta.mobile.data.chat.tools.bundled/BundledToolPresenters { //
         final fun <get-registry>(): com.letta.mobile.data.chat.tools/ToolPresenterRegistry // com.letta.mobile.data.chat.tools.bundled/BundledToolPresenters.registry.<get-registry>|<get-registry>(){}[0]
 }
 
+final object com.letta.mobile.data.chat.tools.links/OutputLinks { // com.letta.mobile.data.chat.tools.links/OutputLinks|null[0]
+    final fun find(kotlin/String): kotlin.collections/List<com.letta.mobile.data.chat.tools.links/OutputLinks.Match> // com.letta.mobile.data.chat.tools.links/OutputLinks.find|find(kotlin.String){}[0]
+
+    sealed interface Match { // com.letta.mobile.data.chat.tools.links/OutputLinks.Match|null[0]
+        abstract val range // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.range|{}range[0]
+            abstract fun <get-range>(): kotlin.ranges/IntRange // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.range.<get-range>|<get-range>(){}[0]
+        abstract val value // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.value|{}value[0]
+            abstract fun <get-value>(): kotlin/String // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.value.<get-value>|<get-value>(){}[0]
+
+        final class Path : com.letta.mobile.data.chat.tools.links/OutputLinks.Match { // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path|null[0]
+            constructor <init>(kotlin/String, kotlin.ranges/IntRange, kotlin/String, kotlin/Int?) // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.<init>|<init>(kotlin.String;kotlin.ranges.IntRange;kotlin.String;kotlin.Int?){}[0]
+
+            final val line // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.line|{}line[0]
+                final fun <get-line>(): kotlin/Int? // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.line.<get-line>|<get-line>(){}[0]
+            final val path // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.path|{}path[0]
+                final fun <get-path>(): kotlin/String // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.path.<get-path>|<get-path>(){}[0]
+            final val range // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.range|{}range[0]
+                final fun <get-range>(): kotlin.ranges/IntRange // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.range.<get-range>|<get-range>(){}[0]
+            final val value // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.value|{}value[0]
+                final fun <get-value>(): kotlin/String // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.value.<get-value>|<get-value>(){}[0]
+
+            final fun component1(): kotlin/String // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.component1|component1(){}[0]
+            final fun component2(): kotlin.ranges/IntRange // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.component2|component2(){}[0]
+            final fun component3(): kotlin/String // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.component3|component3(){}[0]
+            final fun component4(): kotlin/Int? // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.component4|component4(){}[0]
+            final fun copy(kotlin/String = ..., kotlin.ranges/IntRange = ..., kotlin/String = ..., kotlin/Int? = ...): com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.copy|copy(kotlin.String;kotlin.ranges.IntRange;kotlin.String;kotlin.Int?){}[0]
+            final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.equals|equals(kotlin.Any?){}[0]
+            final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.hashCode|hashCode(){}[0]
+            final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Path.toString|toString(){}[0]
+        }
+
+        final class Url : com.letta.mobile.data.chat.tools.links/OutputLinks.Match { // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Url|null[0]
+            constructor <init>(kotlin/String, kotlin.ranges/IntRange) // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Url.<init>|<init>(kotlin.String;kotlin.ranges.IntRange){}[0]
+
+            final val range // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Url.range|{}range[0]
+                final fun <get-range>(): kotlin.ranges/IntRange // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Url.range.<get-range>|<get-range>(){}[0]
+            final val value // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Url.value|{}value[0]
+                final fun <get-value>(): kotlin/String // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Url.value.<get-value>|<get-value>(){}[0]
+
+            final fun component1(): kotlin/String // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Url.component1|component1(){}[0]
+            final fun component2(): kotlin.ranges/IntRange // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Url.component2|component2(){}[0]
+            final fun copy(kotlin/String = ..., kotlin.ranges/IntRange = ...): com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Url // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Url.copy|copy(kotlin.String;kotlin.ranges.IntRange){}[0]
+            final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Url.equals|equals(kotlin.Any?){}[0]
+            final fun hashCode(): kotlin/Int // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Url.hashCode|hashCode(){}[0]
+            final fun toString(): kotlin/String // com.letta.mobile.data.chat.tools.links/OutputLinks.Match.Url.toString|toString(){}[0]
+        }
+    }
+}
+
 final object com.letta.mobile.data.chat.tools.shell/ShellScript { // com.letta.mobile.data.chat.tools.shell/ShellScript|null[0]
     final fun scan(kotlin/String): kotlin.collections/List<com.letta.mobile.data.chat.tools.shell/ShellCommand>? // com.letta.mobile.data.chat.tools.shell/ShellScript.scan|scan(kotlin.String){}[0]
 }
@@ -67036,7 +67109,7 @@ final object com.letta.mobile.data.workspace/WorkspaceFileErrors { // com.letta.
 
 final object com.letta.mobile.data.workspace/WorkspaceFileViewerReducer { // com.letta.mobile.data.workspace/WorkspaceFileViewerReducer|null[0]
     final fun failed(com.letta.mobile.data.workspace/WorkspaceFileViewerState, kotlin/String, kotlin/String): com.letta.mobile.data.workspace/WorkspaceFileViewerState // com.letta.mobile.data.workspace/WorkspaceFileViewerReducer.failed|failed(com.letta.mobile.data.workspace.WorkspaceFileViewerState;kotlin.String;kotlin.String){}[0]
-    final fun opening(kotlin/String): com.letta.mobile.data.workspace/WorkspaceFileViewerState // com.letta.mobile.data.workspace/WorkspaceFileViewerReducer.opening|opening(kotlin.String){}[0]
+    final fun opening(kotlin/String, kotlin.ranges/IntRange? = ...): com.letta.mobile.data.workspace/WorkspaceFileViewerState // com.letta.mobile.data.workspace/WorkspaceFileViewerReducer.opening|opening(kotlin.String;kotlin.ranges.IntRange?){}[0]
     final fun read(com.letta.mobile.data.workspace/WorkspaceFileViewerState, com.letta.mobile.data.workspace/WorkspaceFileContent): com.letta.mobile.data.workspace/WorkspaceFileViewerState // com.letta.mobile.data.workspace/WorkspaceFileViewerReducer.read|read(com.letta.mobile.data.workspace.WorkspaceFileViewerState;com.letta.mobile.data.workspace.WorkspaceFileContent){}[0]
 }
 

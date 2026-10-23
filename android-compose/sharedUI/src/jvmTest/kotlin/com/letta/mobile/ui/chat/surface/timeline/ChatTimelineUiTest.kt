@@ -34,7 +34,6 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
-import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
 import com.letta.mobile.ui.chat.surface.timeline.rows.awaitText
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -297,8 +296,7 @@ class ChatTimelineUiTest {
         val host = ChatSurfaceHost(openSubagent = { callId, agentId, description -> opened += Triple(callId, agentId, description) })
         show(ready.copy(messages = messages.toPersistentList()), RecordingChatActions(), host)
 
-        // The dispatch reads as one tool summary line; its card opens from it.
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
+        // The dispatch reads as its own card among the message's steps, no summary line to open first.
         onNodeWithText("Dispatched: Audit the build").performClick()
         runOnIdle { assertEquals(listOf<Triple<String, String?, String>>(Triple("agent-call-1", "agent-sub", "Audit the build")), opened) }
     }

@@ -6,6 +6,7 @@ and top-level declarations in production sources without compiling them.
 """
 from __future__ import annotations
 
+import functools
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -142,13 +143,35 @@ def balanced_end(text: str, open_idx: int) -> int:
     return len(text)
 
 
+_LITERAL_START = re.compile(r"//|/\*|[\"']")
+_NOT_NEWLINE = re.compile(r"[^\n]")
+
+
+def blank_literals(text: str, kinds: frozenset[str]) -> str:
+    """[text] with each literal (comment, string, char) whose token kind is in [kinds] blanked.
+
+    Newlines are kept, so offsets and line numbers survive. Jumps from one literal start to the
+    next instead of tokenizing the code between them; the token stream still decides where each
+    literal ends.
+    """
+    out, i = [], 0
+    while (m := _LITERAL_START.search(text, i)) is not None:
+        token = next(tokens(text, m.start()))
+        chunk = text[token.start : token.end]
+        out += [text[i : m.start()], _blank(chunk) if token.kind in kinds else chunk]
+        i = token.end
+    out.append(text[i:])
+    return "".join(out)
+
+
+@functools.lru_cache(maxsize=None)
 def strip_comments(text: str) -> str:
     """Comments replaced by blanks (newlines kept); strings kept verbatim."""
-    return "".join(_blank(text[t.start : t.end]) if t.kind == "comment" else text[t.start : t.end] for t in tokens(text))
+    return blank_literals(text, frozenset({"comment"}))
 
 
 def _blank(chunk: str) -> str:
-    return re.sub(r"[^\n]", " ", chunk)
+    return _NOT_NEWLINE.sub(" ", chunk)
 
 
 def without_bodies(text: str) -> str:

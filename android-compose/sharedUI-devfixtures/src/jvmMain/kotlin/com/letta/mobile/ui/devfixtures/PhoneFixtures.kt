@@ -14,7 +14,6 @@ import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
-import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import java.awt.GradientPaint
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
@@ -41,7 +40,7 @@ object PhoneFixtures {
 
     /** The phone's idiom, exactly as Android's SharedChatPage sets it. */
     val touchAppearance: ChatSurfaceAppearance =
-        ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch, toolDetails = ChatToolDetails.Sheet)
+        ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch)
 
     /** A small gradient PNG standing in for a screenshot the person attached. */
     val screenshot: UiImageAttachment by lazy { UiImageAttachment(base64 = sampleImageBase64(), mediaType = "image/png") }

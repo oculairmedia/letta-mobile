@@ -226,7 +226,7 @@ internal data class ParityRow(
             ParityRow("user", "User bubble", listOf(f.userPrompt)),
             ParityRow("assistant", "Assistant bubble (no run)", listOf(f.assistantStandalone)),
             ParityRow("reasoning", "Reasoning (ChatRowReasoning)", listOf(f.reasoning)),
-            ParityRow("tool-call-return", "Tool call + return (ChatRowToolRun)", listOf(f.toolCallReturn)),
+            ParityRow("tool-call-return", "Tool call + return (ToolStep)", listOf(f.toolCallReturn)),
             ParityRow("tool-call-error", "Tool call, failed return", listOf(f.toolCallFailed)),
             ParityRow("assistant-in-run", "Assistant reply in a run", listOf(f.assistantReply)),
             ParityRow(

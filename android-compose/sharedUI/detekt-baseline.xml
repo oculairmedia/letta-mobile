@@ -283,7 +283,6 @@
     <ID>MaxLineLength:ChatRowLegacyParityUiTest.kt$ChatRowLegacyParityUiTest$private val tools = UiMessage(id = "t", role = "assistant", content = "", timestamp = "2026-10-11T16:00:02Z", runId = "run-1", toolCalls = listOf(call("c1"), call("c2", "error")))</ID>
     <ID>MaxLineLength:ChatRowMessage.kt$modifier = Modifier.padding(horizontal = ChatRowSpacing.bubblePaddingHorizontal, vertical = ChatRowSpacing.bubblePaddingVertical)</ID>
     <ID>MaxLineLength:ChatRowMotionUiTest.kt$ChatRowMotionUiTest$UiMessage(id = "a", role = "assistant", content = "", timestamp = "2026-07-19T12:00:00Z", runId = "run-1", toolCalls = listOf(call("c1")))</ID>
-    <ID>MaxLineLength:ChatRowPendingApprovalUiTest.kt$ChatRowPendingApprovalUiTest$RenderRow(item, rowContext(itemState = renderState(collapsedRunIds = setOf(RUN_ID)), toolDetails = ChatToolDetails.Sheet))</ID>
     <ID>MaxLineLength:ChatRowPendingApprovalUiTest.kt$ChatRowPendingApprovalUiTest$val narration = UiMessage(id = "n", role = "assistant", content = "Let me look.", timestamp = "2026-07-19T12:00:00Z", runId = RUN_ID)</ID>
     <ID>MaxLineLength:ChatRowReasoning.kt$Column</ID>
     <ID>MaxLineLength:ChatRowReconcileNoJumpTest.kt$ChatRowReconcileNoJumpTest$UiMessage(id = "e", role = "assistant", content = "Run failed: rate limit exceeded.", timestamp = "2026-10-11T16:05:00Z", isError = true)</ID>
@@ -295,7 +294,6 @@
     <ID>MaxLineLength:ChatRowRunAlignmentUiTest.kt$ChatRowRunAlignmentUiTest$UiMessage(id = "a", role = "assistant", content = "", timestamp = "2026-07-19T12:00:00Z", runId = "run-1", toolCalls = listOf(call("c1"), call("c2")))</ID>
     <ID>MaxLineLength:ChatRowRunAlignmentUiTest.kt$ChatRowRunAlignmentUiTest$assertEquals(0, onAllNodesWithContentDescription("command details", substring = true).fetchSemanticsNodes().size, "$details @ $width")</ID>
     <ID>MaxLineLength:ChatRowRunAlignmentUiTest.kt$ChatRowRunAlignmentUiTest$assertTrue(abs(tools.left - label.left) &lt; TOLERANCE_PX, "the tool step is not under the summary's label ($details @ $width)")</ID>
-    <ID>MaxLineLength:ChatRowRunBlockSummaryUiTest.kt$ChatRowRunBlockSummaryUiTest$RenderRow(item, rowContext(itemState = state, newestMessageId = "a", toolDetails = ChatToolDetails.Sheet), rowCallbacks(actions))</ID>
     <ID>MaxLineLength:ChatRowRunBlockSummaryUiTest.kt$ChatRowRunBlockSummaryUiTest$UiMessage(id = "r", role = "assistant", content = "Thinking it through.", timestamp = "2026-10-11T16:00:00Z", runId = RUN_ID, isReasoning = true)</ID>
     <ID>MaxLineLength:ChatRowRunBlockSummaryUiTest.kt$ChatRowRunBlockSummaryUiTest$UiMessage(id = "t", role = "assistant", content = "", timestamp = "2026-10-11T16:00:02Z", runId = RUN_ID, toolCalls = listOf(call("c1"), call("c2")))</ID>
     <ID>MaxLineLength:ChatRowRunBlockSummaryUiTest.kt$ChatRowRunBlockSummaryUiTest$UiToolCall(name = "Bash", arguments = """{"command":"ls"}""", result = if (status == null) null else "ok", status = status, toolCallId = id)</ID>

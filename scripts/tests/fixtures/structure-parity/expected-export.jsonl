@@ -1,0 +1,42 @@
+{"type":"file","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","mentions":"AlsoCommented Any BRACE Base Beta Bodiless Busy Callback CommentedOut Comparable Deep Factory Flow Generic Holder Idle InString Inject Injected Inner InnerOne InsideEnum Int LocalOne LocalTwo Marker Mode Nested Nope OFF ON Outer Platform Renamed Runnable State String Suppress T TEXT Tag Thing Unit X abstract alpha annotation anon as beta callback class companion const constructor coroutines data dep enum expect file flip flow fun fx gamma helper import inner interface invoke kotlinx later n nested object open override package private run sealed sub template typed unused val where work x y"}
+{"type":"file","path":"android-compose/alpha/src/jvmMain/kotlin/fx/alpha/Platform.jvm.kt","module":"alpha","package":"fx.alpha","mentions":"Platform actual alpha class fx package"}
+{"type":"file","path":"android-compose/alpha/src/phonePlayground/kotlin/fx/alpha/Playground.kt","module":"alpha","package":"fx.alpha.playground","mentions":"Nested Outer Playground alpha fx import object package playground"}
+{"type":"file","path":"android-compose/core/beta/src/main/kotlin/fx/beta/Beta.kt","module":"core/beta","package":"fx.beta","mentions":"Beta Inner Outer alpha beta class fun fx helper import package"}
+{"type":"file","path":"android-compose/core/beta/src/main/kotlin/fx/beta/sub/Sub.kt","module":"core/beta","package":"fx.beta.sub","mentions":"Sub Thing beta fx gamma import interface package sub"}
+{"type":"file","path":"android-compose/gamma/src/desktopMain/kotlin/fx/gamma/Thing.kt","module":"gamma","package":"fx.gamma","mentions":"DesktopThing SharedThing Sub Thing beta class fx gamma import lowercase member package sub"}
+{"type":"file","path":"android-compose/gamma/src/main/kotlin/fx/alpha/Duplicate.kt","module":"gamma","package":"fx.alpha","mentions":"Outer alpha class fx package"}
+{"type":"importEdge","from":"fx.alpha","to":"fx.beta"}
+{"type":"importEdge","from":"fx.alpha","to":"fx.beta.sub"}
+{"type":"importEdge","from":"fx.alpha","to":"fx.gamma"}
+{"type":"importEdge","from":"fx.alpha.playground","to":"fx.alpha"}
+{"type":"importEdge","from":"fx.beta","to":"fx.alpha"}
+{"type":"importEdge","from":"fx.beta.sub","to":"fx.gamma"}
+{"type":"importEdge","from":"fx.gamma","to":"fx.beta.sub"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Base","kind":"class"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Bodiless","kind":"class"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Callback","kind":"interface"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Generic","kind":"class"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Generic.Factory","kind":"object"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Injected","kind":"class"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Injected.Holder","kind":"object"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Marker","kind":"object"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Mode","kind":"class"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Mode.InsideEnum","kind":"class"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Outer","kind":"class"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Outer.Companion","kind":"object"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Outer.InnerOne","kind":"class"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Outer.Nested","kind":"class"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Platform","kind":"class"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.State","kind":"interface"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.State.Busy","kind":"class"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.State.Idle","kind":"object"}
+{"type":"type","path":"android-compose/alpha/src/commonMain/kotlin/fx/alpha/Alpha.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Tag","kind":"class"}
+{"type":"type","path":"android-compose/alpha/src/jvmMain/kotlin/fx/alpha/Platform.jvm.kt","module":"alpha","package":"fx.alpha","name":"fx.alpha.Platform","kind":"class"}
+{"type":"type","path":"android-compose/alpha/src/phonePlayground/kotlin/fx/alpha/Playground.kt","module":"alpha","package":"fx.alpha.playground","name":"fx.alpha.playground.Playground","kind":"object"}
+{"type":"type","path":"android-compose/core/beta/src/main/kotlin/fx/beta/Beta.kt","module":"core/beta","package":"fx.beta","name":"fx.beta.Beta","kind":"class"}
+{"type":"type","path":"android-compose/core/beta/src/main/kotlin/fx/beta/Beta.kt","module":"core/beta","package":"fx.beta","name":"fx.beta.Beta.Inner","kind":"class"}
+{"type":"type","path":"android-compose/core/beta/src/main/kotlin/fx/beta/sub/Sub.kt","module":"core/beta","package":"fx.beta.sub","name":"fx.beta.sub.Sub","kind":"interface"}
+{"type":"type","path":"android-compose/gamma/src/desktopMain/kotlin/fx/gamma/Thing.kt","module":"gamma","package":"fx.gamma","name":"fx.gamma.DesktopThing","kind":"class"}
+{"type":"type","path":"android-compose/gamma/src/desktopMain/kotlin/fx/gamma/Thing.kt","module":"gamma","package":"fx.gamma","name":"fx.gamma.SharedThing","kind":"class"}
+{"type":"type","path":"android-compose/gamma/src/desktopMain/kotlin/fx/gamma/Thing.kt","module":"gamma","package":"fx.gamma","name":"fx.gamma.Thing","kind":"class"}
+{"type":"type","path":"android-compose/gamma/src/main/kotlin/fx/alpha/Duplicate.kt","module":"gamma","package":"fx.alpha","name":"fx.alpha.Outer","kind":"class"}

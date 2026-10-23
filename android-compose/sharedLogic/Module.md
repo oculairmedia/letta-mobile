@@ -115,7 +115,11 @@ The tool presenter plugin contract: how a tool call reads as a timeline step on 
 
 # Package com.letta.mobile.data.chat.tools.bundled
 
-The presenters every host ships, one unit per tool or CLI, registered into [BundledToolPresenters](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.bundled/-bundled-tool-presenters/index.html) through the same registry calls a plugin's contributions use. Keep each presenter to its own tool and leave rendering to `sharedUI`; start a new one from [BashToolPresenter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.bundled/-bash-tool-presenter/index.html).
+The presenters every host ships, one file per tool or CLI, each listed in its area's registration file (shell, files, tasks and agents, memory, canvas CLI) that [BundledToolPresenters](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.bundled/-bundled-tool-presenters/index.html) combines through the same registry calls a plugin's contributions use, so adding a presenter never edits a list another area owns. Keep each presenter to its own tool and leave rendering to `sharedUI`; start a new one from [BashToolPresenter](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.bundled/-bash-tool-presenter/index.html).
+
+# Package com.letta.mobile.data.chat.tools.links
+
+The URLs and file paths in a tool's output, found so a step's inset can make them links: a URL to open in the browser, a path (and the line it names) to open in the file preview. Plain words, numbers and bare file names never read as links; find them with [OutputLinks](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.chat.tools.links/-output-links/index.html).
 
 # Package com.letta.mobile.data.chat.tools.shell
 
@@ -172,6 +176,10 @@ Node identity, client/server contracts and relay configuration. These abstractio
 # Package com.letta.mobile.data.controller.node.agentfiles
 
 A bounded, change-aware view of the local backend's agent records on disk. Admin reads such as the agent count, the hidden-agent set and the block index use it so they stat each record and parse only the ones that changed, instead of re-reading the whole store on every request. Keep record parsing for a served page in the readers; this package holds only the few fields kept per file and never covers more than its entry cap.
+
+# Package com.letta.mobile.data.controller.node.listcache
+
+Full App Server lists the host holds and reuses while the files they are built from are unchanged, so a client paging a list or reading it agent by agent costs one App Server fetch per change rather than one per request. A held list is dropped by a host write, by a change in its files' signature or after a short age bound; a list too large to hold falls back to the request's own fetch. Keep the per-request slicing, which must match the App Server's own paging, with the admin handlers that serve it.
 
 # Package com.letta.mobile.data.controller.node.iroh
 

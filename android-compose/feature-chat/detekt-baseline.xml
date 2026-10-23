@@ -65,7 +65,6 @@
     <ID>MaxLineLength:MessageGroupingTest.kt$MessageGroupingTest$UiToolCall(name = "Bash", arguments = """{"command":"ls"}""", result = "file.txt", status = "success", toolCallId = "call-1")</ID>
     <ID>MaxLineLength:ProjectChatCoordinatorTest.kt$ProjectChatCoordinatorTest$coEvery { mockAgentRepository.getContextWindow(AgentId(testAgentId), ConversationId(testConversationId)) } throws RuntimeException("API error")</ID>
     <ID>MaxLineLength:ProjectChatCoordinatorTest.kt$ProjectChatCoordinatorTest$val updatedBlock = Block(label = "project_description", value = "New desc", id = BlockId("b1"), limit = 1000, updatedAt = "2023-01-01T00:00:00Z")</ID>
-    <ID>MaxLineLength:RelayedPendingApprovalTimelineTest.kt$RelayedPendingApprovalTimelineTest$appearance = ChatSurfaceAppearance(toolDetails = ChatToolDetails.Sheet, platformStyle = ChatPlatformStyle.Touch)</ID>
     <ID>MaxLineLength:RelayedPendingApprovalTimelineTest.kt$RelayedPendingApprovalTimelineTest$toolCalls = listOf(UiToolCall(name = "Bash", arguments = """{"command":"ls -la"}""", result = null, status = null, toolCallId = CALL_ID))</ID>
     <ID>MaxLineLength:RelayedPendingApprovalTimelineTest.kt$RelayedPendingApprovalTimelineTest$val narration = UiMessage(id = "n1", role = "assistant", content = "Let me check the tree.", timestamp = "2026-10-12T10:00:00Z", runId = RUN_ID)</ID>
     <ID>MaxLineLength:RowParityScreenshotTest.kt$RowParityScreenshotTest$ParityResult(themeName, row.id, row.label, null, null, null, "render failed: ${failure::class.simpleName}: ${failure.message?.take(MAX_NOTE)}")</ID>

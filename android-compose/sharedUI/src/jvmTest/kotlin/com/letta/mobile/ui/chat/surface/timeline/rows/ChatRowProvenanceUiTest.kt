@@ -174,9 +174,8 @@ class ChatRowProvenanceUiTest {
             }
         }
 
-        // The send reads as one tool summary line; the card with its sender -> recipient label
-        // opens from it.
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
+        // The send reads as its own step line, its sender -> recipient label on it, no summary line
+        // to open first.
         onNodeWithText("PM-letta-mobile → Meridian · Agent message").assertExists()
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).assertExists()
     }
