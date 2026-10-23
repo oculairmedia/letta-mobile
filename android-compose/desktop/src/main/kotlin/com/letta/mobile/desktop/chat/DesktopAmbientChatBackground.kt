@@ -26,9 +26,10 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_PREMULTIPLIED
-import com.letta.mobile.ui.ambient.AMBIENT_GLOW_SHADER_SOURCE
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
+import com.letta.mobile.ui.ambient.ambientGlowShaderSource
+import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
 import com.letta.mobile.util.Telemetry
 import org.jetbrains.skia.Paint as SkiaPaint
 import org.jetbrains.skia.Rect as SkiaRect
@@ -41,7 +42,7 @@ import kotlin.math.sin
  * Desktop port of the mobile chat's ambient agent-status glow — the REAL noise
  * shader, not a flat gradient. Desktop Compose renders through Skia, and
  * [RuntimeEffect] compiles the exact SkSL source the Android AGSL path uses
- * ([AMBIENT_GLOW_SHADER_SOURCE]): two noise octaves, domain warp, the works.
+ * (ambientGlowShaderSource for the chosen style).
  * The layered radial gradient survives only as a fallback if the effect fails
  * to compile on some exotic GPU/driver.
  *
@@ -135,8 +136,10 @@ internal fun DesktopAmbientChatBackground(
     // cannot run the shader" otherwise look identical from the outside — a
     // subtly flatter glow that could ship unnoticed. Degradation is
     // safe-direction, but it must still be greppable.
-    val shaderBuilder = remember {
-        runCatching { RuntimeShaderBuilder(RuntimeEffect.makeForShader(AMBIENT_GLOW_SHADER_SOURCE + AMBIENT_GLOW_MAIN_PREMULTIPLIED)) }
+    val glowStyle = LocalThinkingGlowStyle.current
+    val shaderBuilder = remember(glowStyle) {
+        val source = ambientGlowShaderSource(glowStyle) + AMBIENT_GLOW_MAIN_PREMULTIPLIED
+        runCatching { RuntimeShaderBuilder(RuntimeEffect.makeForShader(source)) }
             .onFailure { failure ->
                 Telemetry.event(
                     AMBIENT_TELEMETRY_TAG,
@@ -147,7 +150,8 @@ internal fun DesktopAmbientChatBackground(
             }
             .getOrNull()
     }
-    val shaderPaint = remember { SkiaPaint() }
+    // Keyed with the builder: a style change disposes both together (the effect below).
+    val shaderPaint = remember(glowStyle) { SkiaPaint() }
     // The builder outlives individual frames, but not the composition: leaving
     // and returning to Conversations disposes and recreates this pane, and each
     // mount compiles another native-backed effect. Released explicitly rather

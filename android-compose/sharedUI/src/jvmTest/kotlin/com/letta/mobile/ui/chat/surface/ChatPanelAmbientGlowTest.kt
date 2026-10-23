@@ -23,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.ambient.ThinkingGlowStyle
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -40,6 +41,7 @@ import com.letta.mobile.ui.chat.surface.ambient.CHAT_AMBIENT_GLOW_TAG
 import com.letta.mobile.ui.chat.surface.ambient.ChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.ChatPanelAmbientGlow
 import com.letta.mobile.ui.chat.surface.ambient.LocalAmbientGlowShaders
+import com.letta.mobile.ui.ambient.LocalThinkingGlowStyle
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbient
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbientStatus
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -212,6 +214,35 @@ class ChatPanelAmbientGlowTest {
         ambient = ChatAmbient(AmbientMotionStatus.Running)
         waitForIdle()
         assertSame(compiled, shaders.get())
+        shaders.release()
+    }
+
+    @Test
+    fun every_glow_style_compiles_and_draws_its_own_picture() = runComposeUiTest {
+        val shaders = AmbientGlowShaders()
+        var style by mutableStateOf(ThinkingGlowStyle.Default)
+        setContent {
+            StillTheme {
+                CompositionLocalProvider(LocalAmbientGlowShaders provides shaders, LocalThinkingGlowStyle provides style) {
+                    Box(Modifier.size(GLOW_SIZE).background(MaterialTheme.colorScheme.surfaceContainer)) {
+                        ChatPanelAmbientGlow(
+                            ambient = ChatAmbient(AmbientMotionStatus.Running),
+                            placement = AmbientGlowPlacement.AboveComposer { 0.dp },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            }
+        }
+        val pictures = ThinkingGlowStyle.entries.map { next ->
+            style = next
+            waitForIdle()
+            assertTrue(shaders.get(next) != null, "$next compiles on the desktop test renderer")
+            val image = onNodeWithTag(CHAT_AMBIENT_GLOW_TAG, useUnmergedTree = true).captureToImage().toAwtImage()
+            (0 until image.width step 4).flatMap { x -> (0 until image.height step 4).map { y -> image.getRGB(x, y) } }
+        }
+        // The picked style reaches the draw: each one paints a different picture.
+        assertEquals(ThinkingGlowStyle.entries.size, pictures.toSet().size)
         shaders.release()
     }
 

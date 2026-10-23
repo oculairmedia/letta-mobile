@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.display.ChatTextSize
+import com.letta.mobile.ui.ambient.ThinkingGlowStyle
 import com.letta.mobile.ui.components.LettaSectionLabel
 import com.letta.mobile.ui.host.LettaAlertPane
 import com.letta.mobile.ui.host.LettaAlertSpec
@@ -60,13 +61,16 @@ object ShellChatOptionsTags {
 
     fun textSize(size: ChatTextSize) = "shell-chat-options-text-${size.name}"
 
+    fun glow(style: ThinkingGlowStyle) = "shell-chat-options-glow-${style.name}"
+
     fun restore(id: String) = "shell-archived-restore-$id"
 }
 
 /**
  * The chat's display options (reasoning, compactions, token usage, text
- * size), the list's auto-pin, and Download transcript. Switches for the on/off choices, a
- * segmented S / M / L for the text size; changes apply at once and the dialog stays open.
+ * size, thinking glow), the list's auto-pin, and Download transcript. Switches for the on/off
+ * choices, segmented rows for the text size and the glow's style; changes apply at once and the
+ * dialog stays open.
  */
 @Composable
 fun ShellChatOptionsDialog(state: ShellChatOptionsState, actions: ShellChatOptionsActions, onDismiss: () -> Unit) {
@@ -94,7 +98,9 @@ private fun ShellChatOptionsContent(state: ShellChatOptionsState, actions: Shell
             actions.onDisplayChange(display.copy(showTokenUsage = it))
         }
         LettaSectionLabel("Text size")
-        TextSizeSelector(state.textSize, actions.onTextSizeChange)
+        SegmentedChoice(TEXT_SIZE_SEGMENTS, state.textSize, actions.onTextSizeChange)
+        LettaSectionLabel("Thinking glow")
+        SegmentedChoice(GLOW_SEGMENTS, display.thinkingGlow) { actions.onDisplayChange(display.copy(thinkingGlow = it)) }
         if (state.offersAutoPin) {
             LettaSectionLabel("Chats")
             OptionSwitch("Pin new chats", state.autoPinNewChats, ShellChatOptionsTags.AUTO_PIN, actions.onAutoPinNewChatsChange)
@@ -119,19 +125,30 @@ private fun OptionSwitch(label: String, checked: Boolean, tag: String, onChange:
     }
 }
 
+/**
+ * One choice of a few [options] as a segmented row. No check mark, so four short labels fit a
+ * phone's dialog on one line; the selected segment's fill says which is on.
+ */
 @Composable
-private fun TextSizeSelector(selected: ChatTextSize, onSelect: (ChatTextSize) -> Unit) {
-    val sizes = ChatTextSize.entries
+private fun <T> SegmentedChoice(segments: List<Segment<T>>, selected: T, onSelect: (T) -> Unit) {
     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        sizes.forEachIndexed { index, size ->
+        segments.forEachIndexed { index, segment ->
             SegmentedButton(
-                selected = size == selected,
-                onClick = { onSelect(size) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = sizes.size),
-                modifier = Modifier.testTag(ShellChatOptionsTags.textSize(size)),
+                selected = segment.value == selected,
+                onClick = { onSelect(segment.value) },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = segments.size),
+                modifier = Modifier.testTag(segment.tag),
+                icon = {},
             ) {
-                Text(size.label)
+                Text(segment.label, maxLines = 1)
             }
         }
     }
 }
+
+/** One segment of a [SegmentedChoice]: the value it picks, its label and its test tag. */
+@Immutable
+private class Segment<T>(val value: T, val label: String, val tag: String)
+
+private val TEXT_SIZE_SEGMENTS = ChatTextSize.entries.map { Segment(it, it.label, ShellChatOptionsTags.textSize(it)) }
+private val GLOW_SEGMENTS = ThinkingGlowStyle.entries.map { Segment(it, it.label, ShellChatOptionsTags.glow(it)) }
