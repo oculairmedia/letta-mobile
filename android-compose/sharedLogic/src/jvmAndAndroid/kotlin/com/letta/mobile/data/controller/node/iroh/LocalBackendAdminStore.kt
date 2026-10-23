@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.node.listcache.recordFilesSignature
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.serialization.json.JsonArray
@@ -67,6 +68,14 @@ open class LocalBackendAdminStore(
      */
     open fun agentFilesSignature(): Long? = runCatching {
         support.agentIndex.signature { id -> support.defaultConversationFile(AgentId(id)) }
+    }.getOrNull()
+
+    /**
+     * A value that changes whenever a conversation record (`conversations/<key>/conversation.json`,
+     * which the App Server re-reads for every list) is added, removed or rewritten. Null when unreadable.
+     */
+    open fun conversationRecordsSignature(): Long? = runCatching {
+        recordFilesSignature(File(support.baseDir, "conversations"), "conversation.json")
     }.getOrNull()
 
     /** See [LocalBackendAgentReader.hiddenAgentIds]. */

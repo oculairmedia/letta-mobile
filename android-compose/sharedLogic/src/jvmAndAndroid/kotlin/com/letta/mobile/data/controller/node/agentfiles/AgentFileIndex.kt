@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import com.letta.mobile.data.controller.node.listcache.stampMix
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.BasicFileAttributes
@@ -80,7 +81,7 @@ internal class AgentFileIndex(
             val file = derive(stamp)?.id?.let(companion)
             sum + (file?.let(::stamp)?.mix() ?: 0L)
         }
-        return agents * MIX_PRIME + companions
+        return agents * COMBINE_PRIME + companions
     }
 
     /** The record's derived fields, parsed only when its stamp changed; null when it could not be read. */
@@ -102,13 +103,7 @@ internal class AgentFileIndex(
     private class Stamp(val file: File, val modified: FileTime, val sizeBytes: Long) {
         val mtimeMs: Long get() = modified.toMillis()
 
-        fun mix(): Long {
-            var h = file.path.hashCode().toLong()
-            h = h * MIX_PRIME + modified.to(TimeUnit.NANOSECONDS)
-            h = h * MIX_PRIME + sizeBytes
-            h = (h xor (h ushr 33)) * MIX_MULTIPLIER
-            return h xor (h ushr 29)
-        }
+        fun mix(): Long = stampMix(file.path, modified.to(TimeUnit.NANOSECONDS), sizeBytes)
     }
 
     private fun stamp(file: File): Stamp? = runCatching {
@@ -130,9 +125,6 @@ internal class AgentFileIndex(
         /** The most agent files one index covers; the live host has a few thousand. */
         const val DEFAULT_MAX_ENTRIES: Int = 20_000
 
-        private const val MIX_PRIME = 1_000_003L
-
-        /** SplitMix64's 0xbf58476d1ce4e5b9, so one changed field flips about half the bits. */
-        private const val MIX_MULTIPLIER = -0x40a7b892e31b1a47L
+        private const val COMBINE_PRIME = 1_000_003L
     }
 }
