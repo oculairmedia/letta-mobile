@@ -9,8 +9,8 @@ import com.letta.mobile.data.chat.tools.ToolStepLine
 import com.letta.mobile.data.chat.tools.ToolVerb
 
 /**
- * letta-code's `Read` (and its other toolsets' `read_file`): "Read src/Main.kt", opening to what it
- * read, its chip opening the file at the lines it read (`offset`, `limit`).
+ * letta-code's `Read` (and its other toolsets' `read_file`): "Read src/Main.kt", its chip opening the
+ * file in the preview at the lines it read (`offset`, `limit`). No inset: the file is the preview's to show.
  */
 object ReadToolPresenter : ToolPresenter {
     override val id: String = "read"
@@ -24,7 +24,8 @@ object ReadToolPresenter : ToolPresenter {
         presenterId = id,
     )
 
-    override fun inset(call: ToolCallFacts, scope: ToolPresenterScope): ToolInset? = call.resultText()?.let(ToolInset::Text)
+    // The approved mockup: a read is its chip; the file itself opens in the preview, not inline.
+    override fun inset(call: ToolCallFacts, scope: ToolPresenterScope): ToolInset? = null
 
     /** The 1-based lines read: from `offset` (1 when absent) for `limit` lines; null when the whole file was read. */
     private fun linesRead(call: ToolCallFacts): IntRange? {

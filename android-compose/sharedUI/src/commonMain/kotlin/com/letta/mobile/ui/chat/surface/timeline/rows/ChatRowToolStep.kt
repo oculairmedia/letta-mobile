@@ -40,6 +40,8 @@ import com.letta.mobile.avatar.core.AttentionKey
 import com.letta.mobile.avatar.core.AttentionKind
 import com.letta.mobile.data.chat.projection.ToolTimelineState
 import com.letta.mobile.data.chat.projection.classifyToolCallState
+import com.letta.mobile.data.chat.tools.ToolInset
+import com.letta.mobile.data.chat.tools.ToolOutputStream
 import com.letta.mobile.data.chat.tools.ToolStepLine
 import com.letta.mobile.data.messaging.AgentMessageDeliveryState
 import com.letta.mobile.data.messaging.compactLabel
@@ -120,7 +122,7 @@ internal fun ToolStep(
             exit = ChatRowMotion(LocalReducedMotion.current).expansionExit(),
             label = "toolStepInset",
         ) {
-            ToolStepDetails(toolCall, callbacks, live = running || toolCall.isStreaming())
+            ToolStepDetails(toolCall, callbacks, live = running || toolCall.isStreaming(), failed = resolved.isFailure())
         }
     }
 }
@@ -256,7 +258,7 @@ private fun warningInk(): Color {
 
 /** An open step: its agent-message metadata, its inset (built now, not before), its file chips and its images. */
 @Composable
-private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean) {
+private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean, failed: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -268,21 +270,26 @@ private fun ToolStepDetails(toolCall: UiToolCall, callbacks: ChatRowCallbacks, l
             val failed = provenance.deliveryState == AgentMessageDeliveryState.FAILED
             AgentMessageProvenanceMetadata(provenance, if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary)
         }
-        ToolStepInset(toolCall, callbacks, live)
+        ToolStepInset(toolCall, callbacks, live, failed)
         ToolPreviewChips(toolCall, rememberToolStepLine(toolCall), callbacks)
         ToolGeneratedImages(toolCall, callbacks)
     }
 }
 
 @Composable
-private fun ToolStepInset(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean) {
+private fun ToolStepInset(toolCall: UiToolCall, callbacks: ChatRowCallbacks, live: Boolean, failed: Boolean) {
     val notification = remember(toolCall.result) { toolCall.result?.let(::extractSubagentNotification) }
     if (notification != null) {
         SubagentNotificationCard(notification, callbacks.openSubagent, toolCall.toolCallId)
         return
     }
     val presenters = LocalToolPresenters.current
-    val inset = remember(toolCall, presenters) { presenters.inset(toolCall.facts()) }
+    // A failed call shows what went wrong (muted red), unless its presenter read the failure itself
+    // (a shell's exit code keeps its command over its stderr).
+    val ownFailure = rememberToolStepLine(toolCall).failure != null
+    val inset = remember(toolCall, presenters, failed, ownFailure) {
+        failureInset(toolCall).takeIf { failed && !ownFailure } ?: presenters.inset(toolCall.facts())
+    }
     inset?.let { ToolInsetView(it, live = live) }
     if (toolCall.resultTruncation != null) {
         Text(
@@ -314,3 +321,9 @@ private const val TARGET_ALPHA = 0.8f
 
 /** A call whose output may still grow: no terminal status yet, and not read back settled from the ledger. */
 private fun UiToolCall.isStreaming(): Boolean = status == null && !settled
+
+/** What a failed call said, as stderr in an inset of its own; null when it said nothing. */
+private fun failureInset(toolCall: UiToolCall): ToolInset? =
+    toolCall.result?.takeIf { it.isNotBlank() }?.let { error ->
+        ToolInset.Command(workingDirectory = null, command = "", output = listOf(ToolOutputStream(ToolOutputStream.Kind.Stderr, error)))
+    }
