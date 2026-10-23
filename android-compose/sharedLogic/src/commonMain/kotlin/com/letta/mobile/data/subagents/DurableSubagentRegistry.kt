@@ -304,11 +304,12 @@ class DurableSubagentRegistry(
      *  (RC4): a re-delivered identical snapshot is not
      * progress. A new tool call, new activity lines or a lifecycle change is.
      */
-    private fun SubagentChipRecord.madeProgress(observation: SubagentChipObservation): Boolean =
-        observation.state != state ||
+    private fun SubagentChipRecord.madeProgress(observation: SubagentChipObservation): Boolean {
+        return observation.state != state ||
             (observation.todoRevision > todoRevision && observation.todos != todos) ||
             progress.advancedBy(observation.progress) ||
             (observation.activity != null && observation.activity.lines != activity?.lines)
+    }
 
     private fun newerActivity(
         current: com.letta.mobile.data.model.SubagentActivitySnapshot?,
