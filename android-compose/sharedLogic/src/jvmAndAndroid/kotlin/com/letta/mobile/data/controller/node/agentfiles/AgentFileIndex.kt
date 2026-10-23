@@ -10,6 +10,7 @@ import java.nio.file.Files
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 /**
  * What the admin reads need to know about every `agents/<id>.json` record without holding or
@@ -55,15 +56,39 @@ internal class AgentFileIndex(
         derived.keys.retainAll(live)
         val entries = newest
             .mapNotNull { stamp ->
-                // A null from parse (the read failed) leaves nothing cached, so the next scan retries.
-                val info = derived.compute(stamp.file.name) { _, known ->
-                    known?.takeIf { it.modified == stamp.modified && it.sizeBytes == stamp.sizeBytes } ?: parse(stamp)
-                }
+                val info = derive(stamp)
                 info?.id?.let { id -> Entry(stamp.file, id, stamp.mtimeMs, info.hidden) }
             }
             .sortedByDescending { it.mtimeMs }
         return Scan(entries, uncovered)
     }
+
+    /**
+     * A value that changes whenever an agent file is added, removed or rewritten (path, modified time
+     * at full precision, size), or a [companion] file of a covered agent is. A companion is another
+     * file the agent's served state is built from (the App Server takes an agent's message ids and
+     * last run time from its default conversation). One attribute read per file; a record is parsed
+     * only when it changed, to learn its id. Null when the directory cannot be listed.
+     */
+    fun signature(companion: (String) -> File? = { null }): Long? {
+        val files = agentsDir.listFiles { f -> f.isFile && f.name.endsWith(SUFFIX) } ?: return null
+        val stamped = files.mapNotNull { file -> stamp(file) }
+        val covered = if (stamped.size > maxEntries) stamped.sortedByDescending { it.mtimeMs }.take(maxEntries) else stamped
+        // Sums of per-file mixes, so the listing order does not matter.
+        val agents = stamped.fold(stamped.size.toLong()) { sum, stamp -> sum + stamp.mix() }
+        val companions = covered.fold(0L) { sum, stamp ->
+            val file = derive(stamp)?.id?.let(companion)
+            sum + (file?.let(::stamp)?.mix() ?: 0L)
+        }
+        return agents * MIX_PRIME + companions
+    }
+
+    /** The record's derived fields, parsed only when its stamp changed; null when it could not be read. */
+    private fun derive(stamp: Stamp): Derived? =
+        // A null from parse (the read failed) leaves nothing cached, so the next call retries.
+        derived.compute(stamp.file.name) { _, known ->
+            known?.takeIf { it.modified == stamp.modified && it.sizeBytes == stamp.sizeBytes } ?: parse(stamp)
+        }
 
     /** Reports once per crossing that records beyond the cap are not seen: counts and hidden sets then leave the oldest out. */
     private fun noteCap(found: Int) {
@@ -76,6 +101,14 @@ internal class AgentFileIndex(
 
     private class Stamp(val file: File, val modified: FileTime, val sizeBytes: Long) {
         val mtimeMs: Long get() = modified.toMillis()
+
+        fun mix(): Long {
+            var h = file.path.hashCode().toLong()
+            h = h * MIX_PRIME + modified.to(TimeUnit.NANOSECONDS)
+            h = h * MIX_PRIME + sizeBytes
+            h = (h xor (h ushr 33)) * MIX_MULTIPLIER
+            return h xor (h ushr 29)
+        }
     }
 
     private fun stamp(file: File): Stamp? = runCatching {
@@ -96,5 +129,10 @@ internal class AgentFileIndex(
 
         /** The most agent files one index covers; the live host has a few thousand. */
         const val DEFAULT_MAX_ENTRIES: Int = 20_000
+
+        private const val MIX_PRIME = 1_000_003L
+
+        /** SplitMix64's 0xbf58476d1ce4e5b9, so one changed field flips about half the bits. */
+        private const val MIX_MULTIPLIER = -0x40a7b892e31b1a47L
     }
 }

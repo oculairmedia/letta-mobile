@@ -59,6 +59,40 @@ class AgentFileIndexTest {
     }
 
     @Test
+    fun theSignatureMovesWithEveryAddRemoveAndRewriteOnly() {
+        val root = store()
+        val index = index(root)
+        val a = root.agent("a", mtimeMs = 1_000)
+        val first = index.signature()
+        assertEquals(first, index.signature())
+
+        root.agent("b", mtimeMs = 2_000)
+        val added = index.signature()
+        a.writeText("""{"id":"a","name":"renamed"}""")
+        Files.setLastModifiedTime(a.toPath(), FileTime.fromMillis(1_000))
+        val rewritten = index.signature()
+        File(root, "agents/b.json").delete()
+        val removed = index.signature()
+
+        assertEquals(4, setOf(first, added, rewritten, removed).size)
+    }
+
+    @Test
+    fun theSignatureMovesWhenACoveredAgentsCompanionChanges() {
+        val root = store()
+        root.agent("a", mtimeMs = 1_000)
+        val companion = File(root, "a.companion").apply { writeText("v1") }
+        val index = index(root)
+        fun signature() = index.signature { id -> File(root, "$id.companion") }
+        val first = signature()
+        assertEquals(first, signature())
+
+        companion.writeText("v2-longer")
+
+        assertTrue(first != signature(), "a companion rewrite must move the signature")
+    }
+
+    @Test
     fun hiddenAgentsAreFlaggedByTheirTagOrTheirHiddenField() {
         val root = store()
         root.agent("plain", mtimeMs = 1_000)

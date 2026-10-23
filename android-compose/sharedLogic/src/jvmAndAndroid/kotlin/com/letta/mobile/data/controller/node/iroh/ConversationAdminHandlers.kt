@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.chat.branch.IrohConversationForkRpc
 import com.letta.mobile.data.runtime.TurnIdentityLedger
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -296,7 +297,9 @@ object ConversationAdminHandlers {
                 // Keep App Server membership, ordering and text authoritative. Enrich only
                 // exact user IDs already returned by this authorized page.
                 val rows = wire as? JsonArray ?: return@let wire
-                val local = localStore?.listMessagesProjected(convId, null, MessagePage(64, null, null, "desc"))
+                // Read from the transcript's end: a full parse cost grew with the conversation and
+                // ran again after every append during a live turn.
+                val local = localStore?.newestMessageContents(ConversationId(convId), ENRICHMENT_WINDOW)
                     ?.filterIsInstance<JsonObject>()?.associateBy { it["id"] } ?: return@let wire
                 JsonArray(rows.map { element ->
                     val row = element as? JsonObject ?: return@map element
@@ -425,4 +428,7 @@ object ConversationAdminHandlers {
             adminError("forbidden: conversation out of authorized scope")
         }
     }
+
+    /** How many of the newest local messages `message.list` looks in for images to restore. */
+    private const val ENRICHMENT_WINDOW = 64
 }

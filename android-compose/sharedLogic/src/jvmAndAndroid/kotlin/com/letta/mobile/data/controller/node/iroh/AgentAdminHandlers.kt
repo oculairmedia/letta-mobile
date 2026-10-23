@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
+import com.letta.mobile.data.controller.node.agentfiles.AgentRosterCache
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -23,11 +24,15 @@ object AgentAdminHandlers {
         controller: AppServerController? = null,
         tiers: NativeReadTiers = NativeReadTiers(),
     ) {
-        registerAgentList(router, tiers)
+        // Without a local store there is no cheap change signal, so every page is fetched as before.
+        val roster = tiers.localBackendStore?.let { store ->
+            AgentRosterCache(signature = store::agentFilesSignature, onTooLarge = ::reportAgentRosterTooLarge)
+        }
+        registerAgentList(router, tiers, roster)
         registerAgentGet(router, tiers)
-        registerAgentCreate(router, tiers)
-        registerAgentUpdate(router, controller, tiers)
-        registerAgentDelete(router, tiers)
+        registerAgentCreate(router, tiers, roster)
+        registerAgentUpdate(router, controller, tiers, roster)
+        registerAgentDelete(router, tiers, roster)
         // letta-mobile-ulz2b.1: authoritative scalar roster size from the on-disk
         // agent catalog. Completeness is the directory listing itself — never a
         // client agent.list .size. Absent store fails closed (same contract as
@@ -39,7 +44,7 @@ object AgentAdminHandlers {
     // The App Server drops agent `metadata`; Meridian keeps it (see AgentMetadataSidecar), so every
     // agent returned below goes through [overlaid] and every write through the sidecar.
 
-    private fun registerAgentList(router: AdminRpcRouter, tiers: NativeReadTiers) {
+    private fun registerAgentList(router: AdminRpcRouter, tiers: NativeReadTiers, roster: AgentRosterCache?) {
         router.register("agent.list") { params ->
             val limit = param(params, AdminParamKey("limit"))?.toLongOrNull()?.coerceAtLeast(1L)
             val offset = param(params, AdminParamKey("offset"))?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
@@ -51,20 +56,32 @@ object AgentAdminHandlers {
                 // limit) and agents beyond page 1 never resolved. Emulate
                 // offset here: fetch offset+limit rows in one read (the store
                 // is in-memory) and slice locally, preserving the admin RPC's
-                // limit/offset contract for both clients.
+                // limit/offset contract for both clients. With a roster cache
+                // the whole roster is fetched once and every page sliced from it.
                 val pageSize = limit ?: DEFAULT_AGENT_LIST_LIMIT
-                val fetch = (offset + pageSize).coerceAtMost(MAX_AGENT_LIST_FETCH)
-                val response = c.agentList(
-                    AppServerCommand.AgentList(
-                        requestId = NativeAdmin.requestId(),
-                        query = NativeAdmin.queryOf("limit" to fetch.toString()),
-                    ),
-                )
-                if (!response.success) return@require null
-                val page = pageOf(response.agents ?: JsonArray(emptyList()), offset, pageSize)
+                val window = (offset + pageSize).coerceAtMost(MAX_AGENT_LIST_FETCH)
+                val agents = if (roster != null) {
+                    roster.roster(
+                        fetchAll = { fetchAgents(c, MAX_AGENT_LIST_FETCH) },
+                        fetchWindow = { fetchAgents(c, window) },
+                    )
+                } else {
+                    fetchAgents(c, window)
+                } ?: return@require null
+                val page = pageOf(agents, offset, pageSize)
                 tiers.agentMetadata?.overlayAll(page) ?: page
             }
         }
+    }
+
+    private suspend fun fetchAgents(client: AppServerClient, count: Long): JsonArray? {
+        val response = client.agentList(
+            AppServerCommand.AgentList(
+                requestId = NativeAdmin.requestId(),
+                query = NativeAdmin.queryOf("limit" to count.toString()),
+            ),
+        )
+        return if (response.success) response.agents ?: JsonArray(emptyList()) else null
     }
 
     private fun pageOf(all: JsonArray, offset: Long, pageSize: Long): JsonArray =
@@ -87,7 +104,7 @@ object AgentAdminHandlers {
             }
         }
 
-    private fun registerAgentCreate(router: AdminRpcRouter, tiers: NativeReadTiers) {
+    private fun registerAgentCreate(router: AdminRpcRouter, tiers: NativeReadTiers, roster: AgentRosterCache?) {
         router.register("agent.create") { params ->
             val body = params.withDefaultContextWindow()
             NativeAdmin.require(tiers.nativeClient, NativeAdminOp.AgentCreate) { c ->
@@ -100,6 +117,7 @@ object AgentAdminHandlers {
                 if (!response.success) return@require null
                 val created = agentIdOf(response.agent)
                 storeMetadata(tiers.agentMetadata, created, metadataOf(body))
+                roster?.invalidate()
                 // Every agent write from an Iroh client lands in these handlers, so this is where
                 // connected clients learn of it (AgentChangeNotifier).
                 created?.let { tiers.agentChanges?.notify(it, AgentChangeKind.Created) }
@@ -108,7 +126,12 @@ object AgentAdminHandlers {
         }
     }
 
-    private fun registerAgentUpdate(router: AdminRpcRouter, controller: AppServerController?, tiers: NativeReadTiers) {
+    private fun registerAgentUpdate(
+        router: AdminRpcRouter,
+        controller: AppServerController?,
+        tiers: NativeReadTiers,
+        roster: AgentRosterCache?,
+    ) {
         router.register("agent.update") { params ->
             val id = params.requireParam(AdminParamKey("agent_id"))
             // Never inject a default context_window_limit on update — model-only
@@ -124,7 +147,10 @@ object AgentAdminHandlers {
                     updateThroughAppServer(c, sidecar, id, body)
                 }
                 // Inside the success path: a failed update tells no client to refetch.
-                updated?.also { tiers.agentChanges?.notify(id, AgentChangeKind.Updated) }
+                updated?.also {
+                    roster?.invalidate()
+                    tiers.agentChanges?.notify(id, AgentChangeKind.Updated)
+                }
             }
             if (RuntimeInvalidationPolicy.agentUpdateRequiresRestart(params)) {
                 controller?.stopRuntime(AgentId(id))
@@ -161,12 +187,13 @@ object AgentAdminHandlers {
         return sidecar.overlaid(response.agent)
     }
 
-    private fun registerAgentDelete(router: AdminRpcRouter, tiers: NativeReadTiers) =
+    private fun registerAgentDelete(router: AdminRpcRouter, tiers: NativeReadTiers, roster: AgentRosterCache?) =
         router.registerById("agent.delete") { id ->
             NativeAdmin.require(tiers.nativeClient, NativeAdminOp.AgentDelete) { c ->
                 val response = c.agentDelete(AppServerCommand.AgentDelete(requestId = NativeAdmin.requestId(), agentId = id))
                 if (response.success) {
                     tiers.agentMetadata?.delete(id)
+                    roster?.invalidate()
                     tiers.agentChanges?.notify(id, AgentChangeKind.Deleted)
                     buildJsonObject { put("deleted", true) }
                 } else {
