@@ -10852,6 +10852,8 @@ final object com.letta.mobile.ui.theme/ChatTimelineDimens { // com.letta.mobile.
 
     final val bottomFadeLength // com.letta.mobile.ui.theme/ChatTimelineDimens.bottomFadeLength|{}bottomFadeLength[0]
         final fun <get-bottomFadeLength>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/ChatTimelineDimens.bottomFadeLength.<get-bottomFadeLength>|<get-bottomFadeLength>(){}[0]
+    final val coveredEdgeGradeLength // com.letta.mobile.ui.theme/ChatTimelineDimens.coveredEdgeGradeLength|{}coveredEdgeGradeLength[0]
+        final fun <get-coveredEdgeGradeLength>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/ChatTimelineDimens.coveredEdgeGradeLength.<get-coveredEdgeGradeLength>|<get-coveredEdgeGradeLength>(){}[0]
     final val placeholderRowHeight // com.letta.mobile.ui.theme/ChatTimelineDimens.placeholderRowHeight|{}placeholderRowHeight[0]
         final fun <get-placeholderRowHeight>(): androidx.compose.ui.unit/Dp // com.letta.mobile.ui.theme/ChatTimelineDimens.placeholderRowHeight.<get-placeholderRowHeight>|<get-placeholderRowHeight>(){}[0]
     final val proseMaxWidth // com.letta.mobile.ui.theme/ChatTimelineDimens.proseMaxWidth|{}proseMaxWidth[0]

@@ -10622,6 +10622,7 @@ public final class com/letta/mobile/ui/theme/ChatTimelineDimens {
 	public static final field skeletonPulseMillis I
 	public static final field skeletonStaggerMillis I
 	public final fun getBottomFadeLength-D9Ej5fM ()F
+	public final fun getCoveredEdgeGradeLength-D9Ej5fM ()F
 	public final fun getPlaceholderRowHeight-D9Ej5fM ()F
 	public final fun getProseMaxWidth-D9Ej5fM ()F
 	public final fun getScrollToLatestMaxOvershoot-D9Ej5fM ()F

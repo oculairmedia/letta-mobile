@@ -117,11 +117,7 @@ internal fun TimelineListFrame(
                     // chat list fades over its top padding, ChatMessageListBody).
                     // A sticky prompt runs the rows out above its bottom edge, so they never pass
                     // hard under it or the chrome.
-                    .timelineFadingEdges(
-                        fades,
-                        topLength = ChatTimelineDimens.topFadeLength + overlays.topReserve,
-                        sticky = pinned,
-                    )
+                    .timelineFadingEdges(fades, sticky = pinned, chrome = overlays.topReserve)
                     .graphicsLayer {
                         translationY = overlays.glide.overshootPx
                         // A pinch in progress, read here only: it redraws the rows, never re-lays them out.

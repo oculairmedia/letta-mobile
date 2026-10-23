@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_scroll_to_latest
 import com.letta.mobile.sharedui.resources.timeline_today
@@ -109,7 +110,8 @@ internal fun rememberTimelineFadeAlphas(
  *
  * [sticky] is the pinned prompt the bands keep clear of, read at draw time: while
  * [TimelineFadeAlphas.pinned] is up the content is gone down to its copy's bottom edge and grades
- * back in over [topLength]'s fade length below it; and the top and pinned bands end above a prompt
+ * back in over a short grade below it ([ChatTimelineDimens.coveredEdgeGradeLength]), as the rows do
+ * below floating [chrome]; and the top and pinned bands end above a prompt
  * riding up to the visible top (or pushing the held copy out), so a prompt is never shaded on its
  * way up. Only the copy, once pushed above the line, dissolves (stickyCopyHeaderFade).
  */
@@ -118,6 +120,7 @@ internal fun Modifier.timelineFadingEdges(
     topLength: Dp = ChatTimelineDimens.topFadeLength,
     bottomLength: Dp = ChatTimelineDimens.bottomFadeLength,
     sticky: PinnedPrompt? = null,
+    chrome: Dp = 0.dp,
 ): Modifier {
     if (!alphas.anyShown) return this
     return this
@@ -125,10 +128,16 @@ internal fun Modifier.timelineFadingEdges(
         .drawWithContent {
             drawContent()
             val guard = sticky?.ridingPromptTopPx?.toFloat() ?: Float.MAX_VALUE
-            drawFadeBand(minOf(topLength.toPx(), guard), alphas.top, fromTop = true)
+            val grade = ChatTimelineDimens.coveredEdgeGradeLength.toPx()
+            // Under floating chrome the rows clear behind it and are back in just below it.
+            if (chrome > 0.dp) {
+                drawPinnedBand(chrome.toPx(), grade, alphas.top, guard)
+            } else {
+                drawFadeBand(minOf(topLength.toPx(), guard), alphas.top, fromTop = true)
+            }
             drawFadeBand(bottomLength.toPx(), alphas.bottom, fromTop = false)
             val edge = sticky?.copyBottomPx?.toFloat() ?: 0f
-            drawPinnedBand(edge, ChatTimelineDimens.topFadeLength.toPx(), alphas.pinned, guard)
+            drawPinnedBand(edge, grade, alphas.pinned, guard)
         }
 }
 
