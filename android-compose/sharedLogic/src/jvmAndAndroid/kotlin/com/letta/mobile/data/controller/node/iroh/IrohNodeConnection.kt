@@ -699,6 +699,15 @@ class IrohNodeConnection(
             """{"type":"runtime_start_response","success":false,"error":"request_id is required"}"""
         } else if (agentId == null || conversationId == null) {
             """{"type":"runtime_start_response","request_id":"$requestId","success":false,"error":"agent_id and conversation_id are required"}"""
+        } else if (
+            modeName != null &&
+            !IrohPeerCapabilities.isAllowed(
+                effectiveCapabilities(),
+                IrohPeerCapabilities.CONVERSATION_MANAGE,
+            )
+        ) {
+            // letta-mobile-wisqe.2 F3: setting mode through runtime_start is a conversation-management write.
+            capabilityDenied(requestId, IrohPeerCapabilities.CONVERSATION_MANAGE)
         } else if (modeName != null && mode == null) {
             """{"type":"runtime_start_response","request_id":"$requestId","success":false,"error":"unsupported permission mode"}"""
         } else {
