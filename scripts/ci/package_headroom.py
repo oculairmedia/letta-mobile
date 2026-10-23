@@ -412,4 +412,5 @@ if __name__ == "__main__":
     try:
         sys.exit(main())
     except ValueError as error:
-        sys.exit(f"package_headroom.py: {error}")
+        print(f"package_headroom.py: {error}", file=sys.stderr)
+        sys.exit(2)
