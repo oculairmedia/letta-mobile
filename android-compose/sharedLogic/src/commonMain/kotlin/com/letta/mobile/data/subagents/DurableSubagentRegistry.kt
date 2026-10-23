@@ -251,11 +251,15 @@ class DurableSubagentRegistry(
             lastSeenEpochMs = now,
             terminalAtEpochMs = firstTerminalAt,
             progress = progress.mergedWith(observation.progress),
-            todos = if (observation.todoRevision > todoRevision) observation.todos ?: todos else todos,
+            todos = authoredTodosAfter(observation),
             todoRevision = maxOf(todoRevision, observation.todoRevision),
             lastActivityEpochMs = activityAt,
         )
     }
+
+    /** Only a newer authored plan replaces the retained snapshot; missing plans preserve it. */
+    private fun SubagentChipRecord.authoredTodosAfter(observation: SubagentChipObservation) =
+        if (observation.todoRevision > todoRevision) observation.todos ?: todos else todos
 
     /** Provenance only fills gaps: a populated value is never replaced. */
     private fun SubagentChipRecord.backfilledFrom(observation: SubagentChipObservation): SubagentChipRecord {
