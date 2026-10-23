@@ -65088,6 +65088,56 @@ final object com.letta.mobile.data.chat.tools.bundled/BundledToolPresenters { //
         final fun <get-registry>(): com.letta.mobile.data.chat.tools/ToolPresenterRegistry // com.letta.mobile.data.chat.tools.bundled/BundledToolPresenters.registry.<get-registry>|<get-registry>(){}[0]
 }
 
+final object com.letta.mobile.data.chat.tools.bundled/EditToolPresenter : com.letta.mobile.data.chat.tools/ToolPresenter { // com.letta.mobile.data.chat.tools.bundled/EditToolPresenter|null[0]
+    final val id // com.letta.mobile.data.chat.tools.bundled/EditToolPresenter.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.letta.mobile.data.chat.tools.bundled/EditToolPresenter.id.<get-id>|<get-id>(){}[0]
+    final val matcher // com.letta.mobile.data.chat.tools.bundled/EditToolPresenter.matcher|{}matcher[0]
+        final fun <get-matcher>(): com.letta.mobile.data.chat.tools/ToolMatcher // com.letta.mobile.data.chat.tools.bundled/EditToolPresenter.matcher.<get-matcher>|<get-matcher>(){}[0]
+
+    final fun inset(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools.bundled/EditToolPresenter.inset|inset(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
+    final fun line(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools.bundled/EditToolPresenter.line|line(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
+}
+
+final object com.letta.mobile.data.chat.tools.bundled/GlobToolPresenter : com.letta.mobile.data.chat.tools/ToolPresenter { // com.letta.mobile.data.chat.tools.bundled/GlobToolPresenter|null[0]
+    final val id // com.letta.mobile.data.chat.tools.bundled/GlobToolPresenter.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.letta.mobile.data.chat.tools.bundled/GlobToolPresenter.id.<get-id>|<get-id>(){}[0]
+    final val matcher // com.letta.mobile.data.chat.tools.bundled/GlobToolPresenter.matcher|{}matcher[0]
+        final fun <get-matcher>(): com.letta.mobile.data.chat.tools/ToolMatcher // com.letta.mobile.data.chat.tools.bundled/GlobToolPresenter.matcher.<get-matcher>|<get-matcher>(){}[0]
+
+    final fun inset(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools.bundled/GlobToolPresenter.inset|inset(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
+    final fun line(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools.bundled/GlobToolPresenter.line|line(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
+}
+
+final object com.letta.mobile.data.chat.tools.bundled/GrepToolPresenter : com.letta.mobile.data.chat.tools/ToolPresenter { // com.letta.mobile.data.chat.tools.bundled/GrepToolPresenter|null[0]
+    final val id // com.letta.mobile.data.chat.tools.bundled/GrepToolPresenter.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.letta.mobile.data.chat.tools.bundled/GrepToolPresenter.id.<get-id>|<get-id>(){}[0]
+    final val matcher // com.letta.mobile.data.chat.tools.bundled/GrepToolPresenter.matcher|{}matcher[0]
+        final fun <get-matcher>(): com.letta.mobile.data.chat.tools/ToolMatcher // com.letta.mobile.data.chat.tools.bundled/GrepToolPresenter.matcher.<get-matcher>|<get-matcher>(){}[0]
+
+    final fun inset(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools.bundled/GrepToolPresenter.inset|inset(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
+    final fun line(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools.bundled/GrepToolPresenter.line|line(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
+}
+
+final object com.letta.mobile.data.chat.tools.bundled/ReadToolPresenter : com.letta.mobile.data.chat.tools/ToolPresenter { // com.letta.mobile.data.chat.tools.bundled/ReadToolPresenter|null[0]
+    final val id // com.letta.mobile.data.chat.tools.bundled/ReadToolPresenter.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.letta.mobile.data.chat.tools.bundled/ReadToolPresenter.id.<get-id>|<get-id>(){}[0]
+    final val matcher // com.letta.mobile.data.chat.tools.bundled/ReadToolPresenter.matcher|{}matcher[0]
+        final fun <get-matcher>(): com.letta.mobile.data.chat.tools/ToolMatcher // com.letta.mobile.data.chat.tools.bundled/ReadToolPresenter.matcher.<get-matcher>|<get-matcher>(){}[0]
+
+    final fun inset(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools.bundled/ReadToolPresenter.inset|inset(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
+    final fun line(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools.bundled/ReadToolPresenter.line|line(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
+}
+
+final object com.letta.mobile.data.chat.tools.bundled/WriteToolPresenter : com.letta.mobile.data.chat.tools/ToolPresenter { // com.letta.mobile.data.chat.tools.bundled/WriteToolPresenter|null[0]
+    final val id // com.letta.mobile.data.chat.tools.bundled/WriteToolPresenter.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.letta.mobile.data.chat.tools.bundled/WriteToolPresenter.id.<get-id>|<get-id>(){}[0]
+    final val matcher // com.letta.mobile.data.chat.tools.bundled/WriteToolPresenter.matcher|{}matcher[0]
+        final fun <get-matcher>(): com.letta.mobile.data.chat.tools/ToolMatcher // com.letta.mobile.data.chat.tools.bundled/WriteToolPresenter.matcher.<get-matcher>|<get-matcher>(){}[0]
+
+    final fun inset(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolInset? // com.letta.mobile.data.chat.tools.bundled/WriteToolPresenter.inset|inset(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
+    final fun line(com.letta.mobile.data.chat.tools/ToolCallFacts, com.letta.mobile.data.chat.tools/ToolPresenterScope): com.letta.mobile.data.chat.tools/ToolStepLine // com.letta.mobile.data.chat.tools.bundled/WriteToolPresenter.line|line(com.letta.mobile.data.chat.tools.ToolCallFacts;com.letta.mobile.data.chat.tools.ToolPresenterScope){}[0]
+}
+
 final object com.letta.mobile.data.chat.tools.links/OutputLinks { // com.letta.mobile.data.chat.tools.links/OutputLinks|null[0]
     final fun find(kotlin/String): kotlin.collections/List<com.letta.mobile.data.chat.tools.links/OutputLinks.Match> // com.letta.mobile.data.chat.tools.links/OutputLinks.find|find(kotlin.String){}[0]
 
