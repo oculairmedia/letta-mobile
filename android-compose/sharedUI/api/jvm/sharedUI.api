@@ -2150,7 +2150,6 @@ public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSing
 	public final fun getLambda$-145576189$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-491711505$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1449840956$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$1768079866$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowImageViewerKt {
@@ -10664,7 +10663,6 @@ public final class com/letta/mobile/ui/theme/ChatRowDimens {
 	public static final field INSTANCE Lcom/letta/mobile/ui/theme/ChatRowDimens;
 	public static final field copiedFeedbackMillis J
 	public static final field diffVisibleLines I
-	public static final field dispatchPromptMaxLines I
 	public static final field gridMaxImages I
 	public static final field promptCollapsedMaxLines I
 	public static final field promptGridMaxImages I

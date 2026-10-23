@@ -10710,8 +10710,6 @@ final object com.letta.mobile.ui.theme/ChatRowDimens { // com.letta.mobile.ui.th
         final fun <get-copiedFeedbackMillis>(): kotlin/Long // com.letta.mobile.ui.theme/ChatRowDimens.copiedFeedbackMillis.<get-copiedFeedbackMillis>|<get-copiedFeedbackMillis>(){}[0]
     final const val diffVisibleLines // com.letta.mobile.ui.theme/ChatRowDimens.diffVisibleLines|{}diffVisibleLines[0]
         final fun <get-diffVisibleLines>(): kotlin/Int // com.letta.mobile.ui.theme/ChatRowDimens.diffVisibleLines.<get-diffVisibleLines>|<get-diffVisibleLines>(){}[0]
-    final const val dispatchPromptMaxLines // com.letta.mobile.ui.theme/ChatRowDimens.dispatchPromptMaxLines|{}dispatchPromptMaxLines[0]
-        final fun <get-dispatchPromptMaxLines>(): kotlin/Int // com.letta.mobile.ui.theme/ChatRowDimens.dispatchPromptMaxLines.<get-dispatchPromptMaxLines>|<get-dispatchPromptMaxLines>(){}[0]
     final const val gridMaxImages // com.letta.mobile.ui.theme/ChatRowDimens.gridMaxImages|{}gridMaxImages[0]
         final fun <get-gridMaxImages>(): kotlin/Int // com.letta.mobile.ui.theme/ChatRowDimens.gridMaxImages.<get-gridMaxImages>|<get-gridMaxImages>(){}[0]
     final const val promptCollapsedMaxLines // com.letta.mobile.ui.theme/ChatRowDimens.promptCollapsedMaxLines|{}promptCollapsedMaxLines[0]
