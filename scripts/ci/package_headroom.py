@@ -59,7 +59,7 @@ _DECLARATION_START = re.compile(r"(?:fun|val|var|class|interface|object|typealia
 _HEADER_STOP = re.compile(r"[()\[\]{};=\n]")
 _NESTING = {"(": 1, "[": 1, ")": -1, "]": -1}
 NEWLINE = "\n"
-_REVISION = re.compile(r"[\w./@^~{}-]+")
+_REVISION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/@{}^~-]*")
 _SHA = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 _PLANNED_EDGE = re.compile(r"\s*([\w.]+)\s*->\s*([\w.]+)\s*")
 
@@ -312,23 +312,31 @@ def compare(report: dict, ci_report: dict) -> list[str]:
     return problems
 
 
-def _git(repo: Path, *args: str) -> list[str]:
-    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, check=True).stdout.split("\n")
-
-
 def merge_base(repo: Path, base: str) -> str:
-    """The commit where HEAD left [base], as a full SHA; [base] must be a plain revision name."""
+    """The full SHA where HEAD left [base]; only a validated name reaches git, only a SHA leaves."""
     if _REVISION.fullmatch(base) is None:
         raise ValueError(f"not a revision name: {base!r}")
-    commit = _git(repo, "merge-base", "--end-of-options", base, "HEAD")[0].strip()
-    if _SHA.fullmatch(commit) is None:
+    result = subprocess.run(["git", "-C", str(repo), "merge-base", "--end-of-options", base, "HEAD"],
+                            capture_output=True, text=True, encoding="utf-8")
+    commit = result.stdout.strip()
+    if result.returncode != 0 or _SHA.fullmatch(commit) is None:
         raise ValueError(f"no merge base with {base!r}")
     return commit
 
 
+def changed_paths(repo: Path, commit: str) -> set[str]:
+    """Repo paths changed since [commit] (a full SHA), including untracked files."""
+    if _SHA.fullmatch(commit) is None:
+        raise ValueError(f"not a commit sha: {commit!r}")
+    tracked = subprocess.run(["git", "-C", str(repo), "diff", "--name-only", "--end-of-options", commit, "--"],
+                             capture_output=True, text=True, encoding="utf-8", check=True)
+    untracked = subprocess.run(["git", "-C", str(repo), "ls-files", "--others", "--exclude-standard"],
+                               capture_output=True, text=True, encoding="utf-8", check=True)
+    return set(tracked.stdout.splitlines()) | set(untracked.stdout.splitlines())
+
+
 def changed_packages(repo: Path, base: str, structure: Structure) -> list[str]:
-    commit = merge_base(repo, base)
-    paths = set(_git(repo, "diff", "--name-only", commit, "--")) | set(_git(repo, "ls-files", "--others", "--exclude-standard"))
+    paths = changed_paths(repo, merge_base(repo, base))
     by_path = {row["path"]: row["package"] for row in structure.files}
     return sorted({by_path[path] for path in paths if path in by_path})
 
