@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { webcrypto } from 'node:crypto';
-import { loadOrCreateIdentity, forgetIdentity } from './src/wasmJsMain/resources/iroh-identity.js';
+import { forgetIdentity, fromHex, loadOrCreateIdentity, toHex } from './src/wasmJsMain/resources/iroh-identity.js';
 
 // In-memory stand-in for the IndexedDB store; keeps values by reference like structured clone keeps CryptoKeys.
 const memoryStore = () => {
@@ -68,4 +68,18 @@ test('forgetIdentity makes the next connect a new NodeId', async () => {
     await forgetIdentity({ store });
     const next = await loadOrCreateIdentity({ store, subtle });
     assert.notEqual(hex(next), hex(first));
+});
+
+test('the identity round-trips through hex unchanged (wisqe S1b: how it crosses to Kotlin)', () => {
+    const secret = Uint8Array.from({ length: 32 }, (_, i) => (i * 37 + 5) & 0xff);
+    const text = toHex(secret);
+    assert.equal(text, hex(secret));
+    assert.deepEqual(fromHex(text), secret);
+    assert.deepEqual(fromHex(text.toUpperCase()), secret);
+});
+
+test('fromHex refuses anything that is not whole hex pairs', () => {
+    assert.throws(() => fromHex('abc'));
+    assert.throws(() => fromHex('zz'));
+    assert.deepEqual(fromHex(''), new Uint8Array(0));
 });
