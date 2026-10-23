@@ -13,6 +13,7 @@ import com.letta.mobile.data.subagents.SubagentChipRecord
 import com.letta.mobile.data.subagents.SubagentChipSource
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -176,13 +177,24 @@ class ControllerSubagentRegistrySource(
                 ?.takeIf { it != SubagentStatus.RUNNING } ?: return null
             // Task ids, tool ids and child agent ids are separate namespaces. Require
             // a unique dispatch in this exact parent scope; never use display titles.
-            val matches = registry.replaySnapshot(frame.runtime.conversationId).filter { record ->
+            val matches = registry.replaySnapshot(frame.runtime.conversationId).filterNot { it.state.isTerminal }.filter { record ->
                 record.agentId == frame.runtime.agentId &&
                     (notification.taskId != null || notification.toolCallId != null) &&
                     notification.matchesDispatch(record)
             }
-            val entry = matches.singleOrNull()?.toEntry() ?: return null
+            val entry = matches.singleUnambiguousEntry(notification) ?: return null
             return entry.copy(status = status, durationMs = notification.durationMs ?: entry.durationMs)
+        }
+
+        private fun List<SubagentChipRecord>.singleUnambiguousEntry(notification: UiSubagentNotification): SubagentEntry? {
+            if (size > 1) {
+                Telemetry.event(
+                    "SubagentRegistry", "terminal.ambiguous",
+                    "taskId" to notification.taskId, "matchCount" to size,
+                    level = Telemetry.Level.WARN,
+                )
+            }
+            return singleOrNull()?.toEntry()
         }
 
         /** Every supplied identity must match its own namespace on the same dispatch. */
