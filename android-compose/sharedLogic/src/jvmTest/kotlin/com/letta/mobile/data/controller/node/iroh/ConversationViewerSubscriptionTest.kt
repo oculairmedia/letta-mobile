@@ -170,10 +170,11 @@ class ConversationViewerSubscriptionTest {
                 firstFrameTimeoutMs = 1_000,
             ),
             onMethodObserved = { method, params ->
-                if (method == "message.list") {
-                    val convId = params?.get("conversation_id")?.jsonPrimitive?.content
-                    if (!convId.isNullOrEmpty()) subscription.subscribe(convId)
+                val conversationId = params?.get("conversation_id")?.jsonPrimitive?.content
+                if (method == "message.list" && !conversationId.isNullOrEmpty()) {
+                    subscription.subscribe(conversationId)
                 }
+                null
             },
         )
 
@@ -190,6 +191,83 @@ class ConversationViewerSubscriptionTest {
         // The hook subscribed the connection as a viewer of convB.
         assertEquals("convB", subscription.currentConversation)
         assertEquals(setOf<ViewerHandle>(connViewer), registry.viewersFor("convB"))
+    }
+
+    @Test
+    fun agentScopeDenialDoesNotObserveTheConversation() = runTest {
+        val registry = ConnectionRegistry()
+        val connViewer = viewer("conn-A")
+        val subscription = subscription(registry, connViewer)
+        subscription.subscribe("convA")
+        val router = AdminRpcRouter().apply {
+            register("message.list") { kotlinx.serialization.json.JsonPrimitive("[]") }
+        }
+        val server = AdminRpcStreamServer(
+            router = router,
+            authenticated = AtomicBoolean(true),
+            limits = AdminRpcStreamLimits(firstFrameTimeoutMs = 1_000),
+            onMethodObserved = { method, params ->
+                val conversationId = params?.get("conversation_id")?.jsonPrimitive?.content
+                if (method == "message.list" && !conversationId.isNullOrEmpty()) {
+                    subscription.subscribe(conversationId)
+                }
+                null
+            },
+            requestContextProvider = {
+                AdminRpcRequestContext(authenticated = true, authorizedAgentIds = setOf("agent-A"))
+            },
+        )
+        val stream = FakeBiStream()
+        val job = with(server) { launch { handleStream(stream) } }
+        stream.sendFrame(
+            """{"type":"admin_rpc","request_id":"r1","method":"message.list","params":{"conversation_id":"convB","agent_id":"agent-B"}}""",
+        )
+        val response = stream.awaitFrame()
+        job.join()
+
+        assertEquals("false", response["success"]?.jsonPrimitive?.content)
+        assertEquals(AgentScopeGuard.DENIED, response["error"]?.jsonPrimitive?.content)
+        assertEquals("convA", subscription.currentConversation)
+        assertEquals(setOf<ViewerHandle>(connViewer), registry.viewersFor("convA"))
+        assertTrue(registry.viewersFor("convB").isEmpty(), "denied conversation must not gain a viewer")
+    }
+
+    @Test
+    fun failedMessageListRestoresThePreviousViewerSubscription() = runTest {
+        val registry = ConnectionRegistry()
+        val connViewer = viewer("conn-A")
+        val subscription = subscription(registry, connViewer)
+        subscription.subscribe("convA")
+        val router = AdminRpcRouter().apply {
+            register("message.list") { throw IllegalStateException("native message list failed") }
+        }
+        val server = AdminRpcStreamServer(
+            router = router,
+            authenticated = AtomicBoolean(true),
+            limits = AdminRpcStreamLimits(firstFrameTimeoutMs = 1_000),
+            onMethodObserved = { method, params ->
+                val conversationId = params?.get("conversation_id")?.jsonPrimitive?.content
+                if (method == "message.list" && !conversationId.isNullOrEmpty()) {
+                    subscription.subscribe(conversationId)
+                    suspend { subscription.subscribe("convA") }
+                } else {
+                    null
+                }
+            },
+        )
+        val stream = FakeBiStream()
+        val job = with(server) { launch { handleStream(stream) } }
+        stream.sendFrame(
+            """{"type":"admin_rpc","request_id":"r1","method":"message.list","params":{"conversation_id":"convB"}}""",
+        )
+        val response = stream.awaitFrame()
+        job.join()
+
+        assertEquals("false", response["success"]?.jsonPrimitive?.content)
+        assertEquals("native message list failed", response["error"]?.jsonPrimitive?.content)
+        assertEquals("convA", subscription.currentConversation)
+        assertEquals(setOf<ViewerHandle>(connViewer), registry.viewersFor("convA"))
+        assertTrue(registry.viewersFor("convB").isEmpty(), "failed hydration must roll back its viewer")
     }
 
     @Test

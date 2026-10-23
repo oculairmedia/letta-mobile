@@ -216,6 +216,15 @@ internal class ConversationViewerSubscription(
             viewed = conversationId.takeIf { registered }
         }
     }
+
+    /** Remove this connection from its current conversation, if any. */
+    suspend fun unsubscribe() {
+        mutex.withLock {
+            val previous = viewed ?: return
+            runCatching { registry.unregister(previous, viewer) }
+            viewed = null
+        }
+    }
 }
 
 /**

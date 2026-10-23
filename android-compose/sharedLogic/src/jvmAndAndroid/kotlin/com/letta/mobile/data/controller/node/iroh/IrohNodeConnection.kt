@@ -369,27 +369,72 @@ class IrohNodeConnection(
             return """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"forbidden","capability":"$requiredCapability"}"""
         }
         val params = obj["params"]?.jsonObject
-        // A client whose admin_rpc rides the control channel (the browser over iroh-wasm) hydrates
-        // through here, so it becomes the conversation's viewer the same way.
-        observeAdminMethod(method, params)
-        return adminRpcRouter.dispatch(
-            AdminRpcInvocation(
-                requestId = requestId,
-                method = method,
-                params = params,
-                context = currentAdminRpcRequestContext(),
-            ),
+        val invocation = AdminRpcInvocation(
+            requestId = requestId,
+            method = method,
+            params = params,
+            context = currentAdminRpcRequestContext(),
         )
+        // Authorize before the observer can add this connection as a viewer.
+        // Dispatch still receives a fresh context after observation so a successful
+        // message.list keeps its established conversation-scope behaviour.
+        adminRpcRouter.preauthorize(invocation)?.let { return it }
+        val rollback = observeAdminMethod(method, params)
+        val response = try {
+            adminRpcRouter.dispatch(invocation.copy(context = currentAdminRpcRequestContext()))
+        } catch (cancelled: CancellationException) {
+            rollbackObservedAdminMethod(rollback)
+            throw cancelled
+        } catch (error: Exception) {
+            rollbackObservedAdminMethod(rollback)
+            throw error
+        }
+        if (isAdminRpcFailureEnvelope(response)) rollbackObservedAdminMethod(rollback)
+        return response
     }
 
     /**
      * The OBSERVER signal: a connection that hydrates conversation X with `message.list`
      * becomes X's viewer (de-scoping any prior conversation), on either admin_rpc path.
      */
-    private suspend fun observeAdminMethod(method: String, params: JsonObject?) {
-        if (method != "message.list") return
+    private suspend fun observeAdminMethod(method: String, params: JsonObject?): (suspend () -> Unit)? {
+        if (method != "message.list") return null
         val conversationId = params?.get("conversation_id")?.let { (it as? JsonPrimitive)?.contentOrNull }
-        if (!conversationId.isNullOrEmpty()) registerAsViewer(conversationId)
+        if (conversationId.isNullOrEmpty()) return null
+        val subscription = viewerSubscription ?: return null
+        val previous = subscription.currentConversation
+        registerAsViewer(conversationId)
+        return {
+            if (previous == null) {
+                subscription.unsubscribe()
+            } else {
+                subscription.subscribe(previous)
+            }
+            Telemetry.event(
+                "IrohNode", "viewer.registration_rolled_back",
+                "remoteEndpointId" to remoteEndpointId,
+                "restoredConversationId" to (previous ?: ""),
+            )
+        }
+    }
+
+    /** Restore observer state after a handler failure without delaying cancellation cleanup. */
+    private suspend fun rollbackObservedAdminMethod(rollback: (suspend () -> Unit)?) {
+        if (rollback == null) return
+        withContext(NonCancellable) {
+            try {
+                rollback()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Telemetry.event(
+                    "IrohNode", "admin_rpc.method_observer.rollback_failed",
+                    "remoteEndpointId" to remoteEndpointId,
+                    "error" to (error.message ?: error.toString()),
+                    level = Telemetry.Level.WARN,
+                )
+            }
+        }
     }
 
     /** Control-channel sync frame — kept out of [handleControlFrame] for complexity. */
