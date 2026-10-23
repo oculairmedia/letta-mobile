@@ -2132,6 +2132,10 @@ public final class com/letta/mobile/ui/chat/surface/timeline/rows/ChatRowCompact
 	public static final fun CompactionDividerRow (Ljava/lang/String;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
 
+public final class com/letta/mobile/ui/chat/surface/timeline/rows/ChatRowToolPreviewKt {
+	public static final fun getLocalMemoryPreview ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
 public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatApprovalStepperKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatApprovalStepperKt;
 	public fun <init> ()V
@@ -2170,7 +2174,8 @@ public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSing
 public final class com/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowToolPreviewKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/chat/surface/timeline/rows/ComposableSingletons$ChatRowToolPreviewKt;
 	public fun <init> ()V
-	public final fun getLambda$-1321150667$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$-1035601529$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-1666066412$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$598866409$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
@@ -7610,6 +7615,35 @@ public final class com/letta/mobile/ui/shell/pages/ShellLibrarySources {
 	public final fun getSettings ()Lcom/letta/mobile/data/storage/SecureSettingsStore;
 }
 
+public final class com/letta/mobile/ui/shell/pages/ShellMemoryPreview : com/letta/mobile/ui/shell/pages/workspace/MemoryPreview {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/ui/shell/pages/ShellMemorySources;Lkotlin/jvm/functions/Function0;)V
+	public fun Chip (Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget;Lcom/letta/mobile/data/model/UiToolCall;Landroidx/compose/runtime/Composer;I)V
+	public synthetic fun Chip (Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget;Ljava/lang/Object;Landroidx/compose/runtime/Composer;I)V
+	public fun Pane (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;I)V
+	public final fun close ()V
+	public final fun getOpenTarget ()Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget;
+	public final fun open (Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget;Lcom/letta/mobile/data/model/UiToolCall;)V
+}
+
+public final class com/letta/mobile/ui/shell/pages/ShellMemoryPreviewTags {
+	public static final field $stable I
+	public static final field CHIP Ljava/lang/String;
+	public static final field EARLIER Ljava/lang/String;
+	public static final field INSTANCE Lcom/letta/mobile/ui/shell/pages/ShellMemoryPreviewTags;
+	public static final field PANE Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/shell/pages/ShellMemorySources {
+	public static final field $stable I
+	public fun <init> (Lkotlinx/coroutines/flow/StateFlow;Lcom/letta/mobile/data/memory/graph/MemoryPageActions;Lkotlinx/coroutines/flow/StateFlow;Lcom/letta/mobile/data/memory/memfs/MemfsPageActions;Lkotlin/jvm/functions/Function1;)V
+	public final fun getFiles ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getFilesActions ()Lcom/letta/mobile/data/memory/memfs/MemfsPageActions;
+	public final fun getMemory ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getMemoryActions ()Lcom/letta/mobile/data/memory/graph/MemoryPageActions;
+	public final fun getSelectFilesAgent ()Lkotlin/jvm/functions/Function1;
+}
+
 public final class com/letta/mobile/ui/shell/pages/ShellPageBindingKt {
 	public static final fun rememberShellPageDeps (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lcom/letta/mobile/ui/shell/pages/ShellLibraryControllers;Lcom/letta/mobile/ui/shell/pages/ShellPageHost;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/ShellPageDeps;
 	public static final fun shellPageDeps (Lcom/letta/mobile/data/session/SessionRepositoryGraph;Lcom/letta/mobile/ui/shell/pages/ShellLibraryControllers;Lcom/letta/mobile/ui/shell/pages/ShellPageHost;)Lcom/letta/mobile/ui/shell/ShellPageDeps;
@@ -8888,6 +8922,11 @@ public final class com/letta/mobile/ui/shell/pages/workspace/ComposableSingleton
 	public final fun getLambda$-676852416$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
+public abstract interface class com/letta/mobile/ui/shell/pages/workspace/MemoryPreview {
+	public abstract fun Chip (Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget;Ljava/lang/Object;Landroidx/compose/runtime/Composer;I)V
+	public abstract fun Pane (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;I)V
+}
+
 public final class com/letta/mobile/ui/shell/pages/workspace/WorkingDirectoryPickerHost {
 	public static final field $stable I
 	public fun <init> ()V
@@ -8934,7 +8973,7 @@ public final class com/letta/mobile/ui/shell/pages/workspace/WorkingDirectoryPic
 }
 
 public final class com/letta/mobile/ui/shell/pages/workspace/WorkspaceFileLinkKt {
-	public static final fun ToolPreviewFileChip (Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget;Landroidx/compose/runtime/Composer;I)V
+	public static final fun ToolPreviewFileChip (Lcom/letta/mobile/data/chat/tools/ToolPreviewTarget$File;Landroidx/compose/runtime/Composer;I)V
 	public static final fun WorkspaceFileChip (Lcom/letta/mobile/data/workspace/WorkspaceFileRequest;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun WorkspaceFilePreview (Landroidx/compose/runtime/Composer;I)V
 	public static final fun getLocalWorkspaceFiles ()Landroidx/compose/runtime/ProvidableCompositionLocal;
