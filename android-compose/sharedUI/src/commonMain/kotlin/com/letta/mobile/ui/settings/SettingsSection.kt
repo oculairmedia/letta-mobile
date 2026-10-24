@@ -35,10 +35,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -65,9 +69,14 @@ import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.host.LocalLettaHost
+import com.letta.mobile.ui.host.LocalOverlayHost
 import com.letta.mobile.ui.host.PaneAnchor
+import com.letta.mobile.ui.host.showPasteBlockedHint
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.text.ClipboardTextRead
+import com.letta.mobile.ui.text.readPlainText
 import com.letta.mobile.ui.theme.LettaDimens
+import kotlinx.coroutines.launch
 
 /** Test handles of the settings primitives; a row's tag is its prefix plus the row key. */
 object SettingsSectionTags {
@@ -156,14 +165,21 @@ object SettingsScope {
 
     /**
      * A text field with its label above it, showing [value]; edits go to [onValueChange]. A secret
-     * row hides its text behind a show/hide toggle; [paste] adds a Paste button. The row's problem
-     * marks it invalid once something is typed, in words under the field.
+     * row hides its text behind a show/hide toggle; [paste] adds a Paste button, which focuses the field
+     * and says to paste with the keyboard when the clipboard cannot be read. The row's problem marks it
+     * invalid once something is typed, in words under the field.
      */
     @Composable
     fun TextFieldRow(row: SettingsRow.Text, value: String, paste: Boolean = false, onValueChange: (String) -> Unit) {
         val enabled = LocalSettingsLock.current == null
         var revealed by rememberSaveable(row.key) { mutableStateOf(false) }
         val problem = row.problem?.invoke(value)?.takeIf { value.isNotBlank() }
+        val focus = remember { FocusRequester() }
+        val overlays = LocalOverlayHost.current
+        val onPasteBlocked: () -> Unit = {
+            focus.requestFocus()
+            overlays?.showPasteBlockedHint()
+        }
         Column(Modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.xs), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
             Text(row.title, style = MaterialTheme.typography.labelLarge)
             OutlinedTextField(
@@ -177,8 +193,8 @@ object SettingsScope {
                 minLines = row.lines.coerceAtLeast(1),
                 visualTransformation = if (row.secret && !revealed) PasswordVisualTransformation() else VisualTransformation.None,
                 keyboardOptions = if (row.numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
-                trailingIcon = fieldTrailing(row, FieldExtras(paste, revealed, { revealed = !revealed }, onValueChange)),
-                modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + row.key),
+                trailingIcon = fieldTrailing(row, FieldExtras(paste, revealed, { revealed = !revealed }, onValueChange, onPasteBlocked)),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag(SettingsSectionTags.ROW_PREFIX + row.key),
             )
         }
     }
@@ -396,7 +412,13 @@ private fun Chevron() {
 }
 
 /** A field's trailing controls and what they act on. */
-private class FieldExtras(val paste: Boolean, val revealed: Boolean, val onToggleReveal: () -> Unit, val onValueChange: (String) -> Unit)
+private class FieldExtras(
+    val paste: Boolean,
+    val revealed: Boolean,
+    val onToggleReveal: () -> Unit,
+    val onValueChange: (String) -> Unit,
+    val onPasteBlocked: () -> Unit,
+)
 
 private fun fieldSupport(row: SettingsRow.Text, problem: String?): (@Composable () -> Unit)? = when {
     problem != null -> {
@@ -412,20 +434,29 @@ private fun fieldTrailing(row: SettingsRow.Text, extras: FieldExtras): (@Composa
     if (!row.secret && !extras.paste) return null
     return {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (extras.paste) PasteButton(row.key, extras.onValueChange)
+            if (extras.paste) PasteButton(row.key, extras.onValueChange, extras.onPasteBlocked)
             if (row.secret) SecretToggle(extras.revealed, extras.onToggleReveal)
         }
     }
 }
 
+/** Pastes the clipboard's trimmed text; an empty clipboard leaves the field as it is, a refused read calls [onBlocked]. */
 @Composable
-private fun PasteButton(key: String, onPaste: (String) -> Unit) {
-    @Suppress("DEPRECATION")
-    val clipboard = LocalClipboardManager.current
+private fun PasteButton(key: String, onPaste: (String) -> Unit, onBlocked: () -> Unit) {
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     TextButton(
-        onClick = { clipboard.getText()?.text?.trim()?.takeIf { it.isNotEmpty() }?.let(onPaste) },
+        onClick = { scope.launch { pasteInto(clipboard.readPlainText(), onPaste, onBlocked) } },
         modifier = Modifier.testTag(SettingsSectionTags.PASTE_PREFIX + key),
     ) { Text(PASTE_LABEL) }
+}
+
+private fun pasteInto(read: ClipboardTextRead, onPaste: (String) -> Unit, onBlocked: () -> Unit) {
+    when (read) {
+        is ClipboardTextRead.Readable -> read.text.trim().takeIf { it.isNotEmpty() }?.let(onPaste)
+        ClipboardTextRead.Empty -> Unit
+        ClipboardTextRead.Blocked -> onBlocked()
+    }
 }
 
 @Composable
