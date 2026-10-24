@@ -302,13 +302,15 @@ class CanvasSession(
     }
 
     /**
-     * Whether [stored] is ahead of [held]: a later revision, or the same one carrying newer
-     * provenance (an op that changed nothing on the board is kept without a revision; see [keepProvenance]).
+     * Whether [stored] is ahead of [held]: a later revision, or the same one with a newer writer for
+     * some value (an op that changed nothing on the board is kept without a revision; see
+     * [keepProvenance]). Left behind, that provenance would be overwritten by this session's next
+     * write, and an older edit could then win where it had already lost.
      */
     private fun isAhead(stored: CanvasDocument, held: CanvasDocument): Boolean = when {
         stored.revision != held.revision -> stored.revision > held.revision
         stored.sceneJson == held.sceneJson -> false
-        else -> CanvasOpProjector.maxLamport(stored.sceneJson) > CanvasOpProjector.maxLamport(held.sceneJson)
+        else -> hasNewerProvenance(stored.sceneJson, held.sceneJson)
     }
 
     /**

@@ -725,10 +725,14 @@ object CanvasOpProjector {
         return drawingsEqual(pa, pb)
     }
 
-    /** [drawingsEqual] for drawings already parsed: a board that holds the tree compares without parsing again. */
+    /**
+     * [drawingsEqual] for drawings already parsed: a board that holds the tree compares without
+     * parsing again. A drawing whose `elements` is not an array is no drawing DrawBox can hold, so
+     * it equals nothing (an `{}` read as no elements would have passed for an empty board).
+     */
     fun drawingsEqual(a: JsonObject, b: JsonObject): Boolean {
-        val ea = (a["elements"] as? JsonArray)?.toSet().orEmpty()
-        val eb = (b["elements"] as? JsonArray)?.toSet().orEmpty()
+        val ea = (a["elements"] as? JsonArray)?.toSet() ?: return false
+        val eb = (b["elements"] as? JsonArray)?.toSet() ?: return false
         return ea == eb && a.filterKeys { it != "elements" } == b.filterKeys { it != "elements" }
     }
 

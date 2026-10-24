@@ -105,10 +105,58 @@ class CanvasContentNeutralRevisionTest {
         assertTrue(!sameSceneContent("", first), "the first write to a board is a change")
     }
 
-    private suspend fun session(transport: CanvasSyncTransport?): CanvasSession = CanvasSession.create(
-        store = InMemoryCanvasDocumentStore(),
+    @Test
+    fun provenanceAnotherWriterMovedOnAtTheSameRevisionSurvivesTheNextEdit() = runTest {
+        val store = InMemoryCanvasDocumentStore()
+        val opLog = InMemoryCanvasOpLog()
+        val open = session(transport = null, store = store, opLog = opLog)
+        val addA = CanvasOp.AddElementOp("op-a", "client_a", 2L, "A", text("A", "a"))
+        val addB = CanvasOp.AddElementOp("op-b", "client_a", 10L, "B", text("B", "b"))
+        // Re-sends A as it is, newer than A's writer but older than B's: the scene-wide highest Lamport stays B's.
+        val resend = CanvasOp.UpdateElementOp("op-resend", "client_b", 5L, "A", text("A", "a"))
+        val editB = CanvasOp.UpdateElementOp("op-edit-b", "client_a", 11L, "B", text("B", "b2"))
+        // Newer than A's first write, older than the re-send: it must lose.
+        val stale = CanvasOp.UpdateElementOp("op-stale", "client_b", 4L, "A", text("A", "stale"))
+        open.applyLocal(addA)
+        open.applyLocal(addB)
+
+        // The re-send lands in the store while this board does not hold it (a closed-board applier on
+        // the same store and log): no revision, but A's provenance moves on.
+        StoreCanvasClosedBoardApplier(store, opLog).apply(canvasId, resend, vouchedActor = null)
+        assertEquals(open.revision(), store.get(canvasId)?.revision)
+        // The host replays it to the board as a duplicate; then a real edit, then the stale one.
+        open.applyRemote(resend)
+        open.applyLocal(editB)
+        open.applyRemote(stale)
+
+        val replica = session(transport = null)
+        listOf(addA, addB, resend, editB, stale).forEach { replica.applyRemote(it) }
+        assertEquals(replica.sceneJsonOrEmpty(), open.sceneJsonOrEmpty(), "the replicas converge")
+        assertEquals(open.sceneJsonOrEmpty(), store.get(canvasId)?.sceneJson)
+        assertTrue("stale" !in open.sceneJsonOrEmpty(), "the re-send's provenance was kept, so the older edit lost")
+    }
+
+    @Test
+    fun aDrawingWhoseElementsIsNotAnArrayEqualsNothing() {
+        val notArray = assertNotNull(CanvasOpProjector.parseSceneOrNull("""{"bgColor":"#ffffffff","elements":{}}"""))
+        val empty = assertNotNull(CanvasOpProjector.parseSceneOrNull("""{"bgColor":"#ffffffff","elements":[]}"""))
+
+        assertTrue(!CanvasOpProjector.drawingsEqual(notArray, empty))
+        assertTrue(!CanvasOpProjector.drawingsEqual(empty, notArray))
+        assertTrue(CanvasOpProjector.drawingsEqual(empty, empty))
+    }
+
+    private fun text(id: String, words: String): String = """{"id":"$id","type":"Text","text":"$words"}"""
+
+    private suspend fun session(
+        transport: CanvasSyncTransport?,
+        store: CanvasDocumentStore = InMemoryCanvasDocumentStore(),
+        opLog: CanvasOpLog = InMemoryCanvasOpLog(),
+    ): CanvasSession = CanvasSession.create(
+        store = store,
         options = CanvasCreateOptions(
             canvasId = canvasId,
+            opLog = opLog,
             syncTransport = transport,
             acl = CanvasAcl(ownerUserId = "client_a", writerUserIds = setOf("client_b")),
         ),

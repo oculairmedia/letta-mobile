@@ -3,12 +3,16 @@ package com.letta.mobile.data.canvas
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 /** The scene root's table of element tombstones (see [CanvasOpProjector]). */
 private const val ELEMENT_TOMBSTONES = "_removed"
 
 /** How every provenance key the projector writes ends: `_lamport`, `_bgActorId`, `_bgPatternOpId`... */
-private val PROVENANCE_SUFFIXES = listOf("lamport", "actorId", "opId")
+private const val LAMPORT = "lamport"
+
+private val PROVENANCE_SUFFIXES = listOf(LAMPORT, "actorId", "opId")
 
 /**
  * Whether scenes [a] and [b] hold the same board, differing at most in provenance: who last wrote
@@ -35,3 +39,49 @@ private fun withoutProvenance(element: JsonElement): JsonElement = when (element
 
 private fun isProvenanceKey(key: String): Boolean =
     key.startsWith("_") && PROVENANCE_SUFFIXES.any { key.endsWith(it, ignoreCase = true) }
+
+/**
+ * Whether [stored] holds a newer writer for any value than [held] does: some element, tombstone,
+ * document, binding or background whose provenance moved on, or that [held] has no provenance for.
+ *
+ * A change that leaves the board as it was is no revision, yet it moves the provenance of what it
+ * wrote. Two copies at one revision can therefore differ, and only value by value can tell which is
+ * ahead: the scene-wide highest Lamport cannot, as another value may already hold it.
+ */
+internal fun hasNewerProvenance(stored: String, held: String): Boolean {
+    val newer = CanvasOpProjector.parseSceneOrNull(stored)?.let(::stampsOf) ?: return false
+    val older = CanvasOpProjector.parseSceneOrNull(held)?.let(::stampsOf).orEmpty()
+    return newer.any { (path, stamp) -> older[path]?.let { isNewer(stamp, it) } ?: true }
+}
+
+/** Writers' stamps are (lamport, actor, op id), ordered as the projector orders writers. */
+private fun isNewer(a: Triple<Long, String, String>, b: Triple<Long, String, String>): Boolean =
+    CanvasOpOrder.compare(a.first, a.second, a.third, b.first, b.second, b.third) > 0
+
+/** Every provenance stamp in [root], keyed by where it sits (array entries by their id). */
+private fun stampsOf(root: JsonObject): Map<String, Triple<Long, String, String>> = buildMap { collectStamps(root, "", this) }
+
+private fun collectStamps(node: JsonElement, path: String, into: MutableMap<String, Triple<Long, String, String>>) {
+    when (node) {
+        is JsonObject -> node.forEach { (key, value) ->
+            stampAt(node, key)?.let { into["$path/$key"] = it }
+            collectStamps(value, "$path/$key", into)
+        }
+        is JsonArray -> node.forEachIndexed { index, child -> collectStamps(child, "$path/${entryId(child) ?: index}", into) }
+        else -> Unit
+    }
+}
+
+/** The stamp whose Lamport is [key] (`_lamport`, `_bgLamport`...), with the actor and op id beside it. */
+private fun stampAt(node: JsonObject, key: String): Triple<Long, String, String>? {
+    if (!key.startsWith("_") || !key.endsWith(LAMPORT, ignoreCase = true)) return null
+    val lamport = (node[key] as? JsonPrimitive)?.longOrNull ?: return null
+    val prefix = key.dropLast(LAMPORT.length)
+    return Triple(lamport, node.besideStamp(prefix, "actorId"), node.besideStamp(prefix, "opId"))
+}
+
+private fun JsonObject.besideStamp(prefix: String, suffix: String): String =
+    entries.firstOrNull { (key, _) -> key.length == prefix.length + suffix.length && key.startsWith(prefix) && key.endsWith(suffix, true) }
+        ?.let { (it.value as? JsonPrimitive)?.content }.orEmpty()
+
+private fun entryId(entry: JsonElement): String? = ((entry as? JsonObject)?.get("id") as? JsonPrimitive)?.content
