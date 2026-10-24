@@ -9,6 +9,7 @@ import com.letta.mobile.ui.mascot.frame.RivePointerEvent
 import com.sun.jna.Library
 import com.sun.jna.Memory
 import com.sun.jna.Native
+import com.sun.jna.FunctionMapper
 import kotlinx.coroutines.asCoroutineDispatcher
 import com.sun.jna.NativeLibrary
 import com.sun.jna.Pointer
@@ -17,14 +18,7 @@ import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.Image
 import org.jetbrains.skia.ImageInfo
 
-/**
- * letta-mobile-0s5bi spike: the C ABI of `rive_desktop_bridge.dll`
- * (`avatar/renderer-rive/native/desktop`), which drives rive-runtime through the Rive Renderer's
- * D3D11 backend and reads frames back into memory.
- *
- * JNA rather than JNI because the bridge is plain C: no generated headers, and the desktop module
- * already ships JNA for its Win32 calls.
- */
+/** JNA declarations for the C ABI in `avatar/renderer-rive/native/desktop`; it drives Rive's D3D11 renderer. */
 internal interface RiveBridgeNative : Library {
     fun rive_bridge_create(adapterNameOut: ByteArray, adapterNameCap: Int): Pointer?
     fun rive_bridge_destroy(bridge: Pointer)
@@ -40,6 +34,7 @@ internal interface RiveBridgeNative : Library {
     fun rive_bridge_artboard_width(bridge: Pointer): Float
     fun rive_bridge_artboard_height(bridge: Pointer): Float
     fun rive_bridge_advance(bridge: Pointer, seconds: Float)
+    fun riveBridgeAdvanceIsActive(bridge: Pointer, seconds: Float): Int
     fun rive_bridge_render(bridge: Pointer, width: Int, height: Int, clearArgb: Int, rgbaOut: Pointer): Int
     fun rive_bridge_pointer(bridge: Pointer, kind: Int, x: Float, y: Float)
     fun rive_bridge_fire_trigger(bridge: Pointer, name: String): Int
@@ -73,14 +68,18 @@ internal interface RiveBridgeNative : Library {
         }
 
         val INSTANCE: RiveBridgeNative by lazy {
-            Native.load(PATH ?: error("Set -Drive.bridge.path to rive_desktop_bridge.dll"), RiveBridgeNative::class.java)
+            Native.load(
+                PATH ?: error("Set -Drive.bridge.path to rive_desktop_bridge.dll"),
+                RiveBridgeNative::class.java,
+                mapOf(Library.OPTION_FUNCTION_MAPPER to ADVANCE_ACTIVITY_MAPPER),
+            )
         }
 
-        /**
-         * A symbol lookup that tolerates a missing export, so a bench built against a newer header
-         * still runs against a DLL someone built before the probe exports existed: JNA only fails
-         * when the method is actually called, and these are the calls the bench guards.
-         */
+        private val ADVANCE_ACTIVITY_MAPPER = FunctionMapper { _, method ->
+            if (method.name == "riveBridgeAdvanceIsActive") BridgeExport.ADVANCE_ACTIVITY.symbol else method.name
+        }
+
+        /** Checks whether [export] exists, so newer Kotlin can run against an older bridge DLL. */
         private fun exports(export: BridgeExport): Boolean = PATH != null &&
             runCatching { NativeLibrary.getInstance(PATH).getFunction(export.symbol) }.isSuccess
 
@@ -91,6 +90,8 @@ internal interface RiveBridgeNative : Library {
 
         /** `rive_bridge_load_artboard`: loading an artboard other than the file's default. */
         val ARTBOARD_BY_NAME: Boolean by lazy { exports(BridgeExport.LOAD_ARTBOARD) }
+
+        val ADVANCE_ACTIVITY: Boolean by lazy { exports(BridgeExport.ADVANCE_ACTIVITY) }
     }
 }
 
@@ -99,15 +100,10 @@ internal enum class BridgeExport(val symbol: String) {
     LOAD_ARTBOARD("rive_bridge_load_artboard"),
     VM_GET_NUMBER("rive_bridge_vm_get_number"),
     VM_NUMBER_NAMES("rive_bridge_vm_number_names"),
+    ADVANCE_ACTIVITY("rive_bridge_advance_is_active"),
 }
 
-/**
- * What [RiveDesktopScene.load] binds: a state machine by name (null for the artboard's default) on an
- * artboard by name. [artboard] null takes the file's default artboard - the only thing the bridge
- * could do before `rive_bridge_load_artboard` existed, and still the production path. A name is how
- * the bench asks for `Harness`; an old DLL cannot honour it, and says so rather than showing the
- * default.
- */
+/** Names the state machine and optional artboard loaded by [RiveDesktopScene.load]; old DLLs require the default artboard. */
 data class RiveSceneTarget(val stateMachine: String? = null, val artboard: String? = null)
 
 /** The bridge's `kind` argument for a pointer event. */
@@ -153,10 +149,11 @@ internal object RiveThread {
  * awaited. Callers may use any thread; the frame loop suspends on [RiveThread.dispatcher] so the
  * readback never stalls the UI.
  */
-class RiveDesktopScene private constructor(
+class RiveDesktopScene internal constructor(
     private val native: RiveBridgeNative,
     private val handle: Pointer,
     val adapterName: String,
+    private val advanceActivity: Boolean = RiveBridgeNative.ADVANCE_ACTIVITY,
 ) : RiveFrameScene(), AutoCloseable {
     private var buffer: Memory? = null
     private var pixels: ByteArray? = null
@@ -184,7 +181,15 @@ class RiveDesktopScene private constructor(
         check(code == 0) { "rive_bridge_load failed ($code)" }
     }
 
-    override fun advance(step: RiveFrameStep) = RiveThread.post { native.rive_bridge_advance(openHandle(), step.seconds) }
+    override fun advance(step: RiveFrameStep) = motionGeneration().let { generation ->
+        RiveThread.post {
+            if (closed) return@post
+            val handle = openHandle()
+            if (advanceActivity) {
+                if (native.riveBridgeAdvanceIsActive(handle, step.seconds) == 0) settleIfUnchanged(generation)
+            } else native.rive_bridge_advance(handle, step.seconds)
+        }
+    }
 
     /**
      * Renders into a reused native buffer and copies it into a reused byte array: premultiplied

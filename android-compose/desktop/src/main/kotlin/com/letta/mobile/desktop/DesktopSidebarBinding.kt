@@ -125,7 +125,7 @@ internal fun desktopChatOptionsState(
 /** What the shared panel's asks do on the desktop. */
 internal fun desktopSidebarActions(
     context: DesktopShellContext,
-    focus: DesktopAgentFocus,
+    frame: androidx.compose.runtime.State<DesktopShellFrame>,
     deleteBehavior: ConversationDeleteBehavior,
     setFontScale: (Float) -> Unit,
 ): ShellAgentPanelActions {
@@ -136,8 +136,8 @@ internal fun desktopSidebarActions(
     return ShellAgentPanelActions(
         onOpenSection = { navigator.navigate(lensNavTarget(navigator.workPlayMode, it).first) },
         onOpenSettings = { navigator.navigate(DesktopDestination.Settings) },
-        onNewChat = { context.openNewChatForFocusedAgent(focus) },
-        onEditAgent = { navigator.editAgentId = focus.selectedAgentId?.let(::AgentId) },
+        onNewChat = { context.openNewChatForFocusedAgent(frame.value.focus) },
+        onEditAgent = { navigator.editAgentId = frame.value.focus.selectedAgentId?.let(::AgentId) },
         onArchiveFilterChange = { chatController.setArchiveFilter(it.toConversationArchiveFilter()) },
         onConversationSelected = { context.router.openConversation(ConversationId(it)) },
         onArchiveConversation = chatController::setConversationArchived,
@@ -149,7 +149,7 @@ internal fun desktopSidebarActions(
         onPinConversation = { id, pinned -> management.setPinned(ConversationId(id), pinned) },
         onForkConversation = management.takeIf { it.supportsBranching }?.let { branching ->
             { id, name ->
-                val origin = ConversationOrigin(ConversationId(id), focus.selectedAgentId?.let(::AgentId))
+                val origin = ConversationOrigin(ConversationId(id), frame.value.focus.selectedAgentId?.let(::AgentId))
                 branching.branches.forkConversation(origin, name)
             }
         },

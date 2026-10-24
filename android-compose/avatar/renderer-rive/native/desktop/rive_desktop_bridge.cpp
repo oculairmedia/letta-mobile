@@ -301,6 +301,13 @@ __declspec(dllexport) void rive_bridge_advance(RiveBridge* bridge, float seconds
         bridge->stateMachine->advanceAndApply(seconds);
 }
 
+// Additive activity export. The original void entry point remains ABI-compatible with older
+// packaged DLLs; callers use this symbol only after looking it up at runtime.
+__declspec(dllexport) int rive_bridge_advance_is_active(RiveBridge* bridge, float seconds)
+{
+    return bridge->stateMachine && bridge->stateMachine->advanceAndApply(seconds) ? 1 : 0;
+}
+
 static bool create_offscreen_textures(RiveBridge* bridge, D3D11_TEXTURE2D_DESC desc)
 {
     ID3D11Device* gpu = bridge->shared->gpu.Get();

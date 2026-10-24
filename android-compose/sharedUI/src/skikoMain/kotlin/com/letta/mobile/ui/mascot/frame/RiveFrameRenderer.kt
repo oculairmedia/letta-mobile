@@ -8,6 +8,7 @@ import com.letta.mobile.ui.mascot.MascotStillStore
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import org.jetbrains.skia.Image
 
 /**
@@ -89,32 +90,44 @@ abstract class RiveFrameScene {
     private var lastFrameNanos = 0L
 
     /** False once the scene [settle]d, true again when [wake] has something that may move it. */
-    private val moving = MutableStateFlow(true)
+    private data class MotionState(
+        val generation: Long = 0L,
+        val moving: Boolean = true,
+        val resuming: Boolean = false,
+    )
 
-    /** Set by a [wake] out of a settle: the next advance is one frame, not the whole idle gap. */
-    private var resuming = false
+    private val motion = MutableStateFlow(MotionState())
 
     /** The last advance left nothing to animate: no frame is worth drawing until [wake]. */
-    val settled: Boolean get() = !moving.value
+    val settled: Boolean get() = !motion.value.moving
 
     /** Called from [advance] when the runtime reports the state machine has nothing left to play. */
-    protected fun settle() {
-        moving.value = false
+    protected fun motionGeneration(): Long = motion.value.generation
+
+    /** A delayed native result must not settle over a newer input or pointer wake. */
+    protected fun settleIfUnchanged(generation: Long) {
+        motion.update { state -> if (state.generation == generation) state.copy(moving = false) else state }
     }
+
+    protected fun settle() = settleIfUnchanged(motionGeneration())
 
     /**
      * Something that can move a settled scene happened - an input write or a pointer event - so
      * the surfaces drawing it play again. Free when the scene is already moving.
      */
     fun wake() {
-        if (moving.value) return
-        resuming = true
-        moving.value = true
+        motion.update { state ->
+            state.copy(
+                generation = state.generation + 1,
+                moving = true,
+                resuming = state.resuming || !state.moving,
+            )
+        }
     }
 
     /** Suspends while the scene is [settled]. */
     internal suspend fun awaitMotion() {
-        moving.first { it }
+        motion.first { it.moving }
     }
 
     /**
@@ -124,12 +137,16 @@ abstract class RiveFrameScene {
      */
     fun advanceTo(nowNanos: Long) {
         if (nowNanos == lastFrameNanos) return
+        var motionState = motion.value
+        while (motionState.resuming && !motion.compareAndSet(motionState, motionState.copy(resuming = false))) {
+            motionState = motion.value
+        }
+        val resumed = motionState.resuming
         val dt = when {
             lastFrameNanos == 0L -> 0f
-            resuming -> ONE_FRAME_SECONDS
+            resumed -> ONE_FRAME_SECONDS
             else -> ((nowNanos - lastFrameNanos) / NANOS_PER_SECOND).coerceIn(0f, MAX_STEP_SECONDS)
         }
-        resuming = false
         lastFrameNanos = nowNanos
         if (dt > 0f) advance(RiveFrameStep(dt))
     }

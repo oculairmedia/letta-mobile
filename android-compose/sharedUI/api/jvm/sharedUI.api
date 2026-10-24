@@ -4578,9 +4578,11 @@ public abstract class com/letta/mobile/ui/mascot/frame/RiveFrameScene {
 	public abstract fun close ()V
 	public abstract fun getInputSink ()Lcom/letta/mobile/avatar/rive/RiveInputSink;
 	public final fun getSettled ()Z
+	protected final fun motionGeneration ()J
 	public abstract fun pointer (Lcom/letta/mobile/ui/mascot/frame/RivePointerEvent;)V
 	public abstract fun renderImage-ozmzZPI (J)Lorg/jetbrains/skia/Image;
 	protected final fun settle ()V
+	protected final fun settleIfUnchanged (J)V
 	public final fun wake ()V
 }
 

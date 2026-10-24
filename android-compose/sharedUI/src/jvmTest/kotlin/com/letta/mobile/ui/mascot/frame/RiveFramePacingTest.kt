@@ -19,7 +19,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.jetbrains.skia.ColorAlphaType
+import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.Image
+import org.jetbrains.skia.ImageInfo
 
 /**
  * letta-mobile-hv54v.14: a live surface asks for a frame only while one is worth drawing. A scene
@@ -31,6 +34,7 @@ class RiveFramePacingTest {
     private class SettlingScene : RiveFrameScene() {
         var holdsStill = false
         val steps = mutableListOf<Float>()
+        var renderedFrames = 0
 
         override val inputSink = RiveWriteSink { }
 
@@ -39,11 +43,26 @@ class RiveFramePacingTest {
             if (holdsStill) settle()
         }
 
-        override fun renderImage(size: IntSize): Image = error("not drawn in this test")
+        override fun renderImage(size: IntSize): Image {
+            renderedFrames++
+            val info = ImageInfo(size.width, size.height, ColorType.RGBA_8888, ColorAlphaType.PREMUL)
+            return Image.makeRaster(info, ByteArray(size.width * size.height * 4), size.width * 4)
+        }
 
         override fun pointer(event: RivePointerEvent) = Unit
 
         override fun close() = Unit
+    }
+
+    private class DelayedSettlingScene : RiveFrameScene() {
+        override val inputSink = RiveWriteSink { }
+        override fun advance(step: RiveFrameStep) = Unit
+        override fun renderImage(size: IntSize): Image = error("not drawn in this test")
+        override fun pointer(event: RivePointerEvent) = Unit
+        override fun close() = Unit
+
+        fun beginAdvance() = motionGeneration()
+        fun completeAdvance(generation: Long) = settleIfUnchanged(generation)
     }
 
     private class SettlingRenderer : RiveFrameRenderer {
@@ -75,6 +94,7 @@ class RiveFramePacingTest {
         backgroundScope.launch(loop.clock) {
             scene.playFrames(loop.visible) { now ->
                 scene.advanceTo(now)
+                scene.renderImage(IntSize(1, 1)).close()
                 loop.frames++
             }
         }
@@ -96,8 +116,10 @@ class RiveFramePacingTest {
             vsync()
             assertTrue(scene.settled)
             assertEquals(3, frames)
+            assertEquals(frames, scene.renderedFrames, "the final frame is rendered before playback pauses")
             repeat(5) { vsync() }
             assertEquals(3, frames, "a settled scene draws nothing more")
+            assertEquals(3, scene.renderedFrames, "the final painted frame remains in place")
             assertFalse(clock.hasAwaiters, "and asks the clock for nothing")
 
             // A write through the entry (here the reduced-motion input) wakes it.
@@ -108,8 +130,25 @@ class RiveFramePacingTest {
             vsync()
             vsync()
             assertEquals(5, frames, "frames resume once the scene is woken")
+            assertEquals(5, scene.renderedFrames)
             assertEquals(ONE_FRAME_SECONDS, scene.steps[scene.steps.size - 2], 1e-6f, "picking up one frame on, not the idle gap")
         }
+    }
+
+    @Test
+    fun aLateNativeSettleCannotOverwriteANewerWake() {
+        val scene = DelayedSettlingScene()
+        val initial = scene.beginAdvance()
+        scene.completeAdvance(initial)
+        assertTrue(scene.settled)
+
+        val delayedSettle = scene.beginAdvance()
+        scene.wake()
+        scene.completeAdvance(delayedSettle)
+
+        assertFalse(scene.settled, "an input wake after advance must beat its delayed settled result")
+        scene.completeAdvance(scene.beginAdvance())
+        assertTrue(scene.settled, "a later current advance still settles normally")
     }
 
     @Test

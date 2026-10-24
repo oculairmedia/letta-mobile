@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -51,13 +52,6 @@ import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.shell.pages.plugins.ProvidePluginToolPresenters
 import com.letta.mobile.ui.context.FocusedAgentContextCard
 
-/**
- * Plugin elements render live through the shared plugin-view renderer on the JCEF host
- * (letta-mobile-cdgpr.3), as on Android. The host's enabled plugins and view transport come from
- * the shared model (letta-mobile-cdgpr.8). With live views off on this device, every element is its
- * card. The browser is only started when a live view first shows. The same plugins' tool and command
- * presenters draw their tools' steps in the chat.
- */
 @Composable
 private fun ShellPluginViews(pluginViews: PluginViewsModel?, content: @Composable () -> Unit) {
     ProvidePluginToolPresenters(pluginViews) {
@@ -65,17 +59,19 @@ private fun ShellPluginViews(pluginViews: PluginViewsModel?, content: @Composabl
     }
 }
 
-/**
- * letta-mobile-ckmub.17.4: the window's surface is the shared [LettaShellWorkspace]; this only binds
- * the desktop's state and verbs into it. The header goes to the title bar ([ShellWindowChrome.Hoisted]);
- * the phone preview folds the rail and panel into the workspace's drawer.
- */
+/** Binds desktop state and verbs to the shared workspace; the title bar hosts its header and phone preview its drawer. */
 @Composable
 internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: DesktopShellFrame, header: DesktopShellHeader) {
     val layout = context.core.layout
     val phone = LocalDesktopPhone.current
-    // The window's compact drawer; the phone preview brings its own.
     val windowDrawer = remember { ShellWorkspaceDrawer() }
+    val drawer = phone?.drawer ?: windowDrawer
+    val deleteBehavior by context.core.chatController.deleteBehavior.collectAsState()
+    val deleteBehaviorState = rememberUpdatedState(deleteBehavior)
+    val fontScaleSetter = rememberUpdatedState(LocalDesktopChatFontScaleSetter.current)
+    val hoistedHeader = rememberUpdatedState(header.onHoisted)
+    val shortcuts = rememberDesktopShortcuts(context, frame)
+    val onWindowWidthChanged: (Float) -> Unit = { if (phone == null) layout.controller.dispatch(ShellLayoutEvent.WindowWidthChanged(it)) }
     CompositionLocalProvider(
         LocalDesktopPermissionModeSettings provides context.core.bootstrap.dataBindings.permissionModeSettings,
         LocalAttentionPrefs provides context.core.attentionPrefs,
@@ -93,19 +89,21 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                         forceCompact = phone != null,
                     ),
                 ),
-                host = LettaShellWorkspaceHost(
-                    actions = desktopWorkspaceActions(context, frame),
-                    slots = desktopWorkspaceSlots(context, frame),
-                    chrome = ShellWindowChrome.Hoisted(header.onHoisted),
-                    drawer = phone?.drawer ?: windowDrawer,
-                    events = ShellWorkspaceEvents(
-                        // A phone's width says nothing about the layout the person saved.
-                        onWidthChanged = { width ->
-                            if (phone == null) layout.controller.dispatch(ShellLayoutEvent.WindowWidthChanged(width))
-                        },
-                        shortcuts = rememberDesktopShortcuts(context, frame),
+                host = com.letta.mobile.ui.shell.workspace.rememberShellWorkspaceHost(
+                    frame,
+                    listOf(
+                        context.core, frame.chatState.sessionGraphId, drawer, deleteBehavior,
+                        context.core.chatController.conversationMarks.markerChoices,
                     ),
-                ),
+                ) { currentFrame ->
+                    LettaShellWorkspaceHost(
+                        desktopWorkspaceActions(context, currentFrame, deleteBehaviorState, fontScaleSetter),
+                        desktopWorkspaceSlots(context, currentFrame),
+                        ShellWindowChrome.Hoisted { hoistedHeader.value(it) },
+                        drawer,
+                        ShellWorkspaceEvents(onWindowWidthChanged, shortcuts),
+                    )
+                },
             )
         }
     }
@@ -156,17 +154,19 @@ private fun DesktopSwingShortcuts() {
     }
 }
 
-private fun desktopWorkspaceSlots(context: DesktopShellContext, frame: DesktopShellFrame) = LettaShellWorkspaceSlots(
-    main = { modifier -> Row(modifier) { DesktopShellMainPane(context, frame) } },
+private fun desktopWorkspaceSlots(context: DesktopShellContext, frame: State<DesktopShellFrame>) = LettaShellWorkspaceSlots(
+    main = { modifier -> Row(modifier) { DesktopShellMainPane(context, frame.value) } },
     // letta-mobile-3io8k: model, context meter and Compact under the agent's name.
     agentCard = {
-        val window = rememberDesktopContextWindow(context, frame)
-        FocusedAgentContextCard(rememberDesktopContextCard(context), frame.contextFocus(), window, frame.chatState.composerModelLabel)
+        val currentFrame = frame.value
+        val window = rememberDesktopContextWindow(context, currentFrame)
+        val contextCard = rememberDesktopContextCard(context)
+        FocusedAgentContextCard(contextCard, currentFrame.contextFocus(), window, currentFrame.chatState.composerModelLabel)
     },
-    sidePane = { DesktopShellBackgroundTasks(context, frame) },
+    sidePane = { DesktopShellBackgroundTasks(context, frame.value) },
     overlays = {
         com.letta.mobile.ui.canvas.library.CanvasLibraryNotice(context.core.canvasShell.library)
-        DesktopShellOverlays(context, frame)
+        DesktopShellOverlays(context, frame.value)
         DesktopSwingShortcuts()
     },
 )
@@ -220,12 +220,13 @@ private fun rememberDesktopSidebarInputs(context: DesktopShellContext, frame: De
     )
 }
 
-/** The rail's and the panel's verbs. The desktop keeps no agent pins, so the orb menu offers Open and Agent settings. */
-@Composable
-private fun desktopWorkspaceActions(context: DesktopShellContext, frame: DesktopShellFrame): ShellWorkspaceNavigationActions {
+private fun desktopWorkspaceActions(
+    context: DesktopShellContext,
+    frame: androidx.compose.runtime.State<DesktopShellFrame>,
+    deleteBehavior: androidx.compose.runtime.State<com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior>,
+    fontScaleSetter: androidx.compose.runtime.State<(Float) -> Unit>,
+): ShellWorkspaceNavigationActions {
     val navigator = context.navigator
-    val deleteBehavior by context.core.chatController.deleteBehavior.collectAsState()
-    val setFontScale by rememberUpdatedState(LocalDesktopChatFontScaleSetter.current)
     return ShellWorkspaceNavigationActions(
         rail = ShellAgentRailActions(
             onHome = { navigator.navigate(DesktopDestination.Home) },
@@ -238,7 +239,7 @@ private fun desktopWorkspaceActions(context: DesktopShellContext, frame: Desktop
             onNewSession = { context.overlays.newConversation = true },
             onAgentSettings = { navigator.editAgentId = AgentId(it) },
         ),
-        panel = desktopSidebarActions(context, frame.focus, deleteBehavior) { setFontScale(it) },
+        panel = desktopSidebarActions(context, frame, deleteBehavior.value) { fontScaleSetter.value(it) },
         onRailDismiss = { navigator.railExpanded = false },
     )
 }
