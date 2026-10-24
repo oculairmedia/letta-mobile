@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,6 +35,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_error_title
+import com.letta.mobile.sharedui.resources.timeline_subagent_empty
+import com.letta.mobile.sharedui.resources.timeline_subagent_waiting
 import com.letta.mobile.sharedui.resources.timeline_no_conversation_title
 import com.letta.mobile.sharedui.resources.timeline_retry
 import com.letta.mobile.sharedui.resources.timeline_starter_capabilities
@@ -142,6 +145,41 @@ internal fun TimelineStatusPanel(message: String, onRetry: () -> Unit, modifier:
                 modifier = Modifier.widthIn(max = ChatTimelineDimens.proseMaxWidth),
             )
             Button(onClick = onRetry) { Text(stringResource(Res.string.timeline_retry)) }
+        }
+    }
+}
+
+/** A settled read-only conversation with no transcript. */
+@Composable
+internal fun TimelineEmptyState(modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxSize().testTag(ChatTimelineTags.EMPTY), contentAlignment = Alignment.Center) {
+        Text(
+            text = stringResource(Res.string.timeline_subagent_empty),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.widthIn(max = ChatTimelineDimens.proseMaxWidth).padding(LettaDimens.Space.xl),
+        )
+    }
+}
+
+/** An empty transcript while its read-only conversation is still running. */
+@Composable
+internal fun TimelineWaitingState(modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxSize().testTag(ChatTimelineTags.WAITING), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+            modifier = Modifier.padding(LettaDimens.Space.xl),
+        ) {
+            CircularProgressIndicator()
+            Text(
+                text = stringResource(Res.string.timeline_subagent_waiting),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = ChatTimelineDimens.proseMaxWidth),
+            )
         }
     }
 }

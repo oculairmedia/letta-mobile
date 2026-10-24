@@ -44,13 +44,50 @@ class ChatTimelineLogicTest {
 
     @Test
     fun anEmptyReadyConversationWelcomes() {
-        assertEquals(ChatTimelinePhase.Welcome(hasConversation = true), chatTimelinePhaseOf(ready, paged = false))
+        assertEquals(
+            ChatTimelinePhase.Empty(hasConversation = true, showWelcome = true, waiting = false),
+            chatTimelinePhaseOf(ready, paged = false),
+        )
+    }
+
+    @Test
+    fun readOnlyEmptyConversationSettlesToEmpty() {
+        val empty = ChatTimelinePhase.Empty(hasConversation = true, showWelcome = false, waiting = false)
+        assertEquals(empty, chatTimelinePhaseOf(ready, paged = false, canSendStarterPrompts = false))
+        assertEquals(empty, chatTimelineEmptyPhaseOf(ready, canSendStarterPrompts = false))
+    }
+
+    @Test
+    fun readOnlyEmptyConversationShowsWaitingWhileTheRunIsActive() {
+        val running = ready.copy(isStreaming = true)
+        val waiting = ChatTimelinePhase.Empty(hasConversation = true, showWelcome = false, waiting = true)
+        assertEquals(waiting, chatTimelinePhaseOf(running, paged = false, canSendStarterPrompts = false))
+        assertEquals(waiting, chatTimelineEmptyPhaseOf(running, canSendStarterPrompts = false))
+    }
+
+    @Test
+    fun readOnlyEmptyConversationKeepsItsLoadingAndFailureStates() {
+        assertEquals(
+            ChatTimelinePhase.Loading,
+            chatTimelinePhaseOf(ready.copy(isLoadingMessages = true), paged = false, canSendStarterPrompts = false),
+        )
+        assertEquals(
+            ChatTimelinePhase.Failed("offline"),
+            chatTimelinePhaseOf(
+                ready.copy(conversationState = ConversationState.Error("offline")),
+                paged = false,
+                canSendStarterPrompts = false,
+            ),
+        )
     }
 
     @Test
     fun noConversationWelcomesWithoutAGreeting() {
         val none = ready.copy(conversationState = ConversationState.NoConversation)
-        assertEquals(ChatTimelinePhase.Welcome(hasConversation = false), chatTimelinePhaseOf(none, paged = false))
+        assertEquals(
+            ChatTimelinePhase.Empty(hasConversation = false, showWelcome = true, waiting = false),
+            chatTimelinePhaseOf(none, paged = false),
+        )
     }
 
     @Test

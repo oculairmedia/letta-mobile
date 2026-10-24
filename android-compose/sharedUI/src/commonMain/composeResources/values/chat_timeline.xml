@@ -9,6 +9,8 @@
     <string name="timeline_welcome_default_agent">your agent</string>
     <string name="timeline_welcome_subtitle">Ask a question, paste an error, or point me at a repo.</string>
     <string name="timeline_no_conversation_title">Start a conversation</string>
+    <string name="timeline_subagent_empty">No messages in this conversation yet.</string>
+    <string name="timeline_subagent_waiting">The subagent is working. Waiting for messages…</string>
     <string name="timeline_starter_help">What can you help me with?</string>
     <string name="timeline_starter_capabilities">Tell me about your capabilities</string>
     <string name="timeline_starter_get_started">How do I get started?</string>

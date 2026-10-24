@@ -72,8 +72,8 @@ class ChatTimelineUiTest {
     private fun androidx.compose.ui.test.ComposeUiTest.show(
         state: ChatUiState,
         actions: RecordingChatActions,
-        host: ChatSurfaceHost = ChatSurfaceHost(),
         capabilities: ChatSurfaceCapabilities = ChatSurfaceCapabilities.Default,
+        canSendStarterPrompts: Boolean = true,
     ) {
         setPointerContent {
             MaterialTheme {
@@ -83,8 +83,9 @@ class ChatTimelineUiTest {
                         pagedTimeline = null,
                         actions = actions,
                         capabilities = capabilities,
-                        host = host,
+                        host = ChatSurfaceHost(),
                         appearance = ChatSurfaceAppearance(),
+                        canSendStarterPrompts = canSendStarterPrompts,
                     )
                 }
             }
@@ -125,6 +126,47 @@ class ChatTimelineUiTest {
         onNodeWithText("Start a conversation").assertExists()
         onNodeWithText("What can you help me with?").performClick()
         assertEquals(listOf("What can you help me with?"), actions.sent)
+    }
+
+    @Test
+    fun readOnlyEmptyConversationShowsTruthfulEmptyStateWithoutStarterPrompts() = runComposeUiTest {
+        val actions = RecordingChatActions()
+        show(ready, actions, canSendStarterPrompts = false)
+
+        onNodeWithTag(ChatTimelineTags.EMPTY).assertExists()
+        onNodeWithTag(ChatTimelineTags.WELCOME).assertDoesNotExist()
+        onNodeWithText("No messages in this conversation yet.").assertExists()
+        onNodeWithText("What can you help me with?").assertDoesNotExist()
+        assertTrue(actions.sent.isEmpty())
+    }
+
+    @Test
+    fun emptyRunningReadOnlyConversationShowsWaitingInsteadOfLoadingOrWelcome() = runComposeUiTest {
+        show(
+            ready.copy(isStreaming = true),
+            RecordingChatActions(),
+            canSendStarterPrompts = false,
+        )
+
+        onNodeWithTag(ChatTimelineTags.WAITING).assertExists()
+        onNodeWithTag(ChatTimelineTags.SKELETON).assertDoesNotExist()
+        onNodeWithTag(ChatTimelineTags.WELCOME).assertDoesNotExist()
+        onNodeWithText("The subagent is working. Waiting for messages…").assertExists()
+    }
+
+    @Test
+    fun readOnlyConversationFailureStillShowsTheErrorAndRetry() = runComposeUiTest {
+        val actions = RecordingChatActions()
+        show(
+            ready.copy(conversationState = ConversationState.Error("Child transcript unavailable")),
+            actions,
+            canSendStarterPrompts = false,
+        )
+
+        onNodeWithTag(ChatTimelineTags.STATUS).assertExists()
+        onNodeWithText("Child transcript unavailable").assertExists()
+        onNodeWithTag(ChatTimelineTags.EMPTY).assertDoesNotExist()
+        onNodeWithTag(ChatTimelineTags.WELCOME).assertDoesNotExist()
     }
 
     @Test
@@ -304,7 +346,20 @@ class ChatTimelineUiTest {
             toolCalls = listOf(call),
         )
         val host = ChatSurfaceHost(openSubagent = { callId, agentId, description -> opened += Triple(callId, agentId, description) })
-        show(ready.copy(messages = messages.toPersistentList()), RecordingChatActions(), host)
+        setPointerContent {
+            MaterialTheme {
+                Box(Modifier.size(width = 420.dp, height = 640.dp)) {
+                    ChatTimeline(
+                        state = ready.copy(messages = messages.toPersistentList()),
+                        pagedTimeline = null,
+                        actions = RecordingChatActions(),
+                        capabilities = ChatSurfaceCapabilities.Default,
+                        host = host,
+                        appearance = ChatSurfaceAppearance(),
+                    )
+                }
+            }
+        }
 
         // The dispatch reads as its step among the message's steps, its chip opening the subagent.
         onNodeWithText("to general-purpose · \"Audit the build\"").performClick()

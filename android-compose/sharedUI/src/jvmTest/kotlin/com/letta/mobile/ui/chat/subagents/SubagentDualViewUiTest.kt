@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.Dp
@@ -24,6 +25,7 @@ import com.letta.mobile.ui.chat.session.SubagentViewSession
 import com.letta.mobile.ui.chat.session.SubagentViewSessions
 import com.letta.mobile.ui.chat.surface.ChatSurfaceUiTest
 import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
+import com.letta.mobile.ui.chat.surface.timeline.ChatTimelineTags
 import com.letta.mobile.ui.chat.surface.timeline.rows.awaitText
 import kotlinx.collections.immutable.persistentListOf
 import kotlin.test.Test
@@ -81,6 +83,38 @@ class SubagentDualViewUiTest {
         onNodeWithTag(SubagentDualViewTags.PARENT).assertExists()
         onNodeWithTag(ComposerTestTags.INPUT, useUnmergedTree = true).assertIsNotEnabled()
         assertEquals(listOf(child), opened)
+    }
+
+    @Test
+    fun completedEmptyChildShowsEmptyStateBesideTheLockedComposer() = runComposeUiTest {
+        val holder = SubagentDualViewHolder()
+        val sessions = SubagentViewSessions { _, _ ->
+            SubagentViewSession(ChatSurfaceUiTest.TestPort(childState.copy(messages = persistentListOf()))) {}
+        }
+        show(holder, width = 1_200.dp, sessions = sessions)
+        runOnIdle { holder.open(child) }
+
+        awaitText("No messages in this conversation yet.")
+        onNodeWithTag(ChatTimelineTags.EMPTY).assertExists()
+        onNodeWithTag(ChatTimelineTags.WELCOME).assertDoesNotExist()
+        onNodeWithText("How do I get started?").assertDoesNotExist()
+        onNodeWithTag(ComposerTestTags.INPUT, useUnmergedTree = true).assertIsNotEnabled()
+    }
+
+    @Test
+    fun runningEmptyChildShowsWaitingBesideTheLockedComposer() = runComposeUiTest {
+        val holder = SubagentDualViewHolder()
+        val running = childState.copy(messages = persistentListOf(), isAgentTyping = true)
+        val sessions = SubagentViewSessions { _, _ ->
+            SubagentViewSession(ChatSurfaceUiTest.TestPort(running)) {}
+        }
+        show(holder, width = 1_200.dp, sessions = sessions)
+        runOnIdle { holder.open(child) }
+
+        awaitText("The subagent is working. Waiting for messages…")
+        onNodeWithTag(ChatTimelineTags.WAITING).assertExists()
+        onNodeWithTag(ChatTimelineTags.WELCOME).assertDoesNotExist()
+        onNodeWithTag(ComposerTestTags.INPUT, useUnmergedTree = true).assertIsNotEnabled()
     }
 
     @Test

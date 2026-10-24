@@ -55,6 +55,8 @@ internal object ChatTimelineTags {
     const val SKELETON = "chat-timeline-skeleton"
     const val STATUS = "chat-timeline-status"
     const val WELCOME = "chat-timeline-welcome"
+    const val EMPTY = "chat-timeline-empty"
+    const val WAITING = "chat-timeline-waiting"
     const val SCROLL_TO_LATEST = "chat-timeline-scroll-to-latest"
     const val THINKING = "chat-timeline-thinking"
     const val PINNED_PROMPT = "chat-timeline-pinned-prompt"
