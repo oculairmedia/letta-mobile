@@ -36,12 +36,17 @@ internal class CanvasSceneIndex private constructor(
         fun of(sceneJson: String): CanvasSceneIndex? {
             val source = sceneJson.ifBlank { CanvasOpProjector.emptySceneJson() }
             val root = runCatching { json.parseToJsonElement(source) }.getOrNull() as? JsonObject ?: return null
+            return of(root)
+        }
+
+        /** [of] for a scene already parsed: every table is read from the one tree. */
+        fun of(root: JsonObject): CanvasSceneIndex? {
             val elements = root["elements"] as? JsonArray ?: return null
             return CanvasSceneIndex(
                 elements = elements.map { it as? JsonObject },
-                documents = CanvasOpProjector.documentsOf(source),
-                labelOwners = CanvasOpProjector.labelOwnersOf(source),
-                arrowBindings = CanvasOpProjector.arrowBindingsOf(source),
+                documents = CanvasOpProjector.documentsOf(root),
+                labelOwners = CanvasOpProjector.labelOwnersOf(root),
+                arrowBindings = CanvasOpProjector.arrowBindingsOf(root),
                 pluginEntries = CanvasPluginElements.typedEntries(root),
             )
         }

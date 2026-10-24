@@ -40,6 +40,7 @@ import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.serialization.json.JsonObject
 import io.ak1.drawbox.domain.model.State as DrawBoxState
 
 /** What the host hands a canvas workspace, kept together for the parts of the board that need it. */
@@ -107,7 +108,12 @@ internal class CanvasBoardUi {
     // The drawing (scene minus our metadata and documents) DrawBox last agreed with the session
     // on. Only a change to *this* re-imports, so a moved note or a saved stroke never reloads
     // the board and throws the camera back.
-    var lastDrawing by mutableStateOf<String?>(null)
+    // Kept parsed, so comparing the next scene with it parses only that scene.
+    var lastDrawing by mutableStateOf<JsonObject?>(null)
+
+    // The session scene, as stored, the board last brought in or saved. The same text arriving
+    // again changes nothing and is not even parsed. A plain field, not state: nothing is drawn from it.
+    var lastSyncedScene: String? = null
 
     // The active note's formatting controls, drawn at the foot of the board.
     var noteToolbar by mutableStateOf<NoteToolbar?>(null)

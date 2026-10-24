@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import kotlinx.serialization.json.JsonObject
+
 /**
  * A rule a canvas scene must keep for every app to draw it as its writers meant
  *. [wire] is how a refusal names it to a model and a WARN names it in the
@@ -61,6 +63,12 @@ object CanvasSceneState {
     fun violations(sceneJson: String): List<CanvasStateViolation> {
         val index = CanvasSceneIndex.of(sceneJson) ?: return listOf(unparsed)
         return CanvasSceneStateChecks.all(index, sceneJson.length)
+    }
+
+    /** [violations] for a scene already parsed, [sceneChars] long as stored. */
+    internal fun violations(root: JsonObject, sceneChars: Int): List<CanvasStateViolation> {
+        val index = CanvasSceneIndex.of(root) ?: return listOf(unparsed)
+        return CanvasSceneStateChecks.all(index, sceneChars)
     }
 
     private val unparsed = CanvasStateViolation(

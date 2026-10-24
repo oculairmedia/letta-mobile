@@ -28,6 +28,10 @@ import io.ak1.drawbox.domain.model.translate
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Clock
 
 internal enum class HistoryDirection(val verb: String, val past: String) {
@@ -108,14 +112,23 @@ internal data class ExternalSyncParams(
     val doc: CanvasDocument?,
     val lastImportedRev: Long,
     val lastExportedJson: String?,
-    val lastDrawing: String?,
+    /** The drawing (scene stripped for DrawBox) the board last agreed with the session on, kept parsed. */
+    val lastDrawing: JsonObject?,
+    /** The session scene, exactly as stored, the board last brought in or saved: the same text again is no change. */
+    val lastSyncedScene: String? = null,
 )
 
 internal data class ExternalSyncResult(
     val shouldImport: Boolean,
-    val cleanJson: String?,
     val newImportedRev: Long,
     val statusMessage: String?,
+    /** The session scene parsed (bookkeeping included), the one parse an import makes; null when not parsed or it does not parse. */
+    val scene: JsonObject? = null,
+    /** [scene] stripped for DrawBox, the board's drawing once imported. */
+    val drawing: JsonObject? = null,
+    /** How many elements the drawing has that the last one did not have as they are, and one of their ids. */
+    val changedElements: Int = 0,
+    val changedSample: String? = null,
 )
 
 internal data class FinalPointerPassParams(
@@ -605,21 +618,47 @@ internal object CanvasWorkspaceSupport {
         return true
     }
 
-    fun evaluateExternalDocSync(params: ExternalSyncParams): ExternalSyncResult? {
+    /**
+     * Whether a revision from elsewhere changes this board's drawing. The scene text the board already
+     * has (its own save, or the scene it last brought in) is no change and is not parsed at all; any
+     * other is parsed once by [parse], and that one tree is what the board strips, compares, checks and
+     * decodes, so an import never parses the scene a second time.
+     */
+    fun evaluateExternalDocSync(
+        params: ExternalSyncParams,
+        parse: (String) -> JsonObject? = CanvasOpProjector::parseSceneOrNull,
+    ): ExternalSyncResult? {
         val doc = params.doc ?: return null
         if (doc.revision <= params.lastImportedRev) return null
         val sceneJson = doc.sceneJson
-        val diffJson = sceneJson.isNotBlank() && sceneJson != params.lastExportedJson
-        val clean = if (diffJson) CanvasOpProjector.stripMetadataForDrawBox(sceneJson) else null
-        val shouldImport = clean != null && !CanvasOpProjector.drawingsEqual(clean, params.lastDrawing)
-        val msg = if (shouldImport) "Agent updated canvas (rev ${doc.revision})" else null
+        val unchanged = sceneJson.isBlank() || sceneJson == params.lastExportedJson || sceneJson == params.lastSyncedScene
+        if (unchanged) return ExternalSyncResult(shouldImport = false, newImportedRev = doc.revision, statusMessage = null)
+        val scene = parse(sceneJson)
+        val drawing = scene?.let(CanvasOpProjector::stripMetadataForDrawBox)
+        val last = params.lastDrawing
+        val shouldImport = drawing == null || last == null || !CanvasOpProjector.drawingsEqual(drawing, last)
+        val changed = if (shouldImport && drawing != null) changedElements(drawing, last) else emptyList()
         return ExternalSyncResult(
             shouldImport = shouldImport,
-            cleanJson = clean,
             newImportedRev = doc.revision,
-            statusMessage = msg,
+            statusMessage = if (shouldImport) "Agent updated canvas (rev ${doc.revision})" else null,
+            scene = scene,
+            drawing = drawing,
+            changedElements = changed.size,
+            changedSample = ((changed.firstOrNull() as? JsonObject)?.get("id") as? JsonPrimitive)?.content,
         )
     }
+
+    /** The elements of [drawing] that [last] does not hold as they are (added or changed). */
+    private fun changedElements(drawing: JsonObject, last: JsonObject?): List<JsonElement> {
+        val now = drawing["elements"] as? JsonArray ?: return emptyList()
+        val before = (last?.get("elements") as? JsonArray)?.toSet().orEmpty()
+        return now.filter { it !in before }
+    }
+
+    /** [sceneJson] parsed and stripped for DrawBox: the drawing a board keeps to compare the next scene with. */
+    fun drawingOf(sceneJson: String): JsonObject? =
+        CanvasOpProjector.parseSceneOrNull(sceneJson)?.let(CanvasOpProjector::stripMetadataForDrawBox)
 
     fun computeJsonExportStatus(json: String, wasAutosaving: Boolean): String? {
         if (wasAutosaving) return null
