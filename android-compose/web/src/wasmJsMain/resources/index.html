@@ -30,7 +30,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
         /* viewport-fit=cover paints the background under the notch and home indicator, but
-           Compose wasm has no safe-area insets. The insets pad <html>, not <body>: ComposeViewport
+           Compose wasm has no safe-area insets. The insets pad the html element, not body: ComposeViewport
            sizes its canvas from body.clientWidth/clientHeight, which would count body padding. */
         html {
             padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
