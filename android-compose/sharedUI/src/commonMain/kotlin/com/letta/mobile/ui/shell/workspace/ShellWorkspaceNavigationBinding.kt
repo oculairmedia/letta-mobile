@@ -23,7 +23,7 @@ import com.letta.mobile.ui.shell.rail.ShellRailFocus
 import kotlin.time.Instant
 /**
  * The workspace's navigation over the workspace and its roster [agents] as
- * (id, name): the whole roster on the rail (its library lists them all), most recently used first
+ * (id, name): the recents cut on the rail, most recently used first
  * by the [conversations] list's activity, and the focused agent's panel.
  */
 fun ShellWorkspaceState.workspaceNavigation(
@@ -52,7 +52,7 @@ fun ShellWorkspaceState.workspaceNavigation(
     conversations: ShellDrawerConversations,
     library: ShellDrawerLibrary = ShellDrawerLibrary(),
 ): ShellWorkspaceNavigation {
-    val ordered = recentFirst(agents, library, now)
+    val ordered = recentFirst(agents, library, now, focusedAgentId?.value)
     val drawer = navDrawerState(ordered, now, conversations, library)
     val identities = library.identities
     return ShellWorkspaceNavigation(
@@ -71,14 +71,25 @@ fun ShellWorkspaceState.workspaceNavigation(
 }
 
 /**
- * The whole roster in rail order, by the shared recents rule ([RecentAgents.cut]) with nothing cut:
- * pinned agents first, then the most recently active, then the rest in roster order.
+ * The rail's recents strip, by the shared recents rule ([RecentAgents.cut]) capped at
+ * [RecentAgentsPolicy.DEFAULT_MAX_AGENTS]: pinned agents first, then the most recently active,
+ * topped up from roster order, plus the focused agent when it fell past the cap.
  */
-internal fun recentFirst(agents: List<Pair<String, String>>, library: ShellDrawerLibrary, now: Instant): List<Pair<String, String>> =
+internal fun recentFirst(
+    agents: List<Pair<String, String>>,
+    library: ShellDrawerLibrary,
+    now: Instant,
+    selectedAgentId: String? = null,
+): List<Pair<String, String>> =
     RecentAgents.cut(
-        RecentAgentsInput(directory = agents, lastActiveAt = library.agentLastActiveAt, pinnedAgentIds = library.pinnedAgentIds),
+        RecentAgentsInput(
+            directory = agents,
+            lastActiveAt = library.agentLastActiveAt,
+            selectedAgentId = selectedAgentId,
+            pinnedAgentIds = library.pinnedAgentIds,
+        ),
         now,
-        RecentAgentsPolicy(window = RecentAgentsPolicy.EVERY_AGENT_WINDOW, maxAgents = agents.size, fillToCap = true),
+        RecentAgentsPolicy(fillToCap = true),
     ).agents
 
 /**
