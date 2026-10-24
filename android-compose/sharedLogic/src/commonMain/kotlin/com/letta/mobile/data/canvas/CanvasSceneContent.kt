@@ -48,9 +48,9 @@ private fun isProvenanceKey(key: String): Boolean =
  * wrote. Two copies at one revision can therefore differ, and only value by value can tell which is
  * ahead: the scene-wide highest Lamport cannot, as another value may already hold it.
  */
-internal fun hasNewerProvenance(stored: String, held: String): Boolean {
-    val newer = CanvasOpProjector.parseSceneOrNull(stored)?.let(::stampsOf) ?: return false
-    val older = CanvasOpProjector.parseSceneOrNull(held)?.let(::stampsOf).orEmpty()
+internal fun hasNewerProvenance(stored: CanvasDocument, held: CanvasDocument): Boolean {
+    val newer = CanvasOpProjector.parseSceneOrNull(stored.sceneJson)?.let(::stampsOf) ?: return false
+    val older = CanvasOpProjector.parseSceneOrNull(held.sceneJson)?.let(::stampsOf).orEmpty()
     return newer.any { (path, stamp) -> older[path]?.let { isNewer(stamp, it) } ?: true }
 }
 
@@ -77,11 +77,11 @@ private fun stampAt(node: JsonObject, key: String): Triple<Long, String, String>
     if (!key.startsWith("_") || !key.endsWith(LAMPORT, ignoreCase = true)) return null
     val lamport = (node[key] as? JsonPrimitive)?.longOrNull ?: return null
     val prefix = key.dropLast(LAMPORT.length)
-    return Triple(lamport, node.besideStamp(prefix, "actorId"), node.besideStamp(prefix, "opId"))
+    return Triple(lamport, node.textAt(prefix + "actorId"), node.textAt(prefix + "opId"))
 }
 
-private fun JsonObject.besideStamp(prefix: String, suffix: String): String =
-    entries.firstOrNull { (key, _) -> key.length == prefix.length + suffix.length && key.startsWith(prefix) && key.endsWith(suffix, true) }
-        ?.let { (it.value as? JsonPrimitive)?.content }.orEmpty()
+/** The text under [name], matched ignoring case (`_actorId` beside `_lamport`, `_bgActorId` beside `_bgLamport`). */
+private fun JsonObject.textAt(name: String): String =
+    entries.firstOrNull { (key, _) -> key.equals(name, ignoreCase = true) }?.let { (it.value as? JsonPrimitive)?.content }.orEmpty()
 
 private fun entryId(entry: JsonElement): String? = ((entry as? JsonObject)?.get("id") as? JsonPrimitive)?.content

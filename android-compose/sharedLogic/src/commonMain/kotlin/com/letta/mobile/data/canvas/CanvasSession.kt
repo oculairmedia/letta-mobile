@@ -310,7 +310,7 @@ class CanvasSession(
     private fun isAhead(stored: CanvasDocument, held: CanvasDocument): Boolean = when {
         stored.revision != held.revision -> stored.revision > held.revision
         stored.sceneJson == held.sceneJson -> false
-        else -> hasNewerProvenance(stored.sceneJson, held.sceneJson)
+        else -> hasNewerProvenance(stored, held)
     }
 
     /**
