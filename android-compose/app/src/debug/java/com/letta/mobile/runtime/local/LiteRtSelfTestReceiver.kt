@@ -71,12 +71,8 @@ class LiteRtSelfTestReceiver : BroadcastReceiver() {
     private fun <T> runSelfTestStage(stage: String, action: () -> T): T? = try {
         action()
     } catch (error: Throwable) {
-        logStageFailure(stage, error)
-        null
-    }
-
-    private fun logStageFailure(stage: String, error: Throwable) {
         selfTestLog(stage, "FAIL", error.fullLiteRtErrorText(), Log.ERROR)
+        null
     }
 
     private fun resolveModelPath(context: Context, modelHandle: String): String {

@@ -6,6 +6,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -83,30 +84,36 @@ class SuRootShellBridge @Inject constructor(
     // This tool boundary reports launch failures through the audited result contract.
     @Suppress("TooGenericExceptionCaught")
     override suspend fun execute(request: RootShellCommandRequest): RootShellCommandResult = withContext(ioDispatcher) {
-        val startMs = System.currentTimeMillis()
+        val startedAt = Instant.now()
         if (RootShellCommandClassifier.requiresHumanApproval(request.command) && request.approvalId.isNullOrBlank()) {
-            return@withContext executionFailure(
+            return@withContext auditedResult(
                 request,
-                startMs,
-                message = "Root command requires explicit user approval before execution.",
+                EMPTY_FAILURE_RESULT.copy(
+                    durationMs = System.currentTimeMillis() - startedAt.toEpochMilli(),
+                    errorMessage = "Root command requires explicit user approval before execution.",
+                ),
             )
         }
 
         val availability = detect()
         if (availability.status != RootShellAvailabilityStatus.SuAvailable) {
-            return@withContext executionFailure(
+            return@withContext auditedResult(
                 request,
-                startMs,
-                providerHint = availability.providerHint,
-                message = availability.reason,
+                EMPTY_FAILURE_RESULT.copy(
+                    durationMs = System.currentTimeMillis() - startedAt.toEpochMilli(),
+                    providerHint = availability.providerHint,
+                    errorMessage = availability.reason,
+                ),
             )
         }
 
-        val su = findSuExecutable() ?: return@withContext executionFailure(
+        val su = findSuExecutable() ?: return@withContext auditedResult(
             request,
-            startMs,
-            providerHint = availability.providerHint,
-            message = "su provider disappeared before command execution.",
+            EMPTY_FAILURE_RESULT.copy(
+                durationMs = System.currentTimeMillis() - startedAt.toEpochMilli(),
+                providerHint = availability.providerHint,
+                errorMessage = "su provider disappeared before command execution.",
+            ),
         )
 
         val process = try {
@@ -117,21 +124,23 @@ class SuRootShellBridge @Inject constructor(
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
-            return@withContext executionFailure(
+            return@withContext auditedResult(
                 request,
-                startMs,
-                providerHint = availability.providerHint,
-                message = error.rootShellMessage(),
+                EMPTY_FAILURE_RESULT.copy(
+                    durationMs = System.currentTimeMillis() - startedAt.toEpochMilli(),
+                    providerHint = availability.providerHint,
+                    errorMessage = error.rootShellMessage(),
+                ),
             )
         }
 
-        executeStartedProcess(request, availability, startMs, process)
+        executeStartedProcess(request, availability, startedAt, process)
     }
 
     // Every failure after launch must destroy the child; cancellation still propagates.
     @Suppress("TooGenericExceptionCaught")
     private suspend fun executeStartedProcess(
-        request: RootShellCommandRequest, availability: RootShellAvailability, startMs: Long, process: Process,
+        request: RootShellCommandRequest, availability: RootShellAvailability, startedAt: Instant, process: Process,
     ): RootShellCommandResult {
         return try {
             coroutineScope {
@@ -158,7 +167,7 @@ class SuRootShellBridge @Inject constructor(
                     stdoutTruncated = out.truncated,
                     stderrTruncated = err.truncated,
                     timedOut = !completed,
-                    durationMs = System.currentTimeMillis() - startMs,
+                    durationMs = System.currentTimeMillis() - startedAt.toEpochMilli(),
                     providerHint = availability.providerHint,
                 )
                 auditedResult(request, result)
@@ -168,27 +177,16 @@ class SuRootShellBridge @Inject constructor(
             throw error
         } catch (error: Throwable) {
             process.destroyRootProcess()
-            executionFailure(request, startMs, availability.providerHint, error.rootShellMessage())
+            auditedResult(
+                request,
+                EMPTY_FAILURE_RESULT.copy(
+                    durationMs = System.currentTimeMillis() - startedAt.toEpochMilli(),
+                    providerHint = availability.providerHint,
+                    errorMessage = error.rootShellMessage(),
+                ),
+            )
         }
     }
-
-    private suspend fun executionFailure(
-        request: RootShellCommandRequest, startMs: Long, providerHint: String? = null,
-        message: String,
-    ): RootShellCommandResult = auditedResult(
-        request,
-        RootShellCommandResult(
-            exitCode = null,
-            stdout = "",
-            stderr = "",
-            stdoutTruncated = false,
-            stderrTruncated = false,
-            timedOut = false,
-            durationMs = System.currentTimeMillis() - startMs,
-            providerHint = providerHint,
-            errorMessage = message,
-        ),
-    )
 
     private suspend fun auditedResult(
         request: RootShellCommandRequest,
@@ -277,6 +275,15 @@ class SuRootShellBridge @Inject constructor(
         private const val GRANT_OUTPUT_LIMIT_BYTES = 4 * 1024
         private const val BUFFER_SIZE = 8 * 1024
         private const val ROOT_UID = "0"
+        private val EMPTY_FAILURE_RESULT = RootShellCommandResult(
+            exitCode = null,
+            stdout = "",
+            stderr = "",
+            stdoutTruncated = false,
+            stderrTruncated = false,
+            timedOut = false,
+            durationMs = 0L,
+        )
         private val COMMON_SU_PATHS = listOf(
             "/system/bin/su",
             "/system/xbin/su",
