@@ -30,6 +30,17 @@ import com.letta.mobile.web.storage.WebStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import com.letta.mobile.data.storage.SecureSettingsStore
+import com.letta.mobile.ui.shell.pages.ShellLibrarySources
+
+/**
+ * letta-mobile-ckmub.17.5: what the web adds to the shared shell pages - its Settings services and
+ * the gateway's sessions. Every page itself is the shared one desktop binds. Home and project pins
+ * and a mascot pick are kept in the browser's settings store (letta-mobile-ckmub.17.7).
+ */
+internal class WebPageServices(val gateway: WasmAppServerClientGateway, val settings: SecureSettingsStore) {
+    val sources = ShellLibrarySources(settings = settings, memfs = gateway.memfs)
+}
 
 /** The page's long-lived bindings: the App Server gateway, the browser's storage and the backend it reaches. */
 internal class WebApp(scope: CoroutineScope) {

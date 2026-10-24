@@ -160,11 +160,11 @@ fun MascotLive(
     LaunchedEffect(entry, reducedMotion, pointerPresent) {
         entry.setPlatformFacts(MascotPlatformFacts(reduceMotion = reducedMotion, pointerPresent = pointerPresent))
     }
-    // At rest (idle, no pointer, its last beat played out) the scene holds its pose and no frame
+    // At rest (idle, the pointer still or gone, its last beat played out) the scene holds its pose and no frame
     // is asked for: a seat that stays composed must not redraw the window every vsync (MascotRest).
     val gestures = rememberMascotGestureEffects(entry, onClick, MotionPreference(reducedMotion))
-    val engaged = mascotEngaged(presence, pointerPresent = pointerPresent) || gestures.petting
-    val moving = rememberMascotMoving(engaged, identity, gestures.touches)
+    val engaged = mascotEngaged(presence) || gestures.petting
+    val moving = rememberMascotMoving(engaged, identity, gestures.touches, pointer = cursor)
     // At rest the clock leaves composition and asks for no frames.
     if (moving) MascotClock(entry, registry)
     // Gaze: this tile vs the pointer, the composer / timeline rects, the other mascots and every

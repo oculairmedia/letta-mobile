@@ -102,7 +102,7 @@ private class RiveCanvasScene(private val js: JsAny) : RiveFrameScene() {
     }
 
     override fun advance(step: RiveFrameStep) {
-        if (!closed) riveAdvance(js, step.seconds)
+        if (!closed && !riveAdvance(js, step.seconds)) settle()
     }
 
     /** Draws into the canvas, reads it back and copies it into this scene's frame; the image is a copy the caller owns. */
@@ -156,6 +156,8 @@ private class RiveCanvasFrame(val size: IntSize) {
     fun copy(pixels: JsAny) {
         val copiedInPlace = fastCopyAvailable && riveCopyIntoHeap(loadedWasm, pixels, address)
         if (!copiedInPlace) {
+            if (!slowCopyReported) println("[mascot] copying frames byte by byte: skiko's wasm memory is unreachable or rows are padded")
+            slowCopyReported = true
             val bytes = ByteArray(rowBytes * size.height) { rivePixelByte(pixels, it).toByte() }
             bitmap.installPixels(bitmap.imageInfo, bytes, rowBytes)
         }
@@ -171,3 +173,6 @@ private class RiveCanvasFrame(val size: IntSize) {
     }
 }
 
+
+/** The byte-by-byte copy (a Kotlin-to-JS call per byte, per frame, per mascot) has been reported. */
+private var slowCopyReported = false

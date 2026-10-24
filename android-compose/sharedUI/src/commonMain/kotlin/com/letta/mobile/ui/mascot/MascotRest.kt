@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.data.presence.AgentPresence
 import com.letta.mobile.data.presence.RunEdges
@@ -28,12 +29,12 @@ import kotlinx.coroutines.delay
 
 /**
  * Whether a live mascot has something to show right now: any presence but plain idle (working,
- * the user typing to it, an approval, an error), or a pointer in the window its eyes can follow.
- * The run edge counts are history, not presence: an agent that has finished runs and does nothing
- * now is at rest.
+ * the user typing to it, an approval, an error). The run edge counts are history, not presence: an
+ * agent that has finished runs and does nothing now is at rest. A pointer is not engagement by
+ * being in the window; each move of it is a wake ([rememberMascotMoving]).
  */
-internal fun mascotEngaged(presence: AgentPresence, pointerPresent: Boolean): Boolean =
-    presence.copy(edges = RunEdges.NONE) != AgentPresence.IDLE || pointerPresent
+internal fun mascotEngaged(presence: AgentPresence): Boolean =
+    presence.copy(edges = RunEdges.NONE) != AgentPresence.IDLE
 
 /**
  * How long a mascot keeps moving after it stops being engaged (or first appears, or changes
@@ -45,14 +46,16 @@ internal val MASCOT_REST_DELAY: Duration = 3.seconds
 
 /**
  * True while [MascotLive]'s scene should advance: while [engaged], and for [MASCOT_REST_DELAY]
- * after it stops being engaged, [identity] changes or [touches] counts another gesture on it (a
- * poke on a resting mascot wakes it to play the reaction). False afterwards:
- * the surface keeps its last frame and nothing asks for another.
+ * after it stops being engaged, [identity] changes, [touches] counts another gesture on it (a
+ * poke on a resting mascot wakes it to play the reaction) or the [pointer] moves (the eyes follow
+ * every move). False afterwards: the surface keeps its last frame and nothing asks for another.
+ * On a desktop or in a browser the pointer is nearly always in the window, so a still one lets the
+ * mascot rest like an absent one.
  */
 @Composable
-internal fun rememberMascotMoving(engaged: Boolean, identity: MascotIdentity, touches: Int = 0): Boolean {
+internal fun rememberMascotMoving(engaged: Boolean, identity: MascotIdentity, touches: Int = 0, pointer: Offset? = null): Boolean {
     var moving by remember { mutableStateOf(true) }
-    LaunchedEffect(engaged, identity, touches) {
+    LaunchedEffect(engaged, identity, touches, pointer) {
         moving = true
         if (!engaged) {
             delay(MASCOT_REST_DELAY)

@@ -16,7 +16,8 @@ import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.AgentPresence
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 
 /**
  * letta-mobile-bglj6.1.12: a seated mascot rests. The shared chat keeps the agent's mascot seated
@@ -31,6 +32,7 @@ class MascotRestUiTest {
     /** Records what [MascotHost.Surface] was last asked for. */
     private class RecordingMascotHost : MascotHost {
         var lastPlaying: Boolean? = null
+        var lastEntry: MascotEntry? = null
 
         override val available: Boolean = true
 
@@ -44,6 +46,7 @@ class MascotRestUiTest {
         @Composable
         override fun Surface(entry: MascotEntry, modifier: Modifier, playing: Boolean) {
             lastPlaying = playing
+            lastEntry = entry
             Box(modifier)
         }
     }
@@ -90,17 +93,40 @@ class MascotRestUiTest {
     }
 
     @Test
-    fun pointerInTheWindowKeepsTheEyesFollowing() = runComposeUiTest {
+    fun stillPointerLetsTheMascotRestAndAMoveWakesIt() = runComposeUiTest {
         val host = RecordingMascotHost()
         val shell = FakeMascotShell(agent, layerMounted = false, host = host)
         shell.registry.cursor.value = Offset(10f, 10f)
         showSeat(shell)
 
-        mainClock.advanceTimeBy(MASCOT_REST_DELAY.inWholeMilliseconds * 3)
-        assertEquals(true, host.lastPlaying, "with a pointer to follow the mascot stays live")
+        mainClock.advanceTimeBy(MASCOT_REST_DELAY.inWholeMilliseconds - REST_MARGIN_MILLIS)
+        assertEquals(true, host.lastPlaying, "a pointer that just arrived is followed")
+        mainClock.advanceTimeBy(REST_MARGIN_MILLIS * 2)
+        assertEquals(false, host.lastPlaying, "a pointer held still for the rest delay lets the mascot rest")
+
+        val entry = assertNotNull(host.lastEntry)
+        val restingGaze = entry.gazeWorld
+        shell.registry.cursor.value = Offset(300f, 200f)
+        // The move restarts the rest timer in an effect; the surface plays on the pass after it.
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeByFrame()
+        assertEquals(true, host.lastPlaying, "a move wakes the mascot within a frame or two")
+        assertNotEquals(restingGaze, entry.gazeWorld, "and its eyes have the new pointer at once")
+
+        mainClock.advanceTimeBy(MASCOT_REST_DELAY.inWholeMilliseconds + REST_MARGIN_MILLIS)
+        assertEquals(false, host.lastPlaying, "still again: it rests again")
+    }
+
+    @Test
+    fun pointerLeavingTheWindowLetsTheMascotRest() = runComposeUiTest {
+        val host = RecordingMascotHost()
+        val shell = FakeMascotShell(agent, layerMounted = false, host = host)
+        shell.registry.cursor.value = Offset(10f, 10f)
+        showSeat(shell)
+
         shell.registry.cursor.value = null
         mainClock.advanceTimeBy(MASCOT_REST_DELAY.inWholeMilliseconds + REST_MARGIN_MILLIS)
-        assertFalse(host.lastPlaying == true, "the pointer left: the mascot rests")
+        assertEquals(false, host.lastPlaying, "the pointer left: the mascot rests")
     }
 
     private companion object {

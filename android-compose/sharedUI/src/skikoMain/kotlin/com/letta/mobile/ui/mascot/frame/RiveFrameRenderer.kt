@@ -6,6 +6,8 @@ import com.letta.mobile.avatar.rive.RiveInputSink
 import kotlin.jvm.JvmInline
 import com.letta.mobile.ui.mascot.MascotStillStore
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import org.jetbrains.skia.Image
 
 /**
@@ -69,7 +71,10 @@ abstract class RiveFrameScene {
     /** The view-model path [com.letta.mobile.avatar.rive.RiveAvatarRuntime] writes through. */
     abstract val inputSink: RiveInputSink
 
-    /** Advances the state machine by [step] and applies it to the artboard. */
+    /**
+     * Advances the state machine by [step] and applies it to the artboard. A platform whose runtime
+     * reports that nothing is left to animate calls [settle]; one that cannot tell never does.
+     */
     abstract fun advance(step: RiveFrameStep)
 
     /** Renders the scene as it stands at [size] pixels: a new image the caller owns and closes. */
@@ -83,6 +88,35 @@ abstract class RiveFrameScene {
 
     private var lastFrameNanos = 0L
 
+    /** False once the scene [settle]d, true again when [wake] has something that may move it. */
+    private val moving = MutableStateFlow(true)
+
+    /** Set by a [wake] out of a settle: the next advance is one frame, not the whole idle gap. */
+    private var resuming = false
+
+    /** The last advance left nothing to animate: no frame is worth drawing until [wake]. */
+    val settled: Boolean get() = !moving.value
+
+    /** Called from [advance] when the runtime reports the state machine has nothing left to play. */
+    protected fun settle() {
+        moving.value = false
+    }
+
+    /**
+     * Something that can move a settled scene happened - an input write or a pointer event - so
+     * the surfaces drawing it play again. Free when the scene is already moving.
+     */
+    fun wake() {
+        if (moving.value) return
+        resuming = true
+        moving.value = true
+    }
+
+    /** Suspends while the scene is [settled]. */
+    internal suspend fun awaitMotion() {
+        moving.first { it }
+    }
+
     /**
      * Advances to the frame clock's [nowNanos] once per frame: a scene shared by several surfaces
      * (the sidebar and the hero draw the same agent) would otherwise be advanced by each of them
@@ -90,7 +124,12 @@ abstract class RiveFrameScene {
      */
     fun advanceTo(nowNanos: Long) {
         if (nowNanos == lastFrameNanos) return
-        val dt = if (lastFrameNanos == 0L) 0f else ((nowNanos - lastFrameNanos) / NANOS_PER_SECOND).coerceIn(0f, MAX_STEP_SECONDS)
+        val dt = when {
+            lastFrameNanos == 0L -> 0f
+            resuming -> ONE_FRAME_SECONDS
+            else -> ((nowNanos - lastFrameNanos) / NANOS_PER_SECOND).coerceIn(0f, MAX_STEP_SECONDS)
+        }
+        resuming = false
         lastFrameNanos = nowNanos
         if (dt > 0f) advance(RiveFrameStep(dt))
     }
@@ -100,5 +139,8 @@ abstract class RiveFrameScene {
 
         /** A tab or window that stopped drawing for a while comes back with one step of motion. */
         const val MAX_STEP_SECONDS = 0.1f
+
+        /** A settled scene picks up where it stopped: its first step back is one 60 Hz frame. */
+        const val ONE_FRAME_SECONDS = 1f / 60f
     }
 }

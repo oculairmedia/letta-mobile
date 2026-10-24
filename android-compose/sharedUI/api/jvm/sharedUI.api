@@ -4577,8 +4577,11 @@ public abstract class com/letta/mobile/ui/mascot/frame/RiveFrameScene {
 	public final fun advanceTo (J)V
 	public abstract fun close ()V
 	public abstract fun getInputSink ()Lcom/letta/mobile/avatar/rive/RiveInputSink;
+	public final fun getSettled ()Z
 	public abstract fun pointer (Lcom/letta/mobile/ui/mascot/frame/RivePointerEvent;)V
 	public abstract fun renderImage-ozmzZPI (J)Lorg/jetbrains/skia/Image;
+	protected final fun settle ()V
+	public final fun wake ()V
 }
 
 public final class com/letta/mobile/ui/mascot/frame/RiveFrameStep {
@@ -10457,6 +10460,12 @@ public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceOverlayData
 public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceOverlaysKt {
 	public static final field NEW_CONVERSATION_RECENTS_LIMIT I
 	public static final fun ShellWorkspaceOverlays (Lcom/letta/mobile/data/shell/ShellOverlays;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceOverlayData;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceOverlayActions;Landroidx/compose/runtime/Composer;I)V
+}
+
+public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceRememberingKt {
+	public static final fun ReportCompositionPasses-WPi__2c (Ljava/lang/String;ZJLandroidx/compose/runtime/Composer;II)V
+	public static final fun rememberCoarseNow-rnQQ1Ag (JLandroidx/compose/runtime/Composer;II)Landroidx/compose/runtime/State;
+	public static final fun rememberShellWorkspaceHost (Ljava/lang/Object;[Ljava/lang/Object;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceHost;
 }
 
 public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceSearch {
