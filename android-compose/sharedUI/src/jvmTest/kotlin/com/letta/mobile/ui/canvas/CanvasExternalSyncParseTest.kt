@@ -18,8 +18,8 @@ import kotlin.test.assertTrue
  * times: the same scene arriving again is not parsed at all, and a real change is parsed once.
  */
 class CanvasExternalSyncParseTest {
-    private val rect = """{"id":"rect","type":"Shape","zIndex":0,"points":["0.0,0.0","50.0,40.0"],"strokeColor":"#000000ff","strokeWidth":1.0,"shapeType":"RECTANGLE"}"""
-    private val circle = """{"id":"circle","type":"Shape","zIndex":1,"points":["100.0,100.0","160.0,180.0"],"strokeColor":"#000000ff","strokeWidth":1.0,"shapeType":"CIRCLE"}"""
+    private val rect = shape("rect", zIndex = 0, points = """"0.0,0.0","50.0,40.0"""", kind = "RECTANGLE")
+    private val circle = shape("circle", zIndex = 1, points = """"100.0,100.0","160.0,180.0"""", kind = "CIRCLE")
     private val before = CanvasOpProjector.project("", listOf(CanvasOp.AddElementOp("op-1", "a", 1L, "rect", rect)))
     private val after = CanvasOpProjector.project(before, listOf(CanvasOp.AddElementOp("op-2", "b", 2L, "circle", circle)))
 
@@ -68,6 +68,10 @@ class CanvasExternalSyncParseTest {
         assertFalse(result.shouldImport)
         assertEquals(1, parses)
     }
+
+    private fun shape(id: String, zIndex: Int, points: String, kind: String): String =
+        """{"id":"$id","type":"Shape","zIndex":$zIndex,"points":[$points],""" +
+            """"strokeColor":"#000000ff","strokeWidth":1.0,"shapeType":"$kind"}"""
 
     private fun evaluate(scene: String, lastExportedJson: String? = null, lastSyncedScene: String? = null): ExternalSyncResult {
         val doc = CanvasDocument(id = CanvasId("c"), title = "c", revision = 2L, sceneJson = scene, updatedAtEpochMs = 0L)

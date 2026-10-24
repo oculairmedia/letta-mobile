@@ -95,7 +95,8 @@ class CanvasContentNeutralRevisionTest {
         val first = CanvasOpProjector.project("", listOf(CanvasOp.AddElementOp("op-1", "a", 1L, "n1", note)))
         val resent = CanvasOpProjector.project(first, listOf(CanvasOp.UpdateElementOp("op-2", "b", 9L, "n1", note)))
         val removedGhost = CanvasOpProjector.project(resent, listOf(CanvasOp.RemoveElementOp("op-3", "b", 10L, "ghost")))
-        val edited = CanvasOpProjector.project(first, listOf(CanvasOp.UpdateElementOp("op-4", "b", 9L, "n1", """{"id":"n1","type":"Text","text":"x"}""")))
+        val other = """{"id":"n1","type":"Text","text":"x"}"""
+        val edited = CanvasOpProjector.project(first, listOf(CanvasOp.UpdateElementOp("op-4", "b", 9L, "n1", other)))
 
         assertNotEquals(first, resent)
         assertTrue(sameSceneContent(first, resent))
