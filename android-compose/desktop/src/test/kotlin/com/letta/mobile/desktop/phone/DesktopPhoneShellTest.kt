@@ -28,8 +28,11 @@ import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
+import com.letta.mobile.data.chat.display.OpenChatsOnCanvas
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerBinding
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
+import com.letta.mobile.data.storage.InMemorySecureSettingsStore
+import com.letta.mobile.desktop.LocalDesktopOpenChatsOnCanvas
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSessionPort
 import com.letta.mobile.desktop.chat.DesktopSharedChatPage
@@ -147,8 +150,9 @@ class DesktopPhoneShellTest {
             gatewayFactory = { FakeDesktopChatGateway() },
         )
         val port = DesktopChatSessionPort(controller = controller, scope = scope.backgroundScope)
+        val openOnCanvas = OpenChatsOnCanvas(InMemorySecureSettingsStore(mapOf("chat.openOnCanvas" to "true")))
         setContent {
-            CompositionLocalProvider(LocalDesktopPhone provides chrome) {
+            CompositionLocalProvider(LocalDesktopPhone provides chrome, LocalDesktopOpenChatsOnCanvas provides openOnCanvas) {
                 MaterialTheme(colorScheme = darkColorScheme()) {
                     DesktopPhoneScreen(state) {
                         DesktopSharedChatPage(
@@ -168,8 +172,8 @@ class DesktopPhoneShellTest {
             }
         }
         settle()
-        // Canvas first, as on Android: the canvas's chat head (the agent bubble, no bar since
-        // letta-mobile-y5q9z), not the desktop's floating panel.
+        // "Open conversations on the canvas" on: the canvas's chat head (the agent bubble, no bar
+        // since letta-mobile-y5q9z), not the desktop's floating panel.
         onNodeWithTag(TOUCH_DOCK_TAG).assertExists()
         onNodeWithTag(TOUCH_HEAD_TAG).assertExists()
         onNodeWithTag("composer-touch-bar", useUnmergedTree = true).assertDoesNotExist()

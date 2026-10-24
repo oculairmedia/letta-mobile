@@ -1,5 +1,6 @@
 package com.letta.mobile.testutil
 
+import com.letta.mobile.data.storage.OPEN_CHATS_ON_CANVAS_DEFAULT
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
@@ -60,7 +61,7 @@ class FakeSettingsRepository(
     private val chatFontScaleState = MutableStateFlow(1f)
     private val enableProjectsState = MutableStateFlow(false)
     private val hapticsEnabledState = MutableStateFlow(true)
-    private val openChatsOnCanvasState = MutableStateFlow(true)
+    private val openChatsOnCanvasState = MutableStateFlow(OPEN_CHATS_ON_CANVAS_DEFAULT)
 
     override val configs: StateFlow<List<LettaConfig>> = configsState.asStateFlow()
 

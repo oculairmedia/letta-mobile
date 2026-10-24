@@ -69,7 +69,7 @@ fun AccessibilitySettingsSection(modifier: Modifier = Modifier) {
     }
 }
 
-/** Canvas-first conversations and the default permission mode. */
+/** Opening conversations on the canvas (opt-in) and the default permission mode. */
 @Composable
 fun ChatSettingsSection(settings: ChatSettings, modifier: Modifier = Modifier) {
     if (settings.isEmpty) return

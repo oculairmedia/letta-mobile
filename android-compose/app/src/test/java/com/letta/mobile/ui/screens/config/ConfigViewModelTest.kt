@@ -468,24 +468,24 @@ class ConfigViewModelTest {
     }
 
     @Test
-    fun openChatsOnCanvas_defaultsOn_andUpdatePersists() = runTest {
+    fun openChatsOnCanvas_defaultsOff_andUpdatePersists() = runTest {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()
 
         viewModel.uiState.test {
             val state = awaitItem()
             assertTrue(state is UiState.Success)
-            assertEquals(true, (state as UiState.Success).data.openChatsOnCanvas)
+            assertEquals(false, (state as UiState.Success).data.openChatsOnCanvas)
         }
 
-        viewModel.updateOpenChatsOnCanvas(false)
+        viewModel.updateOpenChatsOnCanvas(true)
 
         viewModel.uiState.test {
             val state = awaitItem()
             assertTrue(state is UiState.Success)
-            assertEquals(false, (state as UiState.Success).data.openChatsOnCanvas)
+            assertEquals(true, (state as UiState.Success).data.openChatsOnCanvas)
         }
-        assertEquals(false, fakeRepository.getOpenChatsOnCanvas().first())
+        assertEquals(true, fakeRepository.getOpenChatsOnCanvas().first())
     }
 
     @Test

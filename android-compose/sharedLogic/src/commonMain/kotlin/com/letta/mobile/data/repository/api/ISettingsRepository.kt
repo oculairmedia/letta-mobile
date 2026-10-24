@@ -66,7 +66,8 @@ interface ISettingsRepository {
     /**
      * Whether the shared chat page opens a conversation on the canvas
      * (canvas-first) rather than the traditional full-screen chat. Only the initial
-     * presentation; the user's later surface mode still wins. Defaults to enabled.
+     * presentation; the user's later surface mode still wins. Defaults to off
+     * ([com.letta.mobile.data.storage.OPEN_CHATS_ON_CANVAS_DEFAULT]).
      */
     fun getOpenChatsOnCanvas(): Flow<Boolean>
     suspend fun setOpenChatsOnCanvas(enabled: Boolean)
