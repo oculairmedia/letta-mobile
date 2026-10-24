@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import com.letta.mobile.ui.mascot.MascotAvatar
+import com.letta.mobile.ui.mascot.mascotAtWork
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -53,7 +54,7 @@ fun agentOrbBrush(index: Int): Brush {
     return Brush.linearGradient(colors = listOf(start, end))
 }
 
-/** A rounded-square gradient agent orb (rail / sidebar avatar). */
+/** A rounded-square gradient agent orb (rail / sidebar avatar), or that agent's mascot when known. */
 @Composable
 fun AgentOrb(
     index: Int,
@@ -61,14 +62,16 @@ fun AgentOrb(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = LettaDimens.Radius.sm,
     onClick: (() -> Unit)? = null,
-    /** The agent this orb stands for; with a known mascot identity the orb is the live mascot. */
+    /** The agent this orb stands for; with a known identity it draws that mascot. */
     agentId: String? = null,
+    /** Whether its mascot animates; list tiles can keep stills without changing other orb callers. */
+    live: Boolean = mascotAtWork(agentId),
     content: @Composable (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(cornerRadius)
     // With an identity in MascotIdentityRegistry and a renderer in LocalMascotHost, the orb IS
-    // the live mascot (one shared scene per agent); the gradient stands in otherwise.
-    MascotAvatar(agentId = agentId, size = size, modifier = modifier, cornerRadius = cornerRadius, onClick = onClick) {
+    // the mascot (one shared scene per agent when [live] is true); the gradient stands in otherwise.
+    MascotAvatar(agentId = agentId, size = size, modifier = modifier, cornerRadius = cornerRadius, onClick = onClick, live = live) {
         Box(
             // clip BEFORE clickable so the hover/press indication follows the orb's
             // rounded shape instead of a rectangle. onClick is applied here (not by

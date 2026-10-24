@@ -1007,7 +1007,7 @@ public final class com/letta/mobile/ui/chat/AgentIdentityPillKt {
 
 public final class com/letta/mobile/ui/chat/AgentOrbKt {
 	public static final fun AgentActivityOrb-Kz89ssw (FLcom/letta/mobile/ui/chat/AgentActivity;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
-	public static final fun AgentOrb-9QcgTRs (IFLandroidx/compose/ui/Modifier;FLkotlin/jvm/functions/Function0;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun AgentOrb-VUP9l70 (IFLandroidx/compose/ui/Modifier;FLkotlin/jvm/functions/Function0;Ljava/lang/String;ZLkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public static final fun AgentSphere--orJrPs (FLandroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 	public static final fun agentOrbBrush (I)Landroidx/compose/ui/graphics/Brush;
 }

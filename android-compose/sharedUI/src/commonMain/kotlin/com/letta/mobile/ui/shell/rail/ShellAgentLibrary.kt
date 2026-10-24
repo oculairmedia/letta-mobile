@@ -24,6 +24,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import com.letta.mobile.data.agents.AgentRailGroup
+import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.agents.deriveAgentSpaces
 import com.letta.mobile.data.search.TextMatch
 import com.letta.mobile.ui.components.LettaEmptyHint
@@ -50,7 +51,7 @@ object ShellAgentLibraryTags {
     const val SEARCH = "shell-agent-library-search"
 }
 
-/** The rail with its expanded library: the agents (id, name) folded into stacks, then drawn. */
+/** The full ordered roster, retained for the expanded library and cut only for the collapsed rail. */
 @Immutable
 data class ShellLibraryRailState(
     val agents: List<Pair<String, String>>,
@@ -65,11 +66,16 @@ data class ShellLibraryRailState(
  */
 @Composable
 fun ShellLibraryRail(state: ShellLibraryRailState, actions: ShellAgentRailActions, modifier: Modifier = Modifier) {
-    val groups = remember(state.agents, state.focus.selectedAgentId) { ShellRailMapping.groups(state.agents, state.focus.selectedAgentId) }
+    // The expanded library is the complete roster, including the focused agent, and marks the
+    // focused row. In the collapsed rail the focused agent is already represented by its panel.
+    val groups = remember(state.agents) { ShellRailMapping.groups(state.agents, selectedAgentId = null) }
     val entries = remember(groups, state.focus) { ShellRailMapping.entries(groups, state.focus) }
+    val collapsedEntries = remember(state.agents, state.focus) {
+        collapsedRailEntries(state.agents, state.focus)
+    }
     ShellAgentRail(
         state = ShellAgentRailState(
-            entries = entries,
+            entries = collapsedEntries,
             homeSelected = state.homeSelected,
             expanded = state.expanded,
         ),
@@ -78,6 +84,11 @@ fun ShellLibraryRail(state: ShellLibraryRailState, actions: ShellAgentRailAction
         library = { ShellAgentLibrary(groups = groups, entries = entries, actions = actions) },
     )
 }
+
+/** The collapsed rail's bounded recents, in the same pinned/activity order as the full roster. */
+internal fun collapsedRailEntries(agents: List<Pair<String, String>>, focus: ShellRailFocus): List<ShellRailEntry> =
+    ShellRailMapping.entries(ShellRailMapping.groups(agents, focus.selectedAgentId), focus)
+        .take(RecentAgentsPolicy.DEFAULT_MAX_AGENTS)
 
 /**
  * The expanded rail ("Your Library"): agents grouped into spaces derived from their names, each

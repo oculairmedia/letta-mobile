@@ -3,13 +3,19 @@
 package com.letta.mobile.ui.shell.rail
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.agents.AgentRailGroup
+import com.letta.mobile.data.agents.RecentAgentsPolicy
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -53,5 +59,60 @@ class ShellAgentLibraryTest {
         onNodeWithContentDescription("Clear search").performClick()
         onNodeWithText("Meridian").performClick()
         assertEquals(listOf("a4"), opened)
+    }
+
+    @Test
+    fun collapsedRailIsCappedButExpandedLibraryKeepsAndSearchesTheFullRoster() = runComposeUiTest {
+        val roster = (0 until 100).map { index ->
+            "agent-$index" to "Agent ${index.toString().padStart(3, '0')}"
+        }
+        val focus = ShellRailFocus()
+        val expectedCollapsed = collapsedRailEntries(roster, focus)
+        assertEquals(RecentAgentsPolicy.DEFAULT_MAX_AGENTS, expectedCollapsed.size)
+        assertEquals((0..7).map { "Agent ${it.toString().padStart(3, '0')}" }, expectedCollapsed.map { it.name })
+
+        var state by mutableStateOf(ShellLibraryRailState(agents = roster, focus = focus))
+        val opened = mutableListOf<String>()
+        setContent {
+            MaterialTheme {
+                ShellLibraryRail(
+                    state = state,
+                    actions = ShellAgentRailActions(onAgentSelected = { opened += it }),
+                )
+            }
+        }
+        onNodeWithTag(ShellAgentRailTags.orb("Agent 000")).assertExists()
+        onNodeWithContentDescription("Search agents").assertDoesNotExist()
+
+        state = state.copy(expanded = true)
+        waitForIdle()
+        val groups = ShellRailMapping.groups(roster, selectedAgentId = null)
+        val entries = ShellRailMapping.entries(groups, state.focus)
+        assertEquals(100, librarySections(groups, entries, needle = "").sumOf { it.items.size })
+        onNodeWithContentDescription("Search agents").performTextInput("Agent 099")
+        onAllNodesWithText("Agent 099")[1].performClick()
+        assertEquals(listOf("agent-99"), opened)
+
+        // Collapse after selecting the last roster member. Its panel owns focus; the rail returns
+        // to its eight-entry recents cut and does not lose the expanded library's roster.
+        state = state.copy(expanded = false, focus = focus.copy(selectedAgentId = "agent-99"))
+        waitForIdle()
+        assertEquals(100, state.agents.size)
+        assertEquals(8, collapsedRailEntries(state.agents, state.focus).size)
+        onNodeWithContentDescription("Search agents").assertDoesNotExist()
+        onNodeWithTag(ShellAgentRailTags.orb("Agent 000")).assertExists()
+    }
+
+    @Test
+    fun collapsedOverflowKeepsPinsFirstAndCapsEvenWhenPinsOverflow() {
+        val roster = (0 until 12).map { index ->
+            "agent-$index" to "Agent ${index.toString().padStart(2, '0')}"
+        }
+        val pinned = (0..9).mapTo(mutableSetOf()) { "agent-$it" }
+        val entries = collapsedRailEntries(roster, ShellRailFocus(pinnedAgentIds = pinned))
+
+        assertEquals(8, entries.size)
+        assertEquals((0..7).map { "Agent ${it.toString().padStart(2, '0')}" }, entries.map { it.name })
+        assertEquals(true, entries.all { it.pinned })
     }
 }

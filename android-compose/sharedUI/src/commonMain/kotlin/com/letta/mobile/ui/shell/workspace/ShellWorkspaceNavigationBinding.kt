@@ -23,8 +23,9 @@ import com.letta.mobile.ui.shell.rail.ShellRailFocus
 import kotlin.time.Instant
 /**
  * The workspace's navigation over the workspace and its roster [agents] as
- * (id, name): the whole roster on the rail (its library lists them all), most recently used first
- * by the [conversations] list's activity, and the focused agent's panel.
+ * (id, name): the full roster for the expanded library, ordered most recently used first by the
+ * [conversations] list's activity. The collapsed rail applies its bounded cut at render time so
+ * the focused agent's panel and expanded library keep the complete roster.
  */
 fun ShellWorkspaceState.workspaceNavigation(
     agents: List<Pair<String, String>>,
@@ -71,8 +72,9 @@ fun ShellWorkspaceState.workspaceNavigation(
 }
 
 /**
- * The whole roster in rail order, by the shared recents rule ([RecentAgents.cut]) with nothing cut:
- * pinned agents first, then the most recently active, then the rest in roster order.
+ * The whole roster in shared recents order ([RecentAgents.cut]) with a cap equal to its size:
+ * pinned agents first, then the most recently active, then the rest in roster order. The UI keeps
+ * this full order for the expanded library and applies its eight-entry cap only when collapsed.
  */
 internal fun recentFirst(agents: List<Pair<String, String>>, library: ShellDrawerLibrary, now: Instant): List<Pair<String, String>> =
     RecentAgents.cut(
