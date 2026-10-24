@@ -97,6 +97,22 @@ class ChatSurfaceUiTest {
     }
 
     @Test
+    fun temporarilyDisabledOrdinaryComposerKeepsTheNewConversationWelcome() = runComposeUiTest {
+        val empty = ChatUiState(
+            conversationState = ConversationState.NoConversation,
+            isLoadingMessages = false,
+            messages = persistentListOf(),
+        )
+        val port = TestPort(empty, ChatComposerUiState(canSend = false, acceptsInput = false))
+
+        show(port, ChatSurfacePresentation.ChatFirst)
+
+        onNodeWithTag(ChatTimelineTags.WELCOME).assertExists()
+        onNodeWithTag(ChatTimelineTags.EMPTY).assertDoesNotExist()
+        onNodeWithText("How do I get started?").assertExists()
+    }
+
+    @Test
     fun anErrorIsShownOnceThenClearedInFullScreen() = runComposeUiTest {
         val port = TestPort(ready.copy(error = "Send failed"))
         show(port, ChatSurfacePresentation.ChatFirst)

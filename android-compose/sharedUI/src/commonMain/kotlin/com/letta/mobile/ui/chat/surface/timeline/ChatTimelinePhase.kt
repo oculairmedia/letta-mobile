@@ -19,14 +19,16 @@ internal sealed interface ChatTimelinePhase {
     /** The conversation (or the connection to it) failed; offers a retry. */
     data class Failed(val message: String) : ChatTimelinePhase
 
-    /**
-     * Nothing to show yet: starter prompts. [hasConversation] is false when no conversation is
-     * selected at all (Android's NoConversationChatContent), true for a fresh, empty one.
-     */
-    data class Welcome(val hasConversation: Boolean) : ChatTimelinePhase
+    /** No transcript rows: show the welcome, a waiting cue, or a settled empty state. */
+    data class Empty(
+        val hasConversation: Boolean,
+        val showWelcome: Boolean,
+        val waiting: Boolean,
+    ) : ChatTimelinePhase
 
     /** The message list (paged or legacy). */
     data object Ready : ChatTimelinePhase
+
 }
 
 /**
@@ -34,20 +36,35 @@ internal sealed interface ChatTimelinePhase {
  *   empty and history-error states (from Paging's load states), so only a conversation-level
  *   failure overrides it.
  */
-internal fun chatTimelinePhaseOf(state: ChatUiState, paged: Boolean): ChatTimelinePhase {
+internal fun chatTimelinePhaseOf(
+    state: ChatUiState,
+    paged: Boolean,
+    canSendStarterPrompts: Boolean = true,
+): ChatTimelinePhase {
     val conversation = state.conversationState
     if (conversation is ConversationState.Error) return ChatTimelinePhase.Failed(conversation.message)
     if (paged) return ChatTimelinePhase.Ready
-    val hasContent = state.hasRenderableContent()
+    if (state.hasRenderableContent() || (canSendStarterPrompts && state.isRunInFlight)) return ChatTimelinePhase.Ready
+    return chatTimelineEmptyPhaseOf(state, canSendStarterPrompts)
+}
+
+/** Phase shown when the timeline has no rows, including a confirmed empty paged history. */
+internal fun chatTimelineEmptyPhaseOf(
+    state: ChatUiState,
+    canSendStarterPrompts: Boolean,
+): ChatTimelinePhase {
+    val conversation = state.conversationState
     return when {
-        hasContent -> ChatTimelinePhase.Ready
-        conversation is ConversationState.NoConversation -> ChatTimelinePhase.Welcome(hasConversation = false)
-        conversation is ConversationState.Loading -> ChatTimelinePhase.Loading
-        state.isLoadingMessages -> ChatTimelinePhase.Loading
-        else -> ChatTimelinePhase.Welcome(hasConversation = true)
+        conversation is ConversationState.NoConversation && canSendStarterPrompts ->
+            ChatTimelinePhase.Empty(hasConversation = false, showWelcome = true, waiting = false)
+        conversation is ConversationState.Loading || state.isLoadingMessages -> ChatTimelinePhase.Loading
+        else -> ChatTimelinePhase.Empty(
+            hasConversation = conversation !is ConversationState.NoConversation,
+            showWelcome = canSendStarterPrompts,
+            waiting = !canSendStarterPrompts && state.isRunInFlight,
+        )
     }
 }
 
-/** Anything the list would draw: messages, a run in flight, or a generated surface. */
-private fun ChatUiState.hasRenderableContent(): Boolean =
-    messages.isNotEmpty() || isStreaming || isAgentTyping || a2uiSurfaces.isNotEmpty()
+/** Anything a transcript row or generated surface would draw. */
+private fun ChatUiState.hasRenderableContent(): Boolean = messages.isNotEmpty() || a2uiSurfaces.isNotEmpty()

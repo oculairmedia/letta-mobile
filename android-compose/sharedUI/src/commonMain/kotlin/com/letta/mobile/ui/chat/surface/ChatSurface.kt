@@ -59,6 +59,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
+import com.letta.mobile.ui.chat.session.ReadOnlySubagentSessionPort
 import com.letta.mobile.ui.chat.surface.composer.ChatComposerPanel
 import com.letta.mobile.ui.chat.surface.status.RunStatusLine
 import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
@@ -269,6 +270,9 @@ internal class ChatSurfaceSession(
     /** One scroll position per conversation/paged timeline, preserved across presentation changes. */
     val listState: LazyListState,
 ) {
+    /** Starter prompts are hidden for read-only child sessions, independent of temporary input availability. */
+    val canSendStarterPrompts: Boolean = port !is ReadOnlySubagentSessionPort
+
     /** The current chat state; reading it subscribes the reading composable to every update. */
     val uiState: ChatUiState get() = uiStateSource.value
 
@@ -696,6 +700,7 @@ private fun TimelineWithOverlay(frame: ChatSurfaceFrame, modifier: Modifier) {
             modifier = Modifier.fillMaxSize(),
             listState = frame.session.listState,
             topInset = frame.platform.topChromeInset,
+            canSendStarterPrompts = frame.session.canSendStarterPrompts,
         )
         frame.platform.timelineOverlay?.let { overlay ->
             Box(
