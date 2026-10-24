@@ -548,6 +548,23 @@ nucleus.application {
         } else {
             targetFormats(TargetFormat.Exe, TargetFormat.Msi)
         }
+        // letta-mobile-q056w: the packaged runtime is jlinked to the default module set plus these.
+        // `jdeps --print-module-deps --ignore-missing-deps` over the packaged jars names everything
+        // but java.management (reached through jdk.management) and the ServiceLoader-only charsets
+        // and zipfs providers. A class from a missing module fails at runtime, not at packaging:
+        // ManagementFactory crashed every installed launch (DesktopMemoryPressureMonitor).
+        modules(
+            "java.compiler",
+            "java.instrument",
+            "java.management",
+            "java.sql",
+            "jdk.charsets",
+            "jdk.management",
+            "jdk.net",
+            "jdk.security.auth",
+            "jdk.unsupported",
+            "jdk.zipfs",
+        )
         // Startup is dominated by loading and linking ~180 jars' classes. Packaging launches the
         // app once in training mode (it exits itself: DesktopAotTraining.kt) and ships the JVM's
         // AOT cache beside it, so installed launches start with those classes already loaded and
@@ -867,6 +884,37 @@ fun verifyBundledRuntime(distributableDir: File) {
             "\"Failed to launch JVM\". Re-run downloadDesktopJbr and repackage."
     }
     logger.lifecycle("verifyBundledRuntime: bundled runtime is Java $version (>= $minimumRuntimeJdk required).")
+    verifyBundledModules(distributableDir, release, props["MODULES"].orEmpty().split(' ').filter(String::isNotBlank).toSet())
+}
+
+/**
+ * letta-mobile-q056w: every JDK module the packaged jars reference is in the jlinked runtime. A
+ * missing one is a NoClassDefFoundError at runtime, not a packaging failure, so it is checked here
+ * with `jdeps` from the extracted JBR (a full SDK). Hosts without that JBR skip the check; the
+ * Windows installer job always has it.
+ */
+fun verifyBundledModules(distributableDir: File, release: File, bundled: Set<String>) {
+    val jdeps = desktopJbrHome.get().asFile.resolve(if (isWindowsHost) "bin/jdeps.exe" else "bin/jdeps")
+    if (!jdeps.isFile) {
+        logger.lifecycle("verifyBundledModules: no jdeps at $jdeps; skipped.")
+        return
+    }
+    val app = release.parentFile.parentFile
+    val jars = app.walkTopDown().filter { it.isFile && it.extension == "jar" }.map { it.relativeTo(app).path }.toList()
+    check(jars.isNotEmpty()) { "No jars under $distributableDir - cannot verify the bundled modules." }
+    // One run over every jar, so modular jars resolve each other. jdeps takes no @argfile, and
+    // ~180 absolute paths overflow a Windows command line, so the paths are relative to the app.
+    val command = listOf(jdeps.absolutePath, "--print-module-deps", "--ignore-missing-deps", "--multi-release", "$minimumRuntimeJdk", "-q") + jars
+    val process = ProcessBuilder(command).directory(app).redirectErrorStream(true).start()
+    val output = process.inputStream.bufferedReader().readText().trim()
+    check(process.waitFor() == 0) { "jdeps failed on the packaged jars:\n$output" }
+    val needed = output.lines().last().split(',').map(String::trim).filter(String::isNotEmpty).toSet()
+    val missing = needed - bundled
+    check(missing.isEmpty()) {
+        "The packaged jars need JDK modules the bundled runtime lacks: ${missing.sorted()}. Add them to " +
+            "nativeDistributions.modules(...); a missing module crashes the installed app at runtime."
+    }
+    logger.lifecycle("verifyBundledModules: all ${needed.size} modules the jars need are bundled.")
 }
 
 tasks.matching { it.name.startsWith("createDistributable") || it.name.startsWith("createReleaseDistributable") }
