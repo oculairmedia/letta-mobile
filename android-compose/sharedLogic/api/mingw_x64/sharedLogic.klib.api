@@ -26998,6 +26998,7 @@ final class com.letta.mobile.data.canvas/CanvasSceneStateGuard { // com.letta.mo
     constructor <init>(com.letta.mobile.data.model/CanvasId?) // com.letta.mobile.data.canvas/CanvasSceneStateGuard.<init>|<init>(com.letta.mobile.data.model.CanvasId?){}[0]
 
     final fun drawable(kotlin/String): kotlin/String // com.letta.mobile.data.canvas/CanvasSceneStateGuard.drawable|drawable(kotlin.String){}[0]
+    final fun drawable(kotlinx.serialization.json/JsonObject, kotlin/Int): kotlinx.serialization.json/JsonObject // com.letta.mobile.data.canvas/CanvasSceneStateGuard.drawable|drawable(kotlinx.serialization.json.JsonObject;kotlin.Int){}[0]
 }
 
 final class com.letta.mobile.data.canvas/CanvasSession { // com.letta.mobile.data.canvas/CanvasSession|null[0]
@@ -64860,12 +64861,16 @@ final object com.letta.mobile.data.canvas/CanvasOpProjector { // com.letta.mobil
     final fun backgroundPatternOf(kotlin/String): com.letta.mobile.data.canvas/CanvasBackgroundPattern? // com.letta.mobile.data.canvas/CanvasOpProjector.backgroundPatternOf|backgroundPatternOf(kotlin.String){}[0]
     final fun documentsOf(kotlin/String): kotlin.collections/List<com.letta.mobile.data.canvas/CanvasSceneDocument> // com.letta.mobile.data.canvas/CanvasOpProjector.documentsOf|documentsOf(kotlin.String){}[0]
     final fun drawingsEqual(kotlin/String?, kotlin/String?): kotlin/Boolean // com.letta.mobile.data.canvas/CanvasOpProjector.drawingsEqual|drawingsEqual(kotlin.String?;kotlin.String?){}[0]
+    final fun drawingsEqual(kotlinx.serialization.json/JsonObject, kotlinx.serialization.json/JsonObject): kotlin/Boolean // com.letta.mobile.data.canvas/CanvasOpProjector.drawingsEqual|drawingsEqual(kotlinx.serialization.json.JsonObject;kotlinx.serialization.json.JsonObject){}[0]
     final fun emptySceneJson(): kotlin/String // com.letta.mobile.data.canvas/CanvasOpProjector.emptySceneJson|emptySceneJson(){}[0]
+    final fun encodeScene(kotlinx.serialization.json/JsonObject): kotlin/String // com.letta.mobile.data.canvas/CanvasOpProjector.encodeScene|encodeScene(kotlinx.serialization.json.JsonObject){}[0]
     final fun labelOwnersOf(kotlin/String): kotlin.collections/Map<kotlin/String, kotlin/String> // com.letta.mobile.data.canvas/CanvasOpProjector.labelOwnersOf|labelOwnersOf(kotlin.String){}[0]
     final fun maxLamport(kotlin/String): kotlin/Long // com.letta.mobile.data.canvas/CanvasOpProjector.maxLamport|maxLamport(kotlin.String){}[0]
+    final fun parseSceneOrNull(kotlin/String): kotlinx.serialization.json/JsonObject? // com.letta.mobile.data.canvas/CanvasOpProjector.parseSceneOrNull|parseSceneOrNull(kotlin.String){}[0]
     final fun pluginElementsOf(kotlin/String): kotlin.collections/List<com.letta.mobile.data.canvas.plugin/CanvasPluginElement> // com.letta.mobile.data.canvas/CanvasOpProjector.pluginElementsOf|pluginElementsOf(kotlin.String){}[0]
     final fun project(kotlin/String, kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp>): kotlin/String // com.letta.mobile.data.canvas/CanvasOpProjector.project|project(kotlin.String;kotlin.collections.List<com.letta.mobile.data.canvas.CanvasOp>){}[0]
     final fun stripMetadataForDrawBox(kotlin/String): kotlin/String // com.letta.mobile.data.canvas/CanvasOpProjector.stripMetadataForDrawBox|stripMetadataForDrawBox(kotlin.String){}[0]
+    final fun stripMetadataForDrawBox(kotlinx.serialization.json/JsonObject): kotlinx.serialization.json/JsonObject? // com.letta.mobile.data.canvas/CanvasOpProjector.stripMetadataForDrawBox|stripMetadataForDrawBox(kotlinx.serialization.json.JsonObject){}[0]
 }
 
 final object com.letta.mobile.data.canvas/CanvasRelayFeatures { // com.letta.mobile.data.canvas/CanvasRelayFeatures|null[0]
