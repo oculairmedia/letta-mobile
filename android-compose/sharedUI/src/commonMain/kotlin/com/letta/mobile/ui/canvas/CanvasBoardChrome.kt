@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
 import com.letta.mobile.data.canvas.CanvasCheckpoint
 import com.letta.mobile.data.canvas.CanvasDeletedElement
+import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.ui.theme.LettaDimens
 import io.ak1.drawbox.ui.controls.ControlsBarIntent
@@ -276,7 +277,8 @@ private fun CanvasBoard.restorerContext(): CanvasHistoryRestorer.WorkspaceContex
 
 private fun CanvasBoard.keepRestoredScene(restored: CanvasHistoryRestorer.RestoredSceneState) {
     ui.lastExportedJson = restored.sceneJson
-    ui.lastDrawing = restored.cleanDrawing
+    ui.lastSyncedScene = restored.sceneJson
+    ui.lastDrawing = CanvasOpProjector.parseSceneOrNull(restored.cleanDrawing)
     ui.lastSavedElements = restored.elements
 }
 

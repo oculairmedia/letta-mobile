@@ -109,12 +109,14 @@ class CanvasLargeSceneBench {
         log("sceneGuard.drawable.ms=${median { CanvasSceneStateGuard(null).drawable(json) }}")
         // The whole off-main work of one sync.imported, as CanvasBoardSync does it.
         var rev = 1L
+        val otherDrawing = CanvasWorkspaceSupport.drawingOf(other)
         log(
             "syncImport.offMain.ms=" + median {
                 val doc = CanvasDocument(id = CanvasId("bench"), title = "b", revision = ++rev, sceneJson = json, updatedAtEpochMs = 0L)
-                val params = ExternalSyncParams(doc, rev - 1, lastExportedJson = null, lastDrawing = other)
+                val params = ExternalSyncParams(doc, rev - 1, lastExportedJson = null, lastDrawing = otherDrawing)
                 val evaluated = CanvasWorkspaceSupport.evaluateExternalDocSync(params)
-                if (evaluated?.shouldImport == true) CanvasImageAssets.parse(CanvasSceneStateGuard(null).drawable(json), null)
+                val scene = evaluated?.scene?.takeIf { evaluated.shouldImport }
+                if (scene != null) CanvasImageAssets.parse(CanvasSceneStateGuard(null).drawable(scene, json.length), null)
             },
         )
         // What autosave does after every import or edit: serialize + strip twice. On the main thread before

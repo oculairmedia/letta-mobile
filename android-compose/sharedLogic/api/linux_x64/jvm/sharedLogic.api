@@ -3446,12 +3446,16 @@ public final class com/letta/mobile/data/canvas/CanvasOpProjector {
 	public final fun backgroundPatternOf (Ljava/lang/String;)Lcom/letta/mobile/data/canvas/CanvasBackgroundPattern;
 	public final fun documentsOf (Ljava/lang/String;)Ljava/util/List;
 	public final fun drawingsEqual (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun drawingsEqual (Lkotlinx/serialization/json/JsonObject;Lkotlinx/serialization/json/JsonObject;)Z
 	public final fun emptySceneJson ()Ljava/lang/String;
+	public final fun encodeScene (Lkotlinx/serialization/json/JsonObject;)Ljava/lang/String;
 	public final fun labelOwnersOf (Ljava/lang/String;)Ljava/util/Map;
 	public final fun maxLamport (Ljava/lang/String;)J
+	public final fun parseSceneOrNull (Ljava/lang/String;)Lkotlinx/serialization/json/JsonObject;
 	public final fun pluginElementsOf (Ljava/lang/String;)Ljava/util/List;
 	public final fun project (Ljava/lang/String;Ljava/util/List;)Ljava/lang/String;
 	public final fun stripMetadataForDrawBox (Ljava/lang/String;)Ljava/lang/String;
+	public final fun stripMetadataForDrawBox (Lkotlinx/serialization/json/JsonObject;)Lkotlinx/serialization/json/JsonObject;
 }
 
 public abstract interface class com/letta/mobile/data/canvas/CanvasOpsCheck {
@@ -4720,6 +4724,7 @@ public final class com/letta/mobile/data/canvas/CanvasSceneState {
 public final class com/letta/mobile/data/canvas/CanvasSceneStateGuard {
 	public fun <init> (Lcom/letta/mobile/data/model/CanvasId;)V
 	public final fun drawable (Ljava/lang/String;)Ljava/lang/String;
+	public final fun drawable (Lkotlinx/serialization/json/JsonObject;I)Lkotlinx/serialization/json/JsonObject;
 }
 
 public final class com/letta/mobile/data/canvas/CanvasSceneValidator {

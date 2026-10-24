@@ -2,7 +2,6 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.util.Telemetry
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
@@ -25,14 +24,25 @@ import kotlinx.serialization.json.JsonObject
  * One guard per open board; not thread-safe, it is called from the board's one loader.
  */
 class CanvasSceneStateGuard(private val canvasId: CanvasId?) {
-    private var lastValid: String? = null
+    private var lastValid: JsonObject? = null
     private var reported: Set<Pair<CanvasStateInvariant, String>> = emptySet()
 
     /** What to hand DrawBox for [sceneJson], the session's projected scene (op-log bookkeeping included). */
     fun drawable(sceneJson: String): String {
-        val violations = if (sceneJson.isBlank()) emptyList() else CanvasSceneState.violations(sceneJson)
+        val root = CanvasOpProjector.parseSceneOrNull(sceneJson)
+        if (root != null) return CanvasOpProjector.encodeScene(drawable(root, sceneJson.length))
+        report(CanvasSceneState.violations(sceneJson))
+        return lastValid?.let(CanvasOpProjector::encodeScene) ?: sceneJson
+    }
+
+    /**
+     * [drawable] for a scene already parsed, [sceneChars] long as stored. A board brings in a synced
+     * scene from this one tree: checked, stripped and guarded with no further parse.
+     */
+    fun drawable(root: JsonObject, sceneChars: Int): JsonObject {
+        val violations = CanvasSceneState.violations(root, sceneChars)
         report(violations)
-        val stripped = CanvasOpProjector.stripMetadataForDrawBox(sceneJson)
+        val stripped = CanvasOpProjector.stripMetadataForDrawBox(root) ?: return lastValid ?: root
         if (violations.none { it.invariant.breaksRender }) {
             return CanvasSceneRenderGuard.renderable(stripped, canvasId).also { lastValid = it }
         }
@@ -57,18 +67,13 @@ class CanvasSceneStateGuard(private val canvasId: CanvasId?) {
         )
     }
 
-    private fun withoutDuplicates(stripped: String): String {
-        val root = runCatching { json.parseToJsonElement(stripped) }.getOrNull() as? JsonObject ?: return stripped
-        val elements = root["elements"] as? JsonArray ?: return stripped
+    private fun withoutDuplicates(root: JsonObject): JsonObject {
+        val elements = root["elements"] as? JsonArray ?: return root
         val lastById = elements.withIndex().associateBy { (_, element) -> (element as? JsonObject)?.get("id")?.toString() ?: "" }
         val kept = elements.filterIndexed { position, element ->
             val id = (element as? JsonObject)?.get("id")?.toString() ?: return@filterIndexed true
             lastById[id]?.index == position
         }
-        return json.encodeToString(JsonObject.serializer(), JsonObject(root + ("elements" to JsonArray(kept))))
-    }
-
-    private companion object {
-        val json = Json { prettyPrint = false }
+        return JsonObject(root + ("elements" to JsonArray(kept)))
     }
 }

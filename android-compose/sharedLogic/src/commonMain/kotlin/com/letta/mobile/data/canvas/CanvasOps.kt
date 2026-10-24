@@ -216,6 +216,31 @@ fun CanvasOp.withActor(actorId: CanvasActorId): CanvasOp = when (this) {
 val CanvasOp.canvasOpId: CanvasOpId get() = CanvasOpId(opId)
 
 /**
+ * What this op writes to, as telemetry names it: the element or document it targets (a batch, its
+ * first op's), or null for a scene-wide op (the background, a whole-scene replace).
+ */
+internal val CanvasOp.subjectId: String?
+    get() = when (this) {
+        is CanvasOp.ReplaceSceneOp, is CanvasOp.SetBackgroundOp, is CanvasOp.SetBackgroundPatternOp -> null
+        is CanvasOp.AddElementOp -> elementId
+        is CanvasOp.UpdateElementOp -> elementId
+        is CanvasOp.RemoveElementOp -> elementId
+        is CanvasOp.SetArrowBindingOp -> elementId
+        is CanvasOp.SetLabelOwnerOp -> documentId
+        is CanvasOp.SetDocumentOp -> documentId
+        is CanvasOp.RemoveDocumentOp -> documentId
+        is CanvasOp.SetPluginElementOp -> elementId
+        is CanvasOp.RemovePluginElementOp -> elementId
+        is CanvasOp.BatchOp -> ops.firstOrNull()?.subjectId
+    }
+
+/** The op's kind as telemetry names it (the class name: `UpdateElementOp`, `BatchOp`...). */
+internal val CanvasOp.kind: String get() = this::class.simpleName ?: "CanvasOp"
+
+/** The prefix this op's id was minted with (`op` for a drawing diff, `agent`, `doc`, `plugin`...), naming what wrote it. */
+internal val CanvasOp.opIdPrefix: String get() = opId.substringBefore('-')
+
+/**
  * The same operation with a fresh identity and [lamport].
  *
  * An inverse is built when a change happens and applied whenever the person presses undo, so it

@@ -128,6 +128,7 @@ class CanvasSession(
         metadata: CanvasCommitMetadata = CanvasCommitMetadata(),
     ): CanvasDocument {
         val current = currentDoc()
+        if (sameSceneContent(current.sceneJson, sceneJson)) return keepProvenance(current, sceneJson)
         return commitUpdate(
             current.copy(
                 revision = current.revision + 1L,
@@ -136,6 +137,24 @@ class CanvasSession(
             ),
             metadata = metadata,
         )
+    }
+
+    /**
+     * A change that leaves the board as it was (an op that lost last-writer-wins, re-sent the value
+     * already there, or removed what was gone) still lands: [sceneJson]'s provenance is what keeps
+     * every replica converging, so it is stored and its ops settled. But it is not a new revision
+     * and adds no checkpoint. A revision tells every open board to bring the scene in again, and an
+     * entry no one could tell from the one before it is history about nothing.
+     */
+    private suspend fun keepProvenance(current: CanvasDocument, sceneJson: String): CanvasDocument {
+        if (sceneJson == current.sceneJson) {
+            settlement.settleCarried()
+            return current
+        }
+        val kept = current.copy(sceneJson = sceneJson)
+        settlement.writing { store.upsert(kept) }
+        _document.value = kept
+        return kept
     }
 
     /**
@@ -255,7 +274,17 @@ class CanvasSession(
         settlement.append(op)
         if (op.lamport > lamportClock) lamportClock = op.lamport
         val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
-        commitScene(newScene)
+        commitScene(newScene).also { if (it.revision == current.revision) reportContentNeutral(op) }
+    }
+
+    /** A remote op that changed nothing on the board: kept for its provenance, no revision (see [keepProvenance]). */
+    private fun reportContentNeutral(op: CanvasOp) {
+        com.letta.mobile.util.Telemetry.event(
+            "CanvasSession", "remote.contentNeutral",
+            "canvasId" to canvasId.value, "actorId" to op.actorId, "opIdPrefix" to op.opIdPrefix,
+            "kind" to op.kind, "subject" to op.subjectId,
+            level = com.letta.mobile.util.Telemetry.Level.DEBUG,
+        )
     }
 
     /**
@@ -266,10 +295,22 @@ class CanvasSession(
      */
     private suspend fun adoptNewerStored() {
         val stored = store.get(canvasId) ?: return
-        val held = _document.value?.revision ?: return
-        if (stored.revision <= held) return
+        val held = _document.value ?: return
+        if (!isAhead(stored, held)) return
         _document.value = stored
         adoptLamportOf(stored)
+    }
+
+    /**
+     * Whether [stored] is ahead of [held]: a later revision, or the same one with a newer writer for
+     * some value (an op that changed nothing on the board is kept without a revision; see
+     * [keepProvenance]). Left behind, that provenance would be overwritten by this session's next
+     * write, and an older edit could then win where it had already lost.
+     */
+    private fun isAhead(stored: CanvasDocument, held: CanvasDocument): Boolean = when {
+        stored.revision != held.revision -> stored.revision > held.revision
+        stored.sceneJson == held.sceneJson -> false
+        else -> hasNewerProvenance(stored, held)
     }
 
     /**

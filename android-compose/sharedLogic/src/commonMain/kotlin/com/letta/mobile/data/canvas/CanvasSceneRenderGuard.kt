@@ -24,13 +24,18 @@ object CanvasSceneRenderGuard {
     fun renderable(sceneJson: String, canvasId: CanvasId?): String {
         if (sceneJson.isBlank()) return sceneJson
         val root = runCatching { json.parseToJsonElement(sceneJson) }.getOrNull() as? JsonObject ?: return sceneJson
-        val elements = root["elements"] as? JsonArray ?: return sceneJson
+        val cleaned = renderable(root, canvasId)
+        return if (cleaned === root) sceneJson else json.encodeToString(JsonObject.serializer(), cleaned)
+    }
+
+    /** [renderable] for a scene already parsed: [root] itself when every element can be drawn. */
+    internal fun renderable(root: JsonObject, canvasId: CanvasId?): JsonObject {
+        val elements = root["elements"] as? JsonArray ?: return root
         val kept = elements.filter { element -> fault(element)?.also { report(canvasId, element, it) } == null }
         val hasBackground = root["bgColor"]?.let { CanvasSceneFieldChecks.accepts(CanvasFieldKind.COLOR, it, strict = false) } == true
-        if (kept.size == elements.size && hasBackground) return sceneJson
+        if (kept.size == elements.size && hasBackground) return root
         val background = root["bgColor"].takeIf { hasBackground } ?: JsonPrimitive(CanvasSceneSchema.DEFAULT_BG_COLOR)
-        val cleaned = JsonObject(root + mapOf("bgColor" to background, "elements" to JsonArray(kept)))
-        return json.encodeToString(JsonObject.serializer(), cleaned)
+        return JsonObject(root + mapOf("bgColor" to background, "elements" to JsonArray(kept)))
     }
 
     private fun fault(element: JsonElement): String? =
