@@ -10,9 +10,13 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Shared owner supplies continuation serialization; Desktop never interprets evidence or messages. */
@@ -22,8 +26,9 @@ internal interface DesktopTimelineCheckpointCodec {
 }
 
 /**
- * One scope per directory, indexed by [DesktopPersistentTimelineAccess] under `v2`, behind a scoped
- * OS transaction lock.
+ * One scope per directory, indexed by [DesktopPersistentTimelineAccess] under `v2`. Transactions on a
+ * scope queue behind a process-wide mutex (Room's `withTransaction` contract) and then take the scope's
+ * OS lock, which only fences other processes: a second in-process lock would throw instead of waiting.
  *
  * Image bodies too large for an event record live content-addressed in the scope's `images`
  * directory, so they go wherever the scope goes. Like Room's ledger they are never reclaimed on
@@ -39,28 +44,38 @@ internal class DesktopTimelineBoundedStore(
             try { block(reader) } finally { reader.active = false }
         }
 
-    override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T =
-        withContext(Dispatchers.IO) {
-            val directory = directory(scope)
-            Files.createDirectories(directory)
-            FileChannel.open(directory.resolve("transaction.lock"), StandardOpenOption.CREATE,
-                StandardOpenOption.WRITE).use { channel ->
-                channel.tryLock().use { lock ->
-                    check(lock != null) { "Another scoped transaction is active" }
-                    val tx = Transaction(directory)
-                    try {
-                        val result = block(tx)
-                        currentCoroutineContext().ensureActive()
-                        tx.commit()
-                        result
-                    } finally {
-                        tx.active = false
-                        // A rolled-back transaction leaves no body behind for a reference to find.
-                        tx.discardStagedImages()
+    override suspend fun <T> transaction(scope: TimelineScope, block: suspend TimelineStoreTransaction.() -> T): T {
+        val directory = directory(scope).toAbsolutePath().normalize()
+        val held = currentCoroutineContext()[HeldScopes]?.directories.orEmpty()
+        check(directory !in held) { "Nested transaction on the same timeline scope would deadlock" }
+        return scopeMutexes.computeIfAbsent(directory) { Mutex() }.withLock {
+            withContext(Dispatchers.IO + HeldScopes(held.plusElement(directory))) {
+                Files.createDirectories(directory)
+                FileChannel.open(directory.resolve("transaction.lock"), StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE).use { channel ->
+                    channel.tryLock().use { lock ->
+                        check(lock != null) { "Another scoped transaction is active" }
+                        val tx = Transaction(directory)
+                        try {
+                            val result = block(tx)
+                            currentCoroutineContext().ensureActive()
+                            tx.commit()
+                            result
+                        } finally {
+                            tx.active = false
+                            // A rolled-back transaction leaves no body behind for a reference to find.
+                            tx.discardStagedImages()
+                        }
                     }
                 }
             }
         }
+    }
+
+    /** Scope directories whose transaction this coroutine holds; `plusElement` because Path is Iterable. */
+    private class HeldScopes(val directories: Set<Path>) : AbstractCoroutineContextElement(Key) {
+        companion object Key : CoroutineContext.Key<HeldScopes>
+    }
 
     private fun directory(scope: TimelineScope): Path = root.resolve(digest(
         kotlinx.serialization.json.Json.encodeToString(TimelineScope.serializer(), scope).exactBytes(),
@@ -70,48 +85,25 @@ internal class DesktopTimelineBoundedStore(
         val persistent = DesktopPersistentTimelineAccess(directory.resolve("v2"), checkpointCodec)
         var active = true
         fun checkActive() { check(active) { "Storage callback has escaped" } }
+        protected inline fun <T> guarded(block: () -> T): T { checkActive(); return block() }
         val imageDirectory: Path get() = directory.resolve(IMAGE_DIRECTORY)
-        override suspend fun resolveImage(reference: StoredImageBodyReference): String? {
-            checkActive()
-            return DesktopTimelineImageBodies.read(
-                DesktopTimelineImageBodies.bodyFile(imageDirectory, reference.sha256), reference,
-            )
+        override suspend fun resolveImage(reference: StoredImageBodyReference): String? = guarded {
+            DesktopTimelineImageBodies.read(DesktopTimelineImageBodies.bodyFile(imageDirectory, reference.sha256), reference)
         }
-        override suspend fun toolCall(callId: String): TimelineToolIndexEntry? {
-            checkActive()
-            return persistent.toolCall(callId)
-        }
-        override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int): List<TimelineToolIndexEntry> {
-            checkActive()
-            return persistent.unresolvedTools(afterCallId, maxRows)
-        }
-        override suspend fun toolSweepGeneration(): Long {
-            checkActive()
-            return persistent.toolSweepGeneration()
-        }
-        override suspend fun checkpoint(): TimelineDurableCheckpoint {
-            checkActive()
-            return persistent.checkpoint()
-        }
-        override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage {
-            checkActive()
-            require(maxRows > 0)
-            return persistent.metadata(position, maxRows)
-        }
-        override suspend fun locate(identity: TimelineMessageId): TimelinePageKey? {
-            checkActive()
-            return persistent.locate(identity)
-        }
-        override suspend fun body(pointer: TimelineBodyPointer, offset: Long, maxBytes: Int): ByteArray {
-            checkActive()
+        override suspend fun toolCall(callId: String): TimelineToolIndexEntry? = guarded { persistent.toolCall(callId) }
+        override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int): List<TimelineToolIndexEntry> =
+            guarded { persistent.unresolvedTools(afterCallId, maxRows) }
+        override suspend fun toolSweepGeneration(): Long = guarded { persistent.toolSweepGeneration() }
+        override suspend fun checkpoint(): TimelineDurableCheckpoint = guarded { persistent.checkpoint() }
+        override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage =
+            guarded { require(maxRows > 0); persistent.metadata(position, maxRows) }
+        override suspend fun locate(identity: TimelineMessageId): TimelinePageKey? = guarded { persistent.locate(identity) }
+        override suspend fun body(pointer: TimelineBodyPointer, offset: Long, maxBytes: Int): ByteArray = guarded {
             require(offset in 0..pointer.encodedBytes && maxBytes >= 0)
-            return persistent.body(pointer, offset, maxBytes)
+            persistent.body(pointer, offset, maxBytes)
         }
-        override suspend fun evidence(key: String, maxBytes: Int): ByteArray? {
-            checkActive()
-            require(maxBytes >= 0)
-            return persistent.evidence(key, maxBytes)
-        }
+        override suspend fun evidence(key: String, maxBytes: Int): ByteArray? =
+            guarded { require(maxBytes >= 0); persistent.evidence(key, maxBytes) }
     }
 
     private inner class Transaction(directory: Path) :
@@ -152,14 +144,9 @@ internal class DesktopTimelineBoundedStore(
         val evidenceChanges = mutableMapOf<String, ByteArray?>()
         val toolChanges = mutableMapOf<String, TimelineToolIndexEntry>()
         var toolGeneration: Long? = null
-        override suspend fun toolCall(callId: String): TimelineToolIndexEntry? {
-            checkActive()
-            return toolChanges[callId] ?: super.toolCall(callId)
-        }
-        override suspend fun toolSweepGeneration(): Long {
-            checkActive()
-            return toolGeneration ?: super.toolSweepGeneration()
-        }
+        override suspend fun toolCall(callId: String): TimelineToolIndexEntry? =
+            guarded { toolChanges[callId] ?: super.toolCall(callId) }
+        override suspend fun toolSweepGeneration(): Long = guarded { toolGeneration ?: super.toolSweepGeneration() }
         override suspend fun putToolCall(entry: TimelineToolIndexEntry) {
             checkActive()
             DesktopPersistentTimelineAccess.exact(entry.callId)
@@ -235,10 +222,8 @@ internal class DesktopTimelineBoundedStore(
                 cursorValue?.first ?: if (cursorValue == null) old.continuation else null,
                 cursorValue?.second ?: old.hasMore)
         }
-        override suspend fun locate(identity: TimelineMessageId): TimelinePageKey? {
-            checkActive()
-            return if (records.containsKey(identity)) records[identity]?.key else super.locate(identity)
-        }
+        override suspend fun locate(identity: TimelineMessageId): TimelinePageKey? =
+            guarded { if (records.containsKey(identity)) records[identity]?.key else super.locate(identity) }
         override suspend fun evidence(key: String, maxBytes: Int): ByteArray? {
             checkActive(); require(maxBytes >= 0)
             if (!evidenceChanges.containsKey(key)) return super.evidence(key, maxBytes)
@@ -307,6 +292,8 @@ internal class DesktopTimelineBoundedStore(
 
     companion object {
         private const val IMAGE_DIRECTORY = "images"
+        // Process-wide (stores share roots). Never evicted: that could split one scope's waiters.
+        private val scopeMutexes = java.util.concurrent.ConcurrentHashMap<Path, Mutex>()
         // Preserve Kotlin String identity, including unpaired UTF-16 code units.
         private fun String.exactBytes(): ByteArray = java.nio.ByteBuffer.allocate(Math.multiplyExact(length, 2)).also {
             for (char in this) it.putChar(char)

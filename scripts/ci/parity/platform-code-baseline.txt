@@ -192,7 +192,7 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopPer
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopPersistentTimelineIndex.kt 367
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopSessionGraphBinding.kt 44
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopSettingsAdapters.kt 347
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopTimelineBoundedStore.kt 317
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopTimelineBoundedStore.kt 304
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopTimelineImageBodies.kt 96
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/home/DesktopHomeBinding.kt 18
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/input/TabletBridge.kt 76

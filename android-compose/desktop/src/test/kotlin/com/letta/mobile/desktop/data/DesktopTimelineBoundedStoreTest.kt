@@ -4,6 +4,10 @@ import com.letta.mobile.data.timeline.*
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import java.nio.file.Files
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.*
@@ -209,9 +213,10 @@ class DesktopTimelineBoundedStoreTest {
     @Test fun concurrentWriterIsFencedAndStagedReadsAreBounded() = runTest {
         store().transaction(scope) {
             nextRevision(); for (i in 0L..10) put(record(i))
-            assertFailsWith<java.nio.channels.OverlappingFileLockException> {
+            val nested = assertFailsWith<IllegalStateException> {
                 store().transaction(scope) { nextRevision(); put(record(12)) }
             }
+            assertEquals("Nested transaction on the same timeline scope would deadlock", nested.message)
             val around = metadata(TimelineReadPosition.Around(record(5).key), 3)
             assertEquals(listOf(4L, 5L, 6L), around.rows.map { it.key.order })
             val before = metadata(TimelineReadPosition.Before(record(4).key), 2)
@@ -219,6 +224,26 @@ class DesktopTimelineBoundedStoreTest {
             assertEquals(before.rows.last().key, before.newer)
             val after = metadata(TimelineReadPosition.After(record(6).key), 2)
             assertEquals(listOf(7L, 8L), after.rows.map { it.key.order })
+        }
+    }
+
+    @Test fun sameScopeWritersFromSeparateCoroutinesQueueAndBothCommit() = runTest {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val first = async(Dispatchers.IO) {
+            store().transaction(scope) { nextRevision(); put(record(1)); entered.complete(Unit); release.await() }
+        }
+        entered.await()
+        // Undispatched: by the time async returns, the second writer is already waiting on the scope.
+        val second = async(Dispatchers.IO, CoroutineStart.UNDISPATCHED) {
+            store().transaction(scope) { nextRevision().also { put(record(2)) } }
+        }
+        release.complete(Unit)
+        first.await()
+        assertEquals(2L, second.await())
+        store().read(scope) {
+            assertEquals(2L, checkpoint().revision)
+            assertEquals(listOf(1L, 2L), metadata(TimelineReadPosition.Tail, 2).rows.map { it.key.order })
         }
     }
 
