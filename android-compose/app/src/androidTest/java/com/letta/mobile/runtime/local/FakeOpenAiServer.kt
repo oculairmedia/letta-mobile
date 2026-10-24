@@ -122,18 +122,24 @@ internal class FakeOpenAiServer(val modelHandle: String = MODEL_HANDLE) : AutoCl
 
     private fun OutputStream.writeJson(status: Int, body: String) {
         val bytes = body.toByteArray(Charsets.UTF_8)
-        write("HTTP/1.1 $status ${if (status == 200) "OK" else "Not Found"}\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())
+        val reason = if (status == 200) "OK" else "Not Found"
+        val headers = listOf(
+            "HTTP/1.1 $status $reason",
+            "Content-Type: application/json",
+            "Content-Length: ${bytes.size}",
+            "Connection: close",
+        ).joinToString(separator = "\r\n", postfix = "\r\n\r\n")
+        write(headers.toByteArray(Charsets.UTF_8))
         write(bytes)
     }
 
     private fun readHead(input: InputStream): List<String> {
         val lines = mutableListOf<String>()
         while (true) {
-            val line = readLine(input) ?: break
-            if (line.isEmpty()) break
+            val line = readLine(input)
+            if (line.isNullOrEmpty()) return lines
             lines += line
         }
-        return lines
     }
 
     private fun readBody(input: InputStream, headers: Map<String, String>): String {
@@ -141,12 +147,12 @@ internal class FakeOpenAiServer(val modelHandle: String = MODEL_HANDLE) : AutoCl
         if (headers["transfer-encoding"]?.contains("chunked") != true) return ""
         val body = ByteArrayOutputStream()
         while (true) {
-            val size = readLine(input)?.substringBefore(';')?.trim()?.toIntOrNull(radix = 16) ?: break
-            if (size == 0) break
+            val size = readLine(input)?.substringBefore(';')?.trim()?.toIntOrNull(radix = 16)
+                ?: return body.toString(Charsets.UTF_8.name())
+            if (size == 0) return body.toString(Charsets.UTF_8.name())
             body.write(readExactly(input, size))
             readLine(input)
         }
-        return body.toString(Charsets.UTF_8.name())
     }
 
     private fun readExactly(input: InputStream, size: Int): ByteArray =

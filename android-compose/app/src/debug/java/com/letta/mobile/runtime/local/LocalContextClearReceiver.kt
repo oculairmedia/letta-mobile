@@ -26,6 +26,8 @@ class LocalContextClearReceiver : BroadcastReceiver() {
         }.start()
     }
 
+    // Preserve this debug command's failure-reporting boundary while rolling back the transaction.
+    @Suppress("TooGenericExceptionCaught")
     private fun clear(context: Context, intent: Intent) {
         val agentId = intent.getStringExtra(EXTRA_AGENT)?.trim()?.takeIf { it.isNotBlank() }
             ?: DEFAULT_NOSWITCH_AGENT
@@ -53,7 +55,8 @@ class LocalContextClearReceiver : BroadcastReceiver() {
             db.setTransactionSuccessful()
             Log.i(
                 TAG,
-                "CLEARED agent=$agentId conversation=$conversationId events=$deletedEvents refresh=$deletedRefresh conversations=$deletedConversations",
+                "CLEARED agent=$agentId conversation=$conversationId events=$deletedEvents " +
+                    "refresh=$deletedRefresh conversations=$deletedConversations",
             )
         } catch (error: Throwable) {
             Log.e(TAG, "FAILED agent=$agentId conversation=$conversationId", error)

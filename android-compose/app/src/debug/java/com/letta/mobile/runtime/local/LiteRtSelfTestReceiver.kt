@@ -29,17 +29,13 @@ class LiteRtSelfTestReceiver : BroadcastReceiver() {
     private fun runSelfTest(context: Context, intent: Intent) {
         val modelHandle = intent.getStringExtra(EXTRA_MODEL)?.trim()?.takeIf { it.isNotBlank() } ?: DEFAULT_MODEL_HANDLE
         selfTestLog("model_handle", "PASS", "model=$modelHandle")
-        val modelPath = try {
-            resolveModelPath(context, modelHandle)
-        } catch (error: Throwable) {
-            selfTestLog("resolve_model", "FAIL", error.fullLiteRtErrorText(), Log.ERROR)
-            return
-        }
+        val modelPath = runSelfTestStage("resolve_model") { resolveModelPath(context, modelHandle) } ?: return
         val modelFile = File(modelPath)
         selfTestLog(
             "resolve_model",
             "PASS",
-            "model=$modelHandle path=${modelFile.absolutePath} exists=${modelFile.exists()} isFile=${modelFile.isFile} size=${modelFile.takeIf { it.exists() }?.length() ?: -1L}",
+            "model=$modelHandle path=${modelFile.absolutePath} exists=${modelFile.exists()} " +
+                "isFile=${modelFile.isFile} size=${modelFile.takeIf { it.exists() }?.length() ?: -1L}",
         )
 
         val selection = EmbeddedLettaCodeModelSelection(
@@ -51,21 +47,15 @@ class LiteRtSelfTestReceiver : BroadcastReceiver() {
         )
         val engine = LiteRtLmOnDeviceChatCompletionEngine(context)
         val bridge = LocalOpenAiOnDeviceBridge(engine)
-        val session = try {
+        val session = runSelfTestStage("bridge_start") {
             selfTestLog("bridge_start", "PASS", "starting production OnDeviceOpenAiBridge")
             bridge.start(selection)
-        } catch (error: Throwable) {
-            selfTestLog("bridge_start", "FAIL", error.fullLiteRtErrorText(), Log.ERROR)
-            return
-        }
+        } ?: return
         session.use {
-            val response = try {
+            val response = runSelfTestStage("inference") {
                 selfTestLog("inference", "PASS", "sending one-shot chat completion")
                 postChatCompletion(it, modelHandle)
-            } catch (error: Throwable) {
-                selfTestLog("inference", "FAIL", error.fullLiteRtErrorText(), Log.ERROR)
-                return
-            }
+            } ?: return
             val passed = response.startsWith("HTTP/1.1 200")
             selfTestLog(
                 "completion",
@@ -76,6 +66,19 @@ class LiteRtSelfTestReceiver : BroadcastReceiver() {
         }
     }
 
+    // Native linkage failures must be reported as self-test failures too, not escape the receiver.
+    @Suppress("TooGenericExceptionCaught")
+    private fun <T> runSelfTestStage(stage: String, action: () -> T): T? = try {
+        action()
+    } catch (error: Throwable) {
+        logStageFailure(stage, error)
+        null
+    }
+
+    private fun logStageFailure(stage: String, error: Throwable) {
+        selfTestLog(stage, "FAIL", error.fullLiteRtErrorText(), Log.ERROR)
+    }
+
     private fun resolveModelPath(context: Context, modelHandle: String): String {
         val entries = context.assets.open(CATALOG_ASSET).bufferedReader().use { reader ->
             EmbeddedModelCatalogParser().parse(reader.readText())
@@ -84,7 +87,8 @@ class LiteRtSelfTestReceiver : BroadcastReceiver() {
             ?: error("No embedded model catalog entry found for model handle '$modelHandle'.")
         val target = File(File(context.filesDir, MODEL_DIRECTORY), entry.modelFile)
         check(target.isFile && target.length() > 0L) {
-            "Resolved LiteRT model for '$modelHandle' was not found at ${target.absolutePath}. exists=${target.exists()} size=${target.takeIf { it.exists() }?.length() ?: -1L}"
+            "Resolved LiteRT model for '$modelHandle' was not found at ${target.absolutePath}. " +
+                "exists=${target.exists()} size=${target.takeIf { it.exists() }?.length() ?: -1L}"
         }
         return target.absolutePath
     }

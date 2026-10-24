@@ -45,7 +45,8 @@ object MobileIntentActionsSelfTest {
             },
         )
         val report = MobileIntentActionsSelfTestReport(
-            passed = checks.all { it.status == "resolved" || it.status == "not_resolved" } && checks.all { it.userActionRequired && !it.launched },
+            passed = checks.all { it.status == "resolved" || it.status == "not_resolved" } &&
+                checks.all { it.userActionRequired && !it.launched },
             checks = checks,
         )
         File(context.filesDir, MobileIntentActionsSelfTestReceiver.REPORT_FILE).writeText(json.encodeToString(report))

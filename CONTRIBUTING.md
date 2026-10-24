@@ -45,6 +45,64 @@ The repo admin runs this once to apply / re-apply branch protection on the remot
 ./scripts/bootstrap-branch-protection.sh
 ```
 
+## Automated verification
+
+### Linters must measure the intended code
+
+- Run `JAVA_HOME=<jdk-21> ./gradlew detekt -Parchitecture.strict=true` from
+  `android-compose/`. Without strict mode, ordinary detekt findings are advisory locally.
+- Aggregate detekt explicitly includes every existing `src/<sourceSet>/kotlin`
+  and `java` directory, including Android `root`, `release`, other flavours,
+  tests and KMP targets. Generated/build directories remain excluded.
+- After an AGP, Kotlin or linter upgrade, verify the actual analysed file list
+  (not only task registration or success). A missing variant task or `NO-SOURCE`
+  requires investigation. Temporarily introduce a known rule violation in a flavour
+  source, prove the strict aggregate fails, then remove it and rerun.
+- Run `:quality:detekt-rules:guardrailDetekt` separately: quick-check is not a
+  substitute. Do not increase baselines, suppress findings or relax rules to hide
+  an upgrade regression. Fix scanner false positives with positive and negative fixtures.
+- On intentional kotlinx/Compose/AGP upgrades, inventory their deprecation warnings
+  and complete the migration. Add scoped warning enforcement only after measuring
+  existing debt; this instruction does not claim all warnings are currently errors.
+
+### Test results are evidence, not task names
+
+- Read the complete command output and exit status. Preserve logs, exact head SHA,
+  command, platform and JUnit XML counts (tests, failures, errors and skips).
+- Use `:architecture-tests:architectureTest` for production scans and
+  `:architecture-tests:test` for fixtures. Confirm the intended tests executed;
+  a successful task selecting zero tests does not satisfy acceptance.
+- For shared logic, run unfiltered `:sharedLogic:jvmTest --rerun-tasks`; focused
+  filters are useful during diagnosis but do not replace the module gate.
+- WASM compilation is not browser execution. Run the browser suite for browser
+  behaviour and distinguish fake transport fixtures from a live deployed journey.
+- Reproduce a reported regression before changing production code. Where feasible,
+  revert only the proposed fix temporarily and prove the new test fails, restore
+  it, then rerun. Never weaken assertions to make the reproduction pass.
+- A packaged desktop must be tested using its shipped runtime, not `:desktop:run`
+  with a full developer JDK. Verify required JDK modules and dependency identities;
+  launch-smoke evidence must include first-window success and new crash-log checks.
+  Installer assembly alone is not launch verification. Do not report a smoke test
+  as automated until the workflow actually runs it.
+- A retry does not erase a failure. Record recurrence and an owner; two confirmed
+  main recurrences require P1 triage. Any quarantine names an expiry and lost coverage.
+
+### CI and handoff discipline
+
+- Required checks must pass on the exact reviewed head. `--admin` is never a way
+  around a red, cancelled, missing or pending required check. Builders stop before
+  merge; name one merge authority or use an explicitly configured merge queue.
+- Preserve one completed main verification run per merge; cancelling the previous
+  main run destroys attribution. This is a workflow requirement, not evidence that
+  every current workflow already implements it.
+- Advisory checks must be repaired or explicitly retired with a coverage decision;
+  persistent red is not an acceptable baseline. Keep intentional workflow constraints
+  explained beside the affected lines, as well as in policy tests.
+- Claim the bead and record agent/session identity and owned files before building.
+  A takeover needs an explicit handoff or verified owner termination, not idle time.
+- Published release tags are immutable once installation is possible. Ship fixes as
+  patch versions so updater comparisons can deliver them.
+
 ## Local Android setup
 
 1. Create `android-compose/local.properties` with your Android SDK path.

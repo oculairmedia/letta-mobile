@@ -67,7 +67,7 @@ if (providers.gradleProperty("dependencyAnalysisAdvisory").orNull == "true") {
     }
 }
 
-/** Every `src/<sourceSet>/kotlin|java` directory, for detekt on KMP/JVM modules (letta-mobile-by4vm.65). */
+/** Every source directory, including Android flavours and KMP targets, for aggregate detekt. */
 fun allSourceSetDirs(srcRoot: File): List<File> =
     srcRoot.listFiles().orEmpty()
         .filter(File::isDirectory)
@@ -101,17 +101,11 @@ subprojects {
             // letta-mobile-by4vm.65: the plugin's plain `detekt` task only sees
             // src/{main,test}/{java,kotlin}, so KMP modules (commonMain, jvmMain,
             // androidMain, ...) and desktop's extra source sets reported NO-SOURCE.
-            // Every non-Android module analyses each src/<sourceSet>/kotlin|java dir
-            // instead. Android modules keep the plugin default (flavour dirs untouched).
-            // Evaluated lazily: the Android plugin may be applied after detekt.
-            val pluginDefaultSource = source.from.toList()
+            // Include Android flavours explicitly too: detekt 1.x may not register
+            // variant tasks under AGP 9. A green aggregate must not silently lose them.
             source.setFrom(
                 provider {
-                    if (plugins.hasPlugin("com.android.application") || plugins.hasPlugin("com.android.library")) {
-                        files(pluginDefaultSource)
-                    } else {
-                        files(allSourceSetDirs(layout.projectDirectory.dir("src").asFile))
-                    }
+                    files(allSourceSetDirs(layout.projectDirectory.dir("src").asFile))
                 },
             )
         }
