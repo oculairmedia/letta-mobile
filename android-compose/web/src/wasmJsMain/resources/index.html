@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- Before any CSS, so the browser picks the dark canvas up front (no white flash). -->
+    <meta name="color-scheme" content="light dark">
     <meta name="description" content="Manage Letta agents and conversations from the browser.">
     <title>Letta Web</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -13,9 +15,11 @@
     <meta name="theme-color" content="#FBFCFD" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#0B0D11" media="(prefers-color-scheme: dark)">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Letta">
     <style>
         html, body {
+            box-sizing: border-box;
             width: 100%;
             height: 100%;
             margin: 0;
@@ -25,13 +29,15 @@
             color-scheme: light dark;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
+        /* viewport-fit=cover paints the background under the notch and home indicator, but
+           Compose wasm has no safe-area insets. The insets pad <html>, not <body>: ComposeViewport
+           sizes its canvas from body.clientWidth/clientHeight, which would count body padding. */
+        html {
+            padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+                env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+        }
         @media (prefers-color-scheme: dark) {
             html, body { background-color: #0B0D11; }
-        }
-        #ComposeTarget {
-            width: 100%;
-            height: 100%;
-            display: block;
         }
     </style>
     <script type="module">
@@ -174,6 +180,9 @@
             relay.native.free();
         };
     </script>
+    <!-- Deferred: fetched in parallel with the head, run after the document parses and after the
+         module above has defined window.iroh*; ComposeViewport(document.body) needs the body. -->
+    <script src="letta-web.js" defer></script>
     <script>
         // letta-mobile-2cson: installable PWA. Relative path, so it works under /letta-mobile/ too.
         if ('serviceWorker' in navigator) {
@@ -192,7 +201,5 @@
     </script>
 </head>
 <body>
-    <canvas id="ComposeTarget"></canvas>
-    <script src="letta-web.js"></script>
 </body>
 </html>
