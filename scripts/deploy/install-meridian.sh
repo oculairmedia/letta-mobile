@@ -38,11 +38,12 @@ UNITS=(
 # drop-in template -> "<unit>.d/<name>.conf"
 declare -A DROPINS=(
   [meridian-appserver.memory-protection.conf]="meridian-appserver.service.d/memory-protection.conf"
+  [meridian-appserver.subagent-archive.conf]="meridian-appserver.service.d/subagent-archive.conf"
   [meridian-iroh-wrapper.memory-protection.conf]="meridian-iroh-wrapper.service.d/memory-protection.conf"
 )
 # meridian-token-hook.cjs requires its two neighbours, so the shim is installed here too.
 SCRIPTS=(appserver-probe.cjs stall-watchdog.sh adopt-builds.sh cron-sensing-check.sh meridian-permission-hook.cjs
-  meridian-shim.cjs meridian-token-hook.cjs)
+  meridian-shim.cjs meridian-token-hook.cjs meridian-subagent-archive.cjs)
 
 # letta-mobile-jna0o.5: the agent-side `meridian` shim (on the App Server's PATH) and the
 # `meridian-canvas` letta-code skill (in the App Server user's global skills root, which letta-code
