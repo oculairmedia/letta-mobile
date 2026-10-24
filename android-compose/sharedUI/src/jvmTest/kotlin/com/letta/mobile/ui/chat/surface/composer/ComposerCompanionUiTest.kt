@@ -28,6 +28,7 @@ import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.theme.ChatMascotDimens
 import kotlin.test.Test
 import kotlin.test.assertNotNull
+import com.letta.mobile.ui.chat.surface.setPointerContent
 
 /**
  * The agent's mascot beside the shared composer (letta-mobile-bglj6.1): its seat registers with
@@ -43,7 +44,7 @@ class ComposerCompanionUiTest {
         agentPaneOpen: () -> Boolean = { false },
         agentId: String? = agent,
     ) {
-        setContent {
+        setPointerContent {
             shell.Provide {
                 MaterialTheme {
                     Column(Modifier.width(900.dp)) {

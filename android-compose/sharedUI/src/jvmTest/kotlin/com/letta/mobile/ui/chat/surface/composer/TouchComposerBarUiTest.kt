@@ -24,21 +24,22 @@ import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
-import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import com.letta.mobile.ui.theme.TouchComposerDimens
 import kotlinx.collections.immutable.persistentListOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.LocalLettaHost
 
 /** letta-mobile-bglj6.1.9 / bglj6.1.23: the Touch composer bar's parity with the legacy composer. */
 class TouchComposerBarUiTest {
     @Composable
     private fun TouchPanel(inputs: ComposerInputs) {
         MaterialTheme {
-            CompositionLocalProvider(LocalChatPlatformStyle provides ChatPlatformStyle.Touch) {
+            CompositionLocalProvider(LocalLettaHost provides LettaHost(input = LettaInput.Touch)) {
                 ChatComposerPanel(inputs)
             }
         }

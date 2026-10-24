@@ -40,6 +40,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 
 /** The whole shared page's own layers (letta-mobile-bglj6.1). */
 class ChatSurfaceUiTest {
@@ -141,18 +144,19 @@ class ChatSurfaceUiTest {
     }
 
     /** The full-screen page scrolled up into [history], in [style]. */
-    private fun ComposeUiTest.showScrolledUp(style: ChatPlatformStyle) {
+    private fun ComposeUiTest.showScrolledUp(style: LettaInput) {
         setContent {
             MaterialTheme {
                 Box(Modifier.size(width = 480.dp, height = 720.dp)) {
-                    ChatSurface(
-                        port = TestPort(ready.copy(messages = history.toPersistentList())),
-                        presentation = ChatSurfacePresentation.ChatFirst,
-                        onIntent = {},
-                        host = ChatSurfaceHost(),
-                        appearance = ChatSurfaceAppearance(platformStyle = style),
-                        platform = ChatSurfacePlatform(showKeyboardHints = false),
-                    )
+                    ProvideLettaHost(LettaHost(input = style)) {
+                        ChatSurface(
+                            port = TestPort(ready.copy(messages = history.toPersistentList())),
+                            presentation = ChatSurfacePresentation.ChatFirst,
+                            onIntent = {},
+                            host = ChatSurfaceHost(),
+                            platform = ChatSurfacePlatform(showKeyboardHints = false),
+                        )
+                    }
                 }
             }
         }
@@ -163,7 +167,7 @@ class ChatSurfaceUiTest {
     /** Touch: Android's FAB at the bottom end, just above the composer bar (feature-chat ChatMessageList). */
     @Test
     fun onTouchScrollToLatestSitsAtTheBottomEndAboveTheComposer() = runComposeUiTest {
-        showScrolledUp(ChatPlatformStyle.Touch)
+        showScrolledUp(LettaInput.Touch)
         val button = onNodeWithTag(ChatTimelineTags.SCROLL_TO_LATEST).getBoundsInRoot()
         val list = onNodeWithTag(ChatTimelineTags.LIST).getBoundsInRoot()
         val composer = onNodeWithTag(ComposerTestTags.TOUCH_BAR).getBoundsInRoot()
@@ -177,7 +181,7 @@ class ChatSurfaceUiTest {
     /** Pointer keeps desktop's quiet squircle, centred over the reading area. */
     @Test
     fun onPointerScrollToLatestStaysCentredOverTheList() = runComposeUiTest {
-        showScrolledUp(ChatPlatformStyle.Pointer)
+        showScrolledUp(LettaInput.Pointer)
         val button = onNodeWithTag(ChatTimelineTags.SCROLL_TO_LATEST).getBoundsInRoot()
         val list = onNodeWithTag(ChatTimelineTags.LIST).getBoundsInRoot()
         assertEquals(((list.left + list.right) / 2).value, ((button.left + button.right) / 2).value, absoluteTolerance = 1f)

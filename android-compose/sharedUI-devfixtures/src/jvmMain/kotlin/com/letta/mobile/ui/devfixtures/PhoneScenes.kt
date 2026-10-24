@@ -17,8 +17,8 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.ChatSurface
-import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
+import com.letta.mobile.ui.host.ProvideLettaIdiom
 import kotlinx.collections.immutable.persistentListOf
 
 /**
@@ -40,7 +40,6 @@ data class PhoneScene(
     val composer: ChatComposerUiState = PhoneFixtures.idleComposer,
     /** The playground raises its stand-in keyboard for this screen (the snapshots have no keyboard). */
     val keyboardUp: Boolean = false,
-    val appearance: ChatSurfaceAppearance = PhoneFixtures.touchAppearance,
 )
 
 /** The phone screens the snapshot tests and the playground share. */
@@ -150,22 +149,24 @@ fun PhoneSceneSurface(
     onDockGeometryChange: ((ChatDockGeometry) -> Unit)? = null,
     dock: ChatDockGeometry = scene.dock,
 ) {
-    Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        ChatSurface(
-            port = port,
-            presentation = presentation,
-            onIntent = onIntent,
-            host = host,
-            appearance = scene.appearance,
-            platform = ChatSurfacePlatform(showKeyboardHints = false, voiceInput = { _ -> MicStandIn() }),
-            canvas = if (scene.withCanvas) {
-                { _ -> CanvasWorkspace(showTitle = false, layout = CanvasLayout.COMPACT) }
-            } else {
-                null
-            },
-            dockGeometry = dock,
-            onDockGeometryChange = onDockGeometryChange ?: {},
-        )
+    // A phone's window is compact, so it is Touch whatever host the caller runs under.
+    ProvideLettaIdiom(compact = true) {
+        Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            ChatSurface(
+                port = port,
+                presentation = presentation,
+                onIntent = onIntent,
+                host = host,
+                platform = ChatSurfacePlatform(showKeyboardHints = false, voiceInput = { _ -> MicStandIn() }),
+                canvas = if (scene.withCanvas) {
+                    { _ -> CanvasWorkspace(showTitle = false, layout = CanvasLayout.COMPACT) }
+                } else {
+                    null
+                },
+                dockGeometry = dock,
+                onDockGeometryChange = onDockGeometryChange ?: {},
+            )
+        }
     }
 }
 

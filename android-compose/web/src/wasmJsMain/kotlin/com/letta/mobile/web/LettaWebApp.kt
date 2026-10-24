@@ -15,6 +15,7 @@ import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.ProvideLettaHost
+import com.letta.mobile.ui.host.rememberPrimaryPointer
 import com.letta.mobile.ui.mascot.frame.ProvideFrameMascots
 import com.letta.mobile.ui.mascot.rememberMascotRegistry
 import com.letta.mobile.ui.shell.pages.ShellHomeBackendFleetEffect
@@ -75,7 +76,9 @@ fun LettaWebApp() {
     val header = rememberShellWorkspaceHeader(ShellWorkspaceHeaderBinding(shell.navigator, layout, webSearch(shell, page), chat.list::tab))
     CompositionLocalProvider(LocalHighContrastPreference provides highContrastPreference) {
         SharedMaterialTheme {
-            ProvideLettaHost(LettaHost.Pointer) {
+            // letta-mobile-ckmub.17.36: the root reports the browser's pointer; the workspace turns it into the idiom.
+            val pointer = rememberPrimaryPointer()
+            ProvideLettaHost(remember(pointer) { LettaHost.Pointer.copy(input = pointer) }) {
                 // letta-mobile-ckmub.17.6: Rive mascots through the shared frame pipeline.
                 ProvideFrameMascots(remember { RiveCanvasRenderer() }, rememberMascotRegistry(backend.agents.value)) {
                     val bound = webWorkspace(shell, page, header)

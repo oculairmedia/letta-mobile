@@ -54,7 +54,6 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 import com.letta.mobile.ui.chat.surface.ChatImageActions
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
@@ -254,8 +253,6 @@ private fun rememberSharedChatAppearance(params: SharedChatPageParams, displayOp
             hapticsEnabled = params.hapticsEnabled,
             // CachedSettingsRepository.setChatFontScale clamps to this range.
             fontScaleRange = DefaultFontScaleRange,
-            // The phone's idiom: the legacy composer bar, sheets, and the canvas's chat head.
-            platformStyle = ChatPlatformStyle.Touch,
         )
     }
 

@@ -21,8 +21,6 @@ import com.letta.mobile.feature.chat.parity.RowParityFixture
 import com.letta.mobile.feature.chat.screen.shared.SharedChatPageLocals
 import com.letta.mobile.ui.chat.session.TimelineHostApprovals
 import com.letta.mobile.ui.chat.session.withHostApprovals
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
-import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.composer.ComposerThinkingSnapshot
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimelineSnapshot
 import com.letta.mobile.ui.theme.LettaTheme
@@ -31,6 +29,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 
 /**
  * letta-mobile-sieej (P0): the phone's chat over Iroh, Strict mode. The phone's own engine sees the
@@ -66,12 +66,13 @@ class RelayedPendingApprovalTimelineTest {
             LettaTheme(appTheme = AppTheme.LIGHT, themePreset = ThemePreset.DEFAULT, dynamicColor = false) {
                 SharedChatPageLocals(hapticsEnabled = false) {
                     Column(Modifier.fillMaxSize()) {
-                        ChatTimelineSnapshot(
-                            state = state,
-                            actions = NoOpChatActions,
-                            appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
-                        )
+                        ProvideLettaHost(LettaHost.Touch) {
+                            ChatTimelineSnapshot(
+                                state = state,
+                                actions = NoOpChatActions,
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                            )
+                        }
                         ComposerThinkingSnapshot(state, Modifier.fillMaxWidth())
                     }
                 }

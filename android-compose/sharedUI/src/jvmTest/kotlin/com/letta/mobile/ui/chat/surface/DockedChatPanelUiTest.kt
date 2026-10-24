@@ -74,7 +74,7 @@ class DockedChatPanelUiTest {
     private fun ComposeUiTest.show(port: FixturePort = FixturePort(), initial: ChatDockGeometry = ChatDockGeometry.Default): Harness {
         val harness = Harness()
         harness.geometry = initial
-        setContent {
+        setPointerContent {
             MaterialTheme {
                 ChatSurface(
                     port = port,
@@ -99,7 +99,7 @@ class DockedChatPanelUiTest {
     @Test
     fun noDockIsDrawnUntilTheSavedPlacementIsKnown() = runComposeUiTest {
         var placement by mutableStateOf<ChatDockGeometry?>(null)
-        setContent {
+        setPointerContent {
             MaterialTheme {
                 ChatSurface(
                     port = FixturePort(),

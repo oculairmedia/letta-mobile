@@ -20,13 +20,14 @@ import com.letta.mobile.data.chat.projection.withPendingApprovalDetails
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.runtime.PendingApprovalDetails
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
-import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import com.letta.mobile.ui.common.GroupPosition
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.LocalLettaHost
 
 /**
  * letta-mobile-sieej (P0): a Bash call parked for approval under "Strict"/"Ask" drew on the phone
@@ -66,7 +67,7 @@ class ChatRowPendingApprovalUiTest {
     fun onceAnsweredTheRunFoldsBackToItsLegacySummary() = runComposeUiTest {
         var item by mutableStateOf(relayedRun(parked = true))
         setContent {
-            CompositionLocalProvider(LocalChatPlatformStyle provides ChatPlatformStyle.Touch) {
+            CompositionLocalProvider(LocalLettaHost provides LettaHost(input = LettaInput.Touch)) {
                 MaterialTheme {
                     RenderRow(item, rowContext(itemState = renderState(collapsedRunIds = setOf(RUN_ID))))
                 }
@@ -120,7 +121,7 @@ class ChatRowPendingApprovalUiTest {
     ) {
         val state = renderState(collapsedRunIds = if (collapsed) setOf(RUN_ID) else emptySet())
         setContent {
-            CompositionLocalProvider(LocalChatPlatformStyle provides host.style) {
+            CompositionLocalProvider(LocalLettaHost provides LettaHost(input = host.style)) {
                 MaterialTheme { RenderRow(item, rowContext(itemState = state), rowCallbacks(actions)) }
             }
         }
@@ -155,9 +156,9 @@ class ChatRowPendingApprovalUiTest {
     }
 
     /** How a host draws the row: the phone (Touch) or desktop (Pointer). */
-    private enum class RowHost(val style: ChatPlatformStyle) {
-        Phone(ChatPlatformStyle.Touch),
-        Desktop(ChatPlatformStyle.Pointer),
+    private enum class RowHost(val style: LettaInput) {
+        Phone(LettaInput.Touch),
+        Desktop(LettaInput.Pointer),
     }
 
     private companion object {

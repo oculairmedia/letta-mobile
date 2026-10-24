@@ -44,6 +44,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 
 /**
  * letta-mobile-y5q9z: the phone's canvas mode is the agent bubble, not a bottom bar. Collapsed: the
@@ -99,17 +101,18 @@ class CanvasBubbleUiTest {
     private fun ComposeUiTest.showTouch(port: Port, hops: Hops, recents: ChatRecentInteractions? = recents(hops)) {
         setContent {
             MaterialTheme {
-                ChatSurface(
-                    port = port,
-                    presentation = ChatSurfacePresentation.CanvasFirst,
-                    onIntent = { hops.intents += it },
-                    host = ChatSurfaceHost(openCanvas = {}),
-                    modifier = Modifier.fillMaxSize(),
-                    appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                    platform = ChatSurfacePlatform(showKeyboardHints = false),
-                    canvas = { _ -> Box(Modifier.fillMaxSize().testTag(BOARD_TAG)) },
-                    recents = recents,
-                )
+                ProvideLettaHost(LettaHost.Touch) {
+                    ChatSurface(
+                        port = port,
+                        presentation = ChatSurfacePresentation.CanvasFirst,
+                        onIntent = { hops.intents += it },
+                        host = ChatSurfaceHost(openCanvas = {}),
+                        modifier = Modifier.fillMaxSize(),
+                        platform = ChatSurfacePlatform(showKeyboardHints = false),
+                        canvas = { _ -> Box(Modifier.fillMaxSize().testTag(BOARD_TAG)) },
+                        recents = recents,
+                    )
+                }
             }
         }
         waitForIdle()
@@ -257,17 +260,18 @@ class CanvasBubbleUiTest {
         val hops = Hops()
         setContent {
             MaterialTheme {
-                ChatSurface(
-                    port = Port(),
-                    presentation = presentation,
-                    onIntent = {},
-                    host = ChatSurfaceHost(openCanvas = {}),
-                    modifier = Modifier.fillMaxSize(),
-                    appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                    platform = ChatSurfacePlatform(showKeyboardHints = false),
-                    canvas = { _ -> Box(Modifier.fillMaxSize()) },
-                    recents = recents(hops),
-                )
+                ProvideLettaHost(LettaHost.Touch) {
+                    ChatSurface(
+                        port = Port(),
+                        presentation = presentation,
+                        onIntent = {},
+                        host = ChatSurfaceHost(openCanvas = {}),
+                        modifier = Modifier.fillMaxSize(),
+                        platform = ChatSurfacePlatform(showKeyboardHints = false),
+                        canvas = { _ -> Box(Modifier.fillMaxSize()) },
+                        recents = recents(hops),
+                    )
+                }
             }
         }
         waitForIdle()
@@ -286,16 +290,17 @@ class CanvasBubbleUiTest {
         val hops = Hops()
         setContent {
             MaterialTheme {
-                ChatSurface(
-                    port = Port(),
-                    presentation = ChatSurfacePresentation.ChatFirst,
-                    onIntent = {},
-                    host = ChatSurfaceHost(),
-                    modifier = Modifier.fillMaxSize(),
-                    appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                    platform = ChatSurfacePlatform(showKeyboardHints = false),
-                    recents = recents(hops),
-                )
+                ProvideLettaHost(LettaHost.Touch) {
+                    ChatSurface(
+                        port = Port(),
+                        presentation = ChatSurfacePresentation.ChatFirst,
+                        onIntent = {},
+                        host = ChatSurfaceHost(),
+                        modifier = Modifier.fillMaxSize(),
+                        platform = ChatSurfacePlatform(showKeyboardHints = false),
+                        recents = recents(hops),
+                    )
+                }
             }
         }
         waitForIdle()
@@ -306,7 +311,7 @@ class CanvasBubbleUiTest {
     @Test
     fun theDesktopPanelsPlusHopsBetweenConversations() = runComposeUiTest {
         val hops = Hops()
-        setContent {
+        setPointerContent {
             MaterialTheme {
                 ChatSurface(
                     port = Port(),

@@ -23,6 +23,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import com.letta.mobile.ui.chat.surface.setPointerContent
 
 /** letta-mobile-bzvro.13 (F13): the permission-mode chip in the composer's control row. */
 class ComposerPermissionModeUiTest {
@@ -32,7 +33,7 @@ class ComposerPermissionModeUiTest {
         state: ChatPermissionModeUiState?,
         actions: RecordingChatActions = RecordingChatActions(),
         mode: ChatSurfaceMode = ChatSurfaceMode.FullScreen,
-    ) = setContent {
+    ) = setPointerContent {
         MaterialTheme {
             ChatComposerPanel(
                 ComposerInputs(

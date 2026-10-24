@@ -73,7 +73,7 @@ class CanvasBubbleLayoutUiTest {
     private fun ComposeUiTest.show(prefs: CanvasBubbleLayoutPrefs, messages: List<UiMessage> = listOf(prompt, reply)) {
         var geometry by mutableStateOf(ChatDockGeometry(collapsed = true))
         mainClock.autoAdvance = false
-        setContent {
+        setPointerContent {
             FakeMascotShell(AGENT).Provide {
                 MaterialTheme {
                     CompositionLocalProvider(LocalCanvasBubbleLayoutPrefs provides prefs) {

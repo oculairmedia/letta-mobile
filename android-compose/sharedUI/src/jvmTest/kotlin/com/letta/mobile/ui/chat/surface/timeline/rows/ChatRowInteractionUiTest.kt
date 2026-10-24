@@ -2,8 +2,6 @@
 
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
-import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -33,6 +31,7 @@ import com.letta.mobile.ui.components.LettaListRowDefaults
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -57,6 +56,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.datetime.TimeZone
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LocalLettaHost
+import com.letta.mobile.ui.host.LettaHost
+
+/** Longer than any platform's long-press timeout. */
+private const val MOUSE_HOLD_MILLIS = 1_000L
 
 /**
  * letta-mobile-bglj6.1: row-level cases ported from desktop's DesktopChatInteractionUiTest,
@@ -98,7 +103,7 @@ class ChatRowInteractionUiTest {
         val text = "The cache keeps the newest page resident, which goes a long way."
         setContent {
             MaterialTheme {
-                CompositionLocalProvider(LocalChatPlatformStyle provides ChatPlatformStyle.Pointer) {
+                CompositionLocalProvider(LocalLettaHost provides LettaHost(input = LettaInput.Pointer)) {
                     AgentText(AgentTextParams(text = text, isError = false, onFork = {}))
                 }
             }
@@ -178,6 +183,25 @@ class ChatRowInteractionUiTest {
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
         onNodeWithTag(ChatRowTestTags.TOOL_RESULT_PREVIEW, useUnmergedTree = true).assertExists()
         runOnIdle { assertEquals(listOf("ret-1"), actions.expandedTruncations) }
+    }
+
+    /** A narrow browser or desktop window draws Touch rows: holding the mouse down opens the prompt's menu as a finger does. */
+    @Test
+    fun aMousePressAndHoldOnATouchPromptOpensItsMenu() = runComposeUiTest {
+        val prompt = message("user-2", "user", "Run the tests")
+        setContent {
+            CompositionLocalProvider(LocalLettaHost provides LettaHost(input = LettaInput.Touch)) {
+                MaterialTheme { RenderRow(single(prompt), rowContext(), rowCallbacks(RecordingChatActions())) }
+            }
+        }
+
+        onNodeWithTag(ChatRowTestTags.USER_PROMPT).performMouseInput {
+            moveTo(center)
+            press()
+            advanceEventTime(MOUSE_HOLD_MILLIS)
+            release()
+        }
+        onNodeWithText("Copy").assertExists()
     }
 
     @Test
@@ -402,9 +426,9 @@ class ChatRowInteractionUiTest {
 
     @Test
     fun onTouchTheRequestedCallsWearAndroidsToolCardChrome() = runComposeUiTest {
-        var style by mutableStateOf(ChatPlatformStyle.Touch)
+        var style by mutableStateOf(LettaInput.Touch)
         setContent {
-            CompositionLocalProvider(LocalChatPlatformStyle provides style) {
+            CompositionLocalProvider(LocalLettaHost provides LettaHost(input = style)) {
                 MaterialTheme { RenderRow(single(genericApprovalMessage())) }
             }
         }
@@ -412,7 +436,7 @@ class ChatRowInteractionUiTest {
         onNodeWithTag(ChatRowTestTags.APPROVAL_TOOL_CALL).assertExists()
         onNodeWithTag(ChatRowTestTags.APPROVAL_REQUESTING_INPUT, useUnmergedTree = true).assertExists()
         onNodeWithText("requesting input", useUnmergedTree = true).assertExists()
-        runOnIdle { style = ChatPlatformStyle.Pointer }
+        runOnIdle { style = LettaInput.Pointer }
         onNodeWithTag(ChatRowTestTags.APPROVAL_TOOL_CALL).assertDoesNotExist()
         onNodeWithText("requesting input", useUnmergedTree = true).assertDoesNotExist()
     }
@@ -424,9 +448,9 @@ class ChatRowInteractionUiTest {
      */
     @Test
     fun aRuntimeResolvedApprovalRendersAsItsToolLineOnly() = runComposeUiTest {
-        var style by mutableStateOf(ChatPlatformStyle.Touch)
+        var style by mutableStateOf(LettaInput.Touch)
         setContent {
-            CompositionLocalProvider(LocalChatPlatformStyle provides style) {
+            CompositionLocalProvider(LocalLettaHost provides LettaHost(input = style)) {
                 MaterialTheme { RenderRow(single(runtimeResolvedBashMessage())) }
             }
         }
@@ -436,7 +460,7 @@ class ChatRowInteractionUiTest {
         onNodeWithTag(ChatRowTestTags.APPROVAL_TOOL_CALL).assertDoesNotExist()
         onNodeWithTag(ChatRowTestTags.APPROVAL_REQUESTING_INPUT, useUnmergedTree = true).assertDoesNotExist()
         onNodeWithTag(ChatRowTestTags.SPEAKER_HEADER).assertDoesNotExist()
-        runOnIdle { style = ChatPlatformStyle.Pointer }
+        runOnIdle { style = LettaInput.Pointer }
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).assertExists()
         onNodeWithText("Approval requested").assertDoesNotExist()
     }

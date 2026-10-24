@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.chat.AgentIdentity
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
 import com.letta.mobile.ui.theme.LettaDimens
@@ -45,14 +44,14 @@ internal class PhoneChatPageInputs(
 /** The phone opens conversations on the canvas, as Android does; the desktop follows its preference. */
 internal fun DesktopPhoneChrome?.opensOnCanvas(preference: Boolean): Boolean = this != null || preference
 
-/** The phone's idiom, as Android's SharedChatPage sets it; [desktop] when there is no phone. */
+/**
+ * The phone's appearance, as Android's SharedChatPage sets it; [desktop] when there is no phone.
+ * The phone's Touch idiom is not set here: its compact window resolves it.
+ */
 internal fun DesktopPhoneChrome?.chatAppearance(desktop: ChatSurfaceAppearance): ChatSurfaceAppearance =
     if (this == null) desktop else PhoneChatAppearance
 
-private val PhoneChatAppearance = ChatSurfaceAppearance(
-    platformStyle = ChatPlatformStyle.Touch,
-    fontScaleRange = DefaultFontScaleRange,
-)
+private val PhoneChatAppearance = ChatSurfaceAppearance(fontScaleRange = DefaultFontScaleRange)
 
 /**
  * Hosts the shared chat [page] as this window draws it. Without a phone it is exactly

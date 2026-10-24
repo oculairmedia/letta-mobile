@@ -65,6 +65,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.chat.surface.setPointerContent
 
 /**
  * The shared composer's UI behaviour. The first cases are ported from desktop's
@@ -89,7 +90,7 @@ class ChatComposerPanelUiTest {
     fun externalComposerResetMovesCaretToEnd() = runComposeUiTest {
         var text by mutableStateOf("draft")
         val actions = RecordingChatActions(onText = { text = it })
-        setContent { Panel(ComposerInputs(composer = ready(text), actions = actions)) }
+        setPointerContent { Panel(ComposerInputs(composer = ready(text), actions = actions)) }
 
         runOnIdle { text = "externally reset" }
         val input = onNodeWithTag(ComposerTestTags.INPUT)
@@ -102,7 +103,7 @@ class ChatComposerPanelUiTest {
     @Test
     fun narrowComposerKeepsEveryControlAndSendReachable() = runComposeUiTest {
         val actions = RecordingChatActions()
-        setContent { Box(Modifier.width(420.dp)) { Panel(ComposerInputs(composer = ready(), actions = actions)) } }
+        setPointerContent { Box(Modifier.width(420.dp)) { Panel(ComposerInputs(composer = ready(), actions = actions)) } }
 
         onNodeWithContentDescription("Attach").assertExists()
         onNodeWithText("Model").assertExists()
@@ -112,13 +113,13 @@ class ChatComposerPanelUiTest {
 
     @Test
     fun keyboardHintsShowWhereThePlatformAsksForThem() = runComposeUiTest {
-        setContent { Panel(ComposerInputs(composer = ready(text = ""), actions = RecordingChatActions())) }
+        setPointerContent { Panel(ComposerInputs(composer = ready(text = ""), actions = RecordingChatActions())) }
         assertEquals(1, onAllNodesWithTag(ComposerTestTags.HINT, useUnmergedTree = true).fetchSemanticsNodes().size)
     }
 
     @Test
     fun touchHostsHideTheKeyboardHints() = runComposeUiTest {
-        setContent {
+        setPointerContent {
             Panel(
                 ComposerInputs(
                     composer = ready(text = ""),
@@ -132,7 +133,7 @@ class ChatComposerPanelUiTest {
 
     @Test
     fun sendIsDisabledWithoutAPayload() = runComposeUiTest {
-        setContent { Panel(ComposerInputs(composer = ready(text = ""), actions = RecordingChatActions())) }
+        setPointerContent { Panel(ComposerInputs(composer = ready(text = ""), actions = RecordingChatActions())) }
         onNodeWithTag(ComposerTestTags.SEND).assertIsNotEnabled()
     }
 
@@ -141,7 +142,7 @@ class ChatComposerPanelUiTest {
         val wide = 1600.dp
         var measured: Dp = Dp.Unspecified
         runComposeUiTest {
-            setContent { Box(Modifier.width(wide)) { Panel(ComposerInputs(composer = ready(), actions = RecordingChatActions())) } }
+            setPointerContent { Box(Modifier.width(wide)) { Panel(ComposerInputs(composer = ready(), actions = RecordingChatActions())) } }
             measured = onNodeWithTag(ComposerTestTags.CONTROLS).getUnclippedBoundsInRoot().width
         }
         assertTrue(measured <= ChatColumnMaxWidth, "composer spanned $measured of a $wide window")
@@ -150,7 +151,7 @@ class ChatComposerPanelUiTest {
     @Test
     fun stopButtonStopsTheRunWhileStreaming() = runComposeUiTest {
         val actions = RecordingChatActions()
-        setContent {
+        setPointerContent {
             Panel(ComposerInputs(composer = ready(text = ""), actions = actions, uiState = ChatUiState(isStreaming = true)))
         }
         onNodeWithTag(ComposerTestTags.SEND).assertDoesNotExist()
@@ -161,7 +162,7 @@ class ChatComposerPanelUiTest {
     @Test
     fun swipeUpOnTheFullScreenCardOpensTheCanvas() = runComposeUiTest {
         val intents = mutableListOf<ChatSurfaceIntent>()
-        setContent {
+        setPointerContent {
             Panel(
                 ComposerInputs(
                     composer = ready(),
@@ -179,7 +180,7 @@ class ChatComposerPanelUiTest {
     @Test
     fun swipeUpDoesNothingWhenTheHostHasNoCanvas() = runComposeUiTest {
         val intents = mutableListOf<ChatSurfaceIntent>()
-        setContent { Panel(ComposerInputs(composer = ready(), actions = RecordingChatActions(), onIntent = { intents += it })) }
+        setPointerContent { Panel(ComposerInputs(composer = ready(), actions = RecordingChatActions(), onIntent = { intents += it })) }
 
         onNodeWithTag(ComposerTestTags.CARD).performTouchInput { swipeUp() }
         runOnIdle { assertTrue(intents.isEmpty(), "got $intents") }
@@ -188,7 +189,7 @@ class ChatComposerPanelUiTest {
     @Test
     fun swipeUpDoesNothingWhileARunStreams() = runComposeUiTest {
         val intents = mutableListOf<ChatSurfaceIntent>()
-        setContent {
+        setPointerContent {
             Panel(
                 ComposerInputs(
                     composer = ready(),
@@ -207,7 +208,7 @@ class ChatComposerPanelUiTest {
     fun dockedBarExpandsAndSendsTheSameDraft() = runComposeUiTest {
         val intents = mutableListOf<ChatSurfaceIntent>()
         val actions = RecordingChatActions()
-        setContent {
+        setPointerContent {
             Panel(ComposerInputs(composer = ready(), actions = actions, mode = ChatSurfaceMode.Docked, onIntent = { intents += it }))
         }
 
@@ -226,7 +227,7 @@ class ChatComposerPanelUiTest {
         val command = ChatComposerCommand(id = "new", label = "new", description = "New chat")
         var text by mutableStateOf("/ne")
         val actions = RecordingChatActions(onText = { text = it })
-        setContent { Panel(ComposerInputs(composer = ready(text).copy(commands = persistentListOf(command)), actions = actions)) }
+        setPointerContent { Panel(ComposerInputs(composer = ready(text).copy(commands = persistentListOf(command)), actions = actions)) }
 
         onNodeWithTag(ComposerTestTags.COMMAND_ROW + "new").performClick()
         runOnIdle {
@@ -240,7 +241,7 @@ class ChatComposerPanelUiTest {
     fun enterRunsTheTypedSlashActionCommand() = runComposeUiTest {
         val command = ChatComposerCommand(id = "new", label = "new")
         val actions = RecordingChatActions()
-        setContent { Panel(ComposerInputs(composer = ready("/new").copy(commands = persistentListOf(command)), actions = actions)) }
+        setPointerContent { Panel(ComposerInputs(composer = ready("/new").copy(commands = persistentListOf(command)), actions = actions)) }
 
         onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performKeyInput { pressKey(Key.Enter) }
         runOnIdle {
@@ -254,7 +255,7 @@ class ChatComposerPanelUiTest {
         val skill = ChatComposerCommand(id = "/review", label = "/review", fillsComposer = true, removable = true)
         var text by mutableStateOf("/rev")
         val actions = RecordingChatActions(onText = { text = it })
-        setContent { Panel(ComposerInputs(composer = ready(text).copy(commands = persistentListOf(skill)), actions = actions)) }
+        setPointerContent { Panel(ComposerInputs(composer = ready(text).copy(commands = persistentListOf(skill)), actions = actions)) }
 
         onNodeWithContentDescription("More options for /review").performClick()
         onNodeWithText("Uninstall /review").performClick()
@@ -272,7 +273,9 @@ class ChatComposerPanelUiTest {
         val mention = Mentionable(id = "f1", label = "main.kt", sublabel = "src", kind = MentionKind.File)
         var text by mutableStateOf("look at @ma")
         val actions = RecordingChatActions(onText = { text = it })
-        setContent { Panel(ComposerInputs(composer = ready(text).copy(mentionables = persistentListOf(mention)), actions = actions)) }
+        setPointerContent {
+            Panel(ComposerInputs(composer = ready(text).copy(mentionables = persistentListOf(mention)), actions = actions))
+        }
 
         onNodeWithText("main.kt").performClick()
         runOnIdle { assertEquals("look at @main.kt ", text) }
@@ -286,7 +289,7 @@ class ChatComposerPanelUiTest {
             paused = true,
         )
         val actions = RecordingChatActions()
-        setContent { Panel(ComposerInputs(composer = ready(), actions = actions, uiState = ChatUiState(sendQueue = queue))) }
+        setPointerContent { Panel(ComposerInputs(composer = ready(), actions = actions, uiState = ChatUiState(sendQueue = queue))) }
 
         onNodeWithTag(QueuedSendsPanelTestTags.CANCEL + "q1").performClick()
         onNodeWithTag(QueuedSendsPanelTestTags.SEND_NOW + "q1").performClick()
@@ -301,7 +304,7 @@ class ChatComposerPanelUiTest {
     @Test
     fun composerErrorShowsInlineAndDismisses() = runComposeUiTest {
         val actions = RecordingChatActions()
-        setContent { Panel(ComposerInputs(composer = ready().copy(error = "Image too large"), actions = actions)) }
+        setPointerContent { Panel(ComposerInputs(composer = ready().copy(error = "Image too large"), actions = actions)) }
 
         onNodeWithText("Image too large").assertExists()
         onNodeWithContentDescription("Dismiss").performClick()
@@ -312,7 +315,7 @@ class ChatComposerPanelUiTest {
     fun modelChipOpensTheSharedPickerAndHidesWithoutTheCapability() = runComposeUiTest {
         val picker = testModelPicker()
         var capabilities by mutableStateOf(ChatSurfaceCapabilities.Default)
-        setContent {
+        setPointerContent {
             Panel(
                 ComposerInputs(
                     composer = ready(),
@@ -333,7 +336,7 @@ class ChatComposerPanelUiTest {
 
     @Test
     fun withoutAHostPickerTheChipOpensNothing() = runComposeUiTest {
-        setContent { Panel(ComposerInputs(composer = ready(), actions = RecordingChatActions(), host = ChatSurfaceHost())) }
+        setPointerContent { Panel(ComposerInputs(composer = ready(), actions = RecordingChatActions(), host = ChatSurfaceHost())) }
 
         onNodeWithTag(ComposerTestTags.MODEL_CHIP).assertIsNotEnabled()
         onNodeWithTag(ModelPickerTags.PANE).assertDoesNotExist()
@@ -357,7 +360,7 @@ class ChatComposerPanelUiTest {
         )
         val actions = RecordingChatActions()
         val inputs = ComposerInputs(composer = ready().copy(model = model), actions = actions, host = ChatSurfaceHost(modelPicker = picker))
-        setContent { Panel(inputs) }
+        setPointerContent { Panel(inputs) }
 
         onNodeWithTag(ComposerTestTags.MODEL_CHIP).performClick()
         onNodeWithTag(ModelPickerTags.PANE).assertExists()
@@ -380,7 +383,7 @@ class ChatComposerPanelUiTest {
     fun workingDirectoryShowsOnlyWithTheCapabilityAndPicksThroughTheHost() = runComposeUiTest {
         var picks = 0
         var capabilities by mutableStateOf(ChatSurfaceCapabilities(workingDirectory = true))
-        setContent {
+        setPointerContent {
             Panel(
                 ComposerInputs(
                     composer = ready().copy(workingDirectory = ChatWorkingDirectoryUiState(path = "/repo")),
@@ -406,7 +409,7 @@ class ChatComposerPanelUiTest {
             description = "npm run build",
             ageSeconds = 42,
         )
-        setContent {
+        setPointerContent {
             Panel(
                 ComposerInputs(
                     composer = ready().copy(backgroundProcesses = persistentListOf(process)),

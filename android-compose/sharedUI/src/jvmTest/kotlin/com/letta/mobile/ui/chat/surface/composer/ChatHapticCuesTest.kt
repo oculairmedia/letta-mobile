@@ -14,14 +14,15 @@ import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
-import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import com.letta.mobile.ui.haptics.Haptics
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.LocalLettaHost
 
 /**
  * letta-mobile-bglj6.1.17: the chat surface describes its interactions with haptic cues through
@@ -35,7 +36,7 @@ class ChatHapticCuesTest {
     private fun TouchPanel(inputs: ComposerInputs, haptics: Haptics) {
         MaterialTheme {
             CompositionLocalProvider(
-                LocalChatPlatformStyle provides ChatPlatformStyle.Touch,
+                LocalLettaHost provides LettaHost(input = LettaInput.Touch),
                 LocalHaptics provides haptics,
             ) {
                 ChatComposerPanel(inputs)

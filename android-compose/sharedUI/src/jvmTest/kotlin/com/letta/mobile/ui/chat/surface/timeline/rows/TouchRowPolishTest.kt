@@ -13,8 +13,6 @@ import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiToolCall
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
-import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.timeline.timelineLeadingSpace
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.theme.ChatRowSpacing
@@ -22,6 +20,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.LocalLettaHost
 
 /** letta-mobile-bglj6.1.23: the Touch rows' parity with the legacy Android timeline. */
 class TouchRowPolishTest {
@@ -66,7 +67,7 @@ class TouchRowPolishTest {
         val msg = message("a-1", "assistant", "").copy(attachments = listOf(image))
         setContent {
             MaterialTheme {
-                CompositionLocalProvider(LocalChatPlatformStyle provides ChatPlatformStyle.Touch) {
+                CompositionLocalProvider(LocalLettaHost provides LettaHost(input = LettaInput.Touch)) {
                     RenderRow(ChatRenderItem.Single(msg, GroupPosition.First))
                 }
             }

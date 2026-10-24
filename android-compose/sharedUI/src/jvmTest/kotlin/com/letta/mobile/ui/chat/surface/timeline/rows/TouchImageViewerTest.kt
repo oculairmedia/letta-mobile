@@ -15,13 +15,14 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.ui.chat.surface.ChatImageActions
-import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.LocalChatImageActions
-import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.LocalLettaHost
 
 /** letta-mobile-bglj6.1.23: the phone's image viewer gestures and actions (the legacy ChatImageViewer). */
 class TouchImageViewerTest {
@@ -65,7 +66,7 @@ class TouchImageViewerTest {
         setContent {
             MaterialTheme {
                 CompositionLocalProvider(
-                    LocalChatPlatformStyle provides ChatPlatformStyle.Touch,
+                    LocalLettaHost provides LettaHost(input = LettaInput.Touch),
                     LocalChatImageActions provides ChatImageActions(save = { saved += it }, share = { shared += it }),
                 ) {
                     ChatImageViewerContent(images = images, initialIndex = 1, onDismiss = { dismissed = true })
@@ -86,7 +87,7 @@ class TouchImageViewerTest {
     fun doubleTappingAPageZoomsIt() = runComposeUiTest {
         setContent {
             MaterialTheme {
-                CompositionLocalProvider(LocalChatPlatformStyle provides ChatPlatformStyle.Touch) {
+                CompositionLocalProvider(LocalLettaHost provides LettaHost(input = LettaInput.Touch)) {
                     ChatImageViewerContent(images = images.take(1), initialIndex = 0, onDismiss = {})
                 }
             }

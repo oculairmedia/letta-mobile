@@ -94,7 +94,7 @@ class ChatSurfaceRecompositionTest {
     @Test
     fun typingInTheComposerDoesNotRecomposeSettledRows() = runComposeUiTest {
         val port = TypingPort(state)
-        setContent {
+        setPointerContent {
             // Read the draft here, so this host recomposes on every keystroke like ChatScreen.
             val draft by port.composer.collectAsState()
             MaterialTheme {
@@ -140,7 +140,7 @@ class ChatSurfaceRecompositionTest {
         val runs = CompositionRunCounter(PAGE_LAYERS)
         runs.install()
         try {
-            setContent {
+            setPointerContent {
                 MaterialTheme {
                     Box(Modifier.size(width = 960.dp, height = 720.dp)) {
                         ChatSurface(

@@ -7,6 +7,8 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LocalLettaHost
 
 /**
  * How the shared chat page looks, set by the host from its own
@@ -27,12 +29,6 @@ data class ChatSurfaceAppearance(
     /** The host's font-scale range: pinch-to-zoom clamps to it (Android 0.7–1.6, desktop 0.8–2.0). */
     val fontScaleRange: ClosedFloatingPointRange<Float> = DefaultFontScaleRange,
     /**
-     * The host's input idiom. Touch draws the phone's chat: the flush
-     * full-width composer bar, the "+" action sheet, the canvas's bottom bar with a floating chat
-     * head. Pointer keeps the desktop card, the floating panel and the minimised mascot.
-     */
-    val platformStyle: ChatPlatformStyle = ChatPlatformStyle.Pointer,
-    /**
      *  (G91): which rows and readouts the timeline leaves out (reasoning,
      * compaction summaries, token usage). The host reads them from its settings.
      */
@@ -40,23 +36,13 @@ data class ChatSurfaceAppearance(
 )
 
 /**
- * Which idiom the page is drawn in. Keyed off the platform, not the
- * window width: a narrow desktop window is still driven by a pointer, a tablet still by touch.
+ * True when the page is drawn in the Touch idiom: the flush full-width composer bar, the "+"
+ * action sheet, the canvas's bottom bar with a floating chat head. Otherwise the pointer idiom: the
+ * composer card, the floating panel and the minimised mascot. It is the host's resolved idiom
+ * ([com.letta.mobile.ui.host.lettaIdiom]), so the chat and the shell's containers never disagree.
  */
-enum class ChatPlatformStyle {
-    /** Phones and tablets: the legacy Android composer bar, sheets, chat head over the canvas. */
-    Touch,
-
-    /** Desktop: the composer card, popup menus, the movable docked panel. */
-    Pointer,
-}
-
-/** The page's [ChatPlatformStyle], for parts that sit deep under the page (the composer, rows). */
-internal val LocalChatPlatformStyle = androidx.compose.runtime.staticCompositionLocalOf { ChatPlatformStyle.Pointer }
-
-/** True when the page is drawn in the [ChatPlatformStyle.Touch] idiom. */
 @Composable
-internal fun touchStyle(): Boolean = LocalChatPlatformStyle.current == ChatPlatformStyle.Touch
+internal fun touchStyle(): Boolean = LocalLettaHost.current.input == LettaInput.Touch
 
 /** Android's settings range, the default for hosts that do not set their own. */
 val DefaultFontScaleRange: ClosedFloatingPointRange<Float> = 0.7f..1.6f

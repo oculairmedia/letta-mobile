@@ -48,6 +48,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 
 /**
  * letta-mobile-bglj6.1: the phone's canvas mode keeps the top of the board clear. No actions pill:
@@ -80,31 +83,32 @@ class TouchCanvasChromeUiTest {
     }
 
     private fun ComposeUiTest.showBoard(
-        style: ChatPlatformStyle,
+        style: LettaInput,
         controller: DrawBoxController,
         host: Host = Host(),
         presentation: ChatSurfacePresentation = ChatSurfacePresentation.CanvasFirst,
     ) {
         setContent {
             MaterialTheme {
-                ChatSurface(
-                    port = Port(),
-                    presentation = presentation,
-                    onIntent = {},
-                    host = host.host,
-                    modifier = Modifier.fillMaxSize(),
-                    appearance = ChatSurfaceAppearance(platformStyle = style),
-                    platform = ChatSurfacePlatform(showKeyboardHints = false),
-                    canvas = { _ ->
-                        CanvasWorkspace(
-                            controller = controller,
-                            showTitle = false,
-                            layout = CanvasLayout.COMPACT,
-                            onShareToChat = { _, _ -> },
-                        )
-                    },
-                    dockGeometry = ChatDockGeometry.Default,
-                )
+                ProvideLettaHost(LettaHost(input = style)) {
+                    ChatSurface(
+                        port = Port(),
+                        presentation = presentation,
+                        onIntent = {},
+                        host = host.host,
+                        modifier = Modifier.fillMaxSize(),
+                        platform = ChatSurfacePlatform(showKeyboardHints = false),
+                        canvas = { _ ->
+                            CanvasWorkspace(
+                                controller = controller,
+                                showTitle = false,
+                                layout = CanvasLayout.COMPACT,
+                                onShareToChat = { _, _ -> },
+                            )
+                        },
+                        dockGeometry = ChatDockGeometry.Default,
+                    )
+                }
             }
         }
         waitForIdle()
@@ -112,7 +116,7 @@ class TouchCanvasChromeUiTest {
 
     @Test
     fun theTouchCanvasHasNoTopPillAndItsActionsEndTheToolBar() = runComposeUiTest {
-        showBoard(ChatPlatformStyle.Touch, DrawBoxController(Reducer(UseCase())))
+        showBoard(LettaInput.Touch, DrawBoxController(Reducer(UseCase())))
 
         onAllNodesWithTag(CANVAS_ACTIONS_TAG).assertCountEquals(0)
         val bar = onNodeWithTag(CANVAS_COMPACT_TOOLBAR_TAG).getBoundsInRoot()
@@ -130,7 +134,7 @@ class TouchCanvasChromeUiTest {
     @Test
     fun undoAndRedoOnTheToolBarWork() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
-        showBoard(ChatPlatformStyle.Touch, controller)
+        showBoard(LettaInput.Touch, controller)
         runOnIdle { CanvasInsert.addShape(controller, Mode.RECTANGLE, Offset(200f, 200f)) }
         waitUntil(timeoutMillis = 5_000) { controller.state.value.elements.size == 1 }
 
@@ -143,7 +147,7 @@ class TouchCanvasChromeUiTest {
     @Test
     fun theMoreMenuCarriesShareTheAgentSwitcherAndTheAgentMenu() = runComposeUiTest {
         val host = Host()
-        showBoard(ChatPlatformStyle.Touch, DrawBoxController(Reducer(UseCase())), host)
+        showBoard(LettaInput.Touch, DrawBoxController(Reducer(UseCase())), host)
 
         onNodeWithTag(CANVAS_FOOT_MORE_TAG).performClick()
         waitForIdle()
@@ -161,7 +165,7 @@ class TouchCanvasChromeUiTest {
 
     @Test
     fun aDesktopBoardKeepsItsActionsPill() = runComposeUiTest {
-        showBoard(ChatPlatformStyle.Pointer, DrawBoxController(Reducer(UseCase())))
+        showBoard(LettaInput.Pointer, DrawBoxController(Reducer(UseCase())))
 
         onNodeWithTag(CANVAS_ACTIONS_TAG).assertExists()
         onAllNodesWithTag(CANVAS_FOOT_MORE_TAG).assertCountEquals(0)
@@ -182,16 +186,17 @@ class TouchCanvasChromeUiTest {
     fun theChatHeadHasNoGlowWhileTheAgentWorks() = runComposeUiTest {
         setContent {
             MaterialTheme(colorScheme = lightColorScheme()) {
-                ChatSurface(
-                    port = Port(typing = true),
-                    presentation = ChatSurfacePresentation.CanvasFirst,
-                    onIntent = {},
-                    host = ChatSurfaceHost(openCanvas = {}),
-                    modifier = Modifier.fillMaxSize(),
-                    appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                    platform = ChatSurfacePlatform(showKeyboardHints = false),
-                    canvas = { _ -> Box(Modifier.fillMaxSize().background(Color.White)) },
-                )
+                ProvideLettaHost(LettaHost.Touch) {
+                    ChatSurface(
+                        port = Port(typing = true),
+                        presentation = ChatSurfacePresentation.CanvasFirst,
+                        onIntent = {},
+                        host = ChatSurfaceHost(openCanvas = {}),
+                        modifier = Modifier.fillMaxSize(),
+                        platform = ChatSurfacePlatform(showKeyboardHints = false),
+                        canvas = { _ -> Box(Modifier.fillMaxSize().background(Color.White)) },
+                    )
+                }
             }
         }
         waitForIdle()

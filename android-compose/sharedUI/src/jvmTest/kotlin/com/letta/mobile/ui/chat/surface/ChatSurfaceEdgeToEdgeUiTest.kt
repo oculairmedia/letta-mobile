@@ -40,6 +40,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 
 /**
  * letta-mobile-bglj6.1: the phone page is edge to edge, as the legacy Android chat screen is. The
@@ -91,16 +93,17 @@ class ChatSurfaceEdgeToEdgeUiTest {
             )
             MaterialTheme {
                 CompositionLocalProvider(LocalShellFloatingChromeInset provides if (floating) TOP_CHROME else 0.dp) {
-                    ChatSurface(
-                        port = Port(messages),
-                        presentation = presentation,
-                        onIntent = {},
-                        host = ChatSurfaceHost(openCanvas = {}),
-                        modifier = Modifier.fillMaxSize(),
-                        appearance = ChatSurfaceAppearance(platformStyle = ChatPlatformStyle.Touch),
-                        platform = platform.underFloatingChrome(LocalShellFloatingChromeInset.current),
-                        canvas = canvas,
-                    )
+                    ProvideLettaHost(LettaHost.Touch) {
+                        ChatSurface(
+                            port = Port(messages),
+                            presentation = presentation,
+                            onIntent = {},
+                            host = ChatSurfaceHost(openCanvas = {}),
+                            modifier = Modifier.fillMaxSize(),
+                            platform = platform.underFloatingChrome(LocalShellFloatingChromeInset.current),
+                            canvas = canvas,
+                        )
+                    }
                 }
             }
         }

@@ -17,6 +17,13 @@ import com.letta.mobile.ui.shell.ShellLongPressMenu
  * ContextMenuArea). It asks for a [LettaPaneKind] through [LettaPane] and the [LettaHost] in effect
  * decides how that kind is drawn. Android keeps the [LettaHost.Touch] default; desktop and web
  * provide a pointer host once at their window root.
+ *
+ * [LettaHost.input] means two things by depth. At the window root it is the platform's primary
+ * pointer (Android Touch, desktop Pointer, the browser's `(pointer: coarse)` media query). Under
+ * [com.letta.mobile.ui.shell.workspace.LettaShellWorkspace] it is the idiom: the workspace
+ * re-provides the host through [ProvideLettaIdiom], so a compact window reads Touch on every
+ * platform. Surfaces mounted outside the workspace (a desktop secondary window, a preview) keep the
+ * root value.
  */
 enum class LettaInput { Touch, Pointer }
 
@@ -117,6 +124,7 @@ data class LettaConfirmTags(
  */
 @Immutable
 class LettaHost(
+    /** The primary pointer at the window root, the idiom under the workspace (see [lettaIdiom]). */
     val input: LettaInput = LettaInput.Touch,
     val sheet: PaneContainer = LettaPaneDefaults.Sheet,
     val popover: PaneContainer = LettaPaneDefaults.Popover,
