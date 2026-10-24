@@ -67928,6 +67928,8 @@ final const val com.letta.mobile.data.session/UNCONFIGURED_BACKEND_KEY // com.le
     final fun <get-UNCONFIGURED_BACKEND_KEY>(): kotlin/String // com.letta.mobile.data.session/UNCONFIGURED_BACKEND_KEY.<get-UNCONFIGURED_BACKEND_KEY>|<get-UNCONFIGURED_BACKEND_KEY>(){}[0]
 final const val com.letta.mobile.data.session/WEB_REMOTE_LETTA_ID_PREFIX // com.letta.mobile.data.session/WEB_REMOTE_LETTA_ID_PREFIX|{}WEB_REMOTE_LETTA_ID_PREFIX[0]
     final fun <get-WEB_REMOTE_LETTA_ID_PREFIX>(): kotlin/String // com.letta.mobile.data.session/WEB_REMOTE_LETTA_ID_PREFIX.<get-WEB_REMOTE_LETTA_ID_PREFIX>|<get-WEB_REMOTE_LETTA_ID_PREFIX>(){}[0]
+final const val com.letta.mobile.data.storage/OPEN_CHATS_ON_CANVAS_DEFAULT // com.letta.mobile.data.storage/OPEN_CHATS_ON_CANVAS_DEFAULT|{}OPEN_CHATS_ON_CANVAS_DEFAULT[0]
+    final fun <get-OPEN_CHATS_ON_CANVAS_DEFAULT>(): kotlin/Boolean // com.letta.mobile.data.storage/OPEN_CHATS_ON_CANVAS_DEFAULT.<get-OPEN_CHATS_ON_CANVAS_DEFAULT>|<get-OPEN_CHATS_ON_CANVAS_DEFAULT>(){}[0]
 final const val com.letta.mobile.data.subagents/MAX_OPEN_SUBAGENT_VIEWS // com.letta.mobile.data.subagents/MAX_OPEN_SUBAGENT_VIEWS|{}MAX_OPEN_SUBAGENT_VIEWS[0]
     final fun <get-MAX_OPEN_SUBAGENT_VIEWS>(): kotlin/Int // com.letta.mobile.data.subagents/MAX_OPEN_SUBAGENT_VIEWS.<get-MAX_OPEN_SUBAGENT_VIEWS>|<get-MAX_OPEN_SUBAGENT_VIEWS>(){}[0]
 final const val com.letta.mobile.data.subagents/QUIET_AFTER_MS // com.letta.mobile.data.subagents/QUIET_AFTER_MS|{}QUIET_AFTER_MS[0]

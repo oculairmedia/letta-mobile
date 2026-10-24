@@ -45382,6 +45382,10 @@ public abstract interface class com/letta/mobile/data/storage/MutableSettingsPre
 	public abstract fun remove (Ljava/lang/String;)V
 }
 
+public final class com/letta/mobile/data/storage/OpenChatsOnCanvasDefaultKt {
+	public static final field OPEN_CHATS_ON_CANVAS_DEFAULT Z
+}
+
 public abstract interface class com/letta/mobile/data/storage/SecureSettingsStore {
 	public abstract fun clear ()V
 	public abstract fun getString (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
