@@ -60,7 +60,9 @@ internal fun ComposerCompanionRow(model: ComposerModel, content: @Composable () 
     Row(
         // Order matters: widthIn BEFORE fillMaxWidth, or fillMaxWidth pins min == max and the cap is lost.
         modifier = Modifier.widthIn(max = composerBarMaxWidth() + slot).fillMaxWidth(),
-        verticalAlignment = Alignment.Bottom,
+        // The companion's anchor occupies the seat box, so bottom-aligning it leaves the visible
+        // character above the prompt's midpoint as the card grows taller than the seat.
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         // Kept while it closes, so the bar widens smoothly when the companion leaves the row.
         if (available || slot > 0.dp) {
@@ -68,12 +70,12 @@ internal fun ComposerCompanionRow(model: ComposerModel, content: @Composable () 
             // character to come back to it.
             Box(
                 Modifier.testTag(ComposerCompanionTags.SLOT).width(slot).padding(end = LettaDimens.Space.lg),
-                contentAlignment = Alignment.BottomCenter,
+                contentAlignment = Alignment.Center,
             ) {
                 if (available) CompanionSeatHere(agentId!!, model)
             }
         }
-        Box(Modifier.weight(1f), contentAlignment = Alignment.BottomCenter) { content() }
+        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { content() }
     }
 }
 
