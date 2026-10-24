@@ -6,15 +6,22 @@ import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
@@ -23,11 +30,14 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.mascot.FakeMascotShell
+import com.letta.mobile.ui.mascot.FakeMascotHost
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.theme.ChatMascotDimens
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import com.letta.mobile.ui.chat.surface.setPointerContent
 
 /**
@@ -66,6 +76,53 @@ class ComposerCompanionUiTest {
                 }
             }
         }
+    }
+
+    private fun ComposeUiTest.showMeasuredPanel(
+        mode: ChatSurfaceMode,
+        width: Dp,
+        composer: ChatComposerUiState,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+        fontScale: Float = 1f,
+    ) {
+        val shell = FakeMascotShell(agent, layerMounted = false)
+        setPointerContent {
+            shell.Provide {
+                val density = LocalDensity.current
+                CompositionLocalProvider(
+                    LocalDensity provides Density(density.density, fontScale),
+                    LocalLayoutDirection provides layoutDirection,
+                ) {
+                    MaterialTheme {
+                        Column(Modifier.width(width)) {
+                            ChatComposerPanel(
+                                ComposerInputs(
+                                    composer = composer,
+                                    uiState = ChatUiState(agentId = agent),
+                                    actions = RecordingChatActions(),
+                                    capabilities = ChatSurfaceCapabilities.Default,
+                                    host = ChatSurfaceHost(),
+                                    platform = ChatSurfacePlatform.Default,
+                                    mode = mode,
+                                    onIntent = {},
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        waitForIdle()
+    }
+
+    private fun ComposeUiTest.assertCompanionCenteredOn(tag: String) {
+        val mascot: Rect = onNodeWithTag(FakeMascotHost.SURFACE_TAG).fetchSemanticsNode().boundsInRoot
+        val card: Rect = onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+        val centerDelta = abs(mascot.center.y - card.center.y)
+        assertTrue(
+            centerDelta <= 1f,
+            "companion centerY ${mascot.center.y} should match $tag centerY ${card.center.y}; delta=$centerDelta px",
+        )
     }
 
     @Test
@@ -123,5 +180,58 @@ class ComposerCompanionUiTest {
         waitForIdle()
         onNodeWithTag(ComposerCompanionTags.SLOT).assertDoesNotExist()
         onNodeWithTag(ComposerTestTags.INPUT).assertExists()
+    }
+
+    @Test
+    fun companionCentersOnSingleLineAndExpandedPromptCards() = runComposeUiTest {
+        var composer by mutableStateOf(ChatComposerUiState(text = "One line prompt"))
+        val shell = FakeMascotShell(agent, layerMounted = false)
+        setPointerContent {
+            shell.Provide {
+                MaterialTheme {
+                    Column(Modifier.width(900.dp)) {
+                        ChatComposerPanel(
+                            ComposerInputs(
+                                composer = composer,
+                                uiState = ChatUiState(agentId = agent),
+                                actions = RecordingChatActions(),
+                                mode = ChatSurfaceMode.FullScreen,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+        waitForIdle()
+
+        assertCompanionCenteredOn(ComposerTestTags.CARD)
+
+        runOnIdle { composer = ChatComposerUiState(text = "First line\nSecond line\nThird line\nFourth line") }
+        waitForIdle()
+        assertCompanionCenteredOn(ComposerTestTags.CARD)
+    }
+
+    @Test
+    fun companionCentersOnTheCompactDockedBar() = runComposeUiTest {
+        showMeasuredPanel(
+            mode = ChatSurfaceMode.Docked,
+            width = 420.dp,
+            composer = ChatComposerUiState(text = "Compact prompt"),
+        )
+
+        assertCompanionCenteredOn(ComposerTestTags.DOCKED_BAR)
+    }
+
+    @Test
+    fun companionCentersOnThePromptWithRtlAndScaledText() = runComposeUiTest {
+        showMeasuredPanel(
+            mode = ChatSurfaceMode.FullScreen,
+            width = 900.dp,
+            composer = ChatComposerUiState(text = "First line\nSecond line\nThird line\nFourth line"),
+            layoutDirection = LayoutDirection.Rtl,
+            fontScale = 1.5f,
+        )
+
+        assertCompanionCenteredOn(ComposerTestTags.CARD)
     }
 }
