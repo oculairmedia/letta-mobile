@@ -81,7 +81,8 @@ class CanvasExternalSyncParseTest {
             lastExportedJson = lastExportedJson,
             lastDrawing = CanvasWorkspaceSupport.drawingOf(before),
             lastSyncedScene = lastSyncedScene,
+            parse = countingParse,
         )
-        return assertNotNull(CanvasWorkspaceSupport.evaluateExternalDocSync(params, countingParse))
+        return assertNotNull(CanvasWorkspaceSupport.evaluateExternalDocSync(params))
     }
 }

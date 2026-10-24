@@ -116,6 +116,8 @@ internal data class ExternalSyncParams(
     val lastDrawing: JsonObject?,
     /** The session scene, exactly as stored, the board last brought in or saved: the same text again is no change. */
     val lastSyncedScene: String? = null,
+    /** How a scene that must be looked at is parsed: the one parse an import makes. */
+    val parse: (String) -> JsonObject? = CanvasOpProjector::parseSceneOrNull,
 )
 
 internal data class ExternalSyncResult(
@@ -621,31 +623,34 @@ internal object CanvasWorkspaceSupport {
     /**
      * Whether a revision from elsewhere changes this board's drawing. The scene text the board already
      * has (its own save, or the scene it last brought in) is no change and is not parsed at all; any
-     * other is parsed once by [parse], and that one tree is what the board strips, compares, checks and
-     * decodes, so an import never parses the scene a second time.
+     * other is parsed once by [ExternalSyncParams.parse], and that one tree is what the board strips,
+     * compares, checks and decodes, so an import never parses the scene a second time.
      */
-    fun evaluateExternalDocSync(
-        params: ExternalSyncParams,
-        parse: (String) -> JsonObject? = CanvasOpProjector::parseSceneOrNull,
-    ): ExternalSyncResult? {
+    fun evaluateExternalDocSync(params: ExternalSyncParams): ExternalSyncResult? {
         val doc = params.doc ?: return null
         if (doc.revision <= params.lastImportedRev) return null
-        val sceneJson = doc.sceneJson
-        val unchanged = sceneJson.isBlank() || sceneJson == params.lastExportedJson || sceneJson == params.lastSyncedScene
-        if (unchanged) return ExternalSyncResult(shouldImport = false, newImportedRev = doc.revision, statusMessage = null)
-        val scene = parse(sceneJson)
+        if (params.alreadyHas(doc.sceneJson)) return ExternalSyncResult(false, doc.revision, statusMessage = null)
+        return evaluateParsed(doc, params.lastDrawing, params.parse(doc.sceneJson))
+    }
+
+    /** The scene text the board already has: blank, its own save, or what it last brought in. */
+    private fun ExternalSyncParams.alreadyHas(sceneJson: String): Boolean =
+        sceneJson.isBlank() || sceneJson == lastExportedJson || sceneJson == lastSyncedScene
+
+    /** [doc]'s [scene], parsed, against the board's [last] drawing: no import when it draws the same. */
+    private fun evaluateParsed(doc: CanvasDocument, last: JsonObject?, scene: JsonObject?): ExternalSyncResult {
         val drawing = scene?.let(CanvasOpProjector::stripMetadataForDrawBox)
-        val last = params.lastDrawing
-        val shouldImport = drawing == null || last == null || !CanvasOpProjector.drawingsEqual(drawing, last)
-        val changed = if (shouldImport && drawing != null) changedElements(drawing, last) else emptyList()
+        val same = drawing != null && last != null && CanvasOpProjector.drawingsEqual(drawing, last)
+        if (same) return ExternalSyncResult(false, doc.revision, statusMessage = null, scene = scene, drawing = drawing)
+        val changed = drawing?.let { changedElements(it, last) }.orEmpty()
         return ExternalSyncResult(
-            shouldImport = shouldImport,
+            shouldImport = true,
             newImportedRev = doc.revision,
-            statusMessage = if (shouldImport) "Agent updated canvas (rev ${doc.revision})" else null,
+            statusMessage = "Agent updated canvas (rev ${doc.revision})",
             scene = scene,
             drawing = drawing,
             changedElements = changed.size,
-            changedSample = ((changed.firstOrNull() as? JsonObject)?.get("id") as? JsonPrimitive)?.content,
+            changedSample = changed.firstOrNull()?.let(::elementId),
         )
     }
 
@@ -655,6 +660,8 @@ internal object CanvasWorkspaceSupport {
         val before = (last?.get("elements") as? JsonArray)?.toSet().orEmpty()
         return now.filter { it !in before }
     }
+
+    private fun elementId(element: JsonElement): String? = ((element as? JsonObject)?.get("id") as? JsonPrimitive)?.content
 
     /** [sceneJson] parsed and stripped for DrawBox: the drawing a board keeps to compare the next scene with. */
     fun drawingOf(sceneJson: String): JsonObject? =
