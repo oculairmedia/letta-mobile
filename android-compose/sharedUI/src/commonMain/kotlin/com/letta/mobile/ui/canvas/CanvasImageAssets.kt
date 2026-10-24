@@ -82,6 +82,11 @@ internal object CanvasImageAssets {
         runCatching { io.ak1.drawbox.domain.model.DrawingSerializer.deserialize(json) }.getOrNull()
             ?.let { drawing -> if (store != null) resolve(drawing, store) else drawing }
 
+    /** [parse] for a drawing already parsed into [drawing]: decoded from the tree, with no second parse. */
+    fun parse(drawing: kotlinx.serialization.json.JsonObject, store: AssetStore?): PayLoad? =
+        runCatching { io.ak1.drawbox.domain.model.DrawingSerializer.deserialize(drawing) }.getOrNull()
+            ?.let { decoded -> if (store != null) resolve(decoded, store) else decoded }
+
     /** [hydrate] and [keep] for every image in a parsed drawing. */
     fun resolve(payLoad: PayLoad, store: AssetStore): PayLoad {
         if (payLoad.elements.none { it is Element.Image }) return payLoad

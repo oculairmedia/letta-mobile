@@ -438,11 +438,28 @@ class CanvasRelayClient(
 
     private suspend fun op(live: Live, message: CanvasRelayMessage.Op) {
         val applied = applyLocally(message.topic, message.op, vouchedActor(message))
+        received(message, applied)
         if (!applied) unapplied(message)
         // Only after it was applied, and nothing before it is missing: a crash before this
         // replays it, and an op nothing took is replayed by the next join, never skipped.
         if (applied && gate.mayAdvance(CanvasRelayTopic(message.topic))) delivery.advanceCursor(live.connection.hostId, message.topic, message.cursor)
         raiseHostCursor(message.topic, message.cursor)
+    }
+
+    /**
+     * Who wrote each op that arrives, and what it touched: the peer the host relayed it from (an
+     * app's node id, or `agent:<id>`), its actor, the prefix its id was minted with and its kind.
+     * A board that keeps re-reading its scene is named by these.
+     */
+    private fun received(message: CanvasRelayMessage.Op, applied: Boolean) {
+        val op = message.op
+        com.letta.mobile.util.Telemetry.event(
+            "CanvasRelayClient", "op.received",
+            "topic" to message.topic, "cursor" to message.cursor, "origin" to message.origin,
+            "actorId" to op.actorId, "opIdPrefix" to op.opIdPrefix, "kind" to op.kind,
+            "subject" to op.subjectId, "applied" to applied,
+            level = com.letta.mobile.util.Telemetry.Level.DEBUG,
+        )
     }
 
     private suspend fun unapplied(message: CanvasRelayMessage.Op) {

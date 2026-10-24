@@ -236,8 +236,10 @@ object CanvasOpProjector {
     }
 
     /** Every connector's document bindings on the scene root, by element id. */
-    fun arrowBindingsOf(sceneJson: String): Map<String, CanvasArrowBinding> {
-        val parsed = parseScene(sceneJson)
+    fun arrowBindingsOf(sceneJson: String): Map<String, CanvasArrowBinding> = arrowBindingsOf(parseScene(sceneJson))
+
+    /** [arrowBindingsOf] for a scene already parsed. */
+    internal fun arrowBindingsOf(parsed: JsonObject): Map<String, CanvasArrowBinding> {
         val table = runCatching { parsed[ARROW_BINDINGS]?.jsonObject }.getOrNull() ?: return emptyMap()
         return table.mapNotNull { (id, entry) ->
             val value = runCatching { entry.jsonObject[BINDING_VALUE] }.getOrNull() ?: return@mapNotNull null
@@ -277,8 +279,10 @@ object CanvasOpProjector {
      *
      * A document is a shape's label because this says so, not because of what it is called.
      */
-    fun labelOwnersOf(sceneJson: String): Map<String, String> {
-        val parsed = parseScene(sceneJson)
+    fun labelOwnersOf(sceneJson: String): Map<String, String> = labelOwnersOf(parseScene(sceneJson))
+
+    /** [labelOwnersOf] for a scene already parsed. */
+    internal fun labelOwnersOf(parsed: JsonObject): Map<String, String> {
         val table = runCatching { parsed[LABEL_OWNERS]?.jsonObject }.getOrNull() ?: return emptyMap()
         return table.mapNotNull { (documentId, entry) ->
             val shapeId = runCatching { entry.jsonObject[BINDING_VALUE]?.jsonPrimitive?.content }.getOrNull()
@@ -397,9 +401,11 @@ object CanvasOpProjector {
     }
 
     /** The live block documents of [sceneJson], removed ones excluded, ordered by id. */
-    fun documentsOf(sceneJson: String): List<CanvasSceneDocument> {
-        if (sceneJson.isBlank()) return emptyList()
-        val parsed = runCatching { parseScene(sceneJson) }.getOrNull() ?: return emptyList()
+    fun documentsOf(sceneJson: String): List<CanvasSceneDocument> =
+        if (sceneJson.isBlank()) emptyList() else documentsOf(parseScene(sceneJson))
+
+    /** [documentsOf] for a scene already parsed. */
+    internal fun documentsOf(parsed: JsonObject): List<CanvasSceneDocument> {
         return documentEntries(parsed)
             .filter { !isRemovedDocument(it) }
             .mapNotNull { entry ->
@@ -716,11 +722,26 @@ object CanvasOpProjector {
         if (a == null || b == null) return false
         val pa = runCatching { json.parseToJsonElement(a).jsonObject }.getOrNull() ?: return false
         val pb = runCatching { json.parseToJsonElement(b).jsonObject }.getOrNull() ?: return false
-        val ea = runCatching { pa["elements"]?.jsonArray?.toSet() }.getOrNull().orEmpty()
-        val eb = runCatching { pb["elements"]?.jsonArray?.toSet() }.getOrNull().orEmpty()
-        if (ea != eb) return false
-        return pa.filterKeys { it != "elements" } == pb.filterKeys { it != "elements" }
+        return drawingsEqual(pa, pb)
     }
+
+    /**
+     * [drawingsEqual] for drawings already parsed: a board that holds the tree compares without
+     * parsing again. A drawing whose `elements` is not an array is no drawing DrawBox can hold, so
+     * it equals nothing (an `{}` read as no elements would have passed for an empty board).
+     */
+    fun drawingsEqual(a: JsonObject, b: JsonObject): Boolean {
+        val ea = (a["elements"] as? JsonArray)?.toSet() ?: return false
+        val eb = (b["elements"] as? JsonArray)?.toSet() ?: return false
+        return ea == eb && a.filterKeys { it != "elements" } == b.filterKeys { it != "elements" }
+    }
+
+    /** [sceneJson] parsed, or null when it is not a JSON object; a blank scene is the empty one. */
+    fun parseSceneOrNull(sceneJson: String): JsonObject? =
+        if (sceneJson.isBlank()) parseEmptyScene() else runCatching { json.parseToJsonElement(sceneJson) as? JsonObject }.getOrNull()
+
+    /** [scene] printed as this projector prints every scene. */
+    fun encodeScene(scene: JsonObject): String = json.encodeToString(JsonObject.serializer(), scene)
 
     /**
      * The highest lamport any writer left anywhere in [sceneJson] - elements, their tombstones,
@@ -755,14 +776,14 @@ object CanvasOpProjector {
 
     fun stripMetadataForDrawBox(sceneJson: String): String {
         if (sceneJson.isBlank()) return emptySceneJson()
-        return try {
-            val parsed = json.parseToJsonElement(sceneJson).jsonObject
-            val elements = parsed["elements"]?.jsonArray
-            val cleanedElements = if (elements != null) cleanElementsArray(elements) else emptyList()
-            val cleaned = cleanSceneRoot(parsed, cleanedElements)
-            json.encodeToString(JsonObject.serializer(), cleaned)
-        } catch (_: Exception) {
-            sceneJson
-        }
+        val parsed = parseSceneOrNull(sceneJson) ?: return sceneJson
+        return stripMetadataForDrawBox(parsed)?.let(::encodeScene) ?: sceneJson
+    }
+
+    /** [stripMetadataForDrawBox] for a scene already parsed; null when its `elements` is not an array. */
+    fun stripMetadataForDrawBox(scene: JsonObject): JsonObject? {
+        val elements = scene["elements"]
+        if (elements != null && elements !is JsonArray) return null
+        return cleanSceneRoot(scene, (elements as? JsonArray)?.let(::cleanElementsArray).orEmpty())
     }
 }

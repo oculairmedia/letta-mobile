@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Color
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlin.math.roundToInt
 
 fun Color.toHexString(): String {
@@ -536,8 +537,14 @@ object DrawingSerializer {
         return json.encodeToString(SerializableDrawing.serializer(), serializableDrawing)
     }
 
-    fun deserialize(jsonString: String): PayLoad {
-        val serializableDrawing = json.decodeFromString(SerializableDrawing.serializer(), jsonString)
+    fun deserialize(jsonString: String): PayLoad =
+        deserialize(json.decodeFromString(SerializableDrawing.serializer(), jsonString))
+
+    /** [deserialize] for a drawing already parsed: a host holding the tree decodes it without printing and parsing it again. */
+    fun deserialize(drawing: JsonElement): PayLoad =
+        deserialize(json.decodeFromJsonElement(SerializableDrawing.serializer(), drawing))
+
+    private fun deserialize(serializableDrawing: SerializableDrawing): PayLoad {
         val dto = DrawingExportDto(
             bgColor = serializableDrawing.bgColor,
             elements = serializableDrawing.elements.map { element ->

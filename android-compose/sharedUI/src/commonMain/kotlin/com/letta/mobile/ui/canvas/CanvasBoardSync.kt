@@ -19,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonObject
 import kotlin.time.TimeSource
 
 /** How long before asking the host again for an asset it did not have yet. */
@@ -124,12 +125,13 @@ private suspend fun CanvasBoard.openSession(s: CanvasSession) {
     // Parsing the scene is the heaviest thing opening a board does, and a board with pictures on
     // it is megabytes of JSON: it is parsed off the main thread, and only the parsed drawing is
     // handed to the controller on it.
-    val (clean, parsed) = withContext(Dispatchers.Default) { parseOpenedScene(sessionJson) }
+    val opened = withContext(Dispatchers.Default) { parseOpenedScene(sessionJson) }
     // Known even for an empty canvas, or the first note placed on it would read as an external
     // change to the drawing and reload the board.
-    ui.lastDrawing = clean
+    ui.lastDrawing = opened.drawing
+    ui.lastSyncedScene = sessionJson
     if (sessionJson.isNotBlank()) {
-        importOpenedScene(OpenedScene(sessionJson, clean, parsed), s, openStarted)
+        importOpenedScene(opened, s, openStarted)
     }
     ui.importedRevision = lastImportedRev
     delay(LOAD_SETTLE_MS)
@@ -144,18 +146,23 @@ private suspend fun CanvasBoard.openSession(s: CanvasSession) {
     s.document.collect { doc -> lastImportedRev = syncExternalRevision(doc, lastImportedRev) }
 }
 
-/** The scene a session opened with: as stored, stripped for DrawBox, and parsed. */
-private class OpenedScene(val json: String, val clean: String, val parsed: PayLoad?)
+/** The scene a session opened with: as stored, stripped for DrawBox (kept parsed), and decoded. */
+private class OpenedScene(val json: String, val drawing: JsonObject?, val parsed: PayLoad?)
 
 /**
  * Elements DrawBox cannot read are dropped (and reported) first: one of them would otherwise fail
  * the whole scene and open an empty board. A scene that breaks the board's state rules is
- * reported too (see the scene guard).
+ * reported too (see the scene guard). The scene is parsed once, and stripped, checked and decoded
+ * from that tree.
  */
-private fun CanvasBoard.parseOpenedScene(sessionJson: String): Pair<String, PayLoad?> {
-    val stripped = CanvasOpProjector.stripMetadataForDrawBox(sessionJson)
-    val drawable = kept.sceneGuard.drawable(sessionJson)
-    return stripped to if (sessionJson.isBlank()) null else CanvasImageAssets.parse(drawable, host.assets)
+private fun CanvasBoard.parseOpenedScene(sessionJson: String): OpenedScene {
+    val root = CanvasOpProjector.parseSceneOrNull(sessionJson)
+    val parsed = when {
+        sessionJson.isBlank() -> null
+        root != null -> CanvasImageAssets.parse(kept.sceneGuard.drawable(root, sessionJson.length), host.assets)
+        else -> CanvasImageAssets.parse(kept.sceneGuard.drawable(sessionJson), host.assets)
+    }
+    return OpenedScene(sessionJson, root?.let(CanvasOpProjector::stripMetadataForDrawBox), parsed)
 }
 
 private fun CanvasBoard.importOpenedScene(
@@ -165,7 +172,7 @@ private fun CanvasBoard.importOpenedScene(
 ) {
     // A scene that does not parse still goes through the text path, which reports it.
     val parsed = scene.parsed
-    if (parsed != null) controller.importPath(parsed) else controller.importPath(scene.clean)
+    if (parsed != null) controller.importPath(parsed) else controller.importPath(CanvasOpProjector.stripMetadataForDrawBox(scene.json))
     Telemetry.event(
         "CanvasPerformance", "open.loaded",
         "canvasId" to s.canvasId.value,
@@ -185,40 +192,59 @@ private suspend fun CanvasBoard.syncExternalRevision(doc: CanvasDocument?, lastI
         lastImportedRev = lastImportedRev,
         lastExportedJson = ui.lastExportedJson,
         lastDrawing = ui.lastDrawing,
+        lastSyncedScene = ui.lastSyncedScene,
     )
     val (result, parsedExternal) = withContext(Dispatchers.Default) { evaluateExternal(params) } ?: return lastImportedRev
     ui.importedRevision = result.newImportedRev
-    val cleanJson = result.cleanJson?.takeIf { result.shouldImport } ?: return result.newImportedRev
-    importExternalScene(ExternalScene(doc, cleanJson, parsedExternal), importStarted)
+    doc?.let { ui.lastSyncedScene = it.sceneJson }
+    if (!result.shouldImport) return result.newImportedRev
+    importExternalScene(ExternalScene(doc, result, parsedExternal), importStarted)
     result.statusMessage?.let { ui.statusMessage = it }
     return result.newImportedRev
 }
 
+/**
+ * The scene is parsed once, in the evaluation; the guard checks and strips that tree and DrawBox
+ * decodes what it hands back. Only a scene that does not parse at all goes the text way, which
+ * reports it (and draws the last scene that did).
+ */
 private fun CanvasBoard.evaluateExternal(params: ExternalSyncParams): Pair<ExternalSyncResult, PayLoad?>? {
     val evaluated = CanvasWorkspaceSupport.evaluateExternalDocSync(params) ?: return null
-    val payload = evaluated.cleanJson?.takeIf { evaluated.shouldImport }
-        ?.let { CanvasImageAssets.parse(kept.sceneGuard.drawable(params.doc?.sceneJson.orEmpty()), host.assets) }
+    if (!evaluated.shouldImport) return evaluated to null
+    val sceneJson = params.doc?.sceneJson.orEmpty()
+    val drawable = evaluated.scene?.let { kept.sceneGuard.drawable(it, sceneJson.length) }
+    val payload = if (drawable != null) {
+        CanvasImageAssets.parse(drawable, host.assets)
+    } else {
+        CanvasImageAssets.parse(kept.sceneGuard.drawable(sceneJson), host.assets)
+    }
     return evaluated to payload
 }
 
-/** A revision from elsewhere, stripped for DrawBox and parsed. */
-private class ExternalScene(val doc: CanvasDocument?, val cleanJson: String, val parsed: PayLoad?)
+/** A revision from elsewhere: what its evaluation found, and the drawing decoded. */
+private class ExternalScene(val doc: CanvasDocument?, val evaluated: ExternalSyncResult, val parsed: PayLoad?)
 
 private fun CanvasBoard.importExternalScene(scene: ExternalScene, importStarted: TimeSource.Monotonic.ValueTimeMark) {
     // A change from another app must not move this one's camera or tool.
     val parsed = scene.parsed
-    if (parsed != null) controller.importExternal(parsed) else controller.importExternal(scene.cleanJson)
+    if (parsed != null) {
+        controller.importExternal(parsed)
+    } else {
+        controller.importExternal(CanvasOpProjector.stripMetadataForDrawBox(scene.doc?.sceneJson.orEmpty()))
+    }
     Telemetry.event(
         "CanvasPerformance", "sync.imported",
         "revision" to scene.doc?.revision,
-        "sceneChars" to scene.cleanJson.length,
+        "sceneChars" to scene.doc?.sceneJson?.length,
+        "changed" to scene.evaluated.changedElements,
+        "changedSample" to scene.evaluated.changedSample,
         durationMs = importStarted.elapsedNow().inWholeMilliseconds,
         level = Telemetry.Level.DEBUG,
     )
     // Nor put a caret in text placed there: it is known before the caret effect sees it, or text
     // placed on a desktop opened a phone's keyboard.
     kept.knownTextIds = CanvasTextElements.ids(controller.state.value.elements)
-    ui.lastDrawing = scene.cleanJson
+    ui.lastDrawing = scene.evaluated.drawing
     controller.state.value.let { ui.importedDrawing = it.elements to it.bgColor }
 }
 
@@ -340,13 +366,14 @@ private suspend fun CanvasBoard.onJsonExported(json: String) {
     CanvasWorkspaceSupport.computeJsonExportStatus(json, wasAutosaving)?.let { ui.statusMessage = it }
     val s = session ?: return
     if (s.sceneJsonOrEmpty() == json) return
-    // Each strip is a full parse and print of the scene: done off the main thread.
-    ui.lastDrawing = withContext(Dispatchers.Default) { CanvasOpProjector.stripMetadataForDrawBox(json) }
+    // Each strip is a full parse of the scene: done off the main thread.
+    ui.lastDrawing = withContext(Dispatchers.Default) { CanvasWorkspaceSupport.drawingOf(json) }
     val saved = withContext(Dispatchers.Default) {
         s.applyLocalScene(json)
-        CanvasOpProjector.stripMetadataForDrawBox(s.sceneJsonOrEmpty())
+        s.sceneJsonOrEmpty().let { stored -> stored to CanvasWorkspaceSupport.drawingOf(stored) }
     }
-    ui.lastDrawing = saved
+    ui.lastSyncedScene = saved.first
+    ui.lastDrawing = saved.second
     recordDrawingStep()
 }
 
