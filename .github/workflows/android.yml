@@ -610,7 +610,8 @@ jobs:
         # :core:runtime owns its contract tests (letta-mobile-by4vm.58): JVM run
         # plus native/wasm test compiles, in the same invocation.
         run: |
-          ./gradlew :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist :core:runtime:jvmTest :core:runtime:compileTestKotlinHostNative :core:runtime:compileTestKotlinWasmJs :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs :sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs
+          ./gradlew :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist :core:runtime:jvmTest :core:runtime:compileTestKotlinHostNative :core:runtime:compileTestKotlinWasmJs
+          ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs :sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs
           node sharedLogic/karma.config.test.cjs
 
       - name: Save Konan (Kotlin/Native) toolchain
