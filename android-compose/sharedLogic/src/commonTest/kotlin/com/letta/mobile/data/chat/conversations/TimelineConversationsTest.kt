@@ -71,13 +71,43 @@ class TimelineConversationsTest {
     }
 
     @Test
-    fun aFailedListSaysWhyAndKeepsTheListUnloaded() = runTest {
-        val host = IrohHost().apply { failing += "conversation.list" }
+    fun aRosterArrivingAfterAnEmptyInitialRosterLoadsEveryAgentsConversations() = runTest {
+        val host = IrohHost(HostConversation("c1", "agent-1"), HostConversation("c2", "agent-2"))
+        val owner = TimelineConversations(
+            backgroundScope,
+            host.chatGateway(backgroundScope),
+            emptyList(),
+            ConversationManagementPrefs.from(MapSettingsStore()),
+        )
+        runCurrent()
+
+        assertEquals(false, owner.state.value.loaded)
+        assertTrue(host.methods.isEmpty(), "an empty initial roster does not query the backend")
+
+        owner.roster = listOf(Agent(id = nora, name = "Nora"), Agent(id = ivo, name = "Ivo"))
+        runCurrent()
+
+        assertEquals(listOf("c1", "c2"), owner.state.value.conversations.map { it.id.value }.toSet().sorted())
+        owner.refresh()
+        assertEquals(listOf("c1", "c2"), owner.state.value.conversations.map { it.id.value }.toSet().sorted())
+        assertEquals(2, owner.state.value.conversations.map { it.id }.distinct().size)
+    }
+
+    @Test
+    fun aFailedListSaysWhyAndARefreshRecoversTheList() = runTest {
+        val host = IrohHost(HostConversation("c1", "agent-1")).apply { failing += "conversation.list" }
         val owner = owner(host)
         runCurrent()
 
         assertEquals("conversation.list denied", owner.state.value.error)
         assertEquals(false, owner.state.value.loaded)
+
+        host.failing.clear()
+        owner.refresh()
+
+        assertEquals(null, owner.state.value.error)
+        assertEquals(true, owner.state.value.loaded)
+        assertEquals(listOf("c1"), owner.state.value.conversations.map { it.id.value })
     }
 
     @Test
