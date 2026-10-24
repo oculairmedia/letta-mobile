@@ -50,6 +50,10 @@ git push --force-with-lease                 # safe force-push to your branch
 
 ### CI map (what runs where)
 
+For linter coverage verification, test evidence, packaged-build acceptance and
+flake handling, follow [Automated verification](CONTRIBUTING.md#automated-verification).
+A green task with no analysed files or no selected tests is not verification.
+
 **Required** (red blocks merge):
 
 | Check | Workflow | Runs on | What it actually runs |
@@ -726,11 +730,10 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 
 ### Flaky unit tests
 
-- Under cold-VM CPU contention a few timing-sensitive tests can spuriously fail
-  (`AndroidNetworkBridgeStreamingTest` → `SocketTimeoutException`,
-  `LettaDatabaseCharacterizationTest` / `MessageRepositoryE2eTest` → `UncompletedCoroutinesError`).
-  They pass on an isolated re-run (`--tests`); treat these specific failures as flakiness, not a
-  regression.
+- A passing retry is evidence of nondeterminism, not proof the first failure was harmless.
+  Preserve the failing head, attempt, test name and logs; link the owning bead.
+- Two confirmed recurrences on main require P1 triage. Quarantine requires an owner,
+  expiry date and explicit lost-coverage statement. Never silently skip or shrink tests.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 

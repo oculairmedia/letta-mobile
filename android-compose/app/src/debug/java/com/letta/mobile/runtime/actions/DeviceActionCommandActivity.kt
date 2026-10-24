@@ -34,9 +34,9 @@ class DeviceActionCommandActivity : ComponentActivity() {
             Log.w(TAG, "[device-action-command] wrote ${out.absolutePath} command=$commandJson")
         }.onFailure { error ->
             Log.e(TAG, "[device-action-command] failed", error)
-            File(filesDir, OUTPUT_FILE).writeText(
-                """{"command":"unknown","success":false,"error":{"code":"activity_failed","message":${error.message.orEmpty().jsonString()}}}"""
-            )
+            val message = error.message.orEmpty().jsonString()
+            val failure = """{"command":"unknown","success":false,"error":{"code":"activity_failed","message":$message}}"""
+            File(filesDir, OUTPUT_FILE).writeText(failure)
         }
         finish()
         overridePendingTransition(0, 0)

@@ -10,6 +10,12 @@ assert_eq() { [[ "$1" == "$2" ]] || fail "expected '$2', got '$1'"; }
 assert_contains() { [[ "$1" == *"$2"* ]] || fail "expected output to contain '$2': $1"; }
 assert_not_contains() { [[ "$1" != *"$2"* ]] || fail "expected output not to contain '$2': $1"; }
 
+# AGP 9 may omit detekt's Android variant tasks. The aggregate must scan
+# every source set instead of reverting Android modules to the plugin defaults.
+detekt_build="$(<"$SOURCE_ROOT/android-compose/build.gradle.kts")"
+assert_contains "$detekt_build" 'files(allSourceSetDirs(layout.projectDirectory.dir("src").asFile))'
+assert_not_contains "$detekt_build" 'files(pluginDefaultSource)'
+
 # Probe assertions moved with the probe helpers into the JVM CLI. Keep the
 # workflow pointed at that owner: the old sharedLogic filter selects no tests
 # and prevents the hermetic/red-path jobs from running.

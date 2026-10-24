@@ -82,53 +82,14 @@ class LocalAppServerDeviceSmokeTest {
             log("asset extraction ${SystemClock.elapsedRealtime() - extractStart} ms")
             project.storageDirectory.writeLocalProviderAuth(ProviderEndpoint(baseUrl, SMOKE_API_KEY))
 
-            val host = androidLocalAppServerHost(
-                launcher = LibnodeAppServerLauncher(NativeLettaCodeNodeBridge()),
-                launchSource = AndroidLocalAppServerLaunchSource(
-                    context,
-                    EmbeddedLettaCodeAssetExtractor(context),
-                    LocalAndroidNetworkBridge(),
-                    onDeviceBridge = object : OnDeviceOpenAiBridge {
-                        override fun start(modelSelection: EmbeddedLettaCodeModelSelection) =
-                            error("the smoke writes its own provider")
-                    },
-                    lifecycleLog = RuntimeLifecycleLog(context),
-                ),
-                discovery = AppServerDiscovery(http),
-                scope = scope,
-            )
+            val host = createHost(http, scope)
             val acquireStart = SystemClock.elapsedRealtime()
             val lease = host.acquire()
             log("node::Start -> Listening -> readyz ${SystemClock.elapsedRealtime() - acquireStart} ms at ${lease.serverUrl}")
             assertTrue(lease.serverUrl, lease.serverUrl.matches(Regex("""ws://127\.0\.0\.1:\d+""")))
 
             deletingSmokeAgentsAfter(http, lease) {
-                assertServesThisContract(http, lease)
-                val (agentId, conversationId) = createAgentAndConversation(http, lease, modelHandle)
-                val lines = mutableListOf<String>()
-                runAppServerSmokeTurn(
-                    // CIO: the smoke sets a WebSocket maxFrameSize, which Ktor's OkHttp engine refuses.
-                    engineFactory = CIO,
-                    identityPrefix = "device",
-                    spec = AppServerSmokeSpec(
-                        url = lease.serverUrl,
-                        token = lease.bearerToken,
-                        agentId = agentId,
-                        conversationId = conversationId,
-                        message = "Run `${FakeOpenAiServer.TOOL_COMMAND}` with your shell tool and tell me what it printed.",
-                        timeoutMs = TURN_TIMEOUT_MS,
-                    ),
-                    newToken = { UUID.randomUUID().toString() },
-                    emit = { line -> log(line); lines += line },
-                )
-
-                assertTrue(lines.joinToString("\n"), lines.any { it.startsWith("[lifecycle] Completed") })
-                if (fake != null) {
-                    assertTrue("tool call; fake served ${fake.requests}: $lines", lines.any { it.startsWith("[tool-call]") })
-                    assertTrue("tool return: $lines", lines.any { it.startsWith("[tool-return]") })
-                    assertTrue("the shell tool must succeed: $lines", lines.none { it.startsWith("[tool-return] Failed") })
-                }
-                assertImageTurnCompletes(lease, agentId, conversationId)
+                runToolTurn(http, lease, modelHandle, fake)
                 assertTrue("the host is still serving", host.health.value.active)
             }
             lease.close()
@@ -137,6 +98,56 @@ class LocalAppServerDeviceSmokeTest {
             fake?.close()
             scope.cancel()
         }
+    }
+
+    private fun createHost(http: HttpClient, scope: CoroutineScope) = androidLocalAppServerHost(
+        launcher = LibnodeAppServerLauncher(NativeLettaCodeNodeBridge()),
+        launchSource = AndroidLocalAppServerLaunchSource(
+            context,
+            EmbeddedLettaCodeAssetExtractor(context),
+            LocalAndroidNetworkBridge(),
+            onDeviceBridge = object : OnDeviceOpenAiBridge {
+                override fun start(modelSelection: EmbeddedLettaCodeModelSelection) =
+                    error("the smoke writes its own provider")
+            },
+            lifecycleLog = RuntimeLifecycleLog(context),
+        ),
+        discovery = AppServerDiscovery(http),
+        scope = scope,
+    )
+
+    private suspend fun runToolTurn(
+        http: HttpClient,
+        lease: LocalAppServerLease,
+        modelHandle: String,
+        fake: FakeOpenAiServer?,
+    ) {
+        assertServesThisContract(http, lease)
+        val (agentId, conversationId) = createAgentAndConversation(http, lease, modelHandle)
+        val lines = mutableListOf<String>()
+        runAppServerSmokeTurn(
+            // CIO: the smoke sets a WebSocket maxFrameSize, which Ktor's OkHttp engine refuses.
+            engineFactory = CIO,
+            identityPrefix = "device",
+            spec = AppServerSmokeSpec(
+                url = lease.serverUrl,
+                token = lease.bearerToken,
+                agentId = agentId,
+                conversationId = conversationId,
+                message = "Run `${FakeOpenAiServer.TOOL_COMMAND}` with your shell tool and tell me what it printed.",
+                timeoutMs = TURN_TIMEOUT_MS,
+            ),
+            newToken = { UUID.randomUUID().toString() },
+            emit = { line -> log(line); lines += line },
+        )
+
+        assertTrue(lines.joinToString("\n"), lines.any { it.startsWith("[lifecycle] Completed") })
+        if (fake != null) {
+            assertTrue("tool call; fake served ${fake.requests}: $lines", lines.any { it.startsWith("[tool-call]") })
+            assertTrue("tool return: $lines", lines.any { it.startsWith("[tool-return]") })
+            assertTrue("the shell tool must succeed: $lines", lines.none { it.startsWith("[tool-return] Failed") })
+        }
+        assertImageTurnCompletes(lease, agentId, conversationId)
     }
 
     private suspend fun assertImageTurnCompletes(lease: LocalAppServerLease, agentId: String, conversationId: String) {

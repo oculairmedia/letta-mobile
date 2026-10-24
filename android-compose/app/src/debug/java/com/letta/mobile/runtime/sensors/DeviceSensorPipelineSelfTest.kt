@@ -27,53 +27,72 @@ object DeviceSensorPipelineSelfTest {
         val provider = AndroidDeviceSensorSnapshotProvider(context.applicationContext)
         val snapshot = provider.snapshot()
         val summary = DeviceSensorSnapshotFormatter.toCompactString(snapshot)
+        addSnapshotStages(filesDir, snapshot, stages)
+        addMobileActionCapabilityStage(context, filesDir, stages)
+        addHardwareControlStage(context, filesDir, stages)
+
+        val report = PipelineSelfTestReport(
+            passed = stages.all { it.passed }, summary = summary,
+            sensorCount = snapshot.sensorCount, stages = stages,
+            artifacts = listOf(
+                DeviceSensorSelfTestReceiver.OUTPUT_FILE, DeviceSensorSelfTestActivity.READ_SENSORS_OUTPUT_FILE,
+                ACTION_CAPABILITY_MATRIX_FILE, DeviceSensorSelfTestActivity.HARDWARE_CONTROLS_OUTPUT_FILE, REPORT_FILE,
+            ),
+        )
+        File(filesDir, REPORT_FILE).writeText(json.encodeToString(report))
+        return report
+    }
+
+    private fun addSnapshotStages(
+        filesDir: File, snapshot: DeviceSensorSnapshot, stages: MutableList<PipelineStageResult>,
+    ) {
         stages += stage(
-            id = "stage1.raw_android_providers",
-            passed = snapshot.sensorCount > 0,
-            details = "Enumerated ${snapshot.sensorCount} sensors via SensorManager.TYPE_ALL.",
-            artifact = null,
+            "stage1.raw_android_providers", snapshot.sensorCount > 0,
+            "Enumerated ${snapshot.sensorCount} sensors via SensorManager.TYPE_ALL.", null,
         )
         stages += stage(
-            id = "stage2.typed_snapshot",
-            passed = snapshot.capturedAtMillis > 0 && snapshot.battery != null && snapshot.memory != null,
-            details = "Typed snapshot has battery=${snapshot.battery != null}, memory=${snapshot.memory != null}, network=${snapshot.network != null}.",
-            artifact = null,
+            "stage2.typed_snapshot",
+            snapshot.capturedAtMillis > 0 && snapshot.battery != null && snapshot.memory != null,
+            "Typed snapshot has battery=${snapshot.battery != null}, memory=${snapshot.memory != null}, " +
+                "network=${snapshot.network != null}.",
+            null,
         )
 
         val snapshotOut = File(filesDir, DeviceSensorSelfTestReceiver.OUTPUT_FILE)
         snapshotOut.writeText(DeviceSensorSelfTestService.buildSelfTestPayload(snapshot))
 
         val readToolOut = File(filesDir, DeviceSensorSelfTestActivity.READ_SENSORS_OUTPUT_FILE)
-        val readToolText = DeviceSensorReadTool(
-            provider = object : DeviceSensorSnapshotProvider {
-                override fun snapshot(nowMillis: Long): DeviceSensorSnapshot = snapshot
-            },
-        ).handleJson(buildJsonObject { put("mode", "summary") }, snapshot.capturedAtMillis)
+        val readToolText = DeviceSensorReadTool(provider = object : DeviceSensorSnapshotProvider {
+            override fun snapshot(nowMillis: Long): DeviceSensorSnapshot = snapshot
+        }).handleJson(buildJsonObject { put("mode", "summary") }, snapshot.capturedAtMillis)
         readToolOut.writeText(readToolText)
         val readToolPayload = runCatching { json.parseToJsonElement(readToolText).jsonObject }.getOrNull()
         stages += stage(
-            id = "stage4.active_read_sensors_shape",
-            passed = readToolPayload?.get("sensorCount")?.jsonPrimitive?.content?.toIntOrNull() == snapshot.sensorCount,
-            details = "read_sensors summary returned sensorCount=${readToolPayload?.get("sensorCount")?.jsonPrimitive?.content}.",
-            artifact = readToolOut.name,
+            "stage4.active_read_sensors_shape",
+            readToolPayload?.get("sensorCount")?.jsonPrimitive?.content?.toIntOrNull() == snapshot.sensorCount,
+            "read_sensors summary returned sensorCount=${readToolPayload?.get("sensorCount")?.jsonPrimitive?.content}.",
+            readToolOut.name,
         )
+    }
 
+    private fun addMobileActionCapabilityStage(context: Context, filesDir: File, stages: MutableList<PipelineStageResult>) {
         val actionMatrixOut = File(filesDir, ACTION_CAPABILITY_MATRIX_FILE)
         val actionRegistry = MobileActionRegistry(
             providers = setOf(AndroidMobileActionCapabilityProvider(context.applicationContext)),
-            handlers = emptySet(),
-            auditSink = InMemoryMobileActionAuditSink(),
+            handlers = emptySet(), auditSink = InMemoryMobileActionAuditSink(),
         )
         actionMatrixOut.writeText(json.encodeToString(actionRegistry.matrix()))
         val actionMatrixPayload = runCatching { json.parseToJsonElement(actionMatrixOut.readText()).jsonObject }.getOrNull()
         stages += stage(
-            id = "stage5.mobile_action_capability_matrix",
-            passed = actionMatrixPayload?.get("platform")?.jsonPrimitive?.content == "android" &&
+            "stage5.mobile_action_capability_matrix",
+            actionMatrixPayload?.get("platform")?.jsonPrimitive?.content == "android" &&
                 actionRegistry.matrix().capabilities.isNotEmpty(),
-            details = "Wrote ${actionRegistry.matrix().capabilities.size} mobile action capability descriptors for future tools.",
-            artifact = actionMatrixOut.name,
+            "Wrote ${actionRegistry.matrix().capabilities.size} mobile action capability descriptors for future tools.",
+            actionMatrixOut.name,
         )
+    }
 
+    private fun addHardwareControlStage(context: Context, filesDir: File, stages: MutableList<PipelineStageResult>) {
         val hardwareToolOut = File(filesDir, DeviceSensorSelfTestActivity.HARDWARE_CONTROLS_OUTPUT_FILE)
         val hardwareTool = DeviceHardwareControlTool(AndroidDeviceHardwareControlProvider(context.applicationContext))
         val capabilitiesText = hardwareTool.capabilitiesJson()
@@ -101,31 +120,17 @@ object DeviceSensorPipelineSelfTest {
             HardwareControlStatus.BlockedByAndroidPolicy.name,
         )
         stages += stage(
-            id = "stage6.hardware_controls_safe_probe",
-            passed = safeVibration && dryRunFlashlight,
-            details = "Hardware controls probed; vibration status=${vibrationPayload?.get("status")?.jsonPrimitive?.content}, flashlight status=${flashlightPayload?.get("status")?.jsonPrimitive?.content}.",
-            artifact = hardwareToolOut.name,
+            "stage6.hardware_controls_safe_probe",
+            safeVibration && dryRunFlashlight,
+            "Hardware controls probed; " +
+                "vibration status=${vibrationPayload?.get("status")?.jsonPrimitive?.content}, " +
+                "flashlight status=${flashlightPayload?.get("status")?.jsonPrimitive?.content}.",
+            hardwareToolOut.name,
         )
-
-        val report = PipelineSelfTestReport(
-            passed = stages.all { it.passed },
-            summary = summary,
-            sensorCount = snapshot.sensorCount,
-            stages = stages,
-            artifacts = listOf(
-                snapshotOut.name,
-                readToolOut.name,
-                actionMatrixOut.name,
-                hardwareToolOut.name,
-                REPORT_FILE,
-            ),
-        )
-        File(filesDir, REPORT_FILE).writeText(json.encodeToString(report))
-        return report
     }
 
     private fun stage(id: String, passed: Boolean, details: String, artifact: String?): PipelineStageResult =
-        PipelineStageResult(id = id, passed = passed, details = details, artifact = artifact)
+        PipelineStageResult(id, passed, details, artifact)
 }
 
 @kotlinx.serialization.Serializable
