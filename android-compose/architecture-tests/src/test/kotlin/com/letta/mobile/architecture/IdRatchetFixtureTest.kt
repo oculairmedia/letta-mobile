@@ -53,6 +53,31 @@ class IdRatchetFixtureTest {
     }
 
     @Test
+    fun `ignores ordinary and extension String id properties`() {
+        val text = """
+            internal val CanvasOp.subjectId: String?
+            var CanvasOp?.subjectID : String ?
+            val Map<String, List<CanvasOp>>.canvasId: String
+            val agentId : String?
+            class Row(val messageId: String?, private var toolCallID : String)
+        """.trimIndent()
+
+        assertEquals(0, IdRatchetScan.rawIdParameterCount(text))
+    }
+
+    @Test
+    fun `counts parameters on property initializer lines`() {
+        val text = """
+            val CanvasOp.subjectId: String? = computed; val handler = { approvalId : String? -> }
+            var CanvasOp?.subjectID : String ? = computed
+            fun load(agentId : String?, other: Int) {}
+            class Request(val propertyId: String, parameterID : String?)
+        """.trimIndent()
+
+        assertEquals(3, IdRatchetScan.rawIdParameterCount(text))
+    }
+
+    @Test
     fun `growth is NEW and an unbaselined file is NEW`() {
         val drift = CountRatchetBaseline.drift(
             actual = mapOf("a.kt" to 3, "b.kt" to 1),

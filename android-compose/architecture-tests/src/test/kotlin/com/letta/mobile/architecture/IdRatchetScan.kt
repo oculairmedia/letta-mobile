@@ -25,16 +25,28 @@ internal object IdRatchetScan {
 
     /**
      * A parameter (function, constructor or lambda) named `*Id`/`*ID` typed `String` or
-     * `String?`. Declarations preceded by `val `/`var ` are properties, not parameters.
+     * `String?`. Property declarations are removed separately so extension receivers do not
+     * confuse this line-based scan.
      */
-    private val rawIdParameter = Regex("""(?<!val )(?<!var )\b[a-z]\w*(?:Id|ID)\s*:\s*String\b\??(?![\w.<])""")
+    private val rawIdParameter = Regex("""\b[a-z]\w*(?:Id|ID)\s*:\s*String\b\s*\??(?![\w.<])""")
+
+    /** The declaration header of a typed `val`/`var` property, including extension properties. */
+    private val rawIdProperty = Regex(
+        """\b(?:val|var)\s+(?:<[^;\n]*>\s*)?(?:[A-Za-z_]\w*(?:\s*<[^;\n]*>)?\s*\??\s*\.\s*)*""" +
+            """[a-z]\w*(?:Id|ID)\s*:\s*String\b\s*\??(?![\w.<])""",
+    )
 
     fun idLiteralCount(text: String): Int = codeLines(text).sumOf { line ->
         val defaults = if (idContext.containsMatchIn(line)) defaultLiteral.findAll(line).count() else 0
         prefixLiteral.findAll(line).count() + defaults
     }
 
-    fun rawIdParameterCount(text: String): Int = codeLines(text).sumOf { rawIdParameter.findAll(it).count() }
+    fun rawIdParameterCount(text: String): Int = codeLines(text).sumOf { line ->
+        val properties = rawIdProperty.findAll(line).map { it.range }.toList()
+        rawIdParameter.findAll(line).count { parameter -> properties.none { property ->
+            parameter.range.first >= property.first && parameter.range.last <= property.last
+        } }
+    }
 
     /** Per-file counts (relative to [base], `/`-separated), dropping files that count zero. */
     fun countPerFile(base: Path, files: Sequence<File>, counter: (String) -> Int): Map<String, Int> =
