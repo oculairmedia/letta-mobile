@@ -65,7 +65,7 @@ object ShellAgentRailTags {
 
 /**
  * The far-left agent rail: Home on top (fleet-wide, so never in the per-agent panel), the agents as
- * orbs (live mascots where the agent has one), and New pinned at the bottom. Expanded, the header
+ * orbs (cached mascot stills where the agent has one), and New pinned at the bottom. Expanded, the header
  * controls gain labels and [library] replaces the orb list (the desktop's names-and-spaces library);
  * the icons keep their x either way.
  */
@@ -182,15 +182,20 @@ private fun ShellRailOrb(entry: ShellRailEntry, actions: ShellAgentRailActions) 
                 contentAlignment = Alignment.Center,
             ) {
                 if (entry.selected) SelectedRailMarker(Modifier.align(Alignment.CenterStart))
-                // A live mascot shows thinking itself; the ring is for the gradient orb only.
-                if (entry.thinking && entry.identity == null) ShellThinkingRing(diameter = LettaDimens.Orb.md)
                 ShellRailAgentTile(entry = entry, size = LettaDimens.Orb.lg, onClick = { actions.onAgentSelected(entry.agentId) })
+                // Rail mascots stay on their cached still, so the thinking badge remains visible.
+                if (entry.thinking) {
+                    ShellThinkingRing(
+                        diameter = LettaDimens.Orb.md,
+                        modifier = Modifier.testTag("shell-thinking-ring-${entry.key}"),
+                    )
+                }
             }
         }
     }
 }
 
-/** A rail tile: [AgentOrb] with the agent id, so it is the mascot when the agent has an identity. */
+/** A rail tile: [AgentOrb] with its cached mascot still, so a rail never starts a live scene. */
 @Composable
 fun ShellRailAgentTile(
     entry: ShellRailEntry,
@@ -204,6 +209,7 @@ fun ShellRailAgentTile(
         cornerRadius = cornerRadius,
         onClick = onClick,
         agentId = entry.agentId,
+        live = false,
         modifier = Modifier.semantics { contentDescription = entry.tooltip },
     ) {
         Text(
