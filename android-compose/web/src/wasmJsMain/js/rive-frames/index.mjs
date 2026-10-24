@@ -113,8 +113,9 @@ export function pixelByte(pixels, index) {
   return pixels[index];
 }
 
+/** True while the scene still has something to play; false once it has settled into a held pose. */
 export function advance(s, seconds) {
-  if (s.machine) s.machine.advanceAndApply(seconds); else s.artboard.advance(seconds);
+  return s.machine ? s.machine.advanceAndApply(seconds) : s.artboard.advance(seconds);
 }
 
 /** Render pixels to artboard space through the inverse of the last frame's alignment, then hit-test. */

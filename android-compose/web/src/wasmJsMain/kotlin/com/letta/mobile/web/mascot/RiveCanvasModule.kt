@@ -35,8 +35,9 @@ internal external fun riveCopyIntoHeap(skiko: JsAny, pixels: JsAny, address: Int
 @JsName("pixelByte")
 internal external fun rivePixelByte(pixels: JsAny, index: Int): Int
 
+/** False once the state machine has nothing left to play. */
 @JsName("advance")
-internal external fun riveAdvance(scene: JsAny, seconds: Float)
+internal external fun riveAdvance(scene: JsAny, seconds: Float): Boolean
 
 @JsName("pointer")
 internal external fun rivePointer(scene: JsAny, kind: Int, x: Float, y: Float)

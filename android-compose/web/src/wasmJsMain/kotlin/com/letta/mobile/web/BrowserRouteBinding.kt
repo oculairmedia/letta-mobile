@@ -32,3 +32,8 @@ internal class BrowserRouteBinding(private val workspace: ShellWorkspaceState) {
 
     private fun currentRoute(): String = window.location.hash.removePrefix("#")
 }
+
+/** The page was opened with `?perf`: development counters are logged to the console. */
+internal val pagePerfRequested: Boolean by lazy {
+    window.location.search.removePrefix("?").split('&').any { it.substringBefore('=') == "perf" }
+}

@@ -12,7 +12,6 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.plugin.catalog.UnavailablePluginCatalog
 import com.letta.mobile.data.shell.ShellDestination
-import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.shell.workspace.OpenConversation
 import com.letta.mobile.ui.shell.workspace.OpenConversationAgentContextCard
@@ -31,7 +30,6 @@ import com.letta.mobile.ui.shell.pages.ShellAgentEditorHost
 import com.letta.mobile.ui.shell.pages.home.HomePageOptions
 import com.letta.mobile.ui.shell.pages.ShellHomeHost
 import com.letta.mobile.ui.shell.pages.ShellHostPages
-import com.letta.mobile.ui.shell.pages.ShellLibrarySources
 import com.letta.mobile.ui.shell.pages.ShellPageFocus
 import com.letta.mobile.ui.shell.pages.ShellPageHost
 import com.letta.mobile.ui.shell.pages.plugins.PluginsPageBinding
@@ -59,60 +57,50 @@ import com.letta.mobile.ui.shell.workspace.ShellWorkspaceSearch
 import com.letta.mobile.ui.shell.workspace.rememberShellChatPresentation
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.web.chat.WebChatSessionPort
-import com.letta.mobile.web.data.WasmAppServerClientGateway
-import kotlin.time.Clock
-
-/**
- * letta-mobile-ckmub.17.5: what the web adds to the shared shell pages - its Settings services and
- * the gateway's sessions. Every page itself is the shared one desktop binds. Home and project pins
- * and a mascot pick are kept in the browser's settings store (letta-mobile-ckmub.17.7).
- */
-internal class WebPageServices(val gateway: WasmAppServerClientGateway, val settings: SecureSettingsStore) {
-    val sources = ShellLibrarySources(settings = settings, memfs = gateway.memfs)
-}
-
-/** What the web's workspace draws, and its part in it. */
-internal class WebWorkspace(val state: LettaShellWorkspaceState, val host: LettaShellWorkspaceHost)
+import kotlin.time.Instant
 
 /**
  * letta-mobile-ckmub.17.4: the browser binds the same [com.letta.mobile.ui.shell.workspace.LettaShellWorkspace]
  * the desktop window does: the shared navigation over the workspace and its roster, the shared pages
  * in the main pane, the shared overlays, and the shared agent context card with the connection's status.
  */
-internal fun webWorkspace(shell: WebShell, page: WebPageInputs, header: ShellWorkspaceHeaderState): WebWorkspace {
+internal fun webWorkspaceState(shell: WebShell, page: WebPageInputs, header: ShellWorkspaceHeaderState, now: Instant) =
+    LettaShellWorkspaceState(
+        header,
+        shell.workspace.workspaceNavigation(shell.backend.roster, now, conversations = page.chat.list),
+        ShellWorkspaceLayout(sidebarVisible = shell.layout.state.isSidebarVisible),
+    )
+
+/** The web's part in the workspace, kept across passes: every slot reads the [page] as it now stands. */
+internal fun webWorkspaceHost(shell: WebShell, page: androidx.compose.runtime.State<WebPageInputs>): LettaShellWorkspaceHost {
     val workspace = shell.workspace
-    val roster = shell.backend.roster
-    val navigation = workspace.workspaceNavigation(roster, Clock.System.now(), conversations = page.chat.list)
-    return WebWorkspace(
-        state = LettaShellWorkspaceState(header, navigation, ShellWorkspaceLayout(sidebarVisible = shell.layout.state.isSidebarVisible)),
-        host = LettaShellWorkspaceHost(
-            actions = shell.navigator.workspaceNavigationActions(page.chat.list),
-            slots = LettaShellWorkspaceSlots(
-                main = { modifier ->
-                    val deps = rememberShellPageDeps(page.session.graph, page.session.controllers, webPageHost(shell, page))
-                    ShellPage(destination = workspace.destination, deps = deps, modifier = modifier)
-                },
-                agentCard = {
-                    Column {
-                        val session = webContextSession(shell, page)
-                        OpenConversationAgentContextCard(session, shell.workspace.focusedAgentId, page.openConversation()) { picker ->
-                            AgentContextCardBinding(session.context.cardDeps(attention = null), picker)
-                        }
-                        BackendConnectionStatusRow(page.connection)
+    return LettaShellWorkspaceHost(
+        actions = shell.navigator.workspaceNavigationActions(page.value.chat.list),
+        slots = LettaShellWorkspaceSlots(
+            main = { modifier ->
+                val deps = rememberShellPageDeps(page.value.session.graph, page.value.session.controllers, webPageHost(shell, page.value))
+                ShellPage(destination = workspace.destination, deps = deps, modifier = modifier)
+            },
+            agentCard = {
+                Column {
+                    val session = webContextSession(shell, page.value)
+                    OpenConversationAgentContextCard(session, workspace.focusedAgentId, page.value.openConversation()) { picker ->
+                        AgentContextCardBinding(session.context.cardDeps(attention = null), picker)
                     }
-                },
-                // The browser has no background-task roster yet (parity-exemptions.txt).
-                sidePane = {},
-                overlays = {
-                    ShellWorkspaceOverlays(workspace.overlays, webOverlayData(shell, page), webOverlayActions(shell))
-                },
-            ),
-            chrome = ShellWindowChrome.Inline,
-            drawer = shell.drawer,
-            events = ShellWorkspaceEvents(
-                onWidthChanged = { shell.layout.dispatch(ShellLayoutEvent.WindowWidthChanged(it)) },
-                shortcuts = webShortcuts(shell),
-            ),
+                    BackendConnectionStatusRow(page.value.connection)
+                }
+            },
+            // The browser has no background-task roster yet (parity-exemptions.txt).
+            sidePane = {},
+            overlays = {
+                ShellWorkspaceOverlays(workspace.overlays, webOverlayData(shell, page.value), webOverlayActions(shell))
+            },
+        ),
+        chrome = ShellWindowChrome.Inline,
+        drawer = shell.drawer,
+        events = ShellWorkspaceEvents(
+            onWidthChanged = { shell.layout.dispatch(ShellLayoutEvent.WindowWidthChanged(it)) },
+            shortcuts = webShortcuts(shell),
         ),
     )
 }

@@ -22,7 +22,10 @@ import com.letta.mobile.ui.shell.pages.ShellHomeBackendFleetEffect
 import com.letta.mobile.ui.shell.pages.rememberShellLibraryControllers
 import com.letta.mobile.ui.shell.rememberShellWorkspaceState
 import com.letta.mobile.ui.shell.workspace.LettaShellWorkspace
+import com.letta.mobile.ui.shell.workspace.ReportCompositionPasses
 import com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderBinding
+import com.letta.mobile.ui.shell.workspace.rememberCoarseNow
+import com.letta.mobile.ui.shell.workspace.rememberShellWorkspaceHost
 import com.letta.mobile.ui.shell.workspace.rememberShellLayoutController
 import com.letta.mobile.ui.shell.workspace.rememberShellWorkspaceHeader
 import com.letta.mobile.ui.theme.HighContrastPreference
@@ -33,11 +36,7 @@ import com.letta.mobile.web.data.WebPairedHostStore
 import com.letta.mobile.web.mascot.RiveCanvasRenderer
 import kotlinx.coroutines.launch
 
-/**
- * letta-mobile-ckmub.17.4: the web app is bootstrap and browser bindings around the shared
- * [LettaShellWorkspace] the desktop window mounts ([webWorkspace]). Web-side are the App Server gateway,
- * the browser's storage ([WebApp]), and the URL fragment bound to the shared route ([BrowserRouteBinding]).
- */
+/** letta-mobile-ckmub.17.4: bootstrap and browser bindings (gateway, storage, URL) around the shared [LettaShellWorkspace]. */
 @Composable
 fun LettaWebApp() {
     val scope = rememberCoroutineScope()
@@ -74,6 +73,7 @@ fun LettaWebApp() {
     val settings = webSettingsServices(backend.config, app.settingsStore, app.gateway.permissionModeSettings, pairing)
     val page = WebPageInputs(chat, connection, app.canvas, settings, WebPagesSession(graph, controllers, app.services, onRosterChanged))
     val header = rememberShellWorkspaceHeader(ShellWorkspaceHeaderBinding(shell.navigator, layout, webSearch(shell, page), chat.list::tab))
+    val host = rememberShellWorkspaceHost(page, shell, chat.owner, chat.list.state) { webWorkspaceHost(shell, it) }
     CompositionLocalProvider(LocalHighContrastPreference provides highContrastPreference) {
         SharedMaterialTheme {
             // letta-mobile-ckmub.17.36: the root reports the browser's pointer; the workspace turns it into the idiom.
@@ -81,8 +81,8 @@ fun LettaWebApp() {
             ProvideLettaHost(remember(pointer) { LettaHost.Pointer.copy(input = pointer) }) {
                 // letta-mobile-ckmub.17.6: Rive mascots through the shared frame pipeline.
                 ProvideFrameMascots(remember { RiveCanvasRenderer() }, rememberMascotRegistry(backend.agents.value)) {
-                    val bound = webWorkspace(shell, page, header)
-                    LettaShellWorkspace(bound.state, bound.host)
+                    ReportCompositionPasses("workspace root", enabled = pagePerfRequested)
+                    LettaShellWorkspace(webWorkspaceState(shell, page, header, rememberCoarseNow().value), host)
                 }
             }
         }

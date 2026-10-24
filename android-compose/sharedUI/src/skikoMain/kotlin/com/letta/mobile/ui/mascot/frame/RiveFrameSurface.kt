@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -22,11 +23,14 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import kotlin.math.roundToInt
 import kotlin.time.TimeSource
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 
@@ -95,7 +99,7 @@ private class RiveFrameSlots {
  * a frame callback before the effect restarts, and a frame of one size shown at another is wrong.
  */
 private class RiveRenderTarget(
-    private val scene: RiveFrameScene,
+    val scene: RiveFrameScene,
     private val dispatcher: CoroutineDispatcher,
     private val size: IntSize,
     private val slots: RiveFrameSlots,
@@ -125,17 +129,32 @@ private class RiveRenderTarget(
     }
 }
 
+/**
+ * The frame loop's pacing: a frame is asked for only while one is worth drawing. Nothing while the
+ * surface is out of sight ([visible] false: scrolled or clipped away; a hidden browser tab or
+ * minimised window stops the frame clock itself), and nothing while the scene is
+ * [RiveFrameScene.settled] - its last advance left nothing to play - until an input write or a
+ * pointer event [RiveFrameScene.wake]s it. The last frame stays on screen meanwhile.
+ */
+internal suspend fun RiveFrameScene.playFrames(visible: State<Boolean>, frame: suspend (nowNanos: Long) -> Unit) {
+    while (true) {
+        if (!visible.value) snapshotFlow { visible.value }.first { it }
+        if (settled) awaitMotion()
+        frame(withFrameNanos { it })
+    }
+}
+
 /** Plays the scene until the effect is cancelled, feeding every [RiveOnionSkin.stride]th frame to [ring]. */
 private suspend fun RiveRenderTarget.play(
     ring: RiveGhostRing?,
     onion: State<RiveOnionSkin?>,
     onFrameStats: ((nativeMs: Double) -> Unit)?,
+    visible: State<Boolean>,
 ) {
     // Ghosts are sized in pixels, so a resize invalidates every one of them.
     ring?.clear()
     var tick = 0L
-    while (true) {
-        val now = withFrameNanos { it }
+    scene.playFrames(visible) { now ->
         val skin = onion.value
         val wantGhost = ring != null && skin != null && tick % skin.stride.coerceAtLeast(1) == 0L
         val ghost = renderFrame(now, onFrameStats, ghost = wantGhost)
@@ -162,6 +181,8 @@ private fun Modifier.rivePointerInput(scene: RiveFrameScene, renderSize: () -> I
                 val sx = if (size.width > 0) render.width.toFloat() / size.width else 1f
                 val sy = if (size.height > 0) render.height.toFloat() / size.height else 1f
                 scene.pointer(RivePointerEvent(rivePointerKind(event.type), Offset(p.x * sx, p.y * sy)))
+                // A hover or a press can start a listener's animation in a settled scene.
+                scene.wake()
             }
         }
     }
@@ -217,15 +238,21 @@ fun RiveFrameSurface(
     DisposableEffect(ring) { onDispose { ring?.clear() } }
     // Read inside the frame loop so moving the N / stride sliders does not restart it.
     val currentOnion = rememberUpdatedState(onion)
+    // Read inside the frame loop, so scrolling out of sight pauses it rather than restarting it.
+    val visible = remember { mutableStateOf(true) }
 
     LaunchedEffect(scene, size, playing) {
         val pinned = size
         if (pinned.width <= 0 || pinned.height <= 0) return@LaunchedEffect
         val target = RiveRenderTarget(scene, dispatcher, pinned, slots)
-        if (playing) target.play(ring, currentOnion, onFrameStats) else target.renderStill()
+        if (playing) target.play(ring, currentOnion, onFrameStats, visible) else target.renderStill()
     }
 
-    Canvas(modifier.onSizeChanged { nodeSize = it }.rivePointerInput(scene) { size }) {
+    val node = modifier
+        .onSizeChanged { nodeSize = it }
+        .onGloballyPositioned { visible.value = !it.boundsInWindow().isEmpty }
+        .rivePointerInput(scene) { size }
+    Canvas(node) {
         drawOnionGhosts(ring?.ghosts.orEmpty(), onion)
         slots.frame?.let { frame ->
             drawImage(

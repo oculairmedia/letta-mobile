@@ -64,8 +64,14 @@ class FrameMascotEntry private constructor(
             return
         }
         // Back on the UI thread, where every write is made: attaching replays them in order, the
-        // identity first, ahead of the first advance the frame loop queues.
-        sink.attach(created.inputSink)
+        // identity first, ahead of the first advance the frame loop queues. Every write wakes a
+        // settled scene: a new value is something to animate toward.
+        sink.attach(
+            RiveWriteSink { write ->
+                write.applyTo(created.inputSink)
+                created.wake()
+            },
+        )
         rive.load(MASCOT_MODEL)
         scene = created
     }
@@ -82,9 +88,12 @@ class FrameMascotEntry private constructor(
  * The shared contribution of the frame pipeline to the mascot: an offscreen scene per agent,
  * rendered by [renderer] and painted by [RiveFrameSurface] as a Compose node. Desktop and the web
  * bind it with their own renderer; presence, time, gaze and sizing stay the shared
- * [com.letta.mobile.ui.mascot.MascotAvatar]'s, and nothing here is policy.
+ * [com.letta.mobile.ui.mascot.MascotAvatar]'s, and nothing here is policy. Every live surface's
+ * render time is held against the frame budget, and a window over it is logged ([RiveFrameBudget]).
  */
 class FrameMascotHost(private val renderer: RiveFrameRenderer) : MascotHost {
+    private val frameBudget = RiveFrameBudget(report = ::println)
+    private val frameStats: (nativeMs: Double) -> Unit = frameBudget::record
     private val entries = MascotEntries { identity -> FrameMascotEntry(renderer, identity) }
     private val capture = FrameStillCapture(renderer)
     private var cachedStills: MascotStills? = null
@@ -99,7 +108,7 @@ class FrameMascotHost(private val renderer: RiveFrameRenderer) : MascotHost {
     override fun Surface(entry: MascotEntry, modifier: Modifier, playing: Boolean) {
         // Nothing until the scene is up; the entry's state flips and this recomposes into it.
         val scene = (entry as FrameMascotEntry).scene ?: return
-        RiveFrameSurface(scene, renderer.dispatcher, modifier, playing = playing)
+        RiveFrameSurface(scene, renderer.dispatcher, modifier, playing = playing, onFrameStats = frameStats)
     }
 
     /** Captured once per identity (see [MascotStills]); none until the renderer is available. */

@@ -10325,6 +10325,12 @@ public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceOverlaysKt 
 	public static final fun ShellWorkspaceOverlays (Lcom/letta/mobile/data/shell/ShellOverlays;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceOverlayData;Lcom/letta/mobile/ui/shell/workspace/ShellWorkspaceOverlayActions;Landroidx/compose/runtime/Composer;I)V
 }
 
+public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceRememberingKt {
+	public static final fun ReportCompositionPasses-WPi__2c (Ljava/lang/String;ZJLandroidx/compose/runtime/Composer;II)V
+	public static final fun rememberCoarseNow-rnQQ1Ag (JLandroidx/compose/runtime/Composer;II)Landroidx/compose/runtime/State;
+	public static final fun rememberShellWorkspaceHost (Ljava/lang/Object;[Ljava/lang/Object;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceHost;
+}
+
 public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceSearch {
 	public static final field $stable I
 	public fun <init> (Lcom/letta/mobile/data/home/HomePageActions;Lcom/letta/mobile/ui/shell/header/UnifiedSearchSources;)V
