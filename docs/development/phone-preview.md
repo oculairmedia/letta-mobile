@@ -34,7 +34,7 @@ With the flag off, `Main.kt` takes the normal path and nothing below applies.
   dp is one window dp, scaled down in 0.05 steps only when the monitor is too short. Resizing the
   window resizes the phone in dp, like a resizable emulator; the title shows the current size.
 - **Shell.** The shared chat page (desktop's only chat since the hard cut) draws in the Touch idiom with Android's appearance: `ChatToolDetails.Sheet`, no shortcut strip.
-  It opens canvas-first, edge to edge. The full-screen chat has a floating header (menu, agent name,
+  It opens on the full-screen chat, edge to edge (on the canvas when "Open conversations on the canvas" is on, as on Android). The full-screen chat has a floating header (menu, agent name,
   back to the canvas) and passes its height as `topChromeInset`, as `SharedChatPage` does; the
   canvas mode hides the header and keeps the top of the board clear. The desktop's agent rail and
   sidebar move into a navigation drawer, opened from the header's menu, the chat head's agent pane

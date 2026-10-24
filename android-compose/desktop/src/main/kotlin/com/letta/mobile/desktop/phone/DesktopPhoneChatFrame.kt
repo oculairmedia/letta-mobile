@@ -41,9 +41,6 @@ internal class PhoneChatPageInputs(
     val onBackToCanvas: () -> Unit,
 )
 
-/** The phone opens conversations on the canvas, as Android does; the desktop follows its preference. */
-internal fun DesktopPhoneChrome?.opensOnCanvas(preference: Boolean): Boolean = this != null || preference
-
 /**
  * The phone's appearance, as Android's SharedChatPage sets it; [desktop] when there is no phone.
  * The phone's Touch idiom is not set here: its compact window resolves it.

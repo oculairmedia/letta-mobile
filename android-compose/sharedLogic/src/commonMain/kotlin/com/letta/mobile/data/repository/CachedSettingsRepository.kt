@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.storage.OPEN_CHATS_ON_CANVAS_DEFAULT
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
@@ -308,7 +309,7 @@ open class CachedSettingsRepository(
     }
 
     override fun getOpenChatsOnCanvas(): Flow<Boolean> = preferencesStore.snapshots.map { prefs ->
-        prefs.getBoolean(SettingsPreferenceKeys.OPEN_CHATS_ON_CANVAS) ?: true
+        prefs.getBoolean(SettingsPreferenceKeys.OPEN_CHATS_ON_CANVAS) ?: OPEN_CHATS_ON_CANVAS_DEFAULT
     }
 
     override suspend fun setOpenChatsOnCanvas(enabled: Boolean) {

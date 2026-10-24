@@ -27,7 +27,6 @@ import com.letta.mobile.desktop.phone.DesktopPhoneChrome
 import com.letta.mobile.desktop.phone.LocalDesktopPhone
 import com.letta.mobile.desktop.phone.PhoneChatPageInputs
 import com.letta.mobile.desktop.phone.chatAppearance
-import com.letta.mobile.desktop.phone.opensOnCanvas
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
@@ -121,9 +120,10 @@ internal data class DesktopSharedChatPageState(
 )
 
 /**
- * letta-mobile-bglj6.1 (stage 4): the conversation opens on its canvas with the chat docked
- * under it; expanding gives the full-screen page, and swipe up or "Open canvas" returns to the
- * canvas. The page itself is the shared [ShellChatDestination].
+ * letta-mobile-bglj6.1 (stage 4): the conversation opens on the full-screen page, or, with "Open
+ * conversations on the canvas" on, on its canvas with the chat docked under it; swipe up or "Open
+ * canvas" goes to the canvas and expanding the dock returns to the page. The page itself is the
+ * shared [ShellChatDestination].
  */
 @Composable
 internal fun DesktopSharedChatPage(
@@ -136,7 +136,7 @@ internal fun DesktopSharedChatPage(
     val openOnCanvas = LocalDesktopOpenChatsOnCanvas.current
     // The phone preview draws this page as Android's SharedChatPage does; null on the desktop.
     val phone = LocalDesktopPhone.current
-    val presentation = rememberShellChatPresentation(phone.opensOnCanvas(openOnCanvas.enabled.value))
+    val presentation = rememberShellChatPresentation(openOnCanvas.enabled.value)
     val directoryPicker = rememberDesktopWorkingDirectoryPicker(port)
     val host = rememberDesktopChatSurfaceHost(port, navigation, directoryPicker, phone)
     val pageHost = rememberSubagentDualViewHost(host, state.subagents?.views, state.subagents?.entries.orEmpty())

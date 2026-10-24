@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.storage.OPEN_CHATS_ON_CANVAS_DEFAULT
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
@@ -71,6 +72,6 @@ class ActiveConfigSettingsRepository(
     override suspend fun setDynamicColor(enabled: Boolean) = Unit
     override suspend fun setEnableProjects(enabled: Boolean) = Unit
     override suspend fun setHapticsEnabled(enabled: Boolean) = Unit
-    override fun getOpenChatsOnCanvas(): Flow<Boolean> = flowOf(true)
+    override fun getOpenChatsOnCanvas(): Flow<Boolean> = flowOf(OPEN_CHATS_ON_CANVAS_DEFAULT)
     override suspend fun setOpenChatsOnCanvas(enabled: Boolean) = Unit
 }

@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.api.AppServerConnectionTester
+import com.letta.mobile.data.storage.OPEN_CHATS_ON_CANVAS_DEFAULT
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
@@ -58,7 +59,7 @@ data class ConfigUiState(
     val dynamicColor: Boolean = false,
     val enableProjects: Boolean = false,
     val hapticsEnabled: Boolean = true,
-    val openChatsOnCanvas: Boolean = true,
+    val openChatsOnCanvas: Boolean = OPEN_CHATS_ON_CANVAS_DEFAULT,
     val localModelPath: String = "",
     val localModelHandle: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_HANDLE,
     val localModelAccelerator: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_ACCELERATOR,
@@ -156,7 +157,7 @@ class ConfigViewModel @Inject constructor(
     /** The Chat section's settings. */
     val chat: ChatSettings by lazy {
         ChatSettings(
-            openChatsOnCanvas = setting(true, { it.openChatsOnCanvas }, ::updateOpenChatsOnCanvas),
+            openChatsOnCanvas = setting(OPEN_CHATS_ON_CANVAS_DEFAULT, { it.openChatsOnCanvas }, ::updateOpenChatsOnCanvas),
             permissionMode = permissionModeSettings,
         )
     }

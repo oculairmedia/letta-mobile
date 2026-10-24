@@ -1,6 +1,7 @@
 package com.letta.mobile.data.chat.display
 
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
+import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -57,19 +58,34 @@ class ChatFontScaleTest {
     }
 
     @Test
-    fun openOnTheCanvasIsOnUntilTurnedOffAndPersists() = runTest {
-        val settings = InMemorySecureSettingsStore()
-        val preference = OpenChatsOnCanvas(settings, StandardTestDispatcher(testScheduler))
-        assertTrue(preference.enabled.value)
-
-        preference.setEnabled(false)
+    fun aFreshStoreOpensTheFullScreenChat() {
+        val preference = OpenChatsOnCanvas(InMemorySecureSettingsStore())
 
         assertFalse(preference.enabled.value)
-        assertFalse(OpenChatsOnCanvas(settings).enabled.value)
+        assertEquals(
+            ChatSurfacePresentation.ChatFirst,
+            ChatSurfacePresentation.initial(openOnCanvas = preference.enabled.value, hasCanvas = true),
+        )
     }
 
     @Test
-    fun aDamagedOpenOnCanvasValueReadsAsOn() {
-        assertTrue(OpenChatsOnCanvas(InMemorySecureSettingsStore(mapOf("chat.openOnCanvas" to "maybe"))).enabled.value)
+    fun turningOpenOnTheCanvasOnPersistsAndOpensTheCanvas() = runTest {
+        val settings = InMemorySecureSettingsStore()
+        val preference = OpenChatsOnCanvas(settings, StandardTestDispatcher(testScheduler))
+
+        preference.setEnabled(true)
+
+        assertTrue(preference.enabled.value)
+        val reloaded = OpenChatsOnCanvas(settings).enabled.value
+        assertTrue(reloaded)
+        assertEquals(
+            ChatSurfacePresentation.CanvasFirst,
+            ChatSurfacePresentation.initial(openOnCanvas = reloaded, hasCanvas = true),
+        )
+    }
+
+    @Test
+    fun aDamagedOpenOnCanvasValueReadsAsOff() {
+        assertFalse(OpenChatsOnCanvas(InMemorySecureSettingsStore(mapOf("chat.openOnCanvas" to "maybe"))).enabled.value)
     }
 }

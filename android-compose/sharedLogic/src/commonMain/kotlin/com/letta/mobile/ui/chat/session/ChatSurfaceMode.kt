@@ -72,10 +72,10 @@ data class ChatSurfacePresentation(
     val canvasVisible: Boolean get() = mode != ChatSurfaceMode.FullScreen
 
     companion object {
-        /** Canvas-first: the default view is the canvas with the chat docked. */
+        /** Canvas-first: the canvas with the chat docked, the opt-in first view. */
         val CanvasFirst = ChatSurfacePresentation(mode = ChatSurfaceMode.Docked)
 
-        /** Traditional chat: the optional full-screen page. */
+        /** Traditional chat: the full-screen page, the default first view. */
         val ChatFirst = ChatSurfacePresentation(mode = ChatSurfaceMode.FullScreen)
 
         /**
