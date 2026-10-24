@@ -207,7 +207,7 @@ class WasmAppServerSessionTest {
             setOf(CONVERSATION_ID_1.value, CONVERSATION_ID_2.value),
             owner.state.value.conversations.map { it.id.value }.toSet(),
         )
-        assertEquals(2, owner.state.value.conversations.map { it.id }.distinct().size)
+        assertEquals(2, owner.state.value.conversations.size)
 
         val reconnected = TimelineConversations(
             backgroundScope,

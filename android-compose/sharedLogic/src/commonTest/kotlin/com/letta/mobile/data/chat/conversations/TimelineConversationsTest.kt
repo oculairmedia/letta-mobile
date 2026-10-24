@@ -90,7 +90,7 @@ class TimelineConversationsTest {
         assertEquals(listOf("c1", "c2"), owner.state.value.conversations.map { it.id.value }.toSet().sorted())
         owner.refresh()
         assertEquals(listOf("c1", "c2"), owner.state.value.conversations.map { it.id.value }.toSet().sorted())
-        assertEquals(2, owner.state.value.conversations.map { it.id }.distinct().size)
+        assertEquals(2, owner.state.value.conversations.size)
     }
 
     @Test
