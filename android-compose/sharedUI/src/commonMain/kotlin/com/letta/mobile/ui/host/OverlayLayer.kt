@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.text.ProvidePlatformClipboard
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -60,9 +61,12 @@ fun rememberOverlayHost(): OverlayHost = remember { OverlayHost() }
 @Composable
 fun OverlayHostRoot(host: OverlayHost, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalOverlayHost provides host) {
-        Box(modifier) {
-            content()
-            OverlayHostLayer(host, Modifier.matchParentSize())
+        // A Paste that cannot read the clipboard says how to paste instead of doing nothing (ckmub.17.38).
+        ProvidePlatformClipboard(onPasteBlocked = { host.showPasteBlockedHint() }) {
+            Box(modifier) {
+                content()
+                OverlayHostLayer(host, Modifier.matchParentSize())
+            }
         }
     }
 }

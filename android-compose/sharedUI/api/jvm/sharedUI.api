@@ -6469,7 +6469,7 @@ public final class com/letta/mobile/ui/settings/ComposableSingletons$SettingsRow
 public final class com/letta/mobile/ui/settings/ComposableSingletons$SettingsSectionKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/settings/ComposableSingletons$SettingsSectionKt;
 	public fun <init> ()V
-	public final fun getLambda$2128520336$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$212232604$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public abstract interface class com/letta/mobile/ui/settings/ConnectionTest {
@@ -10465,7 +10465,7 @@ public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceOverlaysKt 
 public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceRememberingKt {
 	public static final fun ReportCompositionPasses-WPi__2c (Ljava/lang/String;ZJLandroidx/compose/runtime/Composer;II)V
 	public static final fun rememberCoarseNow-rnQQ1Ag (JLandroidx/compose/runtime/Composer;II)Landroidx/compose/runtime/State;
-	public static final fun rememberShellWorkspaceHost (Ljava/lang/Object;[Ljava/lang/Object;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceHost;
+	public static final fun rememberShellWorkspaceHost (Ljava/lang/Object;Ljava/lang/Object;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/shell/workspace/LettaShellWorkspaceHost;
 }
 
 public final class com/letta/mobile/ui/shell/workspace/ShellWorkspaceSearch {

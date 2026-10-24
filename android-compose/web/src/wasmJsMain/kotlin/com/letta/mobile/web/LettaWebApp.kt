@@ -73,7 +73,7 @@ fun LettaWebApp() {
     val settings = webSettingsServices(backend.config, app.settingsStore, app.gateway.permissionModeSettings, pairing)
     val page = WebPageInputs(chat, connection, app.canvas, settings, WebPagesSession(graph, controllers, app.services, onRosterChanged))
     val header = rememberShellWorkspaceHeader(ShellWorkspaceHeaderBinding(shell.navigator, layout, webSearch(shell, page), chat.list::tab))
-    val host = rememberShellWorkspaceHost(page, shell, chat.owner, chat.list.state) { webWorkspaceHost(shell, it) }
+    val host = rememberShellWorkspaceHost(page, Triple(shell, chat.owner, chat.list.state)) { webWorkspaceHost(shell, it) }
     CompositionLocalProvider(LocalHighContrastPreference provides highContrastPreference) {
         SharedMaterialTheme {
             // letta-mobile-ckmub.17.36: the root reports the browser's pointer; the workspace turns it into the idiom.
