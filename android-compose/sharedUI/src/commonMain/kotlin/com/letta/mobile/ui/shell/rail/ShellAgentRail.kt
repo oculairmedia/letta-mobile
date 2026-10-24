@@ -182,6 +182,7 @@ private fun ShellRailOrb(entry: ShellRailEntry, actions: ShellAgentRailActions) 
                 contentAlignment = Alignment.Center,
             ) {
                 if (entry.selected) SelectedRailMarker(Modifier.align(Alignment.CenterStart))
+                ShellRailAgentTile(entry = entry, size = LettaDimens.Orb.lg, onClick = { actions.onAgentSelected(entry.agentId) })
                 // Rail mascots stay on their cached still, so the thinking badge remains visible.
                 if (entry.thinking) {
                     ShellThinkingRing(
@@ -189,7 +190,6 @@ private fun ShellRailOrb(entry: ShellRailEntry, actions: ShellAgentRailActions) 
                         modifier = Modifier.testTag("shell-thinking-ring-${entry.key}"),
                     )
                 }
-                ShellRailAgentTile(entry = entry, size = LettaDimens.Orb.lg, onClick = { actions.onAgentSelected(entry.agentId) })
             }
         }
     }
