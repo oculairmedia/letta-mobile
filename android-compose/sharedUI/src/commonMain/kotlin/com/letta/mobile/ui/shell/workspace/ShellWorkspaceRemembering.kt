@@ -36,18 +36,18 @@ fun rememberCoarseNow(period: Duration = 1.minutes): State<Instant> =
     }
 
 /**
- * The workspace host [build] makes, kept until one of [keys] changes. Its slots and verbs read the
- * host's [inputs] through the state they are handed, so a pass with new inputs reaches them
- * without a new host.
+ * The workspace host [build] makes, kept until [key] changes (compared by value). Its slots and
+ * verbs read the host's [inputs] through the state they are handed, so a pass with new inputs
+ * reaches them without a new host.
  */
 @Composable
-fun <I> rememberShellWorkspaceHost(
+fun <I, K> rememberShellWorkspaceHost(
     inputs: I,
-    vararg keys: Any?,
+    key: K,
     build: (State<I>) -> LettaShellWorkspaceHost,
 ): LettaShellWorkspaceHost {
     val current = rememberUpdatedState(inputs)
-    return remember(*keys) { build(current) }
+    return remember(key) { build(current) }
 }
 
 /**
