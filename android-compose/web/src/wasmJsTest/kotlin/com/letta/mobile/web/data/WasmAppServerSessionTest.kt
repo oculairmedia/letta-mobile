@@ -68,6 +68,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -165,11 +166,11 @@ class WasmAppServerSessionTest {
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @Test
     fun `wasm conversation owner loads late roster through the app server wire shape and recovers`() = runTest {
-        val roster = listOf(Agent(id = AgentId(AGENT_ID), name = "Nora"))
+        val roster = listOf(Agent(id = AGENT_ID, name = "Nora"))
         val rows = JsonArray(
             listOf(
-                conversationRow(CONVERSATION_ID_1, AGENT_ID, "2026-10-20T10:00:00Z"),
-                conversationRow(CONVERSATION_ID_2, AGENT_ID, "2026-10-21T10:00:00Z"),
+                conversationRow(CONVERSATION_ID_1, AGENT_ID, Instant.parse("2026-10-20T10:00:00Z")),
+                conversationRow(CONVERSATION_ID_2, AGENT_ID, Instant.parse("2026-10-21T10:00:00Z")),
             ),
         )
         val transport = ConversationListTransport(rows, failLists = true)
@@ -190,7 +191,7 @@ class WasmAppServerSessionTest {
         assertTrue(!owner.state.value.error.isNullOrBlank(), "the failed App Server list remains visible in owner state")
         assertTrue(owner.state.value.conversations.isEmpty())
         val query = assertNotNull(transport.requests.single().query)
-        assertEquals(JsonPrimitive(AGENT_ID), query["agent_id"])
+        assertEquals(JsonPrimitive(AGENT_ID.value), query["agent_id"])
         assertEquals(JsonPrimitive(50), query["limit"])
         assertEquals(JsonPrimitive("all"), query["archive_status"])
         assertEquals(JsonPrimitive("desc"), query["order"])
@@ -201,8 +202,11 @@ class WasmAppServerSessionTest {
         owner.refresh()
 
         assertNull(owner.state.value.error)
-        assertEquals(false, owner.state.value.conversations.any { it.agentId != AgentId(AGENT_ID) })
-        assertEquals(setOf(CONVERSATION_ID_1, CONVERSATION_ID_2), owner.state.value.conversations.map { it.id.value }.toSet())
+        assertEquals(false, owner.state.value.conversations.any { it.agentId != AGENT_ID })
+        assertEquals(
+            setOf(CONVERSATION_ID_1.value, CONVERSATION_ID_2.value),
+            owner.state.value.conversations.map { it.id.value }.toSet(),
+        )
         assertEquals(2, owner.state.value.conversations.map { it.id }.distinct().size)
 
         val reconnected = TimelineConversations(
@@ -213,7 +217,10 @@ class WasmAppServerSessionTest {
         )
         runCurrent()
 
-        assertEquals(setOf(CONVERSATION_ID_1, CONVERSATION_ID_2), reconnected.state.value.conversations.map { it.id.value }.toSet())
+        assertEquals(
+            setOf(CONVERSATION_ID_1.value, CONVERSATION_ID_2.value),
+            reconnected.state.value.conversations.map { it.id.value }.toSet(),
+        )
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -223,8 +230,8 @@ class WasmAppServerSessionTest {
         val transport = ConversationListTransport(
             JsonArray(
                 listOf(
-                    conversationRow(CONVERSATION_ID_1, AGENT_ID, "2026-10-20T10:00:00Z"),
-                    conversationRow(CONVERSATION_ID_2, AGENT_ID, "2026-10-21T10:00:00Z"),
+                    conversationRow(CONVERSATION_ID_1, AGENT_ID, Instant.parse("2026-10-20T10:00:00Z")),
+                    conversationRow(CONVERSATION_ID_2, AGENT_ID, Instant.parse("2026-10-21T10:00:00Z")),
                 ),
             ),
         )
@@ -252,19 +259,20 @@ class WasmAppServerSessionTest {
             assertTrue(transport.requests.isEmpty(), "the empty initial roster does not query the App Server")
             assertTrue(home.state.value.fleet.recent.isEmpty())
 
-            roster = listOf(Agent(id = AgentId(AGENT_ID), name = "Nora"))
+            roster = listOf(Agent(id = AGENT_ID, name = "Nora"))
 
             waitUntil("the same owner loads conversations after the roster arrives", timeoutMillis = 5_000) {
                 retainedOwner.state.value.loaded
             }
             assertEquals(
-                setOf(CONVERSATION_ID_1, CONVERSATION_ID_2),
+                setOf(CONVERSATION_ID_1.value, CONVERSATION_ID_2.value),
                 retainedOwner.state.value.conversations.map { it.id.value }.toSet(),
             )
             assertEquals(1, transport.requests.size)
 
             waitUntil("Home's fleet receives the owner's delayed conversation list", timeoutMillis = 5_000) {
-                home.state.value.fleet.recent.map { it.conversationId }.toSet() == setOf(CONVERSATION_ID_1, CONVERSATION_ID_2)
+                home.state.value.fleet.recent.map { it.conversationId }.toSet() ==
+                    setOf(CONVERSATION_ID_1.value, CONVERSATION_ID_2.value)
             }
 
             assertSame(retainedOwner, owner, "the roster update reaches the same owner produced at connection time")
@@ -415,16 +423,20 @@ class WasmAppServerSessionTest {
         override fun setPinned(key: String, pinned: Boolean) = Unit
     }
 
-    private fun conversationRow(id: String, agentId: String, lastMessageAt: String) = buildJsonObject {
-        put("id", id)
-        put("agent_id", agentId)
+    private fun conversationRow(
+        id: DataConversationId,
+        agentId: AgentId,
+        lastMessageAt: Instant,
+    ) = buildJsonObject {
+        put("id", id.value)
+        put("agent_id", agentId.value)
         put("archived", false)
-        put("last_message_at", lastMessageAt)
+        put("last_message_at", lastMessageAt.toString())
     }
 
     private companion object {
-        const val AGENT_ID = "agent-0000000000000000000000000000000000000001"
-        const val CONVERSATION_ID_1 = "conv-0000000000000000000000000000000000000001"
-        const val CONVERSATION_ID_2 = "conv-0000000000000000000000000000000000000002"
+        val AGENT_ID = AgentId("agent-0000000000000000000000000000000000000001")
+        val CONVERSATION_ID_1 = DataConversationId("conv-0000000000000000000000000000000000000001")
+        val CONVERSATION_ID_2 = DataConversationId("conv-0000000000000000000000000000000000000002")
     }
 }
