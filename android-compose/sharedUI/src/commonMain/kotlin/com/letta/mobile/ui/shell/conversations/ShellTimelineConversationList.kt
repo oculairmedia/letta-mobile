@@ -150,6 +150,9 @@ fun rememberTimelineConversations(
     val owner by produceState<TimelineConversations?>(null, connection) {
         val live = backend().takeIf { connection is BackendConnectionStatus.Connected }
         value = live?.let { TimelineConversations(this, it, roster, prefs) }
+        // The owner launches later roster refreshes in this producer's scope.
+        // Keep it alive even when its initial empty-roster refresh finishes.
+        awaitDispose { }
     }
     LaunchedEffect(owner, agents) { owner?.roster = agents }
     return owner
