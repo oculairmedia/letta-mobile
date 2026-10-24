@@ -102,15 +102,28 @@ jobs:
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
-      - name: Cache Konan toolchain
-        uses: actions/cache@v4
+      - name: Restore Konan toolchain
+        id: konan
+        # The K/N toolchain version is the catalog's kotlin version, so the key
+        # is the catalog hash (letta-mobile-uwvx1). Saved only from main pushes
+        # by the per-OS saver job below; PR-scoped entries would eat the quota.
+        uses: actions/cache/restore@v4
         with:
           path: ~/.konan
-          key: ${{ runner.os }}-konan-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/sharedLogic/build.gradle.kts') }}
+          key: ${{ runner.os }}-konan-v2-${{ hashFiles('android-compose/gradle/libs.versions.toml') }}
           restore-keys: |
             ${{ runner.os }}-konan-
       - name: Check Windows public API contracts
         run: ./gradlew.bat --no-daemon --no-parallel --max-workers=1 "-Pkotlin.compiler.execution.strategy=in-process" apiCheck
+      - name: Save Konan (Kotlin/Native) toolchain
+        # Windows saver: klib apiCheck pulls the full Windows K/N toolchain.
+        # success(), not always(): a failed or cancelled build must not save a
+        # partial toolchain. An exact restore hit means nothing new to save.
+        if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.konan.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.konan
+          key: ${{ steps.konan.outputs.cache-primary-key }}
       - name: Upload actual Windows API signatures
         if: always()
         uses: actions/upload-artifact@v4
@@ -174,11 +187,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-project-v1-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/settings.gradle.kts', 'android-compose/**/*.gradle.kts', 'android-compose/gradle/libs.versions.toml', 'android-compose/gradle.properties') }}-
 
-      - name: Cache Konan (Kotlin/Native) toolchain
-        uses: actions/cache@v4
+      - name: Restore Konan (Kotlin/Native) toolchain
+        id: konan
+        # Restore only: the per-OS saver (android.yml shared-multiplatform on
+        # Linux, api-contract-windows on Windows) owns this key on main pushes,
+        # so a job needing a toolchain subset never claims the exact key.
+        uses: actions/cache/restore@v4
         with:
           path: ~/.konan
-          key: ${{ runner.os }}-konan-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/sharedLogic/build.gradle.kts') }}
+          key: ${{ runner.os }}-konan-v2-${{ hashFiles('android-compose/gradle/libs.versions.toml') }}
           restore-keys: |
             ${{ runner.os }}-konan-
 
@@ -540,11 +557,15 @@ jobs:
           # The required test job is the sole PR cache writer.
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
-      - name: Cache Konan (Kotlin/Native) toolchain
-        uses: actions/cache@v4
+      - name: Restore Konan (Kotlin/Native) toolchain
+        id: konan
+        # The K/N toolchain version is the catalog's kotlin version, so the key
+        # is the catalog hash (letta-mobile-uwvx1). Saved only from main pushes
+        # by the per-OS saver job below; PR-scoped entries would eat the quota.
+        uses: actions/cache/restore@v4
         with:
           path: ~/.konan
-          key: ${{ runner.os }}-konan-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/sharedLogic/build.gradle.kts') }}
+          key: ${{ runner.os }}-konan-v2-${{ hashFiles('android-compose/gradle/libs.versions.toml') }}
           restore-keys: |
             ${{ runner.os }}-konan-
 
@@ -592,6 +613,16 @@ jobs:
           ./gradlew :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist :core:runtime:jvmTest :core:runtime:compileTestKotlinHostNative :core:runtime:compileTestKotlinWasmJs
           ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs :sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs
           node sharedLogic/karma.config.test.cjs
+
+      - name: Save Konan (Kotlin/Native) toolchain
+        # Linux saver: the hostNative compiles pull the full Linux K/N toolchain.
+        # success(), not always(): a failed or cancelled build must not save a
+        # partial toolchain. An exact restore hit means nothing new to save.
+        if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.konan.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.konan
+          key: ${{ steps.konan.outputs.cache-primary-key }}
 
   required-test:
     name: test
