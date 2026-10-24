@@ -282,7 +282,7 @@ class CanvasSession(
         com.letta.mobile.util.Telemetry.event(
             "CanvasSession", "remote.contentNeutral",
             "canvasId" to canvasId.value, "actorId" to op.actorId, "opIdPrefix" to op.opIdPrefix,
-            "kind" to op.kind, "subject" to op.subjectId,
+            "kind" to op.kind, "subject" to op.telemetrySubject,
             level = com.letta.mobile.util.Telemetry.Level.DEBUG,
         )
     }

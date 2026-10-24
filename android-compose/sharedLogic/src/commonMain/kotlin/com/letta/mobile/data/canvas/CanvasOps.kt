@@ -217,9 +217,10 @@ val CanvasOp.canvasOpId: CanvasOpId get() = CanvasOpId(opId)
 
 /**
  * What this op writes to, as telemetry names it: the element or document it targets (a batch, its
- * first op's), or null for a scene-wide op (the background, a whole-scene replace).
+ * first op's), or null for a scene-wide op (the background, a whole-scene replace). A log label
+ * only, never an id to look anything up by.
  */
-internal val CanvasOp.subjectId: String?
+internal val CanvasOp.telemetrySubject: String?
     get() = when (this) {
         is CanvasOp.ReplaceSceneOp, is CanvasOp.SetBackgroundOp, is CanvasOp.SetBackgroundPatternOp -> null
         is CanvasOp.AddElementOp -> elementId
@@ -231,7 +232,7 @@ internal val CanvasOp.subjectId: String?
         is CanvasOp.RemoveDocumentOp -> documentId
         is CanvasOp.SetPluginElementOp -> elementId
         is CanvasOp.RemovePluginElementOp -> elementId
-        is CanvasOp.BatchOp -> ops.firstOrNull()?.subjectId
+        is CanvasOp.BatchOp -> ops.firstOrNull()?.telemetrySubject
     }
 
 /** The op's kind as telemetry names it (the class name: `UpdateElementOp`, `BatchOp`...). */

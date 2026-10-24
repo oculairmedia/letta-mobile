@@ -457,7 +457,7 @@ class CanvasRelayClient(
             "CanvasRelayClient", "op.received",
             "topic" to message.topic, "cursor" to message.cursor, "origin" to message.origin,
             "actorId" to op.actorId, "opIdPrefix" to op.opIdPrefix, "kind" to op.kind,
-            "subject" to op.subjectId, "applied" to applied,
+            "subject" to op.telemetrySubject, "applied" to applied,
             level = com.letta.mobile.util.Telemetry.Level.DEBUG,
         )
     }
