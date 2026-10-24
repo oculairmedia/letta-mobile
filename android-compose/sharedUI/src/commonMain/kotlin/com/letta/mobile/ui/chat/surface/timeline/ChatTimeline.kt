@@ -92,6 +92,7 @@ internal fun ChatTimeline(
     val bindings = remember(contexts, callbacks, pinch) { TimelineRowBindings(contexts, callbacks, pinch) }
     var a2uiHeight by remember { mutableStateOf(0.dp) }
     val bottomReserve = if (state.a2uiSurfaces.isNotEmpty()) a2uiHeight else 0.dp
+    val goalActions = remember(actions, capabilities.goals) { GoalCardActions.of(actions, capabilities) }
 
     Box(modifier = modifier.accessibilityTraversal(AccessibilityTraversal.TIMELINE).then(pinchModifier)) {
         Column(Modifier.fillMaxSize()) {
@@ -99,7 +100,7 @@ internal fun ChatTimeline(
             // letta-mobile-bglj6.1.22: on Touch the goal card sits at thumb reach over the composer, as
             // Android's legacy composer column put it; a pointer host keeps it at the top.
             val goalAtBottom = touchStyle()
-            TimelineGoalCard(state, actions, capabilities, topInset, bottom = false)
+            TimelineGoalCard(state, goalActions, topInset, bottom = false)
             // The goal card, when there is one on top, already rests below the chrome; the list starts under it.
             val bodyTopInset = if (goal != null && !goalAtBottom) 0.dp else topInset
             // letta-mobile-bzvro.14: several approvals waiting at once are answered one at a time.
@@ -120,18 +121,11 @@ internal fun ChatTimeline(
                 // The file or memory entry a tool step's chip or a path in its output opens, in the window's detail pane.
                 ToolPreviewPanes { latestState.value.messages.flatMap { it.toolCalls.orEmpty() } }
             }
-            TimelineGoalCard(state, actions, capabilities, topInset, bottom = true)
+            TimelineGoalCard(state, goalActions, topInset, bottom = true)
         }
-        TimelineOverlays(
-            state = state,
-            actions = actions,
-            pinch = pinch,
-            appearance = appearance,
-            topInset = topInset,
-            viewer = viewer,
-            onViewerDismiss = { viewer = null },
-            onA2uiHeight = { a2uiHeight = it },
-        )
+        TimelineA2uiOverlay(state, actions) { a2uiHeight = it }
+        TimelinePinchOverlay(pinch, appearance, topInset)
+        TimelineImageViewerOverlay(viewer) { viewer = null }
     }
 }
 
@@ -161,14 +155,12 @@ private class TimelineBodyParams(
 @Composable
 private fun ColumnScope.TimelineGoalCard(
     state: ChatUiState,
-    actions: ChatActions,
-    capabilities: ChatSurfaceCapabilities,
+    goalActions: GoalCardActions,
     topInset: Dp,
     bottom: Boolean,
 ) {
     val goal = state.goalStatus ?: return
     if (touchStyle() != bottom) return
-    val goalActions = remember(actions, capabilities.goals) { GoalCardActions.of(actions, capabilities) }
     val modifier = Modifier.align(Alignment.CenterHorizontally)
     GoalStatusCard(
         goal,
@@ -179,14 +171,9 @@ private fun ColumnScope.TimelineGoalCard(
 }
 
 @Composable
-private fun BoxScope.TimelineOverlays(
+private fun BoxScope.TimelineA2uiOverlay(
     state: ChatUiState,
     actions: ChatActions,
-    pinch: TimelinePinchScale,
-    appearance: ChatSurfaceAppearance,
-    topInset: Dp,
-    viewer: ImageViewerRequest?,
-    onViewerDismiss: () -> Unit,
     onA2uiHeight: (Dp) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -200,11 +187,26 @@ private fun BoxScope.TimelineOverlays(
             .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm)
             .onSizeChanged { onA2uiHeight(with(density) { it.height.toDp() }) },
     )
+}
+
+@Composable
+private fun BoxScope.TimelinePinchOverlay(
+    pinch: TimelinePinchScale,
+    appearance: ChatSurfaceAppearance,
+    topInset: Dp,
+) {
     PinchScaleReadout(
         pinch,
         TextScale(appearance.fontScale),
         Modifier.align(Alignment.TopCenter).padding(top = topInset + LettaDimens.Space.lg),
     )
+}
+
+@Composable
+private fun BoxScope.TimelineImageViewerOverlay(
+    viewer: ImageViewerRequest?,
+    onViewerDismiss: () -> Unit,
+) {
     viewer?.let { request ->
         ChatImageViewer(images = request.images, initialIndex = request.initialIndex, onDismiss = onViewerDismiss)
     }

@@ -72,7 +72,6 @@ class ChatTimelineUiTest {
     private fun androidx.compose.ui.test.ComposeUiTest.show(
         state: ChatUiState,
         actions: RecordingChatActions,
-        host: ChatSurfaceHost = ChatSurfaceHost(),
         capabilities: ChatSurfaceCapabilities = ChatSurfaceCapabilities.Default,
         canSendStarterPrompts: Boolean = true,
     ) {
@@ -84,7 +83,7 @@ class ChatTimelineUiTest {
                         pagedTimeline = null,
                         actions = actions,
                         capabilities = capabilities,
-                        host = host,
+                        host = ChatSurfaceHost(),
                         appearance = ChatSurfaceAppearance(),
                         canSendStarterPrompts = canSendStarterPrompts,
                     )
@@ -347,7 +346,20 @@ class ChatTimelineUiTest {
             toolCalls = listOf(call),
         )
         val host = ChatSurfaceHost(openSubagent = { callId, agentId, description -> opened += Triple(callId, agentId, description) })
-        show(ready.copy(messages = messages.toPersistentList()), RecordingChatActions(), host)
+        setPointerContent {
+            MaterialTheme {
+                Box(Modifier.size(width = 420.dp, height = 640.dp)) {
+                    ChatTimeline(
+                        state = ready.copy(messages = messages.toPersistentList()),
+                        pagedTimeline = null,
+                        actions = RecordingChatActions(),
+                        capabilities = ChatSurfaceCapabilities.Default,
+                        host = host,
+                        appearance = ChatSurfaceAppearance(),
+                    )
+                }
+            }
+        }
 
         // The dispatch reads as its step among the message's steps, its chip opening the subagent.
         onNodeWithText("to general-purpose · \"Audit the build\"").performClick()

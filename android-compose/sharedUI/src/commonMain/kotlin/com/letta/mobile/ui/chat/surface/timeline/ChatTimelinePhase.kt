@@ -44,8 +44,23 @@ internal fun chatTimelinePhaseOf(
     val conversation = state.conversationState
     if (conversation is ConversationState.Error) return ChatTimelinePhase.Failed(conversation.message)
     if (paged) return ChatTimelinePhase.Ready
-    if (state.hasRenderableContent() || (canSendStarterPrompts && state.isRunInFlight)) return ChatTimelinePhase.Ready
-    return chatTimelineEmptyPhaseOf(state, canSendStarterPrompts)
+    if (state.hasRenderableContent()) return ChatTimelinePhase.Ready
+    return chatTimelinePhaseWithoutContent(state, canSendStarterPrompts)
+}
+
+/** With no content, an interactive run owns the live list; read-only runs settle in the empty phase. */
+private fun chatTimelinePhaseWithoutContent(
+    state: ChatUiState,
+    canSendStarterPrompts: Boolean,
+): ChatTimelinePhase = when (canSendStarterPrompts) {
+    true -> chatTimelineStarterPhaseOf(state)
+    false -> chatTimelineEmptyPhaseOf(state, canSendStarterPrompts = false)
+}
+
+/** A starter prompt can have an active run before it has produced its first row. */
+private fun chatTimelineStarterPhaseOf(state: ChatUiState): ChatTimelinePhase {
+    if (state.isRunInFlight) return ChatTimelinePhase.Ready
+    return chatTimelineEmptyPhaseOf(state, canSendStarterPrompts = true)
 }
 
 /** Phase shown when the timeline has no rows, including a confirmed empty paged history. */
