@@ -1416,7 +1416,9 @@ abstract class com.letta.mobile.ui.mascot.frame/RiveFrameScene { // com.letta.mo
     abstract fun pointer(com.letta.mobile.ui.mascot.frame/RivePointerEvent) // com.letta.mobile.ui.mascot.frame/RiveFrameScene.pointer|pointer(com.letta.mobile.ui.mascot.frame.RivePointerEvent){}[0]
     abstract fun renderImage(androidx.compose.ui.unit/IntSize): org.jetbrains.skia/Image // com.letta.mobile.ui.mascot.frame/RiveFrameScene.renderImage|renderImage(androidx.compose.ui.unit.IntSize){}[0]
     final fun advanceTo(kotlin/Long) // com.letta.mobile.ui.mascot.frame/RiveFrameScene.advanceTo|advanceTo(kotlin.Long){}[0]
+    final fun motionGeneration(): kotlin/Long // com.letta.mobile.ui.mascot.frame/RiveFrameScene.motionGeneration|motionGeneration(){}[0]
     final fun settle() // com.letta.mobile.ui.mascot.frame/RiveFrameScene.settle|settle(){}[0]
+    final fun settleIfUnchanged(kotlin/Long) // com.letta.mobile.ui.mascot.frame/RiveFrameScene.settleIfUnchanged|settleIfUnchanged(kotlin.Long){}[0]
     final fun wake() // com.letta.mobile.ui.mascot.frame/RiveFrameScene.wake|wake(){}[0]
 }
 
