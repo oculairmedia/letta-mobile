@@ -10,7 +10,10 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.Optional
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.ForkJoinWorkerThread
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import com.letta.mobile.data.document.HistoryPressure
 import com.letta.mobile.util.Telemetry
 import org.automerge.repo.Repo
@@ -33,6 +36,8 @@ internal class NotebookStorageHealth(
     /** The repository's cross-process canvas lock; moves and recovery run under it. */
     private val lock: (() -> Unit) -> Unit,
     private val archive: NotebookHistoryArchive = NotebookHistoryArchive(storageRoot),
+    /** Matches NotebookLocalStore's ten-second future deadline; tests use a short bounded value. */
+    private val persistenceTimeoutMillis: Long = TimeUnit.SECONDS.toMillis(PERSISTENCE_TIMEOUT_SECONDS),
 ) : AutoCloseable {
     val faults = CanvasStorageFaults()
     private val quarantined = ConcurrentHashMap.newKeySet<String>()
@@ -58,25 +63,67 @@ internal class NotebookStorageHealth(
      * tasks. Write an incremental chunk through the same observed storage and await it instead.
      * This retains history and makes retries work even when the CRDT transaction changed nothing.
      */
-    fun persistCanvas(id: DocumentId, handle: DocHandle): Boolean {
+    fun persistCanvas(
+        id: DocumentId,
+        handle: DocHandle,
+        snapshot: (Array<ChangeHash>) -> CompletableFuture<Pair<Array<ChangeHash>, ByteArray>> = { previous ->
+            handle.withDocument { doc -> doc.heads to doc.encodeChangesSince(previous) }
+        },
+    ): Boolean {
         checkWritable()
         val key = id.bytes.joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
         // Diagnostics can age out of the bounded list; the backend's refusal remains authoritative.
         if (key in layoutRefused) return false
         val storage = checkNotNull(repositoryStorage)
         val previous = durableHeads[id] ?: emptyArray()
-        val (heads, changes) = handle.withDocument { doc -> doc.heads to doc.encodeChangesSince(previous) }.get()
+        val snapshotResult = snapshotCanvas(key, previous, snapshot) ?: return false
+        val (heads, changes) = snapshotResult
         if (heads.contentEquals(previous)) return true
         val name = archive.storageName(key)
         val chunk = StorageKey(name, "incremental", sha256Hex(changes))
-        return try {
-            storage.put(chunk, changes).get()
-            durableHeads[id] = heads
-            true
-        } catch (_: java.util.concurrent.ExecutionException) {
-            // ObservedStorage has already retained and logged the exact failure.
-            false
-        }
+        return persistChunk(storage, chunk, changes, heads, id, key)
+    }
+
+    private fun snapshotCanvas(
+        key: String,
+        previous: Array<ChangeHash>,
+        snapshot: (Array<ChangeHash>) -> CompletableFuture<Pair<Array<ChangeHash>, ByteArray>>,
+    ): Pair<Array<ChangeHash>, ByteArray>? = try {
+        snapshot(previous).get(persistenceTimeoutMillis, TimeUnit.MILLISECONDS)
+    } catch (error: ExecutionException) {
+        recordCanvasSaveFailure(key, "Notebook canvas snapshot failed; changes remain retryable", error.cause ?: error)
+        null
+    } catch (timeout: TimeoutException) {
+        recordCanvasSaveFailure(key, "Notebook canvas snapshot timed out after ${persistenceTimeoutMillis} ms", timeout)
+        null
+    }
+
+    private fun persistChunk(
+        storage: Storage,
+        chunk: StorageKey,
+        changes: ByteArray,
+        heads: Array<ChangeHash>,
+        id: DocumentId,
+        key: String,
+    ): Boolean = try {
+        storage.put(chunk, changes).get(persistenceTimeoutMillis, TimeUnit.MILLISECONDS)
+        durableHeads[id] = heads
+        true
+    } catch (_: ExecutionException) {
+        // ObservedStorage has already retained and logged the exact failure.
+        false
+    } catch (timeout: TimeoutException) {
+        recordCanvasSaveFailure(key, "Notebook canvas write timed out after ${persistenceTimeoutMillis} ms", timeout)
+        false
+    }
+
+    private fun recordCanvasSaveFailure(key: String, message: String, error: Throwable) {
+        record(
+            CanvasStorageFault.Kind.SAVE_FAILED,
+            Subject(key),
+            message,
+            error,
+        )
     }
 
     @Volatile
@@ -438,6 +485,7 @@ internal class NotebookStorageHealth(
     private enum class BudgetLevel { WARNED, OVER }
 
     companion object {
+        private const val PERSISTENCE_TIMEOUT_SECONDS = 10L
         private const val KIB = 1024L
         private const val PERCENT = 100
 

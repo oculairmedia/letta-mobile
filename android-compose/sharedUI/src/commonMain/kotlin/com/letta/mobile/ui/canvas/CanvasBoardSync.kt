@@ -2,7 +2,7 @@ package com.letta.mobile.ui.canvas
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import com.letta.mobile.data.attachment.AttachmentLimits
@@ -11,6 +11,8 @@ import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
+import com.letta.mobile.ui.canvas.lifetime.CanvasWorkspaceLoadState
+import com.letta.mobile.ui.canvas.lifetime.CanvasWorkspaceSessionLifecycle
 import com.letta.mobile.util.Telemetry
 import io.ak1.drawbox.domain.model.DrawingSerializer
 import io.ak1.drawbox.domain.model.Element
@@ -18,6 +20,7 @@ import io.ak1.drawbox.domain.model.Event
 import io.ak1.drawbox.domain.model.Intent
 import io.ak1.drawbox.domain.model.PayLoad
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
@@ -75,23 +78,56 @@ internal fun CanvasBoardSessionEffects(board: CanvasBoard) {
 
 /** Keeps loading, registration and remote ops alive independently of the selected viewer. */
 @Composable
-internal fun CanvasWorkspaceSessionLifetime(session: CanvasSession?, sessionRegistry: CanvasSessionRegistry?): State<Boolean> {
-    val loaded = remember(session) { mutableStateOf(session == null || session.document.value != null) }
-    LaunchedEffect(session, sessionRegistry) {
+internal fun CanvasWorkspaceSessionLifetime(
+    session: CanvasSession?,
+    sessionRegistry: CanvasSessionRegistry?,
+): CanvasWorkspaceSessionLifecycle {
+    val loadState = remember(session) {
+        mutableStateOf(
+            if (session == null || session.document.value != null) CanvasWorkspaceLoadState.Ready
+            else CanvasWorkspaceLoadState.Loading,
+        )
+    }
+    val retryGeneration = remember(session) { mutableIntStateOf(0) }
+    val retry = remember(loadState, retryGeneration) {
+        {
+            loadState.value = CanvasWorkspaceLoadState.Loading
+            retryGeneration.intValue++
+            Unit
+        }
+    }
+    LaunchedEffect(session, sessionRegistry, retryGeneration.intValue) {
         val activeSession = session ?: return@LaunchedEffect
         var syncJob: Job? = null
         var registered = false
         try {
-            if (!loaded.value) {
-                activeSession.loadIfMissing()
-                loaded.value = true
+            val failure = runCatching {
+                if (activeSession.document.value == null) {
+                    loadState.value = CanvasWorkspaceLoadState.Loading
+                    activeSession.loadIfMissing()
+                }
+                if (sessionRegistry != null && sessionRegistry.get(activeSession.canvasId) !== activeSession) {
+                    sessionRegistry.register(activeSession)
+                    registered = true
+                }
+                syncJob = activeSession.startSync(this)
+                loadState.value = CanvasWorkspaceLoadState.Ready
+                awaitCancellation()
+            }.exceptionOrNull()
+            when (failure) {
+                null -> Unit
+                is CancellationException -> throw failure
+                is Exception -> {
+                    Telemetry.error(
+                        "CanvasWorkspace",
+                        "session.load.failed",
+                        failure,
+                        "canvasId" to activeSession.canvasId.value,
+                    )
+                    loadState.value = CanvasWorkspaceLoadState.Failed
+                }
+                else -> throw failure
             }
-            if (sessionRegistry != null && sessionRegistry.get(activeSession.canvasId) !== activeSession) {
-                sessionRegistry.register(activeSession)
-                registered = true
-            }
-            syncJob = activeSession.startSync(this)
-            awaitCancellation()
         } finally {
             withContext(NonCancellable) {
                 syncJob?.cancelAndJoin()
@@ -101,7 +137,7 @@ internal fun CanvasWorkspaceSessionLifetime(session: CanvasSession?, sessionRegi
             }
         }
     }
-    return loaded
+    return CanvasWorkspaceSessionLifecycle(loadState, retry)
 }
 
 private suspend fun CanvasSession.loadIfMissing() {

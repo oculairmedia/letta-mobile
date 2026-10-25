@@ -32,6 +32,10 @@ Interactive canvas layers, gestures, cameras, selection, notes, formatting and s
 
 Canvas-library status presented through the shared overlay host. `CanvasLibraryNotice` keeps storage failures visible, offers reload-only retry, and withdraws the notice after recovery. Hosts supply the shared library controller; keep persistence and retry policy in sharedLogic rather than the composable.
 
+# Package com.letta.mobile.ui.canvas.lifetime
+
+Internal CanvasWorkspace session-load state and retry action. The workspace owns load, registration and sync sequencing; keep the state adapter independent of canvas rendering and persistence.
+
 # Package com.letta.mobile.ui.canvas.plugin
 
 Plugin element renderers, fallback cards and live-view host contracts. Extend through PluginElementRenderers and PluginViewHost composition locals; plugin execution, capability enforcement and sandbox setup belong to the runtime/host, not fallback rendering. `ProvideCanvasDocumentViewers` registers native sharedUI document renderers with typed IDs; `CanvasWorkspace` keeps the existing `CanvasSession` mounted and supplies extensions only an immutable `CanvasId`/revision/scene snapshot. Registration is an in-process UI extension point; installed process plugins are not loaded as viewers. The canvas viewer ID is reserved and cannot be replaced or removed. The selector scrolls on compact widths. Initial session loading and synchronization belong to the workspace; switching away from the board waits for its pending drawing edits to persist, and a failed save keeps the board and draft visible. Successful switches dispose board rendering and presence work.

@@ -4,6 +4,8 @@ import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Optional
+import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPInputStream
@@ -15,6 +17,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.automerge.AmValue
 import org.automerge.Document
 import org.automerge.ObjectId
+import org.automerge.ChangeHash
 import org.automerge.repo.DocumentId
 import org.automerge.repo.Storage
 import org.automerge.repo.StorageKey
@@ -111,6 +114,196 @@ class NotebookStorageFaultsTest {
             store.upsert(CanvasDocument(canvasId, title = "Failing", revision = 2, sceneJson = """{"elements":[{"id":"b"}]}"""))
             assertTrue(store.get(canvasId)!!.sceneJson.contains("\"b\""))
         }
+    }
+
+    @Test
+    fun aNeverCompletingCanvasWriteTimesOutWithoutAdvancingItsHeadAndCanRetry() = runBlocking {
+        val path = Files.createTempDirectory("notebook-canvas-write-timeout-")
+        NotebookLocalStore(path, "canvas-write-timeout-peer", smallBudget).use { notebooks ->
+            val id = notebooks.create("Timeout")
+            val handle = assertNotNull(notebooks.open(id))
+            val canvasId = CanvasId("write-timeout")
+            val neverCompletes = CompletableFuture<Void>()
+            var putAttempts = 0
+            val health = persistenceHealth(path, ScriptedStorage {
+                putAttempts++
+                if (putAttempts == 1) neverCompletes else CompletableFuture.completedFuture(null)
+            })
+            try {
+                health.rememberCanvas(id.key(), canvasId)
+                val (heads, changes) = handle.withDocument { document ->
+                    document.heads to document.encodeChangesSince(emptyArray())
+                }.get(5, TimeUnit.SECONDS)
+                var retryHeads: Array<ChangeHash>? = null
+                val timedOut = notebooks.withCanvasLock {
+                    health.persistCanvas(id, handle) {
+                        CompletableFuture.completedFuture(heads to changes)
+                    }
+                }
+                assertFalse(timedOut)
+                assertEquals(1, putAttempts)
+                val timeoutFault = health.faults.faults.value.single { it.kind == CanvasStorageFault.Kind.SAVE_FAILED }
+                assertEquals(canvasId, timeoutFault.canvasId)
+                assertTrue(timeoutFault.message.contains("write timed out"), timeoutFault.message)
+
+                assertTrue(
+                    notebooks.withCanvasLock {
+                        health.persistCanvas(id, handle) { previous ->
+                            retryHeads = previous
+                            CompletableFuture.completedFuture(heads to changes)
+                        }
+                    },
+                )
+                assertEquals(2, putAttempts)
+                assertTrue(assertNotNull(retryHeads).isEmpty(), "a timed-out write must remain retryable")
+            } finally {
+                health.close()
+            }
+        }
+    }
+
+    @Test
+    fun aFailedCanvasSnapshotFutureIsRecordedWithoutAdvancingItsHead() = runBlocking {
+        val path = Files.createTempDirectory("notebook-canvas-snapshot-failure-")
+        NotebookLocalStore(path, "canvas-snapshot-failure-peer", smallBudget).use { notebooks ->
+            val id = notebooks.create("Snapshot failure")
+            val handle = assertNotNull(notebooks.open(id))
+            val canvasId = CanvasId("snapshot-failure")
+            var putAttempts = 0
+            val health = persistenceHealth(path, ScriptedStorage {
+                putAttempts++
+                CompletableFuture.completedFuture(null)
+            })
+            try {
+                health.rememberCanvas(id.key(), canvasId)
+                val (heads, changes) = handle.withDocument { document ->
+                    document.heads to document.encodeChangesSince(emptyArray())
+                }.get(5, TimeUnit.SECONDS)
+                val failedSnapshot = CompletableFuture<Pair<Array<ChangeHash>, ByteArray>>().apply {
+                    completeExceptionally(IllegalStateException("snapshot failed"))
+                }
+                assertFalse(
+                    notebooks.withCanvasLock {
+                        health.persistCanvas(id, handle) { failedSnapshot }
+                    },
+                )
+                val snapshotFault = health.faults.faults.value.single { it.kind == CanvasStorageFault.Kind.SAVE_FAILED }
+                assertEquals(canvasId, snapshotFault.canvasId)
+                assertTrue(snapshotFault.message.contains("snapshot"), snapshotFault.message)
+                assertEquals(0, putAttempts)
+
+                var retryHeads: Array<ChangeHash>? = null
+                assertTrue(
+                    notebooks.withCanvasLock {
+                        health.persistCanvas(id, handle) { previous ->
+                            retryHeads = previous
+                            CompletableFuture.completedFuture(heads to changes)
+                        }
+                    },
+                )
+                assertTrue(assertNotNull(retryHeads).isEmpty(), "a failed snapshot must remain retryable")
+                assertEquals(1, putAttempts)
+            } finally {
+                health.close()
+            }
+        }
+    }
+
+    @Test
+    fun aNeverCompletingCanvasSnapshotTimesOutWithoutAdvancingItsHeadAndCanRetry() = runBlocking {
+        val path = Files.createTempDirectory("notebook-canvas-snapshot-timeout-")
+        NotebookLocalStore(path, "canvas-snapshot-timeout-peer", smallBudget).use { notebooks ->
+            val id = notebooks.create("Snapshot timeout")
+            val handle = assertNotNull(notebooks.open(id))
+            val canvasId = CanvasId("snapshot-timeout")
+            var putAttempts = 0
+            val health = persistenceHealth(path, ScriptedStorage {
+                putAttempts++
+                CompletableFuture.completedFuture(null)
+            })
+            try {
+                health.rememberCanvas(id.key(), canvasId)
+                val (heads, changes) = handle.withDocument { document ->
+                    document.heads to document.encodeChangesSince(emptyArray())
+                }.get(5, TimeUnit.SECONDS)
+                val neverCompletes = CompletableFuture<Pair<Array<ChangeHash>, ByteArray>>()
+                assertFalse(
+                    notebooks.withCanvasLock {
+                        health.persistCanvas(id, handle) { neverCompletes }
+                    },
+                )
+                val timeoutFault = health.faults.faults.value.single { it.kind == CanvasStorageFault.Kind.SAVE_FAILED }
+                assertEquals(canvasId, timeoutFault.canvasId)
+                assertTrue(timeoutFault.message.contains("snapshot timed out"), timeoutFault.message)
+                assertEquals(0, putAttempts)
+
+                var retryHeads: Array<ChangeHash>? = null
+                assertTrue(
+                    notebooks.withCanvasLock {
+                        health.persistCanvas(id, handle) { previous ->
+                            retryHeads = previous
+                            CompletableFuture.completedFuture(heads to changes)
+                        }
+                    },
+                )
+                assertTrue(assertNotNull(retryHeads).isEmpty(), "a timed-out snapshot must remain retryable")
+                assertEquals(1, putAttempts)
+            } finally {
+                health.close()
+            }
+        }
+    }
+
+    @Test
+    fun cancellationAndInterruptionWhileWaitingForCanvasSnapshotPropagate() = runBlocking {
+        val path = Files.createTempDirectory("notebook-canvas-snapshot-cancel-")
+        NotebookLocalStore(path, "canvas-snapshot-cancel-peer", smallBudget).use { notebooks ->
+            val id = notebooks.create("Snapshot cancellation")
+            val handle = assertNotNull(notebooks.open(id))
+            val health = persistenceHealth(path, ScriptedStorage { CompletableFuture.completedFuture(null) })
+            try {
+                val cancelled = CompletableFuture<Pair<Array<ChangeHash>, ByteArray>>().apply { cancel(false) }
+                assertFailsWith<CancellationException> {
+                    health.persistCanvas(id, handle) { cancelled }
+                }
+
+                val interrupted = CompletableFuture<Pair<Array<ChangeHash>, ByteArray>>()
+                Thread.currentThread().interrupt()
+                try {
+                    assertFailsWith<InterruptedException> {
+                        health.persistCanvas(id, handle) { interrupted }
+                    }
+                } finally {
+                    Thread.interrupted()
+                }
+                assertTrue(health.faults.faults.value.isEmpty(), "cancellation is not a failed save")
+            } finally {
+                health.close()
+            }
+        }
+    }
+
+    private fun persistenceHealth(path: Path, storage: Storage): NotebookStorageHealth =
+        NotebookStorageHealth(
+            storageRoot = path,
+            budget = smallBudget,
+            index = NotebookDocumentIndex(path),
+            lock = { action -> action() },
+            persistenceTimeoutMillis = 1,
+        ).apply { observe(storage) }
+
+    private class ScriptedStorage(
+        private val put: () -> CompletableFuture<Void>,
+    ) : Storage {
+        override fun load(key: StorageKey): CompletableFuture<Optional<ByteArray>> =
+            CompletableFuture.completedFuture(Optional.empty())
+
+        override fun loadRange(prefix: StorageKey): CompletableFuture<MutableMap<StorageKey, ByteArray>> =
+            CompletableFuture.completedFuture(mutableMapOf())
+
+        override fun put(key: StorageKey, value: ByteArray): CompletableFuture<Void> = put()
+
+        override fun delete(key: StorageKey): CompletableFuture<Void> = CompletableFuture.completedFuture(null)
     }
 
     @Test

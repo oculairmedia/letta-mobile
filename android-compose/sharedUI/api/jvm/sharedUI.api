@@ -558,6 +558,12 @@ public final class com/letta/mobile/ui/canvas/ComposableSingletons$CanvasPropert
 	public final fun getLambda$-24022577$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
+public final class com/letta/mobile/ui/canvas/ComposableSingletons$CanvasWorkspaceKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/ComposableSingletons$CanvasWorkspaceKt;
+	public fun <init> ()V
+	public final fun getLambda$863096003$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
 public final class com/letta/mobile/ui/canvas/DefaultPenTarget : com/letta/mobile/ui/canvas/CanvasPenTarget {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/DefaultPenTarget;

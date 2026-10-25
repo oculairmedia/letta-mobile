@@ -38,6 +38,7 @@ import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
@@ -259,6 +260,56 @@ class CanvasWorkspaceDrawingHandoffTest {
         assertEquals(existing, registry.get(existing.canvasId))
     }
 
+    @Test
+    fun failedLoadReplacesAnEarlyTextViewerAndRetryLoadsTheSession() = runDesktopComposeUiTest(width = 900, height = 700) {
+        val store = ControlledStore()
+        val existing = createSession(store)
+        val loading = CanvasSession(existing.canvasId, store)
+        val registry = CanvasSessionRegistry()
+        val gate = CompletableDeferred<Unit>()
+        store.loadGate = gate
+        store.failLoadsRemaining = 1
+        setContent { MaterialTheme { CanvasWorkspace(session = loading, sessionRegistry = registry, showTitle = false) } }
+
+        waitUntil { store.loads.get() == 1 }
+        onNodeWithTag(canvasViewerOptionTag(CanvasDocumentViewerId.TEXT)).performClick()
+        onNodeWithText("Waiting for canvas content").assertIsDisplayed()
+        gate.complete(Unit)
+        waitUntil {
+            mainClock.advanceTimeByFrame()
+            onAllNodesWithText("Canvas could not be loaded").fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithText("Canvas could not be loaded").assertIsDisplayed()
+        onNodeWithText("Waiting for canvas content").assertDoesNotExist()
+        onNodeWithText("Retry").assertIsDisplayed()
+        assertEquals(null, registry.get(loading.canvasId), "failed sessions must not register")
+
+        onNodeWithText("Retry").performClick()
+        waitUntil {
+            mainClock.advanceTimeByFrame()
+            onAllNodesWithContentDescription("Canvas board").fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithContentDescription("Canvas board").assertIsDisplayed()
+        assertEquals(2, store.loads.get(), "retry must run a new load")
+        assertEquals(loading, registry.get(loading.canvasId))
+    }
+
+    @Test
+    fun cancellationDuringLoadIsNotRenderedAsAFailure() = runDesktopComposeUiTest(width = 900, height = 700) {
+        val store = ControlledStore()
+        val existing = createSession(store)
+        val loading = CanvasSession(existing.canvasId, store)
+        val registry = CanvasSessionRegistry()
+        store.cancelLoads = true
+        setContent { MaterialTheme { CanvasWorkspace(session = loading, sessionRegistry = registry, showTitle = false) } }
+
+        waitUntil { store.loads.get() == 1 }
+        onNodeWithTag(canvasViewerOptionTag(CanvasDocumentViewerId.TEXT)).performClick()
+        onNodeWithText("Waiting for canvas content").assertIsDisplayed()
+        onNodeWithText("Canvas could not be loaded").assertDoesNotExist()
+        assertEquals(null, registry.get(loading.canvasId), "a cancelled load must not register")
+    }
+
     private var editStarted = 0L
 
     private suspend fun ComposeUiTest.mount(session: CanvasSession, controller: DrawBoxController) {
@@ -326,12 +377,19 @@ class CanvasWorkspaceDrawingHandoffTest {
         val failures = AtomicInteger()
         @Volatile var writeGate: CompletableDeferred<Unit>? = null
         @Volatile var loadGate: CompletableDeferred<Unit>? = null
+        @Volatile var failLoadsRemaining = 0
+        @Volatile var cancelLoads = false
         @Volatile var failWrites = false
         @Volatile var reportFaultOnly = false
 
         override suspend fun get(id: CanvasId): CanvasDocument? {
             loads.incrementAndGet()
             loadGate?.await()
+            if (cancelLoads) throw CancellationException("test load cancelled")
+            if (failLoadsRemaining > 0) {
+                failLoadsRemaining--
+                error("test storage load failure")
+            }
             return backing.get(id)
         }
 
