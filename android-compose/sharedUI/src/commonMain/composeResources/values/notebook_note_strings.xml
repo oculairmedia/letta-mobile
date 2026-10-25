@@ -1,0 +1,15 @@
+<resources>
+    <string name="notebook_note_title">Note</string>
+    <string name="notebook_note_markdown">Markdown</string>
+    <string name="notebook_note_save">Save</string>
+    <string name="notebook_note_refresh">Refresh</string>
+    <string name="notebook_note_discard_reload">Discard draft and reload</string>
+    <string name="notebook_note_retry">Retry persistence</string>
+    <string name="notebook_note_loading">Loading note…</string>
+    <string name="notebook_note_saving">Saving…</string>
+    <string name="notebook_note_pending">Applied locally; persistence is still pending</string>
+    <string name="notebook_note_dirty">Unsaved changes</string>
+    <string name="notebook_note_clean">No unsaved changes</string>
+    <string name="notebook_note_conflict">The note changed elsewhere. Your draft is retained. Copy it before discarding and reloading.</string>
+    <string name="notebook_note_not_found">Note not found in the local store</string>
+</resources>
