@@ -82,21 +82,36 @@ private fun NoteToolbar(session: NotebookNoteSession, state: NotebookNoteState, 
     Column(Modifier.fillMaxWidth().padding(LettaDimens.Space.sm)) {
         Text(state.baseline?.title ?: stringResource(Res.string.notebook_note_title), style = MaterialTheme.typography.titleMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-            Button(onClick = { scope.launch { session.save() } }, enabled = state.canSave && state.dirty && !state.pendingDurability) {
-                Text(stringResource(Res.string.notebook_note_save))
-            }
-            TextButton(onClick = { scope.launch { session.refresh() } }, enabled = !state.loading && !state.saving) {
-                Text(stringResource(Res.string.notebook_note_refresh))
-            }
-            TextButton(
-                onClick = { scope.launch { session.discardAndReload() } },
-                enabled = state.baseline != null && !state.loading && !state.saving,
-            ) { Text(stringResource(Res.string.notebook_note_discard_reload)) }
-            if (state.pendingDurability) {
-                TextButton(onClick = { scope.launch { session.retryPersistence() } }, enabled = !state.saving && !state.loading) {
-                    Text(stringResource(Res.string.notebook_note_retry))
-                }
-            }
+            NoteSaveAction(session, state, scope)
+            NoteReloadActions(session, state, scope)
+            NotePersistenceAction(session, state, scope)
+        }
+    }
+}
+
+@Composable
+private fun NoteSaveAction(session: NotebookNoteSession, state: NotebookNoteState, scope: CoroutineScope) {
+    Button(onClick = { scope.launch { session.save() } }, enabled = state.canSave && state.dirty && !state.pendingDurability) {
+        Text(stringResource(Res.string.notebook_note_save))
+    }
+}
+
+@Composable
+private fun NoteReloadActions(session: NotebookNoteSession, state: NotebookNoteState, scope: CoroutineScope) {
+    TextButton(onClick = { scope.launch { session.refresh() } }, enabled = !state.loading && !state.saving) {
+        Text(stringResource(Res.string.notebook_note_refresh))
+    }
+    TextButton(
+        onClick = { scope.launch { session.discardAndReload() } },
+        enabled = state.baseline != null && !state.loading && !state.saving,
+    ) { Text(stringResource(Res.string.notebook_note_discard_reload)) }
+}
+
+@Composable
+private fun NotePersistenceAction(session: NotebookNoteSession, state: NotebookNoteState, scope: CoroutineScope) {
+    if (state.pendingDurability) {
+        TextButton(onClick = { scope.launch { session.retryPersistence() } }, enabled = !state.saving && !state.loading) {
+            Text(stringResource(Res.string.notebook_note_retry))
         }
     }
 }

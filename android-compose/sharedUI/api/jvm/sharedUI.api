@@ -718,11 +718,11 @@ public final class com/letta/mobile/ui/canvas/library/CanvasLibraryNoticeKt {
 public final class com/letta/mobile/ui/canvas/notes/ComposableSingletons$NotebookNoteEditorKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/notes/ComposableSingletons$NotebookNoteEditorKt;
 	public fun <init> ()V
-	public final fun getLambda$-1895878137$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-662582589$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$-827730389$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-2042904544$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1158043402$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1261586918$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
-	public final fun getLambda$2141012816$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1735937374$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$490734485$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/canvas/notes/NotebookNoteEditorKt {

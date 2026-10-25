@@ -43,12 +43,7 @@ class LocalNotebookNoteBackend(private val notebooks: NotebookLocalStore) : Note
             if (!notebooks.persistCanvas(id)) {
                 NotebookNoteSave.PendingDurability(applied, "Local notebook persistence failed; retry to flush")
             } else {
-                val current = snapshot(applied.id)
-                when {
-                    current == null -> NotebookNoteSave.Unavailable("Local notebook disappeared after persistence")
-                    current.markdown != applied.markdown -> NotebookNoteSave.Conflict(current, durable = applied)
-                    else -> NotebookNoteSave.Saved(applied)
-                }
+                persistedResult(applied)
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -56,6 +51,15 @@ class LocalNotebookNoteBackend(private val notebooks: NotebookLocalStore) : Note
             throw error
         } catch (expectedFailure: Exception) {
             NotebookNoteSave.PendingDurability(applied, expectedFailure.message ?: "Local notebook persistence failed")
+        }
+    }
+
+    private fun persistedResult(applied: NotebookNoteSnapshot): NotebookNoteSave {
+        val current = snapshot(applied.id)
+        return when {
+            current == null -> NotebookNoteSave.Unavailable("Local notebook disappeared after persistence")
+            current.markdown != applied.markdown -> NotebookNoteSave.Conflict(current, durable = applied)
+            else -> NotebookNoteSave.Saved(applied)
         }
     }
 

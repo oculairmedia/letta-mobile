@@ -69,21 +69,7 @@ class NotebookNoteSession(val id: NotebookDocumentId, private val backend: Noteb
         val before = state.value
         mutableState.value = before.copy(loading = true, error = null)
         try {
-            when (val result = backend.load(id)) {
-                is NotebookNoteLoad.Found -> {
-                    val current = state.value
-                    val mayReplace = generation == editGeneration && !current.pendingDurability &&
-                        (discard || !before.dirty && !before.conflict)
-                    mutableState.value = current.copy(
-                        baseline = if (mayReplace || current.baseline == null) result.snapshot else current.baseline,
-                        observed = result.snapshot,
-                        draft = if (mayReplace) result.snapshot.markdown else current.draft,
-                        notFound = false,
-                    )
-                }
-                NotebookNoteLoad.NotFound -> mutableState.value = state.value.copy(notFound = true)
-                is NotebookNoteLoad.Unavailable -> mutableState.value = state.value.copy(error = result.reason)
-            }
+            acceptLoad(backend.load(id), before, generation, discard)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (expectedFailure: Exception) {
@@ -92,6 +78,27 @@ class NotebookNoteSession(val id: NotebookDocumentId, private val backend: Noteb
             mutableState.value = state.value.copy(loading = false)
         }
         return !state.value.notFound && state.value.error == null
+    }
+
+    private fun acceptLoad(result: NotebookNoteLoad, before: NotebookNoteState, generation: Long, discard: Boolean) {
+        when (result) {
+            is NotebookNoteLoad.Found -> acceptSnapshot(result.snapshot, mayReplaceDraft(before, generation, discard))
+            NotebookNoteLoad.NotFound -> mutableState.value = state.value.copy(notFound = true)
+            is NotebookNoteLoad.Unavailable -> mutableState.value = state.value.copy(error = result.reason)
+        }
+    }
+
+    private fun mayReplaceDraft(before: NotebookNoteState, generation: Long, discard: Boolean): Boolean =
+        generation == editGeneration && !state.value.pendingDurability && (discard || !before.dirty && !before.conflict)
+
+    private fun acceptSnapshot(snapshot: NotebookNoteSnapshot, mayReplace: Boolean) {
+        val current = state.value
+        mutableState.value = current.copy(
+            baseline = if (mayReplace || current.baseline == null) snapshot else current.baseline,
+            observed = snapshot,
+            draft = if (mayReplace) snapshot.markdown else current.draft,
+            notFound = false,
+        )
     }
 
     private suspend fun saveDraft(): Boolean {
