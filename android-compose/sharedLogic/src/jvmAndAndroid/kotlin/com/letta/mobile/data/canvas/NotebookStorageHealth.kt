@@ -74,14 +74,12 @@ internal class NotebookStorageHealth(
         val key = id.bytes.joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
         // Diagnostics can age out of the bounded list; the backend's refusal remains authoritative.
         if (key in layoutRefused) return false
-        val storage = checkNotNull(repositoryStorage)
+        checkNotNull(repositoryStorage)
         val previous = durableHeads[id] ?: emptyArray()
         val snapshotResult = snapshotCanvas(key, previous, snapshot) ?: return false
         val (heads, changes) = snapshotResult
         if (heads.contentEquals(previous)) return true
-        val name = archive.storageName(key)
-        val chunk = StorageKey(name, "incremental", sha256Hex(changes))
-        return persistChunk(storage, chunk, changes, heads, id, key)
+        return persistChunk(changes, heads, id, key)
     }
 
     private fun snapshotCanvas(
@@ -99,13 +97,13 @@ internal class NotebookStorageHealth(
     }
 
     private fun persistChunk(
-        storage: Storage,
-        chunk: StorageKey,
         changes: ByteArray,
         heads: Array<ChangeHash>,
         id: DocumentId,
         key: String,
     ): Boolean = try {
+        val storage = checkNotNull(repositoryStorage)
+        val chunk = StorageKey(archive.storageName(key), "incremental", sha256Hex(changes))
         storage.put(chunk, changes).get(persistenceTimeoutMillis, TimeUnit.MILLISECONDS)
         durableHeads[id] = heads
         true

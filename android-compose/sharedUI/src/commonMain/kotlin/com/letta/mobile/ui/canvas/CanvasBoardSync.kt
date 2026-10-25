@@ -114,20 +114,7 @@ internal fun CanvasWorkspaceSessionLifetime(
                 loadState.value = CanvasWorkspaceLoadState.Ready
                 awaitCancellation()
             }.exceptionOrNull()
-            when (failure) {
-                null -> Unit
-                is CancellationException -> throw failure
-                is Exception -> {
-                    Telemetry.error(
-                        "CanvasWorkspace",
-                        "session.load.failed",
-                        failure,
-                        "canvasId" to activeSession.canvasId.value,
-                    )
-                    loadState.value = CanvasWorkspaceLoadState.Failed
-                }
-                else -> throw failure
-            }
+            loadState.value = activeSession.completedLoadState(failure)
         } finally {
             withContext(NonCancellable) {
                 syncJob?.cancelAndJoin()
@@ -138,6 +125,16 @@ internal fun CanvasWorkspaceSessionLifetime(
         }
     }
     return CanvasWorkspaceSessionLifecycle(loadState, retry)
+}
+
+private fun CanvasSession.completedLoadState(failure: Throwable?): CanvasWorkspaceLoadState = when (failure) {
+    null -> CanvasWorkspaceLoadState.Ready
+    is CancellationException -> throw failure
+    is Exception -> {
+        Telemetry.error("CanvasWorkspace", "session.load.failed", failure, "canvasId" to canvasId.value)
+        CanvasWorkspaceLoadState.Failed
+    }
+    else -> throw failure
 }
 
 private suspend fun CanvasSession.loadIfMissing() {
