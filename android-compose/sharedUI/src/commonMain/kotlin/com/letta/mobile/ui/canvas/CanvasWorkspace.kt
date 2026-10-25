@@ -94,7 +94,19 @@ fun CanvasWorkspace(
             showTitle, headerTrailing, layout, longPressDrawsSelectionBox, chromeTopInset, cameraRequest,
         ),
     )
-    CanvasWorkspaceBoard(host, modifier)
+    CanvasWorkspaceSessionLifetime(host.session, host.sessionRegistry)
+    val activeSession = host.session
+    if (activeSession == null) {
+        CanvasWorkspaceBoard(host, modifier)
+    } else {
+        CanvasDocumentViewerHost(
+            session = activeSession,
+            modifier = modifier,
+            chromeTopInset = chromeTopInset,
+        ) { boardModifier ->
+            CanvasWorkspaceBoard(host, boardModifier)
+        }
+    }
 }
 
 /**

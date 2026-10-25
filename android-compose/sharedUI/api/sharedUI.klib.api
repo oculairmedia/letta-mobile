@@ -1808,6 +1808,51 @@ final class com.letta.mobile.ui.agenteditor/AgentEditorPanels { // com.letta.mob
         final fun <get-secrets>(): kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>? // com.letta.mobile.ui.agenteditor/AgentEditorPanels.secrets.<get-secrets>|<get-secrets>(){}[0]
 }
 
+final class com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewer { // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewer|null[0]
+    constructor <init>(com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId, kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/String>, kotlin/Function4<com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>) // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewer.<init>|<init>(com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.String>;kotlin.Function4<com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerContext,androidx.compose.ui.Modifier,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>){}[0]
+
+    final val id // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewer.id|{}id[0]
+        final fun <get-id>(): com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewer.id.<get-id>|<get-id>(){}[0]
+    final val label // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewer.label|{}label[0]
+        final fun <get-label>(): kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/String> // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewer.label.<get-label>|<get-label>(){}[0]
+    final val render // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewer.render|{}render[0]
+        final fun <get-render>(): kotlin/Function4<com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext, androidx.compose.ui/Modifier, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit> // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewer.render.<get-render>|<get-render>(){}[0]
+}
+
+final class com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext { // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext|null[0]
+    constructor <init>(com.letta.mobile.data.model/CanvasId, kotlin/Long?, kotlin/String?) // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext.<init>|<init>(com.letta.mobile.data.model.CanvasId;kotlin.Long?;kotlin.String?){}[0]
+
+    final val canvasId // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext.canvasId|{}canvasId[0]
+        final fun <get-canvasId>(): com.letta.mobile.data.model/CanvasId // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext.canvasId.<get-canvasId>|<get-canvasId>(){}[0]
+    final val revision // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext.revision|{}revision[0]
+        final fun <get-revision>(): kotlin/Long? // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext.revision.<get-revision>|<get-revision>(){}[0]
+    final val sceneJson // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext.sceneJson|{}sceneJson[0]
+        final fun <get-sceneJson>(): kotlin/String? // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext.sceneJson.<get-sceneJson>|<get-sceneJson>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.model/CanvasId // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext.component1|component1(){}[0]
+    final fun component2(): kotlin/Long? // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext.component3|component3(){}[0]
+    final fun copy(com.letta.mobile.data.model/CanvasId = ..., kotlin/Long? = ..., kotlin/String? = ...): com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext.copy|copy(com.letta.mobile.data.model.CanvasId;kotlin.Long?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerContext.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers { // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers|null[0]
+    final val all // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers.all|{}all[0]
+        final fun <get-all>(): kotlin.collections/List<com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewer> // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers.all.<get-all>|<get-all>(){}[0]
+
+    final fun contains(com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId): kotlin/Boolean // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers.contains|contains(com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId){}[0]
+    final fun register(com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewer): com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers.register|register(com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewer){}[0]
+    final fun unregister(com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId): com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers.unregister|unregister(com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId){}[0]
+    final fun viewerFor(com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId): com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewer // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers.viewerFor|viewerFor(com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId){}[0]
+
+    final object Companion { // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers.Companion|null[0]
+        final val Core // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers.Companion.Core|{}Core[0]
+            final fun <get-Core>(): com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers.Companion.Core.<get-Core>|<get-Core>(){}[0]
+    }
+}
+
 final class com.letta.mobile.ui.canvas.plugin/PluginAvailability { // com.letta.mobile.ui.canvas.plugin/PluginAvailability|null[0]
     constructor <init>(com.letta.mobile.ui.canvas.plugin/PluginInstallState = ..., kotlin/Boolean = ...) // com.letta.mobile.ui.canvas.plugin/PluginAvailability.<init>|<init>(com.letta.mobile.ui.canvas.plugin.PluginInstallState;kotlin.Boolean){}[0]
 
@@ -8129,6 +8174,24 @@ final class com.letta.mobile.ui.theme/HighContrastPreference { // com.letta.mobi
     final fun set(kotlin/Boolean) // com.letta.mobile.ui.theme/HighContrastPreference.set|set(kotlin.Boolean){}[0]
 }
 
+final value class com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId { // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId|null[0]
+    constructor <init>(kotlin/String) // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId.<init>|<init>(kotlin.String){}[0]
+
+    final val value // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId.value|{}value[0]
+        final fun <get-value>(): kotlin/String // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId.toString|toString(){}[0]
+
+    final object Companion { // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId.Companion|null[0]
+        final val CANVAS // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId.Companion.CANVAS|{}CANVAS[0]
+            final fun <get-CANVAS>(): com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId.Companion.CANVAS.<get-CANVAS>|<get-CANVAS>(){}[0]
+        final val TEXT // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId.Companion.TEXT|{}TEXT[0]
+            final fun <get-TEXT>(): com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId // com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewerId.Companion.TEXT.<get-TEXT>|<get-TEXT>(){}[0]
+    }
+}
+
 final value class com.letta.mobile.ui.components.list/RosterListTag { // com.letta.mobile.ui.components.list/RosterListTag|null[0]
     constructor <init>(kotlin/String) // com.letta.mobile.ui.components.list/RosterListTag.<init>|<init>(kotlin.String){}[0]
 
@@ -11134,12 +11197,17 @@ final val com.letta.mobile.ui.a2ui/com_letta_mobile_ui_a2ui_A2uiLocalStateScope$
 final val com.letta.mobile.ui.agenteditor/com_letta_mobile_ui_agenteditor_AgentEditorPageOptions$stableprop // com.letta.mobile.ui.agenteditor/com_letta_mobile_ui_agenteditor_AgentEditorPageOptions$stableprop|#static{}com_letta_mobile_ui_agenteditor_AgentEditorPageOptions$stableprop[0]
 final val com.letta.mobile.ui.agenteditor/com_letta_mobile_ui_agenteditor_AgentEditorPageTags$stableprop // com.letta.mobile.ui.agenteditor/com_letta_mobile_ui_agenteditor_AgentEditorPageTags$stableprop|#static{}com_letta_mobile_ui_agenteditor_AgentEditorPageTags$stableprop[0]
 final val com.letta.mobile.ui.agenteditor/com_letta_mobile_ui_agenteditor_AgentEditorPanels$stableprop // com.letta.mobile.ui.agenteditor/com_letta_mobile_ui_agenteditor_AgentEditorPanels$stableprop|#static{}com_letta_mobile_ui_agenteditor_AgentEditorPanels$stableprop[0]
+final val com.letta.mobile.ui.canvas.plugin/LocalCanvasDocumentViewers // com.letta.mobile.ui.canvas.plugin/LocalCanvasDocumentViewers|{}LocalCanvasDocumentViewers[0]
+    final fun <get-LocalCanvasDocumentViewers>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers> // com.letta.mobile.ui.canvas.plugin/LocalCanvasDocumentViewers.<get-LocalCanvasDocumentViewers>|<get-LocalCanvasDocumentViewers>(){}[0]
 final val com.letta.mobile.ui.canvas.plugin/LocalPluginAvailability // com.letta.mobile.ui.canvas.plugin/LocalPluginAvailability|{}LocalPluginAvailability[0]
     final fun <get-LocalPluginAvailability>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.canvas.plugin/PluginAvailabilitySource> // com.letta.mobile.ui.canvas.plugin/LocalPluginAvailability.<get-LocalPluginAvailability>|<get-LocalPluginAvailability>(){}[0]
 final val com.letta.mobile.ui.canvas.plugin/LocalPluginElementRenderers // com.letta.mobile.ui.canvas.plugin/LocalPluginElementRenderers|{}LocalPluginElementRenderers[0]
     final fun <get-LocalPluginElementRenderers>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.canvas.plugin/PluginElementRenderers> // com.letta.mobile.ui.canvas.plugin/LocalPluginElementRenderers.<get-LocalPluginElementRenderers>|<get-LocalPluginElementRenderers>(){}[0]
 final val com.letta.mobile.ui.canvas.plugin/LocalPluginViewHost // com.letta.mobile.ui.canvas.plugin/LocalPluginViewHost|{}LocalPluginViewHost[0]
     final fun <get-LocalPluginViewHost>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.canvas.plugin/PluginViewHost?> // com.letta.mobile.ui.canvas.plugin/LocalPluginViewHost.<get-LocalPluginViewHost>|<get-LocalPluginViewHost>(){}[0]
+final val com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewer$stableprop // com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewer$stableprop|#static{}com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewer$stableprop[0]
+final val com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewerContext$stableprop // com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewerContext$stableprop|#static{}com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewerContext$stableprop[0]
+final val com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewers$stableprop // com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewers$stableprop|#static{}com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewers$stableprop[0]
 final val com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_PluginAvailability$stableprop // com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_PluginAvailability$stableprop|#static{}com_letta_mobile_ui_canvas_plugin_PluginAvailability$stableprop[0]
 final val com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_PluginBoard$stableprop // com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_PluginBoard$stableprop|#static{}com_letta_mobile_ui_canvas_plugin_PluginBoard$stableprop[0]
 final val com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_PluginBoardSelection$stableprop // com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_PluginBoardSelection$stableprop|#static{}com_letta_mobile_ui_canvas_plugin_PluginBoardSelection$stableprop[0]
@@ -11942,7 +12010,11 @@ final fun com.letta.mobile.ui.canvas.plugin/CanvasPluginLayer(com.letta.mobile.u
 final fun com.letta.mobile.ui.canvas.plugin/PluginFallbackCard(com.letta.mobile.ui.canvas.plugin/PluginElementView, com.letta.mobile.ui.canvas.plugin/PluginElementChrome, androidx.compose.ui/Modifier?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.canvas.plugin/PluginFallbackCard|PluginFallbackCard(com.letta.mobile.ui.canvas.plugin.PluginElementView;com.letta.mobile.ui.canvas.plugin.PluginElementChrome;androidx.compose.ui.Modifier?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.canvas.plugin/PluginLiveCard(com.letta.mobile.ui.canvas.plugin/PluginElementView, com.letta.mobile.ui.canvas.plugin/PluginElementChrome, androidx.compose.ui/Modifier?, kotlin/Function3<androidx.compose.ui/Modifier, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.canvas.plugin/PluginLiveCard|PluginLiveCard(com.letta.mobile.ui.canvas.plugin.PluginElementView;com.letta.mobile.ui.canvas.plugin.PluginElementChrome;androidx.compose.ui.Modifier?;kotlin.Function3<androidx.compose.ui.Modifier,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.canvas.plugin/PluginViewSlot(com.letta.mobile.ui.canvas.plugin/PluginElementView, com.letta.mobile.ui.canvas.plugin/PluginElementChrome, androidx.compose.ui/Modifier?, kotlin/Function3<com.letta.mobile.ui.canvas.plugin/PluginViewHost, androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.letta.mobile.ui.canvas.plugin/PluginViewSlot|PluginViewSlot(com.letta.mobile.ui.canvas.plugin.PluginElementView;com.letta.mobile.ui.canvas.plugin.PluginElementChrome;androidx.compose.ui.Modifier?;kotlin.Function3<com.letta.mobile.ui.canvas.plugin.PluginViewHost,androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.canvas.plugin/ProvideCanvasDocumentViewers(kotlin/Function1<com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers, com.letta.mobile.ui.canvas.plugin/CanvasDocumentViewers>, kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.canvas.plugin/ProvideCanvasDocumentViewers|ProvideCanvasDocumentViewers(kotlin.Function1<com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewers,com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewers>;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
 final fun com.letta.mobile.ui.canvas.plugin/ProvidePluginElementRenderers(kotlin/Function1<com.letta.mobile.ui.canvas.plugin/PluginElementRenderers, com.letta.mobile.ui.canvas.plugin/PluginElementRenderers>, kotlin/Function2<androidx.compose.runtime/Composer, kotlin/Int, kotlin/Unit>, androidx.compose.runtime/Composer?, kotlin/Int) // com.letta.mobile.ui.canvas.plugin/ProvidePluginElementRenderers|ProvidePluginElementRenderers(kotlin.Function1<com.letta.mobile.ui.canvas.plugin.PluginElementRenderers,com.letta.mobile.ui.canvas.plugin.PluginElementRenderers>;kotlin.Function2<androidx.compose.runtime.Composer,kotlin.Int,kotlin.Unit>;androidx.compose.runtime.Composer?;kotlin.Int){}[0]
+final fun com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewer$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewer$stableprop_getter|com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewer$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewerContext$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewerContext$stableprop_getter|com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewerContext$stableprop_getter(){}[0]
+final fun com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewers$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewers$stableprop_getter|com_letta_mobile_ui_canvas_plugin_CanvasDocumentViewers$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_PluginAvailability$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_PluginAvailability$stableprop_getter|com_letta_mobile_ui_canvas_plugin_PluginAvailability$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_PluginBoard$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_PluginBoard$stableprop_getter|com_letta_mobile_ui_canvas_plugin_PluginBoard$stableprop_getter(){}[0]
 final fun com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_PluginBoardSelection$stableprop_getter(): kotlin/Int // com.letta.mobile.ui.canvas.plugin/com_letta_mobile_ui_canvas_plugin_PluginBoardSelection$stableprop_getter|com_letta_mobile_ui_canvas_plugin_PluginBoardSelection$stableprop_getter(){}[0]

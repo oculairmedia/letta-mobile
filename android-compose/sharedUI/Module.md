@@ -34,7 +34,11 @@ Canvas-library status presented through the shared overlay host. `CanvasLibraryN
 
 # Package com.letta.mobile.ui.canvas.plugin
 
-Plugin element renderers, fallback cards and live-view host contracts. Extend through PluginElementRenderers and PluginViewHost composition locals; plugin execution, capability enforcement and sandbox setup belong to the runtime/host, not fallback rendering.
+Plugin element renderers, fallback cards and live-view host contracts. Extend through PluginElementRenderers and PluginViewHost composition locals; plugin execution, capability enforcement and sandbox setup belong to the runtime/host, not fallback rendering. `ProvideCanvasDocumentViewers` registers native sharedUI document renderers with typed IDs; `CanvasWorkspace` keeps the existing `CanvasSession` mounted and supplies extensions only an immutable `CanvasId`/revision/scene snapshot. Registration is an in-process UI extension point; installed process plugins are not loaded as viewers.
+
+# Package com.letta.mobile.ui.canvas.viewer
+
+Internal document viewer surfaces, including the read-only text rendering used by the canvas viewer SPI.
 
 # Package com.letta.mobile.ui.chat
 

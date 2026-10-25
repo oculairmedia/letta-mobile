@@ -8,14 +8,18 @@ import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasHistory
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.util.Telemetry
 import io.ak1.drawbox.domain.model.DrawingSerializer
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Event
 import io.ak1.drawbox.domain.model.Intent
 import io.ak1.drawbox.domain.model.PayLoad
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,7 +37,7 @@ private const val AUTOSAVE_DEBOUNCE_MS = 500L
 
 /**
  * The board's work with its session and its drawing: folding old labels, the background, the
- * load and the live sync, the autosave, the images and the export events. Launched in this
+ * load and live document import, the autosave, the images and the export events. Launched in this
  * order, which is the order the board has always relied on.
  */
 @Composable
@@ -51,7 +55,7 @@ internal fun CanvasBoardSessionEffects(board: CanvasBoard) {
     val pattern = board.docs.backgroundPattern
     LaunchedEffect(pattern) { board.applyBackgroundPattern(pattern) }
     // Load the initial JSON diagram or the session document and observe external session updates.
-    LaunchedEffect(session, board.host.initialJson) { board.loadBoard(this) }
+    LaunchedEffect(session, board.host.initialJson) { board.loadBoard() }
     // Autosave: debounced on a dirty signal (elements or background colour change), then
     // exportJson(); the resulting Event.JsonExported persists the updated scene off the main
     // thread. The background colour is part of the exported drawing, and the export is the only
@@ -67,6 +71,29 @@ internal fun CanvasBoardSessionEffects(board: CanvasBoard) {
         board.fetchMissingAssets()
     }
     LaunchedEffect(board.controller, session) { board.collectBoardEvents() }
+}
+
+/**
+ * Keeps the live session reachable by external tools and receiving remote ops for the lifetime
+ * of the workspace, even when a document viewer does not compose the board. Board loading and
+ * DrawBox imports remain owned by [CanvasBoardSessionEffects] and run only while canvas is shown.
+ */
+@Composable
+internal fun CanvasWorkspaceSessionLifetime(session: CanvasSession?, sessionRegistry: CanvasSessionRegistry?) {
+    LaunchedEffect(session, sessionRegistry) {
+        val activeSession = session ?: return@LaunchedEffect
+        var syncJob: Job? = null
+        try {
+            sessionRegistry?.register(activeSession)
+            syncJob = activeSession.startSync(this)
+            awaitCancellation()
+        } finally {
+            withContext(NonCancellable) {
+                syncJob?.cancelAndJoin()
+                sessionRegistry?.unregister(activeSession.canvasId)
+            }
+        }
+    }
 }
 
 private suspend fun CanvasBoard.foldLegacyLabels() {
@@ -90,20 +117,14 @@ private fun CanvasBoard.applyBackgroundPattern(pattern: CanvasBackgroundPattern)
  * replaced, starts with an empty undo history: the steps that remain would undo into a board
  * that no longer exists.
  */
-private suspend fun CanvasBoard.loadBoard(effectScope: CoroutineScope) {
+private suspend fun CanvasBoard.loadBoard() {
     kept.history.clear()
     val s = session
     if (s == null) {
         loadPreview()
         return
     }
-    host.sessionRegistry?.register(s)
-    s.startSync(effectScope)
-    try {
-        openSession(s)
-    } finally {
-        host.sessionRegistry?.unregister(s.canvasId)
-    }
+    openSession(s)
 }
 
 private suspend fun CanvasBoard.loadPreview() {
