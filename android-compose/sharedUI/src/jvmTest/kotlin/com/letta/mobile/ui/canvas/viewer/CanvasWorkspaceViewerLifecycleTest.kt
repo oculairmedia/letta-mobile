@@ -4,14 +4,18 @@ package com.letta.mobile.ui.canvas.viewer
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
@@ -27,6 +31,7 @@ import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.ui.canvas.CANVAS_VIEWER_TOGGLE_TAG
 import com.letta.mobile.ui.canvas.CanvasWorkspace
+import com.letta.mobile.ui.canvas.LocalCanvasBoardSessionImportGate
 import com.letta.mobile.ui.canvas.canvasViewerOptionTag
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewer
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId
@@ -36,8 +41,13 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.atomic.AtomicInteger
+import io.ak1.drawbox.domain.model.DrawingSerializer
+import io.ak1.drawbox.domain.usecase.UseCase
+import io.ak1.drawbox.presentation.reducer.Reducer
+import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -108,6 +118,71 @@ class CanvasWorkspaceViewerLifecycleTest {
         assertEquals(1, transport.activeCollectors.get())
         assertEquals(1, transport.collectorStarts.get())
         assertEquals(updatedDocument, session.document.value)
+    }
+
+    @Test
+    fun replacingReadySessionHidesOldDrawingUntilNewSceneIsImported() = runComposeUiTest {
+        val sessionA = session(CountingCanvasSyncTransport(), OLD_SESSION_SCENE, CanvasId("replace-session-a"))
+        val sessionB = session(CountingCanvasSyncTransport(), NEW_SESSION_SCENE, CanvasId("replace-session-b"))
+        val originalSceneA = sessionA.sceneJsonOrEmpty()
+        val controllerA = DrawBoxController(Reducer(UseCase()))
+        val controllerB = DrawBoxController(Reducer(UseCase())).also { it.importPath(OLD_SESSION_SCENE) }
+        val currentWorkspace = mutableStateOf(sessionA to controllerA)
+        val sessionBImportStarted = CompletableDeferred<Unit>()
+        val releaseSessionBImport = CompletableDeferred<Unit>()
+
+        setContent {
+            MaterialTheme {
+                CompositionLocalProvider(
+                    LocalCanvasBoardSessionImportGate provides { openingSession ->
+                        if (openingSession === sessionB) {
+                            sessionBImportStarted.complete(Unit)
+                            releaseSessionBImport.await()
+                        }
+                    },
+                ) {
+                    CanvasWorkspace(
+                        session = currentWorkspace.value.first,
+                        controller = currentWorkspace.value.second,
+                        showTitle = false,
+                    )
+                }
+            }
+        }
+
+        waitUntil(timeoutMillis = TIMEOUT_MILLIS) {
+            controllerA.state.value.elements.singleOrNull()?.id == "old-session-shape"
+        }
+        onNodeWithContentDescription("Canvas board").assertIsDisplayed()
+
+        try {
+            runOnIdle { currentWorkspace.value = sessionB to controllerB }
+            waitUntil(timeoutMillis = TIMEOUT_MILLIS) { sessionBImportStarted.isCompleted }
+
+            onNodeWithContentDescription("Canvas board").assertDoesNotExist()
+            assertEquals("old-session-shape", controllerB.state.value.elements.single().id)
+
+            releaseSessionBImport.complete(Unit)
+            waitUntil(timeoutMillis = TIMEOUT_MILLIS) {
+                controllerB.state.value.elements.singleOrNull()?.id == "new-session-shape" &&
+                    onAllNodesWithContentDescription("Canvas board").fetchSemanticsNodes().isNotEmpty()
+            }
+            onNodeWithContentDescription("Canvas board").assertIsDisplayed()
+
+            val editedColor = Color(0xFF123456)
+            runOnIdle { controllerB.setBgColor(editedColor) }
+            waitUntil(timeoutMillis = TIMEOUT_MILLIS) {
+                sessionB.document.value?.let { DrawingSerializer.deserialize(it.sceneJson).bgColor == editedColor } == true
+            }
+            assertEquals(originalSceneA, sessionA.sceneJsonOrEmpty(), "the replaced session must not receive B's edit")
+            assertEquals(editedColor, DrawingSerializer.deserialize(sessionB.sceneJsonOrEmpty()).bgColor)
+            assertEquals(sessionB.canvasId, sessionB.document.value?.id)
+
+            onNodeWithTag(canvasViewerOptionTag(CanvasDocumentViewerId.TEXT)).performClick()
+            onNodeWithTag(CANVAS_TEXT_VIEWER_CONTENT_TAG).assertTextEquals(sessionB.sceneJsonOrEmpty())
+        } finally {
+            releaseSessionBImport.complete(Unit)
+        }
     }
 
     private fun pluginViewer(id: CanvasDocumentViewerId): CanvasDocumentViewer = CanvasDocumentViewer(
@@ -291,11 +366,12 @@ class CanvasWorkspaceViewerLifecycleTest {
     private fun session(
         transport: CanvasSyncTransport,
         initialSceneJson: String = """{"elements":[]}""",
+        canvasId: CanvasId = CanvasId("canvas-workspace-viewer-lifecycle"),
     ): CanvasSession = runBlocking {
         CanvasSession.create(
             store = InMemoryCanvasDocumentStore(),
             options = CanvasCreateOptions(
-                canvasId = CanvasId("canvas-workspace-viewer-lifecycle"),
+                canvasId = canvasId,
                 agentId = "peer-1",
                 initialSceneJson = initialSceneJson,
                 syncTransport = transport,
@@ -306,5 +382,15 @@ class CanvasWorkspaceViewerLifecycleTest {
     private companion object {
         const val TIMEOUT_MILLIS = 5_000L
         const val CUSTOM_VIEWER_CONTENT_TAG = "custom-canvas-viewer-content"
+        const val OLD_SESSION_SCENE = """{"bgColor":"#ffffffff","elements":[
+            {"id":"old-session-shape","type":"Shape","zIndex":2,
+             "points":["20.0,20.0","80.0,80.0"],"strokeColor":"#000000ff","strokeWidth":4.0,
+             "shapeType":"RECTANGLE","modifiedAt":1}
+        ]}"""
+        const val NEW_SESSION_SCENE = """{"bgColor":"#ffffffff","elements":[
+            {"id":"new-session-shape","type":"Shape","zIndex":2,
+             "points":["120.0,120.0","200.0,200.0"],"strokeColor":"#000000ff","strokeWidth":4.0,
+             "shapeType":"RECTANGLE","modifiedAt":2}
+        ]}"""
     }
 }

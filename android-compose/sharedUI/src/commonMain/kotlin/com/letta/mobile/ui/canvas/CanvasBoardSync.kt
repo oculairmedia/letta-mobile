@@ -192,6 +192,7 @@ private suspend fun CanvasBoard.openSession(s: CanvasSession) {
     // it is megabytes of JSON: it is parsed off the main thread, and only the parsed drawing is
     // handed to the controller on it.
     val opened = withContext(Dispatchers.Default) { parseOpenedScene(sessionJson) }
+    beforeSessionImport(s)
     // Known even for an empty canvas, or the first note placed on it would read as an external
     // change to the drawing and reload the board.
     ui.lastDrawing = opened.drawing
