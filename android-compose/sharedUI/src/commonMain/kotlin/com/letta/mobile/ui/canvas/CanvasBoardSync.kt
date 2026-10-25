@@ -83,10 +83,7 @@ internal fun CanvasWorkspaceSessionLifetime(
     sessionRegistry: CanvasSessionRegistry?,
 ): CanvasWorkspaceSessionLifecycle {
     val loadState = remember(session) {
-        mutableStateOf(
-            if (session == null || session.document.value != null) CanvasWorkspaceLoadState.Ready
-            else CanvasWorkspaceLoadState.Loading,
-        )
+        mutableStateOf(initialWorkspaceLoadState(session))
     }
     val retryGeneration = remember(session) { mutableIntStateOf(0) }
     val retry = remember(loadState, retryGeneration) {
@@ -126,6 +123,10 @@ internal fun CanvasWorkspaceSessionLifetime(
     }
     return CanvasWorkspaceSessionLifecycle(loadState, retry)
 }
+
+private fun initialWorkspaceLoadState(session: CanvasSession?): CanvasWorkspaceLoadState =
+    if (session == null || session.document.value != null) CanvasWorkspaceLoadState.Ready
+    else CanvasWorkspaceLoadState.Loading
 
 private fun CanvasSession.completedLoadState(failure: Throwable?): CanvasWorkspaceLoadState = when (failure) {
     null -> CanvasWorkspaceLoadState.Ready
