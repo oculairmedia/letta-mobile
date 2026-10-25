@@ -36,6 +36,10 @@ Canvas-library status presented through the shared overlay host. `CanvasLibraryN
 
 Internal CanvasWorkspace session-load state and retry action. The workspace owns load, registration and sync sequencing; keep the state adapter independent of canvas rendering and persistence.
 
+# Package com.letta.mobile.ui.canvas.notes
+
+The shared [NotebookNoteEditor](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.canvas.notes/-notebook-note-editor.html) renders an existing note session using the shared page scaffold, Markdown field and explicit save/refresh/discard/persistence-retry actions. Draft, conflict and pending-durability status come from sharedLogic; no UI timer or storage policy is introduced. Hosts must await the session's prepare-close acknowledgement and keep the component mounted on failure. The component compiles for all shared UI targets; only JVM/Android currently has the local JNI store adapter. No app, desktop or browser navigation exposes it yet, and local ownership is not remote grant authority.
+
 # Package com.letta.mobile.ui.canvas.plugin
 
 Plugin element renderers, fallback cards and live-view host contracts. Extend through PluginElementRenderers and PluginViewHost composition locals; plugin execution, capability enforcement and sandbox setup belong to the runtime/host, not fallback rendering. `ProvideCanvasDocumentViewers` registers native sharedUI document renderers with typed IDs; `CanvasWorkspace` keeps the existing `CanvasSession` mounted and supplies extensions only an immutable `CanvasId`/revision/scene snapshot. Registration is an in-process UI extension point; installed process plugins are not loaded as viewers. The canvas viewer ID is reserved and cannot be replaced or removed. The selector scrolls on compact widths. Initial session loading and synchronization belong to the workspace; switching away from the board waits for its pending drawing edits to persist, and a failed save keeps the board and draft visible. Successful switches dispose board rendering and presence work.

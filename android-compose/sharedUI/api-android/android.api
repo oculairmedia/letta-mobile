@@ -715,6 +715,20 @@ public final class com/letta/mobile/ui/canvas/library/CanvasLibraryNoticeKt {
 	public static final fun CanvasLibraryNotice (Lcom/letta/mobile/data/canvas/library/CanvasLibraryController;Landroidx/compose/runtime/Composer;I)V
 }
 
+public final class com/letta/mobile/ui/canvas/notes/ComposableSingletons$NotebookNoteEditorKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/notes/ComposableSingletons$NotebookNoteEditorKt;
+	public fun <init> ()V
+	public final fun getLambda$-1895878137$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-662582589$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-827730389$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1261586918$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
+	public final fun getLambda$2141012816$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
+public final class com/letta/mobile/ui/canvas/notes/NotebookNoteEditorKt {
+	public static final fun NotebookNoteEditor (Lcom/letta/mobile/data/canvas/notes/NotebookNoteSession;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+}
+
 public final class com/letta/mobile/ui/canvas/plugin/CanvasDocumentViewer {
 	public static final field $stable I
 	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function4;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
