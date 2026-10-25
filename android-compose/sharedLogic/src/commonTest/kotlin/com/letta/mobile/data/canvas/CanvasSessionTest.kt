@@ -15,6 +15,21 @@ import kotlin.test.assertTrue
 class CanvasSessionTest {
 
     @Test
+    fun drawingBaselinePreservesUnseenRemoteEditsAndUsesTheSessionClock() = runTest {
+        val baseline = """{"bgColor":"#ffffffff","elements":[{"id":"a","type":"rect","x":1}]}"""
+        val session = CanvasSession.create(
+            InMemoryCanvasDocumentStore(), CanvasCreateOptions(initialSceneJson = baseline, agentId = "peer"),
+        )
+        session.applyRemote(CanvasOp.UpdateElementOp("remote-update", "peer", 100, "a", """{"id":"a","type":"rect","x":9}"""))
+        session.applyRemote(CanvasOp.AddElementOp("remote-add", "peer", 101, "b", """{"id":"b","type":"rect"}"""))
+        val edits = session.applyLocalScene(baseline.replace("#ffffffff", "#f7f3eaff"), baseJson = baseline)
+        assertTrue(edits.single() is CanvasOp.SetBackgroundOp)
+        assertEquals(102L, edits.single().lamport)
+        assertTrue(session.sceneJsonOrEmpty().contains("\"x\":9"))
+        assertTrue(session.sceneJsonOrEmpty().contains("\"id\":\"b\""))
+    }
+
+    @Test
     fun restoreUsesExactlyOneLamport() = runTest {
         val log = InMemoryCanvasOpLog()
         val session = CanvasSession.create(

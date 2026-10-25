@@ -711,15 +711,31 @@ class CanvasSession(
         }
 
     suspend fun applyLocalScene(newJson: String, actorId: CanvasActorId = LOCAL_USER_ACTOR): List<CanvasOp> = locked {
+        applyLocalSceneLocked(newJson, sceneJsonOrEmpty(), actorId)
+    }
+
+    /**
+     * Applies only the drawing edits since [baseJson], preserving remote changes the board has
+     * not imported yet. Diffing, clock allocation and persistence share the session lock, just as
+     * in [applyLocalScene]; the baseline must describe the drawing actually shown to the editor.
+     */
+    suspend fun applyLocalScene(
+        newJson: String,
+        baseJson: String,
+        actorId: CanvasActorId = LOCAL_USER_ACTOR,
+    ): List<CanvasOp> = locked {
+        applyLocalSceneLocked(newJson, baseJson, actorId)
+    }
+
+    private suspend fun applyLocalSceneLocked(newJson: String, baseJson: String, actorId: CanvasActorId): List<CanvasOp> {
         val doc = currentDoc()
         if (doc.acl != null && !doc.acl.canWrite(actorId.value)) {
             throw UnauthorizedCanvasMutationException(actorId, canvasId)
         }
-        val current = sceneJsonOrEmpty()
-        if (newJson == current) return@locked emptyList()
+        if (newJson == baseJson) return emptyList()
 
         val generatedOps = CanvasOpDiffer.diff(
-            oldSceneJson = current,
+            oldSceneJson = baseJson,
             newSceneJson = newJson,
             actorId = actorId,
             lamportSupplier = { ++lamportClock },
@@ -728,7 +744,7 @@ class CanvasSession(
         if (generatedOps.isNotEmpty()) {
             applyOpsLocked(generatedOps, isRemote = false)
         }
-        generatedOps
+        return generatedOps
     }
 
     /**

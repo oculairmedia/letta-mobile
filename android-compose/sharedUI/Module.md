@@ -34,7 +34,7 @@ Canvas-library status presented through the shared overlay host. `CanvasLibraryN
 
 # Package com.letta.mobile.ui.canvas.plugin
 
-Plugin element renderers, fallback cards and live-view host contracts. Extend through PluginElementRenderers and PluginViewHost composition locals; plugin execution, capability enforcement and sandbox setup belong to the runtime/host, not fallback rendering. `ProvideCanvasDocumentViewers` registers native sharedUI document renderers with typed IDs; `CanvasWorkspace` keeps the existing `CanvasSession` mounted and supplies extensions only an immutable `CanvasId`/revision/scene snapshot. Registration is an in-process UI extension point; installed process plugins are not loaded as viewers.
+Plugin element renderers, fallback cards and live-view host contracts. Extend through PluginElementRenderers and PluginViewHost composition locals; plugin execution, capability enforcement and sandbox setup belong to the runtime/host, not fallback rendering. `ProvideCanvasDocumentViewers` registers native sharedUI document renderers with typed IDs; `CanvasWorkspace` keeps the existing `CanvasSession` mounted and supplies extensions only an immutable `CanvasId`/revision/scene snapshot. Registration is an in-process UI extension point; installed process plugins are not loaded as viewers. The canvas viewer ID is reserved and cannot be replaced or removed. The selector scrolls on compact widths. Initial session loading and synchronization belong to the workspace; switching away from the board waits for its pending drawing edits to persist, and a failed save keeps the board and draft visible. Successful switches dispose board rendering and presence work.
 
 # Package com.letta.mobile.ui.canvas.viewer
 

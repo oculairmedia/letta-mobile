@@ -4,8 +4,11 @@ package com.letta.mobile.desktop.canvas
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -128,7 +131,7 @@ class CanvasElementInteractionUiTest {
 
         onNodeWithContentDescription("Canvas board").performTouchInput { longClick(Offset(500f, 400f)) }
         onNodeWithText("Note").assertExists()
-        onNodeWithText("Text").assertExists()
+        onNode(hasText("Text") and hasAnyAncestor(isPopup())).assertExists()
         onNodeWithText("Circle").performClick()
         waitUntil(timeoutMillis = 5000) { shapes(controller).any { it.shapeType == ShapeType.CIRCLE } }
         // A long press is not a tap: the draw tool left no dot behind.

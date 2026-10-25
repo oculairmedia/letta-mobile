@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.canvas
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -17,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -24,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerContext
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId
@@ -40,11 +44,14 @@ internal fun CanvasDocumentViewerHost(
     session: CanvasSession,
     modifier: Modifier = Modifier,
     chromeTopInset: Dp = 0.dp,
+    beforeViewerChange: suspend () -> Boolean = { true },
     canvasContent: @Composable (Modifier) -> Unit,
 ) {
     var selectedViewerId by remember(session.canvasId) {
         mutableStateOf(CanvasDocumentViewerId.CANVAS)
     }
+    val scope = rememberCoroutineScope()
+    var switching by remember(session) { mutableStateOf(false) }
     val document by session.document.collectAsState()
     val viewers = LocalCanvasDocumentViewers.current
     LaunchedEffect(viewers, selectedViewerId) {
@@ -66,7 +73,18 @@ internal fun CanvasDocumentViewerHost(
         CanvasDocumentViewerToggle(
             viewers = viewers,
             selectedId = selectedViewer.id,
-            onSelect = { selectedViewerId = it },
+            onSelect = { id ->
+                if (!switching && id != selectedViewer.id) {
+                    switching = true
+                    scope.launch {
+                        try {
+                            if (beforeViewerChange()) selectedViewerId = id
+                        } finally {
+                            switching = false
+                        }
+                    }
+                }
+            },
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
@@ -82,7 +100,7 @@ private fun CanvasDocumentViewerToggle(
     onSelect: (CanvasDocumentViewerId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier = modifier.testTag(CANVAS_VIEWER_TOGGLE_TAG)) {
+    Row(modifier = modifier.testTag(CANVAS_VIEWER_TOGGLE_TAG).horizontalScroll(rememberScrollState())) {
         viewers.all.forEach { viewer ->
             FilterChip(
                 selected = selectedId == viewer.id,

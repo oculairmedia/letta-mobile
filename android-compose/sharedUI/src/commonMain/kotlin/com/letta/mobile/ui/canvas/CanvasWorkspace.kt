@@ -2,11 +2,16 @@ package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -94,7 +99,8 @@ fun CanvasWorkspace(
             showTitle, headerTrailing, layout, longPressDrawsSelectionBox, chromeTopInset, cameraRequest,
         ),
     )
-    CanvasWorkspaceSessionLifetime(host.session, host.sessionRegistry)
+    val sessionLoaded = CanvasWorkspaceSessionLifetime(host.session, host.sessionRegistry)
+    val prepareViewerChange = remember(session, controller) { mutableStateOf<suspend () -> Boolean>({ true }) }
     val activeSession = host.session
     if (activeSession == null) {
         CanvasWorkspaceBoard(host, modifier)
@@ -103,8 +109,13 @@ fun CanvasWorkspace(
             session = activeSession,
             modifier = modifier,
             chromeTopInset = chromeTopInset,
+            beforeViewerChange = { prepareViewerChange.value() },
         ) { boardModifier ->
-            CanvasWorkspaceBoard(host, boardModifier)
+            if (sessionLoaded.value) {
+                CanvasWorkspaceBoard(host, boardModifier, prepareViewerChange)
+            } else {
+                Box(boardModifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            }
         }
     }
 }
@@ -114,8 +125,19 @@ fun CanvasWorkspace(
  * draws. The work is launched in the order the board has always relied on.
  */
 @Composable
-private fun CanvasWorkspaceBoard(host: CanvasWorkspaceHost, modifier: Modifier) {
+private fun CanvasWorkspaceBoard(
+    host: CanvasWorkspaceHost,
+    modifier: Modifier,
+    prepareViewerChange: MutableState<suspend () -> Boolean>? = null,
+) {
     val board = rememberCanvasBoard(host)
+    DisposableEffect(board.controller, board.session) {
+        val flush: suspend () -> Boolean = { board.flushDrawing() }
+        prepareViewerChange?.value = flush
+        onDispose {
+            if (prepareViewerChange?.value === flush) prepareViewerChange.value = { true }
+        }
+    }
     CanvasBoardSessionEffects(board)
     CanvasBoardCameraEffects(board)
     CanvasBoardWheelZoomEffect(board)
@@ -136,9 +158,13 @@ private fun CanvasWorkspaceBoard(host: CanvasWorkspaceHost, modifier: Modifier) 
                 modifier = modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background,
             ) {
-                Box(modifier = Modifier.fillMaxSize().canvasBoardInput(board)) {
-                    CanvasBoardLayers(board)
-                    CanvasBoardChrome(board, insert)
+                if (board.ui.initialLoadDone || board.session == null) {
+                    Box(modifier = Modifier.fillMaxSize().canvasBoardInput(board)) {
+                        CanvasBoardLayers(board)
+                        CanvasBoardChrome(board, insert)
+                    }
+                } else {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 }
             }
         }

@@ -20,9 +20,11 @@ class CanvasDocumentViewers private constructor(
     /** Viewers shown in the workspace's selector, in registration order. */
     val all: List<CanvasDocumentViewer> get() = byId.values.toList()
 
-    /** Add or replace a viewer with the same stable identity. */
-    fun register(viewer: CanvasDocumentViewer): CanvasDocumentViewers =
-        CanvasDocumentViewers(byId + (viewer.id to viewer), fallbackId)
+    /** Add or replace an extension. The built-in canvas identity is reserved. */
+    fun register(viewer: CanvasDocumentViewer): CanvasDocumentViewers {
+        require(viewer.id != fallbackId) { "the fallback canvas document viewer cannot be replaced" }
+        return CanvasDocumentViewers(byId + (viewer.id to viewer), fallbackId)
+    }
 
     /** Remove a registered viewer. The built-in canvas viewer cannot be removed. */
     fun unregister(id: CanvasDocumentViewerId): CanvasDocumentViewers {

@@ -9,10 +9,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
 import com.letta.mobile.data.canvas.CanvasCreateOptions
@@ -21,6 +24,8 @@ import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.model.CanvasActorId
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewer
+import com.letta.mobile.ui.canvas.plugin.ProvideCanvasDocumentViewers
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewerId
 import com.letta.mobile.ui.canvas.plugin.CanvasDocumentViewers
 import com.letta.mobile.ui.canvas.CANVAS_VIEWER_TOGGLE_TAG
@@ -28,6 +33,8 @@ import com.letta.mobile.ui.canvas.CanvasDocumentViewerHost
 import com.letta.mobile.ui.canvas.canvasViewerOptionTag
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -94,6 +101,37 @@ class CanvasDocumentViewerHostTest {
         val fallback = CanvasDocumentViewers.Core.viewerFor(CanvasDocumentViewerId("unknown.reader"))
 
         assertEquals(CanvasDocumentViewerId.CANVAS, fallback.id)
+    }
+
+    @Test
+    fun builtInCanvasIdentityCannotBeReplacedAndFallbackStaysBound() {
+        val registry = CanvasDocumentViewers.Core
+        val original = registry.viewerFor(CanvasDocumentViewerId.CANVAS)
+        val collision = CanvasDocumentViewer(CanvasDocumentViewerId.CANVAS, label = { "Collision" }, render = { _, _ -> })
+        assertFailsWith<IllegalArgumentException> { registry.register(collision) }
+        assertSame(original, registry.viewerFor(CanvasDocumentViewerId("missing")))
+    }
+
+    @Test
+    fun compactWorkspaceCanScrollToAndSelectTheLastOfManyViewers() = runDesktopComposeUiTest(width = 320, height = 640) {
+        val session = session("""{"elements":[]}""")
+        val extensions = (1..8).map { index ->
+            CanvasDocumentViewer(
+                CanvasDocumentViewerId("reader-$index"), label = { "Reader $index" },
+                render = { _, modifier -> Text("Reader $index content", modifier.testTag("last-reader-$index")) },
+            )
+        }
+        setContent {
+            MaterialTheme {
+                ProvideCanvasDocumentViewers(registrations = { extensions.fold(this) { registry, viewer -> registry.register(viewer) } }) {
+                    com.letta.mobile.ui.canvas.CanvasWorkspace(session = session, showTitle = false)
+                }
+            }
+        }
+        val last = extensions.last().id
+        onNodeWithTag(canvasViewerOptionTag(last)).performScrollTo().assertIsDisplayed().performClick()
+        onNodeWithTag(canvasViewerOptionTag(last)).assertIsSelected()
+        onNodeWithTag("last-reader-8").assertIsDisplayed()
     }
 
     private fun session(scene: String): CanvasSession = runBlocking {

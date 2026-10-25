@@ -4751,6 +4751,8 @@ public final class com/letta/mobile/data/canvas/CanvasSession {
 	public final fun applyLocal (Lcom/letta/mobile/data/canvas/CanvasOp;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun applyLocalScene-VqdqOIQ (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun applyLocalScene-VqdqOIQ$default (Lcom/letta/mobile/data/canvas/CanvasSession;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun applyLocalScene-fqO6Vxg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun applyLocalScene-fqO6Vxg$default (Lcom/letta/mobile/data/canvas/CanvasSession;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun applyLocalStamped (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun applyOps (Ljava/util/List;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun applyOps$default (Lcom/letta/mobile/data/canvas/CanvasSession;Ljava/util/List;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;

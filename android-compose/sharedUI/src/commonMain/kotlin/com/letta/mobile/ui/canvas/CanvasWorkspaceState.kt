@@ -40,6 +40,7 @@ import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.JsonObject
 import io.ak1.drawbox.domain.model.State as DrawBoxState
 
@@ -123,7 +124,10 @@ internal class CanvasBoardUi {
     // The background pattern of the session-less preview; a session keeps its own.
     var localPattern by mutableStateOf(CanvasBackgroundPattern())
     var boardSize by mutableStateOf(IntSize.Zero)
-    var isAutosaving by mutableStateOf(false)
+    // Serializes autosave, viewer handoff and remote imports. The baseline is the actual
+    // DrawBox snapshot, so unrendered remote content can never become a local deletion.
+    val drawingSaveMutex = Mutex()
+    var drawingBaseline: String? = null
 
     // Connector snapping: Alt held (from the last pointer event) turns it off; while a line or
     // arrow is being drawn the nearest anchor to the pointer shows as a ring.
