@@ -42,6 +42,7 @@ class CanvasQuickCreateUiTest {
     fun theTargetAddsAJoinedShapeAndTakesTyping() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session(), controller = controller) }
+        awaitCanvasReady()
         controller.onIntent(
             Intent.AddElement(
                 Element.Shape(
@@ -79,6 +80,7 @@ class CanvasQuickCreateUiTest {
     fun anArrowPulledOutOfATargetMakesThePickedShapeWhereItIsLetGo() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session(), controller = controller) }
+        awaitCanvasReady()
         controller.onIntent(
             Intent.AddElement(
                 Element.Shape(
@@ -113,6 +115,7 @@ class CanvasQuickCreateUiTest {
     fun noTargetsWithoutASingleShapeSelected() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session(), controller = controller) }
+        awaitCanvasReady()
         waitForIdle()
         onNodeWithContentDescription("Add to the right").assertDoesNotExist()
     }
@@ -122,6 +125,7 @@ class CanvasQuickCreateUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Canvas board").performMouseInput { rightClick(Offset(300f, 300f)) }
         onNodeWithText("Note").performClick()
@@ -142,6 +146,7 @@ class CanvasQuickCreateUiTest {
     fun theTargetsFollowANoteWhileItIsDragged() = runComposeUiTest {
         val session = session()
         setContent { CanvasWorkspace(session = session) }
+        awaitCanvasReady()
         onNodeWithContentDescription("Canvas board").performMouseInput { rightClick(Offset(500f, 400f)) }
         onNodeWithText("Note").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }

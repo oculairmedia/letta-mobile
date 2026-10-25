@@ -41,6 +41,7 @@ class CanvasRemoteTextUiTest {
         }
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
         mainClock.advanceTimeBy(3_000)
         waitForIdle()
 

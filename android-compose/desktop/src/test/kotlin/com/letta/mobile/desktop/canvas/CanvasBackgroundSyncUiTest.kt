@@ -40,6 +40,7 @@ class CanvasBackgroundSyncUiTest {
         }
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
         // Past the load and its first autosave, so nothing else is on its way out that the
         // colour could ride along with.
         mainClock.advanceTimeBy(3_000)
@@ -69,6 +70,7 @@ class CanvasBackgroundSyncUiTest {
         }
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
         mainClock.advanceTimeBy(3_000)
         waitForIdle()
         val dots = CanvasBackgroundPattern(CanvasBackgroundPattern.DOTS, spacing = 64f, colorHex = "#e5484d")

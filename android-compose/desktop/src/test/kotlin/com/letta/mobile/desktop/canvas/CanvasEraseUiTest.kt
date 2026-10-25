@@ -59,6 +59,7 @@ class CanvasEraseUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         controller.importPath(drawing)
         waitUntil(timeoutMillis = 10_000) { controller.state.value.elements.size == 2 }
@@ -94,6 +95,7 @@ class CanvasEraseUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         controller.importPath(drawing)
         waitUntil(timeoutMillis = 10_000) { controller.state.value.elements.size == 2 }
@@ -146,9 +148,7 @@ class CanvasEraseUiTest {
         waitUntil(timeoutMillis = 10_000) { controller.state.value.elements.size == 2 }
 
         // Imported controller data precedes the workspace's interactive-ready state.
-        waitUntil(timeoutMillis = 10_000) {
-            onAllNodes(androidx.compose.ui.test.hasContentDescription("Canvas board")).fetchSemanticsNodes().isNotEmpty()
-        }
+        awaitCanvasReady()
         onNodeWithContentDescription("Eraser").performClick()
         controller.onIntent(Intent.BeginErase)
         controller.onIntent(Intent.EraseAt(Offset(10f, 40f), 12f))
@@ -168,6 +168,7 @@ class CanvasEraseUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         controller.importPath(drawing)
         waitUntil(timeoutMillis = 10_000) { controller.state.value.elements.size == 2 }

@@ -126,6 +126,7 @@ class CanvasWorkspaceUiTest {
         setContent {
             CanvasWorkspace(session = session, controller = controller)
         }
+        awaitCanvasReady()
         return WorkspaceHarness(session, controller)
     }
 
@@ -229,6 +230,7 @@ class CanvasWorkspaceUiTest {
         setContent {
             CanvasWorkspace(controller = controller, session = session)
         }
+        awaitCanvasReady()
         kotlin.test.assertNull(session.backgroundPattern())
 
         onNodeWithContentDescription("More").performClick()
@@ -308,6 +310,7 @@ class CanvasWorkspaceUiTest {
             io.ak1.drawbox.presentation.reducer.Reducer(io.ak1.drawbox.domain.usecase.UseCase()),
         )
         setContent { CanvasWorkspace(controller = controller, session = session) }
+        awaitCanvasReady()
 
         // A note: Duplicate from its bar makes a second document with the same colour, offset.
         onNodeWithContentDescription("Add note").performClick()
@@ -434,6 +437,7 @@ class CanvasWorkspaceUiTest {
             )
         }
         setContent { CanvasWorkspace(session = session) }
+        awaitCanvasReady()
         onNodeWithContentDescription("Add note").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
         val note = session.documents().single()
@@ -505,9 +509,7 @@ class CanvasWorkspaceUiTest {
         }
 
         // Verify session diagram loaded
-        waitUntil(timeoutMillis = 10_000) {
-            onAllNodes(androidx.compose.ui.test.hasContentDescription("Canvas board")).fetchSemanticsNodes().isNotEmpty()
-        }
+        awaitCanvasReady()
         onNodeWithText("Session Diagram", substring = true).assertExists()
         onNodeWithText("Elements: 15", substring = true).assertExists()
 
@@ -534,6 +536,7 @@ class CanvasWorkspaceUiTest {
                 session = session,
             )
         }
+        awaitCanvasReady()
 
         // Initially revision is 1 and sceneJson is empty
         kotlin.test.assertEquals(1L, session.document.value?.revision)
@@ -576,6 +579,7 @@ class CanvasWorkspaceUiTest {
                 sessionRegistry = sessions,
             )
         }
+        awaitCanvasReady()
 
         // Initially empty
         onNodeWithText("Elements: 0", substring = true).assertExists()
@@ -624,6 +628,7 @@ class CanvasWorkspaceUiTest {
                 currentPeerId = "local-user",
             )
         }
+        awaitCanvasReady()
 
         // Initially no peer cursor
         onAllNodesWithText("Alice (Peer)").assertCountEquals(0)
@@ -711,6 +716,7 @@ class CanvasWorkspaceUiTest {
                 currentPeerId = "host-a",
             )
         }
+        awaitCanvasReady()
 
         // Initially 0 elements
         onNodeWithText("Elements: 0", substring = true).assertExists()

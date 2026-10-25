@@ -43,6 +43,7 @@ class CanvasUnifiedUndoUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Add note").performClick()
         waitUntil(timeoutMillis = 10_000) { session.documents().size == 1 }
@@ -59,6 +60,7 @@ class CanvasUnifiedUndoUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Add note").performClick()
         waitUntil(timeoutMillis = 10_000) { session.documents().size == 1 }
@@ -80,6 +82,7 @@ class CanvasUnifiedUndoUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         // A stroke first, then a note: undo must take the note back before the stroke.
         controller.importPath(
@@ -105,6 +108,7 @@ class CanvasUnifiedUndoUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Add note").performClick()
         waitUntil(timeoutMillis = 10_000) { session.documents().size == 1 }
@@ -132,6 +136,7 @@ class CanvasUnifiedUndoUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Add note").performClick()
         waitUntil(timeoutMillis = 10_000) { session.documents().size == 1 }

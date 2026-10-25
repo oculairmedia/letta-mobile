@@ -57,6 +57,7 @@ class CanvasTextToolUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Text").performClick()
         waitUntil(timeoutMillis = 5000) { controller.state.value.mode == Mode.TEXT }
@@ -84,6 +85,7 @@ class CanvasTextToolUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Text").performClick()
         waitUntil(timeoutMillis = 5000) { controller.state.value.mode == Mode.TEXT }
@@ -113,6 +115,7 @@ class CanvasTextToolUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Text").performClick()
         waitUntil(timeoutMillis = 5000) { controller.state.value.mode == Mode.TEXT }

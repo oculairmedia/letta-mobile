@@ -36,6 +36,7 @@ class CanvasNoteDeletionUiTest {
 
     /** Places a note, types in it, and returns its id once the typing has been persisted. */
     private fun androidx.compose.ui.test.ComposeUiTest.typedNote(session: CanvasSession): String {
+        awaitCanvasReady()
         onNodeWithContentDescription("Add note").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
         val noteId = session.documents().single().id

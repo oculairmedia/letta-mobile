@@ -63,6 +63,7 @@ class CanvasElementInteractionUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Canvas board").performMouseInput { rightClick(Offset(420f, 360f)) }
         onNodeWithText("Rectangle").performClick()
@@ -83,6 +84,7 @@ class CanvasElementInteractionUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Rectangle").performClick()
         onNodeWithContentDescription("Canvas board").performMouseInput {
@@ -101,6 +103,7 @@ class CanvasElementInteractionUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
         controller.onIntent(Intent.AddElement(rectangle("r1", 300f, 300f)))
         waitForIdle()
 
@@ -115,6 +118,7 @@ class CanvasElementInteractionUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
         controller.onIntent(Intent.AddElement(rectangle("r1", 300f, 300f)))
         waitForIdle()
 
@@ -128,6 +132,7 @@ class CanvasElementInteractionUiTest {
     fun aLongPressOnEmptyBoardOffersWhatCanBeAdded() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session(), controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Canvas board").performTouchInput { longClick(Offset(500f, 400f)) }
         onNodeWithText("Note").assertExists()
@@ -142,6 +147,7 @@ class CanvasElementInteractionUiTest {
     fun theSelectionBarFloatsOnTheSelection() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session(), controller = controller) }
+        awaitCanvasReady()
         controller.onIntent(Intent.AddElement(rectangle("r1", 400f, 420f)))
         controller.setMode(Mode.SELECT)
         // On its outline: an unfilled shape is picked by its stroke.
