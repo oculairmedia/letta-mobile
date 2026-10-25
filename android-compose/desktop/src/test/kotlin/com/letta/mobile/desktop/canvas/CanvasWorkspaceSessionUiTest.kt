@@ -48,6 +48,29 @@ class CanvasWorkspaceSessionUiTest {
         return WorkspaceHarness(session, controller)
     }
 
+    private fun createSharedHostTransportSession(
+        canvasId: com.letta.mobile.data.model.CanvasId,
+        title: String,
+        syncTransport: com.letta.mobile.data.canvas.CanvasSyncTransport,
+    ): com.letta.mobile.data.canvas.CanvasSession {
+        val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
+        return kotlinx.coroutines.runBlocking {
+            com.letta.mobile.data.canvas.CanvasSession.create(
+                store = store,
+                options = com.letta.mobile.data.canvas.CanvasCreateOptions(
+                    canvasId = canvasId,
+                    title = title,
+                    syncTransport = syncTransport,
+                    // Both hosts edit this canvas, so the writer ACL names the peer.
+                    acl = com.letta.mobile.data.canvas.CanvasAcl(
+                        ownerUserId = "host-a",
+                        writerUserIds = setOf("host-b"),
+                    ),
+                ),
+            )
+        }
+    }
+
     @Test
     fun canvasWorkspace_addNote_placesABlockDocumentOnTheBoard() = runComposeUiTest {
         val (session, controller) = withWorkspace("Notes Board")
@@ -106,7 +129,11 @@ class CanvasWorkspaceSessionUiTest {
         onNodeWithContentDescription("Canvas board").performMouseInput { doubleClick(centre) }
 
         // The shape's text is the shape's own: no document is made for it, and it is typed in place.
-        waitUntil(timeoutMillis = 5000) { onAllNodes(androidx.compose.ui.test.isFocused() and androidx.compose.ui.test.hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
+        waitUntil(timeoutMillis = 5000) {
+            onAllNodes(androidx.compose.ui.test.isFocused() and androidx.compose.ui.test.hasSetTextAction())
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
         onAllNodes(androidx.compose.ui.test.isFocused() and androidx.compose.ui.test.hasSetTextAction())[0].performTextInput("Launch")
         fun rect() = controller.state.value.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Shape>().single()
         waitUntil(timeoutMillis = 5000) { rect().text == "Launch" }
@@ -258,16 +285,22 @@ class CanvasWorkspaceSessionUiTest {
         waitUntil(timeoutMillis = 5000) { controller.state.value.selectedIds == setOf("rect-1") }
         onNodeWithContentDescription("Canvas workspace").requestFocus()
         onNodeWithContentDescription("Canvas workspace").performKeyInput {
-            keyDown(androidx.compose.ui.input.key.Key.CtrlLeft); pressKey(androidx.compose.ui.input.key.Key.D); keyUp(androidx.compose.ui.input.key.Key.CtrlLeft)
+            keyDown(androidx.compose.ui.input.key.Key.CtrlLeft)
+            pressKey(androidx.compose.ui.input.key.Key.D)
+            keyUp(androidx.compose.ui.input.key.Key.CtrlLeft)
         }
         waitUntil(timeoutMillis = 5000) { controller.state.value.elements.size == 2 }
-        val copyShape = controller.state.value.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Shape>().first { it.id != "rect-1" }
+        val copyShape = controller.state.value.elements
+            .filterIsInstance<io.ak1.drawbox.domain.model.Element.Shape>()
+            .first { it.id != "rect-1" }
         kotlin.test.assertEquals(androidx.compose.ui.geometry.Offset(30f, 30f), copyShape.points.first())
         waitUntil(timeoutMillis = 5000) { controller.state.value.selectedIds == setOf(copyShape.id) }
         onNodeWithContentDescription("Canvas workspace").performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Delete) }
         waitUntil(timeoutMillis = 5000) { controller.state.value.elements.size == 1 }
         onNodeWithContentDescription("Canvas workspace").performKeyInput {
-            keyDown(androidx.compose.ui.input.key.Key.CtrlLeft); pressKey(androidx.compose.ui.input.key.Key.Z); keyUp(androidx.compose.ui.input.key.Key.CtrlLeft)
+            keyDown(androidx.compose.ui.input.key.Key.CtrlLeft)
+            pressKey(androidx.compose.ui.input.key.Key.Z)
+            keyUp(androidx.compose.ui.input.key.Key.CtrlLeft)
         }
         waitUntil(timeoutMillis = 5000) { controller.state.value.elements.size == 2 }
         controller.onIntent(io.ak1.drawbox.domain.model.Intent.SelectAt(androidx.compose.ui.geometry.Offset(60f, 10f), 12f))
@@ -543,34 +576,9 @@ class CanvasWorkspaceSessionUiTest {
     @Test
     fun canvasWorkspace_twoSessionsWithSharedHostTransport_converge() = runComposeUiTest {
         val sharedTransport = DesktopCanvasHostSync.syncTransport
-        val storeA = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
-        val storeB = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
         val canvasId = com.letta.mobile.data.model.CanvasId("host-sync-canvas")
-
-        val sessionA = kotlinx.coroutines.runBlocking {
-            com.letta.mobile.data.canvas.CanvasSession.create(
-                store = storeA,
-                options = com.letta.mobile.data.canvas.CanvasCreateOptions(
-                    canvasId = canvasId,
-                    title = "Host Sync A",
-                    syncTransport = sharedTransport,
-                    // Owner-only by default; both hosts edit this canvas, so both are named.
-                    acl = com.letta.mobile.data.canvas.CanvasAcl(ownerUserId = "host-a", writerUserIds = setOf("host-b")),
-                ),
-            )
-        }
-        val sessionB = kotlinx.coroutines.runBlocking {
-            com.letta.mobile.data.canvas.CanvasSession.create(
-                store = storeB,
-                options = com.letta.mobile.data.canvas.CanvasCreateOptions(
-                    canvasId = canvasId,
-                    title = "Host Sync B",
-                    syncTransport = sharedTransport,
-                    // Owner-only by default; both hosts edit this canvas, so both are named.
-                    acl = com.letta.mobile.data.canvas.CanvasAcl(ownerUserId = "host-a", writerUserIds = setOf("host-b")),
-                ),
-            )
-        }
+        val sessionA = createSharedHostTransportSession(canvasId, "Host Sync A", sharedTransport)
+        val sessionB = createSharedHostTransportSession(canvasId, "Host Sync B", sharedTransport)
 
         // Host UI binds sessionA (startSync is invoked internally in LaunchedEffect)
         setContent {
