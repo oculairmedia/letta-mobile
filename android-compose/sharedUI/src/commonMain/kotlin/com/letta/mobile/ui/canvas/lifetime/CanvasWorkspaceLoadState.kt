@@ -6,7 +6,7 @@ import androidx.compose.runtime.State
 internal enum class CanvasWorkspaceLoadState { Loading, Ready, Failed }
 
 /** The visible load state and its explicit user retry action. */
-internal data class CanvasWorkspaceSessionLifecycle(
+internal class CanvasWorkspaceSessionLifecycle(
     val loadState: State<CanvasWorkspaceLoadState>,
     val retry: () -> Unit,
 )

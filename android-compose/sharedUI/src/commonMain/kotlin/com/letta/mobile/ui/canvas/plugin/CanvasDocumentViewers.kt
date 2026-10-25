@@ -14,43 +14,45 @@ import org.jetbrains.compose.resources.stringResource
 /** Registered renderers available to a canvas workspace. */
 @Immutable
 class CanvasDocumentViewers private constructor(
-    private val byId: Map<CanvasDocumentViewerId, CanvasDocumentViewer>,
+    private val entries: List<CanvasDocumentViewer>,
     private val fallbackId: CanvasDocumentViewerId,
 ) {
     /** Viewers shown in the workspace's selector, in registration order. */
-    val all: List<CanvasDocumentViewer> get() = byId.values.toList()
+    val all: List<CanvasDocumentViewer> get() = entries.toList()
 
     /** Add or replace an extension. The built-in canvas identity is reserved. */
     fun register(viewer: CanvasDocumentViewer): CanvasDocumentViewers {
         require(viewer.id != fallbackId) { "the fallback canvas document viewer cannot be replaced" }
-        return CanvasDocumentViewers(byId + (viewer.id to viewer), fallbackId)
+        val replacement = if (contains(viewer.id)) entries.map { if (it.id == viewer.id) viewer else it }
+        else entries + viewer
+        return CanvasDocumentViewers(replacement, fallbackId)
     }
 
     /** Remove a registered viewer. The built-in canvas viewer cannot be removed. */
     fun unregister(id: CanvasDocumentViewerId): CanvasDocumentViewers {
         require(id != fallbackId) { "the fallback canvas document viewer cannot be removed" }
-        return if (id in byId) CanvasDocumentViewers(byId - id, fallbackId) else this
+        return if (contains(id)) CanvasDocumentViewers(entries.filterNot { it.id == id }, fallbackId) else this
     }
 
     /** Resolve an ID, using the built-in canvas viewer after an extension is removed. */
     fun viewerFor(id: CanvasDocumentViewerId): CanvasDocumentViewer =
-        byId[id] ?: byId.getValue(fallbackId)
+        entries.firstOrNull { it.id == id } ?: entries.first { it.id == fallbackId }
 
     /** Whether this registry currently contains [id]. */
-    fun contains(id: CanvasDocumentViewerId): Boolean = id in byId
+    fun contains(id: CanvasDocumentViewerId): Boolean = entries.any { it.id == id }
 
     companion object {
         /** Core's canvas and read-only text presentations. */
         val Core: CanvasDocumentViewers = CanvasDocumentViewers(
-            byId = linkedMapOf(
-                CanvasDocumentViewerId.CANVAS to CanvasDocumentViewer(
+            entries = listOf(
+                CanvasDocumentViewer(
                     id = CanvasDocumentViewerId.CANVAS,
                     label = { stringResource(Res.string.canvas_viewer_canvas) },
                     render = { context, modifier ->
                         LocalCanvasDocumentCanvasContent.current(context, modifier)
                     },
                 ),
-                CanvasDocumentViewerId.TEXT to CanvasDocumentViewer(
+                CanvasDocumentViewer(
                     id = CanvasDocumentViewerId.TEXT,
                     label = { stringResource(Res.string.canvas_viewer_text) },
                     render = { context, modifier -> CanvasTextViewer(context.sceneJson, modifier) },

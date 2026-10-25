@@ -505,6 +505,9 @@ class CanvasWorkspaceUiTest {
         }
 
         // Verify session diagram loaded
+        waitUntil(timeoutMillis = 10_000) {
+            onAllNodes(androidx.compose.ui.test.hasContentDescription("Canvas board")).fetchSemanticsNodes().isNotEmpty()
+        }
         onNodeWithText("Session Diagram", substring = true).assertExists()
         onNodeWithText("Elements: 15", substring = true).assertExists()
 
