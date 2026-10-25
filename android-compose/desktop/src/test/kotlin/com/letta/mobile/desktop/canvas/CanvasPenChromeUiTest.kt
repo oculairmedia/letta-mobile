@@ -69,6 +69,7 @@ class CanvasPenChromeUiTest {
                 CanvasWorkspace(session = board.session, controller = board.controller)
             }
         }
+        awaitCanvasReady()
         return board
     }
 

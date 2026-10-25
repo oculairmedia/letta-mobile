@@ -18,6 +18,12 @@ import kotlinx.coroutines.flow.asStateFlow
 class InMemoryCanvasDocumentStore(
     backing: DocumentBacking<CanvasDocument>? = null,
 ) : InMemoryDocumentStore<CanvasId, CanvasDocument>(backing), CanvasDocumentStore, CanvasStorageHealth {
+    private val health = backing as? CanvasStorageHealth
+
+    override fun saveFailureGeneration(canvasId: CanvasId): Long = health?.saveFailureGeneration(canvasId) ?: 0L
+
+    override suspend fun awaitDurableSave(canvasId: CanvasId): Boolean = health?.awaitDurableSave(canvasId) ?: true
+
     override val storageFaults: StateFlow<List<CanvasStorageFault>> =
         (backing as? CanvasStorageHealth)?.storageFaults ?: MutableStateFlow(emptyList<CanvasStorageFault>()).asStateFlow()
 

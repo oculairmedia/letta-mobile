@@ -1,27 +1,47 @@
 package com.letta.mobile.ui.canvas
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasPresence
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
+import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.canvas_viewer_load_failed
+import com.letta.mobile.sharedui.resources.canvas_viewer_retry
+import com.letta.mobile.ui.canvas.lifetime.CanvasWorkspaceLoadState
 import com.letta.mobile.ui.theme.LettaDimens
 import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
+import org.jetbrains.compose.resources.stringResource
 
 /** The inset the board's chrome keeps from the board's edges and from each other. */
 internal val CANVAS_CHROME_INSET = LettaDimens.Space.md
 internal const val WHEEL_ZOOM_STEP = 1.1f
+internal const val CANVAS_WORKSPACE_LOAD_FAILURE_TAG = "canvas-workspace-load-failure"
 
 /**
  * Shared Canvas Workspace composable for Meridian: the DrawBox board with block-document notes
@@ -94,7 +114,47 @@ fun CanvasWorkspace(
             showTitle, headerTrailing, layout, longPressDrawsSelectionBox, chromeTopInset, cameraRequest,
         ),
     )
-    CanvasWorkspaceBoard(host, modifier)
+    val sessionLifecycle = CanvasWorkspaceSessionLifetime(host.session, host.sessionRegistry)
+    val sessionLoadState = sessionLifecycle.loadState.value
+    val prepareViewerChange = remember(session, controller) { mutableStateOf<suspend () -> Boolean>({ true }) }
+    val activeSession = host.session
+    if (activeSession == null) {
+        CanvasWorkspaceBoard(host, modifier)
+    } else if (sessionLoadState == CanvasWorkspaceLoadState.Failed) {
+        CanvasWorkspaceLoadFailure(modifier, sessionLifecycle.retry)
+    } else {
+        CanvasDocumentViewerHost(
+            session = activeSession,
+            modifier = modifier,
+            chromeTopInset = chromeTopInset,
+            beforeViewerChange = { prepareViewerChange.value() },
+        ) { boardModifier ->
+            if (sessionLoadState == CanvasWorkspaceLoadState.Ready) {
+                CanvasWorkspaceBoard(host, boardModifier, prepareViewerChange)
+            } else {
+                Box(boardModifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CanvasWorkspaceLoadFailure(modifier: Modifier, onRetry: () -> Unit) {
+    Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp).testTag(CANVAS_WORKSPACE_LOAD_FAILURE_TAG),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = stringResource(Res.string.canvas_viewer_load_failed),
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onRetry) { Text(stringResource(Res.string.canvas_viewer_retry)) }
+        }
+    }
 }
 
 /**
@@ -102,8 +162,19 @@ fun CanvasWorkspace(
  * draws. The work is launched in the order the board has always relied on.
  */
 @Composable
-private fun CanvasWorkspaceBoard(host: CanvasWorkspaceHost, modifier: Modifier) {
+private fun CanvasWorkspaceBoard(
+    host: CanvasWorkspaceHost,
+    modifier: Modifier,
+    prepareViewerChange: MutableState<suspend () -> Boolean>? = null,
+) {
     val board = rememberCanvasBoard(host)
+    DisposableEffect(board.controller, board.session) {
+        val flush: suspend () -> Boolean = { board.flushDrawing() }
+        prepareViewerChange?.value = flush
+        onDispose {
+            if (prepareViewerChange?.value === flush) prepareViewerChange.value = { true }
+        }
+    }
     CanvasBoardSessionEffects(board)
     CanvasBoardCameraEffects(board)
     CanvasBoardWheelZoomEffect(board)
@@ -124,9 +195,13 @@ private fun CanvasWorkspaceBoard(host: CanvasWorkspaceHost, modifier: Modifier) 
                 modifier = modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background,
             ) {
-                Box(modifier = Modifier.fillMaxSize().canvasBoardInput(board)) {
-                    CanvasBoardLayers(board)
-                    CanvasBoardChrome(board, insert)
+                if (board.ui.initialLoadDone || board.session == null) {
+                    Box(modifier = Modifier.fillMaxSize().canvasBoardInput(board)) {
+                        CanvasBoardLayers(board)
+                        CanvasBoardChrome(board, insert)
+                    }
+                } else {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 }
             }
         }

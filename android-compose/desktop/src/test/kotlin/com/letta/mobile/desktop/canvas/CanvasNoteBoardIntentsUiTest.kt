@@ -42,6 +42,7 @@ class CanvasNoteBoardIntentsUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Add note").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
@@ -68,6 +69,7 @@ class CanvasNoteBoardIntentsUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Add note").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }

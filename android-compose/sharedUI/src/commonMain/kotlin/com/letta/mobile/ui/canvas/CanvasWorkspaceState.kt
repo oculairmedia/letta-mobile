@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
@@ -40,8 +41,12 @@ import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.JsonObject
 import io.ak1.drawbox.domain.model.State as DrawBoxState
+
+/** Test seam for holding a session after scene parsing and before its drawing reaches the board. */
+internal val LocalCanvasBoardSessionImportGate = staticCompositionLocalOf<suspend (CanvasSession) -> Unit> { {} }
 
 /** What the host hands a canvas workspace, kept together for the parts of the board that need it. */
 internal class CanvasWorkspaceHost(
@@ -123,7 +128,10 @@ internal class CanvasBoardUi {
     // The background pattern of the session-less preview; a session keeps its own.
     var localPattern by mutableStateOf(CanvasBackgroundPattern())
     var boardSize by mutableStateOf(IntSize.Zero)
-    var isAutosaving by mutableStateOf(false)
+    // Serializes autosave, viewer handoff and remote imports. The baseline is the actual
+    // DrawBox snapshot, so unrendered remote content can never become a local deletion.
+    val drawingSaveMutex = Mutex()
+    var drawingBaseline: String? = null
 
     // Connector snapping: Alt held (from the last pointer event) turns it off; while a line or
     // arrow is being drawn the nearest anchor to the pointer shows as a ring.
@@ -276,6 +284,7 @@ internal class CanvasBoard(
     val host: CanvasWorkspaceHost,
     val ui: CanvasBoardUi,
     val kept: CanvasSessionBoardState,
+    val beforeSessionImport: suspend (CanvasSession) -> Unit,
     val flows: CanvasBoardFlows,
     val docs: CanvasBoardDocuments,
     val view: CanvasBoardView,
@@ -299,14 +308,15 @@ internal class CanvasBoard(
 /** The board for this composition: what it keeps, the flows it watches, and its layout. */
 @Composable
 internal fun rememberCanvasBoard(host: CanvasWorkspaceHost): CanvasBoard {
-    val ui = remember { CanvasBoardUi() }
+    val ui = remember(host.session) { CanvasBoardUi() }
+    val beforeSessionImport = LocalCanvasBoardSessionImportGate.current
     val session = host.session
     val kept = remember(session) { CanvasSessionBoardState(CanvasSceneStateGuard(session?.canvasId)) }
     val flows = collectBoardFlows(host, kept.history)
     val docs = rememberBoardDocuments(session, flows.sessionDoc.value, ui)
     val work = rememberBoardWork(host, ui, kept.history)
     val view = boardView(host.chrome, ui, flows.state.value.selectedIds.isNotEmpty())
-    return CanvasBoard(host, ui, kept, flows, docs, view, work)
+    return CanvasBoard(host, ui, kept, beforeSessionImport, flows, docs, view, work)
 }
 
 @Composable

@@ -52,6 +52,7 @@ class CanvasTouchAndShapeTextUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Canvas board").performMouseInput { rightClick(Offset(500f, 400f)) }
         onNodeWithText("Rectangle").performClick()
@@ -144,6 +145,7 @@ class CanvasTouchAndShapeTextUiTest {
     fun anOutlineOnlyShapeIsDraggedFromAnywhereInside() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session(), controller = controller) }
+        awaitCanvasReady()
         controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(hollowRect("r1")))
         controller.setMode(Mode.SELECT)
         waitForIdle()
@@ -174,6 +176,7 @@ class CanvasTouchAndShapeTextUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
         onNodeWithContentDescription("Canvas board").performMouseInput { rightClick(Offset(500f, 400f)) }
         onNodeWithText("Rectangle").performClick()
         waitUntil(timeoutMillis = 5000) { onAllNodes(isFocused() and hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
@@ -201,6 +204,7 @@ class CanvasTouchAndShapeTextUiTest {
     fun aShapesTextControlsAreOnItsBar() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session(), controller = controller) }
+        awaitCanvasReady()
         controller.onIntent(io.ak1.drawbox.domain.model.Intent.AddElement(hollowRect("r1").copy(text = "Plan")))
         controller.setMode(Mode.SELECT)
         controller.selectAt(Offset(300f, 360f), 4f)

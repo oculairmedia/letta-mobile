@@ -2,22 +2,32 @@ package com.letta.mobile.ui.canvas
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
 import com.letta.mobile.data.canvas.CanvasDocument
-import com.letta.mobile.data.canvas.CanvasHistory
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.CanvasSessionRegistry
+import com.letta.mobile.ui.canvas.lifetime.CanvasWorkspaceLoadState
+import com.letta.mobile.ui.canvas.lifetime.CanvasWorkspaceSessionLifecycle
 import com.letta.mobile.util.Telemetry
 import io.ak1.drawbox.domain.model.DrawingSerializer
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Event
 import io.ak1.drawbox.domain.model.Intent
 import io.ak1.drawbox.domain.model.PayLoad
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.TimeSource
@@ -33,7 +43,7 @@ private const val AUTOSAVE_DEBOUNCE_MS = 500L
 
 /**
  * The board's work with its session and its drawing: folding old labels, the background, the
- * load and the live sync, the autosave, the images and the export events. Launched in this
+ * load and live document import, the autosave, the images and the export events. Launched in this
  * order, which is the order the board has always relied on.
  */
 @Composable
@@ -51,12 +61,9 @@ internal fun CanvasBoardSessionEffects(board: CanvasBoard) {
     val pattern = board.docs.backgroundPattern
     LaunchedEffect(pattern) { board.applyBackgroundPattern(pattern) }
     // Load the initial JSON diagram or the session document and observe external session updates.
-    LaunchedEffect(session, board.host.initialJson) { board.loadBoard(this) }
-    // Autosave: debounced on a dirty signal (elements or background colour change), then
-    // exportJson(); the resulting Event.JsonExported persists the updated scene off the main
-    // thread. The background colour is part of the exported drawing, and the export is the only
-    // way it becomes an op: keyed on the elements alone, a new colour stayed on this board until
-    // the next stroke carried it along.
+    LaunchedEffect(session, board.host.initialJson) { board.loadBoard() }
+    // Autosave and viewer handoff use the same acknowledged drawing save. Both elements and
+    // background colour are drawing edits; a tool or camera change is not.
     LaunchedEffect(state.elements, state.bgColor, ui.initialLoadDone, session) { board.autosave() }
     // Images placed on this board, and those of boards made before it kept images as assets, are
     // moved into the asset store: their bytes stored once under their hash.
@@ -67,6 +74,72 @@ internal fun CanvasBoardSessionEffects(board: CanvasBoard) {
         board.fetchMissingAssets()
     }
     LaunchedEffect(board.controller, session) { board.collectBoardEvents() }
+}
+
+/** Keeps loading, registration and remote ops alive independently of the selected viewer. */
+@Composable
+internal fun CanvasWorkspaceSessionLifetime(
+    session: CanvasSession?,
+    sessionRegistry: CanvasSessionRegistry?,
+): CanvasWorkspaceSessionLifecycle {
+    val loadState = remember(session) {
+        mutableStateOf(initialWorkspaceLoadState(session))
+    }
+    val retryGeneration = remember(session) { mutableIntStateOf(0) }
+    val retry = remember(loadState, retryGeneration) {
+        {
+            loadState.value = CanvasWorkspaceLoadState.Loading
+            retryGeneration.intValue++
+            Unit
+        }
+    }
+    LaunchedEffect(session, sessionRegistry, retryGeneration.intValue) {
+        val activeSession = session ?: return@LaunchedEffect
+        var syncJob: Job? = null
+        var registered = false
+        try {
+            val failure = runCatching {
+                if (activeSession.document.value == null) {
+                    loadState.value = CanvasWorkspaceLoadState.Loading
+                    activeSession.loadIfMissing()
+                }
+                if (sessionRegistry != null && sessionRegistry.get(activeSession.canvasId) !== activeSession) {
+                    sessionRegistry.register(activeSession)
+                    registered = true
+                }
+                syncJob = activeSession.startSync(this)
+                loadState.value = CanvasWorkspaceLoadState.Ready
+                awaitCancellation()
+            }.exceptionOrNull()
+            loadState.value = activeSession.completedLoadState(failure)
+        } finally {
+            withContext(NonCancellable) {
+                syncJob?.cancelAndJoin()
+                if (registered && sessionRegistry?.get(activeSession.canvasId) === activeSession) {
+                    sessionRegistry.unregister(activeSession.canvasId)
+                }
+            }
+        }
+    }
+    return CanvasWorkspaceSessionLifecycle(loadState, retry)
+}
+
+private fun initialWorkspaceLoadState(session: CanvasSession?): CanvasWorkspaceLoadState =
+    if (session == null || session.document.value != null) CanvasWorkspaceLoadState.Ready
+    else CanvasWorkspaceLoadState.Loading
+
+private fun CanvasSession.completedLoadState(failure: Throwable?): CanvasWorkspaceLoadState = when (failure) {
+    null -> CanvasWorkspaceLoadState.Ready
+    is CancellationException -> throw failure
+    is Exception -> {
+        Telemetry.error("CanvasWorkspace", "session.load.failed", failure, "canvasId" to canvasId.value)
+        CanvasWorkspaceLoadState.Failed
+    }
+    else -> throw failure
+}
+
+private suspend fun CanvasSession.loadIfMissing() {
+    if (document.value == null) load()
 }
 
 private suspend fun CanvasBoard.foldLegacyLabels() {
@@ -90,20 +163,14 @@ private fun CanvasBoard.applyBackgroundPattern(pattern: CanvasBackgroundPattern)
  * replaced, starts with an empty undo history: the steps that remain would undo into a board
  * that no longer exists.
  */
-private suspend fun CanvasBoard.loadBoard(effectScope: CoroutineScope) {
+private suspend fun CanvasBoard.loadBoard() {
     kept.history.clear()
     val s = session
     if (s == null) {
         loadPreview()
         return
     }
-    host.sessionRegistry?.register(s)
-    s.startSync(effectScope)
-    try {
-        openSession(s)
-    } finally {
-        host.sessionRegistry?.unregister(s.canvasId)
-    }
+    openSession(s)
 }
 
 private suspend fun CanvasBoard.loadPreview() {
@@ -119,13 +186,13 @@ private suspend fun CanvasBoard.loadPreview() {
 
 private suspend fun CanvasBoard.openSession(s: CanvasSession) {
     val openStarted = TimeSource.Monotonic.markNow()
-    s.load()
     val sessionJson = s.sceneJsonOrEmpty()
     var lastImportedRev = s.document.value?.revision ?: 0L
     // Parsing the scene is the heaviest thing opening a board does, and a board with pictures on
     // it is megabytes of JSON: it is parsed off the main thread, and only the parsed drawing is
     // handed to the controller on it.
     val opened = withContext(Dispatchers.Default) { parseOpenedScene(sessionJson) }
+    beforeSessionImport(s)
     // Known even for an empty canvas, or the first note placed on it would read as an external
     // change to the drawing and reload the board.
     ui.lastDrawing = opened.drawing
@@ -134,11 +201,9 @@ private suspend fun CanvasBoard.openSession(s: CanvasSession) {
         importOpenedScene(opened, s, openStarted)
     }
     ui.importedRevision = lastImportedRev
-    delay(LOAD_SETTLE_MS)
-    // The baseline is the board AS LOADED, set before any edit is accepted. Left null until the
-    // first save, the first drawing change only initialises it and records nothing - so a note
-    // done first and a stroke done second undid in the wrong order.
-    ui.lastSavedElements = controller.state.value.elements
+    // Take the actual imported DrawBox snapshot before accepting edits. Returning to the board
+    // never reloads the store over a newer in-memory session.
+    acceptDrawingBaseline()
     ui.initialLoadDone = true
     // Each revision is compared and parsed off the main thread too. While one is being parsed the
     // collector is suspended, and the document flow keeps only the newest revision, so a catch-up
@@ -185,22 +250,31 @@ private fun CanvasBoard.importOpenedScene(
 }
 
 /** Brings in a revision the session got from elsewhere; answers the revision now imported. */
-private suspend fun CanvasBoard.syncExternalRevision(doc: CanvasDocument?, lastImportedRev: Long): Long {
-    val importStarted = TimeSource.Monotonic.markNow()
-    val params = ExternalSyncParams(
-        doc = doc,
-        lastImportedRev = lastImportedRev,
-        lastExportedJson = ui.lastExportedJson,
-        lastDrawing = ui.lastDrawing,
-        lastSyncedScene = ui.lastSyncedScene,
-    )
-    val (result, parsedExternal) = withContext(Dispatchers.Default) { evaluateExternal(params) } ?: return lastImportedRev
-    ui.importedRevision = result.newImportedRev
-    doc?.let { ui.lastSyncedScene = it.sceneJson }
-    if (!result.shouldImport) return result.newImportedRev
-    importExternalScene(ExternalScene(doc, result, parsedExternal), importStarted)
-    result.statusMessage?.let { ui.statusMessage = it }
-    return result.newImportedRev
+private suspend fun CanvasBoard.syncExternalRevision(doc: CanvasDocument?, lastImportedRev: Long): Long =
+    ui.drawingSaveMutex.withLock {
+        if (doc == null || doc.revision <= lastImportedRev) lastImportedRev else importLatestRevision(lastImportedRev)
+    }
+
+private suspend fun CanvasBoard.importLatestRevision(lastImportedRev: Long): Long {
+    // Preserve pending local edits before importing a remote drawing. While parsing off the
+    // UI thread, another edit can arrive; retry with that edit saved before replacing state.
+    while (true) {
+        if (!flushDrawingLocked()) return lastImportedRev
+        val drawing = controller.state.value
+        val latest = session?.document?.value
+        val params = ExternalSyncParams(latest, lastImportedRev, ui.lastExportedJson, ui.lastDrawing, ui.lastSyncedScene)
+        val evaluated = withContext(Dispatchers.Default) { evaluateExternal(params) } ?: return lastImportedRev
+        if (!drawing.matchesDrawing(controller.state.value)) continue
+        val (result, parsedExternal) = evaluated
+        ui.importedRevision = result.newImportedRev
+        ui.lastSyncedScene = latest?.sceneJson
+        if (result.shouldImport) {
+            importExternalScene(ExternalScene(latest, result, parsedExternal), TimeSource.Monotonic.markNow())
+            acceptDrawingBaseline()
+            result.statusMessage?.let { ui.statusMessage = it }
+        }
+        return result.newImportedRev
+    }
 }
 
 /**
@@ -245,28 +319,13 @@ private fun CanvasBoard.importExternalScene(scene: ExternalScene, importStarted:
     // placed on a desktop opened a phone's keyboard.
     kept.knownTextIds = CanvasTextElements.ids(controller.state.value.elements)
     ui.lastDrawing = scene.evaluated.drawing
-    controller.state.value.let { ui.importedDrawing = it.elements to it.bgColor }
 }
 
-/**
- * Saves the drawing once it has been still for [AUTOSAVE_DEBOUNCE_MS]. The drawing is taken as it
- * is (an immutable state) and serialised off the main thread; at a few thousand elements that is
- * a hundred milliseconds or more, which on the main thread was a dropped frame after every edit.
- *
- * A drawing that is exactly what a change from elsewhere left is not saved: the session already
- * holds it. Saving it only diffed the whole scene against itself and recorded an undo step that
- * undid nothing (the import had already emptied DrawBox's own history).
- */
+/** Debounces drawing edits; a viewer handoff flushes the same save without this delay. */
 private suspend fun CanvasBoard.autosave() {
     if (!ui.initialLoadDone || session == null) return
     delay(AUTOSAVE_DEBOUNCE_MS)
-    val drawing = controller.state.value
-    if (ui.importedDrawing?.let { (elements, background) -> elements === drawing.elements && background == drawing.bgColor } == true) {
-        ui.lastSavedElements = drawing.elements
-        return
-    }
-    ui.isAutosaving = true
-    controller.exportJsonInBackground()
+    flushDrawing()
 }
 
 /**
@@ -360,37 +419,8 @@ private suspend fun CanvasBoard.onBoardEvent(event: Event) {
 }
 
 private suspend fun CanvasBoard.onJsonExported(json: String) {
-    ui.lastExportedJson = json
-    val wasAutosaving = ui.isAutosaving
-    ui.isAutosaving = false
-    CanvasWorkspaceSupport.computeJsonExportStatus(json, wasAutosaving)?.let { ui.statusMessage = it }
-    val s = session ?: return
-    if (s.sceneJsonOrEmpty() == json) return
-    // Each strip is a full parse of the scene: done off the main thread.
-    ui.lastDrawing = withContext(Dispatchers.Default) { CanvasWorkspaceSupport.drawingOf(json) }
-    val saved = withContext(Dispatchers.Default) {
-        s.applyLocalScene(json)
-        s.sceneJsonOrEmpty().let { stored -> stored to CanvasWorkspaceSupport.drawingOf(stored) }
-    }
-    ui.lastSyncedScene = saved.first
-    ui.lastDrawing = saved.second
-    recordDrawingStep()
-}
-
-/** A saved drawing change is one undo step, unless undo or redo made it. */
-private fun CanvasBoard.recordDrawingStep() {
-    val elementsNow = controller.state.value.elements
-    val shouldRecord = CanvasWorkspaceSupport.shouldRecordDrawingStep(
-        elementsBefore = ui.lastSavedElements,
-        elementsNow = elementsNow,
-        isApplyingHistory = ui.applyingHistory,
-    )
-    ui.lastSavedElements = elementsNow
-    if (ui.applyingHistory) {
-        ui.applyingHistory = false
-    } else if (shouldRecord) {
-        kept.history.record(CanvasHistory.Step.Drawing())
-    }
+    CanvasWorkspaceSupport.computeJsonExportStatus(json, wasAutosaving = false)?.let { ui.statusMessage = it }
+    flushDrawing()
 }
 
 private fun CanvasBoard.onSvgExported(svg: String) {

@@ -54,7 +54,7 @@ class JvmLocalAppServerLauncherTest {
     fun killEndsTheServerAndItsDescendants() = runBlocking {
         var spawned: Process? = null
         val process = JvmLocalAppServerLauncher(onSpawned = { spawned = it }, stopTimeoutMs = 2_000).start(
-            launch = LocalAppServerLaunch(listOf("sh", "-c", "sleep 60 & echo started; wait"), root.absolutePath),
+            launch = LocalAppServerLaunch(listOf("sh", "-c", "sleep 60 & child=$!; echo started; wait \"\$child\""), root.absolutePath),
             tokenFile = File(root, "ws-token").absolutePath,
             token = "t",
         )

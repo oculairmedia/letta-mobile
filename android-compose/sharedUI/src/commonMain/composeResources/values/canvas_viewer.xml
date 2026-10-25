@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="canvas_viewer_canvas">Canvas</string>
+    <string name="canvas_viewer_text">Text</string>
+    <string name="canvas_viewer_waiting">Waiting for canvas content</string>
+    <string name="canvas_viewer_load_failed">Canvas could not be loaded</string>
+    <string name="canvas_viewer_retry">Retry</string>
+</resources>

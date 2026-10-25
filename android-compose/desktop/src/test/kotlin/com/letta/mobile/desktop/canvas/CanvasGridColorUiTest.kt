@@ -29,6 +29,7 @@ class CanvasGridColorUiTest {
         }
         runBlocking { session.setBackgroundPattern(CanvasBackgroundPattern(kind = CanvasBackgroundPattern.GRID, spacing = 32f, colorHex = "#ff0000")) }
         setContent { Box(Modifier.size(400.dp, 300.dp)) { CanvasWorkspace(session = session) } }
+        awaitCanvasReady()
         mainClock.advanceTimeBy(1000)
         waitForIdle()
 

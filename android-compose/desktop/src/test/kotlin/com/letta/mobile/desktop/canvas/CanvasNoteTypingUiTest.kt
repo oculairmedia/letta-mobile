@@ -38,6 +38,7 @@ class CanvasNoteTypingUiTest {
     fun note_paragraph_acceptsTypedText() = runComposeUiTest {
         val session = session()
         setContent { CanvasWorkspace(session = session) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Add note").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
@@ -66,6 +67,7 @@ class CanvasNoteTypingUiTest {
             io.ak1.drawbox.presentation.reducer.Reducer(io.ak1.drawbox.domain.usecase.UseCase()),
         )
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Add note").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
@@ -89,6 +91,7 @@ class CanvasNoteTypingUiTest {
     fun eraser_removesNote() = runComposeUiTest {
         val session = session()
         setContent { CanvasWorkspace(session = session) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Add note").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }
@@ -108,6 +111,7 @@ class CanvasNoteTypingUiTest {
     fun chromeHandle_resizesNote() = runComposeUiTest {
         val session = session()
         setContent { CanvasWorkspace(session = session) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Add note").performClick()
         waitUntil(timeoutMillis = 5000) { session.documents().size == 1 }

@@ -49,16 +49,16 @@ internal class CanvasOpSettlement(private val canvasId: CanvasId, private val op
         }
     }
 
-    /** Runs the document write [write], then settles every op it carries. */
-    suspend fun <T> writing(write: suspend () -> T): T {
+    /** Runs [write], settling its carried ops only when it reports durable completion. */
+    suspend fun writing(write: suspend () -> Boolean): Boolean {
         var written = false
-        val result = try {
-            write().also { written = true }
+        return try {
+            written = write()
+            if (written) settleCarried()
+            written
         } finally {
             if (!written) recoveryDue = true
         }
-        settleCarried()
-        return result
     }
 
     /** Settles the carried ops without a write: the document already held all of them. */

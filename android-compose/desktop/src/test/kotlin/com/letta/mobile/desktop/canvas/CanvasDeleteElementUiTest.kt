@@ -44,6 +44,7 @@ class CanvasDeleteElementUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         // Two shapes on the board, saved through the session the way drawing them would.
         controller.importPath(drawing)

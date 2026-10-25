@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,10 +12,19 @@ import kotlinx.coroutines.flow.update
  * the caller. The notebook repository and the key-value board stores report through it.
  */
 class CanvasStorageFaults {
+    private val saveFailures = MutableStateFlow<Map<CanvasId?, Long>>(emptyMap())
     private val _faults = MutableStateFlow<List<CanvasStorageFault>>(emptyList())
     val faults: StateFlow<List<CanvasStorageFault>> = _faults.asStateFlow()
 
+    /** Counts every failed save concerning [canvasId], including failures with no known board. */
+    fun saveFailureGeneration(canvasId: CanvasId): Long = saveFailures.value.let {
+        (it[canvasId] ?: 0L) + (it[null] ?: 0L)
+    }
+
     fun record(fault: CanvasStorageFault, throwable: Throwable? = null) {
+        if (fault.kind == CanvasStorageFault.Kind.SAVE_FAILED) {
+            saveFailures.update { it + (fault.canvasId to ((it[fault.canvasId] ?: 0L) + 1L)) }
+        }
         log(fault, throwable)
         _faults.update { current ->
             // One entry per document and kind; the first SAVE_FAILED time is when changes became at risk.
@@ -23,7 +33,7 @@ class CanvasStorageFaults {
                 atEpochMs = previous?.atEpochMs ?: fault.atEpochMs,
                 canvasId = fault.canvasId ?: previous?.canvasId,
             )
-            (current.filterNot { it === previous } + kept).takeLast(MAX_FAULTS)
+            (current.filterNot { it.kind == fault.kind && it.documentId == fault.documentId } + kept).takeLast(MAX_FAULTS)
         }
     }
 

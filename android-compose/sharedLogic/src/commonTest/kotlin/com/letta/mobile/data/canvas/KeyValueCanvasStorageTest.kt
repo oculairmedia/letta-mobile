@@ -7,6 +7,7 @@ import com.letta.mobile.data.storage.InMemoryKeyValueStore
 import com.letta.mobile.data.storage.KeyValueStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
@@ -14,6 +15,71 @@ import kotlinx.coroutines.test.runTest
 /** letta-mobile-ckmub.17.7: boards kept in a key-value store survive a reload; failures are faults, not crashes. */
 class KeyValueCanvasStorageTest {
     private val store = InMemoryKeyValueStore()
+
+    @Test
+    fun inMemoryEditsAreRetriedDurablyEvenWhenTheDrawingDiffIsEmpty() = runTest {
+        var fail = false
+        var writes = 0
+        val backing = object : KeyValueStore by store {
+            override suspend fun put(key: String, value: String) {
+                if (key.startsWith(KeyValueCanvasStorage.BOARD_PREFIX)) {
+                    writes++
+                    if (fail) error("quota exceeded")
+                }
+                store.put(key, value)
+            }
+        }
+        val storage = KeyValueCanvasStorage(backing)
+        val session = CanvasSession.create(storage.documents, CanvasCreateOptions(opLog = storage.opLog))
+        fail = true
+        session.applyLocal(CanvasOp.AddElementOp("memory", "local_user", 1, "draft", """{"id":"draft"}"""))
+        assertTrue(session.sceneJsonOrEmpty().contains("draft"), "ordinary mutations keep working from memory")
+        assertTrue(storage.opLog.unsettled(session.canvasId).isNotEmpty())
+        assertTrue(KeyValueCanvasStorage(store).documents.get(session.canvasId)!!.sceneJson.isEmpty())
+        fail = false
+        val before = writes
+        assertTrue(session.applyLocalScene(session.sceneJsonOrEmpty()).isEmpty())
+        assertTrue(writes > before, "an empty diff cannot acknowledge the in-memory scene without writing it")
+        assertTrue(storage.opLog.unsettled(session.canvasId).isEmpty())
+        assertTrue(KeyValueCanvasStorage(store).documents.get(session.canvasId)!!.sceneJson.contains("draft"))
+    }
+
+    @Test
+    fun identicalSaveFailuresRemainUnsettledUntilAnActualDurableRetry() = runTest {
+        var fail = false
+        var writes = 0
+        val backing = object : KeyValueStore by store {
+            override suspend fun put(key: String, value: String) {
+                if (key.startsWith(KeyValueCanvasStorage.BOARD_PREFIX)) {
+                    writes++
+                    if (fail) error("same quota failure")
+                }
+                store.put(key, value)
+            }
+        }
+        val storage = KeyValueCanvasStorage(backing, clock = { 1 })
+        val session = CanvasSession.create(storage.documents, CanvasCreateOptions(opLog = storage.opLog))
+        val baseline = session.sceneJsonOrEmpty()
+        val draft = """{"bgColor":"#f7f3eaff","elements":[{"id":"draft","type":"rect"}]}"""
+        fail = true
+        repeat(2) {
+            val before = writes
+            assertFailsWith<IllegalStateException> { session.applyLocalScene(draft, baseJson = baseline) }
+            assertTrue(writes > before, "each retry must reach the backing store")
+            assertTrue(storage.opLog.unsettled(session.canvasId).isNotEmpty(), "failed writes cannot settle edits")
+            assertEquals(baseline, KeyValueCanvasStorage(store).documents.get(session.canvasId)?.sceneJson)
+        }
+        val diagnostic = storage.storageFaults.value.single { it.kind == CanvasStorageFault.Kind.SAVE_FAILED }
+        fail = false
+        val before = writes
+        assertTrue(session.applyLocalScene(draft).isEmpty(), "journal recovery leaves no new drawing ops to generate")
+        assertTrue(writes > before)
+        assertTrue(storage.opLog.unsettled(session.canvasId).isEmpty())
+        assertEquals(diagnostic, storage.storageFaults.value.single { it.kind == CanvasStorageFault.Kind.SAVE_FAILED })
+        val restarted = CanvasSession.open(KeyValueCanvasStorage(store).documents, session.canvasId)!!
+        assertTrue(restarted.sceneJsonOrEmpty().contains("draft"))
+        assertTrue(restarted.sceneJsonOrEmpty().contains("#f7f3eaff"))
+    }
 
     private fun board(id: String = "c-1", conversation: String? = "conv-1", revision: Long = 1) =
         CanvasDocument(CanvasId(id), conversationId = conversation, title = "Board", revision = revision, sceneJson = "{\"elements\":[]}")

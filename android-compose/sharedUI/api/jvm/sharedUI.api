@@ -558,6 +558,12 @@ public final class com/letta/mobile/ui/canvas/ComposableSingletons$CanvasPropert
 	public final fun getLambda$-24022577$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
+public final class com/letta/mobile/ui/canvas/ComposableSingletons$CanvasWorkspaceKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/ComposableSingletons$CanvasWorkspaceKt;
+	public fun <init> ()V
+	public final fun getLambda$863096003$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
 public final class com/letta/mobile/ui/canvas/DefaultPenTarget : com/letta/mobile/ui/canvas/CanvasPenTarget {
 	public static final field $stable I
 	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/DefaultPenTarget;
@@ -709,9 +715,80 @@ public final class com/letta/mobile/ui/canvas/library/CanvasLibraryNoticeKt {
 	public static final fun CanvasLibraryNotice (Lcom/letta/mobile/data/canvas/library/CanvasLibraryController;Landroidx/compose/runtime/Composer;I)V
 }
 
+public final class com/letta/mobile/ui/canvas/plugin/CanvasDocumentViewer {
+	public static final field $stable I
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function4;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getId--cGNYqM ()Ljava/lang/String;
+	public final fun getLabel ()Lkotlin/jvm/functions/Function2;
+	public final fun getRender ()Lkotlin/jvm/functions/Function4;
+}
+
+public final class com/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerContext {
+	public static final field $stable I
+	public fun <init> (Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/Long;Ljava/lang/String;)V
+	public final fun component1 ()Lcom/letta/mobile/data/model/CanvasId;
+	public final fun component2 ()Ljava/lang/Long;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/Long;Ljava/lang/String;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerContext;
+	public static synthetic fun copy$default (Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerContext;Lcom/letta/mobile/data/model/CanvasId;Ljava/lang/Long;Ljava/lang/String;ILjava/lang/Object;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerContext;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCanvasId ()Lcom/letta/mobile/data/model/CanvasId;
+	public final fun getRevision ()Ljava/lang/Long;
+	public final fun getSceneJson ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerId {
+	public static final field Companion Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/canvas/plugin/CanvasDocumentViewerId$Companion {
+	public final fun getCANVAS--cGNYqM ()Ljava/lang/String;
+	public final fun getTEXT--cGNYqM ()Ljava/lang/String;
+}
+
+public final class com/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers {
+	public static final field $stable I
+	public static final field Companion Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers$Companion;
+	public final fun contains-7y3mhsM (Ljava/lang/String;)Z
+	public final fun getAll ()Ljava/util/List;
+	public final fun register (Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewer;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers;
+	public final fun unregister-7y3mhsM (Ljava/lang/String;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers;
+	public final fun viewerFor-7y3mhsM (Ljava/lang/String;)Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewer;
+}
+
+public final class com/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers$Companion {
+	public final fun getCore ()Lcom/letta/mobile/ui/canvas/plugin/CanvasDocumentViewers;
+}
+
+public final class com/letta/mobile/ui/canvas/plugin/CanvasDocumentViewersKt {
+	public static final fun ProvideCanvasDocumentViewers (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun getLocalCanvasDocumentViewers ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
 public final class com/letta/mobile/ui/canvas/plugin/CanvasPluginLayerKt {
 	public static final fun CanvasPluginLayer (Lcom/letta/mobile/ui/canvas/plugin/PluginBoard;Lio/ak1/drawbox/domain/model/Viewport;Landroidx/compose/ui/Modifier;Lcom/letta/mobile/ui/canvas/plugin/PluginBoardSelection;Landroidx/compose/runtime/Composer;II)V
 	public static final fun rememberPluginBoard (Lcom/letta/mobile/data/canvas/CanvasSession;Lcom/letta/mobile/data/canvas/CanvasDocument;Lcom/letta/mobile/data/storage/AssetStore;Landroidx/compose/runtime/Composer;I)Lcom/letta/mobile/ui/canvas/plugin/PluginBoard;
+}
+
+public final class com/letta/mobile/ui/canvas/plugin/ComposableSingletons$CanvasDocumentViewersKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/plugin/ComposableSingletons$CanvasDocumentViewersKt;
+	public fun <init> ()V
+	public final fun getLambda$-1304293009$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+	public final fun getLambda$-342667794$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
+	public final fun getLambda$965638652$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function4;
 }
 
 public final class com/letta/mobile/ui/canvas/plugin/ComposableSingletons$PluginElementRenderersKt {

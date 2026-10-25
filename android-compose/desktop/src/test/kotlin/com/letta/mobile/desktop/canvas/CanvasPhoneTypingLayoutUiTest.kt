@@ -31,6 +31,7 @@ class CanvasPhoneTypingLayoutUiTest {
         }
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller, layout = CanvasLayout.COMPACT) }
+        awaitCanvasReady()
         mainClock.advanceTimeBy(1_000)
         waitForIdle()
 

@@ -67,6 +67,16 @@ data class CanvasStorageFault(
  */
 interface CanvasStorageHealth : DocumentStorageHealth<CanvasStorageFault> {
     override val storageFaults: StateFlow<List<CanvasStorageFault>>
+
+    /** Monotonic count of failed saves for [canvasId], independent of retained diagnostic equality. */
+    fun saveFailureGeneration(canvasId: CanvasId): Long
+
+    /**
+     * Waits for the board's last upsert to reach storage; false retains the draft and journal.
+     * Synchronous backings finish in upsert. Asynchronous stores must override this barrier and
+     * retry missing writes even when their in-memory document already contains the changes.
+     */
+    suspend fun awaitDurableSave(canvasId: CanvasId): Boolean = true
 }
 
 /** The faults that concern [canvasId]: its own, and ones no board could be named for. */

@@ -4,8 +4,11 @@ package com.letta.mobile.desktop.canvas
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -60,6 +63,7 @@ class CanvasElementInteractionUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Canvas board").performMouseInput { rightClick(Offset(420f, 360f)) }
         onNodeWithText("Rectangle").performClick()
@@ -80,6 +84,7 @@ class CanvasElementInteractionUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Rectangle").performClick()
         onNodeWithContentDescription("Canvas board").performMouseInput {
@@ -98,6 +103,7 @@ class CanvasElementInteractionUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
         controller.onIntent(Intent.AddElement(rectangle("r1", 300f, 300f)))
         waitForIdle()
 
@@ -112,6 +118,7 @@ class CanvasElementInteractionUiTest {
         val session = session()
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session, controller = controller) }
+        awaitCanvasReady()
         controller.onIntent(Intent.AddElement(rectangle("r1", 300f, 300f)))
         waitForIdle()
 
@@ -125,10 +132,11 @@ class CanvasElementInteractionUiTest {
     fun aLongPressOnEmptyBoardOffersWhatCanBeAdded() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session(), controller = controller) }
+        awaitCanvasReady()
 
         onNodeWithContentDescription("Canvas board").performTouchInput { longClick(Offset(500f, 400f)) }
         onNodeWithText("Note").assertExists()
-        onNodeWithText("Text").assertExists()
+        onNode(hasText("Text") and hasAnyAncestor(isPopup())).assertExists()
         onNodeWithText("Circle").performClick()
         waitUntil(timeoutMillis = 5000) { shapes(controller).any { it.shapeType == ShapeType.CIRCLE } }
         // A long press is not a tap: the draw tool left no dot behind.
@@ -139,6 +147,7 @@ class CanvasElementInteractionUiTest {
     fun theSelectionBarFloatsOnTheSelection() = runComposeUiTest {
         val controller = DrawBoxController(Reducer(UseCase()))
         setContent { CanvasWorkspace(session = session(), controller = controller) }
+        awaitCanvasReady()
         controller.onIntent(Intent.AddElement(rectangle("r1", 400f, 420f)))
         controller.setMode(Mode.SELECT)
         // On its outline: an unfilled shape is picked by its stroke.

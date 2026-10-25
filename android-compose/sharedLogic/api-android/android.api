@@ -4751,6 +4751,8 @@ public final class com/letta/mobile/data/canvas/CanvasSession {
 	public final fun applyLocal (Lcom/letta/mobile/data/canvas/CanvasOp;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun applyLocalScene-VqdqOIQ (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun applyLocalScene-VqdqOIQ$default (Lcom/letta/mobile/data/canvas/CanvasSession;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun applyLocalScene-fqO6Vxg (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun applyLocalScene-fqO6Vxg$default (Lcom/letta/mobile/data/canvas/CanvasSession;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun applyLocalStamped (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun applyOps (Ljava/util/List;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun applyOps$default (Lcom/letta/mobile/data/canvas/CanvasSession;Ljava/util/List;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
@@ -4990,13 +4992,20 @@ public final class com/letta/mobile/data/canvas/CanvasStorageFaults {
 	public final fun getFaults ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun record (Lcom/letta/mobile/data/canvas/CanvasStorageFault;Ljava/lang/Throwable;)V
 	public static synthetic fun record$default (Lcom/letta/mobile/data/canvas/CanvasStorageFaults;Lcom/letta/mobile/data/canvas/CanvasStorageFault;Ljava/lang/Throwable;ILjava/lang/Object;)V
+	public final fun saveFailureGeneration (Lcom/letta/mobile/data/model/CanvasId;)J
 }
 
 public final class com/letta/mobile/data/canvas/CanvasStorageFaults$Companion {
 }
 
 public abstract interface class com/letta/mobile/data/canvas/CanvasStorageHealth : com/letta/mobile/data/document/DocumentStorageHealth {
+	public fun awaitDurableSave (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun getStorageFaults ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun saveFailureGeneration (Lcom/letta/mobile/data/model/CanvasId;)J
+}
+
+public final class com/letta/mobile/data/canvas/CanvasStorageHealth$DefaultImpls {
+	public static fun awaitDurableSave (Lcom/letta/mobile/data/canvas/CanvasStorageHealth;Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/data/canvas/CanvasStorageHealthKt {
@@ -5356,10 +5365,12 @@ public final class com/letta/mobile/data/canvas/InMemoryCanvasDocumentStore : co
 	public fun <init> ()V
 	public fun <init> (Lcom/letta/mobile/data/document/DocumentBacking;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/document/DocumentBacking;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun awaitDurableSave (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun createForConversationIfAbsent (Lcom/letta/mobile/data/canvas/CanvasDocument;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getForConversation-1iDlvEA (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getStorageFaults ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun listForAgent-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun saveFailureGeneration (Lcom/letta/mobile/data/model/CanvasId;)J
 }
 
 public final class com/letta/mobile/data/canvas/InMemoryCanvasOpLog : com/letta/mobile/data/document/InMemoryOpLog, com/letta/mobile/data/canvas/CanvasOpLog {
@@ -5411,12 +5422,14 @@ public final class com/letta/mobile/data/canvas/KeyValueCanvasStorage : com/lett
 	public static final field OPS_PREFIX Ljava/lang/String;
 	public fun <init> (Lcom/letta/mobile/data/storage/KeyValueStore;Lcom/letta/mobile/data/document/HistoryBudget;Lkotlin/jvm/functions/Function0;)V
 	public synthetic fun <init> (Lcom/letta/mobile/data/storage/KeyValueStore;Lcom/letta/mobile/data/document/HistoryBudget;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun awaitDurableSave (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun getDelivery ()Lcom/letta/mobile/data/canvas/CanvasDeliveryStore;
 	public final fun getDocuments ()Lcom/letta/mobile/data/canvas/CanvasDocumentStore;
 	public final fun getOpLog ()Lcom/letta/mobile/data/canvas/CanvasOpLog;
 	public fun getStorageFaults ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun relayClient (Lcom/letta/mobile/data/storage/AssetStore;)Lcom/letta/mobile/data/canvas/CanvasRelayClient;
 	public static synthetic fun relayClient$default (Lcom/letta/mobile/data/canvas/KeyValueCanvasStorage;Lcom/letta/mobile/data/storage/AssetStore;ILjava/lang/Object;)Lcom/letta/mobile/data/canvas/CanvasRelayClient;
+	public fun saveFailureGeneration (Lcom/letta/mobile/data/model/CanvasId;)J
 }
 
 public final class com/letta/mobile/data/canvas/KeyValueCanvasStorage$Companion {
@@ -5443,6 +5456,7 @@ public final class com/letta/mobile/data/canvas/LoopbackCanvasSyncTransport : co
 
 public final class com/letta/mobile/data/canvas/NotebookCanvasDocumentStore : com/letta/mobile/data/canvas/CanvasDeletedElementStore, com/letta/mobile/data/canvas/CanvasDocumentStore, com/letta/mobile/data/canvas/CanvasStorageHealth {
 	public fun <init> (Lcom/letta/mobile/data/canvas/NotebookLocalStore;)V
+	public fun awaitDurableSave (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun createForConversationIfAbsent (Lcom/letta/mobile/data/canvas/CanvasDocument;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun deletedElements (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun get (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -5451,6 +5465,7 @@ public final class com/letta/mobile/data/canvas/NotebookCanvasDocumentStore : co
 	public fun getStorageFaults ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun listAll (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun listForAgent-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun saveFailureGeneration (Lcom/letta/mobile/data/model/CanvasId;)J
 	public fun upsert (Lcom/letta/mobile/data/canvas/CanvasDocument;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public synthetic fun upsert (Lcom/letta/mobile/data/document/DocumentSnapshot;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun upsertIfRevision (Lcom/letta/mobile/data/canvas/CanvasDocument;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -5670,6 +5685,7 @@ public final class com/letta/mobile/data/canvas/NotebookItemContract$Companion {
 public final class com/letta/mobile/data/canvas/NotebookLocalStore : com/letta/mobile/data/canvas/CanvasStorageHealth, java/lang/AutoCloseable {
 	public fun <init> (Ljava/nio/file/Path;Ljava/lang/String;Lcom/letta/mobile/data/canvas/NotebookHistoryBudget;Lkotlin/jvm/functions/Function1;)V
 	public synthetic fun <init> (Ljava/nio/file/Path;Ljava/lang/String;Lcom/letta/mobile/data/canvas/NotebookHistoryBudget;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun awaitDurableSave (Lcom/letta/mobile/data/model/CanvasId;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun checkLayouts ()Ljava/util/List;
 	public fun close ()V
 	public final fun create (Ljava/lang/String;)Lorg/automerge/repo/DocumentId;
@@ -5688,6 +5704,7 @@ public final class com/letta/mobile/data/canvas/NotebookLocalStore : com/letta/m
 	public final fun registerDocument (Lorg/automerge/repo/DocumentId;)Z
 	public final fun removeBoardElement (Lorg/automerge/repo/DocumentId;Ljava/lang/String;)V
 	public final fun repoForSync ()Lorg/automerge/repo/Repo;
+	public fun saveFailureGeneration (Lcom/letta/mobile/data/model/CanvasId;)J
 	public final fun setBoard (Lorg/automerge/repo/DocumentId;Ljava/lang/String;)V
 	public final fun startPolling (JLkotlin/jvm/functions/Function2;)V
 	public static synthetic fun startPolling$default (Lcom/letta/mobile/data/canvas/NotebookLocalStore;JLkotlin/jvm/functions/Function2;ILjava/lang/Object;)V

@@ -4086,6 +4086,9 @@ abstract interface com.letta.mobile.data.canvas/CanvasRelayStore { // com.letta.
 abstract interface com.letta.mobile.data.canvas/CanvasStorageHealth : com.letta.mobile.data.document/DocumentStorageHealth<com.letta.mobile.data.canvas/CanvasStorageFault> { // com.letta.mobile.data.canvas/CanvasStorageHealth|null[0]
     abstract val storageFaults // com.letta.mobile.data.canvas/CanvasStorageHealth.storageFaults|{}storageFaults[0]
         abstract fun <get-storageFaults>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.canvas/CanvasStorageFault>> // com.letta.mobile.data.canvas/CanvasStorageHealth.storageFaults.<get-storageFaults>|<get-storageFaults>(){}[0]
+
+    abstract fun saveFailureGeneration(com.letta.mobile.data.model/CanvasId): kotlin/Long // com.letta.mobile.data.canvas/CanvasStorageHealth.saveFailureGeneration|saveFailureGeneration(com.letta.mobile.data.model.CanvasId){}[0]
+    open suspend fun awaitDurableSave(com.letta.mobile.data.model/CanvasId): kotlin/Boolean // com.letta.mobile.data.canvas/CanvasStorageHealth.awaitDurableSave|awaitDurableSave(com.letta.mobile.data.model.CanvasId){}[0]
 }
 
 abstract interface com.letta.mobile.data.canvas/CanvasSyncTransport { // com.letta.mobile.data.canvas/CanvasSyncTransport|null[0]
@@ -27029,6 +27032,7 @@ final class com.letta.mobile.data.canvas/CanvasSession { // com.letta.mobile.dat
     final suspend fun applyAgentReplace(kotlin/String, com.letta.mobile.data.model/CanvasActorId? = ...): com.letta.mobile.data.canvas/CanvasDocument // com.letta.mobile.data.canvas/CanvasSession.applyAgentReplace|applyAgentReplace(kotlin.String;com.letta.mobile.data.model.CanvasActorId?){}[0]
     final suspend fun applyLocal(com.letta.mobile.data.canvas/CanvasOp): com.letta.mobile.data.canvas/CanvasDocument // com.letta.mobile.data.canvas/CanvasSession.applyLocal|applyLocal(com.letta.mobile.data.canvas.CanvasOp){}[0]
     final suspend fun applyLocalScene(kotlin/String, com.letta.mobile.data.model/CanvasActorId = ...): kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp> // com.letta.mobile.data.canvas/CanvasSession.applyLocalScene|applyLocalScene(kotlin.String;com.letta.mobile.data.model.CanvasActorId){}[0]
+    final suspend fun applyLocalScene(kotlin/String, kotlin/String, com.letta.mobile.data.model/CanvasActorId = ...): kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp> // com.letta.mobile.data.canvas/CanvasSession.applyLocalScene|applyLocalScene(kotlin.String;kotlin.String;com.letta.mobile.data.model.CanvasActorId){}[0]
     final suspend fun applyLocalStamped(kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp>): com.letta.mobile.data.canvas/CanvasDocument? // com.letta.mobile.data.canvas/CanvasSession.applyLocalStamped|applyLocalStamped(kotlin.collections.List<com.letta.mobile.data.canvas.CanvasOp>){}[0]
     final suspend fun applyOps(kotlin.collections/List<com.letta.mobile.data.canvas/CanvasOp>, kotlin/Boolean = ...): com.letta.mobile.data.canvas/CanvasDocument // com.letta.mobile.data.canvas/CanvasSession.applyOps|applyOps(kotlin.collections.List<com.letta.mobile.data.canvas.CanvasOp>;kotlin.Boolean){}[0]
     final suspend fun applyRemote(com.letta.mobile.data.canvas/CanvasOp, kotlin/String? = ...): com.letta.mobile.data.canvas/CanvasDocument? // com.letta.mobile.data.canvas/CanvasSession.applyRemote|applyRemote(com.letta.mobile.data.canvas.CanvasOp;kotlin.String?){}[0]
@@ -27199,6 +27203,7 @@ final class com.letta.mobile.data.canvas/CanvasStorageFaults { // com.letta.mobi
         final fun <get-faults>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.canvas/CanvasStorageFault>> // com.letta.mobile.data.canvas/CanvasStorageFaults.faults.<get-faults>|<get-faults>(){}[0]
 
     final fun record(com.letta.mobile.data.canvas/CanvasStorageFault, kotlin/Throwable? = ...) // com.letta.mobile.data.canvas/CanvasStorageFaults.record|record(com.letta.mobile.data.canvas.CanvasStorageFault;kotlin.Throwable?){}[0]
+    final fun saveFailureGeneration(com.letta.mobile.data.model/CanvasId): kotlin/Long // com.letta.mobile.data.canvas/CanvasStorageFaults.saveFailureGeneration|saveFailureGeneration(com.letta.mobile.data.model.CanvasId){}[0]
 
     final object Companion { // com.letta.mobile.data.canvas/CanvasStorageFaults.Companion|null[0]
         final const val TAG // com.letta.mobile.data.canvas/CanvasStorageFaults.Companion.TAG|{}TAG[0]
@@ -27373,6 +27378,8 @@ final class com.letta.mobile.data.canvas/InMemoryCanvasDocumentStore : com.letta
     final val storageFaults // com.letta.mobile.data.canvas/InMemoryCanvasDocumentStore.storageFaults|{}storageFaults[0]
         final fun <get-storageFaults>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.canvas/CanvasStorageFault>> // com.letta.mobile.data.canvas/InMemoryCanvasDocumentStore.storageFaults.<get-storageFaults>|<get-storageFaults>(){}[0]
 
+    final fun saveFailureGeneration(com.letta.mobile.data.model/CanvasId): kotlin/Long // com.letta.mobile.data.canvas/InMemoryCanvasDocumentStore.saveFailureGeneration|saveFailureGeneration(com.letta.mobile.data.model.CanvasId){}[0]
+    final suspend fun awaitDurableSave(com.letta.mobile.data.model/CanvasId): kotlin/Boolean // com.letta.mobile.data.canvas/InMemoryCanvasDocumentStore.awaitDurableSave|awaitDurableSave(com.letta.mobile.data.model.CanvasId){}[0]
     final suspend fun createForConversationIfAbsent(com.letta.mobile.data.canvas/CanvasDocument): com.letta.mobile.data.canvas/CanvasDocument // com.letta.mobile.data.canvas/InMemoryCanvasDocumentStore.createForConversationIfAbsent|createForConversationIfAbsent(com.letta.mobile.data.canvas.CanvasDocument){}[0]
     final suspend fun getForConversation(com.letta.mobile.data.model/ConversationId): com.letta.mobile.data.canvas/CanvasDocument? // com.letta.mobile.data.canvas/InMemoryCanvasDocumentStore.getForConversation|getForConversation(com.letta.mobile.data.model.ConversationId){}[0]
     final suspend fun listForAgent(com.letta.mobile.data.model/AgentId): kotlin.collections/List<com.letta.mobile.data.canvas/CanvasDocument> // com.letta.mobile.data.canvas/InMemoryCanvasDocumentStore.listForAgent|listForAgent(com.letta.mobile.data.model.AgentId){}[0]
@@ -27428,6 +27435,7 @@ final class com.letta.mobile.data.canvas/KeyValueCanvasStorage : com.letta.mobil
         final fun <get-storageFaults>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.data.canvas/CanvasStorageFault>> // com.letta.mobile.data.canvas/KeyValueCanvasStorage.storageFaults.<get-storageFaults>|<get-storageFaults>(){}[0]
 
     final fun relayClient(com.letta.mobile.data.storage/AssetStore? = ...): com.letta.mobile.data.canvas/CanvasRelayClient // com.letta.mobile.data.canvas/KeyValueCanvasStorage.relayClient|relayClient(com.letta.mobile.data.storage.AssetStore?){}[0]
+    final fun saveFailureGeneration(com.letta.mobile.data.model/CanvasId): kotlin/Long // com.letta.mobile.data.canvas/KeyValueCanvasStorage.saveFailureGeneration|saveFailureGeneration(com.letta.mobile.data.model.CanvasId){}[0]
 
     final object Companion { // com.letta.mobile.data.canvas/KeyValueCanvasStorage.Companion|null[0]
         final const val BOARD_PREFIX // com.letta.mobile.data.canvas/KeyValueCanvasStorage.Companion.BOARD_PREFIX|{}BOARD_PREFIX[0]

@@ -14,10 +14,117 @@ import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class NotebookCanvasDocumentStoreTest {
+    @Test
+    fun readOnlyNotebookCannotAcknowledgeADraftAfterItsDiagnosticIsEvicted() = runBlocking {
+        val path = Files.createTempDirectory("canvas-read-only-authority-")
+        NotebookLocalStore(path, "read-only-peer").use { notebooks ->
+            val store = NotebookCanvasDocumentStore(notebooks)
+            val session = CanvasSession.create(store)
+            val id = notebooks.listDocuments().single()
+            notebooks.open(id)!!.withDocument { document ->
+                document.startTransaction().use { tx ->
+                    tx.set(org.automerge.ObjectId.ROOT, "boardVersion", NotebookBoardStorage.LAYOUT_VERSION + 1)
+                    tx.commit()
+                }
+            }.get()
+            store.get(session.canvasId)
+            assertTrue(store.storageFaults.value.any { it.kind == CanvasStorageFault.Kind.READ_ONLY })
+            repeat(64) { index ->
+                notebooks.faults.record(CanvasStorageFault(CanvasStorageFault.Kind.NEAR_BUDGET, "other-$index",
+                    CanvasId("other"), null, "unrelated budget notice", 1))
+            }
+            assertTrue(store.storageFaults.value.none { it.kind == CanvasStorageFault.Kind.READ_ONLY })
+            assertFailsWith<IllegalStateException> { session.applyLocalScene("""{"elements":[{"id":"draft"}]}""") }
+            assertFalse(session.sceneJsonOrEmpty().contains("draft"))
+            assertFalse(store.get(session.canvasId)!!.sceneJson.contains("draft"))
+            assertTrue(session.opLog.unsettled(session.canvasId).isNotEmpty())
+        }
+    }
+
+    @Test
+    fun drawingAcknowledgmentWaitsForStorageCompletion() = runBlocking {
+        val path = Files.createTempDirectory("canvas-durable-gate-")
+        val hold = java.util.concurrent.atomic.AtomicBoolean(false)
+        val entered = java.util.concurrent.CompletableFuture<Unit>()
+        val release = java.util.concurrent.CompletableFuture<Void>()
+        val wrap = { delegate: org.automerge.repo.Storage ->
+            object : org.automerge.repo.Storage by delegate {
+                override fun put(key: org.automerge.repo.StorageKey, value: ByteArray): java.util.concurrent.CompletableFuture<Void> =
+                    if (hold.get()) {
+                        entered.complete(Unit)
+                        release.thenCompose { delegate.put(key, value) }
+                    } else delegate.put(key, value)
+            }
+        }
+        NotebookLocalStore(path, "gated-peer", storage = wrap).use { notebooks ->
+            val store = NotebookCanvasDocumentStore(notebooks)
+            val session = CanvasSession.create(store)
+            val baseline = session.sceneJsonOrEmpty()
+            hold.set(true)
+            val saving = async(Dispatchers.Default) { session.applyLocalScene("""{"elements":[{"id":"gated"}]}""") }
+            try {
+                entered.get(10, java.util.concurrent.TimeUnit.SECONDS)
+                assertEquals(null, kotlinx.coroutines.withTimeoutOrNull(1.seconds) { saving.await() },
+                    "an accepted CRDT transaction is not a durable save")
+                assertEquals(baseline, session.sceneJsonOrEmpty())
+            } finally {
+                release.complete(null)
+            }
+            saving.await()
+            NotebookLocalStore(path, "gated-restart").use { restarted ->
+                assertTrue(NotebookCanvasDocumentStore(restarted).get(session.canvasId)!!.sceneJson.contains("gated"))
+            }
+        }
+    }
+
+    @Test
+    fun failedDrawingSavesRetryToDiskBeforeAcknowledgment() = runBlocking {
+        val path = Files.createTempDirectory("canvas-durable-retry-")
+        val failing = java.util.concurrent.atomic.AtomicBoolean(false)
+        val puts = java.util.concurrent.atomic.AtomicInteger()
+        val wrap = { delegate: org.automerge.repo.Storage ->
+            object : org.automerge.repo.Storage by delegate {
+                override fun put(key: org.automerge.repo.StorageKey, value: ByteArray): java.util.concurrent.CompletableFuture<Void> {
+                    puts.incrementAndGet()
+                    if (failing.get()) return java.util.concurrent.CompletableFuture.failedFuture(java.io.IOException("same disk failure"))
+                    return delegate.put(key, value)
+                }
+            }
+        }
+        NotebookLocalStore(path, "retry-peer", storage = wrap).use { notebooks ->
+            val store = NotebookCanvasDocumentStore(notebooks)
+            val session = CanvasSession.create(store, CanvasCreateOptions())
+            val baseline = session.sceneJsonOrEmpty()
+            val draft = """{"bgColor":"#f7f3eaff","elements":[{"id":"draft"}]}"""
+            failing.set(true)
+            repeat(2) {
+                val before = puts.get()
+                assertFailsWith<IllegalStateException> { session.applyLocalScene(draft, baseJson = baseline) }
+                assertTrue(puts.get() > before)
+                assertTrue(session.opLog.unsettled(session.canvasId).isNotEmpty())
+            }
+            val firstFailureTime = store.storageFaults.value.first { it.kind == CanvasStorageFault.Kind.SAVE_FAILED }.atEpochMs
+            failing.set(false)
+            val before = puts.get()
+            assertTrue(session.applyLocalScene(draft).isEmpty(), "retry persists even when recovery leaves no new drawing ops")
+            assertTrue(puts.get() > before)
+            assertTrue(session.opLog.unsettled(session.canvasId).isEmpty())
+            assertEquals(firstFailureTime, store.storageFaults.value.first { it.kind == CanvasStorageFault.Kind.SAVE_FAILED }.atEpochMs)
+            // Reopen before closing the original repository: shutdown must not rescue an early acknowledgment.
+            NotebookLocalStore(path, "restart-peer").use { restarted ->
+                val loaded = assertNotNull(NotebookCanvasDocumentStore(restarted).get(session.canvasId))
+                assertTrue(loaded.sceneJson.contains("draft"))
+                assertTrue(loaded.sceneJson.contains("#f7f3eaff"))
+            }
+        }
+    }
+
     @Test
     fun deletedDrawingItemsSurviveRestartAndRestoreOnlyTheirOwnElement() = runBlocking {
         val path = Files.createTempDirectory("canvas-deleted-history-")

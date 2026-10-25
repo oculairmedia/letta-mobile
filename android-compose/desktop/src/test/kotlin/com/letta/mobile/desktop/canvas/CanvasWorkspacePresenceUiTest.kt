@@ -42,6 +42,7 @@ class CanvasWorkspacePresenceUiTest {
                 )
             }
         }
+        awaitCanvasReady()
         onNodeWithContentDescription("Canvas workspace").performMouseInput { moveTo(center) }
         waitUntil(timeoutMillis = 5000) {
             seen.lastOrNull()?.singleOrNull()?.let { it.peerId == "desktop-peer" && it.isActive } == true

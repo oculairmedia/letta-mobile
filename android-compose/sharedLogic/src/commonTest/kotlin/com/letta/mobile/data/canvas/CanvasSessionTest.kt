@@ -15,6 +15,64 @@ import kotlin.test.assertTrue
 class CanvasSessionTest {
 
     @Test
+    fun identicalFaultsAdvanceOnlyTheAffectedCanvasFailureGeneration() {
+        val faults = CanvasStorageFaults()
+        val canvas = CanvasId("drawing")
+        val fault = CanvasStorageFault(CanvasStorageFault.Kind.SAVE_FAILED, "doc", canvas, null, "same failure", 1)
+        repeat(2) { count ->
+            faults.record(fault)
+            assertEquals((count + 1).toLong(), faults.saveFailureGeneration(canvas))
+            assertEquals(0L, faults.saveFailureGeneration(CanvasId("unrelated")))
+            assertEquals(fault, faults.faults.value.single())
+        }
+    }
+
+    @Test
+    fun anotherCanvasFailureDuringPersistenceDoesNotRejectADurableDrawing() = runTest {
+        val backing = InMemoryCanvasDocumentStore()
+        val faults = CanvasStorageFaults()
+        val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var holdWrite = false
+        val store = object : CanvasDocumentStore by backing, CanvasStorageHealth {
+            override val storageFaults = faults.faults
+            override fun saveFailureGeneration(canvasId: CanvasId): Long = faults.saveFailureGeneration(canvasId)
+            override suspend fun upsert(doc: CanvasDocument) {
+                if (holdWrite) {
+                    entered.complete(Unit)
+                    release.await()
+                }
+                backing.upsert(doc)
+            }
+        }
+        val session = CanvasSession.create(store)
+        holdWrite = true
+        val saving = async { session.applyLocalScene("""{"elements":[{"id":"local"}]}""") }
+        entered.await()
+        faults.record(CanvasStorageFault(CanvasStorageFault.Kind.SAVE_FAILED, "other-doc", CanvasId("other"), null, "unrelated", 1))
+        release.complete(Unit)
+        saving.await()
+        assertTrue(backing.get(session.canvasId)!!.sceneJson.contains("local"))
+        assertTrue(session.opLog.unsettled(session.canvasId).isEmpty())
+        assertEquals(0L, faults.saveFailureGeneration(session.canvasId))
+    }
+
+    @Test
+    fun drawingBaselinePreservesUnseenRemoteEditsAndUsesTheSessionClock() = runTest {
+        val baseline = """{"bgColor":"#ffffffff","elements":[{"id":"a","type":"rect","x":1}]}"""
+        val session = CanvasSession.create(
+            InMemoryCanvasDocumentStore(), CanvasCreateOptions(initialSceneJson = baseline, agentId = "peer"),
+        )
+        session.applyRemote(CanvasOp.UpdateElementOp("remote-update", "peer", 100, "a", """{"id":"a","type":"rect","x":9}"""))
+        session.applyRemote(CanvasOp.AddElementOp("remote-add", "peer", 101, "b", """{"id":"b","type":"rect"}"""))
+        val edits = session.applyLocalScene(baseline.replace("#ffffffff", "#f7f3eaff"), baseJson = baseline)
+        assertTrue(edits.single() is CanvasOp.SetBackgroundOp)
+        assertEquals(102L, edits.single().lamport)
+        assertTrue(session.sceneJsonOrEmpty().contains("\"x\":9"))
+        assertTrue(session.sceneJsonOrEmpty().contains("\"id\":\"b\""))
+    }
+
+    @Test
     fun restoreUsesExactlyOneLamport() = runTest {
         val log = InMemoryCanvasOpLog()
         val session = CanvasSession.create(
