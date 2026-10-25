@@ -490,6 +490,15 @@ class NotebookLocalStore(
         }
     }
 
+    /** Unlink only [key] in this source's item map; the referenced document is untouched. */
+    fun removeItem(id: DocumentId, key: String) {
+        require(key.isNotBlank())
+        mutate(id) { tx ->
+            val itemsId = (tx.get(ObjectId.ROOT, "items").orElseThrow() as AmValue.Map).id
+            tx.delete(itemsId, key)
+        }
+    }
+
     private inline fun mutate(id: DocumentId, crossinline action: (org.automerge.Transaction) -> Unit) {
         val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
         handle.writing(id) { document ->

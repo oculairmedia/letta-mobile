@@ -1059,6 +1059,18 @@ public final class com/letta/mobile/ui/canvas/plugin/PluginViewSession {
 	public final fun readPage (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
+public final class com/letta/mobile/ui/canvas/references/ComposableSingletons$NotebookReferencePreviewKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/references/ComposableSingletons$NotebookReferencePreviewKt;
+	public fun <init> ()V
+	public final fun getLambda$-143532810$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-1901808061$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$1659848785$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
+public final class com/letta/mobile/ui/canvas/references/NotebookReferencePreviewKt {
+	public static final fun NotebookReferencePreview (Lcom/letta/mobile/data/canvas/references/NotebookReferenceSession;Lkotlin/jvm/functions/Function1;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+}
+
 public final class com/letta/mobile/ui/chat/AgentActivity : java/lang/Enum {
 	public static final field Error Lcom/letta/mobile/ui/chat/AgentActivity;
 	public static final field Firing Lcom/letta/mobile/ui/chat/AgentActivity;
