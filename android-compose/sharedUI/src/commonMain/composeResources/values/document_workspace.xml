@@ -1,0 +1,13 @@
+<resources>
+    <string name="document_workspace_title">Document</string>
+    <string name="document_workspace_note">Note</string>
+    <string name="document_workspace_references">References</string>
+    <string name="document_workspace_back">Back</string>
+    <string name="document_workspace_close">Close document</string>
+    <string name="document_workspace_empty">Open a document to begin.</string>
+    <string name="document_workspace_denied">Access to the requested document was denied.</string>
+    <string name="document_workspace_unavailable">The requested document is unavailable. Try opening it again.</string>
+    <string name="document_workspace_identity">The source returned a different document.</string>
+    <string name="document_workspace_save_failed">Save did not complete. Your document is still open; retry navigation or close after resolving the save.</string>
+    <string name="document_workspace_unsupported_references">References are not supported by this document source.</string>
+</resources>

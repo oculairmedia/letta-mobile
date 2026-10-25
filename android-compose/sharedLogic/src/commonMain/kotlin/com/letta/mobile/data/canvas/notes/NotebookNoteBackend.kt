@@ -27,7 +27,10 @@ interface NotebookNoteBackend {
     suspend fun save(id: NotebookDocumentId, expected: String, replacement: String): NotebookNoteSave
 
     /**
-     * Flush the previously [applied] mutation without applying it again. If newer peer content is
+     * Flush history without applying a replacement. [applied] is the acknowledged mutation, or a
+     * freshly loaded snapshot when reconciling an interrupted write with an unknown outcome.
+     * A successful barrier must include all prior mutations from the cancelled call: cancellation
+     * must settle that call before a later load/flush can overtake it. If newer peer content is
      * observed, report it as a conflict while retaining acknowledgement of the applied history.
      */
     suspend fun flush(applied: NotebookNoteSnapshot): NotebookNoteSave

@@ -3,6 +3,8 @@ package com.letta.mobile.data.canvas.notes
 import com.letta.mobile.data.canvas.NotebookDocumentId
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,6 +15,221 @@ import kotlin.test.assertTrue
 
 class NotebookNoteSessionTest {
     private val id = NotebookDocumentId("00112233445566778899aabbccddeeff")
+
+    @Test
+    fun postBarrierPeerUndoCannotCloseUntilCurrentTextIsDurable() = runTest {
+        val backend = NoteTestBackend(id)
+        val session = cancelledUndoSession(backend)
+        backend.source = backend.source.copy(markdown = "persisted peer")
+        val barrier = NoteOperationGate()
+        backend.afterPersistGate = barrier
+        val closing = async { session.prepareClose() }
+        barrier.entered.await()
+        assertEquals("persisted peer", backend.durable.markdown)
+        // This update is newer than the barrier snapshot, and happens to equal our old baseline.
+        backend.source = backend.source.copy(markdown = "original")
+        barrier.release.complete(Unit)
+        assertFalse(closing.await(), "a durable peer snapshot does not acknowledge the newer current text")
+        assertEquals("persisted peer", session.state.value.durable?.markdown)
+        assertEquals("original", session.state.value.observed?.markdown)
+        assertEquals("changed", session.state.value.indeterminateWrite?.markdown)
+        assertTrue(session.state.value.dirty)
+        backend.afterPersistGate = null
+        backend.persist = false
+        assertFalse(session.retryPersistence())
+        assertFalse(session.prepareClose())
+        assertFalse(session.save())
+        assertFalse(session.discardAndReload())
+        session.refresh()
+        assertTrue(session.state.value.dirty)
+        assertEquals("persisted peer", backend.durable.markdown)
+        assertEquals("original", session.state.value.draft)
+        backend.persist = true
+        assertTrue(session.retryPersistence())
+        assertNull(session.state.value.indeterminateWrite)
+        assertTrue(session.prepareClose())
+        assertEquals(session.state.value.draft, backend.durable.markdown)
+        assertEquals("original", backend.source.markdown)
+        assertEquals(1, backend.saves, "reconciliation must flush without applying another replacement")
+    }
+
+    @Test
+    fun postBarrierPeerConflictRetryPersistsCurrentPeerWithoutOverwritingIt() = runTest {
+        val backend = NoteTestBackend(id)
+        val session = cancelledUndoSession(backend)
+        backend.source = backend.source.copy(markdown = "persisted peer")
+        val barrier = NoteOperationGate()
+        backend.afterPersistGate = barrier
+        val closing = async { session.prepareClose() }
+        barrier.entered.await()
+        backend.source = backend.source.copy(markdown = "newer peer")
+        barrier.release.complete(Unit)
+        assertFalse(closing.await())
+        assertEquals("persisted peer", backend.durable.markdown)
+        assertEquals("changed", session.state.value.indeterminateWrite?.markdown)
+        assertEquals("original", session.state.value.draft)
+        backend.afterPersistGate = null
+        assertTrue(session.retryPersistence())
+        assertNull(session.state.value.indeterminateWrite)
+        assertEquals("newer peer", backend.durable.markdown)
+        assertEquals("newer peer", backend.source.markdown)
+        assertTrue(session.state.value.conflict)
+        assertFalse(session.save())
+        assertFalse(session.prepareClose())
+        assertEquals("original", session.state.value.draft)
+        assertEquals(1, backend.saves)
+        assertTrue(session.discardAndReload())
+        assertTrue(session.prepareClose())
+        assertEquals(session.state.value.draft, backend.durable.markdown)
+    }
+
+    private suspend fun cancelledUndoSession(backend: NoteTestBackend): NotebookNoteSession = coroutineScope {
+        val session = NotebookNoteSession(id, backend)
+        session.refresh()
+        session.edit("changed")
+        val applied = NoteOperationGate()
+        backend.afterApplyGate = applied
+        val saving = async { session.save() }
+        applied.entered.await()
+        saving.cancelAndJoin()
+        session.edit("original")
+        backend.afterApplyGate = null
+        session
+    }
+
+    @Test
+    fun cancelledAppliedWriteRemainsDirtyAfterUndoAndRefreshUntilDurableClose() = runTest {
+        val backend = NoteTestBackend(id)
+        val session = NotebookNoteSession(id, backend)
+        session.refresh()
+        session.edit("changed")
+        val gate = NoteOperationGate()
+        backend.afterApplyGate = gate
+        val saving = async { session.save() }
+        gate.entered.await()
+        saving.cancelAndJoin()
+        session.edit("original")
+        session.refresh()
+        assertTrue(session.state.value.dirty)
+        assertEquals("changed", session.state.value.indeterminateWrite?.markdown)
+        assertEquals("original", session.state.value.draft)
+        backend.afterApplyGate = null
+        assertTrue(session.prepareClose())
+        assertNull(session.state.value.indeterminateWrite)
+        assertEquals("original", backend.source.markdown)
+        assertEquals("original", backend.durable.markdown)
+        assertEquals(2, backend.saves)
+        assertEquals(1, backend.flushes)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun indeterminateReadAndFlushEachRespectOneBoundedAttemptAndRetainDraftOnTimeout() = runTest {
+        for (stallRead in listOf(true, false)) {
+            val backend = NoteTestBackend(id)
+            val session = NotebookNoteSession(id, backend)
+            session.refresh()
+            session.edit("changed")
+            val applied = NoteOperationGate()
+            backend.afterApplyGate = applied
+            val saving = async { session.save() }
+            applied.entered.await()
+            saving.cancelAndJoin()
+            session.edit("original")
+            val gate = NoteOperationGate()
+            if (stallRead) backend.loadGate = gate else backend.flushGate = gate
+            val closing = async { session.prepareClose() }
+            try {
+                testScheduler.advanceUntilIdle()
+                assertTrue(closing.isCompleted, "the reconciliation deadline must release the operation")
+                assertFalse(closing.await())
+                assertTrue(session.state.value.dirty)
+                assertTrue(session.state.value.error!!.contains("timed out"))
+                assertEquals(2, backend.loads, "one reconciliation read, with no retry loop")
+                assertEquals(if (stallRead) 0 else 1, backend.flushes)
+            } finally {
+                closing.cancelAndJoin()
+                gate.release.complete(Unit)
+            }
+            backend.afterApplyGate = null
+            assertTrue(session.prepareClose())
+            assertEquals("original", backend.durable.markdown)
+        }
+    }
+
+    @Test
+    fun cancellingReconciliationFlushPreservesIndeterminateWriteForNextClose() = runTest {
+        val backend = NoteTestBackend(id)
+        val session = NotebookNoteSession(id, backend)
+        session.refresh()
+        session.edit("changed")
+        val applied = NoteOperationGate()
+        backend.afterApplyGate = applied
+        val saving = async { session.save() }
+        applied.entered.await()
+        saving.cancelAndJoin()
+        session.edit("original")
+        val flushing = NoteOperationGate()
+        backend.flushGate = flushing
+        val closing = async { session.prepareClose() }
+        flushing.entered.await()
+        closing.cancelAndJoin()
+        assertTrue(closing.isCancelled)
+        assertFalse(session.state.value.saving)
+        assertTrue(session.state.value.dirty)
+        assertEquals("changed", session.state.value.indeterminateWrite?.markdown)
+        backend.flushGate = null
+        backend.afterApplyGate = null
+        assertTrue(session.prepareClose())
+        assertEquals("original", backend.durable.markdown)
+    }
+
+    @Test
+    fun indeterminatePersistenceFailureRefusesCloseAndRetryPersistsUndo() = runTest {
+        val backend = NoteTestBackend(id)
+        val session = NotebookNoteSession(id, backend)
+        session.refresh()
+        session.edit("changed")
+        val applied = NoteOperationGate()
+        backend.afterApplyGate = applied
+        val saving = async { session.save() }
+        applied.entered.await()
+        saving.cancelAndJoin()
+        session.edit("original")
+        backend.persist = false
+        assertFalse(session.prepareClose())
+        assertTrue(session.state.value.dirty)
+        assertEquals("disk failed", session.state.value.error)
+        assertEquals("original", session.state.value.draft)
+        backend.persist = true
+        backend.afterApplyGate = null
+        assertTrue(session.prepareClose())
+        assertEquals("original", backend.durable.markdown)
+        assertEquals(2, backend.saves)
+        assertEquals(2, backend.flushes)
+    }
+
+    @Test
+    fun reconciliationPersistsHistoryButNeverOverwritesUnrelatedPeerText() = runTest {
+        val backend = NoteTestBackend(id)
+        val session = NotebookNoteSession(id, backend)
+        session.refresh()
+        session.edit("changed")
+        val applied = NoteOperationGate()
+        backend.afterApplyGate = applied
+        val saving = async { session.save() }
+        applied.entered.await()
+        saving.cancelAndJoin()
+        session.edit("original")
+        backend.source = backend.source.copy(markdown = "peer")
+        assertFalse(session.prepareClose())
+        assertTrue(session.state.value.conflict)
+        assertNull(session.state.value.indeterminateWrite)
+        assertEquals("original", session.state.value.draft)
+        assertEquals("peer", session.state.value.observed?.markdown)
+        assertEquals("peer", backend.durable.markdown)
+        assertEquals(1, backend.saves)
+    }
 
     @Test
     fun staleSaveAndRefreshRetainBothDraftAndSource() = runTest {

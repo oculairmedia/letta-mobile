@@ -14,16 +14,22 @@ internal class NoteOperationGate {
 
 internal class NoteTestBackend(id: NotebookDocumentId) : NotebookNoteBackend {
     var source = NotebookNoteSnapshot(id, "Note", "original")
+    var durable = source
     var persist = true
     var saves = 0
     var flushes = 0
+    var loads = 0
     var saveGate: NoteOperationGate? = null
+    var afterApplyGate: NoteOperationGate? = null
+    var flushGate: NoteOperationGate? = null
+    var afterPersistGate: NoteOperationGate? = null
     var loadGate: NoteOperationGate? = null
     var loadResult: NotebookNoteLoad? = null
     var saveResult: NotebookNoteSave? = null
 
     override suspend fun load(id: NotebookDocumentId): NotebookNoteLoad {
         check(id == source.id)
+        loads++
         loadGate?.await()
         return loadResult ?: NotebookNoteLoad.Found(source)
     }
@@ -35,17 +41,25 @@ internal class NoteTestBackend(id: NotebookDocumentId) : NotebookNoteBackend {
         saveResult?.let { return it }
         if (source.markdown != expected) return NotebookNoteSave.Conflict(source)
         source = source.copy(markdown = replacement)
+        afterApplyGate?.await()
         return persistence(source)
     }
 
     override suspend fun flush(applied: NotebookNoteSnapshot): NotebookNoteSave {
         flushes++
+        flushGate?.await()
         return persistence(applied)
     }
 
-    private fun persistence(applied: NotebookNoteSnapshot): NotebookNoteSave = when {
-        !persist -> NotebookNoteSave.PendingDurability(applied, "disk failed")
-        source.markdown != applied.markdown -> NotebookNoteSave.Conflict(source, durable = applied)
-        else -> NotebookNoteSave.Saved(applied)
+    private suspend fun persistence(applied: NotebookNoteSnapshot): NotebookNoteSave {
+        if (persist) {
+            durable = source
+            afterPersistGate?.await()
+        }
+        return when {
+            !persist -> NotebookNoteSave.PendingDurability(applied, "disk failed")
+            source.markdown != applied.markdown -> NotebookNoteSave.Conflict(source, durable = applied)
+            else -> NotebookNoteSave.Saved(applied)
+        }
     }
 }
