@@ -468,9 +468,8 @@ class NotebookLocalStore(
         }
         var previousEnd = previous.length
         var replacementEnd = replacement.length
-        while (previousEnd > prefix && replacementEnd > prefix &&
-            previous.codePointBefore(previousEnd) == replacement.codePointBefore(replacementEnd)
-        ) {
+        while (previousEnd > prefix && replacementEnd > prefix) {
+            if (previous.codePointBefore(previousEnd) != replacement.codePointBefore(replacementEnd)) break
             previousEnd -= Character.charCount(previous.codePointBefore(previousEnd))
             replacementEnd -= Character.charCount(replacement.codePointBefore(replacementEnd))
         }
