@@ -252,6 +252,32 @@ final enum class com.letta.mobile.data.canvas.compose/ReserveBlockType : kotlin/
     }
 }
 
+final enum class com.letta.mobile.data.canvas.references/NotebookReferenceAccess : kotlin/Enum<com.letta.mobile.data.canvas.references/NotebookReferenceAccess> { // com.letta.mobile.data.canvas.references/NotebookReferenceAccess|null[0]
+    enum entry ALLOWED // com.letta.mobile.data.canvas.references/NotebookReferenceAccess.ALLOWED|null[0]
+    enum entry DENIED // com.letta.mobile.data.canvas.references/NotebookReferenceAccess.DENIED|null[0]
+    enum entry UNAVAILABLE // com.letta.mobile.data.canvas.references/NotebookReferenceAccess.UNAVAILABLE|null[0]
+
+    final val entries // com.letta.mobile.data.canvas.references/NotebookReferenceAccess.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.canvas.references/NotebookReferenceAccess> // com.letta.mobile.data.canvas.references/NotebookReferenceAccess.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.canvas.references/NotebookReferenceAccess // com.letta.mobile.data.canvas.references/NotebookReferenceAccess.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.canvas.references/NotebookReferenceAccess> // com.letta.mobile.data.canvas.references/NotebookReferenceAccess.values|values#static(){}[0]
+}
+
+final enum class com.letta.mobile.data.canvas.references/NotebookReferencePhase : kotlin/Enum<com.letta.mobile.data.canvas.references/NotebookReferencePhase> { // com.letta.mobile.data.canvas.references/NotebookReferencePhase|null[0]
+    enum entry CANCELLED // com.letta.mobile.data.canvas.references/NotebookReferencePhase.CANCELLED|null[0]
+    enum entry FAILED // com.letta.mobile.data.canvas.references/NotebookReferencePhase.FAILED|null[0]
+    enum entry IDLE // com.letta.mobile.data.canvas.references/NotebookReferencePhase.IDLE|null[0]
+    enum entry LOADING // com.letta.mobile.data.canvas.references/NotebookReferencePhase.LOADING|null[0]
+    enum entry READY // com.letta.mobile.data.canvas.references/NotebookReferencePhase.READY|null[0]
+
+    final val entries // com.letta.mobile.data.canvas.references/NotebookReferencePhase.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.canvas.references/NotebookReferencePhase> // com.letta.mobile.data.canvas.references/NotebookReferencePhase.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.canvas.references/NotebookReferencePhase // com.letta.mobile.data.canvas.references/NotebookReferencePhase.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.canvas.references/NotebookReferencePhase> // com.letta.mobile.data.canvas.references/NotebookReferencePhase.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.canvas/CanvasArchiveFilter : kotlin/Enum<com.letta.mobile.data.canvas/CanvasArchiveFilter> { // com.letta.mobile.data.canvas/CanvasArchiveFilter|null[0]
     enum entry ACTIVE // com.letta.mobile.data.canvas/CanvasArchiveFilter.ACTIVE|null[0]
     enum entry ALL // com.letta.mobile.data.canvas/CanvasArchiveFilter.ALL|null[0]
@@ -6994,6 +7020,149 @@ sealed interface com.letta.mobile.data.canvas.notes/NotebookNoteSave { // com.le
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.notes/NotebookNoteSave.Unavailable.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.canvas.notes/NotebookNoteSave.Unavailable.toString|toString(){}[0]
     }
+}
+
+sealed interface com.letta.mobile.data.canvas.references/NotebookReferenceContent { // com.letta.mobile.data.canvas.references/NotebookReferenceContent|null[0]
+    final enum class Placeholder : com.letta.mobile.data.canvas.references/NotebookReferenceContent, kotlin/Enum<com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder> { // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder|null[0]
+        enum entry CYCLE // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder.CYCLE|null[0]
+        enum entry DENIED // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder.DENIED|null[0]
+        enum entry DEPTH_LIMIT // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder.DEPTH_LIMIT|null[0]
+        enum entry INVALID_REFERENCE // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder.INVALID_REFERENCE|null[0]
+        enum entry MISSING // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder.MISSING|null[0]
+        enum entry NODE_LIMIT // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder.NODE_LIMIT|null[0]
+        enum entry UNAVAILABLE // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder.UNAVAILABLE|null[0]
+        enum entry UNSUPPORTED_ITEM // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder.UNSUPPORTED_ITEM|null[0]
+
+        final val entries // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder.entries|#static{}entries[0]
+            final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder> // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder.entries.<get-entries>|<get-entries>#static(){}[0]
+
+        final fun valueOf(kotlin/String): com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder.valueOf|valueOf#static(kotlin.String){}[0]
+        final fun values(): kotlin/Array<com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder> // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Placeholder.values|values#static(){}[0]
+    }
+
+    final class Markdown : com.letta.mobile.data.canvas.references/NotebookReferenceContent { // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Markdown|null[0]
+        constructor <init>(kotlin/String, kotlin/String) // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Markdown.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+        final val body // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Markdown.body|{}body[0]
+            final fun <get-body>(): kotlin/String // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Markdown.body.<get-body>|<get-body>(){}[0]
+        final val title // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Markdown.title|{}title[0]
+            final fun <get-title>(): kotlin/String // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Markdown.title.<get-title>|<get-title>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Markdown.component1|component1(){}[0]
+        final fun component2(): kotlin/String // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Markdown.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String = ...): com.letta.mobile.data.canvas.references/NotebookReferenceContent.Markdown // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Markdown.copy|copy(kotlin.String;kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Markdown.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Markdown.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.references/NotebookReferenceContent.Markdown.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.canvas.references/NotebookReferenceLoad { // com.letta.mobile.data.canvas.references/NotebookReferenceLoad|null[0]
+    final class Found : com.letta.mobile.data.canvas.references/NotebookReferenceLoad { // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Found|null[0]
+        constructor <init>(com.letta.mobile.data.canvas/NotebookDocument) // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Found.<init>|<init>(com.letta.mobile.data.canvas.NotebookDocument){}[0]
+
+        final val document // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Found.document|{}document[0]
+            final fun <get-document>(): com.letta.mobile.data.canvas/NotebookDocument // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Found.document.<get-document>|<get-document>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.canvas/NotebookDocument // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Found.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.canvas/NotebookDocument = ...): com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Found // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Found.copy|copy(com.letta.mobile.data.canvas.NotebookDocument){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Found.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Found.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Found.toString|toString(){}[0]
+    }
+
+    final object Denied : com.letta.mobile.data.canvas.references/NotebookReferenceLoad { // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Denied|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Denied.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Denied.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Denied.toString|toString(){}[0]
+    }
+
+    final object Missing : com.letta.mobile.data.canvas.references/NotebookReferenceLoad { // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Missing|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Missing.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Missing.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Missing.toString|toString(){}[0]
+    }
+
+    final object Unavailable : com.letta.mobile.data.canvas.references/NotebookReferenceLoad { // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Unavailable|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Unavailable.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Unavailable.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Unavailable.toString|toString(){}[0]
+    }
+}
+
+final class com.letta.mobile.data.canvas.references/NotebookReferenceLimits { // com.letta.mobile.data.canvas.references/NotebookReferenceLimits|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin/Int = ...) // com.letta.mobile.data.canvas.references/NotebookReferenceLimits.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
+
+    final val maxDepth // com.letta.mobile.data.canvas.references/NotebookReferenceLimits.maxDepth|{}maxDepth[0]
+        final fun <get-maxDepth>(): kotlin/Int // com.letta.mobile.data.canvas.references/NotebookReferenceLimits.maxDepth.<get-maxDepth>|<get-maxDepth>(){}[0]
+    final val maxNodes // com.letta.mobile.data.canvas.references/NotebookReferenceLimits.maxNodes|{}maxNodes[0]
+        final fun <get-maxNodes>(): kotlin/Int // com.letta.mobile.data.canvas.references/NotebookReferenceLimits.maxNodes.<get-maxNodes>|<get-maxNodes>(){}[0]
+
+    final fun component1(): kotlin/Int // com.letta.mobile.data.canvas.references/NotebookReferenceLimits.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // com.letta.mobile.data.canvas.references/NotebookReferenceLimits.component2|component2(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int = ...): com.letta.mobile.data.canvas.references/NotebookReferenceLimits // com.letta.mobile.data.canvas.references/NotebookReferenceLimits.copy|copy(kotlin.Int;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.references/NotebookReferenceLimits.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.references/NotebookReferenceLimits.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.canvas.references/NotebookReferenceLimits.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.canvas.references/NotebookReferenceNode { // com.letta.mobile.data.canvas.references/NotebookReferenceNode|null[0]
+    constructor <init>(com.letta.mobile.data.canvas/NotebookDocumentId?, kotlinx.collections.immutable/PersistentList<com.letta.mobile.data.canvas/NotebookDocumentId>, com.letta.mobile.data.canvas.references/NotebookReferenceContent, kotlinx.collections.immutable/PersistentList<com.letta.mobile.data.canvas.references/NotebookReferenceNode> = ..., com.letta.mobile.data.canvas/NotebookItem? = ...) // com.letta.mobile.data.canvas.references/NotebookReferenceNode.<init>|<init>(com.letta.mobile.data.canvas.NotebookDocumentId?;kotlinx.collections.immutable.PersistentList<com.letta.mobile.data.canvas.NotebookDocumentId>;com.letta.mobile.data.canvas.references.NotebookReferenceContent;kotlinx.collections.immutable.PersistentList<com.letta.mobile.data.canvas.references.NotebookReferenceNode>;com.letta.mobile.data.canvas.NotebookItem?){}[0]
+
+    final val children // com.letta.mobile.data.canvas.references/NotebookReferenceNode.children|{}children[0]
+        final fun <get-children>(): kotlinx.collections.immutable/PersistentList<com.letta.mobile.data.canvas.references/NotebookReferenceNode> // com.letta.mobile.data.canvas.references/NotebookReferenceNode.children.<get-children>|<get-children>(){}[0]
+    final val content // com.letta.mobile.data.canvas.references/NotebookReferenceNode.content|{}content[0]
+        final fun <get-content>(): com.letta.mobile.data.canvas.references/NotebookReferenceContent // com.letta.mobile.data.canvas.references/NotebookReferenceNode.content.<get-content>|<get-content>(){}[0]
+    final val item // com.letta.mobile.data.canvas.references/NotebookReferenceNode.item|{}item[0]
+        final fun <get-item>(): com.letta.mobile.data.canvas/NotebookItem? // com.letta.mobile.data.canvas.references/NotebookReferenceNode.item.<get-item>|<get-item>(){}[0]
+    final val path // com.letta.mobile.data.canvas.references/NotebookReferenceNode.path|{}path[0]
+        final fun <get-path>(): kotlinx.collections.immutable/PersistentList<com.letta.mobile.data.canvas/NotebookDocumentId> // com.letta.mobile.data.canvas.references/NotebookReferenceNode.path.<get-path>|<get-path>(){}[0]
+    final val targetId // com.letta.mobile.data.canvas.references/NotebookReferenceNode.targetId|{}targetId[0]
+        final fun <get-targetId>(): com.letta.mobile.data.canvas/NotebookDocumentId? // com.letta.mobile.data.canvas.references/NotebookReferenceNode.targetId.<get-targetId>|<get-targetId>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.canvas/NotebookDocumentId? // com.letta.mobile.data.canvas.references/NotebookReferenceNode.component1|component1(){}[0]
+    final fun component2(): kotlinx.collections.immutable/PersistentList<com.letta.mobile.data.canvas/NotebookDocumentId> // com.letta.mobile.data.canvas.references/NotebookReferenceNode.component2|component2(){}[0]
+    final fun component3(): com.letta.mobile.data.canvas.references/NotebookReferenceContent // com.letta.mobile.data.canvas.references/NotebookReferenceNode.component3|component3(){}[0]
+    final fun component4(): kotlinx.collections.immutable/PersistentList<com.letta.mobile.data.canvas.references/NotebookReferenceNode> // com.letta.mobile.data.canvas.references/NotebookReferenceNode.component4|component4(){}[0]
+    final fun component5(): com.letta.mobile.data.canvas/NotebookItem? // com.letta.mobile.data.canvas.references/NotebookReferenceNode.component5|component5(){}[0]
+    final fun copy(com.letta.mobile.data.canvas/NotebookDocumentId? = ..., kotlinx.collections.immutable/PersistentList<com.letta.mobile.data.canvas/NotebookDocumentId> = ..., com.letta.mobile.data.canvas.references/NotebookReferenceContent = ..., kotlinx.collections.immutable/PersistentList<com.letta.mobile.data.canvas.references/NotebookReferenceNode> = ..., com.letta.mobile.data.canvas/NotebookItem? = ...): com.letta.mobile.data.canvas.references/NotebookReferenceNode // com.letta.mobile.data.canvas.references/NotebookReferenceNode.copy|copy(com.letta.mobile.data.canvas.NotebookDocumentId?;kotlinx.collections.immutable.PersistentList<com.letta.mobile.data.canvas.NotebookDocumentId>;com.letta.mobile.data.canvas.references.NotebookReferenceContent;kotlinx.collections.immutable.PersistentList<com.letta.mobile.data.canvas.references.NotebookReferenceNode>;com.letta.mobile.data.canvas.NotebookItem?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.references/NotebookReferenceNode.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.references/NotebookReferenceNode.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.canvas.references/NotebookReferenceNode.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.canvas.references/NotebookReferenceResolver { // com.letta.mobile.data.canvas.references/NotebookReferenceResolver|null[0]
+    constructor <init>(kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.canvas/NotebookDocumentId, com.letta.mobile.data.canvas.references/NotebookReferenceAccess>, kotlin.coroutines/SuspendFunction1<com.letta.mobile.data.canvas/NotebookDocumentId, com.letta.mobile.data.canvas.references/NotebookReferenceLoad>) // com.letta.mobile.data.canvas.references/NotebookReferenceResolver.<init>|<init>(kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.canvas.NotebookDocumentId,com.letta.mobile.data.canvas.references.NotebookReferenceAccess>;kotlin.coroutines.SuspendFunction1<com.letta.mobile.data.canvas.NotebookDocumentId,com.letta.mobile.data.canvas.references.NotebookReferenceLoad>){}[0]
+
+    final suspend fun resolve(com.letta.mobile.data.canvas/NotebookDocumentId): com.letta.mobile.data.canvas.references/NotebookReferenceLoad // com.letta.mobile.data.canvas.references/NotebookReferenceResolver.resolve|resolve(com.letta.mobile.data.canvas.NotebookDocumentId){}[0]
+}
+
+final class com.letta.mobile.data.canvas.references/NotebookReferenceSession { // com.letta.mobile.data.canvas.references/NotebookReferenceSession|null[0]
+    constructor <init>(com.letta.mobile.data.canvas/NotebookDocumentId, com.letta.mobile.data.canvas.references/NotebookReferenceResolver, com.letta.mobile.data.canvas.references/NotebookReferenceLimits = ...) // com.letta.mobile.data.canvas.references/NotebookReferenceSession.<init>|<init>(com.letta.mobile.data.canvas.NotebookDocumentId;com.letta.mobile.data.canvas.references.NotebookReferenceResolver;com.letta.mobile.data.canvas.references.NotebookReferenceLimits){}[0]
+
+    final val id // com.letta.mobile.data.canvas.references/NotebookReferenceSession.id|{}id[0]
+        final fun <get-id>(): com.letta.mobile.data.canvas/NotebookDocumentId // com.letta.mobile.data.canvas.references/NotebookReferenceSession.id.<get-id>|<get-id>(){}[0]
+    final val state // com.letta.mobile.data.canvas.references/NotebookReferenceSession.state|{}state[0]
+        final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.canvas.references/NotebookReferenceState> // com.letta.mobile.data.canvas.references/NotebookReferenceSession.state.<get-state>|<get-state>(){}[0]
+
+    final fun cancel() // com.letta.mobile.data.canvas.references/NotebookReferenceSession.cancel|cancel(){}[0]
+    final suspend fun refresh() // com.letta.mobile.data.canvas.references/NotebookReferenceSession.refresh|refresh(){}[0]
+}
+
+final class com.letta.mobile.data.canvas.references/NotebookReferenceState { // com.letta.mobile.data.canvas.references/NotebookReferenceState|null[0]
+    constructor <init>(com.letta.mobile.data.canvas.references/NotebookReferencePhase = ..., com.letta.mobile.data.canvas.references/NotebookReferenceNode? = ...) // com.letta.mobile.data.canvas.references/NotebookReferenceState.<init>|<init>(com.letta.mobile.data.canvas.references.NotebookReferencePhase;com.letta.mobile.data.canvas.references.NotebookReferenceNode?){}[0]
+
+    final val phase // com.letta.mobile.data.canvas.references/NotebookReferenceState.phase|{}phase[0]
+        final fun <get-phase>(): com.letta.mobile.data.canvas.references/NotebookReferencePhase // com.letta.mobile.data.canvas.references/NotebookReferenceState.phase.<get-phase>|<get-phase>(){}[0]
+    final val root // com.letta.mobile.data.canvas.references/NotebookReferenceState.root|{}root[0]
+        final fun <get-root>(): com.letta.mobile.data.canvas.references/NotebookReferenceNode? // com.letta.mobile.data.canvas.references/NotebookReferenceState.root.<get-root>|<get-root>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.canvas.references/NotebookReferencePhase // com.letta.mobile.data.canvas.references/NotebookReferenceState.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.canvas.references/NotebookReferenceNode? // com.letta.mobile.data.canvas.references/NotebookReferenceState.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.canvas.references/NotebookReferencePhase = ..., com.letta.mobile.data.canvas.references/NotebookReferenceNode? = ...): com.letta.mobile.data.canvas.references/NotebookReferenceState // com.letta.mobile.data.canvas.references/NotebookReferenceState.copy|copy(com.letta.mobile.data.canvas.references.NotebookReferencePhase;com.letta.mobile.data.canvas.references.NotebookReferenceNode?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.references/NotebookReferenceState.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.references/NotebookReferenceState.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.canvas.references/NotebookReferenceState.toString|toString(){}[0]
 }
 
 sealed interface com.letta.mobile.data.canvas/CanvasBatchCheck { // com.letta.mobile.data.canvas/CanvasBatchCheck|null[0]

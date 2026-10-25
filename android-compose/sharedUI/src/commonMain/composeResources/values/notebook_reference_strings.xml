@@ -1,0 +1,16 @@
+<resources>
+    <string name="notebook_reference_refresh">Refresh preview</string>
+    <string name="notebook_reference_cancel">Cancel preview</string>
+    <string name="notebook_reference_loading">Loading references…</string>
+    <string name="notebook_reference_cancelled">Preview cancelled. Refresh to try again.</string>
+    <string name="notebook_reference_failed">Preview could not be built. Refresh to try again.</string>
+    <string name="notebook_reference_open">Open document</string>
+    <string name="notebook_reference_cycle">Circular reference. This document is already in this branch.</string>
+    <string name="notebook_reference_depth">Preview depth limit reached.</string>
+    <string name="notebook_reference_nodes">Preview size limit reached. Remaining items are omitted.</string>
+    <string name="notebook_reference_denied">Access to this document was denied.</string>
+    <string name="notebook_reference_missing">Referenced document was not found.</string>
+    <string name="notebook_reference_unavailable">Referenced document is currently unavailable.</string>
+    <string name="notebook_reference_unsupported">Unsupported item. Its original data is preserved.</string>
+    <string name="notebook_reference_invalid">Reference has no target document.</string>
+</resources>
