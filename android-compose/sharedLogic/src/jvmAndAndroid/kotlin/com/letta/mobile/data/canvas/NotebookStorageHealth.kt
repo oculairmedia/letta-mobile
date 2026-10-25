@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.storage.sha256Hex
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
@@ -15,6 +16,9 @@ import com.letta.mobile.util.Telemetry
 import org.automerge.repo.Repo
 import org.automerge.repo.Storage
 import org.automerge.repo.StorageKey
+import org.automerge.repo.DocHandle
+import org.automerge.repo.DocumentId
+import org.automerge.ChangeHash
 
 /**
  * Keeps one notebook repository's storage healthy and its failures visible: the history budget
@@ -45,6 +49,35 @@ internal class NotebookStorageHealth(
 
     @Volatile
     private var repositoryStorage: Storage? = null
+
+    /** Only advanced after an awaited write; failed writes are encoded again on retry. */
+    private val durableHeads = ConcurrentHashMap<DocumentId, Array<ChangeHash>>()
+
+    /**
+     * Under the canvas lock. The repository's callback completes before its asynchronous storage
+     * tasks. Write an incremental chunk through the same observed storage and await it instead.
+     * This retains history and makes retries work even when the CRDT transaction changed nothing.
+     */
+    fun persistCanvas(id: DocumentId, handle: DocHandle): Boolean {
+        checkWritable()
+        val key = id.bytes.joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
+        // Diagnostics can age out of the bounded list; the backend's refusal remains authoritative.
+        if (key in layoutRefused) return false
+        val storage = checkNotNull(repositoryStorage)
+        val previous = durableHeads[id] ?: emptyArray()
+        val (heads, changes) = handle.withDocument { doc -> doc.heads to doc.encodeChangesSince(previous) }.get()
+        if (heads.contentEquals(previous)) return true
+        val name = archive.storageName(key)
+        val chunk = StorageKey(name, "incremental", sha256Hex(changes))
+        return try {
+            storage.put(chunk, changes).get()
+            durableHeads[id] = heads
+            true
+        } catch (_: java.util.concurrent.ExecutionException) {
+            // ObservedStorage has already retained and logged the exact failure.
+            false
+        }
+    }
 
     @Volatile
     private var repositoryPool: ExecutorService? = null

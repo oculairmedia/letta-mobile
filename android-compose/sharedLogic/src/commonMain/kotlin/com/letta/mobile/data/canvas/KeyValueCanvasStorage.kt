@@ -38,6 +38,8 @@ class KeyValueCanvasStorage(
 
     override val storageFaults: StateFlow<List<CanvasStorageFault>> get() = faults.faults
 
+    override fun saveFailureGeneration(canvasId: CanvasId): Long = faults.saveFailureGeneration(canvasId)
+
     /** The boards: held in memory, read from [store] once and written through to it. */
     val documents: CanvasDocumentStore = InMemoryCanvasDocumentStore(Boards(io))
 
@@ -101,6 +103,8 @@ private class StorageIo(val store: KeyValueStore, val faults: CanvasStorageFault
 /** The boards, one JSON value per board under [KeyValueCanvasStorage.BOARD_PREFIX]. */
 private class Boards(private val io: StorageIo) : DocumentBacking<CanvasDocument>, CanvasStorageHealth {
     override val storageFaults: StateFlow<List<CanvasStorageFault>> get() = io.faults.faults
+
+    override fun saveFailureGeneration(canvasId: CanvasId): Long = io.faults.saveFailureGeneration(canvasId)
 
     override suspend fun loadAll(): List<CanvasDocument> {
         val prefix = KeyValueCanvasStorage.BOARD_PREFIX

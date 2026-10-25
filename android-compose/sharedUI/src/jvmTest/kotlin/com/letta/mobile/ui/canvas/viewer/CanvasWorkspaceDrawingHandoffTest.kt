@@ -26,6 +26,7 @@ import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasStorageFault
 import com.letta.mobile.data.canvas.CanvasStorageHealth
+import com.letta.mobile.data.canvas.CanvasStorageFaults
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.model.CanvasId
@@ -37,7 +38,6 @@ import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
@@ -139,6 +139,44 @@ class CanvasWorkspaceDrawingHandoffTest {
         onNodeWithTag(canvasViewerOptionTag(CanvasDocumentViewerId.CANVAS)).assertIsSelected()
         assertEquals(draft, controller.state.value.bgColor)
         assertTrue(DrawingSerializer.deserialize(runBlocking { store.saved(session.canvasId) }!!.sceneJson).bgColor != draft)
+
+        val firstFailure = store.storageFaults.value.single()
+        val beforeRetry = store.writes.get()
+        select(CanvasDocumentViewerId.TEXT)
+        waitUntil { mainClock.advanceTimeByFrame(); store.writes.get() > beforeRetry }
+        waitForIdle()
+        assertEquals(firstFailure, store.storageFaults.value.single(), "identical diagnostics may be conflated")
+        onNodeWithTag(CANVAS_TEXT_VIEWER_CONTENT_TAG).assertDoesNotExist()
+        onNodeWithContentDescription("Canvas board").assertIsDisplayed()
+        assertEquals(draft, controller.state.value.bgColor)
+
+        store.reportFaultOnly = false
+        val beforeSuccess = store.writes.get()
+        select(CanvasDocumentViewerId.TEXT)
+        awaitText()
+        assertTrue(store.writes.get() > beforeSuccess, "acknowledgment requires an actual retry write")
+        assertEquals(draft, DrawingSerializer.deserialize(runBlocking { store.saved(session.canvasId) }!!.sceneJson).bgColor)
+        assertEquals(firstFailure, store.storageFaults.value.single(), "success keeps the historical diagnostic")
+    }
+
+    @Test
+    fun readOnlyStorageKeepsTheDraftMountedWithoutAttemptingAWrite() = runDesktopComposeUiTest(width = 900, height = 700) {
+        val store = ControlledStore()
+        val session = createSession(store)
+        val controller = controller()
+        mount(session, controller)
+        changeBackground()
+        val draft = controller.state.value.bgColor
+        store.faults.record(CanvasStorageFault(CanvasStorageFault.Kind.READ_ONLY, "read-only", session.canvasId, null, "read only", 1))
+        select(CanvasDocumentViewerId.TEXT)
+        waitUntil {
+            mainClock.advanceTimeByFrame()
+            onAllNodesWithText("Error: Could not save drawing", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        assertEquals(0, store.writes.get())
+        onNodeWithContentDescription("Canvas board").assertIsDisplayed()
+        onNodeWithTag(CANVAS_TEXT_VIEWER_CONTENT_TAG).assertDoesNotExist()
+        assertEquals(draft, controller.state.value.bgColor)
     }
 
     @Test
@@ -280,7 +318,9 @@ class CanvasWorkspaceDrawingHandoffTest {
     private class ControlledStore(
         private val backing: CanvasDocumentStore = InMemoryCanvasDocumentStore(),
     ) : CanvasDocumentStore by backing, CanvasStorageHealth {
-        override val storageFaults = MutableStateFlow<List<CanvasStorageFault>>(emptyList())
+        val faults = CanvasStorageFaults()
+        override val storageFaults = faults.faults
+        override fun saveFailureGeneration(canvasId: CanvasId): Long = faults.saveFailureGeneration(canvasId)
         val writes = AtomicInteger()
         val loads = AtomicInteger()
         val failures = AtomicInteger()
@@ -303,9 +343,7 @@ class CanvasWorkspaceDrawingHandoffTest {
                 error("test storage failure")
             }
             if (reportFaultOnly) {
-                storageFaults.value = listOf(
-                    CanvasStorageFault(CanvasStorageFault.Kind.SAVE_FAILED, null, doc.id, null, "test reported failure", 1),
-                )
+                faults.record(CanvasStorageFault(CanvasStorageFault.Kind.SAVE_FAILED, null, doc.id, null, "test reported failure", 1))
                 return
             }
             backing.upsert(doc)

@@ -47,6 +47,10 @@ class CanvasSession(
 
     private var lamportClock: Long = 0L
 
+    /** In-memory editing may continue after a reported failure; drawing handoff still waits. */
+    private var documentDurable = true
+    private var requireDurableWrite = false
+
     /** Ties [opLog] to [store]: ops are settled once the document write carrying them succeeds. */
     private val settlement = CanvasOpSettlement(canvasId, opLog)
 
@@ -54,9 +58,14 @@ class CanvasSession(
      * Every change runs under this lock, after folding in any ops the log holds that the stored
      * document missed: a crash or failed write between the two stores.
      */
-    private suspend inline fun <T> locked(block: () -> T): T = mutex.withLock {
-        if (settlement.begin()) recoverUnsettled()
-        block()
+    private suspend inline fun <T> locked(durable: Boolean = false, block: () -> T): T = mutex.withLock {
+        requireDurableWrite = durable
+        try {
+            if (settlement.begin()) recoverUnsettled()
+            block()
+        } finally {
+            requireDurableWrite = false
+        }
     }
 
     /**
@@ -74,7 +83,7 @@ class CanvasSession(
             val current = currentDoc()
             val scene = CanvasOpProjector.project(current.sceneJson, pending)
             if (scene == current.sceneJson) {
-                settlement.settleCarried()
+                persistDocument(current)
             } else {
                 commitScene(scene, CanvasCommitMetadata(actorId = "system", description = "Recovered ${pending.size} unsaved edits"))
             }
@@ -117,7 +126,7 @@ class CanvasSession(
         updated: CanvasDocument,
         metadata: CanvasCommitMetadata = CanvasCommitMetadata(),
     ): CanvasDocument {
-        settlement.writing { store.upsert(updated) }
+        persistDocument(updated)
         _document.value = updated
         recordCheckpoint(updated, metadata = metadata)
         return updated
@@ -148,13 +157,22 @@ class CanvasSession(
      */
     private suspend fun keepProvenance(current: CanvasDocument, sceneJson: String): CanvasDocument {
         if (sceneJson == current.sceneJson) {
-            settlement.settleCarried()
+            if (documentDurable) settlement.settleCarried() else persistDocument(current)
             return current
         }
         val kept = current.copy(sceneJson = sceneJson)
-        settlement.writing { store.upsert(kept) }
+        persistDocument(kept)
         _document.value = kept
         return kept
+    }
+
+    /** Retains failed writes in the journal while allowing existing in-memory editing to continue. */
+    private suspend fun persistDocument(doc: CanvasDocument): Boolean {
+        documentDurable = false
+        return settlement.writing { store.upsertDurably(doc) }.also {
+            documentDurable = it
+            check(!requireDurableWrite || it) { "Canvas save did not reach durable storage" }
+        }
     }
 
     /**
@@ -710,21 +728,34 @@ class CanvasSession(
             applyLocalLocked(op)
         }
 
-    suspend fun applyLocalScene(newJson: String, actorId: CanvasActorId = LOCAL_USER_ACTOR): List<CanvasOp> = locked {
-        applyLocalSceneLocked(newJson, sceneJsonOrEmpty(), actorId)
-    }
+    suspend fun applyLocalScene(newJson: String, actorId: CanvasActorId = LOCAL_USER_ACTOR): List<CanvasOp> =
+        applyLocalSceneChecked(newJson, null, actorId)
 
     /**
      * Applies only the drawing edits since [baseJson], preserving remote changes the board has
      * not imported yet. Diffing, clock allocation and persistence share the session lock, just as
      * in [applyLocalScene]; the baseline must describe the drawing actually shown to the editor.
+     * Returns after durable persistence, including retries with no new ops; newly failed saves
+     * throw without acknowledging the draft. Historical SAVE_FAILED diagnostics remain available.
      */
     suspend fun applyLocalScene(
         newJson: String,
         baseJson: String,
         actorId: CanvasActorId = LOCAL_USER_ACTOR,
-    ): List<CanvasOp> = locked {
-        applyLocalSceneLocked(newJson, baseJson, actorId)
+    ): List<CanvasOp> = applyLocalSceneChecked(newJson, baseJson, actorId)
+
+    private suspend fun applyLocalSceneChecked(newJson: String, baseJson: String?, actorId: CanvasActorId): List<CanvasOp> {
+        val health = store as? CanvasStorageHealth
+        val before = health?.saveFailureGeneration(canvasId)
+        val refused = storageFaults.value.affecting(canvasId).firstOrNull { it.kind == CanvasStorageFault.Kind.READ_ONLY }
+        check(refused == null) { requireNotNull(refused).message }
+        return locked(durable = true) {
+            applyLocalSceneLocked(newJson, baseJson ?: sceneJsonOrEmpty(), actorId).also {
+                check(documentDurable && before == health?.saveFailureGeneration(canvasId)) {
+                    "Canvas save did not reach durable storage"
+                }
+            }
+        }
     }
 
     private suspend fun applyLocalSceneLocked(newJson: String, baseJson: String, actorId: CanvasActorId): List<CanvasOp> {
@@ -732,7 +763,10 @@ class CanvasSession(
         if (doc.acl != null && !doc.acl.canWrite(actorId.value)) {
             throw UnauthorizedCanvasMutationException(actorId, canvasId)
         }
-        if (newJson == baseJson) return emptyList()
+        if (newJson == baseJson) {
+            persistDocument(doc)
+            return emptyList()
+        }
 
         val generatedOps = CanvasOpDiffer.diff(
             oldSceneJson = baseJson,
@@ -743,6 +777,8 @@ class CanvasSession(
 
         if (generatedOps.isNotEmpty()) {
             applyOpsLocked(generatedOps, isRemote = false)
+        } else {
+            persistDocument(doc)
         }
         return generatedOps
     }

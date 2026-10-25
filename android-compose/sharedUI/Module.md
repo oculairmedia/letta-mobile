@@ -40,6 +40,8 @@ Plugin element renderers, fallback cards and live-view host contracts. Extend th
 
 Internal document viewer surfaces, including the read-only text rendering used by the canvas viewer SPI.
 
+Drawing handoff waits for the session's durable save result. Repeated identical storage failures retain the mounted draft; a successful retry can switch viewers while the historical storage diagnostic remains visible on the board.
+
 # Package com.letta.mobile.ui.chat
 
 Reusable chat identity, orb/layout and queued-send components. Consume these composables with supplied identity, activity and queue actions; do not add another send queue or agent repository here.

@@ -1,8 +1,5 @@
 package com.letta.mobile.ui.canvas
 
-import com.letta.mobile.data.canvas.CanvasSession
-import com.letta.mobile.data.canvas.CanvasStorageFault
-import com.letta.mobile.data.canvas.affecting
 import com.letta.mobile.data.canvas.CanvasHistory
 import com.letta.mobile.util.Telemetry
 import io.ak1.drawbox.domain.model.DrawingSerializer
@@ -56,9 +53,7 @@ private suspend fun CanvasBoard.persistDrawing(drawing: State, baseline: String)
     val json = withContext(Dispatchers.Default) {
         drawing.serializeDrawing().also { json ->
             val activeSession = requireNotNull(session)
-            activeSession.requireDrawingStorage()
             activeSession.applyLocalScene(json, baseJson = baseline)
-            activeSession.requireDrawingStorage()
         }
     }
     // Acknowledge only this snapshot, never the merged session scene. Remote elements that are
@@ -68,13 +63,6 @@ private suspend fun CanvasBoard.persistDrawing(drawing: State, baseline: String)
     ui.lastDrawing = withContext(Dispatchers.Default) { CanvasWorkspaceSupport.drawingOf(json) }
     ui.importedDrawing = drawing.elements to drawing.bgColor
     recordDrawingStep(drawing.elements)
-}
-
-private fun CanvasSession.requireDrawingStorage() {
-    val fault = storageFaults.value.affecting(canvasId).firstOrNull {
-        it.kind == CanvasStorageFault.Kind.SAVE_FAILED || it.kind == CanvasStorageFault.Kind.READ_ONLY
-    }
-    check(fault == null) { requireNotNull(fault).message }
 }
 
 private fun State.serializeDrawing(): String = DrawingSerializer.serialize(PayLoad(bgColor = bgColor, elements = elements))

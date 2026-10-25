@@ -6,7 +6,6 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.util.Telemetry
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runInterruptible
 import org.automerge.repo.DocumentId
 
@@ -18,8 +17,16 @@ import org.automerge.repo.DocumentId
  * stalled rendering for the whole read. Lookups match on the canvas metadata alone and decode only
  * the board they return. */
 class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) :
-    CanvasDocumentStore, CanvasDeletedElementStore, CanvasStorageHealth {
-    override val storageFaults: StateFlow<List<CanvasStorageFault>> get() = notebooks.storageFaults
+    CanvasDocumentStore, CanvasDeletedElementStore, CanvasStorageHealth by notebooks {
+
+    override suspend fun awaitDurableSave(canvasId: CanvasId): Boolean = locked {
+        try {
+            findCanvas(canvasId)?.let(notebooks::persistCanvas) ?: false
+        } catch (error: NotebookReadOnlyException) {
+            refused(canvasId, error)
+            false
+        }
+    }
 
     private suspend fun <T> locked(action: () -> T): T = runInterruptible(Dispatchers.IO) { notebooks.withCanvasLock(action) }
 

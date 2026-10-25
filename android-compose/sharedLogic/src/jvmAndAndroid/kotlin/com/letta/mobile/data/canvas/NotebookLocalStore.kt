@@ -183,6 +183,11 @@ class NotebookLocalStore(
     val faults: CanvasStorageFaults get() = health.faults
     override val storageFaults: StateFlow<List<CanvasStorageFault>> get() = health.faults.faults
 
+    override fun saveFailureGeneration(canvasId: com.letta.mobile.data.model.CanvasId): Long = faults.saveFailureGeneration(canvasId)
+
+    /** Under the canvas lock: await a disk write carrying the current notebook's changes. */
+    internal fun persistCanvas(id: DocumentId): Boolean = health.persistCanvas(id, requireNotNull(open(id)))
+
     /** Whether writes are refused after a repository error; see [CanvasStorageFault.Kind.READ_ONLY]. */
     val isReadOnly: Boolean get() = health.isReadOnly
 

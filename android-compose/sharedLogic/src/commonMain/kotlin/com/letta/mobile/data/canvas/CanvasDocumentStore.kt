@@ -32,3 +32,18 @@ interface CanvasDocumentStore : DocumentStore<CanvasId, CanvasDocument> {
      */
     suspend fun createForConversationIfAbsent(doc: CanvasDocument): CanvasDocument
 }
+
+/**
+ * Writes [doc] and awaits its durable storage before journal settlement. Retained SAVE_FAILED
+ * diagnostics never refuse retries. The extension calls this store's own [CanvasDocumentStore.upsert],
+ * including decorators, then its health authority's completion barrier when storage is asynchronous.
+ */
+internal suspend fun CanvasDocumentStore.upsertDurably(doc: CanvasDocument): Boolean {
+    val health = this as? CanvasStorageHealth
+    if (health?.storageFaults?.value?.affecting(doc.id)?.any { it.kind == CanvasStorageFault.Kind.READ_ONLY } == true) return false
+    val before = health?.saveFailureGeneration(doc.id)
+    upsert(doc)
+    val durable = health?.awaitDurableSave(doc.id) ?: true
+    return durable && before == health?.saveFailureGeneration(doc.id) &&
+        health?.storageFaults?.value?.affecting(doc.id)?.none { it.kind == CanvasStorageFault.Kind.READ_ONLY } != false
+}
