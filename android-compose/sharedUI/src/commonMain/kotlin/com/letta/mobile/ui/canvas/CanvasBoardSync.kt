@@ -83,7 +83,7 @@ internal fun CanvasWorkspaceSessionLifetime(session: CanvasSession?, sessionRegi
         var registered = false
         try {
             if (!loaded.value) {
-                if (activeSession.document.value == null) activeSession.load()
+                activeSession.loadIfMissing()
                 loaded.value = true
             }
             if (sessionRegistry != null && sessionRegistry.get(activeSession.canvasId) !== activeSession) {
@@ -102,6 +102,10 @@ internal fun CanvasWorkspaceSessionLifetime(session: CanvasSession?, sessionRegi
         }
     }
     return loaded
+}
+
+private suspend fun CanvasSession.loadIfMissing() {
+    if (document.value == null) load()
 }
 
 private suspend fun CanvasBoard.foldLegacyLabels() {

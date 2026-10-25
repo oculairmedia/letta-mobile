@@ -36,18 +36,20 @@ internal suspend fun CanvasBoard.flushDrawingLocked(): Boolean {
         val drawing = controller.state.value
         if (ui.importedDrawing?.let { (elements, bg) -> elements === drawing.elements && bg == drawing.bgColor } == true) return true
         val baseline = ui.drawingBaseline ?: return false
-        try {
-            // Once a write starts it must finish even if the debounce effect is cancelled by a
-            // newer stroke. No fire-and-forget export event can acknowledge a successful save.
-            withContext(NonCancellable) { persistDrawing(drawing, baseline) }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (expectedFailure: Exception) {
-            ui.statusMessage = "Error: Could not save drawing: ${expectedFailure.message ?: "Unknown"}"
-            Telemetry.error("CanvasWorkspace", "drawing.save.failed", expectedFailure, "canvasId" to session.canvasId.value)
-            return false
-        }
+        if (!persistDrawingOrRetainDraft(drawing, baseline)) return false
     }
+}
+
+private suspend fun CanvasBoard.persistDrawingOrRetainDraft(drawing: State, baseline: String): Boolean = try {
+    // Finish an acknowledged write even if a newer stroke cancels the debounce effect.
+    withContext(NonCancellable) { persistDrawing(drawing, baseline) }
+    true
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (expectedFailure: Exception) {
+    ui.statusMessage = "Error: Could not save drawing: ${expectedFailure.message ?: "Unknown"}"
+    Telemetry.error("CanvasWorkspace", "drawing.save.failed", expectedFailure, "canvasId" to requireNotNull(session).canvasId.value)
+    false
 }
 
 private suspend fun CanvasBoard.persistDrawing(drawing: State, baseline: String) {
