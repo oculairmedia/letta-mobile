@@ -437,6 +437,52 @@ class NotebookLocalStore(
         }
     }
 
+    /**
+     * Replace [expected] Markdown in its existing Text object, returning false if it is stale.
+     * Comparison and splice share the repository's serialized document callback and transaction,
+     * including serialization with incoming sync messages. Unchanged text succeeds without a
+     * commit. A later peer merge still follows Automerge's concurrent text merge semantics;
+     * this comparison does not provide a distributed lock or await durable storage.
+     */
+    fun replaceMarkdown(id: DocumentId, expected: String, replacement: String): Boolean {
+        val handle = requireNotNull(open(id)) { "Unknown notebook document: $id" }
+        return handle.writing(id) { document ->
+            document.startTransaction().use { tx ->
+                val textId = (tx.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
+                val previous = tx.text(textId).orElseThrow()
+                if (previous != expected) return@writing false
+                if (previous == replacement) return@writing true
+                tx.spliceMarkdown(textId, previous, replacement)
+                tx.commit()
+                true
+            }
+        }
+    }
+
+    /** Retain the common prefix/suffix, comparing whole code points to avoid splitting surrogates. */
+    private fun Transaction.spliceMarkdown(textId: ObjectId, previous: String, replacement: String) {
+        var prefix = 0
+        val limit = minOf(previous.length, replacement.length)
+        while (prefix < limit && previous.codePointAt(prefix) == replacement.codePointAt(prefix)) {
+            prefix += Character.charCount(previous.codePointAt(prefix))
+        }
+        var previousEnd = previous.length
+        var replacementEnd = replacement.length
+        while (previousEnd > prefix && replacementEnd > prefix &&
+            previous.codePointBefore(previousEnd) == replacement.codePointBefore(replacementEnd)
+        ) {
+            previousEnd -= Character.charCount(previous.codePointBefore(previousEnd))
+            replacementEnd -= Character.charCount(replacement.codePointBefore(replacementEnd))
+        }
+        // automerge-java 0.0.9 forwards indexes to Rust's default UnicodeCodePoint encoding.
+        spliceText(
+            textId,
+            previous.codePointCount(0, prefix).toLong(),
+            previous.codePointCount(prefix, previousEnd).toLong(),
+            replacement.substring(prefix, replacementEnd),
+        )
+    }
+
     fun putItem(id: DocumentId, item: NotebookItem) {
         require(item.id.isNotBlank())
         mutate(id) { tx ->

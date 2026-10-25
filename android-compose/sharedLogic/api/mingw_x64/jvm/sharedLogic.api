@@ -5742,6 +5742,7 @@ public final class com/letta/mobile/data/canvas/NotebookLocalStore : com/letta/m
 	public final fun reconcile (Lorg/automerge/repo/DocumentId;)Lcom/letta/mobile/data/canvas/NotebookProjectionResult;
 	public final fun registerDocument (Lorg/automerge/repo/DocumentId;)Z
 	public final fun removeBoardElement (Lorg/automerge/repo/DocumentId;Ljava/lang/String;)V
+	public final fun replaceMarkdown (Lorg/automerge/repo/DocumentId;Ljava/lang/String;Ljava/lang/String;)Z
 	public final fun repoForSync ()Lorg/automerge/repo/Repo;
 	public fun saveFailureGeneration (Lcom/letta/mobile/data/model/CanvasId;)J
 	public final fun setBoard (Lorg/automerge/repo/DocumentId;Ljava/lang/String;)V
