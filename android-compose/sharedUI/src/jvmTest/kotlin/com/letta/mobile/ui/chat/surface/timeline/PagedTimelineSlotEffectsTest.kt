@@ -33,6 +33,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
@@ -62,7 +63,7 @@ class PagedTimelineSlotEffectsTest {
 
             assertEquals(listOf("0:refresh", "0:append", "1:refresh", "1:append"), timeline.loads)
             assertEquals(original.second, timeline.items.itemSnapshotList)
-            assertNotSame(original.first, timeline.items.presentedSnapshot.first)
+            assertNotEquals(original.first, timeline.items.presentedSnapshot.first)
             assertNotSame(original.second, timeline.items.itemSnapshotList)
             assertEquals(keys, timeline.visibleKeys)
             assertEquals(mounts, timeline.mounts, "the same keyed slots must stay mounted; no scroll or rebind")
