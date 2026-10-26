@@ -8,11 +8,12 @@ import androidx.paging.PagingData
 import androidx.paging.PagingState
 import androidx.paging.RemoteMediator
 import com.letta.mobile.util.Telemetry
+import kotlinx.atomicfu.AtomicRef
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.flow.collectIndexed
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
@@ -31,7 +32,19 @@ fun CanonicalTimelineSession.paging(
     trims: Flow<Unit> = emptyFlow(),
 ): Flow<PagingData<TimelineSettledRecord>> {
     val active = atomic<TimelineLedgerPagingSource?>(null)
-    val pages = Pager(
+    return createTimelinePager(selection, active, anchor, settledProjectionAdapter).flow
+        .observePublications(selection, active, trims, publication)
+}
+
+/** Creates the Pager and registers each source for revision and trim observation. */
+@OptIn(ExperimentalPagingApi::class)
+internal fun CanonicalTimelineSession.createTimelinePager(
+    selection: TimelineEngineSelection,
+    active: AtomicRef<TimelineLedgerPagingSource?>,
+    anchor: TimelinePageKey? = selection.anchor,
+    settledProjectionAdapter: TimelineSettledProjectionAdapter = DefaultTimelineSettledProjectionAdapter,
+): Pager<TimelinePageKey, TimelineSettledRecord> {
+    return Pager(
         config = PagingConfig(
             pageSize = engine.budget.maxMetadataRows, enablePlaceholders = false,
             initialLoadSize = engine.budget.maxMetadataRows, maxSize = engine.budget.maxMetadataRows * 3,
@@ -41,9 +54,18 @@ fun CanonicalTimelineSession.paging(
         pagingSourceFactory = {
             TimelineLedgerPagingSource(engine, selection, selection.scope.agentId, settledProjectionAdapter).also { active.value = it }
         },
-    ).flow
+    )
+}
+
+/** Keeps revision observation testable independently of the page pump's scheduling. */
+internal fun Flow<PagingData<TimelineSettledRecord>>.observePublications(
+    selection: TimelineEngineSelection,
+    active: AtomicRef<TimelineLedgerPagingSource?>,
+    trims: Flow<Unit> = emptyFlow(),
+    publications: Flow<TimelineEnginePublication>,
+): Flow<PagingData<TimelineSettledRecord>> {
     return channelFlow {
-        val pump = launch { pages.collect { send(it) } }
+        val pump = launch { this@observePublications.collect { send(it) } }
         // Memory pressure replaces the active source in place: Paging reloads one page around the
         // reading position and drops every other page it held, without blanking the list.
         launch {
@@ -53,12 +75,13 @@ fun CanonicalTimelineSession.paging(
             }
         }
         // A superseded selection retires this generation without emitting, matching the prior contract.
-        publication.distinctUntilChanged { old, new ->
+        publications.distinctUntilChanged { old, new ->
             old.selection === new.selection && old.durableRevision == new.durableRevision
-        }.collectIndexed { index, current ->
+        }.collect { current ->
             if (current.selection !== selection) {
                 pump.cancel()
-            } else if (index > 0 && active.value?.invalidateIfBehind(current.durableRevision) == true) {
+            } else if (active.value?.invalidateIfBehind(current.durableRevision) == true) {
+                // The pump may have loaded an older revision before this collector's first emission.
                 // A source that already replaced itself for this revision is current and is left
                 // alone. Every replaced generation redraws the list; a capture names what moved it.
                 Telemetry.event(
