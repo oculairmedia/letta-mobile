@@ -71,33 +71,35 @@ open class CachedAgentRepository(
     internal var clock: Clock = Clock.System
 
     init {
-        repositoryScope.launch {
-            // Resolve + read inside try: Lazy/DAO failures must not escape as
-            // uncaught Dispatchers.IO exceptions (tests historically passed a
-            // broken Lazy mock; production Room build can also throw).
-            try {
-                val generation = refreshMutex.withLock { cacheGeneration }
-                val cache = localCache?.invoke() ?: return@launch
-                val cached = cache.getAllOnce()
-                if (cached.isNotEmpty()) {
-                    // Do not overwrite a refresh that completed while getAllOnce
-                    // was suspended — that would publish a stale roster while
-                    // lastRefreshAtMillis still looks fresh.
-                    refreshMutex.withLock {
-                        if (generation == cacheGeneration && _agents.value.isEmpty()) {
-                            _agents.value = cached
-                        }
-                    }
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (e: Exception) {
-                Telemetry.event("CachedAgentRepository", "Failed to load cached agents", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
-            }
-        }
+        repositoryScope.launch { loadCachedAgents() }
         transport?.let { channelTransport ->
             repositoryScope.launch { observeAgentUpdated(channelTransport) }
             repositoryScope.launch { observeReconnects(channelTransport) }
+        }
+    }
+
+    private suspend fun loadCachedAgents() {
+        // Resolve + read inside try: Lazy/DAO failures must not escape as
+        // uncaught Dispatchers.IO exceptions (tests historically passed a
+        // broken Lazy mock; production Room build can also throw).
+        try {
+            val generation = refreshMutex.withLock { cacheGeneration }
+            val cache = localCache?.invoke() ?: return
+            val cached = cache.getAllOnce()
+            if (cached.isNotEmpty()) {
+                // Do not overwrite a refresh that completed while getAllOnce
+                // was suspended — that would publish a stale roster while
+                // lastRefreshAtMillis still looks fresh.
+                refreshMutex.withLock {
+                    if (generation == cacheGeneration && _agents.value.isEmpty()) {
+                        _agents.value = cached
+                    }
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            Telemetry.event("CachedAgentRepository", "Failed to load cached agents", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
         }
     }
 
