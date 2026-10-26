@@ -2,7 +2,7 @@
 # Linux x86-64 packaging only. Windows retains the existing PowerShell pipeline.
 set -euo pipefail
 [[ $(uname -s) == Linux && $(uname -m) == x86_64 ]] || { echo 'Linux x86-64 host required' >&2; exit 1; }
-mode=${1:?usage: linux-runtime.sh download|extract|npm|stage ...}
+mode=${1:?usage: linux-runtime.sh download|extract|appimage-tools|npm|stage ...}
 shift
 case "$mode" in
   download)
@@ -26,6 +26,35 @@ case "$mode" in
     # GNU tar preserves symlinks and executable bits (unlike ZIP extraction).
     tar -xzf "$archive" --strip-components=1 --no-same-owner -C "$temporary"
     [[ -x $temporary/bin/java || -x $temporary/bin/node ]] || { echo 'Runtime executable missing' >&2; exit 1; }
+    rm -rf "$dest"
+    mv -f "$temporary" "$dest"
+    ;;
+  appimage-tools)
+    archive=${1:?} dest=${2:?}
+    mkdir -p "$(dirname "$dest")"
+    temporary=$(mktemp -d "${dest}.XXXXXX")
+    trap 'rm -rf "$temporary"' EXIT
+    tar -xzf "$archive" --no-same-owner -C "$temporary"
+    for name in mksquashfs desktop-file-validate; do
+      [[ -x $temporary/$name ]] || { echo "AppImage tool missing: $name" >&2; exit 1; }
+    done
+    [[ -f $temporary/runtimes/runtime-x64 ]] || { echo 'AppImage runtime missing' >&2; exit 1; }
+    for name in libappindicator3.so.1 libindicator3.so.7; do
+      [[ -f $temporary/lib/x64/$name ]] || { echo "GTK3 AppImage library missing: $name" >&2; exit 1; }
+    done
+    # Nucleus 2.1.5 does not expose electron-builder's toolsets.appimage option.
+    # Its supported APPIMAGE_TOOLS_PATH override expects the FUSE2 directory
+    # layout. Adapt the verified modern toolset, retaining its entire GTK3 set.
+    mkdir -p "$temporary/linux-x64"
+    for name in mksquashfs desktop-file-validate; do
+      cat > "$temporary/linux-x64/$name" <<'WRAPPER'
+#!/usr/bin/env bash
+set -euo pipefail
+exec "$(dirname "${BASH_SOURCE[0]}")/../$(basename "$0")" "$@"
+WRAPPER
+      chmod 755 "$temporary/linux-x64/$name"
+    done
+    ln -s runtimes/runtime-x64 "$temporary/runtime-x64"
     rm -rf "$dest"
     mv -f "$temporary" "$dest"
     ;;

@@ -59,6 +59,8 @@ class LinuxPackagingTests(unittest.TestCase):
         write(self.root / 'AppRun', '#!/bin/sh\n', True)
         write(self.root / 'meridian.desktop', '[Desktop Entry]\nType=Application\nName=Meridian\nExec=meridian %U\nIcon=meridian\nX-AppImage-Version=0.26.0\n')
         write(self.root / 'meridian.png', b'fixture')
+        for name in ('libappindicator3.so.1', 'libindicator3.so.7'):
+            write(self.root / 'usr/lib' / name, elf())
         self.jar = self.root / 'lib/app/natives.jar'
         self.jar.parent.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(self.jar, 'w') as z:
@@ -80,6 +82,16 @@ class LinuxPackagingTests(unittest.TestCase):
     def test_missing_execute_bit_is_rejected(self):
         self.node.chmod(0o644)
         with self.assertRaisesRegex(ValueError, 'not executable'):
+            self.inspect()
+
+    def test_legacy_gtk2_toolset_is_rejected(self):
+        write(self.root / 'usr/lib/libindicator.so.7', elf())
+        with self.assertRaisesRegex(ValueError, 'Legacy GTK2'):
+            self.inspect()
+
+    def test_missing_gtk3_indicator_is_rejected(self):
+        (self.root / 'usr/lib/libappindicator3.so.1').unlink()
+        with self.assertRaisesRegex(ValueError, 'GTK3 AppImage library missing'):
             self.inspect()
 
     def test_wrong_node_architecture_is_rejected(self):
@@ -159,6 +171,48 @@ class LinuxPackagingTests(unittest.TestCase):
         subprocess.run(['bash', str(SCRIPT), 'extract', str(archive), str(dest)], check=True)
         self.assertTrue(os.access(dest / 'bin/node', os.X_OK))
         self.assertEqual((dest / 'bin/node-link').readlink(), Path('node'))
+
+    def appimage_tools_archive(self, gtk3=True):
+        source = self.work / 'upstream-tools'
+        for name in ('mksquashfs', 'desktop-file-validate'):
+            write(source / name, '#!/bin/sh\nprintf "%s\\n" "$0" "$@"\n', True)
+        # Upstream stores the runtime as non-executable data; the builder prepends it.
+        write(source / 'runtimes/runtime-x64', elf())
+        for name in ('libnotify.so.4', 'libXss.so.1', 'libXtst.so.6', 'libgconf-2.so.4'):
+            write(source / 'lib/x64' / name, elf())
+        if gtk3:
+            for name in ('libappindicator3.so.1', 'libindicator3.so.7'):
+                write(source / 'lib/x64' / (name + '.0'), elf())
+                (source / 'lib/x64' / name).symlink_to(name + '.0')
+        archive = self.work / 'tools.tar.gz'
+        with tarfile.open(archive, 'w:gz') as tar:
+            tar.add(source, arcname='.')
+        return archive
+
+    def test_appimage_tool_override_preserves_gtk3_set_links_and_tool_arguments(self):
+        archive = self.appimage_tools_archive()
+        dest = self.work / 'tool override with spaces'
+        subprocess.run(['bash', str(SCRIPT), 'appimage-tools', str(archive), str(dest)], check=True)
+        for name in ('libappindicator3.so.1', 'libindicator3.so.7'):
+            self.assertTrue((dest / 'lib/x64' / name).is_symlink())
+            self.assertEqual((dest / 'lib/x64' / name).read_bytes(), elf())
+        self.assertEqual(len(list((dest / 'lib/x64').iterdir())), 8)
+        self.assertEqual((dest / 'runtime-x64').read_bytes(), elf())
+        for name in ('mksquashfs', 'desktop-file-validate'):
+            output = subprocess.check_output([str(dest / 'linux-x64' / name), 'argument with spaces'], text=True)
+            self.assertEqual(Path(output.splitlines()[0]).resolve(), dest / name)
+            self.assertEqual(output.splitlines()[1:], ['argument with spaces'])
+
+    def test_appimage_tool_override_rejects_incomplete_gtk3_without_replacing_cache(self):
+        archive = self.appimage_tools_archive(gtk3=False)
+        dest = self.work / 'cached-tools'
+        sentinel = write(dest / 'sentinel', 'old cache')
+        result = subprocess.run(['bash', str(SCRIPT), 'appimage-tools', str(archive), str(dest)],
+                                text=True, capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('GTK3 AppImage library missing', result.stderr)
+        self.assertEqual(sentinel.read_text(), 'old cache')
+        self.assertEqual(list(self.work.glob('cached-tools.*')), [])
 
     def test_smoke_failure_retains_logs_and_exit_status(self):
         image = write(self.work / 'broken.AppImage', '#!/bin/sh\necho extraction-failed\nexit 23\n', True)
@@ -334,7 +388,9 @@ class LinuxPackagingTests(unittest.TestCase):
     def test_library_resolution_rejects_missing_libraries_and_host_rpath(self):
         cases = [('libexample.so => not found\n', '', 'Missing library'),
                  ('libexample.so => /usr/lib/libexample.so\n',
-                  ' 0x1 (RUNPATH) Library runpath: [/home/runner/build]\n', 'Absolute non-system')]
+                  ' 0x1 (RUNPATH) Library runpath: [/home/runner/build]\n', 'Absolute non-system'),
+                 ('libgtk-x11-2.0.so.0 => /usr/lib/libgtk-x11-2.0.so.0\n',
+                  ' 0x1 (NEEDED) Shared library: [libgtk-x11-2.0.so.0]\n', 'GTK2 dependency')]
         for ldd, dynamic, message in cases:
             with self.subTest(message=message):
                 outputs = [subprocess.CompletedProcess([], 0, ldd), subprocess.CompletedProcess([], 0, dynamic)]
