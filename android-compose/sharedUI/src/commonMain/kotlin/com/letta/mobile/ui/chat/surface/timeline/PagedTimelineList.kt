@@ -30,12 +30,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.paging.CombinedLoadStates
-import androidx.paging.ItemSnapshotList
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
-import androidx.paging.compose.collectAsLazyPagingItems
 import com.letta.mobile.data.chat.projection.ChatRenderItem
-import com.letta.mobile.data.chat.projection.TimelineRowAssembly
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.sharedui.resources.Res
@@ -86,10 +83,12 @@ internal fun PagedTimelineList(params: PagedTimelineParams, modifier: Modifier =
 @Composable
 private fun PagedTimelineContent(params: PagedTimelineParams, modifier: Modifier) {
     val presentation = params.presentation
-    val settled = presentation.settled.collectAsLazyPagingItems()
+    val settled = presentation.settled.collectAsPagedTimelineItems()
     val live by presentation.live.collectAsState()
     val rows = rememberPagedRows(live, settled, if (params.thinking) 1 else 0)
-    ObserveResidentRows(presentation, settled)
+    ObserveResidentRows(presentation, settled) {
+        residentReport(settled.itemSnapshotList.items, settled.loadState.refresh)
+    }
 
     when (pagedOpeningOf(settled.loadState, rows.size - rows.leading)) {
         PagedOpening.Loading -> TimelineLoading(params.agentId, modifier.fillMaxSize().padding(top = params.topReserve))
@@ -101,7 +100,7 @@ private fun PagedTimelineContent(params: PagedTimelineParams, modifier: Modifier
 @Composable
 private fun PagedTimelineBody(
     params: PagedTimelineParams,
-    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
+    settled: PagedTimelineItems<CanonicalTimelinePresentation.Row>,
     rows: PagedRows,
     modifier: Modifier,
 ) {
@@ -124,11 +123,7 @@ private fun PagedTimelineBody(
     val pinned = rememberPinnedPrompt(listState, rows.size, params.topReserve, rows::itemAt)
     val glide = rememberNewestEdgeGlide(listState)
     val today = rememberCurrentDate()
-    // The newest row is the live overlay's head, not necessarily the owner state's last message.
-    val newestId = remember(rows) { rows.itemAt(rows.leading)?.newestMessageId() }
-    val bindings = remember(params.bindings, newestId) {
-        TimelineRowBindings(params.bindings.contexts.withNewest(newestId), params.bindings.callbacks, params.bindings.pinch)
-    }
+    val bindings = rememberPagedRowBindings(params.bindings, rows)
 
     Box(modifier) {
         TimelineListFrame(
@@ -173,6 +168,15 @@ private fun PagedTimelineBody(
     }
 }
 
+@Composable
+private fun rememberPagedRowBindings(bindings: TimelineRowBindings, rows: PagedRows): TimelineRowBindings {
+    // The newest row is the live overlay's head, not necessarily the owner state's last message.
+    val newestId = remember(rows) { rows.itemAt(rows.leading)?.newestMessageId() }
+    return remember(bindings, newestId) {
+        TimelineRowBindings(bindings.contexts.withNewest(newestId), bindings.callbacks, bindings.pinch)
+    }
+}
+
 /**
  * The paged list's follow over its rows. a NEW user prompt at the head
  * is the user's own send: always bring them to it, exactly as the legacy list does
@@ -181,7 +185,7 @@ private fun PagedTimelineBody(
 @Composable
 private fun rememberPagedListFollow(
     params: PagedTimelineParams,
-    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
+    settled: PagedTimelineItems<CanonicalTimelinePresentation.Row>,
     rows: PagedRows,
     restoring: Boolean,
 ): PagedFollow {
@@ -214,71 +218,9 @@ internal fun pagedOpeningOf(load: CombinedLoadStates, residentRows: Int): PagedO
     else -> PagedOpening.Loading
 }
 
-/** The two sources [PagedRows] is read from, compared by value to key effects on either. */
-@Immutable
-internal data class PagedRowsIdentity(
-    val live: List<ChatRenderItem>,
-    val settled: ItemSnapshotList<CanonicalTimelinePresentation.Row>,
-)
-
-/**
- * The thinking row, the live overlay and the settled pages as one index space, read from one
- * snapshot of each source (TimelineRowAssembly). Settled rows are read with `peek` here, because
- * deciding what to pin or where the reader is must not register a load and drag prefetch along.
- */
-@Immutable
-internal class PagedRows(
-    val leading: Int,
-    val assembly: TimelineRowAssembly,
-    private val settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
-    /** Changes whenever either source does, so effects keyed on it re-run exactly then. */
-    val identity: PagedRowsIdentity,
-) {
-    val size: Int get() = leading + assembly.size
-    val liveCount: Int get() = assembly.liveCount
-
-    fun key(index: Int): String = assembly.key(index - leading) ?: "settled-slot-${index - leading}"
-
-    fun itemAt(index: Int): ChatRenderItem? {
-        val i = index - leading
-        if (i < 0) return null
-        return assembly.live.getOrNull(i) ?: settledRowAt(index)?.item
-    }
-
-    fun settledRowAt(index: Int): CanonicalTimelinePresentation.Row? =
-        (index - leading - liveCount).takeIf { it in 0 until settled.itemCount }?.let(settled::peek)
-
-    fun indexOf(identity: String): Int? =
-        canonicalRowIndex(assembly.live, settled.itemSnapshotList.items, identity)?.let { it + leading }
-}
-
-@Composable
-private fun rememberPagedRows(
-    live: List<ChatRenderItem>,
-    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
-    leading: Int,
-): PagedRows {
-    val snapshot = settled.itemSnapshotList
-    return remember(live, snapshot, leading) {
-        val assembly = TimelineRowAssembly.assemble(live, snapshot.map { it?.item?.key })
-        PagedRows(leading, assembly, settled, identity = PagedRowsIdentity(live, snapshot))
-    }
-}
-
-/** Resident rows only: an identity not paged in yet has no index (desktop canonicalRowIndex). */
-internal fun canonicalRowIndex(
-    live: List<ChatRenderItem>,
-    settled: List<CanonicalTimelinePresentation.Row>,
-    identity: String,
-): Int? {
-    val inSettled = settled.indexOfFirst { it.identity.value == identity }
-    if (inSettled >= 0) return live.size + inSettled
-    return live.indexOfFirst { it.containsMessageId(identity) }.takeIf { it >= 0 }
-}
-
 private class PagedRowsScope(
     val rows: PagedRows,
-    val settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
+    val settled: PagedTimelineItems<CanonicalTimelinePresentation.Row>,
     val params: PagedTimelineParams,
     val today: LocalDate,
     val bindings: TimelineRowBindings,
@@ -287,15 +229,20 @@ private class PagedRowsScope(
 private fun LazyListScope.pagedRows(scope: PagedRowsScope) {
     val rows = scope.rows
     if (rows.leading > 0) item(key = THINKING_KEY) { ThinkingRow(scope.params.thinkingMessages) }
-    items(count = rows.size - rows.leading, key = { rows.key(it + rows.leading) }) { offset ->
-        PagedSlot(scope, offset + rows.leading, offset)
+    items(
+        count = rows.size - rows.leading,
+        key = { rows.key(it + rows.leading) },
+        contentType = { rows.contentType(it + rows.leading) },
+    ) { offset ->
+        RenderPagedSlot(scope, offset + rows.leading)
     }
     pagedLoadFooter(scope)
 }
 
 /**
- * One slot of the list: a live row, or a settled row read through [LazyPagingItems.get] so the
- * access registers with Paging and drives prefetch. A not-yet-loaded row still occupies space, or
+ * One slot of the list: a live row, or a settled row from the list's immutable snapshot. A
+ * post-composition hint registers with Paging and drives prefetch only while that snapshot is
+ * current. A not-yet-loaded row still occupies space, or
  * the list would collapse toward the tail while a page loads and drag the reader with it.
  *
  * a settled row takes over its live twin's key (TimelineRowAssembly), and
@@ -305,18 +252,17 @@ private fun LazyListScope.pagedRows(scope: PagedRowsScope) {
  * layout, size animation), and the newest row collapsed for a frame and sprang back.
  */
 @Composable
-private fun LazyItemScope.PagedSlot(scope: PagedRowsScope, index: Int, offset: Int) {
-    val live = scope.rows.assembly.live.getOrNull(offset)
-    val row = if (live == null) scope.settled[offset - scope.rows.liveCount] else null
-    val item = live ?: row?.item
-    // Settled rows page in from history: they glide when displaced but never fade in, or every
-    // page load would flash its rows.
-    val modifier = timelineRowMotion(fadesIn = live != null && !live.isUserPrompt())
-    val deferred = row?.takeIf { it.deferred != null }
-    when {
-        item == null -> Box(modifier.height(ChatTimelineDimens.placeholderRowHeight))
-        deferred != null -> DeferredSettledRow(scope, deferred, index, modifier)
-        else -> PagedRow(item, scope.rows.itemAt(index + 1), scope, modifier)
+private fun LazyItemScope.RenderPagedSlot(scope: PagedRowsScope, index: Int) {
+    PagedSlot(scope.rows, scope.settled, index) { item, row ->
+        val live = scope.rows.assembly.live.getOrNull(index - scope.rows.leading)
+        // Settled rows glide when displaced but never fade in on each page load.
+        val modifier = timelineRowMotion(fadesIn = live != null && !live.isUserPrompt())
+        val deferred = row?.takeIf { it.deferred != null }
+        when {
+            item == null -> Box(modifier.height(ChatTimelineDimens.placeholderRowHeight))
+            deferred != null -> DeferredSettledRow(scope, deferred, index, modifier)
+            else -> PagedRow(item, scope.rows.itemAt(index + 1), scope, modifier)
+        }
     }
 }
 
@@ -379,7 +325,7 @@ private fun LazyListScope.pagedLoadFooter(scope: PagedRowsScope) {
  * or the overlay never drains.
  *
  * Several views report the same pager and the last report wins, so a view that has not loaded yet
- * stays quiet: a freshly mounted [LazyPagingItems] reports an empty list while its first page is
+ * stays quiet: a freshly mounted presenter reports an empty list while its first page is
  * still on its way, which would clear what the other views hold.
  */
 @Composable
@@ -387,8 +333,19 @@ internal fun ObserveResidentRows(
     presentation: CanonicalTimelinePresentation,
     settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
 ) {
+    ObserveResidentRows(presentation, settled) {
+        residentReport(settled.itemSnapshotList.items, settled.loadState.refresh)
+    }
+}
+
+@Composable
+private fun <T> ObserveResidentRows(
+    presentation: CanonicalTimelinePresentation,
+    settled: T,
+    residentRows: () -> List<CanonicalTimelinePresentation.Row>?,
+) {
     LaunchedEffect(presentation, settled) {
-        snapshotFlow { residentReport(settled.itemSnapshotList.items, settled.loadState.refresh) }
+        snapshotFlow(residentRows)
             .collect { rows -> if (rows != null) presentation.onResidentRows(rows) }
     }
 }
