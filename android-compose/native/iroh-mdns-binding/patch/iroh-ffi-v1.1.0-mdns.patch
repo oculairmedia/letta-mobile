@@ -2288,7 +2288,7 @@ new file mode 100644
 index 0000000..4582d0c
 --- /dev/null
 +++ b/src/mdns.rs
-@@ -0,0 +1,334 @@
+@@ -0,0 +1,352 @@
 +//! Opt-in DNS-SD peer lookup. Results are transport hints, never trust grants.
 +use std::{
 +    collections::{HashSet, VecDeque},
@@ -2542,10 +2542,7 @@ index 0000000..4582d0c
 +
 +fn candidate(entry: &hick::tokio::ServiceEntry) -> Option<EndpointAddr> {
 +    let name = entry.instance_name().to_string();
-+    let label = name.strip_suffix(SERVICE)?;
-+    if label.is_empty() || label.contains('.') {
-+        return None;
-+    }
++    let label = instance_label(&name)?;
 +    let id: EndpointId = iroh::EndpointId::from_z32(label).ok()?.into();
 +    if entry.port() == 0 {
 +        return None;
@@ -2589,6 +2586,14 @@ index 0000000..4582d0c
 +    Some(EndpointAddr::new(&id, None, addresses))
 +}
 +
++fn instance_label(name: &str) -> Option<&str> {
++    let label = name.strip_suffix(SERVICE)?.strip_suffix('.')?;
++    if label.is_empty() || label.contains('.') {
++        return None;
++    }
++    Some(label)
++}
++
 +fn usable_ip(ip: IpAddr) -> bool {
 +    !ip.is_unspecified() && !ip.is_multicast()
 +}
@@ -2596,6 +2601,19 @@ index 0000000..4582d0c
 +#[cfg(test)]
 +mod tests {
 +    use super::*;
++
++    #[test]
++    fn peer_lookup_instance_requires_exact_dns_separator() {
++        assert_eq!(instance_label("peer._irohv1._udp.local."), Some("peer"));
++        for name in [
++            "peer_irohv1._udp.local.",
++            "._irohv1._udp.local.",
++            "extra.peer._irohv1._udp.local.",
++            "peer._other._udp.local.",
++        ] {
++            assert_eq!(instance_label(name), None);
++        }
++    }
 +
 +    #[tokio::test]
 +    async fn queued_discovery_is_drained_when_scan_is_invalidated() {
