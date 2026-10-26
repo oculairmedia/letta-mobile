@@ -94,6 +94,29 @@ function Test-PackagedChild($Process, [string]$ImagePrefix) {
   return $Process.CreationDate -ge $script:LaunchTime.AddSeconds(-2)
 }
 
+function Add-PackagedChildren($Processes, $Ids, [string]$ImagePrefix) {
+  foreach ($process in $Processes) {
+    if ($Ids.Contains([int]$process.ParentProcessId) -and (Test-PackagedChild $process $ImagePrefix)) {
+      [void]$Ids.Add([int]$process.ProcessId)
+    }
+  }
+}
+
+function Get-ProcessEvidence($Process, $Ids, [string]$ImagePrefix) {
+  $inImage = $Process.ExecutablePath -and $Process.ExecutablePath.StartsWith($ImagePrefix, [System.StringComparison]::OrdinalIgnoreCase)
+  if ($Ids.Contains([int]$Process.ProcessId) -or $inImage) {
+    [pscustomobject]@{
+      Pid = [int]$Process.ProcessId
+      ParentPid = [int]$Process.ParentProcessId
+      Name = $Process.Name
+      Path = $Process.ExecutablePath
+      Created = $Process.CreationDate
+      OwnedTree = $Ids.Contains([int]$Process.ProcessId)
+      InImage = [bool]$inImage
+    }
+  }
+}
+
 function Get-OwnedProcesses([int]$LauncherPid, [string]$ImagePath) {
   $all = @(Get-CimInstance Win32_Process)
   $ids = [System.Collections.Generic.HashSet[int]]::new()
@@ -101,25 +124,10 @@ function Get-OwnedProcesses([int]$LauncherPid, [string]$ImagePath) {
   $imagePrefix = $ImagePath.TrimEnd('\') + '\'
   do {
     $before = $ids.Count
-    foreach ($process in $all) {
-      if ($ids.Contains([int]$process.ParentProcessId) -and (Test-PackagedChild $process $imagePrefix)) {
-        [void]$ids.Add([int]$process.ProcessId)
-      }
-    }
+    Add-PackagedChildren $all $ids $imagePrefix
   } while ($ids.Count -ne $before)
   foreach ($process in $all) {
-    $inImage = $process.ExecutablePath -and $process.ExecutablePath.StartsWith($imagePrefix, [System.StringComparison]::OrdinalIgnoreCase)
-    if ($ids.Contains([int]$process.ProcessId) -or $inImage) {
-      [pscustomobject]@{
-        Pid = [int]$process.ProcessId
-        ParentPid = [int]$process.ParentProcessId
-        Name = $process.Name
-        Path = $process.ExecutablePath
-        Created = $process.CreationDate
-        OwnedTree = $ids.Contains([int]$process.ProcessId)
-        InImage = [bool]$inImage
-      }
-    }
+    Get-ProcessEvidence $process $ids $imagePrefix
   }
 }
 
@@ -179,22 +187,25 @@ function Get-EligibleFrame([int]$LauncherPid, [string]$ImagePath, [string]$Launc
   return $null
 }
 
+function Read-LogMatches([string]$Path, [string]$Pattern) {
+  if (-not (Test-Path -LiteralPath $Path)) { return @() }
+  $raw = Get-Content -LiteralPath $Path -Raw
+  if (-not $raw) { return @() }
+  return [regex]::Matches($raw, $Pattern)
+}
+
+function Get-LauncherMainHandle([int]$LauncherPid) {
+  try { return (Get-Process -Id $LauncherPid -ErrorAction Stop).MainWindowHandle.ToInt64() }
+  catch { return 0 }
+}
+
 function Write-WindowSnapshot([string]$Phase, [int]$LauncherPid, [string]$ImagePath, [string]$EvidencePath) {
   $processes = @(Get-OwnedProcesses $LauncherPid $ImagePath)
-  $owned = [System.Collections.Generic.HashSet[int]]::new()
-  foreach ($process in $processes) { if ($process.OwnedTree) { [void]$owned.Add($process.Pid) } }
-  $windows = @([SmokeWin32]::TopLevelWindows() | Where-Object { $owned.Contains($_.Pid) -or @($processes.Pid) -contains $_.Pid })
-  $knownHandles = @()
+  $windows = @([SmokeWin32]::TopLevelWindows() | Where-Object { @($processes.Pid) -contains $_.Pid })
   $stdout = Join-Path $EvidencePath 'stdout.log'
-  if (Test-Path -LiteralPath $stdout) {
-    $raw = Get-Content -LiteralPath $stdout -Raw
-    if ($raw) {
-      $knownHandles = @([regex]::Matches($raw, 'handle=(\d+)') | ForEach-Object { [long]$_.Groups[1].Value } | Select-Object -Unique)
-    }
-  }
+  $knownHandles = @(Read-LogMatches $stdout 'handle=(\d+)' | ForEach-Object { [long]$_.Groups[1].Value } | Select-Object -Unique)
   $probes = @($knownHandles | ForEach-Object { [SmokeWin32]::Inspect($_) })
-  $mainHandle = 0
-  try { $mainHandle = (Get-Process -Id $LauncherPid -ErrorAction Stop).MainWindowHandle.ToInt64() } catch {}
+  $mainHandle = Get-LauncherMainHandle $LauncherPid
   $snapshot = [pscustomobject]@{
     Phase = $Phase
     TimeUtc = (Get-Date).ToUniversalTime().ToString('o')
@@ -237,25 +248,37 @@ function Save-Screenshot([string]$EvidencePath) {
   } catch { "Screenshot: $($_.Exception.Message)" | Add-Content -LiteralPath (Join-Path $EvidencePath 'diagnostic-errors.log') }
 }
 
+function Test-ThreadDumpTarget([int]$TargetPid, [int]$LauncherPid, $Processes) {
+  if ($TargetPid -eq $LauncherPid) { return $true }
+  return @($Processes | Where-Object { $_.Pid -eq $TargetPid -and $_.InImage }).Count -gt 0
+}
+
+function Save-ThreadDump([string]$Jcmd, [int]$TargetPid, [string]$EvidencePath) {
+  $output = Join-Path $EvidencePath "thread-$TargetPid.log"
+  $errorOutput = Join-Path $EvidencePath "thread-$TargetPid.err.log"
+  try {
+    $dump = Start-Process -FilePath $Jcmd -ArgumentList @($TargetPid, 'Thread.print', '-l') -PassThru -RedirectStandardOutput $output -RedirectStandardError $errorOutput
+    if (-not $dump.WaitForExit(8000)) { Stop-Process -Id $dump.Id -Force -ErrorAction SilentlyContinue; "jcmd timed out for pid $TargetPid" | Add-Content -LiteralPath $errorOutput }
+  } catch { "jcmd pid $TargetPid`: $($_.Exception.Message)" | Add-Content -LiteralPath $errorOutput }
+}
+
+function Get-ThreadDumpTargets([int]$LauncherPid, [string]$EvidencePath) {
+  $targetPids = [System.Collections.Generic.HashSet[int]]::new()
+  [void]$targetPids.Add($LauncherPid)
+  $stderr = Join-Path $EvidencePath 'stderr.log'
+  foreach ($match in (Read-LogMatches $stderr 'TABLET: native tablet_input[^\r\n]* pid=(\d+)')) {
+    [void]$targetPids.Add([int]$match.Groups[1].Value)
+  }
+  return $targetPids
+}
+
 function Save-ThreadDumps([int]$LauncherPid, $Processes, [string]$EvidencePath) {
-  $jcmd = if ($env:JAVA_HOME_26_X64) { Join-Path $env:JAVA_HOME_26_X64 'bin\jcmd.exe' } else { $null }
-  if ($jcmd -and (Test-Path -LiteralPath $jcmd)) {
-    $targetPids = [System.Collections.Generic.HashSet[int]]::new()
-    [void]$targetPids.Add($LauncherPid)
-    $stderr = Join-Path $EvidencePath 'stderr.log'
-    if (Test-Path -LiteralPath $stderr) {
-      foreach ($match in [regex]::Matches((Get-Content -LiteralPath $stderr -Raw), 'TABLET: native tablet_input[^\r\n]* pid=(\d+)')) {
-        [void]$targetPids.Add([int]$match.Groups[1].Value)
-      }
-    }
-    foreach ($targetPid in $targetPids) {
-      if ($targetPid -ne $LauncherPid -and -not @($Processes | Where-Object { $_.Pid -eq $targetPid -and $_.InImage }).Count) { continue }
-      $output = Join-Path $EvidencePath "thread-$targetPid.log"
-      $errorOutput = Join-Path $EvidencePath "thread-$targetPid.err.log"
-      try {
-        $dump = Start-Process -FilePath $jcmd -ArgumentList @($targetPid, 'Thread.print', '-l') -PassThru -RedirectStandardOutput $output -RedirectStandardError $errorOutput
-        if (-not $dump.WaitForExit(8000)) { Stop-Process -Id $dump.Id -Force -ErrorAction SilentlyContinue; "jcmd timed out for pid $targetPid" | Add-Content -LiteralPath $errorOutput }
-      } catch { "jcmd pid $targetPid`: $($_.Exception.Message)" | Add-Content -LiteralPath $errorOutput }
+  if (-not $env:JAVA_HOME_26_X64) { return }
+  $jcmd = Join-Path $env:JAVA_HOME_26_X64 'bin\jcmd.exe'
+  if (-not (Test-Path -LiteralPath $jcmd)) { return }
+  foreach ($targetPid in (Get-ThreadDumpTargets $LauncherPid $EvidencePath)) {
+    if (Test-ThreadDumpTarget $targetPid $LauncherPid $Processes) {
+      Save-ThreadDump $jcmd $targetPid $EvidencePath
     }
   }
 }
@@ -282,10 +305,16 @@ function Wait-ForPackagedFrame($App, [string]$ImagePath, [string]$LauncherPath, 
   throw 'No visible packaged Windows app frame within 90 seconds'
 }
 
+function Test-SameFrameProcess($Frame, $Again) {
+  if (-not $Again) { return $false }
+  if ($Again.Process.Pid -ne $Frame.Process.Pid) { return $false }
+  return $Again.Process.Created -eq $Frame.Process.Created
+}
+
 function Confirm-StableFrame($Frame, [int]$LauncherPid, [string]$ImagePath, [string]$LauncherPath) {
   Start-Sleep -Seconds 5
   $again = Get-EligibleFrame $LauncherPid $ImagePath $LauncherPath $Frame.Window.Handle
-  if (-not $again -or $again.Process.Pid -ne $Frame.Process.Pid -or $again.Process.Created -ne $Frame.Process.Created) {
+  if (-not (Test-SameFrameProcess $Frame $again)) {
     throw 'Packaged Windows app frame did not stay visible for five seconds'
   }
   return $again
