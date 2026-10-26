@@ -33,7 +33,8 @@ def locations(source_arg: str, output_arg: str, unit: Path | None = None) -> tup
         actual = (Path.cwd() / argument).resolve()
         if actual != allowed:
             raise SystemExit(f"Expected path within pinned build root: {allowed}; got {raw}")
-        paths.append(actual)
+        # Construct destinations from our fixed roots, not the validated CLI spelling.
+        paths.append(allowed)
     return paths[0], paths[1]
 
 
@@ -85,7 +86,7 @@ def verify_desktop(source: Path, mode: str, output: Path, summary: dict) -> None
     summary["natives"][platform] = digest(original)
     artifact = jar.read_bytes()
     summary["artifact_sha256"] = digest(artifact)
-    write_output(output, jar.name, artifact)
+    write_output(output, "iroh.jar", artifact)
 
 
 def verify_android(source: Path, output: Path, summary: dict) -> None:
@@ -100,7 +101,7 @@ def verify_android(source: Path, output: Path, summary: dict) -> None:
             summary["natives"][abi] = digest(original)
     artifact = aar.read_bytes()
     summary["artifact_sha256"] = digest(artifact)
-    write_output(output, aar.name, artifact)
+    write_output(output, "iroh.aar", artifact)
 
 
 def main() -> None:

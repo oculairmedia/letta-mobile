@@ -55,6 +55,13 @@ class ArtifactVerifierTest(unittest.TestCase):
                          (self.source / "kotlin/lib/build/libs/iroh.jar").read_bytes())
         self.assertTrue((self.output / "proof.json").is_file())
 
+    def test_input_archive_name_does_not_select_output_path(self) -> None:
+        self.fixture()
+        jar = self.source / "kotlin/lib/build/libs/iroh.jar"
+        jar.rename(jar.with_name("build-controlled-name.jar"))
+        self.run_verifier()
+        self.assertEqual({path.name for path in self.output.iterdir()}, {"iroh.jar", "proof.json"})
+
     def test_absolute_and_traversal_arguments_rejected(self) -> None:
         for source, output in (
             (str(self.source), self.output_arg),
