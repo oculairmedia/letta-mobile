@@ -86,14 +86,11 @@ open class CachedAgentRepository(
             val generation = refreshMutex.withLock { cacheGeneration }
             val cache = localCache?.invoke() ?: return
             val cached = cache.getAllOnce()
-            if (cached.isNotEmpty()) {
-                // Do not overwrite a refresh that completed while getAllOnce
-                // was suspended — that would publish a stale roster while
-                // lastRefreshAtMillis still looks fresh.
-                refreshMutex.withLock {
-                    if (generation == cacheGeneration && _agents.value.isEmpty()) {
-                        _agents.value = cached
-                    }
+            // Do not overwrite a refresh that completed while getAllOnce
+            // was suspended. Assigning an empty cache to an empty StateFlow is a no-op.
+            refreshMutex.withLock {
+                if (generation == cacheGeneration && _agents.value.isEmpty()) {
+                    _agents.value = cached
                 }
             }
         } catch (cancelled: CancellationException) {
