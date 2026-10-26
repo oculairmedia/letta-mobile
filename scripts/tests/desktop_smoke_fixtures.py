@@ -111,7 +111,9 @@ class DesktopSmokeFixtures:
             'python3': 'echo fixture-payload-inspection',
             'desktop-file-validate': 'exit 0',
             'openbox': 'exec /bin/sleep 120',
-            'xprop': "echo '_NET_SUPPORTING_WM_CHECK(WINDOW): window id # 0x200001'",
+            'xprop': ('if [ "$1" = -root ]; then\n'
+                      "echo '_NET_SUPPORTING_WM_CHECK(WINDOW): window id # 0x200001'\n"
+                      "else echo '_NET_WM_WINDOW_TYPE(ATOM) = _NET_WM_WINDOW_TYPE_NORMAL'; fi"),
             'xwininfo': 'echo fixture-window-tree',
             'sleep': 'exec /bin/sleep 0.01',
             'xdotool': ('if [ -n "$FIXTURE_READY" ]; then\n'

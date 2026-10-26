@@ -77,6 +77,33 @@ class LinuxPackagingTests(DesktopSmokeFixtures, unittest.TestCase):
     def inspect(self):
         return inspector.inspect(self.root, self.work / 'native')
 
+    def run_titled_window_fixture(self, title='Home', foreign_pid=False, window_type='NORMAL'):
+        owner = self.work / 'window-owner.txt'
+        search = f'''exec "{os.sys.executable}" - "$@" <<'PYTHON'
+from pathlib import Path
+import re
+import sys
+args = sys.argv[1:]
+title = {title!r}
+if args[0] == 'getwindowname':
+    print(title)
+    sys.exit(0)
+owner = Path({str(owner)!r})
+if not owner.exists():
+    sys.exit(1)
+window_pid = '1' if {foreign_pid!r} else owner.read_text().strip()
+if '--pid' in args and args[args.index('--pid') + 1] != window_pid:
+    sys.exit(1)
+if '--name' in args and not re.search(args[args.index('--name') + 1], title):
+    sys.exit(1)
+print(123)
+PYTHON'''
+        properties = ('if [ "$1" = -root ]; then\n'
+                      "echo '_NET_SUPPORTING_WM_CHECK(WINDOW): window id # 0x200001'\n"
+                      f"else echo '_NET_WM_WINDOW_TYPE(ATOM) = _NET_WM_WINDOW_TYPE_{window_type}'; fi")
+        return self.run_window_harness_fixture(startup=f'echo $$ > "{owner}"',
+                                               options={'tools': {'xdotool': search, 'xprop': properties}})
+
     def test_complete_relocated_package_and_universal_jars(self):
         layout = self.inspect()
         self.assertEqual(len(layout['jni']), 5)
@@ -422,6 +449,21 @@ class LinuxPackagingTests(DesktopSmokeFixtures, unittest.TestCase):
         self.assertEqual((evidence / 'exit-status.txt').read_text(), '0\n')
         self.assertEqual((evidence / 'window.txt').read_text(), 'Meridian\n')
         self.assertEqual(list(self.work.rglob('letta-linux-package-smoke.*')), [])
+
+    def test_window_harness_accepts_dynamic_destination_title(self):
+        result, evidence = self.run_titled_window_fixture()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((evidence / 'window.txt').read_text(), 'Home\n')
+
+    def test_window_harness_rejects_foreign_pid_with_brand_title(self):
+        result, evidence = self.run_titled_window_fixture(title='Meridian Desktop', foreign_pid=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((evidence / 'exit-status.txt').read_text(), '1\n')
+
+    def test_window_harness_rejects_dialog_instead_of_normal_frame(self):
+        result, evidence = self.run_titled_window_fixture(window_type='DIALOG')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((evidence / 'exit-status.txt').read_text(), '1\n')
 
     def test_window_harness_rejects_x_error_even_with_a_window_and_live_process(self):
         result, evidence = self.run_window_harness_fixture(startup="echo 'X Error of failed request: BadMatch'")

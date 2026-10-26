@@ -88,6 +88,17 @@ capture_window_failure() {
 }
 export -f capture_window_failure
 
+visible_app_windows() {
+  local app_pid=$1 candidate
+  while IFS= read -r candidate; do
+    if xprop -id "$candidate" _NET_WM_WINDOW_TYPE 2>/dev/null |
+      grep -Eq '^_NET_WM_WINDOW_TYPE\(ATOM\) = _NET_WM_WINDOW_TYPE_NORMAL$'; then
+      printf '%s\n' "$candidate"
+    fi
+  done < <(xdotool search --onlyvisible --pid "$app_pid" 2>/dev/null || true)
+}
+export -f visible_app_windows
+
 smoke_payload() {
   local here=$1 image=$2 work=$3 app_pid wm_pid
   [[ $(uname -m) == x86_64 ]] || { echo 'x86-64 runner required' >&2; exit 1; }
@@ -141,7 +152,7 @@ SHIM
   window=
   for ((i=0; i<60; i++)); do
     kill -0 "$app_pid" 2>/dev/null || { cat "$work/startup.log"; echo 'Packaged app exited before showing a window' >&2; exit 1; }
-    window=$(xdotool search --onlyvisible --name 'Letta|Meridian' 2>/dev/null | head -n 1 || true)
+    window=$(visible_app_windows "$app_pid" | head -n 1 || true)
     [[ -n $window ]] && break
     sleep 1
   done
@@ -160,7 +171,7 @@ SHIM
   fi
   crash=$(find "$work" -type f \( -name 'hs_err_pid*.log' -o -name 'java_error_in*.log' -o -name 'core' -o -name 'core.[0-9]*' \) -print -quit)
   [[ -z $crash ]] || { echo "New crash evidence: $crash" >&2; exit 1; }
-  xdotool search --onlyvisible --name 'Letta|Meridian' | grep -Fx "$window"
+  visible_app_windows "$app_pid" | grep -Fx "$window"
   xdotool getwindowname "$window" | tee "$work/window.txt"
   xwininfo -root -tree > "$work/window-tree.txt"
   cat "$work/startup.log"
