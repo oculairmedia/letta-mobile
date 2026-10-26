@@ -96,7 +96,7 @@ function Test-PackagedChild($Process, [string]$ImagePrefix) {
 
 function Add-PackagedChildren($Processes, $Ids, [string]$ImagePrefix) {
   foreach ($process in $Processes) {
-    if ($Ids.Contains([int]$process.ParentProcessId) -and (Test-PackagedChild $process $ImagePrefix)) {
+    if ($Ids.Contains([int]$process.ParentProcessId) -and (Test-PackagedChild $process $imagePrefix)) {
       [void]$Ids.Add([int]$process.ProcessId)
     }
   }
@@ -320,6 +320,20 @@ function Confirm-StableFrame($Frame, [int]$LauncherPid, [string]$ImagePath, [str
   return $again
 }
 
+function Save-AppFailure($App, [string]$Image, [string]$EvidencePath) {
+  if (-not $App) { return }
+  try { Save-FailureEvidence $App.Id $Image $EvidencePath }
+  catch { "Diagnostic: $($_.Exception.Message)" | Add-Content -LiteralPath (Join-Path $EvidencePath 'diagnostic-errors.log') }
+}
+
+function Stop-PackagedProcessTree($App, [string]$Image) {
+  if (-not $App) { return }
+  try {
+    $owned = @(Get-OwnedProcesses $App.Id $Image | Where-Object { $_.OwnedTree } | Sort-Object Created -Descending)
+    foreach ($process in $owned) { Stop-Process -Id $process.Pid -Force -ErrorAction SilentlyContinue }
+  } catch { Write-Warning "Packaged process cleanup: $($_.Exception.Message)" }
+}
+
 $images = @(Get-ChildItem -LiteralPath $ImageRoot -Directory)
 if ($images.Count -ne 1) { throw 'Expected one packaged Windows app image' }
 $image = $images[0].FullName
@@ -354,6 +368,7 @@ if ($LASTEXITCODE -ne 0 -or $version -ne "v$($manifest.node)") { throw 'Bundled 
 if ($LASTEXITCODE -ne 0) { throw 'Bundled AppServer CLI failed' }
 & $node $js server --help
 if ($LASTEXITCODE -ne 0) { throw 'Bundled AppServer bootstrap failed' }
+function Invoke-PackagedWindow($image, $launchers, $EvidenceRoot) {
 $app = $null
 try {
   $app = Start-Process -FilePath $launchers[0].FullName -WorkingDirectory $EvidenceRoot -PassThru -RedirectStandardOutput (Join-Path $EvidenceRoot 'stdout.log') -RedirectStandardError (Join-Path $EvidenceRoot 'stderr.log')
@@ -370,16 +385,12 @@ try {
   Save-Screenshot $EvidenceRoot
   "PASS: launcher=$($app.Id) framePid=$($frame.Process.Pid) hwnd=$($frame.Window.Handle) class=$($frame.Window.Class) title=$($frame.Window.Title)" | Tee-Object -FilePath (Join-Path $EvidenceRoot 'window.txt')
 } catch {
-  if ($app) {
-    try { Save-FailureEvidence $app.Id $image $EvidenceRoot } catch { "Diagnostic: $($_.Exception.Message)" | Add-Content -LiteralPath (Join-Path $EvidenceRoot 'diagnostic-errors.log') }
-  }
+  Save-AppFailure $app $image $EvidenceRoot
   throw
 } finally {
-  if ($app) {
-    try {
-      $owned = @(Get-OwnedProcesses $app.Id $image | Where-Object { $_.OwnedTree } | Sort-Object Created -Descending)
-      foreach ($process in $owned) { Stop-Process -Id $process.Pid -Force -ErrorAction SilentlyContinue }
-    } catch { Write-Warning "Packaged process cleanup: $($_.Exception.Message)" }
-  }
+  Stop-PackagedProcessTree $app $image
   Get-Content (Join-Path $EvidenceRoot 'stdout.log'), (Join-Path $EvidenceRoot 'stderr.log') -ErrorAction SilentlyContinue
 }
+}
+
+Invoke-PackagedWindow $image $launchers $EvidenceRoot
