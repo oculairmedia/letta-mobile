@@ -29,10 +29,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -141,8 +143,11 @@ internal fun BubbleCardLayer(bubble: TouchBubble, agentName: String, anchor: Bub
     val expanded = bubble.state.expanded
     // Laid out above the keyboard; the head's own band is not, so the head never moves with it.
     Box(Modifier.fillMaxSize().liftAboveKeyboard().then(cardLayout(anchor, below))) {
-        AnimatedVisibility(visible = expanded, enter = motion.popEnter(origin), exit = motion.popExit(origin)) {
-            BubbleCard(bubble, agentName, CardLook(anchor.headOnRight, below, motion, reduced))
+        // The card's area already excludes the keyboard; its composer must not reserve it again.
+        CompositionLocalProvider(LocalChatKeyboardLift provides rememberUpdatedState(0.dp)) {
+            AnimatedVisibility(visible = expanded, enter = motion.popEnter(origin), exit = motion.popExit(origin)) {
+                BubbleCard(bubble, agentName, CardLook(anchor.headOnRight, below, motion, reduced))
+            }
         }
     }
     if (bubble.recents != null) BubblePlus(bubble.state, anchor, motion)
