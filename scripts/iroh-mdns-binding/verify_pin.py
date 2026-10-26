@@ -11,6 +11,7 @@ UNIT = ROOT / "android-compose/native/iroh-mdns-binding"
 MANIFEST = json.loads((UNIT / "source-pin/manifest.json").read_text())
 PATCH = UNIT / "patch/iroh-ffi-v1.1.0-mdns.patch"
 NATIVE_TEST = UNIT / "tests/native_mdns.rs"
+PEER_PATCH = UNIT / "patch/iroh-mdns-peer-lookup-rust-1.91.patch"
 
 
 def fail(message: str) -> None:
@@ -24,6 +25,9 @@ def verify_patch() -> None:
     test_sha = hashlib.sha256(NATIVE_TEST.read_bytes()).hexdigest()
     if test_sha != MANIFEST["native_test_sha256"]:
         fail(f"Native test checksum mismatch: {test_sha}")
+    peer_patch_sha = hashlib.sha256(PEER_PATCH.read_bytes()).hexdigest()
+    if peer_patch_sha != MANIFEST["peer_lookup"]["compat_patch_sha256"]:
+        fail(f"Peer compatibility patch checksum mismatch: {peer_patch_sha}")
 
 
 def required_packages() -> list[tuple[str, str]]:
@@ -40,8 +44,19 @@ def verify_dependencies(packages: dict) -> None:
         if key not in packages:
             fail(f"Pinned dependency missing: {key}")
     peer = packages[("iroh-mdns-peer-lookup", MANIFEST["peer_lookup"]["version"])]
-    if MANIFEST["peer_lookup"]["commit"] not in peer.get("source", ""):
-        fail("Peer lookup source SHA differs from approved pin")
+    if peer.get("source") is not None:
+        fail("Peer lookup must resolve from the verified local copy")
+
+
+def verify_peer_copy(source: Path, packages: dict) -> None:
+    peer = packages[("iroh-mdns-peer-lookup", MANIFEST["peer_lookup"]["version"])]
+    vendor = source / "vendor/iroh-mdns-peer-lookup"
+    if Path(peer["manifest_path"]).resolve() != (vendor / "Cargo.toml").resolve():
+        fail("Peer lookup resolved outside the verified local copy")
+    for relative, expected in MANIFEST["peer_lookup"]["vendored_files_sha256"].items():
+        actual = hashlib.sha256((vendor / relative).read_bytes()).hexdigest()
+        if actual != expected:
+            fail(f"Vendored peer lookup changed: {relative}: {actual}")
 
 
 def verify_licenses(packages: dict) -> None:
@@ -59,6 +74,7 @@ def verify_source(source: Path) -> None:
     metadata = json.loads((source / "metadata.json").read_text())
     packages = {(item["name"], item["version"]): item for item in metadata["packages"]}
     verify_dependencies(packages)
+    verify_peer_copy(source, packages)
     verify_licenses(packages)
     lock = (source / "Cargo.lock").read_text()
     if "checksum = " not in lock:

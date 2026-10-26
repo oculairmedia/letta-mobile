@@ -12,7 +12,13 @@
     "commit": "e1213d4a7ce16b9a4b7dda81dc835349289f2a9c",
     "crate": "iroh-mdns-peer-lookup",
     "version": "0.1.2",
-    "license": "Apache-2.0"
+    "license": "Apache-2.0",
+    "compat_patch_sha256": "335932f91dfd19fc893d1234a5f608ab9a5b7b7f42a75744af2a787535ce2f05",
+    "vendored_files_sha256": {
+      "Cargo.toml": "61dae386d14a6ab94449b48049523bc9fdf82926af0f53943910f0ab78516811",
+      "README.md": "845bfd4a03f3dc9d5e6d9b990326fcdb3f4efcd1dccfb9f56453c8cdb0ebab5f",
+      "src/lib.rs": "256dbf03b7aa37c951bc583b1ecfa6bec822ade1043e5daa988654415f469e89"
+    }
   },
   "hick": {
     "version": "0.2.0",
@@ -25,6 +31,6 @@
     "iroh-android-1.1.0.pom": "2489f8eca937eb717e73b029cdc161370c6158b0ceeac7081ff1405b939d515b",
     "iroh-android-1.1.0.aar": "ed747f627da6dad314b25b9ff17d38232d8d75cb31e663af348368e6be845ab8"
   },
-  "patch_sha256": "e08df6a7c0c571a506a182e249afff3c6afc6d05ef01dcaabee14216089bb067",
+  "patch_sha256": "f1eb80454d5a030e6722dec2d5dd0bdf606dd25f50e00ae9850f081d62375429",
   "native_test_sha256": "be5e5f012fe0d3f6fe83eae0a4918c63edb41d3886c10c16e98d3bc2a1aca0bc"
 }

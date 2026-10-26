@@ -13,7 +13,11 @@ JVM JAR, source JAR, and Android AAR SHA-256 values, upstream
 `5e451092dba0c1a09ee83ff6e5be37b1152a5c58`, Rust Iroh `1.0.2`, and
 the Apache-2.0 `iroh-mdns-peer-lookup` source commit
 `e1213d4a7ce16b9a4b7dda81dc835349289f2a9c`. The Rust lockfile in the
-patch pins registry checksums. Upstream iroh-ffi retains its MIT and Apache-2.0
+patch pins registry checksums. Preparation clones that exact peer source,
+applies [a three-call compatibility patch](patch/iroh-mdns-peer-lookup-rust-1.91.patch)
+replacing unstable `slice::as_array` with stable array conversions, and uses
+the verified local copy for Rust 1.91.1. The manifest hashes the patch and
+copied crate files. Upstream iroh-ffi retains its MIT and Apache-2.0
 licenses. `hick` 0.2.0 is MIT OR Apache-2.0.
 
 The published peer-lookup 0.1.0 and 0.1.2 archives have a `LICENSE` file
@@ -27,9 +31,9 @@ it with a crates.io release without checking its license and wire format.
 bash scripts/iroh-mdns-binding/prepare.sh
 ```
 
-This checks the patch SHA, clones the exact upstream tag into ignored
-`build/upstream`, applies the patch, verifies `Cargo.lock` and the resolved
-source licenses, and checks that Rust Iroh remains `1.0.2`. It performs no
+This checks both patch SHAs, clones the exact upstream and peer revisions into
+ignored preparation space, applies the patches, verifies `Cargo.lock`, copied
+source hashes and resolved licenses, and checks that Rust Iroh remains `1.0.2`. It performs no
 native build. The dedicated [workflow](../../../.github/workflows/iroh-mdns-binding.yml)
 performs the native two-endpoint test, generates Kotlin from the same patched
 Rust library, builds Linux/Windows JARs and the four-ABI Android AAR, and

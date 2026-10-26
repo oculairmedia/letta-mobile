@@ -21,6 +21,7 @@ iroh-mdns-peer-lookup 0.1.2
 Source: https://codeberg.org/nfnitloop/sned.git
 e1213d4a7ce16b9a4b7dda81dc835349289f2a9c
 License: Apache-2.0 (declared in the pinned source Cargo.toml)
+Local Rust 1.91 compatibility patch: patch/iroh-mdns-peer-lookup-rust-1.91.patch
 hick 0.2.0: MIT OR Apache-2.0
 NOTICE
 done
