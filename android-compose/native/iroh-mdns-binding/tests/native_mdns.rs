@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 
 use iroh_ffi::{
     preset_minimal, Connection, Endpoint, EndpointAddr, EndpointOptions, MdnsEvent, MdnsMode,
-    MdnsSubscription, RelayMode,
+    MdnsSubscription, PathSnapshot, RelayMode,
 };
 use tokio::time::{sleep, timeout};
 
@@ -34,13 +34,13 @@ async fn discover_host(scan: &MdnsSubscription, host: &Endpoint) -> EndpointAddr
     .unwrap()
 }
 
+fn is_selected_direct_ip(path: &PathSnapshot) -> bool {
+    path.is_selected && path.is_ip && !path.is_relay
+}
+
 async fn assert_direct_path(conn: &Connection) {
     for _ in 0..20 {
-        if conn
-            .paths()
-            .iter()
-            .any(|path| path.is_selected && path.is_ip && !path.is_relay)
-        {
+        if conn.paths().iter().any(is_selected_direct_ip) {
             return;
         }
         sleep(Duration::from_millis(50)).await;

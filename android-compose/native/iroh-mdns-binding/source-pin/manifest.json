@@ -26,5 +26,5 @@
     "iroh-android-1.1.0.aar": "ed747f627da6dad314b25b9ff17d38232d8d75cb31e663af348368e6be845ab8"
   },
   "patch_sha256": "e08df6a7c0c571a506a182e249afff3c6afc6d05ef01dcaabee14216089bb067",
-  "native_test_sha256": "37a40fddc5a8b37430cfd4d03bb07df5f43a0f4c0712a5cb3e70543b0c19205b"
+  "native_test_sha256": "be5e5f012fe0d3f6fe83eae0a4918c63edb41d3886c10c16e98d3bc2a1aca0bc"
 }
