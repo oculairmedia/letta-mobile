@@ -1,0 +1,15 @@
+diff --git a/crates/iroh-mdns-peer-lookup/src/lib.rs b/crates/iroh-mdns-peer-lookup/src/lib.rs
+index 2f3ee11..109286d 100644
+--- a/crates/iroh-mdns-peer-lookup/src/lib.rs
++++ b/crates/iroh-mdns-peer-lookup/src/lib.rs
+@@ -524 +524 @@ impl TxtKeyValue {
+-        let addr = if let Some(v4) = value.as_array::<6>() {
++        let addr = if let Ok(v4) = <[u8; 6]>::try_from(value) {
+@@ -528 +528 @@ impl TxtKeyValue {
+-        } else if let Some(v6) = value.as_array::<18>() {
++        } else if let Ok(v6) = <[u8; 18]>::try_from(value) {
+@@ -536,2 +536,2 @@ impl TxtKeyValue {
+-        let port_bytes = value[value.len() - 2..].as_array::<2>().expect("2 bytes");
+-        let port = u16::from_be_bytes(port_bytes.clone());
++        let port_bytes: [u8; 2] = value[value.len() - 2..].try_into().expect("2 bytes");
++        let port = u16::from_be_bytes(port_bytes);

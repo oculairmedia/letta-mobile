@@ -1,0 +1,36 @@
+{
+  "upstream": {
+    "repository": "https://github.com/n0-computer/iroh-ffi.git",
+    "tag": "v1.1.0",
+    "commit": "5e451092dba0c1a09ee83ff6e5be37b1152a5c58",
+    "version": "1.1.0",
+    "license": "MIT OR Apache-2.0"
+  },
+  "rust_iroh": "1.0.2",
+  "peer_lookup": {
+    "repository": "https://codeberg.org/nfnitloop/sned.git",
+    "commit": "e1213d4a7ce16b9a4b7dda81dc835349289f2a9c",
+    "crate": "iroh-mdns-peer-lookup",
+    "version": "0.1.2",
+    "license": "Apache-2.0",
+    "compat_patch_sha256": "335932f91dfd19fc893d1234a5f608ab9a5b7b7f42a75744af2a787535ce2f05",
+    "vendored_files_sha256": {
+      "Cargo.toml": "61dae386d14a6ab94449b48049523bc9fdf82926af0f53943910f0ab78516811",
+      "README.md": "845bfd4a03f3dc9d5e6d9b990326fcdb3f4efcd1dccfb9f56453c8cdb0ebab5f",
+      "src/lib.rs": "256dbf03b7aa37c951bc583b1ecfa6bec822ade1043e5daa988654415f469e89"
+    }
+  },
+  "hick": {
+    "version": "0.2.0",
+    "license": "MIT OR Apache-2.0"
+  },
+  "maven_1_1_0_sha256": {
+    "iroh-1.1.0.pom": "069fd9144ae6e8a3bedd254298f6d4da5756cbcd23992e2ad34e1cef41be2c27",
+    "iroh-1.1.0.jar": "89123221d62e1cc80167e1be3aad9f941c9db0690d3a4081ac322d5d219eaffb",
+    "iroh-1.1.0-sources.jar": "3e523987f4487080cbf02e3c4dcc7b0c3e240ab1c2494c8ccc7f9a8e2a4b72e6",
+    "iroh-android-1.1.0.pom": "2489f8eca937eb717e73b029cdc161370c6158b0ceeac7081ff1405b939d515b",
+    "iroh-android-1.1.0.aar": "ed747f627da6dad314b25b9ff17d38232d8d75cb31e663af348368e6be845ab8"
+  },
+  "patch_sha256": "6b1e7a49a546d11e8e4903be92279cb37778a291805d115f1da6e1e9d9e441f9",
+  "native_test_sha256": "7b6e8a7c29fd9fb9df98a13d904cd6638c1c376637a7cb11335e0649b64fd782"
+}

@@ -1,0 +1,112 @@
+name: Iroh mDNS binding prerequisite
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'android-compose/native/iroh-mdns-binding/**'
+      - 'scripts/iroh-mdns-binding/**'
+      - '.github/workflows/iroh-mdns-binding.yml'
+
+jobs:
+  native:
+    name: Native binding (${{ matrix.mode }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: linux
+            runner: ubuntu-latest
+          - mode: windows
+            runner: windows-latest
+          - mode: android
+            runner: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: 1.91.1
+          targets: ${{ matrix.mode == 'android' && 'aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android' || '' }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          packages: platform-tools
+      - name: Artifact verifier path fixtures
+        if: matrix.mode == 'linux'
+        run: python3 -m unittest discover -s scripts/iroh-mdns-binding -p 'test_verify_artifacts.py'
+      - name: Install Android NDK and cargo-ndk
+        if: matrix.mode == 'android'
+        run: |
+          sdkmanager --install 'ndk;23.2.8568313'
+          cargo install --version 3.5.4 cargo-ndk --locked
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/23.2.8568313" >> "$GITHUB_ENV"
+      - name: Fetch, patch, and verify exact source
+        run: bash scripts/iroh-mdns-binding/prepare.sh
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          key: iroh-mdns-${{ matrix.mode }}
+          workspaces: android-compose/native/iroh-mdns-binding/build/upstream -> target
+      - name: Native two-endpoint and lifecycle proof
+        if: matrix.mode == 'linux'
+        run: |
+          cd android-compose/native/iroh-mdns-binding/build/upstream
+          cargo test --locked --lib
+          cargo test --locked --test native_mdns -- --nocapture
+      - name: Build matching native and Kotlin artifacts
+        run: bash scripts/iroh-mdns-binding/ci-build.sh "${{ matrix.mode }}" android-compose/native/iroh-mdns-binding/build/upstream android-compose/native/iroh-mdns-binding/build/artifacts
+      - name: Enable runner group access to KVM
+        if: matrix.mode == 'android'
+        run: |
+          test -c /dev/kvm
+          sudo chgrp "$(id -gn)" /dev/kvm
+          sudo chmod g+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - name: Android emulator ABI smoke
+        if: matrix.mode == 'android'
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          script: bash scripts/iroh-mdns-binding/android-smoke.sh android-compose/native/iroh-mdns-binding/build/upstream
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binding-${{ matrix.mode }}
+          path: android-compose/native/iroh-mdns-binding/build/artifacts/
+          retention-days: 7
+
+  parity:
+    name: Generated API and ABI parity
+    needs: native
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: binding-linux
+          path: proofs/linux
+      - uses: actions/download-artifact@v4
+        with:
+          name: binding-windows
+          path: proofs/windows
+      - uses: actions/download-artifact@v4
+        with:
+          name: binding-android
+          path: proofs/android
+      - run: python3 scripts/iroh-mdns-binding/verify_matrix.py proofs
