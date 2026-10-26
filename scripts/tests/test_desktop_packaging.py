@@ -10,6 +10,7 @@ import subprocess
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 REPO = Path(__file__).resolve().parents[2]
@@ -314,6 +315,32 @@ class LinuxPackagingTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('No visible desktop window', result.stderr)
         self.assertEqual((evidence / 'exit-status.txt').read_text(), '1\n')
+
+    def test_failed_native_probe_restores_launcher_config_byte_for_byte(self):
+        layout = self.inspect()
+        original = self.cfg.read_bytes().replace(b'\n', b'\r\n')
+        self.cfg.write_bytes(original)
+        probe = self.work / 'owned-probe'
+        probe.mkdir()
+        failure = subprocess.CalledProcessError(17, ['packaged-launcher'])
+        with patch.object(inspector.subprocess, 'run', side_effect=[None, failure]) as run:
+            with self.assertRaises(subprocess.CalledProcessError):
+                inspector.check_bundled_jvm(layout, probe)
+        self.assertEqual(self.cfg.read_bytes(), original)
+        self.assertEqual(run.call_args_list[0].args[0],
+                         ['javac', '--release', '21', 'PackagingNativeSmoke.java'])
+        self.assertEqual(run.call_args_list[0].kwargs['cwd'], probe)
+
+    def test_library_resolution_rejects_missing_libraries_and_host_rpath(self):
+        cases = [('libexample.so => not found\n', '', 'Missing library'),
+                 ('libexample.so => /usr/lib/libexample.so\n',
+                  ' 0x1 (RUNPATH) Library runpath: [/home/runner/build]\n', 'Absolute non-system')]
+        for ldd, dynamic, message in cases:
+            with self.subTest(message=message):
+                outputs = [subprocess.CompletedProcess([], 0, ldd), subprocess.CompletedProcess([], 0, dynamic)]
+                with patch.object(inspector.subprocess, 'run', side_effect=outputs):
+                    with self.assertRaisesRegex(ValueError, message):
+                        inspector.inspect_dynamic_library('fixture.so', {})
 
 
 if __name__ == '__main__':
