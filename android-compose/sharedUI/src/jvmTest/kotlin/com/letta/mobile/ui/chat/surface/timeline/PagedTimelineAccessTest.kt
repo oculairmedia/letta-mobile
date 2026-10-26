@@ -57,7 +57,7 @@ class PagedTimelineAccessTest {
     fun cachedFifthSlotSurvivesFiveToFourAndCurrentScrollingResumes() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
-            val (items, presenter) = pagingItems()
+            val (items, presenter) = timelineItems()
             presenter.collectFrom(PagingData.from(List(5) { "old-$it" }))
             val cached = items.itemSnapshotList
             presenter.collectFrom(PagingData.from(List(4) { "new-$it" }))
@@ -77,7 +77,7 @@ class PagedTimelineAccessTest {
     fun cachedOnlySlotSurvivesOneToZeroThenRepopulation() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
-            val (items, presenter) = pagingItems()
+            val (items, presenter) = timelineItems()
             presenter.collectFrom(PagingData.from(listOf("only")))
             val cached = items.itemSnapshotList
             presenter.collectFrom(PagingData.empty())
@@ -96,11 +96,11 @@ class PagedTimelineAccessTest {
     fun sameSizeReplacementCannotHintUnderTheOldItemKey() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
-            val (items, presenter) = pagingItems()
+            val (items, presenter) = timelineItems()
             presenter.collectFrom(PagingData.from(List(5) { "old-key-$it" }))
             val cached = items.itemSnapshotList
             presenter.collectFrom(PagingData.from(List(5) { "replacement-key-$it" }))
-            assertEquals(cached.size, items.itemCount)
+            assertEquals(cached.size, items.itemSnapshotList.size)
             assertEquals("old-key-4", pagedSnapshotItem(cached, 4))
             assertFalse(items.hintPagedSnapshot(cached, 4))
             assertEquals("replacement-key-4", pagedSnapshotItem(items.itemSnapshotList, 4))
@@ -114,7 +114,7 @@ class PagedTimelineAccessTest {
     fun currentPlaceholderHintLoadsAnotherPageAfterAStaleSlotWasSkipped() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
-            val (items, presenter) = pagingItems()
+            val (items, presenter) = timelineItems()
             presenter.collectFrom(PagingData.from(List(5) { "discarded-$it" }))
             val cached = items.itemSnapshotList
             val loads = mutableListOf<Int>()
@@ -157,6 +157,11 @@ class PagedTimelineAccessTest {
         } finally {
             Dispatchers.resetMain()
         }
+    }
+
+    private fun timelineItems(): Pair<PagedTimelineItems<String>, PagingDataPresenter<String>> {
+        val items = PagedTimelineItems<String>()
+        return items to items
     }
 
     /** Access the pinned library's collector without a window or a substitute presenter. */

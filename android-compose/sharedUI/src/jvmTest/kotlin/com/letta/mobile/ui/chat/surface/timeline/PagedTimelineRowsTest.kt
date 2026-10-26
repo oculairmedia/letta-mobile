@@ -100,7 +100,7 @@ class PagedTimelineRowsTest {
     ) = PagedRows(
         leading = leading,
         assembly = TimelineRowAssembly.assemble(live, snapshot.map { it?.item?.key }),
-        identity = PagedRowsIdentity(live, snapshot),
+        identity = live to snapshot,
     )
 
     private fun row(id: String, run: Boolean = false): CanonicalTimelinePresentation.Row {
