@@ -5,10 +5,12 @@ import hashlib
 import io
 import os
 from pathlib import Path
+import signal
 import struct
 import subprocess
 import tarfile
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 import zipfile
@@ -318,7 +320,84 @@ class LinuxPackagingTests(unittest.TestCase):
         self.assertIn('Generate Nucleus Windows update metadata', release)
         self.assertIn('dbus-run-session -- bash ../scripts/desktop/linux-package-smoke.sh', release)
 
-    def run_window_harness_fixture(self, startup='', crash=False, visible=True):
+    def run_smoke_fixture(self, image, env, timeout=15, terminate_after=None):
+        # A separate fixture session lets even the broken baseline be tested safely.
+        process = subprocess.Popen(['bash', str(REPO / 'scripts/desktop/linux-package-smoke.sh'), str(image)],
+                                   env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   start_new_session=True)
+        def cleanup_fixture_children():
+            for record in self.work.glob('*.pid'):
+                try:
+                    os.kill(int(record.read_text()), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+        self.addCleanup(cleanup_fixture_children)
+        completed = False
+        try:
+            if terminate_after:
+                deadline = time.monotonic() + 5
+                while not terminate_after.exists() and process.poll() is None and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(terminate_after.exists(), 'Fixture never reached startup')
+                process.terminate()
+            stdout, stderr = process.communicate(timeout=timeout)
+            completed = True
+            return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
+        finally:
+            # Only fixture-owned sessions/PIDs; never kill the caller's process group.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            if not completed:
+                cleanup_fixture_children()
+            process.communicate(timeout=2)
+
+    def home_writer(self):
+        return write(self.work / 'write-home', '#!/usr/bin/env python3\n'
+                     'import json, os, pathlib, sys\n'
+                     'keys = ["HOME", "USERPROFILE", "LETTA_HOME", "APPDATA", "LOCALAPPDATA", '
+                     '"XDG_CONFIG_DIRS", "XDG_DATA_DIRS", "XDG_CONFIG_HOME", '
+                     '"XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_RUNTIME_DIR"]\n'
+                     'paths = {key: os.environ[key] for key in keys}\n'
+                     'for value in paths.values():\n'
+                     '    p = pathlib.Path(value) / "fixture-settings"; p.parent.mkdir(parents=True, exist_ok=True)\n'
+                     '    p.write_text("mutated")\n'
+                     'with open(os.environ["FIXTURE_OBSERVATIONS"], "a") as log:\n'
+                     '    log.write(json.dumps(dict(phase=sys.argv[1:], paths=paths, '
+                     'cwd=os.getcwd(), java=os.environ.get("JAVA_TOOL_OPTIONS"), overrides=[key for key in '
+                     '["_JAVA_OPTIONS", "JDK_JAVA_OPTIONS"] if key in os.environ])) + "\\n")\n', True)
+
+    def isolated_fixture_env(self, **extra):
+        real_home = self.work / 'caller-home'
+        real_home.mkdir(exist_ok=True)
+        write(real_home / 'fixture-settings', 'original user settings')
+        env = dict(os.environ, **{key: str(real_home) for key in [
+            'HOME', 'USERPROFILE', 'LETTA_HOME', 'APPDATA', 'LOCALAPPDATA', 'XDG_CONFIG_HOME', 'XDG_CACHE_HOME',
+            'XDG_CONFIG_DIRS', 'XDG_DATA_DIRS',
+            'XDG_DATA_HOME', 'XDG_STATE_HOME', 'XDG_RUNTIME_DIR']})
+        temp_base = self.work / 'temp with spaces'
+        temp_base.mkdir(exist_ok=True)
+        env.update(TMPDIR=str(temp_base), FIXTURE_OBSERVATIONS=str(self.work / 'observations.jsonl'),
+                   JAVA_TOOL_OPTIONS=f'-Duser.home={real_home}', _JAVA_OPTIONS=f'-Duser.home={real_home}',
+                   JDK_JAVA_OPTIONS=f'-Duser.home={real_home}', **extra)
+        return env
+
+    def assert_home_isolated(self, expected_phases):
+        import json
+        observations = [json.loads(line) for line in (self.work / 'observations.jsonl').read_text().splitlines()]
+        self.assertEqual((self.work / 'caller-home/fixture-settings').read_text(), 'original user settings')
+        self.assertEqual([o['phase'][0] for o in observations], expected_phases)
+        for observation in observations:
+            for value in observation['paths'].values():
+                self.assertTrue(Path(value).is_relative_to(self.work), value)
+                self.assertNotEqual(value, str(self.work / 'caller-home'))
+            self.assertIn(f'-Duser.home={observation["paths"]["HOME"]}', observation['java'])
+            self.assertEqual(observation['overrides'], [])
+            self.assertTrue(Path(observation['cwd']).is_relative_to(self.work), observation['cwd'])
+
+    def run_window_harness_fixture(self, startup='', crash=False, visible=True, write_home=False,
+                                   terminate_after=None, ready=None):
         # These simulate process/window boundaries, never count as native launch evidence.
         tools = self.work / 'window-tools'
         for name, body in {
@@ -328,29 +407,136 @@ class LinuxPackagingTests(unittest.TestCase):
             'xprop': "echo '_NET_SUPPORTING_WM_CHECK(WINDOW): window id # 0x200001'",
             'xwininfo': 'echo fixture-window-tree',
             'sleep': 'exec /bin/sleep 0.01',
-            'xdotool': ('if [ "$1" = search ]; then echo 123; else echo Meridian; fi' if visible else 'exit 1'),
+            'xdotool': ('if [ -n "$FIXTURE_READY" ]; then\n'
+                        'while [ ! -f "$FIXTURE_READY" ]; do /bin/sleep 0.01; done\nfi\n' +
+                        ('if [ "$1" = search ]; then echo 123; else echo Meridian; fi' if visible else 'exit 1')),
         }.items():
             write(tools / name, '#!/bin/sh\n' + body + '\n', True)
+        writer = self.home_writer()
+        if write_home:
+            # Use the actual interpreter for this fixture, not its inspector shim.
+            writer.write_text(writer.read_text().replace('#!/usr/bin/env python3', '#!' + os.sys.executable))
+            write(tools / 'python3', f'#!/bin/sh\n"{writer}" inspector\necho fixture-payload-inspection\n', True)
         payload = self.work / 'window-payload'
         write(payload / 'fixture.desktop', '[Desktop Entry]\n')
-        write(payload / 'AppRun', '#!/bin/sh\n' + startup + '\n' +
+        write(payload / 'AppRun', '#!/bin/sh\n' + (f'"{writer}" app\n' if write_home else '') + startup + '\n' +
               ('touch hs_err_pid123.log\n' if crash else '') + 'exec /bin/sleep 120\n', True)
-        image = write(self.work / 'window.AppImage', '#!/bin/sh\nmkdir squashfs-root\n'
+        image = write(self.work / 'window.AppImage', '#!/bin/sh\n' + (f'"{writer}" extract\n' if write_home else '') + 'mkdir squashfs-root\n'
                       'cp -a "$FIXTURE_PAYLOAD/." squashfs-root/\n', True)
         evidence = self.work / 'evidence'
-        env = dict(os.environ, TMPDIR=str(self.work), FIXTURE_PAYLOAD=str(payload),
+        env = self.isolated_fixture_env(FIXTURE_PAYLOAD=str(payload),
+                   FIXTURE_READY=str(ready) if ready else '',
                    PATH=str(tools) + os.pathsep + os.environ['PATH'], DISPLAY=':fixture',
                    DBUS_SESSION_BUS_ADDRESS='fixture-only', LETTA_PACKAGE_SMOKE_EVIDENCE=str(evidence))
-        result = subprocess.run(['bash', str(REPO / 'scripts/desktop/linux-package-smoke.sh'), str(image)],
-                                env=env, text=True, capture_output=True, timeout=20)
+        result = self.run_smoke_fixture(image, env, terminate_after=terminate_after)
         return result, evidence
+
+    def test_every_payload_phase_uses_disposable_home(self):
+        result, _ = self.run_window_harness_fixture(write_home=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assert_home_isolated(['extract', 'inspector', 'app'])
+
+    def stubborn_payload(self):
+        # Parent and child both ignore TERM. The handler also proves evidence was copied first.
+        return write(self.work / 'stubborn', '#!' + os.sys.executable + '\n'
+                     'import os, pathlib, signal, time\n'
+                     f'work = pathlib.Path({str(self.work)!r})\n'
+                     'def term(*_):\n'
+                     '    status = work / "evidence/exit-status.txt"\n'
+                     '    (work / (str(os.getpid()) + ".term")).write_text(status.read_text() if status.exists() else "MISSING")\n'
+                     'signal.signal(signal.SIGTERM, term)\n'
+                     'child = os.fork()\n'
+                     '(work / ("child.pid" if child == 0 else "parent.pid")).write_text(str(os.getpid()))\n'
+                     'while True: time.sleep(0.01)\n', True)
+
+    def assert_stubborn_stopped(self, status):
+        self.assertTrue((self.work / 'parent.pid').exists())
+        self.assertTrue((self.work / 'child.pid').exists())
+        for record in self.work.glob('*.pid'):
+            pid = int(record.read_text())
+            stat = Path(f'/proc/{pid}/stat')
+            self.assertTrue(not stat.exists() or stat.read_text().split(') ')[1].startswith('Z'),
+                            f'Fixture process {pid} survived cleanup')
+            self.assertEqual((self.work / f'{pid}.term').read_text(), f'{status}\n')
+
+    def test_cleanup_kills_stubborn_descendants_and_keeps_unrelated_process(self):
+        stubborn = self.stubborn_payload()
+        # This control deliberately shares the smoke caller's process group.
+        unrelated = subprocess.Popen(['/bin/sleep', '120'])
+        try:
+            start = time.monotonic()
+            result, evidence = self.run_window_harness_fixture(startup=f'exec "{stubborn}"',
+                                                              ready=self.work / 'child.pid')
+            self.assertLess(time.monotonic() - start, 8)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual((evidence / 'window.txt').read_text(), 'Meridian\n')
+            self.assert_stubborn_stopped(0)
+            self.assertIsNone(unrelated.poll(), 'Cleanup killed an unrelated caller process')
+        finally:
+            unrelated.kill()
+            unrelated.wait(timeout=2)
+
+    def test_extraction_failure_preserves_status_and_evidence_before_cleanup(self):
+        stubborn = self.stubborn_payload()
+        image = write(self.work / 'broken.AppImage', '#!/bin/sh\n'
+                      f'"{stubborn}" &\n'
+                      f'while [ ! -f "{self.work}/child.pid" ]; do /bin/sleep 0.01; done\n'
+                      'echo extraction-failed\nexit 23\n', True)
+        evidence = self.work / 'evidence'
+        env = self.isolated_fixture_env(LETTA_PACKAGE_SMOKE_EVIDENCE=str(evidence))
+        start = time.monotonic()
+        result = self.run_smoke_fixture(image, env)
+        self.assertLess(time.monotonic() - start, 8)
+        self.assertEqual(result.returncode, 23, result.stdout + result.stderr)
+        self.assertEqual((evidence / 'exit-status.txt').read_text(), '23\n')
+        self.assertEqual((evidence / 'extract.log').read_text(), 'extraction-failed\n')
+        self.assert_stubborn_stopped(23)
+
+    def test_term_preserves_signal_status_and_cleans_owned_children(self):
+        stubborn = self.stubborn_payload()
+        result, evidence = self.run_window_harness_fixture(startup=f'exec "{stubborn}"', visible=False,
+                                                          terminate_after=self.work / 'child.pid')
+        self.assertEqual(result.returncode, 143, result.stdout + result.stderr)
+        self.assertEqual((evidence / 'exit-status.txt').read_text(), '143\n')
+        self.assert_stubborn_stopped(143)
+
+    def test_evidence_copy_error_does_not_replace_payload_failure_status(self):
+        image = write(self.work / 'broken.AppImage', '#!/bin/sh\necho extraction-failed\nexit 23\n', True)
+        evidence = write(self.work / 'evidence-is-a-file', 'fixture')
+        env = self.isolated_fixture_env(LETTA_PACKAGE_SMOKE_EVIDENCE=str(evidence))
+        result = self.run_smoke_fixture(image, env)
+        self.assertEqual(result.returncode, 23, result.stdout + result.stderr)
+
+    def test_standalone_inspector_isolates_node_jni_and_compiler_probes(self):
+        layout = self.inspect()
+        writer = self.home_writer()
+        writer.write_text(writer.read_text().replace('#!/usr/bin/env python3', '#!' + os.sys.executable))
+        write(self.node, f'#!/bin/sh\n"{writer}" node "$@"\n'
+              'if [ "$1" = --version ]; then echo v24.13.1; fi\n', True)
+        write(Path(layout['launcher']), f'#!/bin/sh\n"{writer}" jni "$@"\n', True)
+        tools = self.work / 'compiler tools'
+        write(tools / 'javac', f'#!/bin/sh\n"{writer}" javac "$@"\n', True)
+        layout['natives'] = []  # ELF inspection has its own real format and ldd fixtures.
+        env = self.isolated_fixture_env(PATH=str(tools) + os.pathsep + os.environ['PATH'])
+        with patch.dict(os.environ, env, clear=True), patch.object(inspector.tempfile, 'tempdir', env['TMPDIR']):
+            inspector.run_checks(layout)
+            self.assertEqual(os.environ['HOME'], env['HOME'], 'Inspector changed the caller environment')
+        self.assert_home_isolated(['node', 'node', 'node', 'node', 'javac', 'jni'])
+
+    def test_windows_smoke_isolates_before_first_bundled_probe(self):
+        workflow = (REPO / '.github/workflows/desktop.yml').read_text()
+        smoke = workflow.split('      - name: Smoke the packaged Windows app', 1)[1].split('\n      - name:', 1)[0]
+        before_probes = smoke.split('$version = & $node --version', 1)[0]
+        for key in ['HOME', 'USERPROFILE', 'LETTA_HOME', 'APPDATA', 'LOCALAPPDATA', 'XDG_CONFIG_HOME', 'XDG_CACHE_HOME',
+                    'XDG_DATA_HOME', 'XDG_STATE_HOME', 'XDG_RUNTIME_DIR', 'JAVA_TOOL_OPTIONS']:
+            self.assertIn(f'$env:{key} = ', before_probes, key)
 
     def test_window_harness_records_success_only_after_visible_window(self):
         result, evidence = self.run_window_harness_fixture()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual((evidence / 'exit-status.txt').read_text(), '0\n')
         self.assertEqual((evidence / 'window.txt').read_text(), 'Meridian\n')
-        self.assertEqual(list(self.work.glob('letta-linux-package-smoke.*')), [])
+        self.assertEqual(list(self.work.rglob('letta-linux-package-smoke.*')), [])
 
     def test_window_harness_rejects_x_error_even_with_a_window_and_live_process(self):
         result, evidence = self.run_window_harness_fixture(startup="echo 'X Error of failed request: BadMatch'")
@@ -379,7 +565,7 @@ class LinuxPackagingTests(unittest.TestCase):
         failure = subprocess.CalledProcessError(17, ['packaged-launcher'])
         with patch.object(inspector.subprocess, 'run', side_effect=[None, failure]) as run:
             with self.assertRaises(subprocess.CalledProcessError):
-                inspector.check_bundled_jvm(layout, probe)
+                inspector.check_bundled_jvm(layout, probe, env=inspector.isolated_probe_env(probe), javac='javac')
         self.assertEqual(self.cfg.read_bytes(), original)
         self.assertEqual(run.call_args_list[0].args[0],
                          ['javac', '--release', '21', 'PackagingNativeSmoke.java'])

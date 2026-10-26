@@ -173,7 +173,7 @@ def inspect(root, native_dir, forbidden=()):
 def inspect_dynamic_library(path, library_env):
     result = subprocess.run(['ldd', path], env=library_env, text=True,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    dynamic = subprocess.run(['readelf', '-d', path], check=True, text=True,
+    dynamic = subprocess.run(['readelf', '-d', path], env=library_env, check=True, text=True,
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout
     needed = set(re.findall(r'\(NEEDED\).*\[([^\]]+)\]', dynamic))
     gtk2 = needed & {'libgtk-x11-2.0.so.0', 'libgdk-x11-2.0.so.0', 'libdbusmenu-gtk.so.4'}
@@ -188,33 +188,59 @@ def inspect_dynamic_library(path, library_env):
             'statically linked' in result.stdout, f'ldd failed for {path}:\n{result.stdout}')
 
 
-def check_bundled_node(layout):
-    version = subprocess.check_output([layout['node'], '--version'], text=True).strip()
+def check_bundled_node(layout, env, work):
+    version = subprocess.check_output([layout['node'], '--version'], cwd=work, env=env, text=True, timeout=60).strip()
     require(version == 'v' + layout['manifest']['node'], 'Wrong bundled Node version')
     subprocess.run([layout['node'], '-e',
                     'const r = require("node:module").createRequire(process.argv[1]); '
                     'for (const name of ["sharp", "@janhapke/sharp-electron", "node-pty"]) { '
-                    'r(name); console.log("Loaded", name); }', layout['js']], check=True, timeout=60)
-    subprocess.run([layout['node'], layout['js'], '--version'], check=True, timeout=60)
-    subprocess.run([layout['node'], layout['js'], 'server', '--help'], check=True, timeout=60)
+                    'r(name); console.log("Loaded", name); }', layout['js']], cwd=work, env=env, check=True, timeout=60)
+    subprocess.run([layout['node'], layout['js'], '--version'], cwd=work, env=env, check=True, timeout=60)
+    subprocess.run([layout['node'], layout['js'], 'server', '--help'], cwd=work, env=env, check=True, timeout=60)
 
 
 def run_checks(layout):
+    # Resolve build tooling from the original PATH, without inheriting the user's profile.
+    javac = shutil.which('javac')
+    require(javac, 'javac required for the packaged JNI probe')
+    with tempfile.TemporaryDirectory(prefix='letta-linux-probes-') as probe:
+        work = Path(probe)
+        env = isolated_probe_env(work)
+        run_isolated_checks(layout, work, env, javac)
+
+
+def isolated_probe_env(work):
+    env = dict(os.environ)
+    for key, directory in {
+        'HOME': 'profile', 'USERPROFILE': 'profile', 'LETTA_HOME': 'profile/.letta',
+        'APPDATA': 'config', 'LOCALAPPDATA': 'data', 'XDG_CONFIG_DIRS': 'config', 'XDG_DATA_DIRS': 'data',
+        'XDG_CONFIG_HOME': 'config', 'XDG_CACHE_HOME': 'cache', 'XDG_DATA_HOME': 'data',
+        'XDG_STATE_HOME': 'state', 'XDG_RUNTIME_DIR': 'runtime',
+    }.items():
+        path = work / directory
+        path.mkdir(mode=0o700, parents=True, exist_ok=True)
+        env[key] = str(path)
+    for key in ('_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS', 'NODE_OPTIONS', 'NODE_PATH', 'JAVA_HOME', 'JDK_HOME',
+                'LETTA_DESKTOP_RUNTIME_NODE', 'LETTA_DESKTOP_RUNTIME_JS'):
+        env.pop(key, None)
+    env['JAVA_TOOL_OPTIONS'] = f'-Dskiko.renderApi=SOFTWARE "-Duser.home={env["HOME"]}"'
+    return env
+
+
+def run_isolated_checks(layout, work, env, javac):
     jvm = Path(layout['jvm'])
     # AppRun prepends its usr/lib; resolve bundled dependencies the same way.
-    library_env = dict(os.environ, LD_LIBRARY_PATH=os.pathsep.join([
+    library_env = dict(env, LD_LIBRARY_PATH=os.pathsep.join([
         str(Path(layout['root']) / 'usr/lib'), str(jvm.parent), str(jvm.parent.parent),
     ]))
     for path in layout['natives']:
         inspect_dynamic_library(path, library_env)
-    check_bundled_node(layout)
-    # Compile into a fresh owned directory, never a caller-selected path/option.
-    with tempfile.TemporaryDirectory(prefix='letta-linux-jni-') as probe:
-        check_bundled_jvm(layout, Path(probe))
+    check_bundled_node(layout, env, work)
+    check_bundled_jvm(layout, work, env=env, javac=javac)
     print(f"Verified {len(layout['natives'])} Linux x64 ELF files and four required JNI libraries")
 
 
-def check_bundled_jvm(layout, work):
+def check_bundled_jvm(layout, work, env, javac):
     # Load the shipped JNI into the shipped JVM, not the build JDK. Compilation is CI-only.
     source = Path(work) / 'PackagingNativeSmoke.java'
     source.write_text('public class PackagingNativeSmoke { public static void main(String[] paths) { '
@@ -223,7 +249,7 @@ def check_bundled_jvm(layout, work):
                       'java.io.File f = new java.io.File(System.getProperty("letta.desktop.runtime." + key)); '
                       'if (!f.isAbsolute() || !f.isFile()) throw new Error("Unresolved bundled path: " + f); } '
                       'for (String path : paths) { System.load(path); System.out.println("Loaded " + path); } } }')
-    subprocess.run(['javac', '--release', '21', 'PackagingNativeSmoke.java'], cwd=work, check=True)
+    subprocess.run([javac, '--release', '21', 'PackagingNativeSmoke.java'], cwd=work, env=env, check=True, timeout=60)
     # Exercise jpackage's shipped launcher/JVM and its $APPDIR expansion. Only the extracted
     # test copy is temporarily redirected to the tiny native-load entry point, then restored.
     cfg = Path(layout['cfg'])
@@ -235,7 +261,7 @@ def check_bundled_jvm(layout, work):
     require(count == 1, 'Launcher classpath missing')
     try:
         cfg.write_text(patched)
-        subprocess.run([layout['launcher'], *layout['jni']], check=True, timeout=60)
+        subprocess.run([layout['launcher'], *layout['jni']], cwd=work, env=env, check=True, timeout=60)
     finally:
         # Copy the original bytes back, including line endings, even if the launcher fails.
         shutil.copyfile(backup, cfg)

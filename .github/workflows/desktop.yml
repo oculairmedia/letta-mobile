@@ -202,18 +202,34 @@ jobs:
           $node = Join-Path $runtime 'node.exe'
           $js = Join-Path $runtime 'node_modules\@letta-ai\letta-code\letta.js'
           $manifest = Get-Content (Join-Path $runtime 'runtime-manifest.json') -Raw | ConvertFrom-Json
+          # Isolate even --version/--help: CLI initialization can write settings.
+          # PATH retains CI tooling lookup; no payload sees the runner's profile.
+          $evidence = Join-Path $env:RUNNER_TEMP 'windows-desktop-smoke'
+          $smokeProfile = Join-Path $evidence ("profile-" + [guid]::NewGuid())
+          $env:HOME = $smokeProfile
+          $env:USERPROFILE = $smokeProfile
+          $env:LETTA_HOME = Join-Path $smokeProfile '.letta'
+          $env:HOMEDRIVE = [System.IO.Path]::GetPathRoot($smokeProfile).TrimEnd('\')
+          $env:HOMEPATH = $smokeProfile.Substring($env:HOMEDRIVE.Length)
+          $env:APPDATA = Join-Path $smokeProfile 'config'
+          $env:LOCALAPPDATA = Join-Path $smokeProfile 'data'
+          $env:XDG_CONFIG_HOME = $env:APPDATA
+          $env:XDG_CACHE_HOME = Join-Path $smokeProfile 'cache'
+          $env:XDG_DATA_HOME = $env:LOCALAPPDATA
+          $env:XDG_STATE_HOME = Join-Path $smokeProfile 'state'
+          $env:XDG_RUNTIME_DIR = Join-Path $smokeProfile 'runtime'
+          $env:XDG_CONFIG_DIRS = $env:APPDATA
+          $env:XDG_DATA_DIRS = $env:LOCALAPPDATA
+          New-Item -ItemType Directory -Force -Path $smokeProfile, $env:APPDATA, $env:LOCALAPPDATA, $env:XDG_CACHE_HOME, $env:XDG_STATE_HOME, $env:XDG_RUNTIME_DIR | Out-Null
+          $env:JAVA_TOOL_OPTIONS = '-Duser.home="' + $smokeProfile + '"'
+          Remove-Item Env:_JAVA_OPTIONS, Env:JDK_JAVA_OPTIONS, Env:NODE_OPTIONS, Env:NODE_PATH, Env:LETTA_DESKTOP_RUNTIME_NODE, Env:LETTA_DESKTOP_RUNTIME_JS, Env:JAVA_HOME, Env:JDK_HOME -ErrorAction SilentlyContinue
+          Set-Location -LiteralPath $smokeProfile
           $version = & $node --version
           if ($LASTEXITCODE -ne 0 -or $version -ne "v$($manifest.node)") { throw "Bundled Node version mismatch" }
           & $node $js --version
           if ($LASTEXITCODE -ne 0) { throw "Bundled AppServer CLI failed" }
           & $node $js server --help
           if ($LASTEXITCODE -ne 0) { throw "Bundled AppServer bootstrap failed" }
-          $evidence = Join-Path $env:RUNNER_TEMP 'windows-desktop-smoke'
-          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
-          $profile = Join-Path $evidence 'profile'
-          New-Item -ItemType Directory -Force -Path $profile | Out-Null
-          $env:JAVA_TOOL_OPTIONS = "-Duser.home=$profile"
-          Remove-Item Env:LETTA_DESKTOP_RUNTIME_NODE, Env:LETTA_DESKTOP_RUNTIME_JS, Env:JAVA_HOME, Env:JDK_HOME -ErrorAction SilentlyContinue
           $app = $null
           try {
             $app = Start-Process -FilePath $launchers[0].FullName -WorkingDirectory $evidence -PassThru -RedirectStandardOutput "$evidence\stdout.log" -RedirectStandardError "$evidence\stderr.log"
