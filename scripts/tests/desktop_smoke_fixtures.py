@@ -117,6 +117,7 @@ class DesktopSmokeFixtures:
             'xdotool': ('if [ -n "$FIXTURE_READY" ]; then\n'
                         'while [ ! -f "$FIXTURE_READY" ]; do /bin/sleep 0.01; done\nfi\n' +
                         ('if [ "$1" = search ]; then echo 123; else echo Meridian; fi' if visible else 'exit 1')),
+            **options.get('tools', {}),
         }.items():
             write(tools / name, '#!/bin/sh\n' + body + '\n', True)
         writer = self.home_writer()
@@ -134,7 +135,8 @@ class DesktopSmokeFixtures:
         env = self.isolated_fixture_env(FIXTURE_PAYLOAD=str(payload),
                    FIXTURE_READY=str(ready) if ready else '',
                    PATH=str(tools) + os.pathsep + os.environ['PATH'], DISPLAY=':fixture',
-                   DBUS_SESSION_BUS_ADDRESS='fixture-only', LETTA_PACKAGE_SMOKE_EVIDENCE=str(evidence))
+                   DBUS_SESSION_BUS_ADDRESS='fixture-only', LETTA_PACKAGE_SMOKE_EVIDENCE=str(evidence),
+                   **options.get('env', {}))
         result = self.run_smoke_fixture(image, env, terminate_after=options.get('terminate_after'))
         return result, evidence
 

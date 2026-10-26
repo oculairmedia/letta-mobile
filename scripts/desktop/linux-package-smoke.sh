@@ -12,7 +12,8 @@ preserve_evidence() {
   mkdir -p "$LETTA_PACKAGE_SMOKE_EVIDENCE" || return 1
   # Save the original status before signalling any process. Never upload the profile.
   printf '%s\n' "$1" > "$LETTA_PACKAGE_SMOKE_EVIDENCE/exit-status.txt" || failed=1
-  for name in extract.log payload.log startup.log window-manager.log window.txt window-tree.txt check/layout.json; do
+  for name in extract.log payload.log startup.log window-manager.log window.txt window-tree.txt check/layout.json \
+    gdb.log gdb-status.txt diagnostic-summary.txt artifact.sha256; do
     if [[ -f $work/$name ]]; then
       cp -f "$work/$name" "$LETTA_PACKAGE_SMOKE_EVIDENCE/" || failed=1
     fi
@@ -69,12 +70,17 @@ export JAVA_TOOL_OPTIONS="-Dskiko.renderApi=SOFTWARE \"-Duser.home=$HOME\""
 unset _JAVA_OPTIONS JDK_JAVA_OPTIONS NODE_OPTIONS NODE_PATH
 # Runtime overrides must not mask the packaged bindings or reach real settings.
 unset LETTA_DESKTOP_RUNTIME_NODE LETTA_DESKTOP_RUNTIME_JS JAVA_HOME JDK_HOME
+if [[ ${LETTA_PACKAGE_X11_TRACE:-0} == 1 ]]; then
+  printf '%s\n' 'INCONCLUSIVE: replay has not reached GDB; original smoke remains failed.' \
+    > "$work/diagnostic-summary.txt"
+fi
 
 smoke_payload() {
   local here=$1 image=$2 work=$3 app_pid wm_pid
   [[ $(uname -m) == x86_64 ]] || { echo 'x86-64 runner required' >&2; exit 1; }
   chmod +x "$image"
   cd "$work"
+  sha256sum "$image" > "$work/artifact.sha256"
   "$image" --appimage-extract > extract.log
   # Space-containing location catches broken quoting in AppRun and jpackage options.
   mv -f squashfs-root 'relocated app'
@@ -100,7 +106,10 @@ SHIM
     echo 'Run smoke under xvfb-run and dbus-run-session' >&2; exit 1;
   }
   # A real WM handles map/focus requests; bare Xvfb is not a desktop session.
-  openbox --sm-disable > "$work/window-manager.log" 2>&1 &
+  # Openbox needs its system theme/config. Its writable profile stays disposable;
+  # these read-only system search paths apply to the WM alone, never app probes.
+  XDG_CONFIG_DIRS=/etc/xdg XDG_DATA_DIRS=/usr/local/share:/usr/share \
+    openbox --sm-disable > "$work/window-manager.log" 2>&1 &
   wm_pid=$!
   wm_ready=
   for ((i=0; i<15; i++)); do
@@ -109,6 +118,10 @@ SHIM
     sleep 1
   done
   [[ -n $wm_ready ]] || { echo 'Window manager did not become ready' >&2; exit 1; }
+  if [[ ${LETTA_PACKAGE_X11_TRACE:-0} == 1 ]]; then
+    python3 "$here/linux-startup-diagnostic.py" "$root" "$work"
+    return
+  fi
   # CI uses software rendering on Xvfb. Production keeps the normal rendering selection.
   "$root/AppRun" > "$work/startup.log" 2>&1 &
   app_pid=$!
