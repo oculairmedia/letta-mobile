@@ -15,6 +15,7 @@ import com.letta.mobile.data.chat.conversations.ComposerHostCommandSources
 import com.letta.mobile.data.chat.conversations.composerHostCommands
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.home.conversationRecency as sharedConversationRecency
 import com.letta.mobile.ui.shell.rail.ShellRailActivity
 import com.letta.mobile.ui.shell.rail.ShellRailMapping
 import com.letta.mobile.data.model.DisplayNames
@@ -64,7 +65,7 @@ internal fun buildRailAgents(
         .filter { it.name.isNotBlank() }
         .associate { it.id.value to it.name }
     val fromConversations = conversations
-        .sortedByDescending { conversationRecency(it.updatedAtLabel) }
+        .sortedByDescending { sharedConversationRecency(it.updatedAtLabel) }
         .filter { !it.agentId.isNullOrBlank() }
         .distinctBy { it.agentId }
         .map { conversation ->
@@ -133,7 +134,7 @@ internal fun rememberRailActivityByAgentId(
         .filter { !it.agentId.isNullOrBlank() }
         .groupBy { it.agentId!! }
         .mapValues { (_, convs) ->
-            val latest = convs.maxBy { conversationRecency(it.updatedAtLabel) }
+            val latest = convs.maxBy { sharedConversationRecency(it.updatedAtLabel) }
             ShellRailActivity(updatedAtLabel = latest.updatedAtLabel, preview = latest.lastMessagePreview)
         }
 }
@@ -226,7 +227,7 @@ private fun List<DesktopConversationSummary>.applyArchiveFilterNewestFirst(
             ConversationArchiveFilter.All -> true
         }
     }
-    .sortedByDescending { conversationRecency(it.updatedAtLabel) }
+    .sortedByDescending { sharedConversationRecency(it.updatedAtLabel) }
 
 /**
  * @mention candidates: the other agents (an `@agent` reference their messaging tools can address,
@@ -348,10 +349,6 @@ internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<Ch
 }
 
 /** Model/embedding defaults for a new agent, copied from the focused agent. */
-internal fun conversationRecency(label: String): java.time.Instant =
-    runCatching { java.time.Instant.parse(label) }.getOrNull()
-        ?: if (label == "Queued") java.time.Instant.MAX else java.time.Instant.MIN
-
 internal data class OpenDesktopCanvasParams(
     val scope: CoroutineScope,
     val store: com.letta.mobile.data.canvas.CanvasDocumentStore,

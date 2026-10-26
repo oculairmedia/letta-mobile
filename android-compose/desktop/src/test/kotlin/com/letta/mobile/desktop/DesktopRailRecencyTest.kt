@@ -1,10 +1,13 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.agents.RecentAgents
 import com.letta.mobile.data.agents.RecentAgentsCut
 import com.letta.mobile.data.agents.RecentAgentsInput
 import com.letta.mobile.data.agents.RecentAgentsPolicy
+import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
+import com.letta.mobile.ui.shell.rail.ShellRailActivity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.days
@@ -14,12 +17,18 @@ import kotlin.time.Instant
 class DesktopRailRecencyTest {
     private val now: Instant = Instant.parse("2026-09-16T20:00:00Z")
 
-    private fun conversation(id: String, agentId: String, daysAgo: Long, label: String? = null) = DesktopConversationSummary(
+    private fun conversation(
+        id: String,
+        agentId: String,
+        daysAgo: Long,
+        label: String? = null,
+        preview: String = "preview",
+    ) = DesktopConversationSummary(
         id = id,
         title = "Conversation $id",
         agentName = "Agent $agentId",
         updatedAtLabel = label ?: (now - daysAgo.days).toString(),
-        lastMessagePreview = "preview",
+        lastMessagePreview = preview,
         agentId = agentId,
         archived = false,
     )
@@ -58,6 +67,89 @@ class DesktopRailRecencyTest {
             conversation("3", "a", daysAgo = 1),
         )
         assertEquals(listOf("a", "b"), recentRailAgents(conversations, directory).agents.map { it.first })
+    }
+
+    @Test
+    fun `rail ordering puts queued first then valid timestamps and keeps ties before malformed labels`() {
+        val tiedAt = "2026-09-16T15:00:00Z"
+        val conversations = listOf(
+            conversation("invalid", "invalid", daysAgo = 0, label = "yesterday-ish"),
+            conversation("tie-first", "tie-first", daysAgo = 0, label = tiedAt),
+            conversation("valid-older", "valid-older", daysAgo = 0, label = "2026-09-16T09:00:00Z"),
+            conversation("queued", "queued", daysAgo = 0, label = "Queued"),
+            conversation("tie-second", "tie-second", daysAgo = 0, label = tiedAt),
+            conversation("valid-newer", "valid-newer", daysAgo = 0, label = "2026-09-16T18:00:00Z"),
+        )
+
+        assertEquals(
+            listOf("queued", "valid-newer", "tie-first", "tie-second", "valid-older", "invalid"),
+            buildRailAgents(conversations, emptyList()).map { it.first },
+        )
+    }
+
+    @Test
+    fun `hover activity chooses queued over valid and malformed and keeps the first tied conversation`() =
+        runComposeUiTest {
+            val tiedAt = "2026-09-16T15:00:00Z"
+            val conversations = listOf(
+                conversation("invalid", "valid-agent", daysAgo = 0, label = "yesterday-ish", preview = "invalid"),
+                conversation(
+                    "valid",
+                    "valid-agent",
+                    daysAgo = 0,
+                    label = "2026-09-16T12:00:00Z",
+                    preview = "valid",
+                ),
+                conversation(
+                    "valid-before-queued",
+                    "queued-agent",
+                    daysAgo = 0,
+                    label = "2026-09-16T18:00:00Z",
+                    preview = "valid before queued",
+                ),
+                conversation("queued", "queued-agent", daysAgo = 0, label = "Queued", preview = "queued"),
+                conversation("invalid-after-queued", "queued-agent", daysAgo = 0, label = "bad", preview = "invalid"),
+                conversation("tie-first", "tie-agent", daysAgo = 0, label = tiedAt, preview = "first tie"),
+                conversation("tie-second", "tie-agent", daysAgo = 0, label = tiedAt, preview = "second tie"),
+            )
+            var result: Map<String, ShellRailActivity>? = null
+
+            setContent { result = rememberRailActivityByAgentId(conversations) }
+            waitForIdle()
+
+            val activity = requireNotNull(result)
+            assertEquals("valid", activity.getValue("valid-agent").preview)
+            assertEquals("queued", activity.getValue("queued-agent").preview)
+            assertEquals("first tie", activity.getValue("tie-agent").preview)
+        }
+
+    @Test
+    fun `selected stack ordering keeps queued valid and tied conversations ahead of malformed labels`() {
+        val tiedAt = "2026-09-16T15:00:00Z"
+        val conversations = listOf(
+            conversation("invalid", "a", daysAgo = 0, label = "yesterday-ish"),
+            conversation("tie-first", "a", daysAgo = 0, label = tiedAt),
+            conversation("valid-older", "a", daysAgo = 0, label = "2026-09-16T09:00:00Z"),
+            conversation("queued", "a", daysAgo = 0, label = "Queued"),
+            conversation("tie-second", "a", daysAgo = 0, label = tiedAt),
+            conversation("valid-newer", "a", daysAgo = 0, label = "2026-09-16T18:00:00Z"),
+        )
+
+        val selected = filterStackConversations(
+            FilterStackConversationsParams(
+                conversations = conversations,
+                activeSubagents = emptyList(),
+                selectedAgentName = "Agent a",
+                selectedAgentId = "a",
+                selectedConversationId = null,
+                archiveFilter = ConversationArchiveFilter.Active,
+            ),
+        )
+
+        assertEquals(
+            listOf("queued", "valid-newer", "tie-first", "tie-second", "valid-older", "invalid"),
+            selected.map { it.id },
+        )
     }
 
     @Test
