@@ -198,68 +198,9 @@ jobs:
       - name: Smoke the packaged Windows app with its bundled runtime
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $images = @(Get-ChildItem 'D:\l\compose\binaries\main\app' -Directory)
-          if ($images.Count -ne 1) { throw "Expected one packaged Windows app image" }
-          $image = $images[0].FullName
-          $launchers = @(Get-ChildItem -LiteralPath $image -File -Filter '*.exe')
-          if ($launchers.Count -ne 1) { throw "Expected one packaged Windows launcher" }
-          $runtime = Join-Path $image 'app\resources\letta-code-runtime'
-          $node = Join-Path $runtime 'node.exe'
-          $js = Join-Path $runtime 'node_modules\@letta-ai\letta-code\letta.js'
-          $manifest = Get-Content (Join-Path $runtime 'runtime-manifest.json') -Raw | ConvertFrom-Json
-          # Isolate even --version/--help: CLI initialization can write settings.
-          # PATH retains CI tooling lookup; no payload sees the runner's profile.
-          $evidence = Join-Path $env:RUNNER_TEMP 'windows-desktop-smoke'
-          $smokeProfile = Join-Path $evidence ("profile-" + [guid]::NewGuid())
-          $env:HOME = $smokeProfile
-          $env:USERPROFILE = $smokeProfile
-          $env:LETTA_HOME = Join-Path $smokeProfile '.letta'
-          $env:HOMEDRIVE = [System.IO.Path]::GetPathRoot($smokeProfile).TrimEnd('\')
-          $env:HOMEPATH = $smokeProfile.Substring($env:HOMEDRIVE.Length)
-          $env:APPDATA = Join-Path $smokeProfile 'config'
-          $env:LOCALAPPDATA = Join-Path $smokeProfile 'data'
-          $env:XDG_CONFIG_HOME = $env:APPDATA
-          $env:XDG_CACHE_HOME = Join-Path $smokeProfile 'cache'
-          $env:XDG_DATA_HOME = $env:LOCALAPPDATA
-          $env:XDG_STATE_HOME = Join-Path $smokeProfile 'state'
-          $env:XDG_RUNTIME_DIR = Join-Path $smokeProfile 'runtime'
-          $env:XDG_CONFIG_DIRS = $env:APPDATA
-          $env:XDG_DATA_DIRS = $env:LOCALAPPDATA
-          New-Item -ItemType Directory -Force -Path $smokeProfile, $env:APPDATA, $env:LOCALAPPDATA, $env:XDG_CACHE_HOME, $env:XDG_STATE_HOME, $env:XDG_RUNTIME_DIR | Out-Null
-          $env:JAVA_TOOL_OPTIONS = '-Duser.home="' + $smokeProfile + '"'
-          Remove-Item Env:_JAVA_OPTIONS, Env:JDK_JAVA_OPTIONS, Env:NODE_OPTIONS, Env:NODE_PATH, Env:LETTA_DESKTOP_RUNTIME_NODE, Env:LETTA_DESKTOP_RUNTIME_JS, Env:JAVA_HOME, Env:JDK_HOME -ErrorAction SilentlyContinue
-          Set-Location -LiteralPath $smokeProfile
-          $version = & $node --version
-          if ($LASTEXITCODE -ne 0 -or $version -ne "v$($manifest.node)") { throw "Bundled Node version mismatch" }
-          & $node $js --version
-          if ($LASTEXITCODE -ne 0) { throw "Bundled AppServer CLI failed" }
-          & $node $js server --help
-          if ($LASTEXITCODE -ne 0) { throw "Bundled AppServer bootstrap failed" }
-          $app = $null
-          try {
-            $app = Start-Process -FilePath $launchers[0].FullName -WorkingDirectory $evidence -PassThru -RedirectStandardOutput "$evidence\stdout.log" -RedirectStandardError "$evidence\stderr.log"
-            $visible = $false
-            for ($i = 0; $i -lt 90; $i++) {
-              $app.Refresh()
-              if ($app.HasExited) { throw "Packaged Windows app exited before first window: $($app.ExitCode)" }
-              # MainWindowHandle belongs to the launched process; the shared page title can be Home.
-              if ($app.MainWindowHandle -ne 0) { $visible = $true; break }
-              Start-Sleep -Seconds 1
-            }
-            if (-not $visible) { throw "No visible packaged Windows app window" }
-            Start-Sleep -Seconds 5
-            $app.Refresh()
-            if ($app.HasExited -or $app.MainWindowHandle -eq 0) { throw "Packaged Windows app did not stay open" }
-            $errors = Get-Content "$evidence\stdout.log", "$evidence\stderr.log" -Raw
-            if ($errors -match 'UnsupportedClassVersionError|NoClassDefFoundError|UnsatisfiedLinkError|Failed to launch JVM|Could not find or load main class|Exception in thread|A fatal error has been detected|FATAL ERROR') { throw "Startup error: $errors" }
-            $crashes = @(Get-ChildItem -LiteralPath $evidence -Recurse -File -Include 'hs_err_pid*.log', 'java_error_in*.log', '*.dmp')
-            if ($crashes.Count -ne 0) { throw "New crash evidence: $($crashes.FullName)" }
-            "PASS: $($app.Id) $($app.MainWindowHandle) $($app.MainWindowTitle)" | Tee-Object -FilePath "$evidence\window.txt"
-          } finally {
-            if ($app -and -not $app.HasExited) { Stop-Process -Id $app.Id -Force }
-            Get-Content "$evidence\stdout.log", "$evidence\stderr.log" -ErrorAction SilentlyContinue
-          }
+          & (Join-Path $env:GITHUB_WORKSPACE 'scripts/desktop/windows-package-smoke.ps1') `
+            -ImageRoot 'D:\l\compose\binaries\main\app' `
+            -EvidenceRoot (Join-Path $env:RUNNER_TEMP 'windows-desktop-smoke')
 
       - name: Upload Windows packaged smoke evidence
         if: always()
@@ -268,6 +209,8 @@ jobs:
           name: windows-desktop-smoke-${{ github.run_number }}
           path: |
             ${{ runner.temp }}/windows-desktop-smoke/*.log
+            ${{ runner.temp }}/windows-desktop-smoke/*.jsonl
+            ${{ runner.temp }}/windows-desktop-smoke/*.png
             ${{ runner.temp }}/windows-desktop-smoke/window.txt
           if-no-files-found: warn
 

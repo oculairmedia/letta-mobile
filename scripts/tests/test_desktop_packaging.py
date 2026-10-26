@@ -439,16 +439,20 @@ PYTHON'''
             self.assertEqual(os.environ['HOME'], env['HOME'], 'Inspector changed the caller environment')
         self.assert_home_isolated(['node', 'node', 'node', 'node', 'javac', 'jni'])
 
-    def test_windows_smoke_uses_owned_window_not_page_title(self):
+    def test_windows_smoke_retains_native_window_diagnostics(self):
         workflow = (REPO / '.github/workflows/desktop.yml').read_text()
         smoke = workflow.split('      - name: Smoke the packaged Windows app', 1)[1].split('\n      - name:', 1)[0]
-        self.assertIn('if ($app.MainWindowHandle -ne 0)', smoke)
-        self.assertNotIn("MainWindowTitle -match", smoke)
-        self.assertIn('$app.HasExited -or $app.MainWindowHandle -eq 0', smoke)
+        script = (REPO / 'scripts/desktop/windows-package-smoke.ps1').read_text()
+        self.assertIn('windows-package-smoke.ps1', smoke)
+        self.assertIn('GetWindowThreadProcessId', script)
+        self.assertIn('IsWindowVisible', script)
+        self.assertIn('GetWindow(hwnd, 4)', script)
+        self.assertIn("Write-WindowSnapshot 'before-cleanup'", script)
+        self.assertIn("'desktop.png'", script)
+        self.assertNotIn('MainWindowTitle -match', script)
 
     def test_windows_smoke_isolates_before_first_bundled_probe(self):
-        workflow = (REPO / '.github/workflows/desktop.yml').read_text()
-        smoke = workflow.split('      - name: Smoke the packaged Windows app', 1)[1].split('\n      - name:', 1)[0]
+        smoke = (REPO / 'scripts/desktop/windows-package-smoke.ps1').read_text()
         before_probes = smoke.split('$version = & $node --version', 1)[0]
         for key in ['HOME', 'USERPROFILE', 'LETTA_HOME', 'APPDATA', 'LOCALAPPDATA', 'XDG_CONFIG_HOME', 'XDG_CACHE_HOME',
                     'XDG_DATA_HOME', 'XDG_STATE_HOME', 'XDG_RUNTIME_DIR', 'JAVA_TOOL_OPTIONS']:
