@@ -435,6 +435,13 @@ PYTHON'''
             self.assertEqual(os.environ['HOME'], env['HOME'], 'Inspector changed the caller environment')
         self.assert_home_isolated(['node', 'node', 'node', 'node', 'javac', 'jni'])
 
+    def test_windows_smoke_uses_owned_window_not_page_title(self):
+        workflow = (REPO / '.github/workflows/desktop.yml').read_text()
+        smoke = workflow.split('      - name: Smoke the packaged Windows app', 1)[1].split('\n      - name:', 1)[0]
+        self.assertIn('if ($app.MainWindowHandle -ne 0)', smoke)
+        self.assertNotIn("MainWindowTitle -match", smoke)
+        self.assertIn('$app.HasExited -or $app.MainWindowHandle -eq 0', smoke)
+
     def test_windows_smoke_isolates_before_first_bundled_probe(self):
         workflow = (REPO / '.github/workflows/desktop.yml').read_text()
         smoke = workflow.split('      - name: Smoke the packaged Windows app', 1)[1].split('\n      - name:', 1)[0]

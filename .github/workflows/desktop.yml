@@ -243,7 +243,8 @@ jobs:
             for ($i = 0; $i -lt 90; $i++) {
               $app.Refresh()
               if ($app.HasExited) { throw "Packaged Windows app exited before first window: $($app.ExitCode)" }
-              if ($app.MainWindowHandle -ne 0 -and $app.MainWindowTitle -match 'Letta|Meridian') { $visible = $true; break }
+              # MainWindowHandle belongs to the launched process; the shared page title can be Home.
+              if ($app.MainWindowHandle -ne 0) { $visible = $true; break }
               Start-Sleep -Seconds 1
             }
             if (-not $visible) { throw "No visible packaged Windows app window" }
@@ -297,6 +298,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Java 21 (Gradle daemon JVM)
         uses: actions/setup-java@v4
