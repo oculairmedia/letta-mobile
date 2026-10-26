@@ -179,9 +179,11 @@ open class CachedAgentRepository(
                     persistRefreshedAgents(_agents.value)
                 }
                 Result.success(Unit)
+            } catch (cancelled: CancellationException) {
+                failure = cancelled
+                throw cancelled
             } catch (t: Throwable) {
                 failure = t
-                if (t is CancellationException) throw t
                 Result.failure(t)
             } finally {
                 withContext(NonCancellable) {
