@@ -320,38 +320,46 @@ class LinuxPackagingTests(unittest.TestCase):
         self.assertIn('Generate Nucleus Windows update metadata', release)
         self.assertIn('dbus-run-session -- bash ../scripts/desktop/linux-package-smoke.sh', release)
 
-    def run_smoke_fixture(self, image, env, timeout=15, terminate_after=None):
+    def cleanup_fixture_children(self):
+        for record in self.work.glob('*.pid'):
+            try:
+                os.kill(int(record.read_text()), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+    def terminate_fixture_when_ready(self, process, ready):
+        deadline = time.monotonic() + 5
+        while not ready.exists():
+            self.assertIsNone(process.poll(), 'Fixture exited before startup')
+            self.assertLess(time.monotonic(), deadline, 'Fixture never reached startup')
+            time.sleep(0.01)
+        process.terminate()
+
+    def stop_fixture_session(self, process, completed):
+        # Only fixture-owned sessions/PIDs; never kill the caller's process group.
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        if not completed:
+            self.cleanup_fixture_children()
+        process.communicate(timeout=2)
+
+    def run_smoke_fixture(self, image, env, terminate_after=None):
         # A separate fixture session lets even the broken baseline be tested safely.
         process = subprocess.Popen(['bash', str(REPO / 'scripts/desktop/linux-package-smoke.sh'), str(image)],
                                    env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                    start_new_session=True)
-        def cleanup_fixture_children():
-            for record in self.work.glob('*.pid'):
-                try:
-                    os.kill(int(record.read_text()), signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-        self.addCleanup(cleanup_fixture_children)
+        self.addCleanup(self.cleanup_fixture_children)
         completed = False
         try:
             if terminate_after:
-                deadline = time.monotonic() + 5
-                while not terminate_after.exists() and process.poll() is None and time.monotonic() < deadline:
-                    time.sleep(0.01)
-                self.assertTrue(terminate_after.exists(), 'Fixture never reached startup')
-                process.terminate()
-            stdout, stderr = process.communicate(timeout=timeout)
+                self.terminate_fixture_when_ready(process, terminate_after)
+            stdout, stderr = process.communicate(timeout=15)
             completed = True
             return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
         finally:
-            # Only fixture-owned sessions/PIDs; never kill the caller's process group.
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            if not completed:
-                cleanup_fixture_children()
-            process.communicate(timeout=2)
+            self.stop_fixture_session(process, completed)
 
     def home_writer(self):
         return write(self.work / 'write-home', '#!/usr/bin/env python3\n'
@@ -396,9 +404,11 @@ class LinuxPackagingTests(unittest.TestCase):
             self.assertEqual(observation['overrides'], [])
             self.assertTrue(Path(observation['cwd']).is_relative_to(self.work), observation['cwd'])
 
-    def run_window_harness_fixture(self, startup='', crash=False, visible=True, write_home=False,
-                                   terminate_after=None, ready=None):
+    def run_window_harness_fixture(self, startup='', crash=False, visible=True, options=None):
         # These simulate process/window boundaries, never count as native launch evidence.
+        options = options or {}
+        write_home = options.get('write_home', False)
+        ready = options.get('ready')
         tools = self.work / 'window-tools'
         for name, body in {
             'python3': 'echo fixture-payload-inspection',
@@ -428,11 +438,11 @@ class LinuxPackagingTests(unittest.TestCase):
                    FIXTURE_READY=str(ready) if ready else '',
                    PATH=str(tools) + os.pathsep + os.environ['PATH'], DISPLAY=':fixture',
                    DBUS_SESSION_BUS_ADDRESS='fixture-only', LETTA_PACKAGE_SMOKE_EVIDENCE=str(evidence))
-        result = self.run_smoke_fixture(image, env, terminate_after=terminate_after)
+        result = self.run_smoke_fixture(image, env, terminate_after=options.get('terminate_after'))
         return result, evidence
 
     def test_every_payload_phase_uses_disposable_home(self):
-        result, _ = self.run_window_harness_fixture(write_home=True)
+        result, _ = self.run_window_harness_fixture(options={'write_home': True})
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assert_home_isolated(['extract', 'inspector', 'app'])
 
@@ -466,7 +476,7 @@ class LinuxPackagingTests(unittest.TestCase):
         try:
             start = time.monotonic()
             result, evidence = self.run_window_harness_fixture(startup=f'exec "{stubborn}"',
-                                                              ready=self.work / 'child.pid')
+                                                              options={'ready': self.work / 'child.pid'})
             self.assertLess(time.monotonic() - start, 8)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual((evidence / 'window.txt').read_text(), 'Meridian\n')
@@ -495,7 +505,7 @@ class LinuxPackagingTests(unittest.TestCase):
     def test_term_preserves_signal_status_and_cleans_owned_children(self):
         stubborn = self.stubborn_payload()
         result, evidence = self.run_window_harness_fixture(startup=f'exec "{stubborn}"', visible=False,
-                                                          terminate_after=self.work / 'child.pid')
+                                                          options={'terminate_after': self.work / 'child.pid'})
         self.assertEqual(result.returncode, 143, result.stdout + result.stderr)
         self.assertEqual((evidence / 'exit-status.txt').read_text(), '143\n')
         self.assert_stubborn_stopped(143)
