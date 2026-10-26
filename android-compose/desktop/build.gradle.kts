@@ -235,13 +235,11 @@ val buildDesktopLinuxHotkey = if (isLinuxHost) {
         inputs.files(upstreamHotkey, fileTree(source) { exclude("**/__pycache__/**") })
         inputs.property("jniHome", System.getProperty("java.home"))
         outputs.file(desktopHotkeyJar)
-        doFirst {
-            commandLine(
-                "python3", source.file("build.py").asFile.absolutePath,
-                upstreamHotkey.singleFile.absolutePath, desktopHotkeyJar.get().asFile.absolutePath,
-                System.getProperty("java.home"),
-            )
-        }
+        commandLine(
+            "python3", source.file("build.py").asFile.absolutePath,
+            upstreamHotkey.singleFile.absolutePath, desktopHotkeyJar.get().asFile.absolutePath,
+            System.getProperty("java.home"),
+        )
     }
 } else {
     null
