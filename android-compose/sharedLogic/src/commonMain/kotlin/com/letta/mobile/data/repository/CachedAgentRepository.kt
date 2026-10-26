@@ -21,6 +21,12 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
@@ -56,6 +62,13 @@ open class CachedAgentRepository(
     override val refreshError: StateFlow<Throwable?> = _refreshError.asStateFlow()
     private val refreshMutex = Mutex()
     private var lastRefreshAtMillis: Long = 0L
+    // Entries live only as long as the cached agents or their active requests.
+    private val agentFetchedAt = mutableMapOf<AgentId, Long>()
+    private val agentRequests = mutableMapOf<AgentId, Deferred<Result<Agent>>>()
+    private var refreshRequest: Deferred<Result<Unit>>? = null
+    private val changedDuringRefresh = mutableSetOf<AgentId>()
+    private var cacheGeneration = 0L
+    internal var clock: Clock = Clock.System
 
     init {
         repositoryScope.launch {
@@ -63,6 +76,7 @@ open class CachedAgentRepository(
             // uncaught Dispatchers.IO exceptions (tests historically passed a
             // broken Lazy mock; production Room build can also throw).
             try {
+                val generation = refreshMutex.withLock { cacheGeneration }
                 val cache = localCache?.invoke() ?: return@launch
                 val cached = cache.getAllOnce()
                 if (cached.isNotEmpty()) {
@@ -70,7 +84,7 @@ open class CachedAgentRepository(
                     // was suspended — that would publish a stale roster while
                     // lastRefreshAtMillis still looks fresh.
                     refreshMutex.withLock {
-                        if (_agents.value.isEmpty()) {
+                        if (generation == cacheGeneration && _agents.value.isEmpty()) {
                             _agents.value = cached
                         }
                     }
@@ -127,21 +141,93 @@ open class CachedAgentRepository(
         return merged
     }
 
-    override suspend fun refreshAgents() = refreshMutex.withLock {
+    override suspend fun refreshAgents() {
+        refreshAgents(maxAgeMs = null)
+    }
+
+    private suspend fun refreshAgents(maxAgeMs: Long?, generation: Long? = null): Boolean {
+        while (true) {
+            var started = false
+            val request = refreshMutex.withLock {
+                if (generation != null && generation != cacheGeneration) return false
+                if (maxAgeMs != null && hasFreshAgents(maxAgeMs)) return false
+                refreshRequest?.takeUnless { it.isCompleted } ?: startRefreshLocked().also { started = true }
+            }
+            request.await().getOrThrow()
+            if (started) return true
+            // A forced refresh starts after the preceding list; stale-only callers recheck its age.
+        }
+    }
+
+    private fun startRefreshLocked(): Deferred<Result<Unit>> {
+        agentRequests.values.forEach { it.cancel() }
+        agentRequests.clear()
+        agentFetchedAt.clear()
+        changedDuringRefresh.clear()
+        lateinit var request: Deferred<Result<Unit>>
+        request = repositoryScope.async(start = CoroutineStart.LAZY) {
+            var failure: Throwable? = null
+            try {
+                val fresh = fetchAgentsForCache { partial ->
+                    refreshMutex.withLock {
+                        checkRefreshCurrent(request)
+                        publishRosterLocked(partial, completed = false)
+                    }
+                }
+                refreshMutex.withLock {
+                    checkRefreshCurrent(request)
+                    publishRosterLocked(fresh, completed = true)
+                    persistRefreshedAgents(_agents.value)
+                }
+                Result.success(Unit)
+            } catch (t: Throwable) {
+                failure = t
+                if (t is CancellationException) throw t
+                Result.failure(t)
+            } finally {
+                withContext(NonCancellable) {
+                    refreshMutex.withLock {
+                        if (refreshRequest === request) {
+                            refreshRequest = null
+                            changedDuringRefresh.clear()
+                            _isRefreshing.value = false
+                            _refreshError.value = failure
+                        }
+                    }
+                }
+            }
+        }
+        refreshRequest = request
         _isRefreshing.value = true
-        try {
-            refreshAgentsLocked()
-            _refreshError.value = null
-        } catch (t: Throwable) {
-            _refreshError.value = t
-            throw t
-        } finally {
-            _isRefreshing.value = false
+        return request
+    }
+
+    private fun checkRefreshCurrent(request: Deferred<Result<Unit>>) {
+        request.ensureActive()
+        if (refreshRequest !== request) throw CancellationException("Agent cache reset")
+    }
+
+    private fun publishRosterLocked(fresh: List<Agent>, completed: Boolean) {
+        // A targeted read, push or deletion after this list started wins over its older snapshot.
+        val current = _agents.value.filter { it.id in changedDuringRefresh }
+        _agents.value = fresh.filterNot { it.id in changedDuringRefresh } + current
+        agentFetchedAt.keys.retainAll(_agents.value.map { it.id }.toSet())
+        if (completed) {
+            val now = nowMillis()
+            fresh.filterNot { it.id in changedDuringRefresh }.forEach { agentFetchedAt[it.id] = now }
+            lastRefreshAtMillis = now
         }
     }
 
     override suspend fun clearForBackendSwitch() {
         refreshMutex.withLock {
+            cacheGeneration += 1
+            refreshRequest?.cancel()
+            refreshRequest = null
+            agentRequests.values.forEach { it.cancel() }
+            agentRequests.clear()
+            agentFetchedAt.clear()
+            changedDuringRefresh.clear()
             _agents.value = emptyList()
             _isRefreshing.value = false
             _refreshError.value = null
@@ -155,15 +241,6 @@ open class CachedAgentRepository(
             // Persist when a local cache is bound (Room on Android).
             localCache?.invoke()?.deleteAll()
         }
-    }
-
-    private suspend fun refreshAgentsLocked() {
-        val fresh = fetchAgentsForCache { partial ->
-            _agents.update { partial }
-        }
-        _agents.update { fresh }
-        lastRefreshAtMillis = nowMillis()
-        persistRefreshedAgents(fresh)
     }
 
     private suspend fun persistRefreshedAgents(fresh: List<Agent>) {
@@ -260,37 +337,72 @@ open class CachedAgentRepository(
         return _agents.value.isNotEmpty() && nowMillis() - lastRefreshAtMillis <= maxAgeMs
     }
 
-    override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
-        if (hasFreshAgents(maxAgeMs)) return@withLock false
-        _isRefreshing.value = true
-        try {
-            refreshAgentsLocked()
-            _refreshError.value = null
-        } catch (t: Throwable) {
-            _refreshError.value = t
-            throw t
-        } finally {
-            _isRefreshing.value = false
-        }
-        true
-    }
+    override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = refreshAgents(maxAgeMs)
 
     override fun getAgent(id: AgentId): Flow<Agent> = flow {
-        // H5 (data-efficiency-audit): read the cached entry + the bulk
-        // freshness marker from ONE synchronized snapshot so a concurrent
-        // refreshAgents() cannot race us into emitting a pre-refresh cached
-        // value the user no longer has.
-        val (cached, snapshotAgeMs) = refreshMutex.withLock {
-            val hit = _agents.value.find { it.id == id }
-            hit to (nowMillis() - lastRefreshAtMillis)
+        val (cached, fresh) = refreshMutex.withLock {
+            _agents.value.find { it.id == id } to isAgentFreshLocked(id)
         }
-        if (cached != null) {
-            emit(cached)
+        if (cached != null) emit(cached)
+        if (!fresh) emit(getFreshAgent(id))
+    }
+
+    private fun isAgentFreshLocked(id: AgentId): Boolean =
+        agentFetchedAt[id]?.let { nowMillis() - it <= SINGLE_AGENT_FRESH_WINDOW_MS } == true
+
+    private suspend fun getFreshAgent(id: AgentId, force: Boolean = false): Agent {
+        val request = refreshMutex.withLock {
+            if (force) invalidateAgentLocked(id)
+            if (isAgentFreshLocked(id)) _agents.value.find { it.id == id }?.let { return it }
+            agentRequests[id]?.takeUnless { it.isCompleted } ?: startAgentRequestLocked(id, persist = force)
         }
-        if (cached != null && snapshotAgeMs <= SINGLE_AGENT_FRESH_WINDOW_MS) return@flow
-        val fresh = fetchAgentRemote(id)
-        emit(fresh)
-        updateAgentInCache(fresh)
+        return request.await().getOrThrow()
+    }
+
+    private fun startAgentRequestLocked(id: AgentId, persist: Boolean): Deferred<Result<Agent>> {
+        lateinit var request: Deferred<Result<Agent>>
+        request = repositoryScope.async(start = CoroutineStart.LAZY) {
+            try {
+                runCatchingCancellable {
+                    val fresh = fetchAgentRemote(id)
+                    refreshMutex.withLock {
+                        request.ensureActive()
+                        if (agentRequests[id] !== request) throw CancellationException("Agent cache invalidated")
+                        updateAgentInCache(fresh)
+                        agentFetchedAt[id] = nowMillis()
+                        if (refreshRequest != null) changedDuringRefresh += id
+                        if (persist) {
+                            runCatchingCancellable { localCache?.invoke()?.upsert(fresh) }
+                                .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated cache persist failed for ${id.value}", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN) }
+                        }
+                    }
+                    fresh
+                }
+            } finally {
+                withContext(NonCancellable) {
+                    refreshMutex.withLock {
+                        if (agentRequests[id] === request) agentRequests.remove(id)
+                    }
+                }
+            }
+        }
+        agentRequests[id] = request
+        return request
+    }
+
+    private fun invalidateAgentLocked(id: AgentId) {
+        agentFetchedAt.remove(id)
+        agentRequests.remove(id)?.cancel()
+        if (refreshRequest != null) changedDuringRefresh += id
+    }
+
+    private suspend fun removeAgentFromCache(id: AgentId, generation: Long? = null) {
+        refreshMutex.withLock {
+            if (generation != null && generation != cacheGeneration) return
+            invalidateAgentLocked(id)
+            _agents.update { current -> current.filterNot { it.id == id } }
+            localCache?.invoke()?.deleteById(id.value)
+        }
     }
 
     /**
@@ -306,26 +418,14 @@ open class CachedAgentRepository(
         }
 
     private suspend fun refreshAgent(agentId: AgentId): Result<Agent> = runCatchingCancellable {
-        // Under refreshMutex like refreshAgents: otherwise a full refresh already in flight can
-        // overwrite this newer agent with its older roster when it lands.
-        val fresh = refreshMutex.withLock {
-            fetchAgentRemote(agentId).also(::updateAgentInCache)
-        }
-        // Persist the transport-driven refresh to the Room cache so a pushed
-        // agent_updated change survives an app restart (CodeRabbit #517).
-        runCatchingCancellable { localCache?.invoke()?.upsert(fresh) }
-            .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated cache persist failed for ${agentId.value}", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN) }
-        fresh
+        getFreshAgent(agentId, force = true)
     }
 
     private suspend fun observeAgentUpdated(channelTransport: IChannelTransport) {
         observeAgentUpdates(
             transport = channelTransport,
             onDeleted = { agentId ->
-                _agents.update { current -> current.filterNot { it.id == agentId } }
-                // Targeted single-agent delete — not a broad deleteExcept that
-                // could race with a stale in-memory list (CodeRabbit #517).
-                runCatchingCancellable { localCache?.invoke()?.deleteById(agentId.value) }
+                runCatchingCancellable { removeAgentFromCache(agentId) }
                     .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated delete cache update failed for ${agentId.value}", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN) }
             },
             onChanged = { agentId ->
@@ -380,34 +480,38 @@ open class CachedAgentRepository(
     }
 
     override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent {
-        // P4 iroh purity: raw HTTP AgentApi hard-fails in iroh:// mode; route
-        // the update over admin_rpc agent.update (model switch from the drawer
-        // failed with "Couldn't switch model" without this).
+        val generation = refreshMutex.withLock {
+            invalidateAgentLocked(id)
+            cacheGeneration
+        }
+        // P4 iroh purity: route updates over admin_rpc when using Iroh.
         val irohSource = irohAgentSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            val agent = irohSource.updateAgent(
+        val agent = if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.updateAgent(
                 id,
                 kotlinx.serialization.json.Json { encodeDefaults = false; explicitNulls = false }
                     .encodeToString(AgentUpdateParams.serializer(), params),
             )
-            refreshAgents()
-            return agent
+        } else {
+            remote.source().updateAgent(id, params)
         }
-        val agent = remote.source().updateAgent(id, params)
-        refreshAgents()
+        refreshAgents(maxAgeMs = null, generation = generation)
         return agent
     }
 
     override suspend fun deleteAgent(id: AgentId) {
+        val generation = refreshMutex.withLock {
+            invalidateAgentLocked(id)
+            cacheGeneration
+        }
         val irohSource = irohAgentSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.deleteAgent(id)
         } else {
             remote.source().deleteAgent(id)
         }
-        _agents.update { current -> current.filterNot { it.id == id } }
         try {
-            localCache?.invoke()?.deleteById(id.value)
+            removeAgentFromCache(id, generation)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {
@@ -478,16 +582,16 @@ open class CachedAgentRepository(
         }
     }
 
-    private fun nowMillis(): Long = Clock.System.now().toEpochMilliseconds()
+    private fun nowMillis(): Long = clock.now().toEpochMilliseconds()
 
     private companion object {
         const val CACHE_REFRESH_PAGE_SIZE = 50
         const val FALLBACK_FULL_FETCH_LIMIT = 5_000
 
         /**
-         * H5 (data-efficiency-audit): if the bulk agent list was refreshed
-         * within this window, [getAgent] trusts the cached copy and skips the
-         * per-agent GET. 30 s covers a chat-open + reply cycle without
+         * A successful bulk or individual read makes an agent fresh for this
+         * window. [getAgent] emits cached data first and only fetches when stale.
+         * 30 s covers a chat-open + reply cycle without
          * risking a stale read for users who keep a chat open across a long
          * idle period.
          */
@@ -495,10 +599,11 @@ open class CachedAgentRepository(
     }
 
     /**
-     * H5 (data-efficiency-audit) test seam: lets unit tests force the bulk
-     * cache to look stale (or fresh) without sleeping the test dispatcher.
+     * Test seam: rewinds completed bulk and per-agent freshness together
+     * without sleeping the test dispatcher.
      */
     fun setLastRefreshForTest(epochMs: Long) {
         lastRefreshAtMillis = epochMs
+        agentFetchedAt.keys.toList().forEach { agentFetchedAt[it] = epochMs }
     }
 }
