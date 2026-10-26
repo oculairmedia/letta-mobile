@@ -12,6 +12,7 @@ on:
       - "scripts/desktop/**"
       - "scripts/tests/test_desktop_packaging.py"
       - "scripts/tests/desktop_smoke_fixtures.py"
+      - "scripts/tests/test_linux_startup_diagnostic.py"
       - "android-compose/build-logic/**"
       - "android-compose/letta-code-runtime/**"
       - "android-compose/sharedUI/**"
@@ -32,6 +33,7 @@ on:
       - "scripts/desktop/**"
       - "scripts/tests/test_desktop_packaging.py"
       - "scripts/tests/desktop_smoke_fixtures.py"
+      - "scripts/tests/test_linux_startup_diagnostic.py"
       - "android-compose/build-logic/**"
       - "android-compose/letta-code-runtime/**"
       - "android-compose/sharedUI/**"
@@ -324,34 +326,64 @@ jobs:
       - name: Install Linux packaging and X11 smoke dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y binutils xvfb xauth xdotool x11-utils openbox dbus-x11 desktop-file-utils patchelf \
+          sudo apt-get install -y binutils gdb xvfb xauth xdotool x11-utils openbox dbus-x11 desktop-file-utils patchelf \
             libgtk-3-0 libasound2 libdbusmenu-gtk3-4 libsystemd0 libx11-6 libxext6 libxi6 libxrender1 libxtst6 \
             libfontconfig1 libfreetype6 libgl1 libegl1 libnss3 libgbm1 libxkbcommon0 \
             libnotify4 libsecret-1-0 libdbus-glib-1-2
 
       - name: Packaging regression fixtures
         working-directory: .
-        run: python3 scripts/tests/test_desktop_packaging.py
+        run: |
+          python3 scripts/tests/test_desktop_packaging.py
+          python3 scripts/tests/test_linux_startup_diagnostic.py
 
       - name: Build Linux x86-64 AppImage
         # Nucleus AppImage uses the real jpackage app image, JBR, Node and shared UI.
         # Rive's D3D11 bridge is Windows-only; Linux retains the existing fallback mascot.
         run: ./gradlew --no-configuration-cache :desktop:packageDistributionForCurrentOS
 
-      - name: Verify and stage the shipped Linux desktop
+      - name: Verify the shipped Linux desktop
+        id: linux-smoke
         env:
           LETTA_PACKAGE_SMOKE_EVIDENCE: ${{ runner.temp }}/linux-desktop-smoke
-          ARTIFACT_TAG: ci-${{ github.run_number }}
         run: |
           set -euo pipefail
           mapfile -d '' images < <(find desktop/build/compose/binaries/main/AppImage -maxdepth 1 -name '*.AppImage' -print0)
           test "${#images[@]}" -eq 1
+          printf 'appimage=%s\n' "${images[0]}" >> "$GITHUB_OUTPUT"
           xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash ../scripts/desktop/linux-package-smoke.sh "${images[0]}"
+
+      - name: Stage the verified Linux desktop
+        env:
+          ARTIFACT_TAG: ci-${{ github.run_number }}
+          APPIMAGE_PATH: ${{ steps.linux-smoke.outputs.appimage }}
+        run: |
+          set -euo pipefail
           mkdir -p desktop/build/linux-release
           name="letta-desktop-${ARTIFACT_TAG}-linux-x64.AppImage"
-          cp -f "${images[0]}" "desktop/build/linux-release/$name"
+          cp -f "$APPIMAGE_PATH" "desktop/build/linux-release/$name"
           cd desktop/build/linux-release
           sha256sum "$name" > "$name.sha256"
+
+      - name: Diagnose failed Linux startup with GDB
+        if: ${{ failure() && steps.linux-smoke.outcome == 'failure' && steps.linux-smoke.outputs.appimage != '' }}
+        # Evidence only: the original smoke step remains failed regardless of replay outcome.
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          APPIMAGE_PATH: ${{ steps.linux-smoke.outputs.appimage }}
+          LETTA_PACKAGE_X11_TRACE: "1"
+          LETTA_PACKAGE_SMOKE_EVIDENCE: ${{ runner.temp }}/linux-desktop-diagnostic
+        run: |
+          xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash ../scripts/desktop/linux-package-smoke.sh "$APPIMAGE_PATH"
+
+      - name: Upload Linux GDB diagnostic evidence
+        if: ${{ always() && steps.linux-smoke.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-desktop-diagnostic-${{ github.run_number }}
+          path: ${{ runner.temp }}/linux-desktop-diagnostic/
+          if-no-files-found: warn
 
       - name: Upload Linux packaged smoke evidence
         if: always()
