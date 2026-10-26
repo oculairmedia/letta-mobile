@@ -68,6 +68,13 @@ jobs:
           cargo test --locked --test native_mdns -- --nocapture
       - name: Build matching native and Kotlin artifacts
         run: bash scripts/iroh-mdns-binding/ci-build.sh "${{ matrix.mode }}" android-compose/native/iroh-mdns-binding/build/upstream android-compose/native/iroh-mdns-binding/build/artifacts
+      - name: Enable runner group access to KVM
+        if: matrix.mode == 'android'
+        run: |
+          test -c /dev/kvm
+          sudo chgrp "$(id -gn)" /dev/kvm
+          sudo chmod g+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
       - name: Android emulator ABI smoke
         if: matrix.mode == 'android'
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
