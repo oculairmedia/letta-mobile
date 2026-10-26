@@ -94,13 +94,17 @@ def inspect_jvm(root, cfg):
     return jvm, launcher
 
 
+def inspect_payload_path(path, root):
+    if path.is_symlink():
+        require(path.resolve().is_relative_to(root) and path.exists(), f'External/broken symlink: {path}')
+    if path.parent.name == '@img' and path.name.startswith('sharp-'):
+        require(path.name in ('sharp-linux-x64', 'sharp-libvips-linux-x64'), f'Foreign sharp: {path}')
+
+
 def inspect_loose_natives(root):
     natives = []
     for path in root.rglob('*'):
-        if path.is_symlink():
-            require(path.resolve().is_relative_to(root) and path.exists(), f'External/broken symlink: {path}')
-        if path.parent.name == '@img' and path.name.startswith('sharp-'):
-            require(path.name in ('sharp-linux-x64', 'sharp-libvips-linux-x64'), f'Foreign sharp: {path}')
+        inspect_payload_path(path, root)
         if not path.is_file():
             continue
         with path.open('rb') as stream:
@@ -155,25 +159,22 @@ def inspect(root, native_dir, forbidden=()):
                 jni=[str(p) for p in extracted if p.name in required], manifest=manifest)
 
 
-def run_checks(layout, work):
-    jvm = Path(layout['jvm'])
-    # AppRun prepends its usr/lib; resolve bundled dependencies the same way.
-    library_env = dict(os.environ, LD_LIBRARY_PATH=os.pathsep.join([
-        str(Path(layout['root']) / 'usr/lib'), str(jvm.parent), str(jvm.parent.parent),
-    ]))
-    for path in layout['natives']:
-        result = subprocess.run(['ldd', path], env=library_env, text=True,
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        dynamic = subprocess.run(['readelf', '-d', path], check=True, text=True,
-                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout
-        for value in re.findall(r'\((?:RPATH|RUNPATH)\).*?\[(.*?)\]', dynamic):
-            for search_path in value.split(':'):
-                require(not search_path.startswith('/') or search_path in ('/lib', '/lib64', '/usr/lib', '/usr/lib64'),
-                        f'Absolute non-system library search path in {path}: {search_path}')
-        # Static executables are valid, but missing DT_NEEDED libraries are not.
-        require('not found' not in result.stdout, f'Missing library for {path}:\n{result.stdout}')
-        require(result.returncode == 0 or 'not a dynamic executable' in result.stdout or
-                'statically linked' in result.stdout, f'ldd failed for {path}:\n{result.stdout}')
+def inspect_dynamic_library(path, library_env):
+    result = subprocess.run(['ldd', path], env=library_env, text=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    dynamic = subprocess.run(['readelf', '-d', path], check=True, text=True,
+                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout
+    for value in re.findall(r'\((?:RPATH|RUNPATH)\).*?\[(.*?)\]', dynamic):
+        for search_path in value.split(':'):
+            require(not search_path.startswith('/') or search_path in ('/lib', '/lib64', '/usr/lib', '/usr/lib64'),
+                    f'Absolute non-system library search path in {path}: {search_path}')
+    # Static executables are valid, but missing DT_NEEDED libraries are not.
+    require('not found' not in result.stdout, f'Missing library for {path}:\n{result.stdout}')
+    require(result.returncode == 0 or 'not a dynamic executable' in result.stdout or
+            'statically linked' in result.stdout, f'ldd failed for {path}:\n{result.stdout}')
+
+
+def check_bundled_node(layout):
     version = subprocess.check_output([layout['node'], '--version'], text=True).strip()
     require(version == 'v' + layout['manifest']['node'], 'Wrong bundled Node version')
     subprocess.run([layout['node'], '-e',
@@ -182,6 +183,17 @@ def run_checks(layout, work):
                     'r(name); console.log("Loaded", name); }', layout['js']], check=True, timeout=60)
     subprocess.run([layout['node'], layout['js'], '--version'], check=True, timeout=60)
     subprocess.run([layout['node'], layout['js'], 'server', '--help'], check=True, timeout=60)
+
+
+def run_checks(layout, work):
+    jvm = Path(layout['jvm'])
+    # AppRun prepends its usr/lib; resolve bundled dependencies the same way.
+    library_env = dict(os.environ, LD_LIBRARY_PATH=os.pathsep.join([
+        str(Path(layout['root']) / 'usr/lib'), str(jvm.parent), str(jvm.parent.parent),
+    ]))
+    for path in layout['natives']:
+        inspect_dynamic_library(path, library_env)
+    check_bundled_node(layout)
     # Load the shipped JNI into the shipped JVM, not the build JDK. Compilation is CI-only.
     source = Path(work) / 'PackagingNativeSmoke.java'
     source.write_text('public class PackagingNativeSmoke { public static void main(String[] paths) { '
