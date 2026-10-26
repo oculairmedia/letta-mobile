@@ -36,8 +36,18 @@ val desktopLettaCodeVersion: String = Properties().apply {
     val pinFile = rootProject.layout.projectDirectory.file("letta-code-runtime/letta-code-runtime.properties")
     load(providers.fileContents(pinFile).asText.get().reader())
 }.getProperty("lettaCodeVersion")
-val desktopNodeArchiveName = "node-v$desktopNodeVersion-win-x64.zip"
-val desktopNodeArchiveSha256 = "fba577c4bb87df04d54dd87bbdaa5a2272f1f99a2acbf9152e1a91b8b5f0b279"
+val isWindowsHost = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+val isLinuxHost = System.getProperty("os.name").startsWith("Linux", ignoreCase = true)
+val isDesktopRuntimeHost = isWindowsHost || isLinuxHost
+val desktopRuntimePlatform = if (isWindowsHost) "windows" else "linux"
+val desktopNodePlatform = if (isWindowsHost) "win-x64" else "linux-x64"
+val desktopNodeArchiveName = "node-v$desktopNodeVersion-$desktopNodePlatform." + if (isWindowsHost) "zip" else "tar.gz"
+// Upstream: https://nodejs.org/dist/v24.13.1/SHASUMS256.txt (same Node version on both hosts).
+val desktopNodeArchiveSha256 = if (isWindowsHost) {
+    "fba577c4bb87df04d54dd87bbdaa5a2272f1f99a2acbf9152e1a91b8b5f0b279"
+} else {
+    "7ad28fb172a9ab0593f86c1a39e5c268d0d8fc3d6cb0167f455b5655a7a6e2fd"
+}
 // Desktop packages bundle JetBrains Runtime 25.0.4 (JBR) rather than Temurin.
 // JBR is the JetBrains-maintained OpenJDK 25 build that ships the
 // AWT/InputMethod bridge Compose Multiplatform uses to surface the OS
@@ -48,14 +58,15 @@ val desktopNodeArchiveSha256 = "fba577c4bb87df04d54dd87bbdaa5a2272f1f99a2acbf915
 // SHA-512 is published by JetBrains alongside the artifact.
 val jbrVersion = "25.0.4"
 val jbrBuild = "b508.27"
-val jbrPlatformSegment = "windows-x64"
-val jbrArchiveName = "jbrsdk-${jbrVersion}-${jbrPlatformSegment}-${jbrBuild}.zip"
-val jbrArchiveSha512 = "22e09469aaef1190d4320e0621ea35f7e944a872c38b7c485f817672cbe25461ffb82db151e93d413c1889cf42bc486041e54e10c30a2601aa8170ef19e4ed98"
+val jbrPlatformSegment = if (isWindowsHost) "windows-x64" else "linux-x64"
+val jbrArchiveName = "jbrsdk-${jbrVersion}-${jbrPlatformSegment}-${jbrBuild}." + if (isWindowsHost) "zip" else "tar.gz"
+// JetBrains publishes SHA-512 at https://cache-redirector.jetbrains.com/intellij-jbr/<archive>.checksum
+val jbrArchiveSha512 = if (isWindowsHost) {
+    "22e09469aaef1190d4320e0621ea35f7e944a872c38b7c485f817672cbe25461ffb82db151e93d413c1889cf42bc486041e54e10c30a2601aa8170ef19e4ed98"
+} else {
+    "380200957c181c1d97b3a2e9ba2aacc32eb179b22d1c75bfd9a1a7fafd785f229339f382345cbad4bef461ac6adcfb7ee0f846837685c2fa55abee5b6b35f9bd"
+}
 val jbrExtractDirName = "jbrsdk-${jbrVersion}-${jbrPlatformSegment}-${jbrBuild}"
-
-// Used by the JBR download below and by the existing Node runtime download
-// further down â€” declared here so both task blocks can read it.
-val isWindowsHost = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
@@ -210,6 +221,55 @@ tasks.named("processResources") {
     dependsOn(stageDesktopMermaidNative, stageDesktopTabletNative)
 }
 
+// Keep the Java API and every non-Linux native member from the pinned upstream
+// JAR. Linux alone rebuilds its hotkey JNI with the source-reviewed handler fix.
+abstract class DesktopHotkeyArguments : org.gradle.process.CommandLineArgumentProvider {
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val buildScript: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFiles
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.NONE)
+    abstract val upstream: org.gradle.api.file.ConfigurableFileCollection
+
+    @get:org.gradle.api.tasks.Internal
+    abstract val outputJar: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.Input
+    abstract val javaHome: org.gradle.api.provider.Property<String>
+
+    override fun asArguments(): Iterable<String> = listOf(
+        buildScript.get().asFile.absolutePath,
+        upstream.singleFile.absolutePath,
+        outputJar.get().asFile.absolutePath,
+        javaHome.get(),
+    )
+}
+
+val desktopHotkeyJar = layout.buildDirectory.file("generated/hotkey/nucleus.global-hotkey-linux-patched.jar")
+val buildDesktopLinuxHotkey = if (isLinuxHost) {
+    val upstreamHotkey = configurations.create("nucleusHotkeyUpstream") {
+        isCanBeConsumed = false
+        isTransitive = false
+    }
+    dependencies.add(upstreamHotkey.name, libs.nucleus.global.hotkey)
+    val source = rootProject.layout.projectDirectory.dir("native/nucleus_hotkey")
+    tasks.register<Exec>("buildDesktopLinuxHotkey") {
+        inputs.files(upstreamHotkey, fileTree(source) { exclude("**/__pycache__/**") })
+        inputs.property("jniHome", System.getProperty("java.home"))
+        outputs.file(desktopHotkeyJar)
+        executable = "python3"
+        val hotkeyArguments = objects.newInstance<DesktopHotkeyArguments>()
+        hotkeyArguments.buildScript.set(source.file("build.py"))
+        hotkeyArguments.upstream.from(upstreamHotkey)
+        hotkeyArguments.outputJar.set(desktopHotkeyJar)
+        hotkeyArguments.javaHome.set(System.getProperty("java.home"))
+        argumentProviders.add(hotkeyArguments)
+    }
+} else {
+    null
+}
+
 dependencies {
     implementation(project(":sharedLogic"))
     implementation(libs.androidx.paging.compose)
@@ -246,7 +306,11 @@ dependencies {
     implementation(libs.nucleus.launcher.windows)
     implementation(libs.nucleus.launcher.linux)
     implementation(libs.nucleus.launcher.macos)
-    implementation(libs.nucleus.global.hotkey)
+    if (isLinuxHost) {
+        implementation(files(desktopHotkeyJar).builtBy(checkNotNull(buildDesktopLinuxHotkey)))
+    } else {
+        implementation(libs.nucleus.global.hotkey)
+    }
     implementation(libs.nucleus.energy.manager)
     implementation(libs.nucleus.media.control)
     implementation(libs.nucleus.linux.hidpi)
@@ -403,62 +467,81 @@ val minimumRuntimeJdk = 25
 
 // Layout for the JBR install that jpackage uses to build the runtime image.
 // The downloader mirrors the existing `downloadDesktopNodeRuntime` pattern:
-// idempotent PowerShell + SHA-512 verify + atomic rename. The extract task
-// unzips into `desktop-jbr-runtime/<jbrExtractDirName>/` so that
+// verified host-specific download + atomic rename. The extract task
+// extracts ZIP on Windows and tar.gz on Linux into `desktop-jbr-runtime/<jbrExtractDirName>/` so that
 // `packagingJavaHome` resolves to a fully-formed JDK with bin/, conf/, lib/.
 val desktopJbrArchive = layout.buildDirectory.file("downloads/$jbrArchiveName")
 val desktopJbrRoot = layout.buildDirectory.dir("desktop-jbr-runtime")
 val desktopJbrHome: Provider<Directory> = desktopJbrRoot.map { it.dir(jbrExtractDirName) }
 
+val desktopLinuxRuntimeScript = rootProject.layout.projectDirectory.file("../scripts/desktop/linux-runtime.sh")
 val desktopDownloadScript = layout.projectDirectory.file("scripts/download-verified.ps1")
 val desktopExtractScript = layout.projectDirectory.file("scripts/extract-zip.ps1")
 val desktopNpmCiScript = layout.projectDirectory.file("scripts/npm-ci.ps1")
 val desktopStageRuntimeScript = layout.projectDirectory.file("scripts/stage-letta-code-runtime.ps1")
 
 val downloadDesktopJbr = tasks.register<Exec>("downloadDesktopJbr") {
-    enabled = isWindowsHost
+    enabled = isDesktopRuntimeHost
     inputs.property("jbrVersion", jbrVersion)
     inputs.property("jbrBuild", jbrBuild)
     inputs.property("sha512", jbrArchiveSha512)
     inputs.file(desktopDownloadScript)
     outputs.file(desktopJbrArchive)
     // All args are config-time strings so Exec stays configuration-cache safe.
-    commandLine(
-        "powershell.exe",
-        "-NoProfile",
-        "-NonInteractive",
-        "-File",
-        desktopDownloadScript.asFile.absolutePath,
-        "-Url",
-        "https://cache-redirector.jetbrains.com/intellij-jbr/$jbrArchiveName",
-        "-OutFile",
-        desktopJbrArchive.get().asFile.absolutePath,
-        "-Algorithm",
-        "SHA512",
-        "-Expected",
-        jbrArchiveSha512,
-    )
+    inputs.file(desktopLinuxRuntimeScript)
+    if (isWindowsHost) {
+        commandLine(
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            desktopDownloadScript.asFile.absolutePath,
+            "-Url",
+            "https://cache-redirector.jetbrains.com/intellij-jbr/$jbrArchiveName",
+            "-OutFile",
+            desktopJbrArchive.get().asFile.absolutePath,
+            "-Algorithm",
+            "SHA512",
+            "-Expected",
+            jbrArchiveSha512,
+        )
+    } else {
+        commandLine(
+            "bash", desktopLinuxRuntimeScript.asFile.absolutePath,
+            "download", "https://cache-redirector.jetbrains.com/intellij-jbr/$jbrArchiveName",
+            desktopJbrArchive.get().asFile.absolutePath, "512", jbrArchiveSha512,
+        )
+    }
 }
 
 val extractDesktopJbr = tasks.register<Exec>("extractDesktopJbr") {
-    enabled = isWindowsHost
+    enabled = isDesktopRuntimeHost
     dependsOn(downloadDesktopJbr)
     inputs.file(desktopExtractScript)
     inputs.file(desktopJbrArchive)
     outputs.dir(desktopJbrHome)
-    commandLine(
-        "powershell.exe",
-        "-NoProfile",
-        "-NonInteractive",
-        "-File",
-        desktopExtractScript.asFile.absolutePath,
-        "-Archive",
-        desktopJbrArchive.get().asFile.absolutePath,
-        "-ExtractTo",
-        desktopJbrRoot.get().asFile.absolutePath,
-        "-Target",
-        desktopJbrHome.get().asFile.absolutePath,
-    )
+    inputs.file(desktopLinuxRuntimeScript)
+    if (isWindowsHost) {
+        commandLine(
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            desktopExtractScript.asFile.absolutePath,
+            "-Archive",
+            desktopJbrArchive.get().asFile.absolutePath,
+            "-ExtractTo",
+            desktopJbrRoot.get().asFile.absolutePath,
+            "-Target",
+            desktopJbrHome.get().asFile.absolutePath,
+        )
+    } else {
+        commandLine(
+            "bash", desktopLinuxRuntimeScript.asFile.absolutePath,
+            "extract", desktopJbrArchive.get().asFile.absolutePath,
+            desktopJbrHome.get().asFile.absolutePath,
+        )
+    }
 }
 
 /**
@@ -517,6 +600,18 @@ nucleus.application {
         "--add-opens=java.desktop/sun.awt.windows=ALL-UNNAMED",
     )
 
+    if (isLinuxHost) {
+        // jpackage expands $APPDIR to lib/app at launch, including after AppImage relocation.
+        // Bind the existing explicit-runtime contract; never capture a build-machine path.
+        jvmArgs(
+            // Nucleus uses this ID for MPRIS: a display name with spaces leaves its
+            // native D-Bus registration waiting on the AWT event thread at startup.
+            "-Dnucleus.app.id=ca.oculair.meridian.desktop",
+            "-Dletta.desktop.runtime.node=\$APPDIR/resources/letta-code-runtime/node",
+            "-Dletta.desktop.runtime.lettaJs=\$APPDIR/resources/letta-code-runtime/node_modules/@letta-ai/letta-code/letta.js",
+        )
+    }
+
     // Skiko's FrameWatcher calls System.gc() every 30s once 1,000 frames have rendered, to
     // reclaim native Skia peers. It assumes a concurrent collector; under G1's default that
     // is a stop-the-world FULL collection (~80ms here), felt as a periodic halt while drawing
@@ -545,6 +640,9 @@ nucleus.application {
         appResourcesRootDir.set(project.layout.buildDirectory.dir("generated/desktop-app-resources"))
         if (providers.gradleProperty("nucleusAllFormats").orNull.toBoolean()) {
             targetFormats(*TargetFormat.entries.toTypedArray())
+        } else if (isLinuxHost) {
+            // Nucleus 2.1.5 supports a portable AppImage; Arch needs no deb/rpm conversion.
+            targetFormats(TargetFormat.AppImage)
         } else {
             targetFormats(TargetFormat.Exe, TargetFormat.Msi)
         }
@@ -569,7 +667,8 @@ nucleus.application {
         // app once in training mode (it exits itself: DesktopAotTraining.kt) and ships the JVM's
         // AOT cache beside it, so installed launches start with those classes already loaded and
         // linked. -PnucleusAotCache=false skips the training run for a quicker local package.
-        enableAotCache = providers.gradleProperty("nucleusAotCache").orNull?.toBoolean() ?: true
+        // Keep the Windows AOT behavior. Linux starts without a machine-specific training cache.
+        enableAotCache = providers.gradleProperty("nucleusAotCache").orNull?.toBoolean() ?: !isLinuxHost
         packageName = "Meridian Desktop"
         packageVersion = computeDesktopPackageVersion().get()
         description = "Desktop client foundation for the Meridian AI platform."
@@ -640,56 +739,129 @@ nucleus.application {
     }
 }
 
+// electron-builder 26.15.5 otherwise selects appimage-12.0.1 and bundles a
+// GTK2 indicator dependency chain. Use its supported toolset-path override.
+val desktopAppImageToolsArchive = layout.buildDirectory.file("downloads/appimage-tools-1.0.3.tar.gz")
+val desktopAppImageToolsDir = layout.buildDirectory.dir("desktop-appimage-tools")
+val downloadDesktopAppImageTools = tasks.register<Exec>("downloadDesktopAppImageTools") {
+    onlyIf { isLinuxHost }
+    inputs.file(desktopLinuxRuntimeScript)
+    val digest = "84021a78ee214ae6fd33a2d62a92ba25542dd10bc86bf117a9b2d0bba44e7665"
+    inputs.property("sha256", digest)
+    outputs.file(desktopAppImageToolsArchive)
+    commandLine(
+        "bash", desktopLinuxRuntimeScript.asFile.absolutePath, "download",
+        "https://github.com/electron-userland/electron-builder-binaries/releases/download/" +
+            "appimage%401.0.3/appimage-tools-runtime-20251108.tar.gz",
+        desktopAppImageToolsArchive.get().asFile.absolutePath, "256", digest,
+    )
+}
+val prepareDesktopAppImageTools = tasks.register<Exec>("prepareDesktopAppImageTools") {
+    onlyIf { isLinuxHost }
+    dependsOn(downloadDesktopAppImageTools)
+    inputs.file(desktopLinuxRuntimeScript)
+    inputs.file(desktopAppImageToolsArchive)
+    outputs.dir(desktopAppImageToolsDir)
+    commandLine(
+        "bash", desktopLinuxRuntimeScript.asFile.absolutePath, "appimage-tools",
+        desktopAppImageToolsArchive.get().asFile.absolutePath,
+        desktopAppImageToolsDir.get().asFile.absolutePath,
+    )
+}
+
+if (isLinuxHost) {
+    tasks.withType<dev.nucleusframework.desktop.application.tasks.AbstractElectronBuilderPackageTask>().configureEach {
+        if (targetFormat == TargetFormat.AppImage) {
+            dependsOn(prepareDesktopAppImageTools)
+            inputs.dir(desktopAppImageToolsDir)
+            doFirst {
+                val toolsPath = desktopAppImageToolsDir.get().asFile.absolutePath
+                check(System.getenv("APPIMAGE_TOOLS_PATH") == null) {
+                    "Unset APPIMAGE_TOOLS_PATH: Linux packaging uses the pinned GTK3 toolset"
+                }
+                // electron-builder loads this from its project directory (destinationDir).
+                // The generated configuration and this build path never enter the app image.
+                destinationDir.file("electron-builder.env").get().asFile.apply {
+                    parentFile.mkdirs()
+                    writeText("APPIMAGE_TOOLS_PATH='$toolsPath'\n")
+                }
+                // Nucleus 2.1.5 only writes this generated file when absent. Refresh it
+                // so an incremental version change also reaches the outer AppImage.
+                val metadata = destinationDir.file("package.json").get().asFile
+                check(!metadata.exists() || metadata.delete()) { "Cannot refresh AppImage metadata: $metadata" }
+            }
+        }
+    }
+}
+
 val desktopRuntimeSourceDir = layout.projectDirectory.dir("runtime")
 val desktopNodeArchive = layout.buildDirectory.file("downloads/$desktopNodeArchiveName")
 val desktopNodeRuntimeRoot = layout.buildDirectory.dir("desktop-node-runtime")
-val desktopNodeExtractDir = desktopNodeRuntimeRoot.map { it.dir("node-v$desktopNodeVersion-win-x64") }
+val desktopNodeExtractDir = desktopNodeRuntimeRoot.map { it.dir("node-v$desktopNodeVersion-$desktopNodePlatform") }
 val desktopRuntimeInstallDir = layout.buildDirectory.dir("desktop-letta-code-runtime")
 val desktopAppResourcesDir = layout.buildDirectory.dir("generated/desktop-app-resources")
-val desktopBundledRuntimeDir = desktopAppResourcesDir.map { it.dir("windows/letta-code-runtime") }
+val desktopBundledRuntimeDir = desktopAppResourcesDir.map { it.dir("$desktopRuntimePlatform/letta-code-runtime") }
 
 val downloadDesktopNodeRuntime = tasks.register<Exec>("downloadDesktopNodeRuntime") {
-    enabled = isWindowsHost
+    enabled = isDesktopRuntimeHost
     inputs.property("nodeVersion", desktopNodeVersion)
     inputs.property("sha256", desktopNodeArchiveSha256)
     inputs.file(desktopDownloadScript)
     outputs.file(desktopNodeArchive)
-    commandLine(
-        "powershell.exe",
-        "-NoProfile",
-        "-NonInteractive",
-        "-File",
-        desktopDownloadScript.asFile.absolutePath,
-        "-Url",
-        "https://nodejs.org/dist/v$desktopNodeVersion/$desktopNodeArchiveName",
-        "-OutFile",
-        desktopNodeArchive.get().asFile.absolutePath,
-        "-Algorithm",
-        "SHA256",
-        "-Expected",
-        desktopNodeArchiveSha256,
-    )
+    inputs.file(desktopLinuxRuntimeScript)
+    if (isWindowsHost) {
+        commandLine(
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            desktopDownloadScript.asFile.absolutePath,
+            "-Url",
+            "https://nodejs.org/dist/v$desktopNodeVersion/$desktopNodeArchiveName",
+            "-OutFile",
+            desktopNodeArchive.get().asFile.absolutePath,
+            "-Algorithm",
+            "SHA256",
+            "-Expected",
+            desktopNodeArchiveSha256,
+        )
+    } else {
+        commandLine(
+            "bash", desktopLinuxRuntimeScript.asFile.absolutePath,
+            "download", "https://nodejs.org/dist/v$desktopNodeVersion/$desktopNodeArchiveName",
+            desktopNodeArchive.get().asFile.absolutePath, "256", desktopNodeArchiveSha256,
+        )
+    }
 }
 
 val extractDesktopNodeRuntime = tasks.register<Exec>("extractDesktopNodeRuntime") {
-    enabled = isWindowsHost
+    enabled = isDesktopRuntimeHost
     dependsOn(downloadDesktopNodeRuntime)
     inputs.file(desktopExtractScript)
     inputs.file(desktopNodeArchive)
     outputs.dir(desktopNodeExtractDir)
-    commandLine(
-        "powershell.exe",
-        "-NoProfile",
-        "-NonInteractive",
-        "-File",
-        desktopExtractScript.asFile.absolutePath,
-        "-Archive",
-        desktopNodeArchive.get().asFile.absolutePath,
-        "-ExtractTo",
-        desktopNodeRuntimeRoot.get().asFile.absolutePath,
-        "-Target",
-        desktopNodeExtractDir.get().asFile.absolutePath,
-    )
+    inputs.file(desktopLinuxRuntimeScript)
+    if (isWindowsHost) {
+        commandLine(
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            desktopExtractScript.asFile.absolutePath,
+            "-Archive",
+            desktopNodeArchive.get().asFile.absolutePath,
+            "-ExtractTo",
+            desktopNodeRuntimeRoot.get().asFile.absolutePath,
+            "-Target",
+            desktopNodeExtractDir.get().asFile.absolutePath,
+        )
+    } else {
+        commandLine(
+            "bash", desktopLinuxRuntimeScript.asFile.absolutePath,
+            "extract", desktopNodeArchive.get().asFile.absolutePath,
+            desktopNodeExtractDir.get().asFile.absolutePath,
+        )
+    }
 }
 
 val prepareDesktopRuntimeInstallDir = tasks.register<Copy>("prepareDesktopRuntimeInstallDir") {
@@ -699,7 +871,7 @@ val prepareDesktopRuntimeInstallDir = tasks.register<Copy>("prepareDesktopRuntim
 }
 
 val installDesktopLettaCodeRuntime = tasks.register<Exec>("installDesktopLettaCodeRuntime") {
-    enabled = isWindowsHost
+    enabled = isDesktopRuntimeHost
     dependsOn(extractDesktopNodeRuntime)
     dependsOn(prepareDesktopRuntimeInstallDir)
     inputs.files(
@@ -709,43 +881,61 @@ val installDesktopLettaCodeRuntime = tasks.register<Exec>("installDesktopLettaCo
     inputs.file(desktopNpmCiScript)
     inputs.property("lettaCodeVersion", desktopLettaCodeVersion)
     outputs.dir(desktopRuntimeInstallDir.map { it.dir("node_modules") })
-    commandLine(
-        "powershell.exe",
-        "-NoProfile",
-        "-NonInteractive",
-        "-File",
-        desktopNpmCiScript.asFile.absolutePath,
-        "-NpmCmd",
-        desktopNodeExtractDir.get().file("npm.cmd").asFile.absolutePath,
-        "-WorkDir",
-        desktopRuntimeInstallDir.get().asFile.absolutePath,
-    )
+    inputs.file(desktopLinuxRuntimeScript)
+    if (isWindowsHost) {
+        commandLine(
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            desktopNpmCiScript.asFile.absolutePath,
+            "-NpmCmd",
+            desktopNodeExtractDir.get().file("npm.cmd").asFile.absolutePath,
+            "-WorkDir",
+            desktopRuntimeInstallDir.get().asFile.absolutePath,
+        )
+    } else {
+        commandLine(
+            "bash", desktopLinuxRuntimeScript.asFile.absolutePath,
+            "npm", desktopNodeExtractDir.get().asFile.absolutePath,
+            desktopRuntimeInstallDir.get().asFile.absolutePath,
+        )
+    }
 }
 
 val prepareDesktopLettaCodeRuntime = tasks.register<Exec>("prepareDesktopLettaCodeRuntime") {
-    enabled = isWindowsHost
+    enabled = isDesktopRuntimeHost
     dependsOn(installDesktopLettaCodeRuntime)
     inputs.file(desktopStageRuntimeScript)
-    inputs.file(desktopNodeExtractDir.map { it.file("node.exe") })
+    inputs.file(desktopNodeExtractDir.map { it.file(if (isWindowsHost) "node.exe" else "bin/node") })
     inputs.dir(desktopRuntimeInstallDir)
     outputs.dir(desktopBundledRuntimeDir)
-    commandLine(
-        "powershell.exe",
-        "-NoProfile",
-        "-NonInteractive",
-        "-File",
-        desktopStageRuntimeScript.asFile.absolutePath,
-        "-NodeExe",
-        desktopNodeExtractDir.get().file("node.exe").asFile.absolutePath,
-        "-InstallDir",
-        desktopRuntimeInstallDir.get().asFile.absolutePath,
-        "-DestDir",
-        desktopBundledRuntimeDir.get().asFile.absolutePath,
-    )
+    inputs.file(desktopLinuxRuntimeScript)
+    if (isWindowsHost) {
+        commandLine(
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-File",
+            desktopStageRuntimeScript.asFile.absolutePath,
+            "-NodeExe",
+            desktopNodeExtractDir.get().file("node.exe").asFile.absolutePath,
+            "-InstallDir",
+            desktopRuntimeInstallDir.get().asFile.absolutePath,
+            "-DestDir",
+            desktopBundledRuntimeDir.get().asFile.absolutePath,
+        )
+    } else {
+        commandLine(
+            "bash", desktopLinuxRuntimeScript.asFile.absolutePath,
+            "stage", desktopNodeExtractDir.get().file("bin/node").asFile.absolutePath,
+            desktopRuntimeInstallDir.get().asFile.absolutePath, desktopBundledRuntimeDir.get().asFile.absolutePath,
+        )
+    }
 }
 
-tasks.matching { it.name == "prepareAppResources" }.configureEach {
-    dependsOn(prepareDesktopLettaCodeRuntime)
+tasks.configureEach {
+    if (name == "prepareAppResources") dependsOn(prepareDesktopLettaCodeRuntime)
 }
 
 /*
@@ -783,16 +973,15 @@ val stageDesktopRiveBridge = tasks.register("stageDesktopRiveBridge") {
     }
 }
 
-tasks.matching { it.name == "prepareAppResources" }.configureEach {
-    dependsOn(stageDesktopRiveBridge)
+tasks.configureEach {
+    if (name == "prepareAppResources") dependsOn(stageDesktopRiveBridge)
 }
 
-tasks.matching {
-    it.name.startsWith("createDistributable") ||
-    it.name.startsWith("createReleaseDistributable") ||
-    it.name.startsWith("packageDistributionForCurrentOS") ||
-    it.name.startsWith("packageReleaseDistributionForCurrentOS")
-}.configureEach {
+tasks.configureEach {
+    if (!(name.startsWith("createDistributable") ||
+            name.startsWith("createReleaseDistributable") ||
+            name.startsWith("packageDistributionForCurrentOS") ||
+            name.startsWith("packageReleaseDistributionForCurrentOS"))) return@configureEach
     val staged = stagedRiveBridge
     doFirst {
         if (!isWindowsHost || allowMissingRiveBridge) return@doFirst
@@ -804,8 +993,8 @@ tasks.matching {
     }
 }
 
-tasks.matching { it.name == "checkRuntime" || it.name == "checkReleaseRuntime" }.configureEach {
-    dependsOn(extractDesktopJbr)
+tasks.configureEach {
+    if (name == "checkRuntime" || name == "checkReleaseRuntime") dependsOn(extractDesktopJbr)
 }
 
 /**
@@ -822,14 +1011,13 @@ tasks.matching { it.name == "checkRuntime" || it.name == "checkReleaseRuntime" }
  * (Temurin's InputMethod bridge is a no-op for non-Swing text components,
  * so the keyboard never pops on Compose Multiplatform text input).
  */
-tasks.matching {
-    it.name.startsWith("createDistributable") ||
-    it.name.startsWith("createReleaseDistributable") ||
-    it.name.startsWith("packageDistributionForCurrentOS")
-}.configureEach {
+tasks.configureEach {
+    if (!(name.startsWith("createDistributable") ||
+            name.startsWith("createReleaseDistributable") ||
+            name.startsWith("packageDistributionForCurrentOS"))) return@configureEach
     dependsOn(extractDesktopJbr)
     doLast {
-        if (!isWindowsHost) return@doLast
+        if (!isDesktopRuntimeHost) return@doLast
         val release = File(desktopJbrHome.get().asFile, "release")
         require(release.isFile) { "Missing JBR release file at $release â€” extractDesktopJbr did not produce one." }
         val props = release.readLines().associate { line ->
@@ -917,10 +1105,25 @@ fun verifyBundledModules(distributableDir: File, release: File, bundled: Set<Str
     logger.lifecycle("verifyBundledModules: all ${needed.size} modules the jars need are bundled.")
 }
 
-tasks.matching { it.name.startsWith("createDistributable") || it.name.startsWith("createReleaseDistributable") }
-    .configureEach {
+tasks.configureEach {
+        if (!(name.startsWith("createDistributable") || name.startsWith("createReleaseDistributable"))) return@configureEach
         doLast {
-            outputs.files.files.filter { it.isDirectory }.forEach(::verifyBundledRuntime)
+            outputs.files.files.filter { it.isDirectory }.forEach { distributable ->
+                if (isLinuxHost) {
+                    // Nucleus 2.1.5 copies resources with File.copyTo, losing executable bits.
+                    // Restore them BEFORE electron-builder consumes the jpackage app image.
+                    val resources = distributable.walkTopDown().firstOrNull {
+                        it.isDirectory && it.name == "resources" && it.resolve("letta-code-runtime/node").isFile
+                    } ?: error("Linux bundled runtime resources missing under $distributable")
+                    val source = desktopAppResourcesDir.get().dir("linux").asFile
+                    resources.walkTopDown().filter { it.isFile }.forEach { packaged ->
+                        if (source.resolve(packaged.relativeTo(resources)).canExecute()) {
+                            check(packaged.setExecutable(true, false)) { "Cannot restore executable mode: $packaged" }
+                        }
+                    }
+                }
+                verifyBundledRuntime(distributable)
+            }
         }
     }
 

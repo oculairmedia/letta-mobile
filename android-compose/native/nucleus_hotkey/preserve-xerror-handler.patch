@@ -1,0 +1,16 @@
+--- a/global-hotkey/src/main/native/linux/nucleus_global_hotkey_linux.c
++++ b/global-hotkey/src/main/native/linux/nucleus_global_hotkey_linux.c
+@@ -163,5 +163,5 @@
+ static int x11_grab(HotKeyEntry *e) {
+     x11err = 0;
+-    XSetErrorHandler(x11errH);
++    XErrorHandler previous_handler = XSetErrorHandler(x11errH);
+     XSync(g_display, False);
+     for (int i = 0; i < (int)NUM_LOCKS; i++)
+@@ -169,5 +169,5 @@
+                  g_rootWindow, True, GrabModeAsync, GrabModeAsync);
+     XSync(g_display, False);
+-    XSetErrorHandler(NULL);
++    XSetErrorHandler(previous_handler);
+     return x11err ? -1 : 0;
+ }

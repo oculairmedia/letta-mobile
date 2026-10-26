@@ -334,6 +334,12 @@ jobs:
       # edges into :app, feature->feature, shell->shell, library->feature and
       # multiplatform->single-platform edges not in architecture-tests/boundary-baseline.txt
       # (letta-mobile-o4ygk.1). :build-logic:test proves each rule on synthetic graphs.
+      - name: Install Linux hotkey build prerequisites for desktop tests
+        if: contains(steps.additive_modules.outputs.tasks, ':desktop:')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc pkg-config patch libx11-dev libglib2.0-dev xvfb xauth
+
       - name: Run Android verification task graph
         env:
           ADDITIVE_TASKS: ${{ steps.additive_modules.outputs.tasks }}

@@ -1,0 +1,12 @@
+{
+  "version": "2.1.5",
+  "commit": "d6bbfea323b1899b0db47acb3ae351859819c80f",
+  "jar_sha256": "b819415f34cb8e86bcf0e55e61d85fb8a5518bc9cc3b4086d82b483ad88673e1",
+  "files": {
+    "global-hotkey/src/main/native/linux/nucleus_global_hotkey_linux.c": "66f102edbdd02f82605e5772172ca4a65c9d7cc2e5034c31e7778977ef6119dd",
+    "global-hotkey/src/main/native/linux/nucleus_hotkey_keys.h": "02c0158800ca341e72604e74defe388766f3e8d60d536bd10ffa680961f1e4cc",
+    "global-hotkey/src/main/native/linux/build.sh": "0704698157a802a59ada5533b1a8ca8b726df94c4217b2eb9b1b6dc318b56b13",
+    "LICENSE": "6381573681eaf927c04185acf8a3fd73399f4e3bdd7e827ddd5adda5fc12d541"
+  },
+  "patched_source_sha256": "bb4d1c125a0fa3e75b98bf5625988604dc055d8355c5480494419495194deabf"
+}

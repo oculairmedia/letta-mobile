@@ -1,15 +1,23 @@
 name: Desktop Installer
 
-# Builds the Windows desktop client installer (EXE + MSI) for the :desktop
-# Compose Multiplatform module. jpackage is OS-native, so the installer MUST be
-# produced on a Windows runner — Linux runners can only build .deb/.rpm or the
-# cross-platform uber-jar. See letta-mobile-nvrq8.
+# Builds the shared :desktop Compose client on native hosts: Windows EXE/MSI
+# and a Linux x86-64 AppImage with bundled JBR/Node/AppServer and Linux JNI.
 
 on:
   push:
     branches: [main]
     paths:
       - ".github/workflows/desktop.yml"
+      - ".github/workflows/release.yml"
+      - "scripts/desktop/**"
+      - "scripts/tests/test_desktop_packaging.py"
+      - "scripts/tests/desktop_smoke_fixtures.py"
+      - "scripts/tests/test_linux_startup_diagnostic.py"
+      - "scripts/tests/test_nucleus_hotkey.py"
+      - "android-compose/build-logic/**"
+      - "android-compose/letta-code-runtime/**"
+      - "android-compose/sharedUI/**"
+      - "android-compose/plugin-view/**"
       - "android-compose/desktop/**"
       - "android-compose/native/**"
       - "android-compose/avatar/**"
@@ -22,6 +30,16 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/desktop.yml"
+      - ".github/workflows/release.yml"
+      - "scripts/desktop/**"
+      - "scripts/tests/test_desktop_packaging.py"
+      - "scripts/tests/desktop_smoke_fixtures.py"
+      - "scripts/tests/test_linux_startup_diagnostic.py"
+      - "scripts/tests/test_nucleus_hotkey.py"
+      - "android-compose/build-logic/**"
+      - "android-compose/letta-code-runtime/**"
+      - "android-compose/sharedUI/**"
+      - "android-compose/plugin-view/**"
       - "android-compose/desktop/**"
       - "android-compose/native/**"
       - "android-compose/avatar/**"
@@ -177,6 +195,25 @@ jobs:
           }
           if ($tooLarge) { throw "An installer is over the $ceilingMb MB ceiling" }
 
+      - name: Smoke the packaged Windows app with its bundled runtime
+        shell: pwsh
+        run: |
+          & (Join-Path $env:GITHUB_WORKSPACE 'scripts/desktop/windows-package-smoke.ps1') `
+            -ImageRoot 'D:\l\compose\binaries\main\app' `
+            -EvidenceRoot (Join-Path $env:RUNNER_TEMP 'windows-desktop-smoke')
+
+      - name: Upload Windows packaged smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-desktop-smoke-${{ github.run_number }}
+          path: |
+            ${{ runner.temp }}/windows-desktop-smoke/*.log
+            ${{ runner.temp }}/windows-desktop-smoke/*.jsonl
+            ${{ runner.temp }}/windows-desktop-smoke/*.png
+            ${{ runner.temp }}/windows-desktop-smoke/window.txt
+          if-no-files-found: warn
+
       - name: Upload Windows installers
         uses: actions/upload-artifact@v4
         with:
@@ -193,13 +230,143 @@ jobs:
           path: D:\rb\out\rive_desktop_bridge.dll
           if-no-files-found: error
 
+  # Portable shared Compose desktop app, built natively on Linux (not the server wrapper).
+  # The pinned AppImage toolset carries GTK3 indicator libraries; no GTK2 host fallback.
+  linux-desktop:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: android-compose
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Java 21 (Gradle daemon JVM)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Java 26 (build tools; the app bundles pinned JBR 25)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+
+      - name: Expose JDK 21 to Gradle's daemon-JVM resolver
+        run: |
+          mkdir -p "$HOME/.gradle"
+          echo "org.gradle.java.installations.fromEnv=JAVA_HOME_21_X64" >> "$HOME/.gradle/gradle.properties"
+
+      - name: Setup Node for Nucleus electron-builder tooling
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.13.1
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Install Linux packaging and X11 smoke dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc pkg-config patch libx11-dev libglib2.0-dev binutils gdb xvfb xauth xdotool x11-utils openbox dbus-x11 desktop-file-utils patchelf \
+            libgtk-3-0 libasound2 libdbusmenu-gtk3-4 libsystemd0 libx11-6 libxext6 libxi6 libxrender1 libxtst6 \
+            libfontconfig1 libfreetype6 libgl1 libegl1 libnss3 libgbm1 libxkbcommon0 \
+            libnotify4 libsecret-1-0 libdbus-glib-1-2
+
+      - name: Packaging regression fixtures
+        working-directory: .
+        run: |
+          python3 scripts/tests/test_desktop_packaging.py
+          python3 scripts/tests/test_linux_startup_diagnostic.py
+          python3 scripts/tests/test_nucleus_hotkey.py
+
+      - name: Build Linux x86-64 AppImage
+        # Nucleus AppImage uses the real jpackage app image, JBR, Node and shared UI.
+        # Rive's D3D11 bridge is Windows-only; Linux retains the existing fallback mascot.
+        run: ./gradlew --no-configuration-cache :desktop:packageDistributionForCurrentOS
+
+      - name: Verify the shipped Linux desktop
+        id: linux-smoke
+        env:
+          LETTA_PACKAGE_SMOKE_EVIDENCE: ${{ runner.temp }}/linux-desktop-smoke
+        run: |
+          set -euo pipefail
+          mapfile -d '' images < <(find desktop/build/compose/binaries/main/AppImage -maxdepth 1 -name '*.AppImage' -print0)
+          test "${#images[@]}" -eq 1
+          printf 'appimage=%s\n' "${images[0]}" >> "$GITHUB_OUTPUT"
+          for attempt in 1 2 3; do
+            LETTA_PACKAGE_SMOKE_EVIDENCE="$LETTA_PACKAGE_SMOKE_EVIDENCE/attempt-$attempt" \
+              xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash ../scripts/desktop/linux-package-smoke.sh "${images[0]}"
+          done
+
+      - name: Stage the verified Linux desktop
+        env:
+          ARTIFACT_TAG: ci-${{ github.run_number }}
+          APPIMAGE_PATH: ${{ steps.linux-smoke.outputs.appimage }}
+        run: |
+          set -euo pipefail
+          mkdir -p desktop/build/linux-release
+          name="letta-desktop-${ARTIFACT_TAG}-linux-x64.AppImage"
+          cp -f "$APPIMAGE_PATH" "desktop/build/linux-release/$name"
+          cd desktop/build/linux-release
+          sha256sum "$name" > "$name.sha256"
+
+      - name: Diagnose failed Linux startup with GDB
+        if: ${{ failure() && steps.linux-smoke.outcome == 'failure' && steps.linux-smoke.outputs.appimage != '' }}
+        # Evidence only: the original smoke step remains failed regardless of replay outcome.
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          APPIMAGE_PATH: ${{ steps.linux-smoke.outputs.appimage }}
+          LETTA_PACKAGE_X11_TRACE: "1"
+          LETTA_PACKAGE_SMOKE_EVIDENCE: ${{ runner.temp }}/linux-desktop-diagnostic
+        run: |
+          xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash ../scripts/desktop/linux-package-smoke.sh "$APPIMAGE_PATH"
+
+      - name: Retain failed Linux AppImage for diagnosis only
+        if: ${{ failure() && steps.linux-smoke.outcome == 'failure' && steps.linux-smoke.outputs.appimage != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: unverified-linux-appimage-${{ github.run_number }}
+          path: ${{ steps.linux-smoke.outputs.appimage }}
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Upload Linux GDB diagnostic evidence
+        if: ${{ always() && steps.linux-smoke.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-desktop-diagnostic-${{ github.run_number }}
+          path: ${{ runner.temp }}/linux-desktop-diagnostic/
+          if-no-files-found: warn
+
+      - name: Upload Linux packaged smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-desktop-smoke-${{ github.run_number }}
+          path: ${{ runner.temp }}/linux-desktop-smoke/
+          if-no-files-found: warn
+
+      - name: Upload Linux desktop AppImage and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: letta-desktop-linux-x64-${{ github.run_number }}
+          path: android-compose/desktop/build/linux-release/*
+          if-no-files-found: error
+
   # Stable status check for branch protection.
   desktop-installer-pass:
     runs-on: ubuntu-latest
-    needs: windows-installer
+    needs: [windows-installer, linux-desktop]
     if: always()
     steps:
-      - name: Verify windows-installer succeeded
+      - name: Verify both native desktop builds succeeded
         run: |
           result="${{ needs.windows-installer.result }}"
           if [ "$result" != "success" ]; then
@@ -207,3 +374,9 @@ jobs:
             exit 1
           fi
           echo "windows-installer succeeded"
+          result="${{ needs.linux-desktop.result }}"
+          if [ "$result" != "success" ]; then
+            echo "linux-desktop did not succeed (result=$result)"
+            exit 1
+          fi
+          echo "linux-desktop succeeded"

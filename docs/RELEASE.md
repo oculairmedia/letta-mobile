@@ -15,6 +15,131 @@ Release packaging is defined by [release.yml](../.github/workflows/release.yml).
 The retained packaging notes below describe its full/lite Android outputs;
 verify the actual workflow run and attached assets for each release.
 
+## Linux x86-64 desktop (Omarchy / Arch)
+
+The desktop artifact is `letta-desktop-<tag>-linux-x64.AppImage`, accompanied by
+`letta-desktop-<tag>-linux-x64.AppImage.sha256`. It runs the same shared Compose
+UI as Windows. It is separate from `meridian-iroh-wrapper-<tag>-linux-x64.tar`,
+which is a server CLI and cannot launch the desktop UI. This is a portable
+AppImage, not an Arch/pacman package; there is no validated PKGBUILD.
+
+The AppImage bundles JBR **25.0.4 b508.27** (Jewel requires Java 25+), Node
+**24.13.1**, the pinned `@letta-ai/letta-code` runtime and its Linux x64 npm
+native dependencies. Neither a system JDK nor a system Node installation is
+needed. Mermaid and tablet JNI are built on Linux; Automerge and Iroh's Linux
+x64 JNI are carried by their upstream JARs. The Rive desktop renderer currently
+requires Windows/D3D11, so Linux uses the existing fallback mascot. Bundling the
+tablet JNI does not certify Surface pen, touch, keyboard, suspend or scaling.
+JCEF keeps its existing on-demand download/cache behavior; this is not an
+offline JCEF bundle.
+
+Build and smoke runners use Ubuntu **22.04 x86-64**. Nucleus 2.1.5 pins
+electron-builder 26.15.5, whose default `appimage-12.0.1` toolset injects GTK2
+`libappindicator.so.1` and `libindicator.so.7` even for this JVM application.
+Packaging instead pins upstream [AppImage tools 1.0.3](https://github.com/electron-userland/electron-builder-binaries/releases/tag/appimage%401.0.3),
+verified against electron-builder's SHA-256
+`84021a78ee214ae6fd33a2d62a92ba25542dd10bc86bf117a9b2d0bba44e7665`.
+The packaging helper adapts its directory layout to the supported
+`APPIMAGE_TOOLS_PATH` override, supplied through the generated build-only
+`electron-builder.env`. No upstream library is deleted or renamed to mask its ABI.
+The shipped set is `libappindicator3.so.1`, `libindicator3.so.7`, `libnotify.so.4`,
+`libgconf-2.so.4`, `libXss.so.1` and `libXtst.so.6` (plus upstream versioned files
+and symlinks). The app's existing Nucleus tray uses C/sd-bus (`libsystemd.so.0`);
+it does not require a new GTK2 or Ayatana backend. The inspector requires the
+GTK3 indicator pair, rejects the legacy pair, and runs `ldd` on every shipped ELF.
+
+The minimum host surface is a current, fully updated glibc-based Arch/Omarchy
+x86-64 desktop with `glibc`, `gcc-libs`, `systemd-libs`, `dbus`, `dbus-glib`, `gtk3`,
+[`libdbusmenu-gtk3`](https://archlinux.org/packages/extra/x86_64/libdbusmenu-gtk3/)
+(which pulls in `libdbusmenu-glib`), `nss`, `alsa-lib`, `libsecret`, `fontconfig`,
+`freetype2`, fonts such as `ttf-dejavu`, the X11 client libraries (`libx11`,
+`libxext`, `libxi`, `libxrender`, `libxtst`), `libxkbcommon`, and an OpenGL/EGL
+driver stack (`mesa`/`libglvnd` for Mesa systems). GTK3 supplies its GLib,
+GDK/Pango/Cairo and accessibility dependencies. The bundled GTK3 indicator
+requires host `libdbusmenu-gtk3.so.4` and `libdbusmenu-glib.so.4`; CI installs
+[`libdbusmenu-gtk3-4`](https://packages.ubuntu.com/jammy/libdbusmenu-gtk3-4).
+The toolset's `libgconf-2.so.4` also requires `libdbus-glib-1.so.2` (`dbus-glib`
+on Arch, `libdbus-glib-1-2` in CI).
+GTK2 and `libdbusmenu-gtk.so.4` are not host prerequisites. A graphical D-Bus session
+and a window manager are required for first-window acceptance; Xvfb alone is not
+a complete desktop session. The Linux launcher uses a reverse-DNS Nucleus app ID
+so its MPRIS D-Bus registration does not inherit spaces from the display name.
+This does not promise compatibility with older Linux distributions or musl.
+The desktop's AWT backend uses **XWayland** in Omarchy's Wayland session; ensure
+`xorg-xwayland` is installed and `DISPLAY` is set. Native Wayland is not enabled
+or claimed. No live Intel Surface Pro7/Omarchy verification has been performed.
+
+Download the AppImage and matching checksum from the same verified release:
+
+```bash
+sha256sum -c letta-desktop-<tag>-linux-x64.AppImage.sha256
+chmod +x letta-desktop-<tag>-linux-x64.AppImage
+./letta-desktop-<tag>-linux-x64.AppImage
+```
+
+Replace `<tag>` with the release tag in these commands. The pinned toolset carries
+the upstream static AppImage runtime; extraction remains the FUSE-independent
+launch path. To run without a FUSE mount, extract into a permanent,
+user-writable directory, then launch its `AppRun` (keep the whole extracted tree):
+
+```bash
+./letta-desktop-<tag>-linux-x64.AppImage --appimage-extract
+mkdir -p "$HOME/.local/opt"
+# Destination must not already exist.
+mv -f squashfs-root "$HOME/.local/opt/letta-desktop"
+"$HOME/.local/opt/letta-desktop/AppRun"
+```
+
+For menu integration, create `~/.local/share/applications/letta-desktop.desktop`
+with the following content, replacing `/home/YOU` with your actual home path.
+Use the existing image's icon if desired; the minimal entry needs no icon:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Letta Desktop
+Exec="/home/YOU/.local/opt/letta-desktop/AppRun" %U
+Terminal=false
+Categories=Utility;
+MimeType=x-scheme-handler/meridian;
+```
+
+Quit the running app before replacing an extracted installation. Keep the
+Windows updater metadata (`latest.yml` / prerelease channel files) unchanged;
+Linux releases are downloaded/replaced manually. Release tagging, publication
+and installation are performed by the PM after verified merge.
+
+Packaging implementation and acceptance:
+
+- `:desktop:packageDistributionForCurrentOS` selects AppImage on Linux and
+  preserves EXE/MSI on Windows. Nucleus **2.1.5** provides the AppImage backend
+  ([upstream source](https://github.com/NucleusFramework/Nucleus/blob/v2.1.5/plugin-build/plugin/src/main/kotlin/dev/nucleusframework/desktop/application/dsl/TargetFormat.kt)).
+- The Linux Node archive SHA-256 comes from
+  [Node's versioned checksum manifest](https://nodejs.org/dist/v24.13.1/SHASUMS256.txt).
+  The Linux JBR SHA-512 comes from
+  [JetBrains' matching archive checksum](https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk-25.0.4-linux-x64-b508.27.tar.gz.checksum).
+  Archive hashes are pinned in `desktop/build.gradle.kts`; Windows pins stay intact.
+- `desktop.yml` and `release.yml` build on Linux, extract the actual AppImage,
+  validate its desktop entry, inspect all loose ELF files and the selected JNI
+  members of universal JARs, check dynamic-library resolution, load required JNI
+  using the packaged JVM, run the bundled Node/AppServer CLI and require a visible
+  app window under Xvfb/software rendering, Openbox and a private D-Bus session
+  after relocation to a path with spaces. Startup errors, X errors and new JVM
+  crash logs fail acceptance; CI uploads smoke diagnostics even after a failure.
+  The package binds the existing explicit runtime properties using `$APPDIR`;
+  the smoke verifies those expand to real bundled files, without development paths.
+- Run `python3 scripts/tests/test_desktop_packaging.py` for lightweight fixtures.
+  After a build slot is authorized, run the Gradle packaging task above, then
+  `xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash scripts/desktop/linux-package-smoke.sh <AppImage>` from the
+  repository root. Preserve Linux and Windows workflow evidence before release;
+  passing fixtures alone is not packaged-build acceptance. Failed smoke runs retain
+  their extracted tree and logs, printing the evidence directory; set
+  `LETTA_KEEP_PACKAGE_SMOKE=1` to retain successful runs too.
+- The PR desktop workflow also opens the Windows packaged app with its shipped
+  runtime, requires its first window to remain open, and rejects startup errors
+  and JVM crash logs. This complements the existing EXE/MSI build and size gates;
+  the Windows updater metadata and installer identity remain unchanged.
+
 ## Historical REST/SSE checklist (retained record)
 
 **Status:** Historical April-era release procedure. The standalone root `cli/`,
