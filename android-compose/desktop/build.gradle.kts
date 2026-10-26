@@ -232,7 +232,7 @@ val buildDesktopLinuxHotkey = if (isLinuxHost) {
     dependencies.add(upstreamHotkey.name, libs.nucleus.global.hotkey)
     val source = rootProject.layout.projectDirectory.dir("native/nucleus_hotkey")
     tasks.register<Exec>("buildDesktopLinuxHotkey") {
-        inputs.files(upstreamHotkey, fileTree(source))
+        inputs.files(upstreamHotkey, fileTree(source) { exclude("**/__pycache__/**") })
         inputs.property("jniHome", System.getProperty("java.home"))
         outputs.file(desktopHotkeyJar)
         doFirst {
