@@ -123,11 +123,7 @@ private fun PagedTimelineBody(
     val pinned = rememberPinnedPrompt(listState, rows.size, params.topReserve, rows::itemAt)
     val glide = rememberNewestEdgeGlide(listState)
     val today = rememberCurrentDate()
-    // The newest row is the live overlay's head, not necessarily the owner state's last message.
-    val newestId = remember(rows) { rows.itemAt(rows.leading)?.newestMessageId() }
-    val bindings = remember(params.bindings, newestId) {
-        TimelineRowBindings(params.bindings.contexts.withNewest(newestId), params.bindings.callbacks, params.bindings.pinch)
-    }
+    val bindings = rememberPagedRowBindings(params.bindings, rows)
 
     Box(modifier) {
         TimelineListFrame(
@@ -169,6 +165,15 @@ private fun PagedTimelineBody(
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = params.topReserve).padding(LettaDimens.Space.sm),
             )
         }
+    }
+}
+
+@Composable
+private fun rememberPagedRowBindings(bindings: TimelineRowBindings, rows: PagedRows): TimelineRowBindings {
+    // The newest row is the live overlay's head, not necessarily the owner state's last message.
+    val newestId = remember(rows) { rows.itemAt(rows.leading)?.newestMessageId() }
+    return remember(bindings, newestId) {
+        TimelineRowBindings(bindings.contexts.withNewest(newestId), bindings.callbacks, bindings.pinch)
     }
 }
 
