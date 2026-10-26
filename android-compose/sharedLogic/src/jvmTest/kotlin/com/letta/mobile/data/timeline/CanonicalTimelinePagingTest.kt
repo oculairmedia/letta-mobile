@@ -7,9 +7,12 @@ import com.letta.mobile.data.platform.MemoryPressureHub
 import com.letta.mobile.data.platform.MemoryPressureLevel
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -39,6 +42,62 @@ import kotlin.test.assertTrue
  * generation for one revision and a newest-end check that never ran (letta-mobile-vyi8l).
  */
 class CanonicalTimelinePagingTest {
+    @Test fun firstPublicationInvalidatesAnEmptyPageLoadedBeforeHistoryCommitted() = runUiTest { ui ->
+        val transport = PageTransport(records = 0)
+        val session = CanonicalTimelineSession(InMemoryTimelineStore(), transport, scope, enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(session.open()).selection
+        val subscribe = CompletableDeferred<Unit>()
+        val presenter = presenter<TimelineSettledRecord>()
+        ui.launch {
+            session.pagingWithPublications(selection, publications = flow {
+                subscribe.await()
+                emitAll(session.publication)
+            }).collectLatest { presenter.collectFrom(it) }
+        }
+        advanceUntilIdle()
+        presenter.assertIdle()
+        assertEquals(0, presenter.size)
+        val loadedRevision = session.publication.value.durableRevision
+
+        transport.records = 2
+        assertEquals(TimelineEnginePageOutcome.Applied, session.reconcileRecent(selection))
+        advanceUntilIdle()
+        assertTrue(session.publication.value.durableRevision > loadedRevision)
+        assertEquals(0, presenter.size, "the old page remains until revision observation starts")
+
+        subscribe.complete(Unit)
+        advanceUntilIdle()
+        presenter.assertIdle()
+        assertEquals(listOf("m-1", "m-0"), presenter.snapshot().items.map { it.key.identity.value })
+    }
+
+    @Test fun firstPublicationDoesNotReplaceAnAlreadyCurrentPage() = runUiTest { ui ->
+        val session = CanonicalTimelineSession(InMemoryTimelineStore(), PageTransport(records = 2), scope, enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(session.open()).selection
+        assertEquals(TimelineEnginePageOutcome.Applied, session.loadOlder(selection))
+        val subscribe = CompletableDeferred<Unit>()
+        val presenter = presenter<TimelineSettledRecord>()
+        var generations = 0
+        ui.launch {
+            session.pagingWithPublications(selection, publications = flow {
+                subscribe.await()
+                emitAll(session.publication)
+            }).collectLatest {
+                generations++
+                presenter.collectFrom(it)
+            }
+        }
+        advanceUntilIdle()
+        presenter.assertIdle()
+        assertEquals(2, presenter.size)
+        val beforeSubscription = generations
+
+        subscribe.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(beforeSubscription, generations, "a current source needs no extra generation")
+        assertEquals(2, presenter.size)
+    }
+
     @Test fun appliedHistoryPageReachesThePresenter() = runUiTest { ui ->
         val store = InMemoryTimelineStore()
         val transport = PageTransport(records = 3)
@@ -499,7 +558,7 @@ class CanonicalTimelinePagingTest {
     }
 
     /** One page of assistant replies, newest first, with no older history behind it. */
-    private class PageTransport(private val records: Int) : TimelineTransport by unexpectedTimelineTransport() {
+    private class PageTransport(var records: Int) : TimelineTransport by unexpectedTimelineTransport() {
         // The newest and older walks fetch independently; a plain ++ can lose a concurrent call.
         private val callCount = AtomicInteger()
         val calls: Int get() = callCount.get()

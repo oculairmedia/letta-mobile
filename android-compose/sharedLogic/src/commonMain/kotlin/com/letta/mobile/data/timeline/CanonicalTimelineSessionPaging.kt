@@ -12,7 +12,7 @@ import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.flow.collectIndexed
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
@@ -29,6 +29,18 @@ fun CanonicalTimelineSession.paging(
     anchor: TimelinePageKey? = selection.anchor,
     settledProjectionAdapter: TimelineSettledProjectionAdapter = DefaultTimelineSettledProjectionAdapter,
     trims: Flow<Unit> = emptyFlow(),
+): Flow<PagingData<TimelineSettledRecord>> = pagingWithPublications(
+    selection, anchor, settledProjectionAdapter, trims, publication,
+)
+
+/** Keeps revision observation testable independently of the page pump's scheduling. */
+@OptIn(ExperimentalPagingApi::class)
+internal fun CanonicalTimelineSession.pagingWithPublications(
+    selection: TimelineEngineSelection,
+    anchor: TimelinePageKey? = selection.anchor,
+    settledProjectionAdapter: TimelineSettledProjectionAdapter = DefaultTimelineSettledProjectionAdapter,
+    trims: Flow<Unit> = emptyFlow(),
+    publications: Flow<TimelineEnginePublication>,
 ): Flow<PagingData<TimelineSettledRecord>> {
     val active = atomic<TimelineLedgerPagingSource?>(null)
     val pages = Pager(
@@ -53,12 +65,13 @@ fun CanonicalTimelineSession.paging(
             }
         }
         // A superseded selection retires this generation without emitting, matching the prior contract.
-        publication.distinctUntilChanged { old, new ->
+        publications.distinctUntilChanged { old, new ->
             old.selection === new.selection && old.durableRevision == new.durableRevision
-        }.collectIndexed { index, current ->
+        }.collect { current ->
             if (current.selection !== selection) {
                 pump.cancel()
-            } else if (index > 0 && active.value?.invalidateIfBehind(current.durableRevision) == true) {
+            } else if (active.value?.invalidateIfBehind(current.durableRevision) == true) {
+                // The pump may have loaded an older revision before this collector's first emission.
                 // A source that already replaced itself for this revision is current and is left
                 // alone. Every replaced generation redraws the list; a capture names what moved it.
                 Telemetry.event(
