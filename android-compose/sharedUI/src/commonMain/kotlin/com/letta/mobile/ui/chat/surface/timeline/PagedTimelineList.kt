@@ -334,9 +334,9 @@ internal fun ObserveResidentRows(
 }
 
 @Composable
-private fun ObserveResidentRows(
+private fun <T> ObserveResidentRows(
     presentation: CanonicalTimelinePresentation,
-    settled: Any,
+    settled: T,
     residentRows: () -> List<CanonicalTimelinePresentation.Row>?,
 ) {
     LaunchedEffect(presentation, settled) {

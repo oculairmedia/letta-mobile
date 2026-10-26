@@ -23,6 +23,9 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
 
+/** Reference identity for one presented page event, even when its rows compare equal. */
+internal class PagedPresentation
+
 /**
  * Compose binding to Paging's presenter with an identity for every presented page event.
  * Paging 3.5 installs the refresh's hint receiver before [presentPagingDataEvent]. Its snapshot
@@ -30,7 +33,7 @@ import kotlinx.coroutines.withContext
  */
 internal class PagedTimelineItems<T : Any>(cached: PagingData<T>? = null) :
     PagingDataPresenter<T>(mainContext = Dispatchers.Main.immediate, cachedPagingData = cached) {
-    var presentedSnapshot by mutableStateOf(Any() to snapshot())
+    var presentedSnapshot by mutableStateOf(PagedPresentation() to snapshot())
         private set
 
     val itemSnapshotList: ItemSnapshotList<T> get() = presentedSnapshot.second
@@ -47,7 +50,7 @@ internal class PagedTimelineItems<T : Any>(cached: PagingData<T>? = null) :
     }
 
     override suspend fun presentPagingDataEvent(event: PagingDataEvent<T>) {
-        presentedSnapshot = Any() to snapshot()
+        presentedSnapshot = PagedPresentation() to snapshot()
     }
 }
 
@@ -96,7 +99,7 @@ internal class PagedRows(
     /** Changes whenever either source does, so effects keyed on it re-run exactly then. */
     val identity: Pair<List<ChatRenderItem>, ItemSnapshotList<CanonicalTimelinePresentation.Row>>,
     /** Distinguishes presented generations even when every row and placeholder compares equal. */
-    val presented: Any = Any(),
+    val presented: PagedPresentation = PagedPresentation(),
 ) {
     val size: Int get() = leading + assembly.size
     val liveCount: Int get() = assembly.liveCount
