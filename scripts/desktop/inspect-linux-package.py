@@ -103,6 +103,14 @@ def inspect_payload_path(path, root):
         require(path.name in ('sharp-linux-x64', 'sharp-libvips-linux-x64'), f'Foreign sharp: {path}')
 
 
+def inspect_appimage_libraries(root):
+    libraries = root / 'usr/lib'
+    for name in ('libappindicator3.so.1', 'libindicator3.so.7'):
+        require((libraries / name).is_file(), f'GTK3 AppImage library missing: {name}')
+    for name in ('libappindicator.so.1', 'libindicator.so.7'):
+        require(not (libraries / name).exists(), f'Legacy GTK2 AppImage library: {name}')
+
+
 def inspect_loose_natives(root):
     natives = []
     for path in root.rglob('*'):
@@ -146,6 +154,7 @@ def inspect(root, native_dir, forbidden=()):
     cfg = inspect_launcher(root, entry)
     inspect_host_paths([cfg, entry_path, root / 'AppRun'], forbidden)
     jvm, launcher = inspect_jvm(root, cfg)
+    inspect_appimage_libraries(root)
     natives = inspect_loose_natives(root)
     jars = list(root.rglob('*.jar'))
     require(jars, 'Desktop runtime JARs missing')
@@ -166,6 +175,9 @@ def inspect_dynamic_library(path, library_env):
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     dynamic = subprocess.run(['readelf', '-d', path], check=True, text=True,
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout
+    needed = set(re.findall(r'\(NEEDED\).*\[([^\]]+)\]', dynamic))
+    gtk2 = needed & {'libgtk-x11-2.0.so.0', 'libgdk-x11-2.0.so.0', 'libdbusmenu-gtk.so.4'}
+    require(not gtk2, f'GTK2 dependency in {path}: {sorted(gtk2)}')
     for value in re.findall(r'\((?:RPATH|RUNPATH)\)[^\[\(\n]*\[([^\]\n]*)\]', dynamic):
         for search_path in value.split(':'):
             require(not search_path.startswith('/') or search_path in ('/lib', '/lib64', '/usr/lib', '/usr/lib64'),

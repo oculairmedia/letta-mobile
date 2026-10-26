@@ -686,10 +686,52 @@ nucleus.application {
     }
 }
 
+// electron-builder 26.15.5 otherwise selects appimage-12.0.1 and bundles a
+// GTK2 indicator dependency chain. Use its supported toolset-path override.
+val desktopAppImageToolsArchive = layout.buildDirectory.file("downloads/appimage-tools-1.0.3.tar.gz")
+val desktopAppImageToolsDir = layout.buildDirectory.dir("desktop-appimage-tools")
+val downloadDesktopAppImageTools = tasks.register<Exec>("downloadDesktopAppImageTools") {
+    onlyIf { isLinuxHost }
+    inputs.file(desktopLinuxRuntimeScript)
+    val digest = "84021a78ee214ae6fd33a2d62a92ba25542dd10bc86bf117a9b2d0bba44e7665"
+    inputs.property("sha256", digest)
+    outputs.file(desktopAppImageToolsArchive)
+    commandLine(
+        "bash", desktopLinuxRuntimeScript.asFile.absolutePath, "download",
+        "https://github.com/electron-userland/electron-builder-binaries/releases/download/" +
+            "appimage%401.0.3/appimage-tools-runtime-20251108.tar.gz",
+        desktopAppImageToolsArchive.get().asFile.absolutePath, "256", digest,
+    )
+}
+val prepareDesktopAppImageTools = tasks.register<Exec>("prepareDesktopAppImageTools") {
+    onlyIf { isLinuxHost }
+    dependsOn(downloadDesktopAppImageTools)
+    inputs.file(desktopLinuxRuntimeScript)
+    inputs.file(desktopAppImageToolsArchive)
+    outputs.dir(desktopAppImageToolsDir)
+    commandLine(
+        "bash", desktopLinuxRuntimeScript.asFile.absolutePath, "appimage-tools",
+        desktopAppImageToolsArchive.get().asFile.absolutePath,
+        desktopAppImageToolsDir.get().asFile.absolutePath,
+    )
+}
+
 if (isLinuxHost) {
     tasks.withType<dev.nucleusframework.desktop.application.tasks.AbstractElectronBuilderPackageTask>().configureEach {
         if (targetFormat == TargetFormat.AppImage) {
+            dependsOn(prepareDesktopAppImageTools)
+            inputs.dir(desktopAppImageToolsDir)
             doFirst {
+                val toolsPath = desktopAppImageToolsDir.get().asFile.absolutePath
+                check(System.getenv("APPIMAGE_TOOLS_PATH") == null) {
+                    "Unset APPIMAGE_TOOLS_PATH: Linux packaging uses the pinned GTK3 toolset"
+                }
+                // electron-builder loads this from its project directory (destinationDir).
+                // The generated configuration and this build path never enter the app image.
+                destinationDir.file("electron-builder.env").get().asFile.apply {
+                    parentFile.mkdirs()
+                    writeText("APPIMAGE_TOOLS_PATH='$toolsPath'\n")
+                }
                 // Nucleus 2.1.5 only writes this generated file when absent. Refresh it
                 // so an incremental version change also reaches the outer AppImage.
                 val metadata = destinationDir.file("package.json").get().asFile

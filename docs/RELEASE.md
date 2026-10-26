@@ -33,15 +33,34 @@ tablet JNI does not certify Surface pen, touch, keyboard, suspend or scaling.
 JCEF keeps its existing on-demand download/cache behavior; this is not an
 offline JCEF bundle.
 
-Build and smoke runners use Ubuntu **22.04 x86-64**, whose official repositories
-provide the legacy `libdbusmenu-gtk4` dependency used by electron-builder's
-AppImage ([package](https://packages.ubuntu.com/jammy/libdbusmenu-gtk4)).
-The intended runtime is a
-current, fully updated glibc-based Arch/Omarchy x86-64 installation with X11
-libraries, GTK3, NSS, ALSA, fontconfig/fonts, OpenGL/Mesa and libstdc++ available.
-The current electron-builder AppImage payload also carries `libappindicator.so.1`,
-which requires the GTK2 `libdbusmenu-gtk.so.4` library. The payload smoke fails if
-that shipped library cannot resolve its dependencies. A graphical D-Bus session
+Build and smoke runners use Ubuntu **22.04 x86-64**. Nucleus 2.1.5 pins
+electron-builder 26.15.5, whose default `appimage-12.0.1` toolset injects GTK2
+`libappindicator.so.1` and `libindicator.so.7` even for this JVM application.
+Packaging instead pins upstream [AppImage tools 1.0.3](https://github.com/electron-userland/electron-builder-binaries/releases/tag/appimage%401.0.3),
+verified against electron-builder's SHA-256
+`84021a78ee214ae6fd33a2d62a92ba25542dd10bc86bf117a9b2d0bba44e7665`.
+The packaging helper adapts its directory layout to the supported
+`APPIMAGE_TOOLS_PATH` override, supplied through the generated build-only
+`electron-builder.env`. No upstream library is deleted or renamed to mask its ABI.
+The shipped set is `libappindicator3.so.1`, `libindicator3.so.7`, `libnotify.so.4`,
+`libgconf-2.so.4`, `libXss.so.1` and `libXtst.so.6` (plus upstream versioned files
+and symlinks). The app's existing Nucleus tray uses C/sd-bus (`libsystemd.so.0`);
+it does not require a new GTK2 or Ayatana backend. The inspector requires the
+GTK3 indicator pair, rejects the legacy pair, and runs `ldd` on every shipped ELF.
+
+The minimum host surface is a current, fully updated glibc-based Arch/Omarchy
+x86-64 desktop with `glibc`, `gcc-libs`, `systemd-libs`, `dbus`, `dbus-glib`, `gtk3`,
+[`libdbusmenu-gtk3`](https://archlinux.org/packages/extra/x86_64/libdbusmenu-gtk3/)
+(which pulls in `libdbusmenu-glib`), `nss`, `alsa-lib`, `libsecret`, `fontconfig`,
+`freetype2`, fonts such as `ttf-dejavu`, the X11 client libraries (`libx11`,
+`libxext`, `libxi`, `libxrender`, `libxtst`), `libxkbcommon`, and an OpenGL/EGL
+driver stack (`mesa`/`libglvnd` for Mesa systems). GTK3 supplies its GLib,
+GDK/Pango/Cairo and accessibility dependencies. The bundled GTK3 indicator
+requires host `libdbusmenu-gtk3.so.4` and `libdbusmenu-glib.so.4`; CI installs
+[`libdbusmenu-gtk3-4`](https://packages.ubuntu.com/jammy/libdbusmenu-gtk3-4).
+The toolset's `libgconf-2.so.4` also requires `libdbus-glib-1.so.2` (`dbus-glib`
+on Arch, `libdbus-glib-1-2` in CI).
+GTK2 and `libdbusmenu-gtk.so.4` are not host prerequisites. A graphical D-Bus session
 and a window manager are required for first-window acceptance; Xvfb alone is not
 a complete desktop session. The Linux launcher uses a reverse-DNS Nucleus app ID
 so its MPRIS D-Bus registration does not inherit spaces from the display name.
@@ -58,8 +77,9 @@ chmod +x letta-desktop-<tag>-linux-x64.AppImage
 ./letta-desktop-<tag>-linux-x64.AppImage
 ```
 
-Replace `<tag>` with the release tag in these commands. FUSE-based execution
-requires Arch's `fuse2` package. To run without FUSE, extract into a permanent,
+Replace `<tag>` with the release tag in these commands. The pinned toolset carries
+the upstream static AppImage runtime; extraction remains the FUSE-independent
+launch path. To run without a FUSE mount, extract into a permanent,
 user-writable directory, then launch its `AppRun` (keep the whole extracted tree):
 
 ```bash

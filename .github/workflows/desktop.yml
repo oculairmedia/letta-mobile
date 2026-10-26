@@ -265,7 +265,7 @@ jobs:
           if-no-files-found: error
 
   # Portable shared Compose desktop app, built natively on Linux (not the server wrapper).
-  # electron-builder ships a GTK2 appindicator; Jammy provides its dbusmenu SONAME.
+  # The pinned AppImage toolset carries GTK3 indicator libraries; no GTK2 host fallback.
   linux-desktop:
     runs-on: ubuntu-22.04
     defaults:
@@ -307,9 +307,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y binutils xvfb xauth xdotool x11-utils openbox dbus-x11 desktop-file-utils patchelf \
-            libgtk-3-0 libasound2 libdbusmenu-gtk4 libx11-6 libxext6 libxi6 libxrender1 libxtst6 \
+            libgtk-3-0 libasound2 libdbusmenu-gtk3-4 libsystemd0 libx11-6 libxext6 libxi6 libxrender1 libxtst6 \
             libfontconfig1 libfreetype6 libgl1 libegl1 libnss3 libgbm1 libxkbcommon0 \
-            libnotify4 libayatana-appindicator3-1 libsecret-1-0
+            libnotify4 libsecret-1-0 libdbus-glib-1-2
 
       - name: Packaging regression fixtures
         working-directory: .
