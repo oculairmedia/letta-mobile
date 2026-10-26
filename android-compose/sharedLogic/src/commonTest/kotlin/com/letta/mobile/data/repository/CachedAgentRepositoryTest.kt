@@ -116,6 +116,26 @@ class CachedAgentRepositoryTest {
     }
 
     @Test
+    fun targetedReadStartedAfterBulkRequestKeepsItsNewerResult() = runTest {
+        val remote = FakeAgentSource()
+        val readGate = CompletableDeferred<Unit>()
+        val listGate = CompletableDeferred<Unit>()
+        remote.read = { id -> readGate.await(); agent(id, "New targeted") }
+        remote.listGate = listGate
+        remote.roster = listOf(agent(ID, "Old bulk"))
+        val repository = repository(remote)
+        val bulk = async { repository.refreshAgents() }
+        runCurrent()
+        val targeted = async { repository.getAgent(ID).toList() }
+        runCurrent()
+        listGate.complete(Unit)
+        bulk.await()
+        readGate.complete(Unit)
+        assertEquals(listOf(agent(ID, "New targeted")), targeted.await())
+        assertEquals(listOf(agent(ID, "New targeted")), repository.agents.value)
+    }
+
+    @Test
     fun differentIdsFetchInParallel() = runTest {
         val remote = FakeAgentSource()
         val gate = CompletableDeferred<Unit>()

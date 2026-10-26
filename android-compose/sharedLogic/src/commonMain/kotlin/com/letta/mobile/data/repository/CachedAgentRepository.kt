@@ -61,13 +61,16 @@ open class CachedAgentRepository(
     private val _refreshError = MutableStateFlow<Throwable?>(null)
     override val refreshError: StateFlow<Throwable?> = _refreshError.asStateFlow()
     private val refreshMutex = Mutex()
-    private var lastRefreshAtMillis: Long = 0L
+    private var lastRefreshAtMillis: Long? = null
     // Entries live only as long as the cached agents or their active requests.
     private val agentFetchedAt = mutableMapOf<AgentId, Long>()
     private val agentRequests = mutableMapOf<AgentId, Deferred<Result<Agent>>>()
     private var refreshRequest: Deferred<Result<Unit>>? = null
     private val changedDuringRefresh = mutableSetOf<AgentId>()
     private var cacheGeneration = 0L
+    private var cachePublicationRevision = 0L
+    private var startedRefreshRevision = 0L
+    private var completedRefreshRevision = 0L
     internal var clock: Clock = Clock.System
 
     init {
@@ -83,13 +86,15 @@ open class CachedAgentRepository(
         // uncaught Dispatchers.IO exceptions (tests historically passed a
         // broken Lazy mock; production Room build can also throw).
         try {
-            val generation = refreshMutex.withLock { cacheGeneration }
+            val (generation, publicationRevision) = refreshMutex.withLock {
+                cacheGeneration to cachePublicationRevision
+            }
             val cache = localCache?.invoke() ?: return
             val cached = cache.getAllOnce()
             // Do not overwrite a refresh that completed while getAllOnce
             // was suspended. Assigning an empty cache to an empty StateFlow is a no-op.
             refreshMutex.withLock {
-                if (generation == cacheGeneration && _agents.value.isEmpty()) {
+                if (canHydrateCache(generation, publicationRevision)) {
                     _agents.value = cached
                 }
             }
@@ -99,6 +104,10 @@ open class CachedAgentRepository(
             Telemetry.event("CachedAgentRepository", "Failed to load cached agents", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
         }
     }
+
+    private fun canHydrateCache(generation: Long, publicationRevision: Long): Boolean =
+        generation == cacheGeneration && publicationRevision == 0L &&
+            cachePublicationRevision == 0L && _agents.value.isEmpty()
 
     override suspend fun countAgents(): Int {
         val irohSource = irohAgentSource
@@ -159,8 +168,7 @@ open class CachedAgentRepository(
     }
 
     private fun startRefreshLocked(): Deferred<Result<Unit>> {
-        agentRequests.values.forEach { it.cancel() }
-        agentRequests.clear()
+        startedRefreshRevision += 1
         agentFetchedAt.clear()
         changedDuringRefresh.clear()
         lateinit var request: Deferred<Result<Unit>>
@@ -212,8 +220,10 @@ open class CachedAgentRepository(
         // A targeted read, push or deletion after this list started wins over its older snapshot.
         val current = _agents.value.filter { it.id in changedDuringRefresh }
         _agents.value = fresh.filterNot { it.id in changedDuringRefresh } + current
+        cachePublicationRevision += 1
         agentFetchedAt.keys.retainAll(_agents.value.map { it.id }.toSet())
         if (completed) {
+            completedRefreshRevision = startedRefreshRevision
             val now = nowMillis()
             fresh.filterNot { it.id in changedDuringRefresh }.forEach { agentFetchedAt[it.id] = now }
             lastRefreshAtMillis = now
@@ -223,6 +233,7 @@ open class CachedAgentRepository(
     override suspend fun clearForBackendSwitch() {
         refreshMutex.withLock {
             cacheGeneration += 1
+            cachePublicationRevision += 1
             refreshRequest?.cancel()
             refreshRequest = null
             agentRequests.values.forEach { it.cancel() }
@@ -232,7 +243,7 @@ open class CachedAgentRepository(
             _agents.value = emptyList()
             _isRefreshing.value = false
             _refreshError.value = null
-            lastRefreshAtMillis = 0L
+            lastRefreshAtMillis = null
             // Propagate DAO failure to the caller. Swallowing here would leave
             // stale agent rows from the previous backend visible after switch
             // while the in-memory state has already been cleared, which is a
@@ -335,7 +346,7 @@ open class CachedAgentRepository(
     }
 
     fun hasFreshAgents(maxAgeMs: Long): Boolean {
-        return _agents.value.isNotEmpty() && nowMillis() - lastRefreshAtMillis <= maxAgeMs
+        return lastRefreshAtMillis?.let { nowMillis() - it <= maxAgeMs } == true
     }
 
     override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = refreshAgents(maxAgeMs)
@@ -361,6 +372,7 @@ open class CachedAgentRepository(
     }
 
     private fun startAgentRequestLocked(id: AgentId, persist: Boolean): Deferred<Result<Agent>> {
+        val refreshRevisionAtStart = startedRefreshRevision
         lateinit var request: Deferred<Result<Agent>>
         request = repositoryScope.async(start = CoroutineStart.LAZY) {
             try {
@@ -369,15 +381,22 @@ open class CachedAgentRepository(
                     refreshMutex.withLock {
                         request.ensureActive()
                         if (agentRequests[id] !== request) throw CancellationException("Agent cache invalidated")
+                        // A completed list requested after this ordinary read is authoritative.
+                        // Keep the waiter alive, but do not restore its older response to the roster.
+                        if (!persist && completedRefreshRevision > refreshRevisionAtStart) {
+                            return@withLock _agents.value.find { it.id == id }
+                                ?: throw NoSuchElementException("Agent ${id.value} missing from refreshed roster")
+                        }
                         updateAgentInCache(fresh)
+                        cachePublicationRevision += 1
                         agentFetchedAt[id] = nowMillis()
                         if (refreshRequest != null) changedDuringRefresh += id
                         if (persist) {
                             runCatchingCancellable { localCache?.invoke()?.upsert(fresh) }
                                 .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated cache persist failed for ${id.value}", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN) }
                         }
+                        fresh
                     }
-                    fresh
                 }
             } finally {
                 withContext(NonCancellable) {
@@ -401,6 +420,7 @@ open class CachedAgentRepository(
         refreshMutex.withLock {
             if (generation != null && generation != cacheGeneration) return
             invalidateAgentLocked(id)
+            cachePublicationRevision += 1
             _agents.update { current -> current.filterNot { it.id == id } }
             localCache?.invoke()?.deleteById(id.value)
         }
