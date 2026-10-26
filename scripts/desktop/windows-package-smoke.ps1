@@ -123,18 +123,47 @@ function Get-OwnedProcesses([int]$LauncherPid, [string]$ImagePath) {
   }
 }
 
-function Test-NormalAppFrame($Window, $Process, [string]$LauncherPath, [int[]]$Screen) {
-  if (-not $Process -or -not $Process.OwnedTree -or -not $Process.InImage) { return $false }
-  if (-not [string]::Equals($Process.Path, $LauncherPath, [System.StringComparison]::OrdinalIgnoreCase)) { return $false }
-  if (-not $Window.Exists -or -not $Window.Visible -or $Window.Minimized -or $Window.Cloaked -ne 0) { return $false }
-  if ($Window.Parent -ne 0 -or $Window.Owner -ne 0 -or $Window.Root -ne $Window.Handle) { return $false }
+function Test-AppFrameProcess($Process, [string]$LauncherPath) {
+  if (-not $Process) { return $false }
+  if (-not $Process.OwnedTree) { return $false }
+  if (-not $Process.InImage) { return $false }
+  return [string]::Equals($Process.Path, $LauncherPath, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Test-VisibleTopLevelFrame($Window) {
+  if (-not $Window.Exists) { return $false }
+  if (-not $Window.Visible) { return $false }
+  if ($Window.Minimized) { return $false }
+  if ($Window.Cloaked -ne 0) { return $false }
+  if ($Window.Parent -ne 0) { return $false }
+  if ($Window.Owner -ne 0) { return $false }
+  return $Window.Root -eq $Window.Handle
+}
+
+function Test-NormalFrameStyle($Window) {
   if ($Window.Class -ne 'SunAwtFrame') { return $false }
-  if (($Window.Style -band 0x40000000) -ne 0 -or ($Window.Style -band 0x00C00000) -ne 0x00C00000) { return $false }
-  if (($Window.Style -band 0x00080000) -eq 0 -or ($Window.Style -band 0x10000000) -eq 0) { return $false }
-  if ($Screen[2] -le 0 -or $Screen[3] -le 0) { return $false }
-  if ($Window.Right -le $Window.Left -or $Window.Bottom -le $Window.Top) { return $false }
-  return $Window.Right -gt $Screen[0] -and $Window.Bottom -gt $Screen[1] -and
-    $Window.Left -lt ($Screen[0] + $Screen[2]) -and $Window.Top -lt ($Screen[1] + $Screen[3])
+  if (($Window.Style -band 0x40000000) -ne 0) { return $false } # WS_CHILD
+  if (($Window.Style -band 0x00C00000) -ne 0x00C00000) { return $false } # WS_CAPTION
+  if (($Window.Style -band 0x00080000) -eq 0) { return $false } # WS_SYSMENU
+  return ($Window.Style -band 0x10000000) -ne 0 # WS_VISIBLE
+}
+
+function Test-FrameOnScreen($Window, [int[]]$Screen) {
+  if ($Screen[2] -le 0) { return $false }
+  if ($Screen[3] -le 0) { return $false }
+  if ($Window.Right -le $Window.Left) { return $false }
+  if ($Window.Bottom -le $Window.Top) { return $false }
+  if ($Window.Right -le $Screen[0]) { return $false }
+  if ($Window.Bottom -le $Screen[1]) { return $false }
+  if ($Window.Left -ge ($Screen[0] + $Screen[2])) { return $false }
+  return $Window.Top -lt ($Screen[1] + $Screen[3])
+}
+
+function Test-NormalAppFrame($Window, $Process, [string]$LauncherPath, [int[]]$Screen) {
+  if (-not (Test-AppFrameProcess $Process $LauncherPath)) { return $false }
+  if (-not (Test-VisibleTopLevelFrame $Window)) { return $false }
+  if (-not (Test-NormalFrameStyle $Window)) { return $false }
+  return Test-FrameOnScreen $Window $Screen
 }
 
 function Get-EligibleFrame([int]$LauncherPid, [string]$ImagePath, [string]$LauncherPath, [long]$TargetHandle = 0) {
