@@ -6,8 +6,10 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import struct
 import subprocess
+import tempfile
 import zipfile
 
 
@@ -164,7 +166,7 @@ def inspect_dynamic_library(path, library_env):
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     dynamic = subprocess.run(['readelf', '-d', path], check=True, text=True,
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout
-    for value in re.findall(r'\((?:RPATH|RUNPATH)\).*?\[(.*?)\]', dynamic):
+    for value in re.findall(r'\((?:RPATH|RUNPATH)\)[^\[\(\n]*\[([^\]\n]*)\]', dynamic):
         for search_path in value.split(':'):
             require(not search_path.startswith('/') or search_path in ('/lib', '/lib64', '/usr/lib', '/usr/lib64'),
                     f'Absolute non-system library search path in {path}: {search_path}')
@@ -185,7 +187,7 @@ def check_bundled_node(layout):
     subprocess.run([layout['node'], layout['js'], 'server', '--help'], check=True, timeout=60)
 
 
-def run_checks(layout, work):
+def run_checks(layout):
     jvm = Path(layout['jvm'])
     # AppRun prepends its usr/lib; resolve bundled dependencies the same way.
     library_env = dict(os.environ, LD_LIBRARY_PATH=os.pathsep.join([
@@ -194,6 +196,13 @@ def run_checks(layout, work):
     for path in layout['natives']:
         inspect_dynamic_library(path, library_env)
     check_bundled_node(layout)
+    # Compile into a fresh owned directory, never a caller-selected path/option.
+    with tempfile.TemporaryDirectory(prefix='letta-linux-jni-') as probe:
+        check_bundled_jvm(layout, Path(probe))
+    print(f"Verified {len(layout['natives'])} Linux x64 ELF files and four required JNI libraries")
+
+
+def check_bundled_jvm(layout, work):
     # Load the shipped JNI into the shipped JVM, not the build JDK. Compilation is CI-only.
     source = Path(work) / 'PackagingNativeSmoke.java'
     source.write_text('public class PackagingNativeSmoke { public static void main(String[] paths) { '
@@ -202,12 +211,13 @@ def run_checks(layout, work):
                       'java.io.File f = new java.io.File(System.getProperty("letta.desktop.runtime." + key)); '
                       'if (!f.isAbsolute() || !f.isFile()) throw new Error("Unresolved bundled path: " + f); } '
                       'for (String path : paths) { System.load(path); System.out.println("Loaded " + path); } } }')
-    subprocess.run(['javac', '--release', '21', str(source)], check=True)
+    subprocess.run(['javac', '--release', '21', 'PackagingNativeSmoke.java'], cwd=work, check=True)
     # Exercise jpackage's shipped launcher/JVM and its $APPDIR expansion. Only the extracted
     # test copy is temporarily redirected to the tiny native-load entry point, then restored.
     cfg = Path(layout['cfg'])
-    original = cfg.read_text()
-    patched = original.replace('app.mainclass=com.letta.mobile.desktop.MainKt', 'app.mainclass=PackagingNativeSmoke')
+    backup = work / 'original.cfg'
+    shutil.copyfile(cfg, backup)
+    patched = cfg.read_text().replace('app.mainclass=com.letta.mobile.desktop.MainKt', 'app.mainclass=PackagingNativeSmoke')
     patched, count = re.subn(r'(?m)^app.classpath=(.*)$',
                             lambda match: 'app.classpath=' + str(work) + os.pathsep + match[1], patched, count=1)
     require(count == 1, 'Launcher classpath missing')
@@ -215,8 +225,8 @@ def run_checks(layout, work):
         cfg.write_text(patched)
         subprocess.run([layout['launcher'], *layout['jni']], check=True, timeout=60)
     finally:
-        cfg.write_text(original)
-    print(f"Verified {len(layout['natives'])} Linux x64 ELF files and four required JNI libraries")
+        # Copy the original bytes back, including line endings, even if the launcher fails.
+        shutil.copyfile(backup, cfg)
 
 
 if __name__ == '__main__':
@@ -230,4 +240,4 @@ if __name__ == '__main__':
     result = inspect(args.root, args.work / 'native', args.forbid_path)
     (args.work / 'layout.json').write_text(json.dumps(result, indent=2))
     if args.run:
-        run_checks(result, args.work)
+        run_checks(result)
