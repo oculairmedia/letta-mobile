@@ -366,7 +366,11 @@ PYTHON'''
 
 
     def test_every_payload_phase_uses_disposable_home(self):
-        result, _ = self.run_window_harness_fixture(options={'write_home': True})
+        # A simulated visible window must not precede the app's HOME-writing startup phase.
+        ready = self.work / 'home-phase-ready'
+        result, _ = self.run_window_harness_fixture(
+            startup='touch "$FIXTURE_READY"', options={'write_home': True, 'ready': ready},
+        )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assert_home_isolated(['extract', 'inspector', 'app'])
 
