@@ -86,15 +86,13 @@ open class CachedAgentRepository(
         // uncaught Dispatchers.IO exceptions (tests historically passed a
         // broken Lazy mock; production Room build can also throw).
         try {
-            val (generation, publicationRevision) = refreshMutex.withLock {
-                cacheGeneration to cachePublicationRevision
-            }
+            val publicationRevision = refreshMutex.withLock { cachePublicationRevision }
             val cache = localCache?.invoke() ?: return
             val cached = cache.getAllOnce()
             // Do not overwrite a refresh that completed while getAllOnce
             // was suspended. Assigning an empty cache to an empty StateFlow is a no-op.
             refreshMutex.withLock {
-                if (canHydrateCache(generation, publicationRevision)) {
+                if (canHydrateCache(publicationRevision)) {
                     _agents.value = cached
                 }
             }
@@ -105,8 +103,8 @@ open class CachedAgentRepository(
         }
     }
 
-    private fun canHydrateCache(generation: Long, publicationRevision: Long): Boolean =
-        generation == cacheGeneration && publicationRevision == 0L &&
+    private fun canHydrateCache(publicationRevision: Long): Boolean =
+        publicationRevision == 0L &&
             cachePublicationRevision == 0L && _agents.value.isEmpty()
 
     override suspend fun countAgents(): Int {
@@ -391,10 +389,7 @@ open class CachedAgentRepository(
                         cachePublicationRevision += 1
                         agentFetchedAt[id] = nowMillis()
                         if (refreshRequest != null) changedDuringRefresh += id
-                        if (persist) {
-                            runCatchingCancellable { localCache?.invoke()?.upsert(fresh) }
-                                .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated cache persist failed for ${id.value}", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN) }
-                        }
+                        if (persist) persistUpdatedAgent(fresh)
                         fresh
                     }
                 }
@@ -408,6 +403,11 @@ open class CachedAgentRepository(
         }
         agentRequests[id] = request
         return request
+    }
+
+    private suspend fun persistUpdatedAgent(agent: Agent) {
+        runCatchingCancellable { localCache?.invoke()?.upsert(agent) }
+            .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated cache persist failed for ${agent.id.value}", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN) }
     }
 
     private fun invalidateAgentLocked(id: AgentId) {
