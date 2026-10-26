@@ -22,13 +22,12 @@ class DesktopRailRecencyTest {
         agentId: String,
         daysAgo: Long,
         label: String? = null,
-        preview: String = "preview",
     ) = DesktopConversationSummary(
         id = id,
         title = "Conversation $id",
         agentName = "Agent $agentId",
         updatedAtLabel = label ?: (now - daysAgo.days).toString(),
-        lastMessagePreview = preview,
+        lastMessagePreview = "preview",
         agentId = agentId,
         archived = false,
     )
@@ -92,25 +91,23 @@ class DesktopRailRecencyTest {
         runComposeUiTest {
             val tiedAt = "2026-09-16T15:00:00Z"
             val conversations = listOf(
-                conversation("invalid", "valid-agent", daysAgo = 0, label = "yesterday-ish", preview = "invalid"),
+                conversation("invalid", "valid-agent", daysAgo = 0, label = "yesterday-ish").copy(lastMessagePreview = "invalid"),
                 conversation(
                     "valid",
                     "valid-agent",
                     daysAgo = 0,
                     label = "2026-09-16T12:00:00Z",
-                    preview = "valid",
-                ),
+                ).copy(lastMessagePreview = "valid"),
                 conversation(
                     "valid-before-queued",
                     "queued-agent",
                     daysAgo = 0,
                     label = "2026-09-16T18:00:00Z",
-                    preview = "valid before queued",
-                ),
-                conversation("queued", "queued-agent", daysAgo = 0, label = "Queued", preview = "queued"),
-                conversation("invalid-after-queued", "queued-agent", daysAgo = 0, label = "bad", preview = "invalid"),
-                conversation("tie-first", "tie-agent", daysAgo = 0, label = tiedAt, preview = "first tie"),
-                conversation("tie-second", "tie-agent", daysAgo = 0, label = tiedAt, preview = "second tie"),
+                ).copy(lastMessagePreview = "valid before queued"),
+                conversation("queued", "queued-agent", daysAgo = 0, label = "Queued").copy(lastMessagePreview = "queued"),
+                conversation("invalid-after-queued", "queued-agent", daysAgo = 0, label = "bad").copy(lastMessagePreview = "invalid"),
+                conversation("tie-first", "tie-agent", daysAgo = 0, label = tiedAt).copy(lastMessagePreview = "first tie"),
+                conversation("tie-second", "tie-agent", daysAgo = 0, label = tiedAt).copy(lastMessagePreview = "second tie"),
             )
             var result: Map<String, ShellRailActivity>? = null
 
