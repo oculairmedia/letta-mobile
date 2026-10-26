@@ -1,0 +1,30 @@
+{
+  "upstream": {
+    "repository": "https://github.com/n0-computer/iroh-ffi.git",
+    "tag": "v1.1.0",
+    "commit": "5e451092dba0c1a09ee83ff6e5be37b1152a5c58",
+    "version": "1.1.0",
+    "license": "MIT OR Apache-2.0"
+  },
+  "rust_iroh": "1.0.2",
+  "peer_lookup": {
+    "repository": "https://codeberg.org/nfnitloop/sned.git",
+    "commit": "e1213d4a7ce16b9a4b7dda81dc835349289f2a9c",
+    "crate": "iroh-mdns-peer-lookup",
+    "version": "0.1.2",
+    "license": "Apache-2.0"
+  },
+  "hick": {
+    "version": "0.2.0",
+    "license": "MIT OR Apache-2.0"
+  },
+  "maven_1_1_0_sha256": {
+    "iroh-1.1.0.pom": "069fd9144ae6e8a3bedd254298f6d4da5756cbcd23992e2ad34e1cef41be2c27",
+    "iroh-1.1.0.jar": "89123221d62e1cc80167e1be3aad9f941c9db0690d3a4081ac322d5d219eaffb",
+    "iroh-1.1.0-sources.jar": "3e523987f4487080cbf02e3c4dcc7b0c3e240ab1c2494c8ccc7f9a8e2a4b72e6",
+    "iroh-android-1.1.0.pom": "2489f8eca937eb717e73b029cdc161370c6158b0ceeac7081ff1405b939d515b",
+    "iroh-android-1.1.0.aar": "ed747f627da6dad314b25b9ff17d38232d8d75cb31e663af348368e6be845ab8"
+  },
+  "patch_sha256": "73f3413d2078c16752f173a2771ba8902a53ccfa0a021470dd0b47bef58e3450",
+  "native_test_sha256": "ff8a57973f5e039444e3e716a1f7431c3ef9970f2bee0eb61b1322636f34cd61"
+}

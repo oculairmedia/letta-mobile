@@ -1,0 +1,99 @@
+name: Iroh mDNS binding prerequisite
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'android-compose/native/iroh-mdns-binding/**'
+      - 'scripts/iroh-mdns-binding/**'
+      - '.github/workflows/iroh-mdns-binding.yml'
+
+jobs:
+  native:
+    name: Native binding (${{ matrix.mode }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: linux
+            runner: ubuntu-latest
+          - mode: windows
+            runner: windows-latest
+          - mode: android
+            runner: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.91.1
+          targets: ${{ matrix.mode == 'android' && 'aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android' || '' }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: iroh-mdns-${{ matrix.mode }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: android-actions/setup-android@v3
+      - name: Install Android NDK and cargo-ndk
+        if: matrix.mode == 'android'
+        run: |
+          sdkmanager --install 'ndk;23.2.8568313'
+          cargo install --version 3.5.4 cargo-ndk --locked
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/23.2.8568313" >> "$GITHUB_ENV"
+      - name: Fetch, patch, and verify exact source
+        run: bash scripts/iroh-mdns-binding/prepare.sh
+      - name: Native two-endpoint and lifecycle proof
+        if: matrix.mode == 'linux'
+        run: |
+          cd android-compose/native/iroh-mdns-binding/build/upstream
+          cargo test --locked --lib
+          cargo test --locked --test native_mdns -- --nocapture
+      - name: Build matching native and Kotlin artifacts
+        run: bash scripts/iroh-mdns-binding/ci-build.sh "${{ matrix.mode }}" android-compose/native/iroh-mdns-binding/build/upstream android-compose/native/iroh-mdns-binding/build/artifacts
+      - name: Android emulator ABI smoke
+        if: matrix.mode == 'android'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          script: bash scripts/iroh-mdns-binding/android-smoke.sh android-compose/native/iroh-mdns-binding/build/upstream
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binding-${{ matrix.mode }}
+          path: android-compose/native/iroh-mdns-binding/build/artifacts/
+          retention-days: 7
+
+  parity:
+    name: Generated API and ABI parity
+    needs: native
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: binding-linux
+          path: proofs/linux
+      - uses: actions/download-artifact@v4
+        with:
+          name: binding-windows
+          path: proofs/windows
+      - uses: actions/download-artifact@v4
+        with:
+          name: binding-android
+          path: proofs/android
+      - run: python3 scripts/iroh-mdns-binding/verify_matrix.py proofs
