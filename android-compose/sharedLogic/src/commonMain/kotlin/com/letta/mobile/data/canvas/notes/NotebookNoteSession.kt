@@ -69,7 +69,7 @@ class NotebookNoteSession(val id: NotebookDocumentId, private val backend: Noteb
         if (state.value.pendingDurability) return@withLock false
         if (state.value.dirty) saveDraft()
         val current = state.value
-        current.baseline != null && !current.dirty && !current.conflict && current.error == null && !current.notFound
+        current.canSave && !current.dirty && current.error == null
     }
 
     private suspend fun read(discard: Boolean): Boolean {
@@ -92,8 +92,11 @@ class NotebookNoteSession(val id: NotebookDocumentId, private val backend: Noteb
         when (result) {
             is NotebookNoteLoad.Found -> {
                 val current = state.value
-                val mayReplace = generation == editGeneration && !current.pendingDurability && current.indeterminateWrite == null &&
-                    (discard || !before.dirty && !before.conflict)
+                val mayReplace = current.canAcceptLoadedSnapshot(
+                    previous = before,
+                    discard = discard,
+                    editsUnchanged = generation == editGeneration,
+                )
                 mutableState.value = current.copy(
                     baseline = if (mayReplace || current.baseline == null) result.snapshot else current.baseline,
                     observed = result.snapshot,
@@ -221,4 +224,14 @@ class NotebookNoteSession(val id: NotebookDocumentId, private val backend: Noteb
             is NotebookNoteSave.Unavailable -> current.copy(error = result.reason)
         }
     }
+}
+
+private fun NotebookNoteState.canAcceptLoadedSnapshot(
+    previous: NotebookNoteState,
+    discard: Boolean,
+    editsUnchanged: Boolean,
+): Boolean {
+    val hasNoPendingWrite = !pendingDurability && indeterminateWrite == null
+    val mayReplaceDraft = discard || (!previous.dirty && !previous.conflict)
+    return editsUnchanged && hasNoPendingWrite && mayReplaceDraft
 }
