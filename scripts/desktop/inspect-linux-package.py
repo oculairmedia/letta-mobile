@@ -153,6 +153,14 @@ def extract_jar_natives(jar, native_dir):
     return extracted
 
 
+def inspect_hotkey(jars, extracted, native_dir):
+    hotkeys = [p for p in extracted if p.name == 'libnucleus_global_hotkey.so']
+    require(len(hotkeys) == 1, 'Expected one patched Linux hotkey JNI')
+    hotkey_jar = next(jar for jar in jars if hotkeys[0].is_relative_to(Path(native_dir) / jar.name))
+    metadata = hotkey_builder.verify_jar(hotkey_jar, json.loads((HOTKEY_SOURCE / 'pins.json').read_text()))
+    print('Verified packaged hotkey source/patch/native:', json.dumps(metadata, sort_keys=True))
+
+
 def inspect(root, native_dir, forbidden=()):
     root = Path(root).resolve()
     entry_path, entry = inspect_desktop_entry(root)
@@ -170,11 +178,7 @@ def inspect(root, native_dir, forbidden=()):
     natives.extend(extracted)
     present = {p.name for p in natives}
     require(required <= present, f'Missing Linux JNI payload: {sorted(required - present)}')
-    hotkeys = [p for p in extracted if p.name == 'libnucleus_global_hotkey.so']
-    require(len(hotkeys) == 1, 'Expected one patched Linux hotkey JNI')
-    hotkey_jar = next(jar for jar in jars if hotkeys[0].is_relative_to(Path(native_dir) / jar.name))
-    hotkey_metadata = hotkey_builder.verify_jar(hotkey_jar, json.loads((HOTKEY_SOURCE / 'pins.json').read_text()))
-    print('Verified packaged hotkey source/patch/native:', json.dumps(hotkey_metadata, sort_keys=True))
+    inspect_hotkey(jars, extracted, native_dir)
     # The current Rive implementation is Windows/D3D11 only; Linux uses the existing fallback.
     require(not list(root.rglob('rive_desktop_bridge.dll')), 'Windows Rive bridge reached Linux image')
     return dict(root=str(root), node=str(node), js=str(js), jvm=str(jvm), launcher=str(launcher), cfg=str(cfg),

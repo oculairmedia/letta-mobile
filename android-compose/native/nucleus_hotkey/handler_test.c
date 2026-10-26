@@ -23,6 +23,24 @@ static void preserves_handler(const char *phase) {
     printf("PASS: %s preserved handler and forwarded BadWindow\n", phase);
 }
 
+static int registration_cycle(Display *owner, Display *contender, HotKeyEntry *entry) {
+    g_display = owner;
+    if (x11_grab(entry) != 0) return 1;
+    preserves_handler("successful grab");
+    g_display = contender;
+    if (x11_grab(entry) != -1) return 1;
+    preserves_handler("conflicting grab");
+    g_display = owner;
+    x11_ungrab(entry);
+    preserves_handler("unregister");
+    g_display = contender;
+    if (x11_grab(entry) != 0) return 1;
+    preserves_handler("register after conflict cleared");
+    x11_ungrab(entry);
+    preserves_handler("final unregister");
+    return 0;
+}
+
 int main(void) {
     if (!XInitThreads()) return 1;
     Display *owner = XOpenDisplay(NULL);
@@ -34,20 +52,7 @@ int main(void) {
     if (!entry.x11_keycode) return 1;
     g_rootWindow = DefaultRootWindow(owner);
     for (int i = 0; i < 3; i++) {
-        g_display = owner;
-        if (x11_grab(&entry) != 0) return 1;
-        preserves_handler("successful grab");
-        g_display = contender;
-        if (x11_grab(&entry) != -1) return 1;
-        preserves_handler("conflicting grab");
-        g_display = owner;
-        x11_ungrab(&entry);
-        preserves_handler("unregister");
-        g_display = contender;
-        if (x11_grab(&entry) != 0) return 1;
-        preserves_handler("register after conflict cleared");
-        x11_ungrab(&entry);
-        preserves_handler("final unregister");
+        if (registration_cycle(owner, contender, &entry) != 0) return 1;
     }
     XCloseDisplay(contender);
     XCloseDisplay(owner);
