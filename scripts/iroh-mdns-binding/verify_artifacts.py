@@ -53,7 +53,9 @@ def read_source(source: Path, relative: str) -> bytes:
 def write_output(output: Path, name: str, data: bytes) -> None:
     if Path(name).name != name:
         raise SystemExit(f"Invalid artifact name: {name}")
-    confined(output / name, output).write_bytes(data)
+    destination = confined(output / name, output)
+    with destination.open("wb") as artifact_file:
+        artifact_file.write(data)
 
 
 def source_summary(source: Path, mode: str) -> dict:
