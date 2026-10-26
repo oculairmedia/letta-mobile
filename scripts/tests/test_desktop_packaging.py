@@ -449,6 +449,12 @@ PYTHON'''
         self.assertIn('GetWindow(hwnd, 4)', script)
         self.assertIn("Write-WindowSnapshot 'before-cleanup'", script)
         self.assertIn("'desktop.png'", script)
+        self.assertIn('Get-EligibleFrame $App.Id $ImagePath $LauncherPath', script)
+        self.assertIn('Confirm-StableFrame $frame', script)
+        self.assertIn("$Window.Class -ne 'SunAwtFrame'", script)
+        self.assertIn('Test-PackagedChild $process $imagePrefix', script)
+        self.assertIn('Stopwatch]::StartNew()', script)
+        self.assertNotIn('if ($app.MainWindowHandle -ne 0)', script)
         self.assertNotIn('MainWindowTitle -match', script)
 
     def test_windows_smoke_isolates_before_first_bundled_probe(self):

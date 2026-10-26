@@ -49,6 +49,7 @@ public static class SmokeWin32 {
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr hwnd, StringBuilder name, int max);
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] private static extern IntPtr GetWindowLongPtr(IntPtr hwnd, int index);
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+    [DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
     [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int size);
 
     public static SmokeWindow Inspect(long handle) {
@@ -80,8 +81,18 @@ public static class SmokeWin32 {
         EnumWindows((hwnd, data) => { result.Add(Inspect(hwnd.ToInt64())); return true; }, IntPtr.Zero);
         return result.ToArray();
     }
+
+    public static int[] VirtualScreen() {
+        return new int[] { GetSystemMetrics(76), GetSystemMetrics(77), GetSystemMetrics(78), GetSystemMetrics(79) };
+    }
 }
 '@
+
+function Test-PackagedChild($Process, [string]$ImagePrefix) {
+  if (-not $Process.ExecutablePath) { return $false }
+  if (-not $Process.ExecutablePath.StartsWith($ImagePrefix, [System.StringComparison]::OrdinalIgnoreCase)) { return $false }
+  return $Process.CreationDate -ge $script:LaunchTime.AddSeconds(-2)
+}
 
 function Get-OwnedProcesses([int]$LauncherPid, [string]$ImagePath) {
   $all = @(Get-CimInstance Win32_Process)
@@ -91,9 +102,9 @@ function Get-OwnedProcesses([int]$LauncherPid, [string]$ImagePath) {
   do {
     $before = $ids.Count
     foreach ($process in $all) {
-      $inImage = $process.ExecutablePath -and $process.ExecutablePath.StartsWith($imagePrefix, [System.StringComparison]::OrdinalIgnoreCase)
-      if ($inImage -and $process.CreationDate -ge $script:LaunchTime.AddSeconds(-2) -and
-          $ids.Contains([int]$process.ParentProcessId)) { [void]$ids.Add([int]$process.ProcessId) }
+      if ($ids.Contains([int]$process.ParentProcessId) -and (Test-PackagedChild $process $imagePrefix)) {
+        [void]$ids.Add([int]$process.ProcessId)
+      }
     }
   } while ($ids.Count -ne $before)
   foreach ($process in $all) {
@@ -112,6 +123,33 @@ function Get-OwnedProcesses([int]$LauncherPid, [string]$ImagePath) {
   }
 }
 
+function Test-NormalAppFrame($Window, $Process, [string]$LauncherPath, [int[]]$Screen) {
+  if (-not $Process -or -not $Process.OwnedTree -or -not $Process.InImage) { return $false }
+  if (-not [string]::Equals($Process.Path, $LauncherPath, [System.StringComparison]::OrdinalIgnoreCase)) { return $false }
+  if (-not $Window.Exists -or -not $Window.Visible -or $Window.Minimized -or $Window.Cloaked -ne 0) { return $false }
+  if ($Window.Parent -ne 0 -or $Window.Owner -ne 0 -or $Window.Root -ne $Window.Handle) { return $false }
+  if ($Window.Class -ne 'SunAwtFrame') { return $false }
+  if (($Window.Style -band 0x40000000) -ne 0 -or ($Window.Style -band 0x00C00000) -ne 0x00C00000) { return $false }
+  if (($Window.Style -band 0x00080000) -eq 0 -or ($Window.Style -band 0x10000000) -eq 0) { return $false }
+  if ($Screen[2] -le 0 -or $Screen[3] -le 0) { return $false }
+  if ($Window.Right -le $Window.Left -or $Window.Bottom -le $Window.Top) { return $false }
+  return $Window.Right -gt $Screen[0] -and $Window.Bottom -gt $Screen[1] -and
+    $Window.Left -lt ($Screen[0] + $Screen[2]) -and $Window.Top -lt ($Screen[1] + $Screen[3])
+}
+
+function Get-EligibleFrame([int]$LauncherPid, [string]$ImagePath, [string]$LauncherPath, [long]$TargetHandle = 0) {
+  $processes = @(Get-OwnedProcesses $LauncherPid $ImagePath)
+  $screen = [SmokeWin32]::VirtualScreen()
+  foreach ($window in [SmokeWin32]::TopLevelWindows()) {
+    if ($TargetHandle -ne 0 -and $window.Handle -ne $TargetHandle) { continue }
+    $process = $processes | Where-Object { $_.Pid -eq $window.Pid } | Select-Object -First 1
+    if (Test-NormalAppFrame $window $process $LauncherPath $screen) {
+      return [pscustomobject]@{ Window = $window; Process = $process; Processes = $processes }
+    }
+  }
+  return $null
+}
+
 function Write-WindowSnapshot([string]$Phase, [int]$LauncherPid, [string]$ImagePath, [string]$EvidencePath) {
   $processes = @(Get-OwnedProcesses $LauncherPid $ImagePath)
   $owned = [System.Collections.Generic.HashSet[int]]::new()
@@ -120,7 +158,10 @@ function Write-WindowSnapshot([string]$Phase, [int]$LauncherPid, [string]$ImageP
   $knownHandles = @()
   $stdout = Join-Path $EvidencePath 'stdout.log'
   if (Test-Path -LiteralPath $stdout) {
-    $knownHandles = @([regex]::Matches((Get-Content -LiteralPath $stdout -Raw), 'handle=(\d+)') | ForEach-Object { [long]$_.Groups[1].Value } | Select-Object -Unique)
+    $raw = Get-Content -LiteralPath $stdout -Raw
+    if ($raw) {
+      $knownHandles = @([regex]::Matches($raw, 'handle=(\d+)') | ForEach-Object { [long]$_.Groups[1].Value } | Select-Object -Unique)
+    }
   }
   $probes = @($knownHandles | ForEach-Object { [SmokeWin32]::Inspect($_) })
   $mainHandle = 0
@@ -149,6 +190,11 @@ function Save-FailureEvidence([int]$LauncherPid, [string]$ImagePath, [string]$Ev
   $processes = @()
   try { $processes = @(Write-WindowSnapshot 'before-cleanup' $LauncherPid $ImagePath $EvidencePath) }
   catch { "Window snapshot: $($_.Exception.Message)" | Add-Content -LiteralPath (Join-Path $EvidencePath 'diagnostic-errors.log') }
+  Save-Screenshot $EvidencePath
+  Save-ThreadDumps $LauncherPid $processes $EvidencePath
+}
+
+function Save-Screenshot([string]$EvidencePath) {
   try {
     Add-Type -AssemblyName System.Drawing
     Add-Type -AssemblyName System.Windows.Forms
@@ -160,6 +206,9 @@ function Save-FailureEvidence([int]$LauncherPid, [string]$ImagePath, [string]$Ev
       $bitmap.Save((Join-Path $EvidencePath 'desktop.png'), [System.Drawing.Imaging.ImageFormat]::Png)
     } finally { $graphics.Dispose(); $bitmap.Dispose() }
   } catch { "Screenshot: $($_.Exception.Message)" | Add-Content -LiteralPath (Join-Path $EvidencePath 'diagnostic-errors.log') }
+}
+
+function Save-ThreadDumps([int]$LauncherPid, $Processes, [string]$EvidencePath) {
   $jcmd = if ($env:JAVA_HOME_26_X64) { Join-Path $env:JAVA_HOME_26_X64 'bin\jcmd.exe' } else { $null }
   if ($jcmd -and (Test-Path -LiteralPath $jcmd)) {
     $targetPids = [System.Collections.Generic.HashSet[int]]::new()
@@ -171,7 +220,7 @@ function Save-FailureEvidence([int]$LauncherPid, [string]$ImagePath, [string]$Ev
       }
     }
     foreach ($targetPid in $targetPids) {
-      if ($targetPid -ne $LauncherPid -and -not @($processes | Where-Object { $_.Pid -eq $targetPid -and $_.InImage }).Count) { continue }
+      if ($targetPid -ne $LauncherPid -and -not @($Processes | Where-Object { $_.Pid -eq $targetPid -and $_.InImage }).Count) { continue }
       $output = Join-Path $EvidencePath "thread-$targetPid.log"
       $errorOutput = Join-Path $EvidencePath "thread-$targetPid.err.log"
       try {
@@ -180,6 +229,37 @@ function Save-FailureEvidence([int]$LauncherPid, [string]$ImagePath, [string]$Ev
       } catch { "jcmd pid $targetPid`: $($_.Exception.Message)" | Add-Content -LiteralPath $errorOutput }
     }
   }
+}
+
+function Wait-ForPackagedFrame($App, [string]$ImagePath, [string]$LauncherPath, [string]$EvidencePath) {
+  $timer = [System.Diagnostics.Stopwatch]::StartNew()
+  $nextSnapshot = 0
+  while ($timer.Elapsed.TotalSeconds -lt 90) {
+    $elapsed = $timer.Elapsed.TotalSeconds
+    if ($elapsed -ge $nextSnapshot) {
+      try { $null = Write-WindowSnapshot "poll-$([int]$elapsed)" $App.Id $ImagePath $EvidencePath }
+      catch { "Poll snapshot: $($_.Exception.Message)" | Add-Content -LiteralPath (Join-Path $EvidencePath 'diagnostic-errors.log') }
+      $nextSnapshot += 15
+    }
+    $frame = Get-EligibleFrame $App.Id $ImagePath $LauncherPath
+    if ($frame) { return $frame }
+    $App.Refresh()
+    if ($App.HasExited -and -not @(Get-OwnedProcesses $App.Id $ImagePath | Where-Object { $_.OwnedTree }).Count) {
+      throw "Packaged Windows app process tree exited before first frame: $($App.ExitCode)"
+    }
+    $remainingMs = [math]::Min(1000, [math]::Max(1, [int]((90 - $timer.Elapsed.TotalSeconds) * 1000)))
+    Start-Sleep -Milliseconds $remainingMs
+  }
+  throw 'No visible packaged Windows app frame within 90 seconds'
+}
+
+function Confirm-StableFrame($Frame, [int]$LauncherPid, [string]$ImagePath, [string]$LauncherPath) {
+  Start-Sleep -Seconds 5
+  $again = Get-EligibleFrame $LauncherPid $ImagePath $LauncherPath $Frame.Window.Handle
+  if (-not $again -or $again.Process.Pid -ne $Frame.Process.Pid -or $again.Process.Created -ne $Frame.Process.Created) {
+    throw 'Packaged Windows app frame did not stay visible for five seconds'
+  }
+  return $again
 }
 
 $images = @(Get-ChildItem -LiteralPath $ImageRoot -Directory)
@@ -221,27 +301,16 @@ try {
   $app = Start-Process -FilePath $launchers[0].FullName -WorkingDirectory $EvidenceRoot -PassThru -RedirectStandardOutput (Join-Path $EvidenceRoot 'stdout.log') -RedirectStandardError (Join-Path $EvidenceRoot 'stderr.log')
   $script:LaunchTime = $app.StartTime
   Write-Host "Launched packaged Windows app: pid=$($app.Id) path=$($launchers[0].FullName)"
-  $visible = $false
-  for ($i = 0; $i -lt 90; $i++) {
-    $app.Refresh()
-    if ($app.HasExited) { throw "Packaged Windows app exited before first window: $($app.ExitCode)" }
-    if ($i -eq 0 -or $i % 15 -eq 0) {
-      try { $null = Write-WindowSnapshot "poll-$i" $app.Id $image $EvidenceRoot }
-      catch { "Poll snapshot $i`: $($_.Exception.Message)" | Add-Content -LiteralPath (Join-Path $EvidenceRoot 'diagnostic-errors.log') }
-    }
-    # Diagnostic run: retain the existing gate until Win32 owner/visibility evidence arrives.
-    if ($app.MainWindowHandle -ne 0) { $visible = $true; break }
-    Start-Sleep -Seconds 1
-  }
-  if (-not $visible) { throw 'No visible packaged Windows app window' }
-  Start-Sleep -Seconds 5
-  $app.Refresh()
-  if ($app.HasExited -or $app.MainWindowHandle -eq 0) { throw 'Packaged Windows app did not stay open' }
+  $frame = Wait-ForPackagedFrame $app $image $launchers[0].FullName $EvidenceRoot
+  $frame = Confirm-StableFrame $frame $app.Id $image $launchers[0].FullName
   $errors = Get-Content (Join-Path $EvidenceRoot 'stdout.log'), (Join-Path $EvidenceRoot 'stderr.log') -Raw
   if ($errors -match 'UnsupportedClassVersionError|NoClassDefFoundError|UnsatisfiedLinkError|Failed to launch JVM|Could not find or load main class|Exception in thread|A fatal error has been detected|FATAL ERROR') { throw "Startup error: $errors" }
   $crashes = @(Get-ChildItem -LiteralPath $EvidenceRoot -Recurse -File -Include 'hs_err_pid*.log', 'java_error_in*.log', '*.dmp')
   if ($crashes.Count -ne 0) { throw "New crash evidence: $($crashes.FullName)" }
-  "PASS: $($app.Id) $($app.MainWindowHandle) $($app.MainWindowTitle)" | Tee-Object -FilePath (Join-Path $EvidenceRoot 'window.txt')
+  try { $null = Write-WindowSnapshot 'accepted' $app.Id $image $EvidenceRoot }
+  catch { "Accepted snapshot: $($_.Exception.Message)" | Add-Content -LiteralPath (Join-Path $EvidenceRoot 'diagnostic-errors.log') }
+  Save-Screenshot $EvidenceRoot
+  "PASS: launcher=$($app.Id) framePid=$($frame.Process.Pid) hwnd=$($frame.Window.Handle) class=$($frame.Window.Class) title=$($frame.Window.Title)" | Tee-Object -FilePath (Join-Path $EvidenceRoot 'window.txt')
 } catch {
   if ($app) {
     try { Save-FailureEvidence $app.Id $image $EvidenceRoot } catch { "Diagnostic: $($_.Exception.Message)" | Add-Content -LiteralPath (Join-Path $EvidenceRoot 'diagnostic-errors.log') }
@@ -250,7 +319,7 @@ try {
 } finally {
   if ($app) {
     try {
-      $owned = @(Get-OwnedProcesses $app.Id $image | Where-Object { $_.OwnedTree } | Sort-Object Pid -Descending)
+      $owned = @(Get-OwnedProcesses $app.Id $image | Where-Object { $_.OwnedTree } | Sort-Object Created -Descending)
       foreach ($process in $owned) { Stop-Process -Id $process.Pid -Force -ErrorAction SilentlyContinue }
     } catch { Write-Warning "Packaged process cleanup: $($_.Exception.Message)" }
   }
