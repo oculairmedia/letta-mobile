@@ -94,6 +94,18 @@ def run_debugger(root, work):
             stop_debugger_session(process)
 
 
+def diagnostic_paths(root_arg, work_arg):
+    # The smoke supervisor has already entered its private disposable directory.
+    # CLI arguments confirm that context; they never select output destinations.
+    work = Path.cwd().resolve()
+    root = work / 'relocated app'
+    if Path(work_arg).resolve() != work:
+        raise ValueError('Diagnostic work directory must be the current smoke directory')
+    if root.is_symlink() or Path(root_arg).resolve() != root:
+        raise ValueError('Diagnostic payload must be the relocated app in the smoke directory')
+    return root, work
+
+
 def main(root, work):
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
     signal.signal(signal.SIGINT, lambda *_: sys.exit(130))
@@ -105,4 +117,4 @@ def main(root, work):
 
 
 if __name__ == '__main__':
-    main(Path(sys.argv[1]), Path(sys.argv[2]))
+    main(*diagnostic_paths(sys.argv[1], sys.argv[2]))

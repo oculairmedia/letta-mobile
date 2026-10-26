@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 from desktop_smoke_fixtures import DesktopSmokeFixtures
 
@@ -26,6 +27,24 @@ class LinuxStartupDiagnosticTests(DesktopSmokeFixtures, unittest.TestCase):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.work = Path(temp.name)
+
+    def test_diagnostic_paths_use_current_smoke_directory(self):
+        root = self.work / 'relocated app'
+        with patch.object(diagnostic.Path, 'cwd', return_value=self.work):
+            self.assertEqual(diagnostic.diagnostic_paths(str(root), str(self.work)), (root, self.work))
+
+    def test_diagnostic_paths_reject_redirected_arguments(self):
+        root = self.work / 'relocated app'
+        with patch.object(diagnostic.Path, 'cwd', return_value=self.work):
+            for payload, output in [(root, self.work.parent), (self.work.parent, self.work)]:
+                with self.subTest(payload=payload, output=output), self.assertRaises(ValueError):
+                    diagnostic.diagnostic_paths(str(payload), str(output))
+
+    def test_diagnostic_paths_reject_payload_symlink(self):
+        root = self.work / 'relocated app'
+        root.symlink_to(self.work.parent, target_is_directory=True)
+        with patch.object(diagnostic.Path, 'cwd', return_value=self.work), self.assertRaises(ValueError):
+            diagnostic.diagnostic_paths(str(root), str(self.work))
 
     def run_trace_fixture(self, body, options=None):
         writer = self.home_writer()

@@ -191,7 +191,7 @@ def inspect_dynamic_library(path, library_env):
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     dynamic = subprocess.run(['readelf', '-d', path], env=library_env, check=True, text=True,
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout
-    needed = set(re.findall(r'\(NEEDED\).*\[([^\]]+)\]', dynamic))
+    needed = set(re.findall(r'\(NEEDED\)[^\[\n]*\[([^\]\n]+)\]', dynamic))
     gtk2 = needed & {'libgtk-x11-2.0.so.0', 'libgdk-x11-2.0.so.0', 'libdbusmenu-gtk.so.4'}
     require(not gtk2, f'GTK2 dependency in {path}: {sorted(gtk2)}')
     for value in re.findall(r'\((?:RPATH|RUNPATH)\)[^\[\(\n]*\[([^\]\n]*)\]', dynamic):
