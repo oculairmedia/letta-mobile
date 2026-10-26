@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.agents.RecentAgents
 import com.letta.mobile.data.agents.RecentAgentsCut
@@ -87,6 +88,7 @@ class DesktopRailRecencyTest {
     }
 
     @Test
+    @OptIn(ExperimentalTestApi::class)
     fun `hover activity chooses queued over valid and malformed and keeps the first tied conversation`() =
         runComposeUiTest {
             val tiedAt = "2026-09-16T15:00:00Z"
