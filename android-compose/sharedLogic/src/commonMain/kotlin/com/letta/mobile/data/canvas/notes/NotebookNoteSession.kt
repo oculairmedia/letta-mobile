@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Explicit-save editor permanently bound to [id]. Create a separate session when switching notes.
@@ -15,6 +17,9 @@ import kotlinx.coroutines.sync.withLock
  * cancels operations; disposal itself never silently saves or discards. Hosts await [prepareClose]
  * before removing a dirty editor. A local CAS is not a distributed lock: later Automerge merges
  * can change the source and are discovered only by explicit refresh/save/flush.
+ * Interrupted writes stay indeterminate until one cancellable read/flush attempt, bounded to
+ * five seconds, acknowledges current state. Failure or a post-flush conflict retains the
+ * reconciliation obligation and draft, and refuses close.
  */
 class NotebookNoteSession(val id: NotebookDocumentId, private val backend: NotebookNoteBackend) {
     private val mutableState = MutableStateFlow(NotebookNoteState(id))
@@ -38,7 +43,8 @@ class NotebookNoteSession(val id: NotebookDocumentId, private val backend: Noteb
      */
     suspend fun discardAndReload(): Boolean = operations.withLock {
         val generation = editGeneration
-        if (state.value.pendingDurability) flushPending()
+        if (!reconcileWrite()) return@withLock false
+        flushPending()
         if (state.value.pendingDurability || generation != editGeneration) return@withLock false
         read(discard = true)
     }
@@ -48,6 +54,7 @@ class NotebookNoteSession(val id: NotebookDocumentId, private val backend: Noteb
 
     /** Retry persistence without reapplying an already accepted mutation. */
     suspend fun retryPersistence(): Boolean = operations.withLock {
+        if (!reconcileWrite()) return@withLock false
         flushPending()
         !state.value.pendingDurability && state.value.error == null
     }
@@ -57,11 +64,12 @@ class NotebookNoteSession(val id: NotebookDocumentId, private val backend: Noteb
      * remains. Concurrent edits keep the editor open; the owner must keep the session mounted on false.
      */
     suspend fun prepareClose(): Boolean = operations.withLock {
-        if (state.value.pendingDurability) flushPending()
+        if (!reconcileWrite()) return@withLock false
+        flushPending()
         if (state.value.pendingDurability) return@withLock false
         if (state.value.dirty) saveDraft()
         val current = state.value
-        current.baseline != null && !current.dirty && !current.conflict && current.error == null && !current.notFound
+        current.canSave && !current.dirty && current.error == null
     }
 
     private suspend fun read(discard: Boolean): Boolean {
@@ -69,7 +77,8 @@ class NotebookNoteSession(val id: NotebookDocumentId, private val backend: Noteb
         val before = state.value
         mutableState.value = before.copy(loading = true, error = null)
         try {
-            acceptLoad(backend.load(id), before, generation, discard)
+            val result = backend.load(id)
+            mutableState.value = state.value.afterLoad(result, before, discard, generation == editGeneration)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (expectedFailure: Exception) {
@@ -80,75 +89,67 @@ class NotebookNoteSession(val id: NotebookDocumentId, private val backend: Noteb
         return !state.value.notFound && state.value.error == null
     }
 
-    private fun acceptLoad(result: NotebookNoteLoad, before: NotebookNoteState, generation: Long, discard: Boolean) {
-        when (result) {
-            is NotebookNoteLoad.Found -> acceptSnapshot(result.snapshot, mayReplaceDraft(before, generation, discard))
-            NotebookNoteLoad.NotFound -> mutableState.value = state.value.copy(notFound = true)
-            is NotebookNoteLoad.Unavailable -> mutableState.value = state.value.copy(error = result.reason)
-        }
-    }
-
-    private fun mayReplaceDraft(before: NotebookNoteState, generation: Long, discard: Boolean): Boolean =
-        generation == editGeneration && !state.value.pendingDurability && (discard || !before.dirty && !before.conflict)
-
-    private fun acceptSnapshot(snapshot: NotebookNoteSnapshot, mayReplace: Boolean) {
-        val current = state.value
-        mutableState.value = current.copy(
-            baseline = if (mayReplace || current.baseline == null) snapshot else current.baseline,
-            observed = snapshot,
-            draft = if (mayReplace) snapshot.markdown else current.draft,
-            notFound = false,
-        )
-    }
-
     private suspend fun saveDraft(): Boolean {
+        if (!reconcileWrite()) return false
         val before = state.value
         val baseline = before.baseline
         return when {
             before.pendingDurability -> flushPending()
             baseline == null || !before.canSave -> false
             !before.dirty -> before.error == null
-            else -> writing { backend.save(id, baseline.markdown, before.draft) }
+            else -> writing {
+                mutableState.value = state.value.copy(indeterminateWrite = baseline.copy(markdown = before.draft))
+                val result = backend.save(id, baseline.markdown, before.draft)
+                if (result !is NotebookNoteSave.Unavailable) {
+                    mutableState.value = state.value.copy(indeterminateWrite = null)
+                }
+                mutableState.value = state.value.afterSave(result)
+            }
         }
+    }
+
+    private suspend fun reconcileWrite(): Boolean {
+        val attempted = state.value.indeterminateWrite ?: return true
+        writing(failureMessage = "Notebook write reconciliation failed") {
+            val result = withTimeoutOrNull(5.seconds) {
+                when (val loaded = backend.load(id)) {
+                    is NotebookNoteLoad.Found -> backend.flush(loaded.snapshot)
+                    NotebookNoteLoad.NotFound -> {
+                        mutableState.value = state.value.copy(notFound = true)
+                        NotebookNoteSave.Unavailable("Local notebook not found")
+                    }
+                    is NotebookNoteLoad.Unavailable -> NotebookNoteSave.Unavailable(loaded.reason)
+                }
+            } ?: NotebookNoteSave.Unavailable("Notebook write reconciliation timed out; retry persistence")
+            mutableState.value = state.value.afterReconciliation(result, attempted)
+        }
+        return state.value.indeterminateWrite == null
     }
 
     private suspend fun flushPending(): Boolean {
         val current = state.value
         val applied = current.applied ?: return current.error == null
         if (!current.pendingDurability) return current.error == null
-        return writing { backend.flush(applied) }
+        return writing {
+            val result = backend.flush(applied)
+            mutableState.value = state.value.afterSave(result)
+        }
     }
 
-    private suspend fun writing(action: suspend () -> NotebookNoteSave): Boolean {
+    private suspend fun writing(
+        failureMessage: String = "Notebook save failed",
+        action: suspend () -> Unit,
+    ): Boolean {
         mutableState.value = state.value.copy(saving = true, error = null)
         try {
-            accept(action())
+            action()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (expectedFailure: Exception) {
-            mutableState.value = state.value.copy(error = expectedFailure.message ?: "Notebook save failed")
+            mutableState.value = state.value.copy(error = expectedFailure.message ?: failureMessage)
         } finally {
             mutableState.value = state.value.copy(saving = false)
         }
         return !state.value.dirty && !state.value.conflict && state.value.error == null
-    }
-
-    private fun accept(result: NotebookNoteSave) {
-        val current = state.value
-        mutableState.value = when (result) {
-            is NotebookNoteSave.Saved -> current.copy(
-                baseline = result.snapshot, applied = result.snapshot, durable = result.snapshot,
-                observed = result.snapshot, notFound = false,
-            )
-            is NotebookNoteSave.PendingDurability -> current.copy(
-                baseline = result.applied, applied = result.applied, error = result.reason,
-                observed = if (current.applied == result.applied) current.observed else result.applied,
-            )
-            is NotebookNoteSave.Conflict -> current.copy(
-                baseline = result.durable ?: current.baseline, applied = result.durable ?: current.applied,
-                observed = result.current, durable = result.durable ?: current.durable,
-            )
-            is NotebookNoteSave.Unavailable -> current.copy(error = result.reason)
-        }
     }
 }

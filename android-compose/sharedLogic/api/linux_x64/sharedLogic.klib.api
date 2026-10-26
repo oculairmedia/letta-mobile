@@ -278,6 +278,30 @@ final enum class com.letta.mobile.data.canvas.references/NotebookReferencePhase 
     final fun values(): kotlin/Array<com.letta.mobile.data.canvas.references/NotebookReferencePhase> // com.letta.mobile.data.canvas.references/NotebookReferencePhase.values|values#static(){}[0]
 }
 
+final enum class com.letta.mobile.data.canvas.workspace/DocumentPresentation : kotlin/Enum<com.letta.mobile.data.canvas.workspace/DocumentPresentation> { // com.letta.mobile.data.canvas.workspace/DocumentPresentation|null[0]
+    enum entry NOTE // com.letta.mobile.data.canvas.workspace/DocumentPresentation.NOTE|null[0]
+    enum entry REFERENCES // com.letta.mobile.data.canvas.workspace/DocumentPresentation.REFERENCES|null[0]
+
+    final val entries // com.letta.mobile.data.canvas.workspace/DocumentPresentation.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.canvas.workspace/DocumentPresentation> // com.letta.mobile.data.canvas.workspace/DocumentPresentation.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.canvas.workspace/DocumentPresentation // com.letta.mobile.data.canvas.workspace/DocumentPresentation.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.canvas.workspace/DocumentPresentation> // com.letta.mobile.data.canvas.workspace/DocumentPresentation.values|values#static(){}[0]
+}
+
+final enum class com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem : kotlin/Enum<com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem> { // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem|null[0]
+    enum entry DENIED // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem.DENIED|null[0]
+    enum entry IDENTITY_MISMATCH // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem.IDENTITY_MISMATCH|null[0]
+    enum entry SAVE_FAILED // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem.SAVE_FAILED|null[0]
+    enum entry UNAVAILABLE // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem.UNAVAILABLE|null[0]
+
+    final val entries // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem> // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem> // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem.values|values#static(){}[0]
+}
+
 final enum class com.letta.mobile.data.canvas/CanvasArchiveFilter : kotlin/Enum<com.letta.mobile.data.canvas/CanvasArchiveFilter> { // com.letta.mobile.data.canvas/CanvasArchiveFilter|null[0]
     enum entry ACTIVE // com.letta.mobile.data.canvas/CanvasArchiveFilter.ACTIVE|null[0]
     enum entry ALL // com.letta.mobile.data.canvas/CanvasArchiveFilter.ALL|null[0]
@@ -3668,6 +3692,10 @@ abstract fun interface com.letta.mobile.data.canvas.plugin/PluginKindCatalog { /
         final val Empty // com.letta.mobile.data.canvas.plugin/PluginKindCatalog.Companion.Empty|{}Empty[0]
             final fun <get-Empty>(): com.letta.mobile.data.canvas.plugin/PluginKindCatalog // com.letta.mobile.data.canvas.plugin/PluginKindCatalog.Companion.Empty.<get-Empty>|<get-Empty>(){}[0]
     }
+}
+
+abstract fun interface com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpener { // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpener|null[0]
+    abstract suspend fun open(com.letta.mobile.data.canvas/NotebookDocumentId): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpener.open|open(com.letta.mobile.data.canvas.NotebookDocumentId){}[0]
 }
 
 abstract fun interface com.letta.mobile.data.canvas/CanvasClosedBoardApplier { // com.letta.mobile.data.canvas/CanvasClosedBoardApplier|null[0]
@@ -7087,6 +7115,33 @@ sealed interface com.letta.mobile.data.canvas.references/NotebookReferenceLoad {
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Unavailable.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Unavailable.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.letta.mobile.data.canvas.references/NotebookReferenceLoad.Unavailable.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen { // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen|null[0]
+    final class Opened : com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen { // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Opened|null[0]
+        constructor <init>(com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions) // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Opened.<init>|<init>(com.letta.mobile.data.canvas.workspace.DocumentWorkspaceSessions){}[0]
+
+        final val sessions // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Opened.sessions|{}sessions[0]
+            final fun <get-sessions>(): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Opened.sessions.<get-sessions>|<get-sessions>(){}[0]
+
+        final fun component1(): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Opened.component1|component1(){}[0]
+        final fun copy(com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions = ...): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Opened // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Opened.copy|copy(com.letta.mobile.data.canvas.workspace.DocumentWorkspaceSessions){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Opened.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Opened.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Opened.toString|toString(){}[0]
+    }
+
+    final object Denied : com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen { // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Denied|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Denied.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Denied.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Denied.toString|toString(){}[0]
+    }
+
+    final object Unavailable : com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen { // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Unavailable|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Unavailable.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Unavailable.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpen.Unavailable.toString|toString(){}[0]
     }
 }
 
@@ -25165,7 +25220,7 @@ final class com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot { // com.let
 }
 
 final class com.letta.mobile.data.canvas.notes/NotebookNoteState { // com.letta.mobile.data.canvas.notes/NotebookNoteState|null[0]
-    constructor <init>(com.letta.mobile.data.canvas/NotebookDocumentId, com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., kotlin/String = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String? = ...) // com.letta.mobile.data.canvas.notes/NotebookNoteState.<init>|<init>(com.letta.mobile.data.canvas.NotebookDocumentId;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;kotlin.String;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String?){}[0]
+    constructor <init>(com.letta.mobile.data.canvas/NotebookDocumentId, com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., kotlin/String = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String? = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ...) // com.letta.mobile.data.canvas.notes/NotebookNoteState.<init>|<init>(com.letta.mobile.data.canvas.NotebookDocumentId;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;kotlin.String;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String?;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?){}[0]
 
     final val applied // com.letta.mobile.data.canvas.notes/NotebookNoteState.applied|{}applied[0]
         final fun <get-applied>(): com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? // com.letta.mobile.data.canvas.notes/NotebookNoteState.applied.<get-applied>|<get-applied>(){}[0]
@@ -25185,6 +25240,8 @@ final class com.letta.mobile.data.canvas.notes/NotebookNoteState { // com.letta.
         final fun <get-error>(): kotlin/String? // com.letta.mobile.data.canvas.notes/NotebookNoteState.error.<get-error>|<get-error>(){}[0]
     final val id // com.letta.mobile.data.canvas.notes/NotebookNoteState.id|{}id[0]
         final fun <get-id>(): com.letta.mobile.data.canvas/NotebookDocumentId // com.letta.mobile.data.canvas.notes/NotebookNoteState.id.<get-id>|<get-id>(){}[0]
+    final val indeterminateWrite // com.letta.mobile.data.canvas.notes/NotebookNoteState.indeterminateWrite|{}indeterminateWrite[0]
+        final fun <get-indeterminateWrite>(): com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? // com.letta.mobile.data.canvas.notes/NotebookNoteState.indeterminateWrite.<get-indeterminateWrite>|<get-indeterminateWrite>(){}[0]
     final val loading // com.letta.mobile.data.canvas.notes/NotebookNoteState.loading|{}loading[0]
         final fun <get-loading>(): kotlin/Boolean // com.letta.mobile.data.canvas.notes/NotebookNoteState.loading.<get-loading>|<get-loading>(){}[0]
     final val notFound // com.letta.mobile.data.canvas.notes/NotebookNoteState.notFound|{}notFound[0]
@@ -25198,6 +25255,7 @@ final class com.letta.mobile.data.canvas.notes/NotebookNoteState { // com.letta.
 
     final fun component1(): com.letta.mobile.data.canvas/NotebookDocumentId // com.letta.mobile.data.canvas.notes/NotebookNoteState.component1|component1(){}[0]
     final fun component10(): kotlin/String? // com.letta.mobile.data.canvas.notes/NotebookNoteState.component10|component10(){}[0]
+    final fun component11(): com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? // com.letta.mobile.data.canvas.notes/NotebookNoteState.component11|component11(){}[0]
     final fun component2(): com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? // com.letta.mobile.data.canvas.notes/NotebookNoteState.component2|component2(){}[0]
     final fun component3(): com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? // com.letta.mobile.data.canvas.notes/NotebookNoteState.component3|component3(){}[0]
     final fun component4(): com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? // com.letta.mobile.data.canvas.notes/NotebookNoteState.component4|component4(){}[0]
@@ -25206,7 +25264,7 @@ final class com.letta.mobile.data.canvas.notes/NotebookNoteState { // com.letta.
     final fun component7(): kotlin/Boolean // com.letta.mobile.data.canvas.notes/NotebookNoteState.component7|component7(){}[0]
     final fun component8(): kotlin/Boolean // com.letta.mobile.data.canvas.notes/NotebookNoteState.component8|component8(){}[0]
     final fun component9(): kotlin/Boolean // com.letta.mobile.data.canvas.notes/NotebookNoteState.component9|component9(){}[0]
-    final fun copy(com.letta.mobile.data.canvas/NotebookDocumentId = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., kotlin/String = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String? = ...): com.letta.mobile.data.canvas.notes/NotebookNoteState // com.letta.mobile.data.canvas.notes/NotebookNoteState.copy|copy(com.letta.mobile.data.canvas.NotebookDocumentId;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;kotlin.String;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String?){}[0]
+    final fun copy(com.letta.mobile.data.canvas/NotebookDocumentId = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ..., kotlin/String = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/String? = ..., com.letta.mobile.data.canvas.notes/NotebookNoteSnapshot? = ...): com.letta.mobile.data.canvas.notes/NotebookNoteState // com.letta.mobile.data.canvas.notes/NotebookNoteState.copy|copy(com.letta.mobile.data.canvas.NotebookDocumentId;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?;kotlin.String;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.String?;com.letta.mobile.data.canvas.notes.NotebookNoteSnapshot?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.notes/NotebookNoteState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.notes/NotebookNoteState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.canvas.notes/NotebookNoteState.toString|toString(){}[0]
@@ -25524,6 +25582,61 @@ final class com.letta.mobile.data.canvas.references/NotebookReferenceState { // 
     final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.references/NotebookReferenceState.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.references/NotebookReferenceState.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.letta.mobile.data.canvas.references/NotebookReferenceState.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController { // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController|null[0]
+    constructor <init>(com.letta.mobile.data.canvas.workspace/DocumentWorkspaceOpener) // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController.<init>|<init>(com.letta.mobile.data.canvas.workspace.DocumentWorkspaceOpener){}[0]
+
+    final val state // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController.state|{}state[0]
+        final fun <get-state>(): kotlinx.coroutines.flow/StateFlow<com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState> // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController.state.<get-state>|<get-state>(){}[0]
+
+    final fun present(com.letta.mobile.data.canvas.workspace/DocumentPresentation) // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController.present|present(com.letta.mobile.data.canvas.workspace.DocumentPresentation){}[0]
+    final suspend fun back(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController.back|back(){}[0]
+    final suspend fun close(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController.close|close(){}[0]
+    final suspend fun open(com.letta.mobile.data.canvas/NotebookDocumentId): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceController.open|open(com.letta.mobile.data.canvas.NotebookDocumentId){}[0]
+}
+
+final class com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions { // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions|null[0]
+    constructor <init>(com.letta.mobile.data.canvas.notes/NotebookNoteSession, com.letta.mobile.data.canvas.references/NotebookReferenceSession?) // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions.<init>|<init>(com.letta.mobile.data.canvas.notes.NotebookNoteSession;com.letta.mobile.data.canvas.references.NotebookReferenceSession?){}[0]
+
+    final val id // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions.id|{}id[0]
+        final fun <get-id>(): com.letta.mobile.data.canvas/NotebookDocumentId // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions.id.<get-id>|<get-id>(){}[0]
+    final val note // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions.note|{}note[0]
+        final fun <get-note>(): com.letta.mobile.data.canvas.notes/NotebookNoteSession // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions.note.<get-note>|<get-note>(){}[0]
+    final val references // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions.references|{}references[0]
+        final fun <get-references>(): com.letta.mobile.data.canvas.references/NotebookReferenceSession? // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions.references.<get-references>|<get-references>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.canvas.notes/NotebookNoteSession // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.canvas.references/NotebookReferenceSession? // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions.component2|component2(){}[0]
+    final fun copy(com.letta.mobile.data.canvas.notes/NotebookNoteSession = ..., com.letta.mobile.data.canvas.references/NotebookReferenceSession? = ...): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions.copy|copy(com.letta.mobile.data.canvas.notes.NotebookNoteSession;com.letta.mobile.data.canvas.references.NotebookReferenceSession?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions.toString|toString(){}[0]
+}
+
+final class com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState { // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState|null[0]
+    constructor <init>(com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions? = ..., com.letta.mobile.data.canvas.workspace/DocumentPresentation = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem? = ...) // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.<init>|<init>(com.letta.mobile.data.canvas.workspace.DocumentWorkspaceSessions?;com.letta.mobile.data.canvas.workspace.DocumentPresentation;kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.canvas.workspace.DocumentWorkspaceProblem?){}[0]
+
+    final val canGoBack // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.canGoBack|{}canGoBack[0]
+        final fun <get-canGoBack>(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.canGoBack.<get-canGoBack>|<get-canGoBack>(){}[0]
+    final val current // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.current|{}current[0]
+        final fun <get-current>(): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions? // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.current.<get-current>|<get-current>(){}[0]
+    final val presentation // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.presentation|{}presentation[0]
+        final fun <get-presentation>(): com.letta.mobile.data.canvas.workspace/DocumentPresentation // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.presentation.<get-presentation>|<get-presentation>(){}[0]
+    final val problem // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.problem|{}problem[0]
+        final fun <get-problem>(): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem? // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.problem.<get-problem>|<get-problem>(){}[0]
+    final val transitioning // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.transitioning|{}transitioning[0]
+        final fun <get-transitioning>(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.transitioning.<get-transitioning>|<get-transitioning>(){}[0]
+
+    final fun component1(): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions? // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.component1|component1(){}[0]
+    final fun component2(): com.letta.mobile.data.canvas.workspace/DocumentPresentation // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.component4|component4(){}[0]
+    final fun component5(): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem? // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.component5|component5(){}[0]
+    final fun copy(com.letta.mobile.data.canvas.workspace/DocumentWorkspaceSessions? = ..., com.letta.mobile.data.canvas.workspace/DocumentPresentation = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.letta.mobile.data.canvas.workspace/DocumentWorkspaceProblem? = ...): com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.copy|copy(com.letta.mobile.data.canvas.workspace.DocumentWorkspaceSessions?;com.letta.mobile.data.canvas.workspace.DocumentPresentation;kotlin.Boolean;kotlin.Boolean;com.letta.mobile.data.canvas.workspace.DocumentWorkspaceProblem?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.letta.mobile.data.canvas.workspace/DocumentWorkspaceState.toString|toString(){}[0]
 }
 
 final class com.letta.mobile.data.canvas/CanvasApplyOpsArgs { // com.letta.mobile.data.canvas/CanvasApplyOpsArgs|null[0]

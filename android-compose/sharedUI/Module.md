@@ -38,7 +38,7 @@ Internal CanvasWorkspace session-load state and retry action. The workspace owns
 
 # Package com.letta.mobile.ui.canvas.notes
 
-The shared [NotebookNoteEditor](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.canvas.notes/-notebook-note-editor.html) renders an existing note session using the shared page scaffold, Markdown field and explicit save/refresh/discard/persistence-retry actions. Draft, conflict and pending-durability status come from sharedLogic; no UI timer or storage policy is introduced. Hosts must await the session's prepare-close acknowledgement and keep the component mounted on failure. The component compiles for all shared UI targets; only JVM/Android currently has the local JNI store adapter. No app, desktop or browser navigation exposes it yet, and local ownership is not remote grant authority.
+The shared [NotebookNoteEditor](https://oculairmedia.github.io/letta-mobile/api/sharedUI/com.letta.mobile.ui.canvas.notes/-notebook-note-editor.html) renders an existing note session using the shared page scaffold, Markdown field and explicit save/refresh/discard/persistence-retry actions. Draft, conflict, indeterminate-write and pending-durability status come from sharedLogic; no UI timer or storage policy is introduced. Embedded owners can supply their operation scope so a hidden presentation does not cancel an explicit save; the standalone editor retains its keyed scope. Persistence retry also reconciles interrupted writes. Owners await prepare-close before replacing or removing the document session and retain it on failure; changing presentation can hide the editor. The component compiles for all shared UI targets; only JVM/Android currently has the local JNI store adapter. No app, desktop or browser navigation exposes it yet, and local ownership is not remote grant authority.
 
 # Package com.letta.mobile.ui.canvas.references
 
@@ -319,3 +319,7 @@ Touch text-selection and menu-density adaptation. Provide toolbar/quote-sink bin
 # Package com.letta.mobile.ui.theme
 
 Material theme construction, semantic colors, dimensions, motion and accessibility policy. Integrate through SharedMaterialTheme and accessibility preference/policy locals; platform preference observation belongs to actuals and domain behavior must not depend on color or motion tokens.
+
+# Package com.letta.mobile.ui.document.workspace
+
+The shared DocumentWorkspace composes the existing note editor and bounded reference preview beneath one LettaPageScaffold. Compact controls and a wide presentation rail switch Note/References over one current document without saving on presentation changes. Explicit note operations use the workspace scope, which survives both presentation and compact/wide layout changes; interrupted navigation writes still use the shared session reconciliation barrier. Preview open actions always use the shared controller and its required trusted opener; absent reference support is explicit. Owners must await controller close before unmounting. This composition has no production host route yet; host authorization, browser storage interoperability and compaction raw-ID correction remain activation prerequisites.

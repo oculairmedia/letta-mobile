@@ -51,28 +51,57 @@ import org.jetbrains.compose.resources.stringResource
  */
 @Composable
 fun NotebookNoteEditor(session: NotebookNoteSession, modifier: Modifier = Modifier) {
+    NoteEditor(session, modifier, framed = true, operationScope = null)
+}
+
+/**
+ * Embed the same editor in an owner's page. Supply [operationScope] from that owner when changing
+ * presentation can hide the editor; its save must live until the owner's close acknowledgement.
+ */
+@Composable
+fun NotebookNoteEditorContent(
+    session: NotebookNoteSession,
+    modifier: Modifier = Modifier,
+    operationScope: CoroutineScope? = null,
+) {
+    NoteEditor(session, modifier, framed = false, operationScope = operationScope)
+}
+
+@Composable
+private fun NoteEditor(session: NotebookNoteSession, modifier: Modifier, framed: Boolean, operationScope: CoroutineScope?) {
     key(session) {
         val state by session.state.collectAsState()
-        val scope = rememberCoroutineScope()
+        val localScope = rememberCoroutineScope()
+        val scope = operationScope ?: localScope
         LaunchedEffect(session) {
             if (session.state.value.baseline == null) session.refresh()
         }
-        LettaPageScaffold(
-            modifier = modifier.testTag("notebook-note-editor"),
-            header = { NoteToolbar(session, state, scope) },
-        ) { padding ->
-            Column(Modifier.fillMaxSize().padding(padding).padding(LettaDimens.Space.md)) {
-                NoteStatus(state)
-                OutlinedTextField(
-                    value = state.draft,
-                    onValueChange = session::edit,
-                    enabled = state.baseline != null,
-                    label = { Text(stringResource(Res.string.notebook_note_markdown)) },
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                    modifier = Modifier.fillMaxSize().testTag("notebook-note-markdown"),
-                )
+        if (framed) {
+            LettaPageScaffold(
+                modifier = modifier.testTag("notebook-note-editor"),
+                header = { NoteToolbar(session, state, scope) },
+            ) { padding -> NoteBody(session, state, Modifier.fillMaxSize().padding(padding)) }
+        } else {
+            Column(modifier.testTag("notebook-note-editor")) {
+                NoteToolbar(session, state, scope)
+                NoteBody(session, state, Modifier.weight(1f).fillMaxWidth())
             }
         }
+    }
+}
+
+@Composable
+private fun NoteBody(session: NotebookNoteSession, state: NotebookNoteState, modifier: Modifier) {
+    Column(modifier.padding(LettaDimens.Space.md)) {
+        NoteStatus(state)
+        OutlinedTextField(
+            value = state.draft,
+            onValueChange = session::edit,
+            enabled = state.baseline != null,
+            label = { Text(stringResource(Res.string.notebook_note_markdown)) },
+            textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+            modifier = Modifier.fillMaxSize().testTag("notebook-note-markdown"),
+        )
     }
 }
 
@@ -109,7 +138,7 @@ private fun NoteReloadActions(session: NotebookNoteSession, state: NotebookNoteS
 
 @Composable
 private fun NotePersistenceAction(session: NotebookNoteSession, state: NotebookNoteState, scope: CoroutineScope) {
-    if (state.pendingDurability) {
+    if (state.pendingDurability || state.indeterminateWrite != null) {
         TextButton(onClick = { scope.launch { session.retryPersistence() } }, enabled = !state.saving && !state.loading) {
             Text(stringResource(Res.string.notebook_note_retry))
         }

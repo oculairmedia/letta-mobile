@@ -718,15 +718,16 @@ public final class com/letta/mobile/ui/canvas/library/CanvasLibraryNoticeKt {
 public final class com/letta/mobile/ui/canvas/notes/ComposableSingletons$NotebookNoteEditorKt {
 	public static final field INSTANCE Lcom/letta/mobile/ui/canvas/notes/ComposableSingletons$NotebookNoteEditorKt;
 	public fun <init> ()V
+	public final fun getLambda$-1070760972$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$-2042904544$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$1158043402$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
-	public final fun getLambda$1261586918$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function2;
 	public final fun getLambda$1735937374$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 	public final fun getLambda$490734485$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
 }
 
 public final class com/letta/mobile/ui/canvas/notes/NotebookNoteEditorKt {
 	public static final fun NotebookNoteEditor (Lcom/letta/mobile/data/canvas/notes/NotebookNoteSession;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+	public static final fun NotebookNoteEditorContent (Lcom/letta/mobile/data/canvas/notes/NotebookNoteSession;Landroidx/compose/ui/Modifier;Lkotlinx/coroutines/CoroutineScope;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/canvas/plugin/CanvasDocumentViewer {
@@ -3337,6 +3338,17 @@ public final class com/letta/mobile/ui/context/FocusedAgentContextKt {
 
 public final class com/letta/mobile/ui/context/ModelPickerHostKt {
 	public static final fun ModelPickerHost (Lcom/letta/mobile/data/repository/modelcontrol/ModelPickerBinding;Ljava/lang/String;Landroidx/compose/runtime/Composer;I)V
+}
+
+public final class com/letta/mobile/ui/document/workspace/ComposableSingletons$DocumentWorkspaceKt {
+	public static final field INSTANCE Lcom/letta/mobile/ui/document/workspace/ComposableSingletons$DocumentWorkspaceKt;
+	public fun <init> ()V
+	public final fun getLambda$-1755918313$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+	public final fun getLambda$-332830034$LettaMobile_sharedUI ()Lkotlin/jvm/functions/Function3;
+}
+
+public final class com/letta/mobile/ui/document/workspace/DocumentWorkspaceKt {
+	public static final fun DocumentWorkspace (Lcom/letta/mobile/data/canvas/workspace/DocumentWorkspaceController;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/letta/mobile/ui/dreaming/ComposableSingletons$DreamingPanelKt {
