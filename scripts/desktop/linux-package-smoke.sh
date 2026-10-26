@@ -75,6 +75,19 @@ if [[ ${LETTA_PACKAGE_X11_TRACE:-0} == 1 ]]; then
     > "$work/diagnostic-summary.txt"
 fi
 
+capture_window_failure() {
+  local work=$1 app_pid=$2 candidate
+  {
+    printf 'Packaged app PID: %s\n' "$app_pid"
+    xwininfo -root -tree || true
+    for candidate in $(xdotool search --pid "$app_pid" 2>/dev/null || true); do
+      xwininfo -id "$candidate" || true
+      xprop -id "$candidate" WM_CLASS _NET_WM_PID _NET_WM_WINDOW_TYPE WM_STATE || true
+    done
+  } > "$work/window-tree.txt" 2>&1
+}
+export -f capture_window_failure
+
 smoke_payload() {
   local here=$1 image=$2 work=$3 app_pid wm_pid
   [[ $(uname -m) == x86_64 ]] || { echo 'x86-64 runner required' >&2; exit 1; }
@@ -132,7 +145,12 @@ SHIM
     [[ -n $window ]] && break
     sleep 1
   done
-  [[ -n $window ]] || { cat "$work/startup.log"; echo 'No visible desktop window' >&2; exit 1; }
+  if [[ -z $window ]]; then
+    capture_window_failure "$work" "$app_pid" || true
+    cat "$work/startup.log"
+    echo 'No visible desktop window' >&2
+    exit 1
+  fi
   sleep 5
   kill -0 "$app_pid"
   kill -0 "$wm_pid"

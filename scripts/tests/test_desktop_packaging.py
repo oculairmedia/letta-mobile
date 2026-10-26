@@ -440,6 +440,8 @@ class LinuxPackagingTests(DesktopSmokeFixtures, unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('No visible desktop window', result.stderr)
         self.assertEqual((evidence / 'exit-status.txt').read_text(), '1\n')
+        self.assertIn('Packaged app PID:', (evidence / 'window-tree.txt').read_text())
+        self.assertIn('fixture-window-tree', (evidence / 'window-tree.txt').read_text())
 
     def test_failed_native_probe_restores_launcher_config_byte_for_byte(self):
         layout = self.inspect()
