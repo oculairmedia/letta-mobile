@@ -2,6 +2,7 @@
 """Inspect the shipped AppImage tree, including native payloads inside runtime JARs."""
 import argparse
 import configparser
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -11,6 +12,11 @@ import struct
 import subprocess
 import tempfile
 import zipfile
+
+HOTKEY_SOURCE = Path(__file__).resolve().parents[2] / 'android-compose/native/nucleus_hotkey'
+hotkey_spec = importlib.util.spec_from_file_location('nucleus_hotkey_builder', HOTKEY_SOURCE / 'build.py')
+hotkey_builder = importlib.util.module_from_spec(hotkey_spec)
+hotkey_spec.loader.exec_module(hotkey_builder)
 
 
 def require(condition, message):
@@ -158,11 +164,17 @@ def inspect(root, native_dir, forbidden=()):
     natives = inspect_loose_natives(root)
     jars = list(root.rglob('*.jar'))
     require(jars, 'Desktop runtime JARs missing')
-    required = {'libautomerge_jni.so', 'libiroh_ffi.so', 'libletta_mermaid_renderer.so', 'libletta_tablet_input.so'}
+    required = {'libautomerge_jni.so', 'libiroh_ffi.so', 'libletta_mermaid_renderer.so', 'libletta_tablet_input.so',
+                'libnucleus_global_hotkey.so'}
     extracted = [path for jar in jars for path in extract_jar_natives(jar, native_dir)]
     natives.extend(extracted)
     present = {p.name for p in natives}
     require(required <= present, f'Missing Linux JNI payload: {sorted(required - present)}')
+    hotkeys = [p for p in extracted if p.name == 'libnucleus_global_hotkey.so']
+    require(len(hotkeys) == 1, 'Expected one patched Linux hotkey JNI')
+    hotkey_jar = next(jar for jar in jars if hotkeys[0].is_relative_to(Path(native_dir) / jar.name))
+    hotkey_metadata = hotkey_builder.verify_jar(hotkey_jar, json.loads((HOTKEY_SOURCE / 'pins.json').read_text()))
+    print('Verified packaged hotkey source/patch/native:', json.dumps(hotkey_metadata, sort_keys=True))
     # The current Rive implementation is Windows/D3D11 only; Linux uses the existing fallback.
     require(not list(root.rglob('rive_desktop_bridge.dll')), 'Windows Rive bridge reached Linux image')
     return dict(root=str(root), node=str(node), js=str(js), jvm=str(jvm), launcher=str(launcher), cfg=str(cfg),
@@ -237,7 +249,7 @@ def run_isolated_checks(layout, work, env, javac):
         inspect_dynamic_library(path, library_env)
     check_bundled_node(layout, env, work)
     check_bundled_jvm(layout, work, env=env, javac=javac)
-    print(f"Verified {len(layout['natives'])} Linux x64 ELF files and four required JNI libraries")
+    print(f"Verified {len(layout['natives'])} Linux x64 ELF files and five required JNI libraries")
 
 
 def check_bundled_jvm(layout, work, env, javac):

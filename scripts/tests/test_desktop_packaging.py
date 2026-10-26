@@ -3,6 +3,7 @@
 import importlib.util
 import hashlib
 import io
+import json
 import os
 from pathlib import Path
 import struct
@@ -65,13 +66,20 @@ class LinuxPackagingTests(DesktopSmokeFixtures, unittest.TestCase):
             # Cross-platform upstream JAR members are allowed and never selected as Linux JNI.
             z.writestr('native/aarch64-unknown-linux-gnu/libautomerge_jni.so', elf(183))
             z.writestr('win32-x86-64/iroh_ffi.dll', b'MZ')
+            z.writestr(inspector.hotkey_builder.MEMBER, elf())
+            pins = json.loads((inspector.HOTKEY_SOURCE / 'pins.json').read_text())
+            z.writestr(inspector.hotkey_builder.PROVENANCE, json.dumps(dict(
+                commit=pins['commit'], version=pins['version'], upstream_jar_sha256=pins['jar_sha256'],
+                patch_sha256=hashlib.sha256((inspector.HOTKEY_SOURCE / 'preserve-xerror-handler.patch').read_bytes()).hexdigest(),
+                source_sha256=pins['patched_source_sha256'], native_sha256=hashlib.sha256(elf()).hexdigest())))
+            z.writestr('META-INF/letta/Nucleus-LICENSE.txt', (inspector.HOTKEY_SOURCE / 'LICENSE').read_bytes())
 
     def inspect(self):
         return inspector.inspect(self.root, self.work / 'native')
 
     def test_complete_relocated_package_and_universal_jars(self):
         layout = self.inspect()
-        self.assertEqual(len(layout['jni']), 4)
+        self.assertEqual(len(layout['jni']), 5)
         self.assertEqual(layout['node'], str(self.node))
 
     def test_missing_execute_bit_is_rejected(self):
@@ -117,6 +125,22 @@ class LinuxPackagingTests(DesktopSmokeFixtures, unittest.TestCase):
         with zipfile.ZipFile(self.jar, 'w') as z:
             z.writestr('libletta_mermaid_renderer.so', elf())
         with self.assertRaisesRegex(ValueError, 'Missing Linux JNI'):
+            self.inspect()
+
+    def test_unpatched_hotkey_payload_is_rejected(self):
+        with zipfile.ZipFile(self.jar) as archive:
+            entries = {name: archive.read(name) for name in archive.namelist()
+                       if name != inspector.hotkey_builder.PROVENANCE}
+        with zipfile.ZipFile(self.jar, 'w') as archive:
+            for name, data in entries.items():
+                archive.writestr(name, data)
+        with self.assertRaises(KeyError):
+            self.inspect()
+
+    def test_second_hotkey_jar_is_rejected(self):
+        with zipfile.ZipFile(self.jar.with_name('duplicate.jar'), 'w') as archive:
+            archive.writestr(inspector.hotkey_builder.MEMBER, elf())
+        with self.assertRaisesRegex(ValueError, 'Expected one patched Linux hotkey JNI'):
             self.inspect()
 
     def test_foreign_loose_native_is_rejected(self):

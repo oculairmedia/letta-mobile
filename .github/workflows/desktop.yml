@@ -326,7 +326,7 @@ jobs:
       - name: Install Linux packaging and X11 smoke dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y binutils gdb xvfb xauth xdotool x11-utils openbox dbus-x11 desktop-file-utils patchelf \
+          sudo apt-get install -y gcc pkg-config patch libx11-dev libglib2.0-dev binutils gdb xvfb xauth xdotool x11-utils openbox dbus-x11 desktop-file-utils patchelf \
             libgtk-3-0 libasound2 libdbusmenu-gtk3-4 libsystemd0 libx11-6 libxext6 libxi6 libxrender1 libxtst6 \
             libfontconfig1 libfreetype6 libgl1 libegl1 libnss3 libgbm1 libxkbcommon0 \
             libnotify4 libsecret-1-0 libdbus-glib-1-2
@@ -336,6 +336,7 @@ jobs:
         run: |
           python3 scripts/tests/test_desktop_packaging.py
           python3 scripts/tests/test_linux_startup_diagnostic.py
+          python3 scripts/tests/test_nucleus_hotkey.py
 
       - name: Build Linux x86-64 AppImage
         # Nucleus AppImage uses the real jpackage app image, JBR, Node and shared UI.
@@ -351,7 +352,10 @@ jobs:
           mapfile -d '' images < <(find desktop/build/compose/binaries/main/AppImage -maxdepth 1 -name '*.AppImage' -print0)
           test "${#images[@]}" -eq 1
           printf 'appimage=%s\n' "${images[0]}" >> "$GITHUB_OUTPUT"
-          xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash ../scripts/desktop/linux-package-smoke.sh "${images[0]}"
+          for attempt in 1 2 3; do
+            LETTA_PACKAGE_SMOKE_EVIDENCE="$LETTA_PACKAGE_SMOKE_EVIDENCE/attempt-$attempt" \
+              xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash ../scripts/desktop/linux-package-smoke.sh "${images[0]}"
+          done
 
       - name: Stage the verified Linux desktop
         env:

@@ -221,6 +221,32 @@ tasks.named("processResources") {
     dependsOn(stageDesktopMermaidNative, stageDesktopTabletNative)
 }
 
+// Keep the Java API and every non-Linux native member from the pinned upstream
+// JAR. Linux alone rebuilds its hotkey JNI with the source-reviewed handler fix.
+val desktopHotkeyJar = layout.buildDirectory.file("generated/hotkey/nucleus.global-hotkey-linux-patched.jar")
+val buildDesktopLinuxHotkey = if (isLinuxHost) {
+    val upstreamHotkey = configurations.create("nucleusHotkeyUpstream") {
+        isCanBeConsumed = false
+        isTransitive = false
+    }
+    dependencies.add(upstreamHotkey.name, libs.nucleus.global.hotkey)
+    val source = rootProject.layout.projectDirectory.dir("native/nucleus_hotkey")
+    tasks.register<Exec>("buildDesktopLinuxHotkey") {
+        inputs.files(upstreamHotkey, fileTree(source))
+        inputs.property("jniHome", System.getProperty("java.home"))
+        outputs.file(desktopHotkeyJar)
+        doFirst {
+            commandLine(
+                "python3", source.file("build.py").asFile.absolutePath,
+                upstreamHotkey.singleFile.absolutePath, desktopHotkeyJar.get().asFile.absolutePath,
+                System.getProperty("java.home"),
+            )
+        }
+    }
+} else {
+    null
+}
+
 dependencies {
     implementation(project(":sharedLogic"))
     implementation(libs.androidx.paging.compose)
@@ -257,7 +283,11 @@ dependencies {
     implementation(libs.nucleus.launcher.windows)
     implementation(libs.nucleus.launcher.linux)
     implementation(libs.nucleus.launcher.macos)
-    implementation(libs.nucleus.global.hotkey)
+    if (isLinuxHost) {
+        implementation(files(desktopHotkeyJar).builtBy(buildDesktopLinuxHotkey))
+    } else {
+        implementation(libs.nucleus.global.hotkey)
+    }
     implementation(libs.nucleus.energy.manager)
     implementation(libs.nucleus.media.control)
     implementation(libs.nucleus.linux.hidpi)
