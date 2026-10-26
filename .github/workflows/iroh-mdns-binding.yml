@@ -45,6 +45,9 @@ jobs:
       - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
         with:
           packages: platform-tools
+      - name: Artifact verifier path fixtures
+        if: matrix.mode == 'linux'
+        run: python3 -m unittest discover -s scripts/iroh-mdns-binding -p 'test_verify_artifacts.py'
       - name: Install Android NDK and cargo-ndk
         if: matrix.mode == 'android'
         run: |

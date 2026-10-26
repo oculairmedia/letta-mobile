@@ -2269,7 +2269,7 @@ new file mode 100644
 index 0000000..4582d0c
 --- /dev/null
 +++ b/src/mdns.rs
-@@ -0,0 +1,332 @@
+@@ -0,0 +1,334 @@
 +//! Opt-in DNS-SD peer lookup. Results are transport hints, never trust grants.
 +use std::{
 +    collections::{HashSet, VecDeque},
@@ -2539,9 +2539,11 @@ index 0000000..4582d0c
 +    // peer-lookup encodes additional IP/port pairs in binary a1=, a2= TXT
 +    // segments. This is the existing peer-lookup wire format, not a new record.
 +    for segment in entry.txt() {
-+        let Some((key, value)) = segment.split_once(|byte| *byte == b'=') else {
++        let Some(separator) = segment.iter().position(|byte| *byte == b'=') else {
 +            continue;
 +        };
++        let (key, encoded_value) = segment.split_at(separator);
++        let value = &encoded_value[1..];
 +        if key.first() != Some(&b'a') || !key[1..].iter().all(u8::is_ascii_digit) {
 +            continue;
 +        }

@@ -2,8 +2,8 @@
 use std::{sync::Arc, time::Duration};
 
 use iroh_ffi::{
-    preset_minimal, Connection, Endpoint, EndpointAddr, EndpointOptions, MdnsEvent, MdnsMode,
-    MdnsSubscription, PathSnapshot, RelayMode,
+    preset_minimal, Connection, Endpoint, EndpointAddr, EndpointOptions, IrohErrorKind, MdnsEvent,
+    MdnsMode, MdnsSubscription, PathSnapshot, RelayMode,
 };
 use tokio::time::{sleep, timeout};
 
@@ -69,25 +69,38 @@ async fn native_mdns_compatibility_direct_path_and_untrusted_candidate() {
         .await
         .is_err());
 
-    // Negative control: with relays off and no lookup, an ID-only address
-    // cannot dial. This catches ambient/manual address injection false passes.
-    let id_only = EndpointAddr::new(host.id().as_ref(), None, vec![]);
-    assert!(id_only.direct_addresses().is_empty());
-    assert!(id_only.relay_url().is_none());
-    let without_lookup = Endpoint::bind(options(MdnsMode::Off)).await.unwrap();
-    let unregistered = timeout(
-        Duration::from_secs(2),
-        without_lookup.connect(&id_only, ALPN),
-    )
-    .await;
-    assert!(!matches!(unregistered, Ok(Ok(_))));
-    without_lookup.close().await.unwrap();
-
     let host_accept = host.clone();
     let accept = tokio::spawn(async move {
         let incoming = host_accept.accept_next().await.unwrap();
         incoming.accept().await.unwrap().connect().await.unwrap()
     });
+
+    // Negative control: with relays off and no lookup, an ID-only address
+    // must fail with Iroh's NoAddress path while the host is accepting.
+    let id_only = EndpointAddr::new(host.id().as_ref(), None, vec![]);
+    assert!(id_only.direct_addresses().is_empty());
+    assert!(id_only.relay_url().is_none());
+    let without_lookup = Endpoint::bind(options(MdnsMode::Off)).await.unwrap();
+    let unregistered = timeout(
+        Duration::from_secs(5),
+        without_lookup.connect(&id_only, ALPN),
+    )
+    .await
+    .expect("Off-mode ID-only dial timed out instead of reporting NoAddress");
+    let unregistered = match unregistered {
+        Ok(_) => panic!("Off-mode ID-only dial unexpectedly connected"),
+        Err(error) => error,
+    };
+    // error.rs converts ConnectError with from_debug, preserving the nested
+    // ConnectWithOptsError::NoAddress variant in debug_message().
+    assert_eq!(unregistered.kind(), IrohErrorKind::Connect);
+    assert!(
+        unregistered.debug_message().contains("NoAddress"),
+        "unexpected Off-mode failure: {}",
+        unregistered.debug_message()
+    );
+    without_lookup.close().await.unwrap();
+
     // This dial supplies only the host ID. Removing the client's
     // builder.address_lookup registration makes this assertion fail.
     let conn = timeout(Duration::from_secs(5), client.connect(&id_only, ALPN))

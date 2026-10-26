@@ -3,9 +3,14 @@
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+repo_root=$(git rev-parse --show-toplevel)
 mode="${1:?expected linux, windows, or android}"
-source_dir=$(realpath "${2:?prepared upstream path required}")
-artifact_dir="${3:?artifact output path required}"
+source_arg="${2:?prepared upstream path required}"
+artifact_arg="${3:?artifact output path required}"
+cd "$repo_root"
+python3 "$script_dir/verify_artifacts.py" "$source_arg" "$mode" "$artifact_arg" --check-paths
+source_dir=$(realpath "$source_arg")
+artifact_dir="$artifact_arg"
 mkdir -p "$artifact_dir"
 artifact_dir=$(realpath "$artifact_dir")
 cd "$source_dir"
@@ -57,5 +62,5 @@ case "$mode" in
     ;;
 esac
 
-python3 "$script_dir/verify_artifacts.py" \
-  "$source_dir" "$mode" "$artifact_dir"
+cd "$repo_root"
+python3 "$script_dir/verify_artifacts.py" "$source_arg" "$mode" "$artifact_arg"
