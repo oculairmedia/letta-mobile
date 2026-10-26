@@ -350,7 +350,7 @@ jobs:
           sudo apt-get install -y binutils xvfb xauth xdotool x11-utils openbox dbus-x11 desktop-file-utils patchelf \
             libgtk-3-0 libasound2 libdbusmenu-gtk3-4 libsystemd0 libx11-6 libxext6 libxi6 libxrender1 libxtst6 \
             libfontconfig1 libfreetype6 libgl1 libegl1 libnss3 libgbm1 libxkbcommon0 \
-            libnotify4 libsecret-1-0 libdbus-glib-1-2
+            libnotify4 libsecret-1-0 libdbus-glib-1-2 gcc pkg-config patch libx11-dev libglib2.0-dev
 
       - name: Packaging regression fixtures
         working-directory: .

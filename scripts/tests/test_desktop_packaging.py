@@ -154,6 +154,21 @@ PYTHON'''
         with self.assertRaisesRegex(ValueError, 'Missing Linux JNI'):
             self.inspect()
 
+    def test_release_declares_native_hotkey_build_prerequisites(self):
+        release = (REPO / '.github/workflows/release.yml').read_text()
+        setup = release.split('name: Install Linux packaging and X11 smoke dependencies', 1)[1].split('\n      - name:', 1)[0]
+        for dependency in ['gcc', 'pkg-config', 'patch', 'libx11-dev', 'libglib2.0-dev']:
+            self.assertIn(dependency, setup)
+
+    def test_hotkey_arguments_are_lazy_and_task_filters_do_not_realize_tasks(self):
+        build = (REPO / 'android-compose/desktop/build.gradle.kts').read_text()
+        hotkey = build.split('tasks.register<Exec>("buildDesktopLinuxHotkey")', 1)[1].split('} else {', 1)[0]
+        self.assertIn('argumentProviders.add(org.gradle.process.CommandLineArgumentProvider', hotkey)
+        self.assertNotIn('doFirst', hotkey)
+        self.assertNotIn('tasks.matching', build)
+        self.assertIn('inputs.files(upstreamHotkey', hotkey)
+        self.assertIn('builtBy(checkNotNull(buildDesktopLinuxHotkey))', build)
+
     def test_unpatched_hotkey_payload_is_rejected(self):
         with zipfile.ZipFile(self.jar) as archive:
             entries = {name: archive.read(name) for name in archive.namelist()

@@ -235,11 +235,14 @@ val buildDesktopLinuxHotkey = if (isLinuxHost) {
         inputs.files(upstreamHotkey, fileTree(source) { exclude("**/__pycache__/**") })
         inputs.property("jniHome", System.getProperty("java.home"))
         outputs.file(desktopHotkeyJar)
-        commandLine(
-            "python3", source.file("build.py").asFile.absolutePath,
-            upstreamHotkey.singleFile.absolutePath, desktopHotkeyJar.get().asFile.absolutePath,
-            System.getProperty("java.home"),
-        )
+        executable = "python3"
+        argumentProviders.add(org.gradle.process.CommandLineArgumentProvider {
+            listOf(
+                source.file("build.py").asFile.absolutePath,
+                upstreamHotkey.singleFile.absolutePath, desktopHotkeyJar.get().asFile.absolutePath,
+                System.getProperty("java.home"),
+            )
+        })
     }
 } else {
     null
@@ -909,8 +912,8 @@ val prepareDesktopLettaCodeRuntime = tasks.register<Exec>("prepareDesktopLettaCo
     }
 }
 
-tasks.matching { it.name == "prepareAppResources" }.configureEach {
-    dependsOn(prepareDesktopLettaCodeRuntime)
+tasks.configureEach {
+    if (name == "prepareAppResources") dependsOn(prepareDesktopLettaCodeRuntime)
 }
 
 /*
@@ -948,16 +951,15 @@ val stageDesktopRiveBridge = tasks.register("stageDesktopRiveBridge") {
     }
 }
 
-tasks.matching { it.name == "prepareAppResources" }.configureEach {
-    dependsOn(stageDesktopRiveBridge)
+tasks.configureEach {
+    if (name == "prepareAppResources") dependsOn(stageDesktopRiveBridge)
 }
 
-tasks.matching {
-    it.name.startsWith("createDistributable") ||
-    it.name.startsWith("createReleaseDistributable") ||
-    it.name.startsWith("packageDistributionForCurrentOS") ||
-    it.name.startsWith("packageReleaseDistributionForCurrentOS")
-}.configureEach {
+tasks.configureEach {
+    if (!(name.startsWith("createDistributable") ||
+            name.startsWith("createReleaseDistributable") ||
+            name.startsWith("packageDistributionForCurrentOS") ||
+            name.startsWith("packageReleaseDistributionForCurrentOS"))) return@configureEach
     val staged = stagedRiveBridge
     doFirst {
         if (!isWindowsHost || allowMissingRiveBridge) return@doFirst
@@ -969,8 +971,8 @@ tasks.matching {
     }
 }
 
-tasks.matching { it.name == "checkRuntime" || it.name == "checkReleaseRuntime" }.configureEach {
-    dependsOn(extractDesktopJbr)
+tasks.configureEach {
+    if (name == "checkRuntime" || name == "checkReleaseRuntime") dependsOn(extractDesktopJbr)
 }
 
 /**
@@ -987,11 +989,10 @@ tasks.matching { it.name == "checkRuntime" || it.name == "checkReleaseRuntime" }
  * (Temurin's InputMethod bridge is a no-op for non-Swing text components,
  * so the keyboard never pops on Compose Multiplatform text input).
  */
-tasks.matching {
-    it.name.startsWith("createDistributable") ||
-    it.name.startsWith("createReleaseDistributable") ||
-    it.name.startsWith("packageDistributionForCurrentOS")
-}.configureEach {
+tasks.configureEach {
+    if (!(name.startsWith("createDistributable") ||
+            name.startsWith("createReleaseDistributable") ||
+            name.startsWith("packageDistributionForCurrentOS"))) return@configureEach
     dependsOn(extractDesktopJbr)
     doLast {
         if (!isDesktopRuntimeHost) return@doLast
@@ -1082,8 +1083,8 @@ fun verifyBundledModules(distributableDir: File, release: File, bundled: Set<Str
     logger.lifecycle("verifyBundledModules: all ${needed.size} modules the jars need are bundled.")
 }
 
-tasks.matching { it.name.startsWith("createDistributable") || it.name.startsWith("createReleaseDistributable") }
-    .configureEach {
+tasks.configureEach {
+        if (!(name.startsWith("createDistributable") || name.startsWith("createReleaseDistributable"))) return@configureEach
         doLast {
             outputs.files.files.filter { it.isDirectory }.forEach { distributable ->
                 if (isLinuxHost) {
