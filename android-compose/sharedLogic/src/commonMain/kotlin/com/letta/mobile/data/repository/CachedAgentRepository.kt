@@ -382,8 +382,7 @@ open class CachedAgentRepository(
                         // A completed list requested after this ordinary read is authoritative.
                         // Keep the waiter alive, but do not restore its older response to the roster.
                         if (!persist && completedRefreshRevision > refreshRevisionAtStart) {
-                            return@withLock _agents.value.find { it.id == id }
-                                ?: throw NoSuchElementException("Agent ${id.value} missing from refreshed roster")
+                            return@withLock refreshedAgentOrThrow(id)
                         }
                         updateAgentInCache(fresh)
                         cachePublicationRevision += 1
@@ -404,6 +403,10 @@ open class CachedAgentRepository(
         agentRequests[id] = request
         return request
     }
+
+    private fun refreshedAgentOrThrow(id: AgentId): Agent =
+        _agents.value.find { it.id == id }
+            ?: throw NoSuchElementException("Agent ${id.value} missing from refreshed roster")
 
     private suspend fun persistUpdatedAgent(agent: Agent) {
         runCatchingCancellable { localCache?.invoke()?.upsert(agent) }
