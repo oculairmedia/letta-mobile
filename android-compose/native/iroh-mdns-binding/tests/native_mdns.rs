@@ -91,11 +91,15 @@ async fn native_mdns_compatibility_direct_path_and_untrusted_candidate() {
         Ok(_) => panic!("Off-mode ID-only dial unexpectedly connected"),
         Err(error) => error,
     };
-    // error.rs converts ConnectError with from_debug, preserving the nested
-    // ConnectWithOptsError::NoAddress variant in debug_message().
+    // Pinned Iroh formats Debug as a message and cause chain, not variant names.
     assert_eq!(unregistered.kind(), IrohErrorKind::Connect);
     assert!(
-        unregistered.debug_message().contains("NoAddress"),
+        unregistered
+            .message()
+            .starts_with("No addressing information available")
+            && unregistered
+                .debug_message()
+                .contains("No address lookup configured"),
         "unexpected Off-mode failure: {}",
         unregistered.debug_message()
     );
