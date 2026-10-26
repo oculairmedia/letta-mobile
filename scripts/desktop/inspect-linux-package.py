@@ -21,8 +21,7 @@ def elf_x64(data, name):
     require(struct.unpack_from('<H', data, 18)[0] == 62, f'Not x86-64: {name}')
 
 
-def inspect(root, native_dir, forbidden=()):
-    root = Path(root).resolve()
+def inspect_desktop_entry(root):
     require((root / 'AppRun').is_file(), 'AppRun missing')
     require(os.access(root / 'AppRun', os.X_OK), 'AppRun is not executable')
     entries = list(root.glob('*.desktop'))
@@ -33,6 +32,10 @@ def inspect(root, native_dir, forbidden=()):
     require(entry.get('Type') == 'Application' and entry.get('Name') and entry.get('Exec'), 'Invalid desktop entry')
     require(entry.get('Icon') and any(root.glob(entry['Icon'] + '.*')), 'Desktop icon missing')
     require(not entry['Exec'].startswith('/'), 'Desktop entry embeds an absolute path')
+    return entries[0], entry
+
+
+def inspect_node_runtime(root):
     nodes = list(root.rglob('resources/letta-code-runtime/node'))
     require(len(nodes) == 1, 'Expected one bundled Linux Node runtime')
     node = nodes[0]
@@ -43,6 +46,10 @@ def inspect(root, native_dir, forbidden=()):
     manifest = json.loads((runtime / 'runtime-manifest.json').read_text())
     package = json.loads(js.with_name('package.json').read_text())
     require(package['version'] == manifest['lettaCode'], 'AppServer does not match runtime manifest')
+    return node, js, manifest
+
+
+def inspect_launcher(root, entry):
     cfgs = [p for p in root.rglob('*.cfg') if 'letta.desktop.runtime.node=' in p.read_text()]
     require(len(cfgs) == 1, 'Packaged launcher runtime binding missing or duplicated')
     cfg = cfgs[0]
@@ -57,11 +64,18 @@ def inspect(root, native_dir, forbidden=()):
     for key, suffix in [('node', 'node'), ('lettaJs', 'node_modules/@letta-ai/letta-code/letta.js')]:
         require(f'-Dletta.desktop.runtime.{key}=$APPDIR/resources/letta-code-runtime/{suffix}' in text,
                 f'{key} must use a relocatable $APPDIR binding')
-    for path in [cfg, entries[0], root / 'AppRun']:
+    return cfg
+
+
+def inspect_host_paths(paths, forbidden):
+    for path in paths:
         contents = path.read_text()
         for build_root in forbidden:
             require(build_root not in contents, f'Build path leaked into {path}')
         require(not re.search(r'/(?:home/runner|opt/stacks|Users)/|[A-Z]:\\', contents), f'Host path in {path}')
+
+
+def inspect_jvm(root, cfg):
     releases = [p for p in root.rglob('runtime/release') if p.is_file()]
     require(len(releases) == 1, 'Bundled Java runtime missing or duplicated')
     release = releases[0]
@@ -77,6 +91,10 @@ def inspect(root, native_dir, forbidden=()):
     # metadata that exists only in the source SDK.
     with jvm.open('rb') as stream:
         elf_x64(stream.read(64), jvm)
+    return jvm, launcher
+
+
+def inspect_loose_natives(root):
     natives = []
     for path in root.rglob('*'):
         if path.is_symlink():
@@ -92,28 +110,42 @@ def inspect(root, native_dir, forbidden=()):
             natives.append(path)
         elif path.suffix in ('.node', '.so', '.dll', '.exe', '.dylib'):
             raise ValueError(f'Foreign or invalid loose native code: {path}')
+    return natives
+
+
+def extract_jar_natives(jar, native_dir):
+    extracted = []
+    with zipfile.ZipFile(jar) as archive:
+        for name in archive.namelist():
+            # Universal JARs contain other architectures. Select the Linux x64 member.
+            if not name.endswith('.so'):
+                continue
+            if not (re.search(r'(?:x86_64.*linux|linux.*(?:x86[-_]?64|x64|amd64))', name) or Path(name).name in {
+                    'libletta_mermaid_renderer.so', 'libletta_tablet_input.so'}):
+                continue
+            data = archive.read(name)
+            elf_x64(data, f'{jar.name}!{name}')
+            target = Path(native_dir) / jar.name / name
+            require(target.resolve().is_relative_to(Path(native_dir).resolve()), 'Unsafe JAR entry')
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+            extracted.append(target)
+    return extracted
+
+
+def inspect(root, native_dir, forbidden=()):
+    root = Path(root).resolve()
+    entry_path, entry = inspect_desktop_entry(root)
+    node, js, manifest = inspect_node_runtime(root)
+    cfg = inspect_launcher(root, entry)
+    inspect_host_paths([cfg, entry_path, root / 'AppRun'], forbidden)
+    jvm, launcher = inspect_jvm(root, cfg)
+    natives = inspect_loose_natives(root)
     jars = list(root.rglob('*.jar'))
     require(jars, 'Desktop runtime JARs missing')
     required = {'libautomerge_jni.so', 'libiroh_ffi.so', 'libletta_mermaid_renderer.so', 'libletta_tablet_input.so'}
-    extracted = []
-    for jar in jars:
-        with zipfile.ZipFile(jar) as archive:
-            for name in archive.namelist():
-                # Universal upstream JARs legitimately contain other architectures. Inspect the
-                # Linux x64 member the JVM actually loads; every loose binary is checked above.
-                if not name.endswith('.so'):
-                    continue
-                if not (re.search(r'(?:x86_64.*linux|linux.*(?:x86[-_]?64|x64|amd64))', name) or Path(name).name in {
-                        'libletta_mermaid_renderer.so', 'libletta_tablet_input.so'}):
-                    continue
-                data = archive.read(name)
-                elf_x64(data, f'{jar.name}!{name}')
-                target = Path(native_dir) / jar.name / name
-                require(target.resolve().is_relative_to(Path(native_dir).resolve()), 'Unsafe JAR entry')
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(data)
-                natives.append(target)
-                extracted.append(target)
+    extracted = [path for jar in jars for path in extract_jar_natives(jar, native_dir)]
+    natives.extend(extracted)
     present = {p.name for p in natives}
     require(required <= present, f'Missing Linux JNI payload: {sorted(required - present)}')
     # The current Rive implementation is Windows/D3D11 only; Linux uses the existing fallback.
