@@ -9,9 +9,9 @@ native libraries. No application code imports this API yet.
 | `MdnsMode::AnnounceHost` | Adds standard DNS-SD peer lookup with announcement and lookup. A listening native host opts in explicitly. |
 | `MdnsMode::LookupClient` | Adds the same lookup format without self-advertisement. A native client opts in only for explicit searches. |
 | `Endpoint::start_mdns_scan(duration_ms: u32)` / `startMdnsScan` | Starts one browse of `_irohv1._udp.local.` for 1–30,000 ms, at most 64 candidate IDs. A new scan cancels the previous scan on this endpoint. Off and closed endpoints reject it. |
-| `MdnsSubscription::next()` / `next` | Yields `Discovered { addr }` and `Expired { id }` events. The latter clears every candidate observed when the bounded scan ends. A closed stream yields `None`. |
-| `MdnsSubscription::close()` / Kotlin `shutdown` | Aborts and joins the browse task, drains buffered events, and closes the stream. Dropping the handle also aborts. |
-| `Endpoint::close()` / Kotlin `shutdown` | Aborts the active scan and drops its browse server before closing Iroh. |
+| `MdnsSubscription::next()` / `next` | Yields `Discovered { addr }` and, on normal bounded completion, `Expired { id }` events. On supersession or close, buffered events are discarded and the old stream yields `None`; consumers clear that scan's candidates then. |
+| `MdnsSubscription::close()` / Kotlin `shutdown` | Invalidates and drains the event stream, then aborts and joins the browse task. Dropping the handle also invalidates and aborts. |
+| `Endpoint::close()` / Kotlin `shutdown` | Invalidates and drains the active scan, aborts it, and drops its browse server before closing Iroh. |
 
 The peer-lookup dependency uses the existing `_irohv1._udp.local.` DNS-SD
 service, z-base-32 endpoint-ID instance label, SRV/A/AAAA direct address, and

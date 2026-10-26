@@ -2267,22 +2267,22 @@ index 3d77cb7..98ecc3c 100644
  uniffi::setup_scaffolding!();
 diff --git a/src/mdns.rs b/src/mdns.rs
 new file mode 100644
-index 0000000..d2ed796
+index 0000000..4582d0c
 --- /dev/null
 +++ b/src/mdns.rs
-@@ -0,0 +1,225 @@
+@@ -0,0 +1,332 @@
 +//! Opt-in DNS-SD peer lookup. Results are transport hints, never trust grants.
 +use std::{
-+    collections::HashSet,
++    collections::{HashSet, VecDeque},
 +    net::{IpAddr, SocketAddr},
 +    str::FromStr,
 +    sync::{Arc, Mutex},
 +    time::Duration,
 +};
 +
-+use hick::{Name, tokio::QueryParam};
++use hick::{tokio::QueryParam, Name};
 +use tokio::{
-+    sync::mpsc,
++    sync::Notify,
 +    task::{AbortHandle, JoinHandle},
 +};
 +
@@ -2311,7 +2311,68 @@ index 0000000..d2ed796
 +
 +struct RuntimeState {
 +    browser: Option<hick::tokio::Endpoint>,
-+    active: Option<AbortHandle>,
++    active: Option<ActiveScan>,
++}
++
++struct ActiveScan {
++    task: AbortHandle,
++    events: Arc<ScanEvents>,
++}
++
++#[derive(Default)]
++struct ScanQueue {
++    items: VecDeque<MdnsEvent>,
++    finished: bool,
++}
++
++#[derive(Default)]
++struct ScanEvents {
++    queue: Mutex<ScanQueue>,
++    changed: Notify,
++}
++
++impl ScanEvents {
++    fn push(&self, event: MdnsEvent) -> bool {
++        let mut queue = self.queue.lock().unwrap();
++        if queue.finished || queue.items.len() == MAX_PEERS * 2 {
++            return false;
++        }
++        queue.items.push_back(event);
++        drop(queue);
++        self.changed.notify_one();
++        true
++    }
++
++    fn finish(&self) {
++        self.queue.lock().unwrap().finished = true;
++        self.changed.notify_waiters();
++    }
++
++    fn invalidate(&self) {
++        let mut queue = self.queue.lock().unwrap();
++        queue.finished = true;
++        queue.items.clear();
++        drop(queue);
++        self.changed.notify_waiters();
++    }
++
++    async fn next(&self) -> Option<MdnsEvent> {
++        loop {
++            let notified = self.changed.notified();
++            tokio::pin!(notified);
++            notified.as_mut().enable();
++            {
++                let mut queue = self.queue.lock().unwrap();
++                if let Some(event) = queue.items.pop_front() {
++                    return Some(event);
++                }
++                if queue.finished {
++                    return None;
++                }
++            }
++            notified.await;
++        }
++    }
 +}
 +
 +pub(crate) struct MdnsRuntime {
@@ -2331,7 +2392,8 @@ index 0000000..d2ed796
 +    pub(crate) fn close(&self) {
 +        let mut state = self.state.lock().unwrap();
 +        if let Some(active) = state.active.take() {
-+            active.abort();
++            active.events.invalidate();
++            active.task.abort();
 +        }
 +        state.browser.take();
 +    }
@@ -2364,18 +2426,22 @@ index 0000000..d2ed796
 +            )
 +            .await
 +            .map_err(anyhow::Error::from)?;
-+        let (tx, rx) = mpsc::channel(MAX_PEERS * 2);
++        let events = Arc::new(ScanEvents::default());
 +        let mut state = self.state.lock().unwrap();
 +        if state.browser.is_none() {
 +            return Err(IrohError::invalid_input("mDNS endpoint has been closed"));
 +        }
 +        if let Some(active) = state.active.take() {
-+            active.abort();
++            active.events.invalidate();
++            active.task.abort();
 +        }
-+        let task = tokio::spawn(run_scan(lookup, own_id, duration, tx));
-+        state.active = Some(task.abort_handle());
++        let task = tokio::spawn(run_scan(lookup, own_id, duration, events.clone()));
++        state.active = Some(ActiveScan {
++            task: task.abort_handle(),
++            events: events.clone(),
++        });
 +        Ok(Arc::new(MdnsSubscription {
-+            events: tokio::sync::Mutex::new(rx),
++            events,
 +            task: Mutex::new(Some(task)),
 +        }))
 +    }
@@ -2385,7 +2451,7 @@ index 0000000..d2ed796
 +/// closing the owning endpoint cancels it as well.
 +#[derive(uniffi::Object)]
 +pub struct MdnsSubscription {
-+    events: tokio::sync::Mutex<mpsc::Receiver<MdnsEvent>>,
++    events: Arc<ScanEvents>,
 +    task: Mutex<Option<JoinHandle<()>>>,
 +}
 +
@@ -2393,24 +2459,23 @@ index 0000000..d2ed796
 +impl MdnsSubscription {
 +    #[uniffi::method(async_runtime = "tokio")]
 +    pub async fn next(&self) -> Option<MdnsEvent> {
-+        self.events.lock().await.recv().await
++        self.events.next().await
 +    }
 +
 +    #[uniffi::method(async_runtime = "tokio")]
 +    pub async fn close(&self) {
++        self.events.invalidate();
 +        let task = self.task.lock().unwrap().take();
 +        if let Some(task) = task {
 +            task.abort();
 +            let _ = task.await;
 +        }
-+        let mut events = self.events.lock().await;
-+        events.close();
-+        while events.try_recv().is_ok() {}
 +    }
 +}
 +
 +impl Drop for MdnsSubscription {
 +    fn drop(&mut self) {
++        self.events.invalidate();
 +        if let Some(task) = self.task.lock().unwrap().take() {
 +            task.abort();
 +        }
@@ -2421,28 +2486,39 @@ index 0000000..d2ed796
 +    mut lookup: hick::tokio::Lookup,
 +    own_id: Arc<EndpointId>,
 +    duration: Duration,
-+    tx: mpsc::Sender<MdnsEvent>,
++    events: Arc<ScanEvents>,
 +) {
 +    let deadline = tokio::time::Instant::now() + duration;
 +    let mut seen = HashSet::new();
 +    while let Ok(Some(entry)) = tokio::time::timeout_at(deadline, lookup.next()).await {
-+        let Some(addr) = candidate(&entry) else {
-+            continue;
-+        };
-+        let id = addr.id();
-+        if id == own_id || !seen.insert(id.to_bytes()) {
-+            continue;
-+        }
-+        let _ = tx.try_send(MdnsEvent::Discovered {
-+            addr: Arc::new(addr),
-+        });
++        record_candidate(&entry, &own_id, &mut seen, &events);
 +    }
 +    // A candidate is valid only for this scan. No stale candidate survives its
 +    // bounded lifetime; a later scan must rediscover it.
 +    for bytes in seen {
 +        if let Ok(id) = EndpointId::from_bytes(bytes) {
-+            let _ = tx.try_send(MdnsEvent::Expired { id: Arc::new(id) });
++            events.push(MdnsEvent::Expired { id: Arc::new(id) });
 +        }
++    }
++    events.finish();
++}
++
++fn record_candidate(
++    entry: &hick::tokio::ServiceEntry,
++    own_id: &EndpointId,
++    seen: &mut HashSet<Vec<u8>>,
++    events: &ScanEvents,
++) {
++    let Some(addr) = candidate(entry) else { return };
++    let id = addr.id();
++    let bytes = id.to_bytes();
++    if id.as_ref() == own_id || seen.contains(&bytes) || seen.len() >= MAX_PEERS {
++        return;
++    }
++    if events.push(MdnsEvent::Discovered {
++        addr: Arc::new(addr),
++    }) {
++        seen.insert(bytes);
 +    }
 +}
 +
@@ -2495,6 +2571,37 @@ index 0000000..d2ed796
 +
 +fn usable_ip(ip: IpAddr) -> bool {
 +    !ip.is_unspecified() && !ip.is_multicast()
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[tokio::test]
++    async fn queued_discovery_is_drained_when_scan_is_invalidated() {
++        let events = ScanEvents::default();
++        let id = EndpointId { key: [7; 32] };
++        let addr = EndpointAddr::new(&id, None, vec!["127.0.0.1:1234".into()]);
++        assert!(events.push(MdnsEvent::Discovered {
++            addr: Arc::new(addr)
++        }));
++        assert!(matches!(
++            events.next().await,
++            Some(MdnsEvent::Discovered { .. })
++        ));
++        let queued_id = EndpointId { key: [8; 32] };
++        let queued = EndpointAddr::new(&queued_id, None, vec!["127.0.0.1:1235".into()]);
++        assert!(events.push(MdnsEvent::Discovered {
++            addr: Arc::new(queued)
++        }));
++        assert_eq!(events.queue.lock().unwrap().items.len(), 1);
++        events.invalidate();
++        assert!(events.queue.lock().unwrap().items.is_empty());
++        assert!(events.next().await.is_none());
++        assert!(!events.push(MdnsEvent::Expired {
++            id: Arc::new(queued_id)
++        }));
++    }
 +}
 diff --git a/uniffi.toml b/uniffi.toml
 index 39c04ea..249faeb 100644

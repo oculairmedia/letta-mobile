@@ -44,16 +44,21 @@ Maven 1.1.0 and its existing N0 DNS/relay behavior.
 
 - [`tests/native_mdns.rs`](tests/native_mdns.rs) starts two native endpoints using the
   same standard DNS-SD peer-lookup format, disables relays, discovers a host,
-  then explicitly dials and asserts a selected direct IP path. It also checks
-  that discovery alone creates no connection, that one scan supersedes another,
-  bounds scan duration, and closing an endpoint rejects further scans.
+  then dials using only its endpoint ID and asserts a selected direct IP path.
+  An Off-mode negative control cannot make that ID-only dial. The test also
+  checks that discovery alone creates no connection, that superseding or closing
+  a scan invalidates its stream after discovery, and that invalid durations and
+  post-close scans are rejected. A crate unit test queues a second candidate
+  and checks that cancellation drains it.
 - The test runs on one multicast-capable CI host. A two-device LAN run and
   blocked-multicast relay/DNS connection proof remain separate platform-matrix
   work. The default option path is checked to leave N0 selection untouched;
   no relay service is started by this test.
-- An `Expired` event means this bounded scan ended and its candidates must be
-  cleared. It does not assert that a remote DNS-SD TTL elapsed or the remote
-  peer went offline. A later scan must rediscover candidates.
+- An `Expired` event means a bounded scan ended normally and its candidates
+  must be cleared. Supersession, subscription close, endpoint close, or handle
+  drop invalidates and drains the old stream immediately. Consumers also clear
+  candidates when `next()` returns `None`. Expiration does not assert that a
+  remote DNS-SD TTL elapsed or the remote peer went offline.
 - A discovered address is an untrusted transport hint. Iroh authenticates the
   dialed endpoint key at the QUIC layer; authorization still requires the
   existing scoped pairing and confirmation flow in the application. This patch

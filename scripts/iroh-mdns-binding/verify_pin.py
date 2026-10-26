@@ -26,27 +26,40 @@ def verify_patch() -> None:
         fail(f"Native test checksum mismatch: {test_sha}")
 
 
-def verify_source(source: Path) -> None:
-    metadata = json.loads((source / "metadata.json").read_text())
-    packages = {(item["name"], item["version"]): item for item in metadata["packages"]}
-    required = [
+def required_packages() -> list[tuple[str, str]]:
+    return [
         ("iroh-ffi", MANIFEST["upstream"]["version"]),
         ("iroh", MANIFEST["rust_iroh"]),
         ("iroh-mdns-peer-lookup", MANIFEST["peer_lookup"]["version"]),
         ("hick", MANIFEST["hick"]["version"]),
     ]
-    for key in required:
+
+
+def verify_dependencies(packages: dict) -> None:
+    for key in required_packages():
         if key not in packages:
             fail(f"Pinned dependency missing: {key}")
     peer = packages[("iroh-mdns-peer-lookup", MANIFEST["peer_lookup"]["version"])]
     if MANIFEST["peer_lookup"]["commit"] not in peer.get("source", ""):
         fail("Peer lookup source SHA differs from approved pin")
-    if peer.get("license") != MANIFEST["peer_lookup"]["license"]:
-        fail(f"Peer lookup license changed: {peer.get('license')}")
-    if packages[("hick", MANIFEST["hick"]["version"])].get("license") != MANIFEST["hick"]["license"]:
-        fail("hick license changed")
-    if packages[("iroh-ffi", MANIFEST["upstream"]["version"])].get("license") != MANIFEST["upstream"]["license"]:
-        fail("iroh-ffi license changed")
+
+
+def verify_licenses(packages: dict) -> None:
+    for name, pin in (
+        ("iroh-mdns-peer-lookup", "peer_lookup"),
+        ("hick", "hick"),
+        ("iroh-ffi", "upstream"),
+    ):
+        package = packages[(name, MANIFEST[pin]["version"])]
+        if package.get("license") != MANIFEST[pin]["license"]:
+            fail(f"{name} license changed: {package.get('license')}")
+
+
+def verify_source(source: Path) -> None:
+    metadata = json.loads((source / "metadata.json").read_text())
+    packages = {(item["name"], item["version"]): item for item in metadata["packages"]}
+    verify_dependencies(packages)
+    verify_licenses(packages)
     lock = (source / "Cargo.lock").read_text()
     if "checksum = " not in lock:
         fail("Cargo.lock is missing registry checksums")
