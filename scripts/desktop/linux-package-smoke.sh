@@ -13,7 +13,7 @@ preserve_evidence() {
   # Save the original status before signalling any process. Never upload the profile.
   printf '%s\n' "$1" > "$LETTA_PACKAGE_SMOKE_EVIDENCE/exit-status.txt" || failed=1
   for name in extract.log payload.log startup.log window-manager.log window.txt window-tree.txt check/layout.json \
-    gdb.log gdb-status.txt diagnostic-summary.txt artifact.sha256; do
+    gdb.log gdb-status.txt diagnostic-summary.txt artifact.sha256 app-exit-status.txt; do
     if [[ -f $work/$name ]]; then
       cp -f "$work/$name" "$LETTA_PACKAGE_SMOKE_EVIDENCE/" || failed=1
     fi
@@ -151,7 +151,14 @@ SHIM
   app_pid=$!
   window=
   for ((i=0; i<60; i++)); do
-    kill -0 "$app_pid" 2>/dev/null || { cat "$work/startup.log"; echo 'Packaged app exited before showing a window' >&2; exit 1; }
+    if ! kill -0 "$app_pid" 2>/dev/null; then
+      local app_status=0
+      wait "$app_pid" || app_status=$?
+      printf '%s\n' "$app_status" > "$work/app-exit-status.txt"
+      cat "$work/startup.log"
+      echo "Packaged app exited before showing a window (status=$app_status)" >&2
+      exit 1
+    fi
     window=$(visible_app_windows "$app_pid" | head -n 1 || true)
     [[ -n $window ]] && break
     sleep 1

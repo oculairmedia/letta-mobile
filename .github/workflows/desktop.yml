@@ -328,6 +328,15 @@ jobs:
         run: |
           xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash ../scripts/desktop/linux-package-smoke.sh "$APPIMAGE_PATH"
 
+      - name: Retain failed Linux AppImage for diagnosis only
+        if: ${{ failure() && steps.linux-smoke.outcome == 'failure' && steps.linux-smoke.outputs.appimage != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: unverified-linux-appimage-${{ github.run_number }}
+          path: ${{ steps.linux-smoke.outputs.appimage }}
+          retention-days: 3
+          if-no-files-found: error
+
       - name: Upload Linux GDB diagnostic evidence
         if: ${{ always() && steps.linux-smoke.outcome == 'failure' }}
         uses: actions/upload-artifact@v4

@@ -488,6 +488,16 @@ PYTHON'''
         self.assertEqual((evidence / 'window.txt').read_text(), 'Meridian\n')
         self.assertEqual(list(self.work.rglob('letta-linux-package-smoke.*')), [])
 
+    def test_window_harness_retains_nonzero_child_exit_status(self):
+        result, evidence = self.run_window_harness_fixture(startup='exit 17', options={'tools': {'xdotool': 'exit 1'}})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((evidence / 'app-exit-status.txt').read_text(), '17\n')
+
+    def test_window_harness_rejects_clean_exit_before_window(self):
+        result, evidence = self.run_window_harness_fixture(startup='exit 0', options={'tools': {'xdotool': 'exit 1'}})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((evidence / 'app-exit-status.txt').read_text(), '0\n')
+
     def test_window_harness_accepts_dynamic_destination_title(self):
         result, evidence = self.run_titled_window_fixture()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
