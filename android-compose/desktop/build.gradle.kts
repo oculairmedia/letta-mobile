@@ -284,7 +284,7 @@ dependencies {
     implementation(libs.nucleus.launcher.linux)
     implementation(libs.nucleus.launcher.macos)
     if (isLinuxHost) {
-        implementation(files(desktopHotkeyJar).builtBy(buildDesktopLinuxHotkey))
+        implementation(files(desktopHotkeyJar).builtBy(checkNotNull(buildDesktopLinuxHotkey)))
     } else {
         implementation(libs.nucleus.global.hotkey)
     }
