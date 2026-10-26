@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.platform.MemoryPressureHub
 import com.letta.mobile.data.platform.MemoryPressureLevel
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
@@ -47,9 +48,10 @@ class CanonicalTimelinePagingTest {
         val session = CanonicalTimelineSession(InMemoryTimelineStore(), transport, scope, enabled = true)
         val selection = assertIs<TimelineEngineOpen.Opened>(session.open()).selection
         val subscribe = CompletableDeferred<Unit>()
+        val active = atomic<TimelineLedgerPagingSource?>(null)
         val presenter = presenter<TimelineSettledRecord>()
         ui.launch {
-            session.pagingWithPublications(selection, publications = flow {
+            session.createTimelinePager(selection, active).flow.observePublications(selection, active, publications = flow {
                 subscribe.await()
                 emitAll(session.publication)
             }).collectLatest { presenter.collectFrom(it) }
@@ -76,10 +78,11 @@ class CanonicalTimelinePagingTest {
         val selection = assertIs<TimelineEngineOpen.Opened>(session.open()).selection
         assertEquals(TimelineEnginePageOutcome.Applied, session.loadOlder(selection))
         val subscribe = CompletableDeferred<Unit>()
+        val active = atomic<TimelineLedgerPagingSource?>(null)
         val presenter = presenter<TimelineSettledRecord>()
         var generations = 0
         ui.launch {
-            session.pagingWithPublications(selection, publications = flow {
+            session.createTimelinePager(selection, active).flow.observePublications(selection, active, publications = flow {
                 subscribe.await()
                 emitAll(session.publication)
             }).collectLatest {

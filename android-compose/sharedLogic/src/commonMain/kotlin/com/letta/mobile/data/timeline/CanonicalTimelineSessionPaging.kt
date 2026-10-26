@@ -8,6 +8,7 @@ import androidx.paging.PagingData
 import androidx.paging.PagingState
 import androidx.paging.RemoteMediator
 import com.letta.mobile.util.Telemetry
+import kotlinx.atomicfu.AtomicRef
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -29,21 +30,21 @@ fun CanonicalTimelineSession.paging(
     anchor: TimelinePageKey? = selection.anchor,
     settledProjectionAdapter: TimelineSettledProjectionAdapter = DefaultTimelineSettledProjectionAdapter,
     trims: Flow<Unit> = emptyFlow(),
-): Flow<PagingData<TimelineSettledRecord>> = pagingWithPublications(
-    selection, anchor, settledProjectionAdapter, trims, publication,
-)
-
-/** Keeps revision observation testable independently of the page pump's scheduling. */
-@OptIn(ExperimentalPagingApi::class)
-internal fun CanonicalTimelineSession.pagingWithPublications(
-    selection: TimelineEngineSelection,
-    anchor: TimelinePageKey? = selection.anchor,
-    settledProjectionAdapter: TimelineSettledProjectionAdapter = DefaultTimelineSettledProjectionAdapter,
-    trims: Flow<Unit> = emptyFlow(),
-    publications: Flow<TimelineEnginePublication>,
 ): Flow<PagingData<TimelineSettledRecord>> {
     val active = atomic<TimelineLedgerPagingSource?>(null)
-    val pages = Pager(
+    return createTimelinePager(selection, active, anchor, settledProjectionAdapter).flow
+        .observePublications(selection, active, trims, publication)
+}
+
+/** Creates the Pager and registers each source for revision and trim observation. */
+@OptIn(ExperimentalPagingApi::class)
+internal fun CanonicalTimelineSession.createTimelinePager(
+    selection: TimelineEngineSelection,
+    active: AtomicRef<TimelineLedgerPagingSource?>,
+    anchor: TimelinePageKey? = selection.anchor,
+    settledProjectionAdapter: TimelineSettledProjectionAdapter = DefaultTimelineSettledProjectionAdapter,
+): Pager<TimelinePageKey, TimelineSettledRecord> {
+    return Pager(
         config = PagingConfig(
             pageSize = engine.budget.maxMetadataRows, enablePlaceholders = false,
             initialLoadSize = engine.budget.maxMetadataRows, maxSize = engine.budget.maxMetadataRows * 3,
@@ -53,9 +54,18 @@ internal fun CanonicalTimelineSession.pagingWithPublications(
         pagingSourceFactory = {
             TimelineLedgerPagingSource(engine, selection, selection.scope.agentId, settledProjectionAdapter).also { active.value = it }
         },
-    ).flow
+    )
+}
+
+/** Keeps revision observation testable independently of the page pump's scheduling. */
+internal fun Flow<PagingData<TimelineSettledRecord>>.observePublications(
+    selection: TimelineEngineSelection,
+    active: AtomicRef<TimelineLedgerPagingSource?>,
+    trims: Flow<Unit> = emptyFlow(),
+    publications: Flow<TimelineEnginePublication>,
+): Flow<PagingData<TimelineSettledRecord>> {
     return channelFlow {
-        val pump = launch { pages.collect { send(it) } }
+        val pump = launch { this@observePublications.collect { send(it) } }
         // Memory pressure replaces the active source in place: Paging reloads one page around the
         // reading position and drops every other page it held, without blanking the list.
         launch {
