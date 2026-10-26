@@ -223,6 +223,29 @@ tasks.named("processResources") {
 
 // Keep the Java API and every non-Linux native member from the pinned upstream
 // JAR. Linux alone rebuilds its hotkey JNI with the source-reviewed handler fix.
+abstract class DesktopHotkeyArguments : org.gradle.process.CommandLineArgumentProvider {
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val buildScript: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.InputFiles
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.NONE)
+    abstract val upstream: org.gradle.api.file.ConfigurableFileCollection
+
+    @get:org.gradle.api.tasks.Internal
+    abstract val outputJar: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.Input
+    abstract val javaHome: org.gradle.api.provider.Property<String>
+
+    override fun asArguments(): Iterable<String> = listOf(
+        buildScript.get().asFile.absolutePath,
+        upstream.singleFile.absolutePath,
+        outputJar.get().asFile.absolutePath,
+        javaHome.get(),
+    )
+}
+
 val desktopHotkeyJar = layout.buildDirectory.file("generated/hotkey/nucleus.global-hotkey-linux-patched.jar")
 val buildDesktopLinuxHotkey = if (isLinuxHost) {
     val upstreamHotkey = configurations.create("nucleusHotkeyUpstream") {
@@ -236,13 +259,12 @@ val buildDesktopLinuxHotkey = if (isLinuxHost) {
         inputs.property("jniHome", System.getProperty("java.home"))
         outputs.file(desktopHotkeyJar)
         executable = "python3"
-        argumentProviders.add(org.gradle.process.CommandLineArgumentProvider {
-            listOf(
-                source.file("build.py").asFile.absolutePath,
-                upstreamHotkey.singleFile.absolutePath, desktopHotkeyJar.get().asFile.absolutePath,
-                System.getProperty("java.home"),
-            )
-        })
+        val hotkeyArguments = objects.newInstance<DesktopHotkeyArguments>()
+        hotkeyArguments.buildScript.set(source.file("build.py"))
+        hotkeyArguments.upstream.from(upstreamHotkey)
+        hotkeyArguments.outputJar.set(desktopHotkeyJar)
+        hotkeyArguments.javaHome.set(System.getProperty("java.home"))
+        argumentProviders.add(hotkeyArguments)
     }
 } else {
     null

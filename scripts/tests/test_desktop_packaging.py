@@ -163,7 +163,9 @@ PYTHON'''
     def test_hotkey_arguments_are_lazy_and_task_filters_do_not_realize_tasks(self):
         build = (REPO / 'android-compose/desktop/build.gradle.kts').read_text()
         hotkey = build.split('tasks.register<Exec>("buildDesktopLinuxHotkey")', 1)[1].split('} else {', 1)[0]
-        self.assertIn('argumentProviders.add(org.gradle.process.CommandLineArgumentProvider', hotkey)
+        self.assertIn('objects.newInstance<DesktopHotkeyArguments>()', hotkey)
+        self.assertIn('argumentProviders.add(hotkeyArguments)', hotkey)
+        self.assertNotIn('CommandLineArgumentProvider {\n            listOf(', hotkey)
         self.assertNotIn('doFirst', hotkey)
         self.assertNotIn('tasks.matching', build)
         self.assertIn('inputs.files(upstreamHotkey', hotkey)
