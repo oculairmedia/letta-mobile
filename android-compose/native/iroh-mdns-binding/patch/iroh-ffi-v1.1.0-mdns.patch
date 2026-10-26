@@ -2102,6 +2102,17 @@ index 9bdbea0..c68906e 100644
  
  
  [dev-dependencies]
+diff --git a/kotlin/android-smoke/src/main/AndroidManifest.xml b/kotlin/android-smoke/src/main/AndroidManifest.xml
+--- a/kotlin/android-smoke/src/main/AndroidManifest.xml
++++ b/kotlin/android-smoke/src/main/AndroidManifest.xml
+@@ -1,6 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <manifest xmlns:android="http://schemas.android.com/apk/res/android">
++    <uses-permission android:name="android.permission.INTERNET" />
+     <application
+         android:label="iroh smoke"
+         android:allowBackup="false" />
+ </manifest>
 diff --git a/kotlin/android-smoke/src/androidTest/kotlin/computer/iroh/smoke/IrohSmokeTest.kt b/kotlin/android-smoke/src/androidTest/kotlin/computer/iroh/smoke/IrohSmokeTest.kt
 index c342d65..a07ca0f 100644
 --- a/kotlin/android-smoke/src/androidTest/kotlin/computer/iroh/smoke/IrohSmokeTest.kt

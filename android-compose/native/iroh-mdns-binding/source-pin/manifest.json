@@ -31,6 +31,6 @@
     "iroh-android-1.1.0.pom": "2489f8eca937eb717e73b029cdc161370c6158b0ceeac7081ff1405b939d515b",
     "iroh-android-1.1.0.aar": "ed747f627da6dad314b25b9ff17d38232d8d75cb31e663af348368e6be845ab8"
   },
-  "patch_sha256": "086f8f85f45a460f39743d394cf9656b75c76ebfd0faff524db5a2644fe081bd",
+  "patch_sha256": "0e5586e47ae0d72c63776fce87d3d570d15c10ebab5d62c0de3391cdea019253",
   "native_test_sha256": "492aefde03243b8b490a32d3056a79206bda02a29ffc8c8582d1fcce538f9493"
 }
