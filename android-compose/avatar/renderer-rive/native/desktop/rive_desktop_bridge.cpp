@@ -1,13 +1,13 @@
 // letta-mobile-0s5bi spike: native Rive for Compose Desktop, no webview.
 //
-// A plain C ABI over rive-runtime + the Rive Renderer's D3D11 backend. Each frame the scene is
+// A plain C ABI over rive-runtime + the Rive Renderer's D3D11 or EGL/OpenGL backend. Each frame the scene is
 // drawn into an offscreen texture and copied back into a caller-owned RGBA buffer, which the JVM
 // side wraps as a Skia image. The GPU renderer is the point: feathering (soft glow, blur) only
 // exists there - Skia- and Canvas2D-backed Rive renderers silently drop it.
 //
-// Threading: a D3D11 immediate context is single-threaded, so every call into this DLL must come
+// Threading: the native GPU context belongs to one thread, so every call into this library must come
 // from one thread (the JVM's Rive thread). The device, the render context and each parsed file are
-// shared by every scene in the process - a scene is an artboard instance, which Rive makes in
+// shared while scenes are alive - a scene is an artboard instance, which Rive makes in
 // microseconds, not a device of its own, which took hundreds of milliseconds per mascot.
 
 #include "rive/animation/state_machine_instance.hpp"
@@ -17,7 +17,9 @@
 #include "rive/math/aabb.hpp"
 #include "rive/renderer.hpp"
 #include "rive/renderer/texture.hpp" // render_context_d3d_impl.hpp needs it complete, but does not include it
+#ifdef _WIN32
 #include "rive/renderer/d3d11/render_context_d3d_impl.hpp"
+#endif
 #include "rive/renderer/render_context.hpp"
 #include "rive/renderer/rive_renderer.hpp"
 #include "rive/animation/state_machine_input_instance.hpp"
@@ -32,13 +34,20 @@
 #include <memory>
 #include <string>
 #include <vector>
+#ifdef _WIN32
 #include <dxgi1_2.h>
+#define RIVE_BRIDGE_EXPORT __declspec(dllexport)
+#else
+#define RIVE_BRIDGE_EXPORT __attribute__((visibility("default")))
+#include "rive_linux_gpu.hpp"
+#endif
 
 using namespace rive;
 using namespace rive::gpu;
 
 // The process's one GPU: device, immediate context and Rive render context (whose shaders compile
-// once). Created on first use, kept for the life of the process; every scene renders through it.
+// once). Created on first use, released after the last scene; every scene renders through it.
+#ifdef _WIN32
 struct SharedGpu
 {
     ComPtr<ID3D11Device> gpu;
@@ -46,6 +55,8 @@ struct SharedGpu
     std::unique_ptr<RenderContext> renderContext;
     std::string adapterName;
 };
+
+#endif
 
 // A parsed .riv, shared by every scene loaded from the same bytes: parsing is per file, instancing
 // an artboard from it is cheap. Keyed by content hash and length; the mascot is one file, so this
@@ -60,9 +71,13 @@ struct CachedFile
 struct RiveBridge
 {
     SharedGpu* shared = nullptr;
+#ifdef _WIN32
     rcp<RenderTargetD3D> renderTarget;
     ComPtr<ID3D11Texture2D> drawTexture;
     ComPtr<ID3D11Texture2D> readbackTexture;
+#else
+    LinuxTarget target;
+#endif
     uint32_t width = 0;
     uint32_t height = 0;
 
@@ -77,11 +92,14 @@ struct RiveBridge
 
 static SharedGpu* g_sharedGpu = nullptr;
 static std::vector<CachedFile> g_files;
+static size_t g_sceneCount = 0;
+static std::string g_gpuError;
 
 static SharedGpu* shared_gpu()
 {
     if (g_sharedGpu)
         return g_sharedGpu;
+#ifdef _WIN32
     ComPtr<IDXGIFactory2> factory;
     if (FAILED(CreateDXGIFactory(__uuidof(IDXGIFactory2),
                                  reinterpret_cast<void**>(factory.ReleaseAndGetAddressOf()))))
@@ -112,6 +130,9 @@ static SharedGpu* shared_gpu()
     if (!shared->renderContext)
         return nullptr;
     g_sharedGpu = shared.release();
+#else
+    g_sharedGpu = SharedGpu::Make(g_gpuError).release();
+#endif
     return g_sharedGpu;
 }
 
@@ -236,30 +257,42 @@ extern "C" {
 
 // A scene: cheap, because the device and render context are the process's shared ones (brought
 // up by the first call) and the file comes from the parse cache at load.
-__declspec(dllexport) RiveBridge* rive_bridge_create(char* adapterNameOut, int adapterNameCap)
+RIVE_BRIDGE_EXPORT RiveBridge* rive_bridge_create(char* adapterNameOut, int adapterNameCap)
 {
     SharedGpu* shared = shared_gpu();
-    if (!shared)
-        return nullptr;
     if (adapterNameOut && adapterNameCap > 0)
     {
-        std::strncpy(adapterNameOut, shared->adapterName.c_str(), (size_t)adapterNameCap - 1);
+        const std::string name = shared ? shared->adapterName :
+            (g_gpuError.empty() ? "no D3D11 feature level 11.1 device" : g_gpuError);
+        std::strncpy(adapterNameOut, name.c_str(), (size_t)adapterNameCap - 1);
         adapterNameOut[adapterNameCap - 1] = 0;
     }
+    if (!shared)
+        return nullptr;
     auto bridge = std::make_unique<RiveBridge>();
     bridge->shared = shared;
+    ++g_sceneCount;
     return bridge.release();
 }
 
-__declspec(dllexport) void rive_bridge_destroy(RiveBridge* bridge)
+RIVE_BRIDGE_EXPORT void rive_bridge_destroy(RiveBridge* bridge)
 {
+    if (!bridge)
+        return;
     delete bridge;
+    if (--g_sceneCount == 0)
+    {
+        // Files can own GPU images: release them while the context is still current.
+        g_files.clear();
+        delete g_sharedGpu;
+        g_sharedGpu = nullptr;
+    }
 }
 
 // Returns 0 on success. `artboardName` null/empty picks the file's default artboard; a name that
 // no artboard carries is an error (4) rather than a silent fall back to the default, so the bench
 // cannot believe it is looking at `Harness` while showing `Mascot`.
-__declspec(dllexport) int rive_bridge_load_artboard(RiveBridge* bridge, const uint8_t* bytes, int length,
+RIVE_BRIDGE_EXPORT int rive_bridge_load_artboard(RiveBridge* bridge, const uint8_t* bytes, int length,
                                                     const char* stateMachineName,
                                                     const char* artboardName)
 {
@@ -279,23 +312,23 @@ __declspec(dllexport) int rive_bridge_load_artboard(RiveBridge* bridge, const ui
 }
 
 // The original entry point: the file's default artboard.
-__declspec(dllexport) int rive_bridge_load(RiveBridge* bridge, const uint8_t* bytes, int length,
+RIVE_BRIDGE_EXPORT int rive_bridge_load(RiveBridge* bridge, const uint8_t* bytes, int length,
                                            const char* stateMachineName)
 {
     return rive_bridge_load_artboard(bridge, bytes, length, stateMachineName, nullptr);
 }
 
-__declspec(dllexport) float rive_bridge_artboard_width(RiveBridge* bridge)
+RIVE_BRIDGE_EXPORT float rive_bridge_artboard_width(RiveBridge* bridge)
 {
     return bridge->artboard ? bridge->artboard->bounds().width() : 0;
 }
 
-__declspec(dllexport) float rive_bridge_artboard_height(RiveBridge* bridge)
+RIVE_BRIDGE_EXPORT float rive_bridge_artboard_height(RiveBridge* bridge)
 {
     return bridge->artboard ? bridge->artboard->bounds().height() : 0;
 }
 
-__declspec(dllexport) void rive_bridge_advance(RiveBridge* bridge, float seconds)
+RIVE_BRIDGE_EXPORT void rive_bridge_advance(RiveBridge* bridge, float seconds)
 {
     if (bridge->stateMachine)
         bridge->stateMachine->advanceAndApply(seconds);
@@ -303,11 +336,12 @@ __declspec(dllexport) void rive_bridge_advance(RiveBridge* bridge, float seconds
 
 // Additive activity export. The original void entry point remains ABI-compatible with older
 // packaged DLLs; callers use this symbol only after looking it up at runtime.
-__declspec(dllexport) int rive_bridge_advance_is_active(RiveBridge* bridge, float seconds)
+RIVE_BRIDGE_EXPORT int rive_bridge_advance_is_active(RiveBridge* bridge, float seconds)
 {
     return bridge->stateMachine && bridge->stateMachine->advanceAndApply(seconds) ? 1 : 0;
 }
 
+#ifdef _WIN32
 static bool create_offscreen_textures(RiveBridge* bridge, D3D11_TEXTURE2D_DESC desc)
 {
     ID3D11Device* gpu = bridge->shared->gpu.Get();
@@ -359,37 +393,21 @@ static bool ensure_target(RiveBridge* bridge, uint32_t width, uint32_t height)
     return true;
 }
 
-// Draws the current scene and copies it into `rgbaOut` (width * height * 4 bytes, premultiplied
-// RGBA, top row first). `clearArgb` 0 keeps the background transparent. Returns 0 on success.
-__declspec(dllexport) int rive_bridge_render(RiveBridge* bridge, int width, int height, uint32_t clearArgb,
-                                             uint8_t* rgbaOut)
+#else
+static bool ensure_target(RiveBridge* bridge, uint32_t width, uint32_t height)
 {
-    if (!bridge->artboard || width <= 0 || height <= 0)
-        return 1;
-    if (!ensure_target(bridge, (uint32_t)width, (uint32_t)height))
-        return 3;
+    return bridge->target.resize(width, height);
+}
+#endif
 
+// Flush and readback belong to the platform target; scene drawing is shared.
+static int read_pixels(RiveBridge* bridge, int width, int height, uint8_t* rgbaOut)
+{
     RenderContext* renderContext = bridge->shared->renderContext.get();
+#ifdef _WIN32
     ID3D11DeviceContext* gpuContext = bridge->shared->gpuContext.Get();
-    renderContext->beginFrame({
-        .renderTargetWidth = (uint32_t)width,
-        .renderTargetHeight = (uint32_t)height,
-        .loadAction = LoadAction::clear,
-        .clearColor = clearArgb,
-    });
-
-    RiveRenderer renderer(renderContext);
-    bridge->viewTransform = computeAlignment(Fit::contain, Alignment::center,
-                                             AABB(0, 0, (float)width, (float)height),
-                                             bridge->artboard->bounds());
-    renderer.save();
-    renderer.transform(bridge->viewTransform);
-    if (bridge->stateMachine)
-        bridge->stateMachine->draw(&renderer);
-    else
-        bridge->artboard->draw(&renderer);
-    renderer.restore();
-
+#endif
+#ifdef _WIN32
     bridge->renderTarget->setTargetTexture(bridge->drawTexture);
     renderContext->flush({.renderTarget = bridge->renderTarget.get()});
     bridge->renderTarget->setTargetTexture(nullptr);
@@ -404,7 +422,59 @@ __declspec(dllexport) int rive_bridge_render(RiveBridge* bridge, int width, int 
                     static_cast<const uint8_t*>(map.pData) + (size_t)y * map.RowPitch, (size_t)width * 4);
     }
     gpuContext->Unmap(bridge->readbackTexture.Get(), 0);
+#else
+    renderContext->flush({.renderTarget = bridge->target.renderTarget.get()});
+    return bridge->target.read(rgbaOut) ? 0 : 2;
+#endif
     return 0;
+}
+
+// Scene drawing is independent of target allocation and platform readback.
+static void draw_scene(RiveBridge* bridge, RiveRenderer& renderer, const AABB& viewport)
+{
+    bridge->viewTransform = computeAlignment(Fit::contain, Alignment::center,
+                                             viewport,
+                                             bridge->artboard->bounds());
+    renderer.save();
+    renderer.transform(bridge->viewTransform);
+    if (bridge->stateMachine)
+        bridge->stateMachine->draw(&renderer);
+    else
+        bridge->artboard->draw(&renderer);
+    renderer.restore();
+}
+
+// Draws the current scene and copies it into `rgbaOut` (width * height * 4 bytes, premultiplied
+// RGBA, top row first). `clearArgb` 0 keeps the background transparent. Returns 0 on success.
+RIVE_BRIDGE_EXPORT int rive_bridge_render(RiveBridge* bridge, int width, int height, uint32_t clearArgb,
+                                             uint8_t* rgbaOut)
+{
+    if (!bridge->artboard || !rgbaOut)
+        return 1;
+    if (width <= 0 || height <= 0)
+        return 1;
+#ifndef _WIN32
+    auto* glImpl = bridge->shared->renderContext->static_impl_cast<RenderContextGLImpl>();
+    glImpl->unbindGLInternalResources();
+#endif
+    if (!ensure_target(bridge, (uint32_t)width, (uint32_t)height))
+        return 3;
+
+#ifndef _WIN32
+    glImpl->invalidateGLState();
+#endif
+    RenderContext* renderContext = bridge->shared->renderContext.get();
+    renderContext->beginFrame({
+        .renderTargetWidth = (uint32_t)width,
+        .renderTargetHeight = (uint32_t)height,
+        .loadAction = LoadAction::clear,
+        .clearColor = clearArgb,
+    });
+
+    RiveRenderer renderer(renderContext);
+    draw_scene(bridge, renderer, AABB(0, 0, (float)width, (float)height));
+
+    return read_pixels(bridge, width, height, rgbaOut);
 }
 
 // Pointer events arrive in surface pixels; the state machine hit-tests in artboard space.
@@ -416,7 +486,7 @@ static Vec2D to_artboard(RiveBridge* bridge, float x, float y)
     return inverse * Vec2D(x, y);
 }
 
-__declspec(dllexport) void rive_bridge_pointer(RiveBridge* bridge, int kind, float x, float y)
+RIVE_BRIDGE_EXPORT void rive_bridge_pointer(RiveBridge* bridge, int kind, float x, float y)
 {
     if (!bridge->stateMachine)
         return;
@@ -432,7 +502,7 @@ __declspec(dllexport) void rive_bridge_pointer(RiveBridge* bridge, int kind, flo
 
 // --- State machine inputs. Return 0 when the named input exists. -------------------------------
 
-__declspec(dllexport) int rive_bridge_fire_trigger(RiveBridge* bridge, const char* name)
+RIVE_BRIDGE_EXPORT int rive_bridge_fire_trigger(RiveBridge* bridge, const char* name)
 {
     auto* input = bridge->stateMachine ? bridge->stateMachine->getTrigger(name) : nullptr;
     if (!input)
@@ -441,7 +511,7 @@ __declspec(dllexport) int rive_bridge_fire_trigger(RiveBridge* bridge, const cha
     return 0;
 }
 
-__declspec(dllexport) int rive_bridge_set_number(RiveBridge* bridge, const char* name, float value)
+RIVE_BRIDGE_EXPORT int rive_bridge_set_number(RiveBridge* bridge, const char* name, float value)
 {
     auto* input = bridge->stateMachine ? bridge->stateMachine->getNumber(name) : nullptr;
     if (!input)
@@ -452,7 +522,7 @@ __declspec(dllexport) int rive_bridge_set_number(RiveBridge* bridge, const char*
 
 // --- View model properties: the RiveAvatarContract path. ---------------------------------------
 
-__declspec(dllexport) int rive_bridge_vm_set_number(RiveBridge* bridge, const char* name, float value)
+RIVE_BRIDGE_EXPORT int rive_bridge_vm_set_number(RiveBridge* bridge, const char* name, float value)
 {
     return with_vm_property<ViewModelInstanceNumber>(bridge, name, [&](ViewModelInstanceNumber* number) {
         number->propertyValue(value);
@@ -463,7 +533,7 @@ __declspec(dllexport) int rive_bridge_vm_set_number(RiveBridge* bridge, const ch
 // Reads a view-model number back. This is the probe path: with `--probe`'s two-way data binds in
 // the file, a node property's real post-state-machine value arrives here every frame. Returns 0 and
 // writes `*out` when the property exists and is a number.
-__declspec(dllexport) int rive_bridge_vm_get_number(RiveBridge* bridge, const char* name, float* out)
+RIVE_BRIDGE_EXPORT int rive_bridge_vm_get_number(RiveBridge* bridge, const char* name, float* out)
 {
     if (!out)
         return 3;
@@ -476,7 +546,7 @@ __declspec(dllexport) int rive_bridge_vm_get_number(RiveBridge* bridge, const ch
 // Newline-separated names of every number property on the bound view model, so the bench can find
 // the `telemetry*` probes without being told what they are. Returns the number of names written, or
 // -1 when the buffer is too small (nothing is written then).
-__declspec(dllexport) int rive_bridge_vm_number_names(RiveBridge* bridge, char* out, int cap)
+RIVE_BRIDGE_EXPORT int rive_bridge_vm_number_names(RiveBridge* bridge, char* out, int cap)
 {
     if (!out || cap <= 0)
         return -1;
@@ -488,14 +558,14 @@ __declspec(dllexport) int rive_bridge_vm_number_names(RiveBridge* bridge, char* 
     return count;
 }
 
-__declspec(dllexport) int rive_bridge_vm_set_enum(RiveBridge* bridge, const char* name, const char* key)
+RIVE_BRIDGE_EXPORT int rive_bridge_vm_set_enum(RiveBridge* bridge, const char* name, const char* key)
 {
     return with_vm_property<ViewModelInstanceEnum>(bridge, name, [&](ViewModelInstanceEnum* enumeration) {
         return enumeration->value(std::string(key)) ? 0 : 2;
     });
 }
 
-__declspec(dllexport) int rive_bridge_vm_set_color(RiveBridge* bridge, const char* name, int argb)
+RIVE_BRIDGE_EXPORT int rive_bridge_vm_set_color(RiveBridge* bridge, const char* name, int argb)
 {
     return with_vm_property<ViewModelInstanceColor>(bridge, name, [&](ViewModelInstanceColor* color) {
         color->propertyValue(argb);
@@ -503,7 +573,7 @@ __declspec(dllexport) int rive_bridge_vm_set_color(RiveBridge* bridge, const cha
     });
 }
 
-__declspec(dllexport) int rive_bridge_vm_fire(RiveBridge* bridge, const char* name)
+RIVE_BRIDGE_EXPORT int rive_bridge_vm_fire(RiveBridge* bridge, const char* name)
 {
     return with_vm_property<ViewModelInstanceTrigger>(bridge, name, [](ViewModelInstanceTrigger* trigger) {
         trigger->trigger();
@@ -511,7 +581,7 @@ __declspec(dllexport) int rive_bridge_vm_fire(RiveBridge* bridge, const char* na
     });
 }
 
-__declspec(dllexport) int rive_bridge_vm_set_boolean(RiveBridge* bridge, const char* name, int value)
+RIVE_BRIDGE_EXPORT int rive_bridge_vm_set_boolean(RiveBridge* bridge, const char* name, int value)
 {
     return with_vm_property<ViewModelInstanceBoolean>(bridge, name, [&](ViewModelInstanceBoolean* boolean) {
         boolean->propertyValue(value != 0);

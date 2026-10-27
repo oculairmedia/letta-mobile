@@ -179,9 +179,10 @@ def inspect(root, native_dir, forbidden=()):
     present = {p.name for p in natives}
     require(required <= present, f'Missing Linux JNI payload: {sorted(required - present)}')
     inspect_hotkey(jars, extracted, native_dir)
-    # The current Rive implementation is Windows/D3D11 only; Linux uses the existing fallback.
+    bridges = list(root.rglob('resources/librive_desktop_bridge.so'))
+    require(len(bridges) == 1, 'Expected one packaged Linux Rive GPU bridge in resources')
     require(not list(root.rglob('rive_desktop_bridge.dll')), 'Windows Rive bridge reached Linux image')
-    return dict(root=str(root), node=str(node), js=str(js), jvm=str(jvm), launcher=str(launcher), cfg=str(cfg),
+    return dict(rive=str(bridges[0]), root=str(root), node=str(node), js=str(js), jvm=str(jvm), launcher=str(launcher), cfg=str(cfg),
                 jars=[str(p) for p in jars], natives=[str(p) for p in natives],
                 jni=[str(p) for p in extracted if p.name in required], manifest=manifest)
 
@@ -215,14 +216,18 @@ def check_bundled_node(layout, env, work):
     subprocess.run([layout['node'], layout['js'], 'server', '--help'], cwd=work, env=env, check=True, timeout=60)
 
 
-def run_checks(layout):
+def run_checks(layout, evidence_dir=None):
     # Resolve build tooling from the original PATH, without inheriting the user's profile.
     javac = shutil.which('javac')
     require(javac, 'javac required for the packaged JNI probe')
     with tempfile.TemporaryDirectory(prefix='letta-linux-probes-') as probe:
         work = Path(probe)
         env = isolated_probe_env(work)
-        run_isolated_checks(layout, work, env, javac)
+        try:
+            run_isolated_checks(layout, work, env, javac)
+        finally:
+            if evidence_dir is not None and (work / 'rive-frames').is_dir():
+                shutil.copytree(work / 'rive-frames', evidence_dir, dirs_exist_ok=True)
 
 
 def isolated_probe_env(work):
@@ -253,19 +258,52 @@ def run_isolated_checks(layout, work, env, javac):
         inspect_dynamic_library(path, library_env)
     check_bundled_node(layout, env, work)
     check_bundled_jvm(layout, work, env=env, javac=javac)
+    check_bundled_rive(layout, work, env)
     print(f"Verified {len(layout['natives'])} Linux x64 ELF files and five required JNI libraries")
+
+
+def check_bundled_rive(layout, work, env):
+    assets = []
+    for jar in layout['jars']:
+        with zipfile.ZipFile(jar) as archive:
+            if 'mascot/mascot.riv' in archive.namelist():
+                assets.append(archive.read('mascot/mascot.riv'))
+    require(len(assets) == 1, 'Expected one shipped mascot.riv in the packaged JVM resources')
+    asset = work / 'mascot.riv'
+    asset.write_bytes(assets[0])
+    smoke = Path(__file__).resolve().parents[2] / 'android-compose/avatar/renderer-rive/native/desktop/smoke-linux.py'
+    subprocess.run([os.sys.executable, str(smoke), layout['rive'], str(asset), str(work / 'rive-frames')],
+                   cwd=work, env=env, check=True, timeout=120)
 
 
 def check_bundled_jvm(layout, work, env, javac):
     # Load the shipped JNI into the shipped JVM, not the build JDK. Compilation is CI-only.
     source = Path(work) / 'PackagingNativeSmoke.java'
-    source.write_text('public class PackagingNativeSmoke { public static void main(String[] paths) { '
+    source.write_text('import com.sun.jna.*; '
+                      'public class PackagingNativeSmoke { '
+                      'public interface Rive extends Library { '
+                      'Pointer rive_bridge_create(byte[] name, int cap); void rive_bridge_destroy(Pointer p); '
+                      'int rive_bridge_load(Pointer p, byte[] bytes, int length, String machine); '
+                      'int rive_bridge_render(Pointer p, int w, int h, int clear, Pointer out); } '
+                      'public static void main(String[] paths) throws Exception { '
                       'if (Runtime.version().feature() < 25) throw new Error("Jewel requires Java 25+"); '
                       'for (String key : new String[]{"node", "lettaJs"}) { '
                       'java.io.File f = new java.io.File(System.getProperty("letta.desktop.runtime." + key)); '
                       'if (!f.isAbsolute() || !f.isFile()) throw new Error("Unresolved bundled path: " + f); } '
-                      'for (String path : paths) { System.load(path); System.out.println("Loaded " + path); } } }')
-    subprocess.run([javac, '--release', '21', 'PackagingNativeSmoke.java'], cwd=work, env=env, check=True, timeout=60)
+                      'for (int i = 1; i < paths.length; i++) { System.load(paths[i]); System.out.println("Loaded " + paths[i]); } '
+                      'Rive rive = Native.load(paths[0], Rive.class); byte[] name = new byte[256]; '
+                      'Pointer scene = rive.rive_bridge_create(name, name.length); '
+                      'if (scene == null) throw new Error("Rive GPU unavailable: " + Native.toString(name)); '
+                      'try (Memory pixels = new Memory(64 * 64 * 4)) { '
+                      'byte[] bytes; try (var input = PackagingNativeSmoke.class.getResourceAsStream("/mascot/mascot.riv")) { '
+                      'if (input == null) throw new Error("Packaged mascot missing"); bytes = input.readAllBytes(); } '
+                      'if (rive.rive_bridge_load(scene, bytes, bytes.length, "Avatar") != 0 || '
+                      'rive.rive_bridge_render(scene, 64, 64, 0, pixels) != 0) throw new Error("JNA Rive render failed"); '
+                      'int visible = 0; for (int i = 3; i < pixels.size(); i += 4) if (pixels.getByte(i) != 0) visible++; '
+                      'if (visible == 0) throw new Error("JNA Rive frame transparent"); '
+                      'System.out.println("JNA Rive rendered " + visible + " pixels: " + Native.toString(name)); '
+                      '} finally { rive.rive_bridge_destroy(scene); } } }')
+    subprocess.run([javac, '--release', '21', '-cp', os.pathsep.join(layout['jars']), 'PackagingNativeSmoke.java'], cwd=work, env=env, check=True, timeout=60)
     # Exercise jpackage's shipped launcher/JVM and its $APPDIR expansion. Only the extracted
     # test copy is temporarily redirected to the tiny native-load entry point, then restored.
     cfg = Path(layout['cfg'])
@@ -277,7 +315,7 @@ def check_bundled_jvm(layout, work, env, javac):
     require(count == 1, 'Launcher classpath missing')
     try:
         cfg.write_text(patched)
-        subprocess.run([layout['launcher'], *layout['jni']], cwd=work, env=env, check=True, timeout=60)
+        subprocess.run([layout['launcher'], layout['rive'], *layout['jni']], cwd=work, env=env, check=True, timeout=60)
     finally:
         # Copy the original bytes back, including line endings, even if the launcher fails.
         shutil.copyfile(backup, cfg)
@@ -294,4 +332,4 @@ if __name__ == '__main__':
     result = inspect(args.root, args.work / 'native', args.forbid_path)
     (args.work / 'layout.json').write_text(json.dumps(result, indent=2))
     if args.run:
-        run_checks(result)
+        run_checks(result, args.work / "rive-frames")

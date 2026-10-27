@@ -1,24 +1,13 @@
 package com.letta.mobile.desktop.avatar.rive
 
-import androidx.compose.ui.unit.IntSize
-import com.letta.mobile.avatar.rive.RiveInputSink
-import com.letta.mobile.ui.mascot.frame.RiveFrameScene
-import com.letta.mobile.ui.mascot.frame.RiveFrameStep
-import com.letta.mobile.ui.mascot.frame.RivePointer
-import com.letta.mobile.ui.mascot.frame.RivePointerEvent
 import com.sun.jna.Library
-import com.sun.jna.Memory
 import com.sun.jna.Native
 import com.sun.jna.FunctionMapper
 import kotlinx.coroutines.asCoroutineDispatcher
 import com.sun.jna.NativeLibrary
 import com.sun.jna.Pointer
-import org.jetbrains.skia.ColorAlphaType
-import org.jetbrains.skia.ColorType
-import org.jetbrains.skia.Image
-import org.jetbrains.skia.ImageInfo
 
-/** JNA declarations for the C ABI in `avatar/renderer-rive/native/desktop`; it drives Rive's D3D11 renderer. */
+/** JNA declarations for the C ABI in `avatar/renderer-rive/native/desktop`; it drives Rive's native GPU renderer. */
 internal interface RiveBridgeNative : Library {
     fun rive_bridge_create(adapterNameOut: ByteArray, adapterNameCap: Int): Pointer?
     fun rive_bridge_destroy(bridge: Pointer)
@@ -48,28 +37,20 @@ internal interface RiveBridgeNative : Library {
     fun rive_bridge_vm_set_boolean(bridge: Pointer, name: String, value: Int): Int
 
     companion object {
-        /**
-         * Where the bridge DLL is: `-Drive.bridge.path`, else `rive_desktop_bridge.dll` in the
-         * packaged app's resources dir, else next to the working directory. Null when none exists,
-         * which is how surfaces decide to fall back to the gradient orb.
-         */
-        val PATH: String? by lazy {
-            val candidates = listOfNotNull(
-                System.getProperty("rive.bridge.path"),
-                System.getProperty("compose.application.resources.dir")?.let { "$it/rive_desktop_bridge.dll" },
-                "rive_desktop_bridge.dll",
-            )
-            candidates.firstOrNull { java.io.File(it).isFile }
-        }
+        /** Platform library from an override, packaged resources, or the developer's working directory. */
+        val PATH: String? by lazy { RiveLibraryLocator.findOrNull(RiveLibrarySearch.fromSystem()) }
 
-        /** True when a bridge DLL is present and this OS can host it (Windows / D3D11 only today). */
+        /** Missing renderers are reported explicitly; distribution inspection also requires the native payload. */
         val AVAILABLE: Boolean by lazy {
-            PATH != null && System.getProperty("os.name").orEmpty().startsWith("Windows")
+            val name = RiveLibraryLocator.libraryName(System.getProperty("os.name").orEmpty())
+            (name != null && PATH != null).also { available ->
+                if (name != null && !available) System.err.println("ERROR: Rive renderer missing: $name; set -Drive.bridge.path")
+            }
         }
 
         val INSTANCE: RiveBridgeNative by lazy {
             Native.load(
-                PATH ?: error("Set -Drive.bridge.path to rive_desktop_bridge.dll"),
+                PATH ?: error("Native Rive renderer missing; set -Drive.bridge.path"),
                 RiveBridgeNative::class.java,
                 mapOf(Library.OPTION_FUNCTION_MAPPER to ADVANCE_ACTIVITY_MAPPER),
             )
@@ -95,6 +76,55 @@ internal interface RiveBridgeNative : Library {
     }
 }
 
+/** Identifies the exact bridge payload used by a scene, distinct from adapter and input names. */
+@JvmInline
+internal value class RiveLibraryPath(val value: String)
+
+/** Where to look for the bridge library: the platform, an explicit override, the packaged resources and the cwd. */
+internal data class RiveLibrarySearch(
+    val osName: String,
+    val explicit: String?,
+    val resources: String?,
+    val workingDir: String,
+) {
+    companion object {
+        fun fromSystem(): RiveLibrarySearch = RiveLibrarySearch(
+            osName = System.getProperty("os.name").orEmpty(),
+            explicit = System.getProperty("rive.bridge.path"),
+            resources = System.getProperty("compose.application.resources.dir"),
+            workingDir = System.getProperty("user.dir"),
+        )
+    }
+}
+
+/** Pure library discovery, independent of JNA loading and optional export negotiation. */
+internal object RiveLibraryLocator {
+    /** The platform's existing C ABI library; macOS has no native backend yet. */
+    internal fun libraryName(osName: String): String? = when {
+        osName.startsWith("Windows") -> "rive_desktop_bridge.dll"
+        osName.startsWith("Linux") -> "librive_desktop_bridge.so"
+        else -> null
+    }
+
+    /** The resolved path, or null when discovery fails (a bad explicit override included) instead of throwing. */
+    internal fun findOrNull(search: RiveLibrarySearch): String? =
+        runCatching { findPath(search.osName, search.explicit, search.resources, search.workingDir) }
+            .onFailure { System.err.println("ERROR: ${it.message}") }
+            .getOrNull()
+
+    /** Explicit overrides are authoritative: a typo must never load a different local bridge. */
+    internal fun findPath(osName: String, explicit: String?, resources: String?, workingDir: String): String? {
+        val name = libraryName(osName) ?: return null
+        if (explicit != null) {
+            check(java.io.File(explicit).isFile) { "Rive bridge not found: $explicit" }
+            return java.io.File(explicit).absolutePath
+        }
+        // A packaged app must use its payload; a developer's working directory cannot mask it.
+        val candidate = java.io.File(resources ?: workingDir, name)
+        return candidate.takeIf { it.isFile }?.absolutePath
+    }
+}
+
 /** The bridge exports newer than the original entry points, which an older DLL may not carry. */
 internal enum class BridgeExport(val symbol: String) {
     LOAD_ARTBOARD("rive_bridge_load_artboard"),
@@ -106,17 +136,8 @@ internal enum class BridgeExport(val symbol: String) {
 /** Names the state machine and optional artboard loaded by [RiveDesktopScene.load]; old DLLs require the default artboard. */
 data class RiveSceneTarget(val stateMachine: String? = null, val artboard: String? = null)
 
-/** The bridge's `kind` argument for a pointer event. */
-private val RivePointer.code: Int
-    get() = when (this) {
-        RivePointer.MOVE -> 0
-        RivePointer.DOWN -> 1
-        RivePointer.UP -> 2
-        RivePointer.EXIT -> 3
-    }
-
 /**
- * The one thread every native scene is driven from. A D3D11 immediate context is single-threaded,
+ * The one thread every native scene is driven from. The native GPU context belongs to this thread,
  * and the render is a GPU round trip with a blocking readback - so it runs here, off the UI
  * thread, and the input writes queue behind it in order rather than racing it. One thread for
  * every scene: the scenes are cheap and serialising them keeps the readbacks from contending.
@@ -139,152 +160,4 @@ internal object RiveThread {
 
     /** Runs [block] on the thread and waits for it; creation, loading, stills and the bench go this way. */
     fun <T> call(block: () -> T): T = if (onThread) block() else executor.submit(block).get()
-}
-
-/**
- * One native scene: a D3D11 device, a loaded file, and its state machine.
- *
- * Not thread-safe by construction - a D3D11 immediate context is single-threaded - so every native
- * call is routed through [RiveThread]: writes are posted, reads and renders are called and
- * awaited. Callers may use any thread; the frame loop suspends on [RiveThread.dispatcher] so the
- * readback never stalls the UI.
- */
-class RiveDesktopScene internal constructor(
-    private val native: RiveBridgeNative,
-    private val handle: Pointer,
-    val adapterName: String,
-    private val advanceActivity: Boolean = RiveBridgeNative.ADVANCE_ACTIVITY,
-) : RiveFrameScene(), AutoCloseable {
-    private var buffer: Memory? = null
-    private var pixels: ByteArray? = null
-    @Volatile private var closed = false
-
-    val artboardWidth: Float get() = RiveThread.call { native.rive_bridge_artboard_width(openHandle()) }
-    val artboardHeight: Float get() = RiveThread.call { native.rive_bridge_artboard_height(openHandle()) }
-
-    private fun openHandle(): Pointer {
-        check(!closed) { "RiveDesktopScene is closed" }
-        return handle
-    }
-
-    /** Load a .riv and bind [target] (see [RiveSceneTarget]). */
-    fun load(bytes: ByteArray, target: RiveSceneTarget = RiveSceneTarget()) = RiveThread.call {
-        val artboard = target.artboard
-        val code = if (artboard == null) {
-            native.rive_bridge_load(openHandle(), bytes, bytes.size, target.stateMachine)
-        } else {
-            check(RiveBridgeNative.ARTBOARD_BY_NAME) {
-                "this rive_desktop_bridge.dll predates rive_bridge_load_artboard; rebuild it to load '$artboard'"
-            }
-            native.rive_bridge_load_artboard(openHandle(), bytes, bytes.size, target.stateMachine, artboard)
-        }
-        check(code == 0) { "rive_bridge_load failed ($code)" }
-    }
-
-    override fun advance(step: RiveFrameStep) = motionGeneration().let { generation ->
-        RiveThread.post {
-            if (closed) return@post
-            val handle = openHandle()
-            if (advanceActivity) {
-                if (native.riveBridgeAdvanceIsActive(handle, step.seconds) == 0) settleIfUnchanged(generation)
-            } else native.rive_bridge_advance(handle, step.seconds)
-        }
-    }
-
-    /**
-     * Renders into a reused native buffer and copies it into a reused byte array: premultiplied
-     * RGBA, top row first. The array is the scene's and is overwritten by the next render - read it
-     * before then (the surface rasterises it into a Skia image at once).
-     */
-    fun render(width: Int, height: Int, clearArgb: Int = 0): ByteArray = RiveThread.call {
-        val size = width.toLong() * height * 4
-        val target = buffer?.takeIf { it.size() == size } ?: Memory(size).also { buffer = it }
-        val code = native.rive_bridge_render(openHandle(), width, height, clearArgb, target)
-        check(code == 0) { "rive_bridge_render failed ($code)" }
-        val out = pixels?.takeIf { it.size.toLong() == size } ?: ByteArray(size.toInt()).also { pixels = it }
-        target.read(0, out, 0, out.size)
-        out
-    }
-
-    /**
-     * One frame as a Skia image the caller owns, rasterised while the bytes are still this frame's
-     * (the scene reuses them): premultiplied RGBA, as the bridge renders it.
-     */
-    override fun renderImage(size: IntSize): Image = RiveThread.call {
-        val info = ImageInfo(size.width, size.height, ColorType.RGBA_8888, ColorAlphaType.PREMUL)
-        Image.makeRaster(info, render(size.width, size.height), size.width * 4)
-    }
-
-    override fun pointer(event: RivePointerEvent) =
-        RiveThread.post { native.rive_bridge_pointer(openHandle(), event.kind.code, event.position.x, event.position.y) }
-
-    fun fireTrigger(name: String): Boolean = RiveThread.call { native.rive_bridge_fire_trigger(openHandle(), name) == 0 }
-
-    fun setNumber(name: String, value: Float): Boolean = RiveThread.call { native.rive_bridge_set_number(openHandle(), name, value) == 0 }
-
-    /**
-     * Reads a view-model number back: the probe path of MOTION-PIPELINE section 0, where a two-way
-     * data bind mirrors a node property into a number every frame. Null when the property is absent,
-     * is not a number, or the loaded DLL has no readback export at all.
-     */
-    fun getNumber(name: String): Float? {
-        if (!RiveBridgeNative.PROBE_READBACK) return null
-        val out = FloatArray(1)
-        return RiveThread.call { if (native.rive_bridge_vm_get_number(openHandle(), name, out) == 0) out[0] else null }
-    }
-
-    /** Every number property on the bound view model, so a caller can discover `telemetry*` probes. */
-    fun numberNames(): List<String> {
-        if (!RiveBridgeNative.PROBE_READBACK) return emptyList()
-        val out = ByteArray(NAME_BUFFER_BYTES)
-        if (RiveThread.call { native.rive_bridge_vm_number_names(openHandle(), out, out.size) } <= 0) return emptyList()
-        return Native.toString(out).split('\n').filter { it.isNotBlank() }
-    }
-
-    /** The view-model path [com.letta.mobile.avatar.rive.RiveAvatarRuntime] writes through. */
-    override val inputSink: RiveInputSink = object : RiveInputSink {
-        override fun setNumber(input: String, value: Float) = RiveThread.post {
-            if (!closed) native.rive_bridge_vm_set_number(handle, input, value)
-        }
-
-        override fun setBoolean(input: String, value: Boolean) = RiveThread.post {
-            if (!closed) native.rive_bridge_vm_set_boolean(handle, input, if (value) 1 else 0)
-        }
-
-        override fun setEnum(input: String, key: String) = RiveThread.post {
-            if (!closed) native.rive_bridge_vm_set_enum(handle, input, key)
-        }
-
-        override fun setColor(input: String, argb: Int) = RiveThread.post {
-            if (!closed) native.rive_bridge_vm_set_color(handle, input, argb)
-        }
-
-        override fun fire(input: String) = RiveThread.post {
-            if (!closed) native.rive_bridge_vm_fire(handle, input)
-        }
-    }
-
-    override fun close() {
-        if (closed) return
-        closed = true
-        // Behind every queued write, so nothing touches a destroyed handle.
-        RiveThread.post {
-            native.rive_bridge_destroy(handle)
-            buffer = null
-            pixels = null
-        }
-    }
-
-    companion object {
-        /** Room for a few hundred property names; the bridge refuses rather than truncate. */
-        private const val NAME_BUFFER_BYTES = 16 * 1024
-
-        fun create(): RiveDesktopScene = RiveThread.call {
-            val native = RiveBridgeNative.INSTANCE
-            val name = ByteArray(256)
-            val handle = native.rive_bridge_create(name, name.size)
-                ?: error("rive_bridge_create failed: no D3D11 feature level 11.1 device")
-            RiveDesktopScene(native, handle, Native.toString(name))
-        }
-    }
 }

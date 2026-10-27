@@ -125,6 +125,41 @@ class ContextBreakdownEstimatorTest {
         assertEquals(30_120 + 2, transcript.recordedTotal())
     }
 
+    @Test
+    fun clientAndRecordedTotalsCalibrateWithTheClientTakingPrecedence() {
+        fun estimate(reportedTotal: Int?) = ContextBreakdownEstimator.estimate(
+            inputs(
+                sidecar = """{"content":"${"s".repeat(400)}"}""",
+                lines = listOf("""{"id":"a","role":"assistant","content":[],"usage":{"totalTokens":5000}}"""),
+                reportedTotal = reportedTotal,
+            ),
+        )
+
+        val recorded = estimate(reportedTotal = null)
+        assertEquals(ContextTotalSource.Recorded, recorded.totalSource)
+        assertEquals(5_000, recorded.total)
+        assertEquals(4_900, recorded.tools)
+
+        val client = estimate(reportedTotal = 8_000)
+        assertEquals(ContextTotalSource.Client, client.totalSource)
+        assertEquals(8_000, client.total)
+    }
+
+    @Test
+    fun aCompactionBoundaryRejectsPreviouslyRecordedUsageAndItsCacheParts() {
+        val transcript = LocalTranscriptContext.read(
+            sequenceOf(
+                """{"type":"message","id":"e1","message":{"id":"m1","role":"assistant","content":[],
+                    "usage":{"input":100,"output":20,"cacheRead":30000},"timestamp":10}}""",
+                """{"type":"compaction","id":"e2","firstKeptEntryId":"e1","message":{"id":"m2","role":"user",
+                    "content":"summary","timestamp":20,"metadata":{"compaction":{"summary":"s"}}}}""",
+                """{"type":"message","id":"e3","message":{"id":"m3","role":"user","content":"12345678","timestamp":30}}""",
+            ),
+        )
+
+        assertNull(transcript.recordedTotal())
+    }
+
     // ── the whole estimate ──────────────────────────────────────────────────
 
     @Test
