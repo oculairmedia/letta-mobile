@@ -126,31 +126,23 @@ class ContextBreakdownEstimatorTest {
     }
 
     @Test
-    fun reportedTotalFallsBackToTheLastRecordedProviderUsage() {
-        val estimate = ContextBreakdownEstimator.estimate(
+    fun clientAndRecordedTotalsCalibrateWithTheClientTakingPrecedence() {
+        fun estimate(reportedTotal: Int?) = ContextBreakdownEstimator.estimate(
             inputs(
                 sidecar = """{"content":"${"s".repeat(400)}"}""",
                 lines = listOf("""{"id":"a","role":"assistant","content":[],"usage":{"totalTokens":5000}}"""),
+                reportedTotal = reportedTotal,
             ),
         )
 
-        assertEquals(ContextTotalSource.Recorded, estimate.totalSource)
-        assertEquals(5_000, estimate.total)
-        assertEquals(4_900, estimate.tools)
-    }
+        val recorded = estimate(reportedTotal = null)
+        assertEquals(ContextTotalSource.Recorded, recorded.totalSource)
+        assertEquals(5_000, recorded.total)
+        assertEquals(4_900, recorded.tools)
 
-    @Test
-    fun clientReportedTotalTakesPrecedenceOverRecordedUsage() {
-        val estimate = ContextBreakdownEstimator.estimate(
-            inputs(
-                sidecar = """{"content":"${"s".repeat(400)}"}""",
-                lines = listOf("""{"id":"a","role":"assistant","content":[],"usage":{"totalTokens":5000}}"""),
-                reportedTotal = 8_000,
-            ),
-        )
-
-        assertEquals(ContextTotalSource.Client, estimate.totalSource)
-        assertEquals(8_000, estimate.total)
+        val client = estimate(reportedTotal = 8_000)
+        assertEquals(ContextTotalSource.Client, client.totalSource)
+        assertEquals(8_000, client.total)
     }
 
     @Test
