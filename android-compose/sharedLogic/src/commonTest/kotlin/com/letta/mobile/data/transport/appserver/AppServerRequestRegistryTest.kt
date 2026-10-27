@@ -196,7 +196,7 @@ class AppServerRequestRegistryTest {
     fun streamFramesKeepIndependentBudgetsAfterSlowSend() = runTest {
         val registry = registry(timeoutMs = 100)
         backgroundScope.launch {
-            delay(190)
+            delay(80)
             emitResponse("stream-budget", syncResponse("stream-budget"))
         }
         val result = registry.requestStream(

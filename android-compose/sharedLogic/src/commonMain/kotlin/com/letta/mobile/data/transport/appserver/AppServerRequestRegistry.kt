@@ -103,14 +103,10 @@ internal class AppServerRequestRegistry(
         send: suspend () -> Unit,
     ): List<T> {
         val entry = PendingStream(response, isFinal)
-        return awaitStreamRegistered(requestId, entry, send)
+        return awaitRegistered(requestId, entry, send) {
+            entry.collectStream()
+        }
     }
-
-    private suspend fun <T : AppServerInboundFrame> awaitStreamRegistered(
-        requestId: String,
-        entry: PendingStream<T>,
-        send: suspend () -> Unit,
-    ): List<T> = awaitRegistered(requestId, entry, send) { entry.collectStream() }
 
     private suspend fun <T : AppServerInboundFrame> PendingStream<T>.collectStream(): List<T> =
         buildList {
@@ -225,6 +221,8 @@ internal class AppServerRequestRegistry(
         private val deferred: CompletableDeferred<T>,
         private val response: (AppServerInboundFrame) -> T?,
     ) : Pending {
+        suspend fun result(): T = deferred.await()
+
         override val failure = CompletableDeferred<Throwable>()
         override var responseComplete = false
 
