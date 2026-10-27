@@ -277,7 +277,7 @@ class IrohNodeConnection(
             viewerRegistration?.let { registration ->
                 runCatching { connectionRegistry?.release(registration) }
             }
-            recordConnectionClosed(remoteEndpointId, connection)
+            recordConnectionClosed("remoteEndpointId" attr remoteEndpointId, connection)
             runCatching { connection.close() }
         }
     }
@@ -531,7 +531,7 @@ class IrohNodeConnection(
             val type = obj["type"]?.jsonPrimitive?.content
             val requestId = obj["request_id"]?.jsonPrimitive?.content
 
-            recordControlFrame(remoteEndpointId, obj)
+            recordControlFrame("remoteEndpointId" attr remoteEndpointId, obj)
             agentScopeViolation(obj)?.let { return it }
             when (type) {
                 "auth" -> handleAuth(obj, requestId)
@@ -726,7 +726,7 @@ class IrohNodeConnection(
             block()
         } else {
             val id = requestId ?: ""
-            recordAuthenticationRequired(remoteEndpointId, id)
+            recordAuthenticationRequired("remoteEndpointId" attr remoteEndpointId, "requestId" attr id)
             """{"type":"error","request_id":"$id","message":"unauthorized"}"""
         }
 
