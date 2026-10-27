@@ -53,12 +53,12 @@ import org.junit.jupiter.api.Test
 class A2aWiringTest {
     private var ownedTelemetryHistory: AutoCloseable? = null
 
-    @kotlin.test.BeforeTest
+    @org.junit.jupiter.api.BeforeEach
     fun installOwnedTelemetryHistory() {
         ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
     }
 
-    @kotlin.test.AfterTest
+    @org.junit.jupiter.api.AfterEach
     fun detachOwnedTelemetryHistory() {
         ownedTelemetryHistory?.close()
     }
