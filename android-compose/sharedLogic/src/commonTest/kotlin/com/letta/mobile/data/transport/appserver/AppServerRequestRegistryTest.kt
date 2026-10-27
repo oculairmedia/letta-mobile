@@ -185,6 +185,10 @@ class AppServerRequestRegistryTest {
     @Test
     fun sendAndResponseShareOneBudget() = runTest {
         val registry = registry(timeoutMs = 100)
+        backgroundScope.launch {
+            delay(150)
+            emitResponse("budget", syncResponse("budget"))
+        }
         assertSendTimesOut {
             registry.request("budget", { it as? AppServerInboundFrame.SyncResponse }) {
                 delay(80)
@@ -196,7 +200,7 @@ class AppServerRequestRegistryTest {
     fun streamFramesKeepIndependentBudgetsAfterSlowSend() = runTest {
         val registry = registry(timeoutMs = 100)
         backgroundScope.launch {
-            delay(80)
+            delay(150)
             emitResponse("stream-budget", syncResponse("stream-budget"))
         }
         val result = registry.requestStream(
