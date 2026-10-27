@@ -223,40 +223,6 @@ class TimelineStreamReducerTest : TimelineStreamReducerFixture() {
         output.emittedEvents shouldBe emptyList()
         output.notification shouldBe null
     }
-}
-
-
-
-
-
-
-class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
-    @Test
-    fun `stream reducer hot path telemetry is disabled by default`() {
-        Telemetry.chatHotPathDebugEnabled.set(false)
-        Telemetry.clear()
-
-        reduce(frame = textAssistant(id = "assistant-default", content = "hello"))
-
-        Telemetry.snapshot().none {
-            it.tag == "TimelineSync" && it.name.startsWith("streamSubscriber")
-        } shouldBe true
-    }
-
-    @Test
-    fun `stream reducer hot path telemetry can be enabled deliberately`() {
-        Telemetry.chatHotPathDebugEnabled.set(true)
-        Telemetry.clear()
-
-        reduce(frame = textAssistant(id = "assistant-debug", content = "hello"))
-
-        Telemetry.snapshot().any {
-            it.tag == "TimelineSync" &&
-                it.name == "streamSubscriber.ingested" &&
-                it.level == Telemetry.Level.DEBUG
-        } shouldBe true
-    }
-
     @Test
     fun `late same-run assistant prefix with a new server id is dropped`() {
         val seeded = seedAssistant(textAssistant(
@@ -305,6 +271,306 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
         output.next.events shouldHaveSize 1
         (output.next.events.single() as TimelineEvent.Confirmed).serverId shouldBe "assistant-full"
         assertNoStreamSideEffects(output)
+    }
+
+    @Test
+    fun `assistant one character prefix replay is dropped after reconciled final without run id`() {
+        val seeded = seedAssistant(textAssistant(
+                id = "assistant-final",
+                content = "Nah, that was just the bit. Real answer: agents stay off the relay.",
+                runId = null,
+            ))
+
+        val output = reduce(
+            prev = seeded,
+            frame = textAssistant(
+                id = "assistant-prefix",
+                content = "N",
+                runId = "local-run-39",
+                seqId = 1,
+            ),
+        )
+
+        val event = singleConfirmed(output)
+        event.serverId shouldBe "assistant-final"
+        event.content shouldBe "Nah, that was just the bit. Real answer: agents stay off the relay."
+        output.emittedEvents shouldBe emptyList()
+    }
+
+    @Test
+    fun `assistant prefix replay from local run is dropped after iroh final`() {
+        val seeded = seedAssistant(textAssistant(
+                id = "assistant-full",
+                content = "Yeah — still seeing it. Smells like a dedup issue.",
+                runId = "iroh-run-123",
+                seqId = 12,
+            ))
+
+        val output = reduce(
+            prev = seeded,
+            frame = textAssistant(
+                id = "assistant-prefix",
+                content = "Yeah",
+                runId = "local-run-12",
+                seqId = 1,
+            ),
+        )
+
+        val event = singleConfirmed(output)
+        event.serverId shouldBe "assistant-full"
+        event.content shouldBe "Yeah — still seeing it. Smells like a dedup issue."
+        output.emittedEvents shouldBe emptyList()
+    }
+
+    @Test
+    fun `cleanup uses observed real run id when terminal frame carries synthetic run id`() {
+        val seeded = seedAssistant(textAssistant(
+                id = "assistant-fragment",
+                content = "Ok",
+                runId = "run-real-observed",
+                seqId = 1,
+            ))
+
+        val cleaned = seeded.cleanupAbandonedAssistantFragments(
+            runId = "iroh-run-terminal",
+            turnId = "turn-terminal",
+            reason = "turn_done_failed",
+            candidateRunIds = setOf("run-real-observed"),
+        ).timeline
+
+        cleaned.events shouldHaveSize 0
+    }
+
+    @Test
+    fun `terminal failed turn cleanup removes one character assistant fragment`() {
+        val withFull = seedAssistant(textAssistant(
+                id = "assistant-full",
+                content = "I can help clean up the lifecycle.",
+                runId = "run-terminal",
+                seqId = 12,
+            ))
+        val withFragment = withFull.append(
+            (textAssistant(
+                id = "assistant-orphan-i",
+                content = "I",
+                runId = "run-terminal",
+                seqId = 13,
+            ).toTimelineEvent(position = withFull.nextLocalPosition())!!),
+        )
+
+        val cleaned = withFragment.cleanupAbandonedAssistantFragments("run-terminal", "turn-terminal", "turn_done_failed").timeline
+
+        cleaned.events shouldHaveSize 1
+        val event = cleaned.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "assistant-full"
+        event.content shouldBe "I can help clean up the lifecycle."
+    }
+
+    @Test
+    fun `terminal disconnect cleanup removes strict prefix assistant fragment`() {
+        val withFull = seedAssistant(textAssistant(
+                id = "assistant-full",
+                content = "Nah, that was the full response.",
+                runId = "run-disconnect",
+                seqId = 20,
+            ))
+        val withFragment = withFull.append(
+            textAssistant(
+                id = "assistant-orphan-n",
+                content = "N",
+                runId = "run-disconnect",
+                seqId = 21,
+            ).toTimelineEvent(position = withFull.nextLocalPosition())!!,
+        )
+
+        val cleaned = withFragment.cleanupAbandonedAssistantFragments("run-disconnect", "turn-disconnect", "disconnect").timeline
+
+        cleaned.events shouldHaveSize 1
+        (cleaned.events.single() as TimelineEvent.Confirmed).serverId shouldBe "assistant-full"
+    }
+
+    @Test
+    fun `terminal cleanup with synthetic run id removes observed real run fragment`() {
+        val withFragment = seedAssistant(textAssistant(
+                id = "assistant-real-run-fragment",
+                content = "I",
+                runId = "run-app",
+                seqId = 1,
+            ))
+
+        val cleaned = withFragment.cleanupAbandonedAssistantFragments(
+            runId = "iroh-run-terminal",
+            turnId = "turn-terminal",
+            reason = "turn_done_failed",
+            candidateRunIds = setOf("run-app"),
+        ).timeline
+
+        cleaned.events shouldHaveSize 0
+    }
+
+    @Test
+    fun `synthetic live to real final uses incoming snapshot on content conflict`() {
+        val live = seedAssistant(textAssistant(
+                id = "letta-msg-302",
+                content = "synthetic partial that should not survive",
+                runId = "iroh-run-client-synthetic",
+                seqId = null,
+            ))
+
+        val output = reduce(
+            prev = live,
+            frame = textAssistant(
+                id = "letta-msg-302",
+                content = "final",
+                runId = "server-run-real",
+                seqId = null,
+            ),
+        )
+
+        val event = singleConfirmed(output)
+        event.runId shouldBe "server-run-real"
+        event.content shouldBe "final"
+    }
+
+    @Test
+    fun `synthetic duplicate seq still reconciles real run id`() {
+        val live = seedAssistant(textAssistant(
+                id = "letta-msg-303",
+                content = "Hello!",
+                runId = "iroh-run-client-synthetic",
+                seqId = 2,
+            ))
+
+        val output = reduce(
+            prev = live,
+            frame = textAssistant(
+                id = "letta-msg-303",
+                content = "Hello!",
+                runId = "server-run-real",
+                seqId = 2,
+            ),
+        )
+
+        val event = singleConfirmed(output)
+        event.runId shouldBe "server-run-real"
+        event.content shouldBe "Hello!"
+    }
+
+    @Test
+    fun `reconcile copy without run id does not duplicate live row with real run id`() {
+        val live = seedAssistant(textAssistant(
+                id = "letta-msg-166",
+                content = "Hey",
+                runId = "run-real-app-server",
+                seqId = 3,
+            ))
+
+        val (mergedTimeline, changed) = live.mergeServerMessages(
+            listOf(
+                textAssistant(
+                    id = "letta-msg-166",
+                    content = "Hey",
+                    runId = null,
+                    seqId = null,
+                )
+            )
+        )
+
+        changed shouldBe 0
+        mergedTimeline.events shouldHaveSize 1
+        val event = mergedTimeline.events.single() as TimelineEvent.Confirmed
+        event.content shouldBe "Hey"
+        event.runId shouldBe "run-real-app-server"
+    }
+
+    @Test
+    fun `ui-msg final without exact alias preserves identical live row`() {
+        val live = seedAssistant(textAssistant(
+                id = "letta-msg-166",
+                content = "Hey",
+                runId = "run-real-app-server",
+                seqId = 3,
+            ))
+
+        val (mergedTimeline, changed) = live.mergeServerMessages(
+            listOf(
+                textAssistant(
+                    id = "ui-msg-55781",
+                    content = "Hey",
+                    runId = null,
+                    seqId = null,
+                )
+            )
+        )
+
+        changed shouldBe 1
+        mergedTimeline.events shouldHaveSize 2
+        (mergedTimeline.events.first() as TimelineEvent.Confirmed).serverId shouldBe "letta-msg-166"
+    }
+
+    @Test
+    fun `recent reconcile real run replaces iroh synthetic live row`() {
+        val live = seedAssistant(textAssistant(
+            id = "letta-msg-301",
+            content = "Hello",
+            runId = "iroh-run-client-synthetic",
+            seqId = 1,
+        ).copy(
+            logicalMessageId = "lm-301",
+        ))
+
+        val (mergedTimeline, changed) = live.mergeServerMessages(
+            listOf(
+                textAssistant(
+                    id = "letta-msg-301",
+                    content = "Hello!",
+                    runId = "server-run-real",
+                    seqId = 2,
+                )
+            )
+        )
+
+        changed shouldBe 1
+        mergedTimeline.events shouldHaveSize 1
+        val event = mergedTimeline.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "letta-msg-301"
+        event.runId shouldBe "server-run-real"
+        event.content shouldBe "Hello!"
+    }
+
+
+}
+
+
+
+
+
+
+class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
+    @Test
+    fun `stream reducer hot path telemetry is disabled by default`() {
+        Telemetry.chatHotPathDebugEnabled.set(false)
+        Telemetry.clear()
+
+        reduce(frame = textAssistant(id = "assistant-default", content = "hello"))
+
+        Telemetry.snapshot().none {
+            it.tag == "TimelineSync" && it.name.startsWith("streamSubscriber")
+        } shouldBe true
+    }
+
+    @Test
+    fun `stream reducer hot path telemetry can be enabled deliberately`() {
+        Telemetry.chatHotPathDebugEnabled.set(true)
+        Telemetry.clear()
+
+        reduce(frame = textAssistant(id = "assistant-debug", content = "hello"))
+
+        Telemetry.snapshot().any {
+            it.tag == "TimelineSync" &&
+                it.name == "streamSubscriber.ingested" &&
+                it.level == Telemetry.Level.DEBUG
+        } shouldBe true
     }
 
     @Test
@@ -431,57 +697,6 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
     }
 
     @Test
-    fun `assistant one character prefix replay is dropped after reconciled final without run id`() {
-        val seeded = seedAssistant(textAssistant(
-                id = "assistant-final",
-                content = "Nah, that was just the bit. Real answer: agents stay off the relay.",
-                runId = null,
-            ))
-
-        val output = reduce(
-            prev = seeded,
-            frame = textAssistant(
-                id = "assistant-prefix",
-                content = "N",
-                runId = "local-run-39",
-                seqId = 1,
-            ),
-        )
-
-        val event = singleConfirmed(output)
-        event.serverId shouldBe "assistant-final"
-        event.content shouldBe "Nah, that was just the bit. Real answer: agents stay off the relay."
-        output.emittedEvents shouldBe emptyList()
-    }
-
-    @Test
-    fun `assistant prefix replay from local run is dropped after iroh final`() {
-        val seeded = seedAssistant(textAssistant(
-                id = "assistant-full",
-                content = "Yeah — still seeing it. Smells like a dedup issue.",
-                runId = "iroh-run-123",
-                seqId = 12,
-            ))
-
-        val output = reduce(
-            prev = seeded,
-            frame = textAssistant(
-                id = "assistant-prefix",
-                content = "Yeah",
-                runId = "local-run-12",
-                seqId = 1,
-            ),
-        )
-
-        val event = singleConfirmed(output)
-        event.serverId shouldBe "assistant-full"
-        event.content shouldBe "Yeah — still seeing it. Smells like a dedup issue."
-        output.emittedEvents shouldBe emptyList()
-    }
-
-
-
-    @Test
     fun `failed turn with sole short assistant fragment removes tail row`() {
         val seeded = seedAssistant(textAssistant(
                 id = "assistant-fragment",
@@ -501,25 +716,6 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
         cleaned.invariantsKnown shouldBe true
     }
 
-
-    @Test
-    fun `cleanup uses observed real run id when terminal frame carries synthetic run id`() {
-        val seeded = seedAssistant(textAssistant(
-                id = "assistant-fragment",
-                content = "Ok",
-                runId = "run-real-observed",
-                seqId = 1,
-            ))
-
-        val cleaned = seeded.cleanupAbandonedAssistantFragments(
-            runId = "iroh-run-terminal",
-            turnId = "turn-terminal",
-            reason = "turn_done_failed",
-            candidateRunIds = setOf("run-real-observed"),
-        ).timeline
-
-        cleaned.events shouldHaveSize 0
-    }
 
     @Test
     fun `tail-only cleanup preserves earlier legitimate short assistant before tool event`() {
@@ -568,54 +764,6 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
     }
 
     @Test
-    fun `terminal failed turn cleanup removes one character assistant fragment`() {
-        val withFull = seedAssistant(textAssistant(
-                id = "assistant-full",
-                content = "I can help clean up the lifecycle.",
-                runId = "run-terminal",
-                seqId = 12,
-            ))
-        val withFragment = withFull.append(
-            (textAssistant(
-                id = "assistant-orphan-i",
-                content = "I",
-                runId = "run-terminal",
-                seqId = 13,
-            ).toTimelineEvent(position = withFull.nextLocalPosition())!!),
-        )
-
-        val cleaned = withFragment.cleanupAbandonedAssistantFragments("run-terminal", "turn-terminal", "turn_done_failed").timeline
-
-        cleaned.events shouldHaveSize 1
-        val event = cleaned.events.single() as TimelineEvent.Confirmed
-        event.serverId shouldBe "assistant-full"
-        event.content shouldBe "I can help clean up the lifecycle."
-    }
-
-    @Test
-    fun `terminal disconnect cleanup removes strict prefix assistant fragment`() {
-        val withFull = seedAssistant(textAssistant(
-                id = "assistant-full",
-                content = "Nah, that was the full response.",
-                runId = "run-disconnect",
-                seqId = 20,
-            ))
-        val withFragment = withFull.append(
-            textAssistant(
-                id = "assistant-orphan-n",
-                content = "N",
-                runId = "run-disconnect",
-                seqId = 21,
-            ).toTimelineEvent(position = withFull.nextLocalPosition())!!,
-        )
-
-        val cleaned = withFragment.cleanupAbandonedAssistantFragments("run-disconnect", "turn-disconnect", "disconnect").timeline
-
-        cleaned.events shouldHaveSize 1
-        (cleaned.events.single() as TimelineEvent.Confirmed).serverId shouldBe "assistant-full"
-    }
-
-    @Test
     fun `terminal failed turn cleanup removes sole one character assistant fragment`() {
         val withFragment = seedAssistant(textAssistant(
                 id = "assistant-orphan-i",
@@ -629,25 +777,6 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
         cleaned.events shouldHaveSize 0
     }
 
-
-    @Test
-    fun `terminal cleanup with synthetic run id removes observed real run fragment`() {
-        val withFragment = seedAssistant(textAssistant(
-                id = "assistant-real-run-fragment",
-                content = "I",
-                runId = "run-app",
-                seqId = 1,
-            ))
-
-        val cleaned = withFragment.cleanupAbandonedAssistantFragments(
-            runId = "iroh-run-terminal",
-            turnId = "turn-terminal",
-            reason = "turn_done_failed",
-            candidateRunIds = setOf("run-app"),
-        ).timeline
-
-        cleaned.events shouldHaveSize 0
-    }
 
     @Test
     fun `abandoned fragment suppression prevents recent reconcile reinsert`() {
@@ -900,54 +1029,6 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
     }
 
     @Test
-    fun `synthetic live to real final uses incoming snapshot on content conflict`() {
-        val live = seedAssistant(textAssistant(
-                id = "letta-msg-302",
-                content = "synthetic partial that should not survive",
-                runId = "iroh-run-client-synthetic",
-                seqId = null,
-            ))
-
-        val output = reduce(
-            prev = live,
-            frame = textAssistant(
-                id = "letta-msg-302",
-                content = "final",
-                runId = "server-run-real",
-                seqId = null,
-            ),
-        )
-
-        val event = singleConfirmed(output)
-        event.runId shouldBe "server-run-real"
-        event.content shouldBe "final"
-    }
-
-    @Test
-    fun `synthetic duplicate seq still reconciles real run id`() {
-        val live = seedAssistant(textAssistant(
-                id = "letta-msg-303",
-                content = "Hello!",
-                runId = "iroh-run-client-synthetic",
-                seqId = 2,
-            ))
-
-        val output = reduce(
-            prev = live,
-            frame = textAssistant(
-                id = "letta-msg-303",
-                content = "Hello!",
-                runId = "server-run-real",
-                seqId = 2,
-            ),
-        )
-
-        val event = singleConfirmed(output)
-        event.runId shouldBe "server-run-real"
-        event.content shouldBe "Hello!"
-    }
-
-    @Test
     fun `mid-stream run id promotion keeps appended tokens instead of dropping them`() {
         // P3 canonical ids: the transport promotes a synthetic iroh-run row to
         // the real server run id mid-stream. A promoted frame that also carries a
@@ -1007,58 +1088,6 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
     }
 
     @Test
-    fun `reconcile copy without run id does not duplicate live row with real run id`() {
-        val live = seedAssistant(textAssistant(
-                id = "letta-msg-166",
-                content = "Hey",
-                runId = "run-real-app-server",
-                seqId = 3,
-            ))
-
-        val (mergedTimeline, changed) = live.mergeServerMessages(
-            listOf(
-                textAssistant(
-                    id = "letta-msg-166",
-                    content = "Hey",
-                    runId = null,
-                    seqId = null,
-                )
-            )
-        )
-
-        changed shouldBe 0
-        mergedTimeline.events shouldHaveSize 1
-        val event = mergedTimeline.events.single() as TimelineEvent.Confirmed
-        event.content shouldBe "Hey"
-        event.runId shouldBe "run-real-app-server"
-    }
-
-    @Test
-    fun `ui-msg final without exact alias preserves identical live row`() {
-        val live = seedAssistant(textAssistant(
-                id = "letta-msg-166",
-                content = "Hey",
-                runId = "run-real-app-server",
-                seqId = 3,
-            ))
-
-        val (mergedTimeline, changed) = live.mergeServerMessages(
-            listOf(
-                textAssistant(
-                    id = "ui-msg-55781",
-                    content = "Hey",
-                    runId = null,
-                    seqId = null,
-                )
-            )
-        )
-
-        changed shouldBe 1
-        mergedTimeline.events shouldHaveSize 2
-        (mergedTimeline.events.first() as TimelineEvent.Confirmed).serverId shouldBe "letta-msg-166"
-    }
-
-    @Test
     fun `recent reconcile final assistant replaces live prefix row`() {
         val live = seedAssistant(textAssistant(
                 id = "letta-msg-624",
@@ -1084,36 +1113,6 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
         event.serverId shouldBe "letta-msg-640"
         event.content shouldBe "Let's find out — no duplicate here."
         event.position shouldBe (live.events.single() as TimelineEvent.Confirmed).position
-    }
-
-    @Test
-    fun `recent reconcile real run replaces iroh synthetic live row`() {
-        val live = seedAssistant(textAssistant(
-            id = "letta-msg-301",
-            content = "Hello",
-            runId = "iroh-run-client-synthetic",
-            seqId = 1,
-        ).copy(
-            logicalMessageId = "lm-301",
-        ))
-
-        val (mergedTimeline, changed) = live.mergeServerMessages(
-            listOf(
-                textAssistant(
-                    id = "letta-msg-301",
-                    content = "Hello!",
-                    runId = "server-run-real",
-                    seqId = 2,
-                )
-            )
-        )
-
-        changed shouldBe 1
-        mergedTimeline.events shouldHaveSize 1
-        val event = mergedTimeline.events.single() as TimelineEvent.Confirmed
-        event.serverId shouldBe "letta-msg-301"
-        event.runId shouldBe "server-run-real"
-        event.content shouldBe "Hello!"
     }
 
     @Test
