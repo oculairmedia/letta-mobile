@@ -54,10 +54,33 @@ class ContextMeterTest {
         assertEquals(50_000, meter.usage.usedTokens)
         assertEquals(50_000, meter.usage.segments.sumOf { it.tokens })
         val tools = meter.usage.segments.single { it.kind == ContextWindowSegmentKind.ToolDefinitions }
-        assertEquals("Tools & other", tools.label)
+        assertEquals("Unclassified / estimation gap", tools.label)
         assertEquals(50_000 - 37_000, tools.tokens)
         // The host's record window wins over the catalog's.
         assertEquals(200_000, meter.usage.maxTokens)
+    }
+
+    @Test
+    fun aLargeEstimationGapIsNotPresentedAsToolSchemaUsage() {
+        val breakdown = estimate.copy(
+            contextWindowSizeCurrent = 752_000,
+            contextWindowSizeMax = 1_000_000,
+            numTokensSystem = 20_000,
+            numTokensCoreMemory = 10_000,
+            numTokensSummaryMemory = 20_000,
+            numTokensMessages = 350_000,
+            numTokensFunctionsDefinitions = 352_000,
+        )
+        // Exercise both a host-calibrated response and recalibration to streamed usage.
+        for (streamed in listOf(null, 752_000)) {
+            val meter = ContextMeter.of(streamed, 1_000_000, breakdown)!!
+            val gap = meter.usage.segments.single { it.kind == ContextWindowSegmentKind.ToolDefinitions }
+            assertEquals("Unclassified / estimation gap", gap.label)
+            assertEquals(352_000, gap.tokens)
+            assertEquals(752_000, meter.usage.usedTokens)
+            assertEquals(752_000, meter.usage.segments.sumOf { it.tokens })
+            assertEquals(350_000, meter.usage.segments.single { it.kind == ContextWindowSegmentKind.Messages }.tokens)
+        }
     }
 
     @Test

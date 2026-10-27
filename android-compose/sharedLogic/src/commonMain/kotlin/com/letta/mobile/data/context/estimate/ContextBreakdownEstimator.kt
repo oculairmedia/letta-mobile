@@ -39,8 +39,8 @@ enum class ContextTotalSource(val wire: String) {
  * An estimated breakdown of one conversation's context.
  *
  * With a [totalSource] the rows are matched to that exact total: [tools] is the residual (tool
- * schemas live only inside the running process, never on disk; it also absorbs reasoning tokens
- * and cache rounding, hence "Tools & other"), or, when the disk sections alone exceed the total,
+ * schemas live only inside the running process, never on disk; section-estimation error and
+ * other unmeasured prompt components also contribute), not measured tool usage. When disk sections exceed the total,
  * the sections are scaled down and [tools] is 0. Either way the five rows sum to [total] exactly.
  * Without a total [tools] is null and [total] is the partial sum of the four sections.
  */
