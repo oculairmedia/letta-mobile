@@ -149,8 +149,10 @@ class ContextBreakdownEstimatorTest {
     fun aCompactionBoundaryRejectsPreviouslyRecordedUsageAndItsCacheParts() {
         val transcript = LocalTranscriptContext.read(
             sequenceOf(
-                """{"type":"message","id":"e1","message":{"id":"m1","role":"assistant","content":[],"usage":{"input":100,"output":20,"cacheRead":30000},"timestamp":10}}""",
-                """{"type":"compaction","id":"e2","firstKeptEntryId":"e1","message":{"id":"m2","role":"user","content":"summary","timestamp":20,"metadata":{"compaction":{"summary":"s"}}}}""",
+                """{"type":"message","id":"e1","message":{"id":"m1","role":"assistant","content":[],
+                    "usage":{"input":100,"output":20,"cacheRead":30000},"timestamp":10}}""",
+                """{"type":"compaction","id":"e2","firstKeptEntryId":"e1","message":{"id":"m2","role":"user",
+                    "content":"summary","timestamp":20,"metadata":{"compaction":{"summary":"s"}}}}""",
                 """{"type":"message","id":"e3","message":{"id":"m3","role":"user","content":"12345678","timestamp":30}}""",
             ),
         )
