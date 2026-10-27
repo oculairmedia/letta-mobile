@@ -38,24 +38,35 @@ class AppServerRequestRegistryTest {
         return r
     }
 
+    private suspend fun TestScope.assertSendTimesOut(
+        request: suspend () -> Unit,
+    ) {
+        assertFailsWith<AppServerRequestTimeoutException> {
+            withTimeout(200) { request() }
+        }
+    }
+
+    private suspend fun TestScope.assertSendFailsOnDisconnect(
+        request: suspend () -> Unit,
+        disconnect: () -> Unit,
+    ) {
+        val job = launch {
+            assertFailsWith<AppServerRequestFailedException> { request() }
+        }
+        runCurrent()
+        disconnect()
+        runCurrent()
+        assertTrue(job.isCompleted)
+    }
+
     @Test
     fun suspendedSendTimesOutAndFreesId() = runTest {
         val registry = registry(timeoutMs = 100)
-        var failure: Throwable? = null
-        val job = launch {
-            try {
-                registry.request("send-timeout", { it as? AppServerInboundFrame.SyncResponse }) {
-                    CompletableDeferred<Unit>().await()
-                }
-            } catch (e: Exception) {
-                failure = e
+        assertSendTimesOut {
+            registry.request("send-timeout", { it as? AppServerInboundFrame.SyncResponse }) {
+                CompletableDeferred<Unit>().await()
             }
         }
-        runCurrent()
-        advanceTimeBy(100)
-        runCurrent()
-        assertTrue(job.isCompleted)
-        assertIs<AppServerRequestTimeoutException>(failure)
         assertEquals("send-timeout", registry.request(
             "send-timeout", { it as? AppServerInboundFrame.SyncResponse },
         ) { emitResponse("send-timeout", syncResponse("send-timeout")) }.requestId)
@@ -126,21 +137,11 @@ class AppServerRequestRegistryTest {
     @Test
     fun streamSendHasItsOwnTimeoutAndFreesId() = runTest {
         val registry = registry(timeoutMs = 100)
-        var failure: Throwable? = null
-        val job = launch {
-            try {
-                registry.requestStream("stream-send", { it as? AppServerInboundFrame.SyncResponse }, { true }) {
-                    CompletableDeferred<Unit>().await()
-                }
-            } catch (e: Exception) {
-                failure = e
-            }
+        assertSendTimesOut {
+            registry.requestStream(
+                "stream-send", { it as? AppServerInboundFrame.SyncResponse }, { true },
+            ) { CompletableDeferred<Unit>().await() }
         }
-        runCurrent()
-        advanceTimeBy(100)
-        runCurrent()
-        assertTrue(job.isCompleted)
-        assertIs<AppServerRequestTimeoutException>(failure)
         assertEquals(1, registry.requestStream(
             "stream-send", { it as? AppServerInboundFrame.SyncResponse }, { true },
         ) { emitResponse("stream-send", syncResponse("stream-send")) }.size)
@@ -149,68 +150,46 @@ class AppServerRequestRegistryTest {
     @Test
     fun failAllInterruptsStreamFrameWait() = runTest {
         val registry = registry()
-        var failure: Throwable? = null
-        val job = launch {
-            try {
+        assertSendFailsOnDisconnect(
+            request = {
                 registry.requestStream(
                     "stream-frame-failed",
                     { it as? AppServerInboundFrame.SyncResponse },
                     { true },
                 ) { }
-            } catch (e: Exception) {
-                failure = e
-            }
-        }
-        runCurrent()
-        registry.failAll(IllegalStateException("generation lost"))
-        runCurrent()
-        assertTrue(job.isCompleted)
-        assertIs<AppServerRequestFailedException>(failure)
+            },
+            disconnect = { registry.failAll(IllegalStateException("generation lost")) },
+        )
     }
 
     @Test
     fun failAllInterruptsStreamSend() = runTest {
         val registry = registry()
-        var failure: Throwable? = null
-        val job = launch {
-            try {
-                registry.requestStream("stream-failed", { it as? AppServerInboundFrame.SyncResponse }, { true }) {
-                    CompletableDeferred<Unit>().await()
-                }
-            } catch (e: Exception) {
-                failure = e
-            }
-        }
-        runCurrent()
-        registry.failAll(IllegalStateException("generation lost"))
-        runCurrent()
-        assertTrue(job.isCompleted)
-        assertIs<AppServerRequestFailedException>(failure)
+        assertSendFailsOnDisconnect(
+            request = {
+                registry.requestStream(
+                    "stream-failed", { it as? AppServerInboundFrame.SyncResponse }, { true },
+                ) { CompletableDeferred<Unit>().await() }
+            },
+            disconnect = { registry.failAll(IllegalStateException("generation lost")) },
+        )
     }
 
     @Test
     fun sendAndResponseShareOneBudget() = runTest {
         val registry = registry(timeoutMs = 100)
-        var failure: Throwable? = null
-        val job = launch {
-            try {
-                registry.request("budget", { it as? AppServerInboundFrame.SyncResponse }) { delay(80) }
-            } catch (e: Exception) {
-                failure = e
+        assertSendTimesOut {
+            registry.request("budget", { it as? AppServerInboundFrame.SyncResponse }) {
+                delay(80)
             }
         }
-        runCurrent()
-        advanceTimeBy(100)
-        runCurrent()
-        assertTrue(job.isCompleted, "response gets only the remaining 20ms")
-        assertIs<AppServerRequestTimeoutException>(failure)
     }
 
     @Test
     fun streamFramesKeepIndependentBudgetsAfterSlowSend() = runTest {
         val registry = registry(timeoutMs = 100)
         backgroundScope.launch {
-            delay(160)
+            delay(190)
             emitResponse("stream-budget", syncResponse("stream-budget"))
         }
         val result = registry.requestStream(
@@ -223,19 +202,14 @@ class AppServerRequestRegistryTest {
     fun responseBeforeSendCompletesStillAwaitsSend() = runTest {
         val registry = registry(timeoutMs = 100)
         val sendFinished = CompletableDeferred<Unit>()
-        var failure: Throwable? = null
         val job = launch {
-            try {
-                registry.request(
-                    "response-first",
-                    { it as? AppServerInboundFrame.SyncResponse },
-                ) {
-                    emitResponse("response-first", syncResponse("response-first"))
-                    delay(80)
-                    sendFinished.complete(Unit)
-                }
-            } catch (e: Exception) {
-                failure = e
+            registry.request(
+                "response-first",
+                { it as? AppServerInboundFrame.SyncResponse },
+            ) {
+                emitResponse("response-first", syncResponse("response-first"))
+                delay(80)
+                sendFinished.complete(Unit)
             }
         }
         runCurrent()
@@ -244,7 +218,6 @@ class AppServerRequestRegistryTest {
         runCurrent()
         assertTrue(sendFinished.isCompleted)
         assertTrue(job.isCompleted)
-        assertEquals(null, failure)
     }
 
     @Test

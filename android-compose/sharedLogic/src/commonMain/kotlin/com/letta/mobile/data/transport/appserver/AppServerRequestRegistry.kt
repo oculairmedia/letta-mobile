@@ -84,19 +84,17 @@ internal class AppServerRequestRegistry(
         response: (AppServerInboundFrame) -> T?,
         send: suspend () -> Unit,
     ): T {
-        val deferred = CompletableDeferred<T>()
-        return awaitRegistered(requestId, PendingRequest(deferred, response), send) {
-            deferred.await()
-        }
+        val pending = PendingRequest(CompletableDeferred<T>(), response)
+        return awaitRegistered(requestId, pending, send) { pending.result() }
     }
 
     /**
      * A request the server answers with several frames sharing one request_id, the last of
      * which [isFinal] recognises (`list_memory` pages carry `done`).
-     * Returns every matched frame in arrival order. [timeoutMs] bounds send separately,
-     * then bounds the wait for EACH frame,
-     * so a long listing that keeps producing pages is never cut off, while a stalled one
-     * surfaces [AppServerRequestTimeoutException] instead of a partial result.
+     * Returns every matched frame in arrival order. [timeoutMs] bounds send and the first
+     * response frame as one budget, then bounds the wait for EACH later frame, so a long
+     * listing that keeps producing pages is never cut off, while a stalled one surfaces
+     * [AppServerRequestTimeoutException] instead of a partial result.
      */
     suspend fun <T : AppServerInboundFrame> requestStream(
         requestId: String,
@@ -105,29 +103,35 @@ internal class AppServerRequestRegistry(
         send: suspend () -> Unit,
     ): List<T> {
         val entry = PendingStream(response, isFinal)
-        return awaitRegistered(requestId, entry, send, streaming = true) {
-            buildList {
-                while (true) {
-                    val next = withTimeout(timeoutMs.milliseconds) {
-                        kotlinx.coroutines.selects.select {
-                            entry.failure.onAwait { throw it }
-                            entry.frames.onReceiveCatching { it }
-                        }
-                    }
-                    next.exceptionOrNull()?.let { throw it }
-                    add(next.getOrNull() ?: break)
-                }
-            }
-        }
+        return awaitStreamRegistered(requestId, entry, send)
     }
 
-    private suspend fun <R> awaitRegistered(
+    private suspend fun <T : AppServerInboundFrame> awaitStreamRegistered(
+        requestId: String,
+        entry: PendingStream<T>,
+        send: suspend () -> Unit,
+    ): List<T> = awaitRegistered(requestId, entry, send) { entry.collectStream() }
+
+    private suspend fun <T : AppServerInboundFrame> PendingStream<T>.collectStream(): List<T> =
+        buildList {
+            while (true) {
+                val next = withTimeout(timeoutMs.milliseconds) {
+                    kotlinx.coroutines.selects.select {
+                        failure.onAwait { throw it }
+                        frames.onReceiveCatching { it }
+                    }
+                }
+                next.exceptionOrNull()?.let { throw it }
+                add(next.getOrNull() ?: break)
+            }
+        }
+
+    private suspend fun <T> awaitRegistered(
         requestId: String,
         entry: Pending,
         send: suspend () -> Unit,
-        streaming: Boolean = false,
-        await: suspend () -> R,
-    ): R = coroutineScope {
+        await: suspend () -> T,
+    ): T = coroutineScope {
         synchronized(lock) {
             check(!failed) { "generation already failed" }
             check(requestId !in pending) {
@@ -141,15 +145,9 @@ internal class AppServerRequestRegistry(
         val localCollector = if (collectorJob == null) launch { routeFrames() } else null
 
         try {
-            if (streaming) {
-                withTimeout(timeoutMs.milliseconds) { sendRegistered(entry, send) }
+            withTimeout(timeoutMs.milliseconds) {
+                sendRegistered(entry, send)
                 await()
-            } else {
-                // One budget, including queue backpressure, not a fresh response budget.
-                withTimeout(timeoutMs.milliseconds) {
-                    sendRegistered(entry, send)
-                    await()
-                }
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             // Must precede the CancellationException clause below:
