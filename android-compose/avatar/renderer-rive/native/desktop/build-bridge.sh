@@ -13,6 +13,9 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ $(uname -s) == Linux ]]; then
+    exec bash "$here/build-linux.sh" "$@"
+fi
 work="${1:?usage: build-bridge.sh <work-dir> <out-dir>}"
 out="${2:?usage: build-bridge.sh <work-dir> <out-dir>}"
 commit="$(tr -d '[:space:]' < "$here/rive-runtime.version")"

@@ -10,8 +10,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import org.jetbrains.skia.Image
 
 /**
- * Desktop's renderer for the shared frame pipeline: the native bridge DLL (rive-runtime on the
- * Rive Renderer's D3D11 backend) and the `.riv` :avatar:renderer-rive packages as a JVM resource.
+ * Desktop's renderer for the shared frame pipeline: the native bridge (rive-runtime on the
+ * Rive Renderer's D3D11 or EGL/OpenGL backend) and the `.riv` :avatar:renderer-rive packages as a JVM resource.
  */
 internal object DesktopRiveRenderer : RiveFrameRenderer {
     /** The shipped mascot (the same bytes Android bundles as res/raw). */

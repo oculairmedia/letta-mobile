@@ -1,8 +1,12 @@
 package com.letta.mobile.desktop.avatar.rive
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.ui.mascot.frame.RiveFrameStep
+import com.sun.jna.Memory
 import com.sun.jna.Pointer
+import com.letta.mobile.ui.mascot.frame.RivePointer
+import com.letta.mobile.ui.mascot.frame.RivePointerEvent
 import java.lang.reflect.Proxy
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
@@ -18,10 +22,14 @@ class RiveDesktopAdvanceTest {
         val legacyCalls = AtomicInteger()
         val renderCalls = AtomicInteger()
         val destroyCalls = AtomicInteger()
+        val pointerCalls = AtomicInteger()
+        var lastBuffer: Memory? = null
+        val threads = mutableListOf<String>()
         val bridge = Proxy.newProxyInstance(
             RiveBridgeNative::class.java.classLoader,
             arrayOf(RiveBridgeNative::class.java),
-        ) { _, method, _ ->
+        ) { _, method, args ->
+            threads.add(Thread.currentThread().name)
             when (method.name) {
                 "riveBridgeAdvanceIsActive" -> {
                     activityCalls.incrementAndGet()
@@ -29,7 +37,12 @@ class RiveDesktopAdvanceTest {
                     activityResult
                 }
                 "rive_bridge_advance" -> { legacyCalls.incrementAndGet(); null }
-                "rive_bridge_render" -> { renderCalls.incrementAndGet(); 0 }
+                "rive_bridge_render" -> {
+                    lastBuffer = args[4] as Memory
+                    renderCalls.incrementAndGet()
+                    0
+                }
+                "rive_bridge_pointer" -> { pointerCalls.incrementAndGet(); null }
                 "rive_bridge_destroy" -> { destroyCalls.incrementAndGet(); null }
                 else -> error("Unexpected native call ${method.name}")
             }
@@ -84,6 +97,40 @@ class RiveDesktopAdvanceTest {
             scene.close()
             RiveThread.call { Unit }
         }
+    }
+
+    @Test
+    fun resizeAndCloseReleaseNativeBuffersBeforeReturning() {
+        val native = NativeFixture()
+        val scene = RiveDesktopScene(native.bridge, Pointer(4), "linux-lifetime", advanceActivity = true)
+        try {
+            scene.render(8, 8)
+            val first = checkNotNull(native.lastBuffer)
+            assertTrue(first.valid())
+            scene.render(16, 12)
+            assertFalse(first.valid(), "viewport replacement closes the previous JNA allocation")
+            val resized = checkNotNull(native.lastBuffer)
+            scene.close()
+            assertFalse(resized.valid(), "close releases the current JNA allocation before returning")
+            RiveThread.call { kotlin.test.assertFailsWith<IllegalStateException> { scene.render(8, 8) } }
+            scene.pointer(RivePointerEvent(RivePointer.MOVE, Offset.Zero))
+            RiveThread.call { Unit }
+            assertEquals(0, native.pointerCalls.get())
+            assertEquals(setOf("rive-render"), native.threads.toSet())
+        } finally {
+            scene.close()
+        }
+        assertEquals(1, native.destroyCalls.get())
+    }
+
+    @Test
+    fun concurrentCloseDestroysTheSceneExactlyOnce() {
+        val native = NativeFixture()
+        val scene = RiveDesktopScene(native.bridge, Pointer(5), "linux-close", advanceActivity = true)
+        val callers = List(8) { Thread { scene.close() }.apply { start() } }
+        callers.forEach { it.join(5_000) }
+        assertTrue(callers.none { it.isAlive })
+        assertEquals(1, native.destroyCalls.get())
     }
 
     @Test

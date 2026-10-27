@@ -57,9 +57,11 @@ class LinuxPackagingTests(DesktopSmokeFixtures, unittest.TestCase):
         write(self.root / 'meridian.png', b'fixture')
         for name in ('libappindicator3.so.1', 'libindicator3.so.7'):
             write(self.root / 'usr/lib' / name, elf())
+        self.rive = write(self.root / 'lib/app/resources/librive_desktop_bridge.so', elf())
         self.jar = self.root / 'lib/app/natives.jar'
         self.jar.parent.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(self.jar, 'w') as z:
+            z.writestr('mascot/mascot.riv', b'fixture-riv')
             for name in ['native/x86_64-unknown-linux-gnu/libautomerge_jni.so',
                          'linux-x86-64/libiroh_ffi.so', 'libletta_mermaid_renderer.so', 'libletta_tablet_input.so']:
                 z.writestr(name, elf())
@@ -108,6 +110,19 @@ PYTHON'''
         layout = self.inspect()
         self.assertEqual(len(layout['jni']), 5)
         self.assertEqual(layout['node'], str(self.node))
+
+    def test_missing_linux_rive_bridge_is_rejected(self):
+        self.rive.unlink()
+        with self.assertRaisesRegex(ValueError, 'packaged Linux Rive GPU bridge'):
+            self.inspect()
+
+    def test_wrong_rive_architecture_is_rejected(self):
+        self.rive.write_bytes(elf(183))
+        with self.assertRaisesRegex(ValueError, 'Not x86-64'):
+            self.inspect()
+
+    def test_rive_bridge_uses_the_existing_packaged_resources_directory(self):
+        self.assertEqual(self.inspect()['rive'], str(self.rive))
 
     def test_missing_execute_bit_is_rejected(self):
         self.node.chmod(0o644)
@@ -451,8 +466,12 @@ PYTHON'''
         write(tools / 'javac', f'#!/bin/sh\n"{writer}" javac "$@"\n', True)
         layout['natives'] = []  # ELF inspection has its own real format and ldd fixtures.
         env = self.isolated_fixture_env(PATH=str(tools) + os.pathsep + os.environ['PATH'])
-        with patch.dict(os.environ, env, clear=True), patch.object(inspector.tempfile, 'tempdir', env['TMPDIR']):
+        with patch.dict(os.environ, env, clear=True), patch.object(inspector.tempfile, 'tempdir', env['TMPDIR']), \
+                patch.object(inspector, 'check_bundled_rive') as rive:
             inspector.run_checks(layout)
+            rive.assert_called_once()
+            self.assertTrue(Path(rive.call_args.args[1]).is_relative_to(Path(env['TMPDIR'])))
+            self.assertNotEqual(rive.call_args.args[2]['HOME'], env['HOME'])
             self.assertEqual(os.environ['HOME'], env['HOME'], 'Inspector changed the caller environment')
         self.assert_home_isolated(['node', 'node', 'node', 'node', 'javac', 'jni'])
 
@@ -545,8 +564,23 @@ PYTHON'''
                 inspector.check_bundled_jvm(layout, probe, env=inspector.isolated_probe_env(probe), javac='javac')
         self.assertEqual(self.cfg.read_bytes(), original)
         self.assertEqual(run.call_args_list[0].args[0],
-                         ['javac', '--release', '21', 'PackagingNativeSmoke.java'])
+                         ['javac', '--release', '21', '-cp', str(self.jar), 'PackagingNativeSmoke.java'])
         self.assertEqual(run.call_args_list[0].kwargs['cwd'], probe)
+
+    def test_packaged_rive_probe_uses_shipped_asset_and_propagates_gpu_failure(self):
+        layout = self.inspect()
+        work = self.work / 'rive-probe'
+        work.mkdir()
+        env = inspector.isolated_probe_env(work)
+        failure = subprocess.CalledProcessError(1, ['smoke-linux.py'])
+        with patch.object(inspector.subprocess, 'run', side_effect=failure) as run:
+            with self.assertRaises(subprocess.CalledProcessError):
+                inspector.check_bundled_rive(layout, work, env)
+        args = run.call_args.args[0]
+        self.assertEqual(args[2], str(self.rive))
+        self.assertEqual(Path(args[3]).read_bytes(), b'fixture-riv')
+        self.assertEqual(run.call_args.kwargs['env'], env)
+        self.assertTrue(run.call_args.kwargs['check'])
 
     def test_library_resolution_rejects_missing_libraries_and_host_rpath(self):
         cases = [('libexample.so => not found\n', '', 'Missing library'),

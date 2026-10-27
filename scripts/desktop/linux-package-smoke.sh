@@ -18,6 +18,9 @@ preserve_evidence() {
       cp -f "$work/$name" "$LETTA_PACKAGE_SMOKE_EVIDENCE/" || failed=1
     fi
   done
+  if [[ -d $work/check/rive-frames ]]; then
+    cp -rf "$work/check/rive-frames" "$LETTA_PACKAGE_SMOKE_EVIDENCE/" || failed=1
+  fi
   find "$work" -type f \( -name 'hs_err_pid*.log' -o -name 'java_error_in*.log' \) \
     -exec cp -f '{}' "$LETTA_PACKAGE_SMOKE_EVIDENCE/" \; || failed=1
   return "$failed"
