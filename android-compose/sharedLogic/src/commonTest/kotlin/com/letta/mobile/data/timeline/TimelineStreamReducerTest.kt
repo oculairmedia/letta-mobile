@@ -240,12 +240,20 @@ abstract class TimelineStreamReducerFixture : com.letta.mobile.util.TelemetryRec
         content: String,
         runId: String? = null,
         seqId: Int? = null,
-        otid: String? = null,
-        logicalMessageId: String? = null,
     ): AssistantMessage = AssistantMessage(
         id = id, contentRaw = JsonPrimitive(content), runId = runId,
-        seqId = seqId, otid = otid, logicalMessageId = logicalMessageId,
+        seqId = seqId,
     )
+
+    protected fun singleConfirmed(output: TimelineReducerOutput): TimelineEvent.Confirmed {
+        output.next.events shouldHaveSize 1
+        return output.next.events.single() as TimelineEvent.Confirmed
+    }
+
+    protected fun assertNoStreamSideEffects(output: TimelineReducerOutput) {
+        output.emittedEvents shouldBe emptyList()
+        output.notification shouldBe null
+    }
 
     protected fun seedAssistant(frame: AssistantMessage): Timeline = reduce(frame = frame).next
 

@@ -53,13 +53,11 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
             ),
         )
 
-        output.next.events shouldHaveSize 1
-        val event = output.next.events.single() as TimelineEvent.Confirmed
+        val event = singleConfirmed(output)
         event.serverId shouldBe "assistant-full"
         event.content shouldBe "Opening line\n\nFinal body"
         output.next.liveCursor shouldBe "assistant-full"
-        output.emittedEvents shouldBe emptyList()
-        output.notification shouldBe null
+        assertNoStreamSideEffects(output)
     }
 
     @Test
@@ -83,8 +81,7 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
         output.next.events shouldHaveSize 1
         (output.next.events.single() as TimelineEvent.Confirmed).serverId shouldBe "assistant-full"
-        output.emittedEvents shouldBe emptyList()
-        output.notification shouldBe null
+        assertNoStreamSideEffects(output)
     }
 
     @Test
@@ -106,12 +103,10 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
             ),
         )
 
-        output.next.events shouldHaveSize 1
-        val event = output.next.events.single() as TimelineEvent.Confirmed
+        val event = singleConfirmed(output)
         event.serverId shouldBe "rest-assistant"
         event.content shouldBe "Got it — I can check the latest build and keep going."
-        output.emittedEvents shouldBe emptyList()
-        output.notification shouldBe null
+        assertNoStreamSideEffects(output)
     }
 
     @Test
@@ -200,6 +195,7 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
                 content = "es — confirmed working at both layers:",
                 runId = "run-1",
                 seqId = 2,
+            ).copy(
                 logicalMessageId = "post-tool-otid",
             ),
         )
@@ -230,8 +226,7 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
             ),
         )
 
-        output.next.events shouldHaveSize 1
-        val event = output.next.events.single() as TimelineEvent.Confirmed
+        val event = singleConfirmed(output)
         event.serverId shouldBe "assistant-final"
         event.content shouldBe "Nah, that was just the bit. Real answer: agents stay off the relay."
         output.emittedEvents shouldBe emptyList()
@@ -256,8 +251,7 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
             ),
         )
 
-        output.next.events shouldHaveSize 1
-        val event = output.next.events.single() as TimelineEvent.Confirmed
+        val event = singleConfirmed(output)
         event.serverId shouldBe "assistant-full"
         event.content shouldBe "Yeah — still seeing it. Smells like a dedup issue."
         output.emittedEvents shouldBe emptyList()
@@ -498,6 +492,7 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
                 content = "Y",
                 runId = "run-success",
                 seqId = 1,
+            ).copy(
                 otid = "post-tool",
             ),
         ).next
@@ -508,6 +503,7 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
                 content = "es, that worked.",
                 runId = "run-success",
                 seqId = 2,
+            ).copy(
                 otid = "post-tool",
             ),
         ).next

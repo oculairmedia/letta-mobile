@@ -34,8 +34,7 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
 
         output.next.events shouldHaveSize 1
         (output.next.events.single() as TimelineEvent.Confirmed).serverId shouldBe "server-user-1"
-        output.emittedEvents shouldBe emptyList()
-        output.notification shouldBe null
+        assertNoStreamSideEffects(output)
     }
 
     @Test
@@ -100,8 +99,7 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
         )
 
         output.next.events shouldBe emptyList()
-        output.emittedEvents shouldBe emptyList()
-        output.notification shouldBe null
+        assertNoStreamSideEffects(output)
     }
 
     @Test
@@ -162,8 +160,7 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
             ),
         )
 
-        output.next.events shouldHaveSize 1
-        val event = output.next.events.single() as TimelineEvent.Confirmed
+        val event = singleConfirmed(output)
         event.serverId shouldBe "letta-msg-300"
         event.runId shouldBe "server-run-real"
         event.content shouldBe "Hello!"
@@ -191,8 +188,7 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
             ),
         )
 
-        output.next.events shouldHaveSize 1
-        val event = output.next.events.single() as TimelineEvent.Confirmed
+        val event = singleConfirmed(output)
         event.runId shouldBe "server-run-real"
         event.content shouldBe "final"
     }
@@ -216,8 +212,7 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
             ),
         )
 
-        output.next.events shouldHaveSize 1
-        val event = output.next.events.single() as TimelineEvent.Confirmed
+        val event = singleConfirmed(output)
         event.runId shouldBe "server-run-real"
         event.content shouldBe "Hello!"
     }
@@ -247,8 +242,7 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
             ),
         )
 
-        output.next.events shouldHaveSize 1
-        val event = output.next.events.single() as TimelineEvent.Confirmed
+        val event = singleConfirmed(output)
         event.serverId shouldBe "letta-msg-700"
         // Merge decided by serverId + run id (single row), not otid/semantic dedup.
         event.runId shouldBe "run-real-app-server"
@@ -277,8 +271,7 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
             ),
         )
 
-        output.next.events shouldHaveSize 1
-        val event = output.next.events.single() as TimelineEvent.Confirmed
+        val event = singleConfirmed(output)
         event.runId shouldBe "run-real-app-server"
         event.content shouldBe "Hello, world"
     }
@@ -366,12 +359,13 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
     @Test
     fun `recent reconcile real run replaces iroh synthetic live row`() {
         val live = seedAssistant(textAssistant(
-                id = "letta-msg-301",
-                content = "Hello",
-                runId = "iroh-run-client-synthetic",
-                seqId = 1,
-                logicalMessageId = "lm-301",
-            ))
+            id = "letta-msg-301",
+            content = "Hello",
+            runId = "iroh-run-client-synthetic",
+            seqId = 1,
+        ).copy(
+            logicalMessageId = "lm-301",
+        ))
 
         val (mergedTimeline, changed) = live.mergeServerMessages(
             listOf(
@@ -407,26 +401,29 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
         // the reconcile must collapse the snapshot into the draft row instead of
         // appending a second, near-identical row.
         val streamedDraft = seedAssistant(textAssistant(
-                // Last rotating backend id observed on the live stream.
+            // Last rotating backend id observed on the live stream.
                 id = "letta-msg-5021",
-                // Draft is missing the leading word ("Still") — first-word lag.
+            // Draft is missing the leading word ("Still") — first-word lag.
                 content = " kicking. Did anything else break?",
-                runId = "run-real-app-server",
-                otid = "iroh-assistant-turn-42",
-                seqId = 7,
-            ))
+            runId = "run-real-app-server",
+            seqId = 7,
+        ).copy(
+            otid = "iroh-assistant-turn-42",
+        ))
 
         streamedDraft.events shouldHaveSize 1
 
         val (mergedTimeline, changed) = streamedDraft.mergeServerMessages(
             listOf(
                 textAssistant(
-                    // Reconcile mints its OWN id, distinct from the streamed one.
+                    // Reconcile mints its OWN id,
+                    distinct from the streamed one.
                     id = "letta-msg-final-99",
                     content = "Still kicking. Did anything else break?",
                     runId = "run-real-app-server",
-                    otid = null,
                     seqId = null,
+                ).copy(
+                    otid = null,
                 )
             )
         )
@@ -463,6 +460,7 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
                 content = "hello from iro",
                 runId = "local-run-new",
                 seqId = 1,
+            ).copy(
                 logicalMessageId = "lm-203-new",
             ),
         )
