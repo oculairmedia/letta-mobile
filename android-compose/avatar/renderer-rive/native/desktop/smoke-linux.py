@@ -8,6 +8,9 @@ import argparse
 import ctypes as c
 import hashlib
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 import struct
 import zlib
@@ -33,6 +36,84 @@ def write_png(path, pixels, width, height):
                      chunk(b'IDAT', zlib.compress(scanlines)) + chunk(b'IEND', b''))
 
 
+# Test-only LD_PRELOAD shim: sabotage the first context after its pbuffer exists. This
+# exercises the real driver and production bridge without adding production test switches.
+FALLBACK_SHIM = r"""
+#include <EGL/egl.h>
+#include <dlfcn.h>
+#include <cstdio>
+#include <cstdlib>
+static EGLDisplay rejected = EGL_NO_DISPLAY;
+static EGLContext rejectedContext = EGL_NO_CONTEXT;
+static EGLSurface rejectedSurface = EGL_NO_SURFACE;
+static bool detached, surfaceDestroyed, contextDestroyed, terminated, released, advanced;
+#define REAL(name) auto real = reinterpret_cast<decltype(&name)>(dlsym(RTLD_NEXT, #name))
+extern "C" EGLBoolean eglMakeCurrent(EGLDisplay d, EGLSurface draw, EGLSurface read, EGLContext ctx) {
+    REAL(eglMakeCurrent);
+    if (rejected == EGL_NO_DISPLAY && ctx != EGL_NO_CONTEXT) {
+        rejected = d; rejectedContext = ctx; rejectedSurface = draw;
+        std::fprintf(stderr, "EGL FALLBACK TEST: rejected first makeCurrent after context+pbuffer\n");
+        return EGL_FALSE;
+    }
+    auto ok = real(d, draw, read, ctx);
+    if (d == rejected && ctx == EGL_NO_CONTEXT && ok) detached = true;
+    return ok;
+}
+extern "C" EGLBoolean eglDestroySurface(EGLDisplay d, EGLSurface s) {
+    REAL(eglDestroySurface); auto ok = real(d, s);
+    if (d == rejected && s == rejectedSurface && ok) surfaceDestroyed = true;
+    return ok;
+}
+extern "C" EGLBoolean eglDestroyContext(EGLDisplay d, EGLContext ctx) {
+    REAL(eglDestroyContext); auto ok = real(d, ctx);
+    if (d == rejected && ctx == rejectedContext && ok) contextDestroyed = true;
+    return ok;
+}
+extern "C" EGLBoolean eglTerminate(EGLDisplay d) {
+    REAL(eglTerminate); auto ok = real(d);
+    if (d == rejected && ok) terminated = true;
+    return ok;
+}
+extern "C" EGLBoolean eglReleaseThread() {
+    REAL(eglReleaseThread); auto ok = real();
+    if (rejected != EGL_NO_DISPLAY && ok) released = true;
+    return ok;
+}
+extern "C" EGLBoolean eglInitialize(EGLDisplay d, EGLint* major, EGLint* minor) {
+    if (rejected != EGL_NO_DISPLAY && !advanced) {
+        if (!(detached && surfaceDestroyed && contextDestroyed && terminated && released)) {
+            std::fprintf(stderr, "EGL FALLBACK TEST: incomplete cleanup before next candidate\n");
+            std::abort();
+        }
+        advanced = true;
+        std::fprintf(stderr, "EGL FALLBACK TEST: next candidate after full cleanup\n");
+    }
+    REAL(eglInitialize); return real(d, major, minor);
+}
+"""
+
+
+def test_fallback(library, asset, output, require_hardware):
+    output.mkdir(parents=True, exist_ok=True)
+    source, shim = output / 'fail-first-egl.cpp', output / 'fail-first-egl.so'
+    source.write_text(FALLBACK_SHIM)
+    subprocess.run(['clang++', '-shared', '-fPIC', '-std=c++17', str(source), '-o', str(shim),
+                    '-Wl,--no-as-needed', '-lEGL', '-ldl'], check=True)
+    env = dict(os.environ, LD_PRELOAD=str(shim.resolve()))
+    command = [sys.executable, str(Path(__file__).resolve()), str(library.resolve()), str(asset.resolve()),
+               str(output.resolve())]
+    if require_hardware:
+        command.append('--require-hardware')
+    result = subprocess.run(command, env=env, capture_output=True, text=True)
+    log = result.stdout + result.stderr
+    (output / 'fallback-test.log').write_text(log)
+    print(log, end='', flush=True)
+    require(result.returncode == 0, f'Fallback smoke failed ({result.returncode})')
+    require('EGL FALLBACK TEST: rejected first makeCurrent after context+pbuffer' in log, 'Failure was not injected')
+    require('EGL FALLBACK TEST: next candidate after full cleanup' in log, 'No fully cleaned-up fallback attempted')
+    print('FALLBACK PASS: first candidate rejected; next candidate rendered actual mascot', flush=True)
+
+
 def smoke(library, asset, output, require_hardware=False):
     output.mkdir(parents=True, exist_ok=True)
     (output / 'render-evidence.json').unlink(missing_ok=True)
@@ -55,7 +136,7 @@ def smoke(library, asset, output, require_hardware=False):
     data = asset.read_bytes()
     scenes = []
     frames = {}
-    adapter = c.create_string_buffer(256)
+    adapter = c.create_string_buffer(2048)
 
     def create():
         scene = native.rive_bridge_create(adapter, len(adapter))
@@ -134,5 +215,10 @@ if __name__ == '__main__':
     parser.add_argument('asset', type=Path)
     parser.add_argument('output', type=Path)
     parser.add_argument('--require-hardware', action='store_true')
+    parser.add_argument('--test-fallback', action='store_true',
+                        help='Compile a test-only EGL shim, fail the first makeCurrent, require cleanup and rendered fallback')
     args = parser.parse_args()
-    smoke(args.library, args.asset, args.output, args.require_hardware)
+    if args.test_fallback:
+        test_fallback(args.library, args.asset, args.output, args.require_hardware)
+    else:
+        smoke(args.library, args.asset, args.output, args.require_hardware)

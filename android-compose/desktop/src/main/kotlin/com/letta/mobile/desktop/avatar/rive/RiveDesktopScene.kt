@@ -6,6 +6,7 @@ import com.letta.mobile.ui.mascot.frame.RiveFrameScene
 import com.letta.mobile.ui.mascot.frame.RiveFrameStep
 import com.letta.mobile.ui.mascot.frame.RivePointer
 import com.letta.mobile.ui.mascot.frame.RivePointerEvent
+import com.letta.mobile.util.Telemetry
 import com.sun.jna.Memory
 import com.sun.jna.Native
 import com.sun.jna.Pointer
@@ -27,6 +28,7 @@ class RiveDesktopScene internal constructor(
     private val handle: Pointer,
     val adapterName: String,
     private val advanceActivity: Boolean = RiveBridgeNative.ADVANCE_ACTIVITY,
+    private val libraryPath: String? = RiveBridgeNative.PATH,
 ) : RiveFrameScene(), AutoCloseable {
     /** The bridge's `kind` argument for a pointer event. */
     private val RivePointer.code: Int
@@ -91,6 +93,14 @@ class RiveDesktopScene internal constructor(
         check(code == 0) { "rive_bridge_render failed ($code)" }
         val out = pixels?.takeIf { it.size.toLong() == size } ?: ByteArray(size.toInt()).also { pixels = it }
         target.read(0, out, 0, out.size)
+        if (!rendererActiveReported) {
+            rendererActiveReported = true
+            Telemetry.event(
+                "Rive", "[mascot] Rive native renderer active:",
+                "adapter" to adapterName, "lib" to libraryPath,
+                level = Telemetry.Level.INFO,
+            )
+        }
         out
     }
 
@@ -169,12 +179,18 @@ class RiveDesktopScene internal constructor(
         /** Room for a few hundred property names; the bridge refuses rather than truncate. */
         private const val NAME_BUFFER_BYTES = 16 * 1024
 
+        /** Confined to RiveThread; survives scene and native context disposal for the process lifetime. */
+        internal var rendererActiveReported = false
+
         fun create(): RiveDesktopScene = RiveThread.call {
-            val native = RiveBridgeNative.INSTANCE
-            val name = ByteArray(256)
+            create(RiveBridgeNative.INSTANCE, checkNotNull(RiveBridgeNative.PATH), RiveBridgeNative.ADVANCE_ACTIVITY)
+        }
+
+        internal fun create(native: RiveBridgeNative, libraryPath: String, advanceActivity: Boolean): RiveDesktopScene = RiveThread.call {
+            val name = ByteArray(NAME_BUFFER_BYTES)
             val handle = native.rive_bridge_create(name, name.size)
                 ?: error("rive_bridge_create failed: ${Native.toString(name)}")
-            RiveDesktopScene(native, handle, Native.toString(name))
+            RiveDesktopScene(native, handle, Native.toString(name), advanceActivity, libraryPath)
         }
     }
 }

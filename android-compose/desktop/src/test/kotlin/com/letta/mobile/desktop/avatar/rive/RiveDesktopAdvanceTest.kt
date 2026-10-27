@@ -3,6 +3,7 @@ package com.letta.mobile.desktop.avatar.rive
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.ui.mascot.frame.RiveFrameStep
+import com.letta.mobile.util.Telemetry
 import com.sun.jna.Memory
 import com.sun.jna.Pointer
 import com.letta.mobile.ui.mascot.frame.RivePointer
@@ -12,11 +13,14 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class RiveDesktopAdvanceTest {
     private class NativeFixture {
         var activityResult = 1
+        var createFails = false
+        var renderResult = 0
         var beforeActivityResult: () -> Unit = {}
         val activityCalls = AtomicInteger()
         val legacyCalls = AtomicInteger()
@@ -31,6 +35,11 @@ class RiveDesktopAdvanceTest {
         ) { _, method, args ->
             threads.add(Thread.currentThread().name)
             when (method.name) {
+                "rive_bridge_create" -> {
+                    val name = (if (createFails) "test create failure" else "test adapter").encodeToByteArray()
+                    name.copyInto(args[0] as ByteArray)
+                    if (createFails) null else Pointer(12)
+                }
                 "riveBridgeAdvanceIsActive" -> {
                     activityCalls.incrementAndGet()
                     beforeActivityResult()
@@ -40,13 +49,53 @@ class RiveDesktopAdvanceTest {
                 "rive_bridge_render" -> {
                     lastBuffer = args[4] as Memory
                     renderCalls.incrementAndGet()
-                    0
+                    lastBuffer?.clear()
+                    renderResult
                 }
                 "rive_bridge_pointer" -> { pointerCalls.incrementAndGet(); null }
                 "rive_bridge_destroy" -> { destroyCalls.incrementAndGet(); null }
                 else -> error("Unexpected native call ${method.name}")
             }
         } as RiveBridgeNative
+    }
+
+    @Test
+    fun rendererEvidenceFollowsSuccessfulReadbackOnceAcrossScenesAndRecreation() = RiveThread.call {
+        val wasReported = RiveDesktopScene.rendererActiveReported
+        RiveDesktopScene.rendererActiveReported = false
+        val native = NativeFixture()
+        val path = "/packaged resources/librive_desktop_bridge.so"
+        val scenes = mutableListOf<RiveDesktopScene>()
+        fun evidence() = Telemetry.events.value.filter { it.name == "[mascot] Rive native renderer active:" }
+        val before = evidence().size
+        try {
+            native.createFails = true
+            assertFailsWith<IllegalStateException> { RiveDesktopScene.create(native.bridge, path, true) }
+            assertEquals(before, evidence().size, "failed creation cannot claim a render")
+            native.createFails = false
+            val first = RiveDesktopScene.create(native.bridge, path, true).also { scenes.add(it) }
+            val second = RiveDesktopScene.create(native.bridge, path, true).also { scenes.add(it) }
+            assertEquals(before, evidence().size, "creation alone is not render evidence")
+            native.renderResult = 1
+            assertFailsWith<IllegalStateException> { first.render(2, 2) }
+            assertEquals(before, evidence().size, "failed rendering cannot claim readback")
+            native.renderResult = 0
+            assertEquals(ByteArray(16).toList(), first.render(2, 2).toList())
+            assertEquals(before + 1, evidence().size)
+            first.render(3, 3)
+            second.render(2, 2)
+            scenes.forEach { it.close() }
+            RiveDesktopScene.create(native.bridge, path, true).also { scenes.add(it) }.render(1, 1)
+            val events = evidence()
+            assertEquals(before + 1, events.size, "all scenes share one process-wide report")
+            assertEquals(Telemetry.Level.INFO, events.first().level)
+            assertEquals("test adapter", events.first().attrs["adapter"])
+            assertEquals(path, events.first().attrs["lib"])
+            assertEquals(setOf("rive-render"), native.threads.toSet())
+        } finally {
+            scenes.forEach { it.close() }
+            RiveDesktopScene.rendererActiveReported = wasReported
+        }
     }
 
     @Test

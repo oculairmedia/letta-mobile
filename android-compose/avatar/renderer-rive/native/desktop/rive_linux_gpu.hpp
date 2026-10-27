@@ -34,83 +34,108 @@ struct SharedGpu
         eglReleaseThread();
     }
 
+    static void shaderSource(GLuint shader, GLsizei count, const GLchar* const* strings, const GLint* lengths)
+    {
+        // The pinned minifier emits OUT(vec2)value. Mesa rejects the resulting joined tokens;
+        // a separator after ')' preserves the intended "out vec2 value" on every GL driver.
+        // Join first so a source-string boundary cannot hide the same spelling.
+        std::string source;
+        for (GLsizei i = 0; i < count; ++i)
+        {
+            const size_t size = lengths && lengths[i] >= 0 ? lengths[i] : std::strlen(strings[i]);
+            for (size_t j = 0; j < size; ++j)
+            {
+                const char ch = strings[i][j];
+                const bool identifier = (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+                    (ch >= '0' && ch <= '9') || ch == '_';
+                if (identifier && !source.empty() && source.back() == ')') source += ' ';
+                source += ch;
+            }
+        }
+        const char* text = source.c_str();
+        auto rawShaderSource = reinterpret_cast<PFNGLSHADERSOURCEPROC>(eglGetProcAddress("glShaderSource"));
+        rawShaderSource(shader, 1, &text, nullptr);
+    }
+
+    // A candidate owns the entire sequence. Returning any reason destroys it before Make
+    // tries another display, including failures after eglInitialize or after GL becomes current.
+    const char* initialize()
+    {
+        if (display == EGL_NO_DISPLAY) return "display unavailable";
+        if (!eglInitialize(display, nullptr, nullptr)) return "initialize failed";
+        if (!eglBindAPI(EGL_OPENGL_API)) return "bind OpenGL failed";
+        const EGLint configAttrs[] = {EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+            EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8,
+            EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_NONE};
+        EGLConfig config;
+        EGLint count = 0;
+        if (!eglChooseConfig(display, configAttrs, &config, 1, &count) || count == 0)
+            return "RGBA8 config unavailable";
+        const EGLint contextAttrs[] = {EGL_CONTEXT_MAJOR_VERSION, 4, EGL_CONTEXT_MINOR_VERSION, 2,
+            EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT, EGL_NONE};
+        context = eglCreateContext(display, config, EGL_NO_CONTEXT, contextAttrs);
+        if (context == EGL_NO_CONTEXT) return "GL 4.2 core context unavailable";
+        const EGLint surfaceAttrs[] = {EGL_WIDTH, 1, EGL_HEIGHT, 1, EGL_NONE};
+        surface = eglCreatePbufferSurface(display, config, surfaceAttrs);
+        if (surface == EGL_NO_SURFACE) return "1x1 pbuffer unavailable";
+        if (!eglMakeCurrent(display, surface, surface, context)) return "makeCurrent failed";
+        if (!gladLoadCustomLoader(reinterpret_cast<GLADloadfunc>(eglGetProcAddress)))
+            return "GL entry points unavailable";
+        glad_glShaderSource = shaderSource;
+        const auto* renderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
+        if (!renderer) return "GL_RENDERER unavailable";
+        adapterName = std::string("EGL/OpenGL: ") + renderer;
+        renderContext = rive::gpu::RenderContextGLImpl::MakeContext();
+        if (!renderContext) return "Rive GL context rejected";
+        return glGetError() == GL_NO_ERROR ? nullptr : "Rive GL setup error";
+    }
+
     static std::unique_ptr<SharedGpu> Make(std::string& error)
     {
-        auto gpu = std::make_unique<SharedGpu>();
+        error = "Linux Rive: GPU setup unavailable";
         auto platformDisplay = reinterpret_cast<PFNEGLGETPLATFORMDISPLAYEXTPROC>(
             eglGetProcAddress("eglGetPlatformDisplayEXT"));
         auto queryDevices = reinterpret_cast<PFNEGLQUERYDEVICESEXTPROC>(
             eglGetProcAddress("eglQueryDevicesEXT"));
         auto deviceString = reinterpret_cast<PFNEGLQUERYDEVICESTRINGEXTPROC>(
             eglGetProcAddress("eglQueryDeviceStringEXT"));
+        auto attempt = [&](EGLenum platform, void* device, const std::string& label) {
+            auto gpu = std::make_unique<SharedGpu>();
+            gpu->display = platformDisplay(platform, device, nullptr);
+            if (const char* reason = gpu->initialize())
+            {
+                error += "; " + label + ": " + reason;
+                return std::unique_ptr<SharedGpu>(); // RAII cleans up before the next candidate.
+            }
+            gpu->adapterName += " [" + label + "]";
+            error.clear();
+            return gpu;
+        };
         // Device displays avoid Xlib entirely, including its process-wide error handlers.
         EGLDeviceEXT devices[16];
         EGLint count = 0;
         if (platformDisplay && queryDevices && queryDevices(16, devices, &count))
         {
             // Mesa may enumerate a software device before a real GPU. Prefer hardware explicitly.
-            for (int pass = 0; pass < 2 && gpu->display == EGL_NO_DISPLAY; ++pass)
+            for (int pass = 0; pass < 2; ++pass)
                 for (EGLint i = 0; i < count; ++i)
                 {
                     const char* extensions = deviceString ? deviceString(devices[i], EGL_EXTENSIONS) : nullptr;
                     const bool software = extensions && std::strstr(extensions, "EGL_MESA_device_software");
                     if (software != (pass == 1)) continue;
-                    EGLDisplay candidate = platformDisplay(EGL_PLATFORM_DEVICE_EXT, devices[i], nullptr);
-                    if (candidate != EGL_NO_DISPLAY && eglInitialize(candidate, nullptr, nullptr))
-                    {
-                        gpu->display = candidate;
-                        break;
-                    }
+                    const auto label = "device" + std::to_string(i) + (software ? " software" : " hardware");
+                    if (auto gpu = attempt(EGL_PLATFORM_DEVICE_EXT, devices[i], label)) return gpu;
                 }
         }
-        // Mesa also supports an independent surfaceless display (including explicit CI software GL).
-        if (gpu->display == EGL_NO_DISPLAY && platformDisplay)
+        // Mesa surfaceless is tried last, even if a device initialized but failed a later step.
+        if (platformDisplay)
         {
-            EGLDisplay candidate = platformDisplay(EGL_PLATFORM_SURFACELESS_MESA, nullptr, nullptr);
-            if (candidate != EGL_NO_DISPLAY && eglInitialize(candidate, nullptr, nullptr))
-                gpu->display = candidate;
+            if (auto gpu = attempt(EGL_PLATFORM_SURFACELESS_MESA, nullptr, "surfaceless Mesa")) return gpu;
         }
-        if (gpu->display == EGL_NO_DISPLAY)
-        {
-            error = "Linux Rive: no EGL device/surfaceless display; GPU setup unavailable";
-            return nullptr;
-        }
-        const EGLint configAttrs[] = {EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
-            EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8,
-            EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_NONE};
-        EGLConfig config;
-        if (!eglBindAPI(EGL_OPENGL_API) ||
-            !eglChooseConfig(gpu->display, configAttrs, &config, 1, &count) || count == 0)
-        {
-            error = "Linux Rive: EGL OpenGL RGBA8 configuration unavailable";
-            return nullptr;
-        }
-        const EGLint contextAttrs[] = {EGL_CONTEXT_MAJOR_VERSION, 4, EGL_CONTEXT_MINOR_VERSION, 2,
-            EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT, EGL_NONE};
-        gpu->context = eglCreateContext(gpu->display, config, EGL_NO_CONTEXT, contextAttrs);
-        const EGLint surfaceAttrs[] = {EGL_WIDTH, 1, EGL_HEIGHT, 1, EGL_NONE};
-        gpu->surface = eglCreatePbufferSurface(gpu->display, config, surfaceAttrs);
-        if (gpu->context == EGL_NO_CONTEXT || gpu->surface == EGL_NO_SURFACE ||
-            !eglMakeCurrent(gpu->display, gpu->surface, gpu->surface, gpu->context))
-        {
-            error = "Linux Rive: private EGL OpenGL 4.2 context unavailable";
-            return nullptr;
-        }
-        if (!gladLoadCustomLoader(reinterpret_cast<GLADloadfunc>(eglGetProcAddress)))
-        {
-            error = "Linux Rive: OpenGL entry points unavailable";
-            return nullptr;
-        }
-        gpu->adapterName = std::string("EGL/OpenGL: ") +
-            reinterpret_cast<const char*>(glGetString(GL_RENDERER));
-        gpu->renderContext = rive::gpu::RenderContextGLImpl::MakeContext();
-        if (!gpu->renderContext)
-        {
-            error = "Linux Rive: pinned Rive GPU renderer rejected " + gpu->adapterName;
-            return nullptr;
-        }
-        error.clear();
-        return gpu;
+        else error += "; EGL platform entry point unavailable";
+        // Also release EGL thread state when discovery itself found no usable candidates.
+        eglReleaseThread();
+        return nullptr;
     }
 };
 
