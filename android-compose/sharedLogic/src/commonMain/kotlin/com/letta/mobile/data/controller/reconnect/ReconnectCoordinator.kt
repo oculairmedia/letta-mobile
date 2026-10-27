@@ -140,7 +140,7 @@ class ReconnectCoordinator(
     private suspend fun syncRuntimeOnResume(record: RuntimeRecord, timeoutPerRuntime: Duration): Result<String> {
         val recordId = record.id
         val canonicalScope = record.canonicalRuntime?.scope ?: return Result.success(recordId)
-        return try {
+        return com.letta.mobile.util.runCatchingCancellable {
             val timedOut = withTimeoutOrNull(timeoutPerRuntime) {
                 controller.sync(runtime = canonicalScope, recoverApprovals = false, forceDeviceStatus = true)
             }
@@ -158,9 +158,7 @@ class ReconnectCoordinator(
             } else {
                 Result.success(recordId)
             }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Throwable) {
+        }.getOrElse { error ->
             Result.failure(
                 ResumeSyncException(
                     ReconnectError(

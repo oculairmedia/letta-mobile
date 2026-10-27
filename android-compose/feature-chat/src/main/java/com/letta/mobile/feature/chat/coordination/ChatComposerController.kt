@@ -61,7 +61,7 @@ internal fun interface ChatComposerTelemetry {
 
 internal class ChatComposerController(
     private val telemetry: ChatComposerTelemetry = ChatComposerTelemetry { name, attrs ->
-        Telemetry.event("AdminChatVM", name, *attrs.telemetryAttributes())
+        Telemetry.event("AdminChatVM", name, attrs = attrs.telemetryAttributes())
     },
     private val limits: AttachmentLimits = AttachmentLimits.Default,
 ) {
