@@ -13,15 +13,13 @@ import org.junit.jupiter.api.Tag
 
 @Tag("unit")
 class TelemetryTest : WordSpec({
-    private var ownedTelemetryHistory: AutoCloseable? = null
+    var ownedTelemetryHistory: AutoCloseable? = null
 
-    @kotlin.test.BeforeTest
-    fun installOwnedTelemetryHistory() {
+    beforeTest {
         ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
     }
 
-    @kotlin.test.AfterTest
-    fun detachOwnedTelemetryHistory() {
+    afterTest {
         ownedTelemetryHistory?.close()
     }
 
@@ -41,7 +39,7 @@ class TelemetryTest : WordSpec({
                 snapshot shouldHaveSize 1
                 snapshot.first().tag shouldBe "Metrics"
                 snapshot.first().name shouldBe "sample"
-                snapshot.first().attrs shouldContain ("count" to 1)
+                snapshot.first().attrs shouldContain ("count" attr 1)
             } finally {
                 Telemetry.clear()
                 Telemetry.enabled.set(wasEnabled)

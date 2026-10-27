@@ -63,12 +63,12 @@ import org.junit.jupiter.api.Tag
 class TimelineSyncLoopReconnectTest {
     private var ownedTelemetryHistory: AutoCloseable? = null
 
-    @kotlin.test.BeforeTest
+    @org.junit.Before
     fun installOwnedTelemetryHistory() {
         ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
     }
 
-    @kotlin.test.AfterTest
+    @org.junit.After
     fun detachOwnedTelemetryHistory() {
         ownedTelemetryHistory?.close()
     }
