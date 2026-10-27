@@ -1,5 +1,8 @@
 package com.letta.mobile.data.transport.appserver
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.cancelAndJoin
@@ -33,6 +36,215 @@ class AppServerRequestRegistryTest {
         r.startRouting(backgroundScope)
         runCurrent()
         return r
+    }
+
+    @Test
+    fun suspendedSendTimesOutAndFreesId() = runTest {
+        val registry = registry(timeoutMs = 100)
+        var failure: Throwable? = null
+        val job = launch {
+            try {
+                registry.request("send-timeout", { it as? AppServerInboundFrame.SyncResponse }) {
+                    CompletableDeferred<Unit>().await()
+                }
+            } catch (e: Exception) {
+                failure = e
+            }
+        }
+        runCurrent()
+        advanceTimeBy(100)
+        runCurrent()
+        assertTrue(job.isCompleted)
+        assertIs<AppServerRequestTimeoutException>(failure)
+        assertEquals("send-timeout", registry.request(
+            "send-timeout", { it as? AppServerInboundFrame.SyncResponse },
+        ) { emitResponse("send-timeout", syncResponse("send-timeout")) }.requestId)
+    }
+
+    @Test
+    fun failAllInterruptsSuspendedSendEvenAfterResponse() = runTest {
+        val registry = registry()
+        val cause = IllegalStateException("generation lost")
+        var failure: Throwable? = null
+        var sendCancelled = false
+        val job = launch {
+            try {
+                registry.request("blocked", { it as? AppServerInboundFrame.SyncResponse }) {
+                    emitResponse("blocked", syncResponse("blocked"))
+                    try {
+                        CompletableDeferred<Unit>().await()
+                    } finally {
+                        sendCancelled = true
+                    }
+                }
+            } catch (e: Exception) {
+                failure = e
+            }
+        }
+        runCurrent()
+        registry.failAll(cause)
+        runCurrent()
+        assertTrue(job.isCompleted)
+        assertTrue(sendCancelled)
+        assertEquals(cause, assertIs<AppServerRequestFailedException>(failure).cause)
+    }
+
+    @Test
+    fun parentCancellationDuringSendRemainsCancellation() = runTest {
+        val registry = registry(timeoutMs = 100)
+        var failure: Throwable? = null
+        val job = launch {
+            try {
+                registry.request("cancel-send", { it as? AppServerInboundFrame.SyncResponse }) {
+                    CompletableDeferred<Unit>().await()
+                }
+            } catch (e: Exception) {
+                failure = e
+                throw e
+            }
+        }
+        runCurrent()
+        job.cancelAndJoin()
+        assertIs<CancellationException>(failure)
+        assertEquals("cancel-send", registry.request(
+            "cancel-send", { it as? AppServerInboundFrame.SyncResponse },
+        ) { emitResponse("cancel-send", syncResponse("cancel-send")) }.requestId)
+    }
+
+    @Test
+    fun shorterCallerTimeoutDuringSendRemainsCancellation() = runTest {
+        val registry = registry(timeoutMs = 1_000)
+        assertFailsWith<TimeoutCancellationException> {
+            withTimeout(100) {
+                registry.request("outer-send", { it as? AppServerInboundFrame.SyncResponse }) {
+                    CompletableDeferred<Unit>().await()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun streamSendHasItsOwnTimeoutAndFreesId() = runTest {
+        val registry = registry(timeoutMs = 100)
+        var failure: Throwable? = null
+        val job = launch {
+            try {
+                registry.requestStream("stream-send", { it as? AppServerInboundFrame.SyncResponse }, { true }) {
+                    CompletableDeferred<Unit>().await()
+                }
+            } catch (e: Exception) {
+                failure = e
+            }
+        }
+        runCurrent()
+        advanceTimeBy(100)
+        runCurrent()
+        assertTrue(job.isCompleted)
+        assertIs<AppServerRequestTimeoutException>(failure)
+        assertEquals(1, registry.requestStream(
+            "stream-send", { it as? AppServerInboundFrame.SyncResponse }, { true },
+        ) { emitResponse("stream-send", syncResponse("stream-send")) }.size)
+    }
+
+    @Test
+    fun failAllInterruptsStreamFrameWait() = runTest {
+        val registry = registry()
+        var failure: Throwable? = null
+        val job = launch {
+            try {
+                registry.requestStream(
+                    "stream-frame-failed",
+                    { it as? AppServerInboundFrame.SyncResponse },
+                    { true },
+                ) { }
+            } catch (e: Exception) {
+                failure = e
+            }
+        }
+        runCurrent()
+        registry.failAll(IllegalStateException("generation lost"))
+        runCurrent()
+        assertTrue(job.isCompleted)
+        assertIs<AppServerRequestFailedException>(failure)
+    }
+
+    @Test
+    fun failAllInterruptsStreamSend() = runTest {
+        val registry = registry()
+        var failure: Throwable? = null
+        val job = launch {
+            try {
+                registry.requestStream("stream-failed", { it as? AppServerInboundFrame.SyncResponse }, { true }) {
+                    CompletableDeferred<Unit>().await()
+                }
+            } catch (e: Exception) {
+                failure = e
+            }
+        }
+        runCurrent()
+        registry.failAll(IllegalStateException("generation lost"))
+        runCurrent()
+        assertTrue(job.isCompleted)
+        assertIs<AppServerRequestFailedException>(failure)
+    }
+
+    @Test
+    fun sendAndResponseShareOneBudget() = runTest {
+        val registry = registry(timeoutMs = 100)
+        var failure: Throwable? = null
+        val job = launch {
+            try {
+                registry.request("budget", { it as? AppServerInboundFrame.SyncResponse }) { delay(80) }
+            } catch (e: Exception) {
+                failure = e
+            }
+        }
+        runCurrent()
+        advanceTimeBy(100)
+        runCurrent()
+        assertTrue(job.isCompleted, "response gets only the remaining 20ms")
+        assertIs<AppServerRequestTimeoutException>(failure)
+    }
+
+    @Test
+    fun streamFramesKeepIndependentBudgetsAfterSlowSend() = runTest {
+        val registry = registry(timeoutMs = 100)
+        backgroundScope.launch {
+            delay(160)
+            emitResponse("stream-budget", syncResponse("stream-budget"))
+        }
+        val result = registry.requestStream(
+            "stream-budget", { it as? AppServerInboundFrame.SyncResponse }, { true },
+        ) { delay(80) }
+        assertEquals(1, result.size)
+    }
+
+    @Test
+    fun responseBeforeSendCompletesStillAwaitsSend() = runTest {
+        val registry = registry(timeoutMs = 100)
+        val sendFinished = CompletableDeferred<Unit>()
+        var failure: Throwable? = null
+        val job = launch {
+            try {
+                registry.request(
+                    "response-first",
+                    { it as? AppServerInboundFrame.SyncResponse },
+                ) {
+                    emitResponse("response-first", syncResponse("response-first"))
+                    delay(80)
+                    sendFinished.complete(Unit)
+                }
+            } catch (e: Exception) {
+                failure = e
+            }
+        }
+        runCurrent()
+        assertTrue(job.isActive, "the response must not bypass a still-running send")
+        advanceTimeBy(80)
+        runCurrent()
+        assertTrue(sendFinished.isCompleted)
+        assertTrue(job.isCompleted)
+        assertEquals(null, failure)
     }
 
     @Test
@@ -238,10 +450,9 @@ class AppServerRequestRegistryTest {
         }
         runCurrent() // both requests register their pending entries
         registry.failAll(RuntimeException("connection lost"))
-        barrier.complete(Unit)
-        advanceUntilIdle()
-        jobA.join()
-        jobB.join()
+        runCurrent() // no barrier release or virtual timeout: teardown interrupts send
+        assertTrue(jobA.isCompleted)
+        assertTrue(jobB.isCompleted)
         assertTrue(aFailed)
         assertTrue(bFailed)
     }

@@ -7,11 +7,14 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -59,9 +62,11 @@ internal class AppServerRequestRegistry(
         controlFrames.collect { received ->
             val frame = received.frame
             val requestId = frame.requestId ?: return@collect
-            val entry = synchronized(lock) { pending[requestId] }
+            val entry = synchronized(lock) { pending[requestId]?.takeUnless { it.responseComplete } }
+            // Keep the entry until its caller exits: a response may arrive while
+            // send is still suspended, and failAll must still be able to wake it.
             if (entry != null && entry.offer(frame)) {
-                synchronized(lock) { pending.remove(requestId) }
+                synchronized(lock) { entry.responseComplete = true }
             }
         }
     }
@@ -81,14 +86,15 @@ internal class AppServerRequestRegistry(
     ): T {
         val deferred = CompletableDeferred<T>()
         return awaitRegistered(requestId, PendingRequest(deferred, response), send) {
-            withTimeout(timeoutMs.milliseconds) { deferred.await() }
+            deferred.await()
         }
     }
 
     /**
      * A request the server answers with several frames sharing one request_id, the last of
      * which [isFinal] recognises (`list_memory` pages carry `done`).
-     * Returns every matched frame in arrival order. [timeoutMs] bounds the wait for EACH frame,
+     * Returns every matched frame in arrival order. [timeoutMs] bounds send separately,
+     * then bounds the wait for EACH frame,
      * so a long listing that keeps producing pages is never cut off, while a stalled one
      * surfaces [AppServerRequestTimeoutException] instead of a partial result.
      */
@@ -99,10 +105,15 @@ internal class AppServerRequestRegistry(
         send: suspend () -> Unit,
     ): List<T> {
         val entry = PendingStream(response, isFinal)
-        return awaitRegistered(requestId, entry, send) {
+        return awaitRegistered(requestId, entry, send, streaming = true) {
             buildList {
                 while (true) {
-                    val next = withTimeout(timeoutMs.milliseconds) { entry.frames.receiveCatching() }
+                    val next = withTimeout(timeoutMs.milliseconds) {
+                        kotlinx.coroutines.selects.select {
+                            entry.failure.onAwait { throw it }
+                            entry.frames.onReceiveCatching { it }
+                        }
+                    }
                     next.exceptionOrNull()?.let { throw it }
                     add(next.getOrNull() ?: break)
                 }
@@ -114,6 +125,7 @@ internal class AppServerRequestRegistry(
         requestId: String,
         entry: Pending,
         send: suspend () -> Unit,
+        streaming: Boolean = false,
         await: suspend () -> R,
     ): R = coroutineScope {
         synchronized(lock) {
@@ -129,13 +141,20 @@ internal class AppServerRequestRegistry(
         val localCollector = if (collectorJob == null) launch { routeFrames() } else null
 
         try {
-            send()
-            await()
+            if (streaming) {
+                withTimeout(timeoutMs.milliseconds) { sendRegistered(entry, send) }
+                await()
+            } else {
+                // One budget, including queue backpressure, not a fresh response budget.
+                withTimeout(timeoutMs.milliseconds) {
+                    sendRegistered(entry, send)
+                    await()
+                }
+            }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             // Must precede the CancellationException clause below:
             // TimeoutCancellationException IS a CancellationException, and
             // callers rely on the typed timeout wrapper.
-            synchronized(lock) { pending.remove(requestId) }
             // Only wrap when THIS request's own withTimeout(timeoutMs) fired. A
             // PARENT cancellation (e.g. the native-admin breaker's short
             // withTimeout, or the caller's scope being cancelled) also surfaces
@@ -143,16 +162,31 @@ internal class AppServerRequestRegistry(
             // parent cancellation so it propagates as cancellation instead of being
             // mislabeled as this request's `timeoutMs` timeout (and silently
             // converting a CancellationException into a plain Exception).
-            ensureActive()
+            val parentCancellation = try {
+                ensureActive()
+                null
+            } catch (parentCancellation: kotlinx.coroutines.TimeoutCancellationException) {
+                parentCancellation
+            }
+            if (parentCancellation != null) throw parentCancellation
             throw AppServerRequestTimeoutException(requestId, timeoutMs, e)
-        } catch (e: CancellationException) {
-            synchronized(lock) { pending.remove(requestId) }
-            throw e
-        } catch (e: Exception) {
-            synchronized(lock) { pending.remove(requestId) }
-            throw e
         } finally {
+            synchronized(lock) { pending.remove(requestId) }
             localCollector?.cancel()
+        }
+    }
+
+    private suspend fun sendRegistered(entry: Pending, send: suspend () -> Unit) = supervisorScope {
+        // Supervision keeps a send exception from cancelling the request scope before
+        // its timeout/cancellation classification. Teardown must also wake a blocked send.
+        val sender = async { send() }
+        try {
+            select<Unit> {
+                entry.failure.onAwait { throw it }
+                sender.onAwait { }
+            }
+        } finally {
+            sender.cancel()
         }
     }
 
@@ -180,6 +214,9 @@ internal class AppServerRequestRegistry(
 
     /** One registered request_id awaiting its response frame(s). */
     private interface Pending {
+        val failure: CompletableDeferred<Throwable>
+        var responseComplete: Boolean
+
         /** Offers a frame carrying this request_id; true once the request has its last frame. */
         fun offer(frame: AppServerInboundFrame): Boolean
 
@@ -190,6 +227,9 @@ internal class AppServerRequestRegistry(
         private val deferred: CompletableDeferred<T>,
         private val response: (AppServerInboundFrame) -> T?,
     ) : Pending {
+        override val failure = CompletableDeferred<Throwable>()
+        override var responseComplete = false
+
         override fun offer(frame: AppServerInboundFrame): Boolean {
             val typed = response(frame)
             return if (typed != null) {
@@ -201,6 +241,7 @@ internal class AppServerRequestRegistry(
         }
 
         override fun fail(cause: Throwable) {
+            failure.complete(cause)
             if (deferred.isActive) {
                 deferred.completeExceptionally(cause)
             }
@@ -211,6 +252,9 @@ internal class AppServerRequestRegistry(
         private val response: (AppServerInboundFrame) -> T?,
         private val isFinal: (T) -> Boolean,
     ) : Pending {
+        override val failure = CompletableDeferred<Throwable>()
+        override var responseComplete = false
+
         val frames = Channel<T>(Channel.UNLIMITED)
 
         override fun offer(frame: AppServerInboundFrame): Boolean {
@@ -222,6 +266,7 @@ internal class AppServerRequestRegistry(
         }
 
         override fun fail(cause: Throwable) {
+            failure.complete(cause)
             frames.close(cause)
         }
     }
