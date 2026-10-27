@@ -107,15 +107,8 @@ internal object RiveLibraryLocator {
     }
 
     /** The resolved path, or null when discovery fails (a bad explicit override included) instead of throwing. */
-    internal fun findOrNull(search: RiveLibrarySearch): String? = findPathOrNull(
-        search.osName,
-        search.explicit,
-        search.resources,
-        search.workingDir,
-    )
-
-    private fun findPathOrNull(osName: String, explicit: String?, resources: String?, workingDir: String): String? =
-        runCatching { findPath(osName, explicit, resources, workingDir) }
+    internal fun findOrNull(search: RiveLibrarySearch): String? =
+        runCatching { findPath(search.osName, search.explicit, search.resources, search.workingDir) }
             .onFailure { System.err.println("ERROR: ${it.message}") }
             .getOrNull()
 
