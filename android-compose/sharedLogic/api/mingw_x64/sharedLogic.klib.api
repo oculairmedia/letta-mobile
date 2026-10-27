@@ -23205,6 +23205,19 @@ sealed interface com.letta.mobile.util/TelemetryValue { // com.letta.mobile.util
         final fun toString(): kotlin/String // com.letta.mobile.util/TelemetryValue.Numeric.toString|toString(){}[0]
     }
 
+    final class NumericList : com.letta.mobile.util/TelemetryValue { // com.letta.mobile.util/TelemetryValue.NumericList|null[0]
+        constructor <init>(kotlin.collections/List<kotlin/Number>) // com.letta.mobile.util/TelemetryValue.NumericList.<init>|<init>(kotlin.collections.List<kotlin.Number>){}[0]
+
+        final val value // com.letta.mobile.util/TelemetryValue.NumericList.value|{}value[0]
+            final fun <get-value>(): kotlin.collections/List<kotlin/Number> // com.letta.mobile.util/TelemetryValue.NumericList.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): kotlin.collections/List<kotlin/Number> // com.letta.mobile.util/TelemetryValue.NumericList.component1|component1(){}[0]
+        final fun copy(kotlin.collections/List<kotlin/Number> = ...): com.letta.mobile.util/TelemetryValue.NumericList // com.letta.mobile.util/TelemetryValue.NumericList.copy|copy(kotlin.collections.List<kotlin.Number>){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.util/TelemetryValue.NumericList.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.util/TelemetryValue.NumericList.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.util/TelemetryValue.NumericList.toString|toString(){}[0]
+    }
+
     final class Text : com.letta.mobile.util/TelemetryValue { // com.letta.mobile.util/TelemetryValue.Text|null[0]
         constructor <init>(kotlin/String) // com.letta.mobile.util/TelemetryValue.Text.<init>|<init>(kotlin.String){}[0]
 
@@ -68766,6 +68779,7 @@ final fun (kotlin/String).com.letta.mobile.data.chat.tools.shell/shellQuoted(): 
 final fun (kotlin/String).com.letta.mobile.data.swarm/withSenderLine(com.letta.mobile.data.swarm/SenderLabel?): kotlin/String // com.letta.mobile.data.swarm/withSenderLine|withSenderLine@kotlin.String(com.letta.mobile.data.swarm.SenderLabel?){}[0]
 final fun (kotlin/String).com.letta.mobile.data.timeline/stripEnvelopeReminders(): kotlin/String // com.letta.mobile.data.timeline/stripEnvelopeReminders|stripEnvelopeReminders@kotlin.String(){}[0]
 final fun (kotlin/String).com.letta.mobile.util/attr(com.letta.mobile.util/TelemetryValue): kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue> // com.letta.mobile.util/attr|attr@kotlin.String(com.letta.mobile.util.TelemetryValue){}[0]
+final fun (kotlin/String).com.letta.mobile.util/attr(kotlin.collections/List<kotlin/Number>): kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue> // com.letta.mobile.util/attr|attr@kotlin.String(kotlin.collections.List<kotlin.Number>){}[0]
 final fun (kotlin/String).com.letta.mobile.util/attr(kotlin/Boolean?): kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue> // com.letta.mobile.util/attr|attr@kotlin.String(kotlin.Boolean?){}[0]
 final fun (kotlin/String).com.letta.mobile.util/attr(kotlin/Number?): kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue> // com.letta.mobile.util/attr|attr@kotlin.String(kotlin.Number?){}[0]
 final fun (kotlin/String).com.letta.mobile.util/attr(kotlin/String?): kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue> // com.letta.mobile.util/attr|attr@kotlin.String(kotlin.String?){}[0]
