@@ -61,19 +61,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class AppServerTurnEngineTest {
-    private var ownedTelemetryHistory: AutoCloseable? = null
-
-    @kotlin.test.BeforeTest
-    fun installOwnedTelemetryHistory() {
-        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
-    }
-
-    @kotlin.test.AfterTest
-    fun detachOwnedTelemetryHistory() {
-        ownedTelemetryHistory?.close()
-    }
-
+class AppServerTurnEngineTest : com.letta.mobile.util.TelemetryRecordingTest() {
     /**
      * letta-mobile-4rxis: letta-code owns context management from the agent's own compaction
      * settings. A user turn goes straight to runtime_start + input; the engine never reads the
@@ -311,10 +299,7 @@ class AppServerTurnEngineTest {
             expectNoEvents()
 
             client.emit(streamDelta(messageType = "assistant_message", runId = "run-1"))
-            assertEquals(
-                "requires_approval",
-                assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).body.jsonDeltaString("stop_reason"),
-            )
+            assertEquals("requires_approval", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).body.jsonDeltaString("stop_reason"))
             assertEquals("assistant_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
 
             client.emit(streamDelta(messageType = "stop_reason", runId = "run-1", stopReason = "end_turn"))

@@ -273,7 +273,7 @@ class TimelineSyncLoop(
         val committedState = timelineProcessor.state.value
         val capturedDelta = pendingPersistenceDelta.snapshot()
         val planningDecision = decideIncrementalPlan(snapshotScope, committedState.timeline, capturedDelta)
-        emitPlanningDecision(planningDecision, capturedDelta)
+        emitSnapshotPlanningDecision(planningDecision, capturedDelta, identityAttrs())
         if (planningDecision.result is TimelineIncrementalSnapshotPlanner.Result.NoWork) {
             // Sequence-safe known-no-persisted-change state: local-only updates (append, retry,
             // delivery state) produce no confirmed delta against an already-persisted baseline.
@@ -298,15 +298,7 @@ class TimelineSyncLoop(
         val fallbackReason = requireNotNull(planningDecision.reason) {
             "planningDecision.reason must not be null when full scan fallback is planned"
         }
-        Telemetry.event(
-            "TimelineSync",
-            "snapshotPersist.fullScanPlanned",
-            attrs = identityAttrs().telemetryAttributes() + arrayOf(
-                "reason" attr fallbackReason.name,
-                "dirtyIdentities" attr capturedDelta.dirtyIdentityCount,
-                "metadataChanged" attr capturedDelta.metadataChanged,
-            ),
-        )
+        emitFullScanPlanned(identityAttrs(), fallbackReason.name, capturedDelta)
         val (provisionalEnvelope, fingerprint) = withContext(ioDispatcher) {
             val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
                 timeline = committedState.timeline,
@@ -441,42 +433,6 @@ class TimelineSyncLoop(
             baseRevision = baseline?.revision,
             targetRevision = targetRevision,
             storeSupportsIncremental = storeSupportsIncremental,
-        )
-    }
-
-    private fun emitPlanningDecision(
-        decision: IncrementalPlanningDecision,
-        delta: PendingTimelinePersistenceDelta.Snapshot,
-    ) {
-        val plan = (decision.result as? TimelineIncrementalSnapshotPlanner.Result.Planned)?.plan
-        val comparisonEvents = (plan as? NormalizedTimelineCommitPlan.Apply)?.commit?.comparisonEvents ?: 0
-        val encodedRows = (plan as? NormalizedTimelineCommitPlan.Apply)?.commit?.encodedRows ?: 0
-        val planningMode = when {
-            decision.result is TimelineIncrementalSnapshotPlanner.Result.NoWork -> "no_work"
-            canPersistIncremental(decision) -> "delta"
-            else -> "full_scan"
-        }
-        val reasonStr = when {
-            decision.reason != null -> decision.reason.name
-            decision.result is TimelineIncrementalSnapshotPlanner.Result.NoWork -> "no_work"
-            else -> "delta"
-        }
-        Telemetry.event(
-            "TimelineSync",
-            "snapshotPersist.planningDecision",
-            attrs = identityAttrs().telemetryAttributes() + arrayOf(
-                "planningMode" attr planningMode,
-                "reason" attr reasonStr,
-                "throughSequence" attr delta.throughSequence,
-                "dirtyChanged" attr delta.changedConfirmedServerIds.size,
-                "dirtyDeleted" attr delta.deletedConfirmedServerIds.size,
-                "metadataChanged" attr delta.metadataChanged,
-                "baselineRevision" attr (decision.baseRevision ?: 0L),
-                "targetRevision" attr decision.targetRevision,
-                "comparisonEvents" attr comparisonEvents,
-                "encodedRows" attr encodedRows,
-                "storeSupportsIncremental" attr decision.storeSupportsIncremental,
-            ),
         )
     }
 
@@ -1180,16 +1136,18 @@ class TimelineSyncLoop(
                 completeGatewayEventExceptionally(event, cancelled)
                 throw cancelled
             } catch (t: Throwable) {
-                completeGatewayEventExceptionally(event, t)
-                Telemetry.error(
-                    "TimelineSync",
-                    "gateway.eventFailed",
-                    t,
-                    "conversationId" attr conversationId,
-                    "event" attr event::class.simpleName,
-                )
+                reportGatewayEventFailure(event, t)
             }
         }
+    }
+
+    private fun reportGatewayEventFailure(event: TimelineGatewayEvent, error: Throwable) {
+        completeGatewayEventExceptionally(event, error)
+        Telemetry.error(
+            "TimelineSync", "gateway.eventFailed", error,
+            "conversationId" attr conversationId,
+            "event" attr event::class.simpleName,
+        )
     }
 
     private fun completeGatewayEventExceptionally(event: TimelineGatewayEvent, t: Throwable) {

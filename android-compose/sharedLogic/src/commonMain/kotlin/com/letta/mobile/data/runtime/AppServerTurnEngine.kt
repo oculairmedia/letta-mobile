@@ -1513,13 +1513,7 @@ class AppServerTurnEngine(
                 externalToolRegistry,
             ),
         )
-        Telemetry.event(
-            "IrohTurn",
-            "runtimeStart.response",
-            "success" attr response.success,
-            "hasRuntime" attr (response.runtime != null),
-            "error" attr response.error,
-        )
+        response.recordRuntimeStartTelemetry()
         if (!response.success) {
             error(response.error ?: "App Server runtime_start failed.")
         }

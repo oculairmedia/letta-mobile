@@ -40,56 +40,58 @@ class ReconnectCoordinatorResumeTest {
     @Test
     fun parentCancellationStopsRegistryAndRuntimeWorkAndReleasesCoordinatorLocks() = runTest {
         for (resume in listOf(false, true)) {
-            for (duringLoad in listOf(false, true)) {
-                val backing = InMemoryRuntimeRegistry()
-                backing.save(RuntimeRecord(
-                    id = "record-1", agentId = AgentId("agent-1"), conversationId = ConversationId("conv-1"),
-                    canonicalRuntime = CanonicalRuntime(scope = AppServerRuntimeScope("agent-1", "conv-1")),
-                ))
-                backing.save(RuntimeRecord(
-                    id = "record-2", agentId = AgentId("agent-2"), conversationId = ConversationId("conv-2"),
-                ))
-                val entered = CompletableDeferred<Unit>()
-                var block = true
-                var cleanups = 0
-                var continued = false
-                suspend fun blockUntilCancelled() {
-                    entered.complete(Unit)
-                    try {
-                        awaitCancellation()
-                    } finally {
-                        cleanups++
-                    }
-                }
-                val registry = object : com.letta.mobile.data.controller.registry.RuntimeRegistry by backing {
-                    override suspend fun list(): List<RuntimeRecord> {
-                        if (block && duringLoad) blockUntilCancelled()
-                        return backing.list()
-                    }
-                }
-                val controller = TestAppServerController(onSyncHook = { _, _ ->
-                    if (block && !duringLoad) blockUntilCancelled()
-                })
-                val coordinator = ReconnectCoordinator(controller, registry)
-                val recorder = com.letta.mobile.util.TelemetryRecorder()
-                com.letta.mobile.util.Telemetry.installRecorder(recorder).use {
-                    val job = launch {
-                        if (resume) coordinator.onAppResumed(cooldown = kotlin.time.Duration.ZERO) else coordinator.reconnect()
-                        continued = true
-                    }
-                    entered.await()
-                    job.cancelAndJoin()
-                    assertFalse(continued, "cancellation must not be converted to a result")
-                    assertEquals(1, cleanups)
-                    assertTrue(controller.startRuntimeCalls.size <= 1, "must not reconnect the next runtime after cancellation")
-                    assertTrue(recorder.snapshot().none { it.name == "resume.sync.failed" || it.name == "resume.sync" })
-                    block = false
-                    if (resume) {
-                        assertIs<ResumeSyncResult.Success>(coordinator.onAppResumed(cooldown = kotlin.time.Duration.ZERO))
-                    } else {
-                        assertTrue(coordinator.reconnect().isFullySuccessful)
-                    }
-                }
+            for (duringLoad in listOf(false, true)) verifyParentCancellation(resume, duringLoad)
+        }
+    }
+
+    private suspend fun kotlinx.coroutines.test.TestScope.verifyParentCancellation(resume: Boolean, duringLoad: Boolean) {
+        val backing = InMemoryRuntimeRegistry()
+        backing.save(RuntimeRecord(
+            id = "record-1", agentId = AgentId("agent-1"), conversationId = ConversationId("conv-1"),
+            canonicalRuntime = CanonicalRuntime(scope = AppServerRuntimeScope("agent-1", "conv-1")),
+        ))
+        backing.save(RuntimeRecord(
+            id = "record-2", agentId = AgentId("agent-2"), conversationId = ConversationId("conv-2"),
+        ))
+        val entered = CompletableDeferred<Unit>()
+        var block = true
+        var cleanups = 0
+        var continued = false
+        suspend fun blockUntilCancelled() {
+            entered.complete(Unit)
+            try {
+                awaitCancellation()
+            } finally {
+                cleanups++
+            }
+        }
+        val registry = object : com.letta.mobile.data.controller.registry.RuntimeRegistry by backing {
+            override suspend fun list(): List<RuntimeRecord> {
+                if (block && duringLoad) blockUntilCancelled()
+                return backing.list()
+            }
+        }
+        val controller = TestAppServerController(onSyncHook = { _, _ ->
+            if (block && !duringLoad) blockUntilCancelled()
+        })
+        val coordinator = ReconnectCoordinator(controller, registry)
+        val recorder = com.letta.mobile.util.TelemetryRecorder()
+        com.letta.mobile.util.Telemetry.installRecorder(recorder).use {
+            val job = launch {
+                if (resume) coordinator.onAppResumed(cooldown = kotlin.time.Duration.ZERO) else coordinator.reconnect()
+                continued = true
+            }
+            entered.await()
+            job.cancelAndJoin()
+            assertFalse(continued, "cancellation must not be converted to a result")
+            assertEquals(1, cleanups)
+            assertTrue(controller.startRuntimeCalls.size <= 1, "must not reconnect the next runtime after cancellation")
+            assertTrue(recorder.snapshot().none { it.name == "resume.sync.failed" || it.name == "resume.sync" })
+            block = false
+            if (resume) {
+                assertIs<ResumeSyncResult.Success>(coordinator.onAppResumed(cooldown = kotlin.time.Duration.ZERO))
+            } else {
+                assertTrue(coordinator.reconnect().isFullySuccessful)
             }
         }
     }

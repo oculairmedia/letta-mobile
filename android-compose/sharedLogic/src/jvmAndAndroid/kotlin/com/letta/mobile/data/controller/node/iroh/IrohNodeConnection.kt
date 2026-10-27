@@ -539,14 +539,7 @@ class IrohNodeConnection(
             val type = obj["type"]?.jsonPrimitive?.content
             val requestId = obj["request_id"]?.jsonPrimitive?.content
 
-            Telemetry.event(
-                "IrohNode",
-                "control.frame",
-                "remoteEndpointId" attr remoteEndpointId,
-                "type" attr type,
-                "requestId" attr requestId,
-                "agentId" attr obj["agent_id"]?.jsonPrimitive?.content,
-            )
+            recordControlFrame(remoteEndpointId, obj)
             agentScopeViolation(obj)?.let { return it }
             when (type) {
                 "auth" -> handleAuth(obj, requestId)
@@ -741,13 +734,7 @@ class IrohNodeConnection(
             block()
         } else {
             val id = requestId ?: ""
-            Telemetry.event(
-                "IrohNode",
-                "auth.required",
-                "remoteEndpointId" attr remoteEndpointId,
-                "requestId" attr id,
-                "reason" attr "missing_token",
-            )
+            recordAuthenticationRequired(remoteEndpointId, id)
             """{"type":"error","request_id":"$id","message":"unauthorized"}"""
         }
 

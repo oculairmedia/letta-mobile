@@ -26,19 +26,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class TimelineStreamReducerTest {
-    private var ownedTelemetryHistory: AutoCloseable? = null
-
-    @kotlin.test.BeforeTest
-    fun installOwnedTelemetryHistory() {
-        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
-    }
-
-    @kotlin.test.AfterTest
-    fun detachOwnedTelemetryHistory() {
-        ownedTelemetryHistory?.close()
-    }
-
+class TimelineStreamReducerTest : com.letta.mobile.util.TelemetryRecordingTest() {
     @AfterTest
     fun tearDown() {
         Telemetry.clear()

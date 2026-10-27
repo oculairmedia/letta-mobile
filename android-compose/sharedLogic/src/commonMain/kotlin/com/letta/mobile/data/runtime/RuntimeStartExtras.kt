@@ -2,12 +2,24 @@ package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ToolAudience
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.util.runCatchingCancellable
+
+internal fun AppServerInboundFrame.RuntimeStartResponse.recordRuntimeStartTelemetry() {
+    Telemetry.event(
+        "IrohTurn", "runtimeStart.response",
+        "success" attr success,
+        "hasRuntime" attr (runtime != null),
+        "error" attr error,
+    )
+}
 
 /** Values `runtime_start` takes besides the turn's agent and conversation. */
 internal data class RuntimeStartExtras(

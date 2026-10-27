@@ -137,6 +137,43 @@ class ReconnectCoordinator(
         )
     }
 
+    private suspend fun syncRuntimeOnResume(record: RuntimeRecord, timeoutPerRuntime: Duration): Result<String> {
+        val recordId = record.id
+        val canonicalScope = record.canonicalRuntime?.scope ?: return Result.success(recordId)
+        return try {
+            val timedOut = withTimeoutOrNull(timeoutPerRuntime) {
+                controller.sync(runtime = canonicalScope, recoverApprovals = false, forceDeviceStatus = true)
+            }
+            if (timedOut == null) {
+                Result.failure(
+                    ResumeSyncException(
+                        ReconnectError(
+                            runtimeRecordId = recordId,
+                            phase = ReconnectPhase.RECONNECT_RUNTIME,
+                            message = "Sync timed out after ${timeoutPerRuntime.inWholeMilliseconds}ms for runtime $recordId",
+                            cause = null,
+                        ),
+                    ),
+                )
+            } else {
+                Result.success(recordId)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            Result.failure(
+                ResumeSyncException(
+                    ReconnectError(
+                        runtimeRecordId = recordId,
+                        phase = ReconnectPhase.RECONNECT_RUNTIME,
+                        message = "Failed to sync runtime $recordId on resume: ${error.message}",
+                        cause = error,
+                    ),
+                ),
+            )
+        }
+    }
+
     /**
      * Executes a lightweight resume sync across all active runtimes when the app returns
      * to the foreground.
@@ -235,48 +272,7 @@ class ReconnectCoordinator(
 
             val results: List<Result<String>> = coroutineScope {
                 eligibleRecords.map { record ->
-                    async {
-                        val recordId = record.id
-                        val canonicalScope = record.canonicalRuntime?.scope
-                            ?: return@async Result.success(recordId)
-
-                        try {
-                            val timedOut = withTimeoutOrNull(timeoutPerRuntime) {
-                                controller.sync(
-                                    runtime = canonicalScope,
-                                    recoverApprovals = false,
-                                    forceDeviceStatus = true,
-                                )
-                            }
-                            if (timedOut == null) {
-                                Result.failure(
-                                    ResumeSyncException(
-                                        ReconnectError(
-                                            runtimeRecordId = recordId,
-                                            phase = ReconnectPhase.RECONNECT_RUNTIME,
-                                            message = "Sync timed out after ${timeoutPerRuntime.inWholeMilliseconds}ms for runtime $recordId",
-                                            cause = null,
-                                        ),
-                                    ),
-                                )
-                            } else {
-                                Result.success(recordId)
-                            }
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (t: Throwable) {
-                            Result.failure(
-                                ResumeSyncException(
-                                    ReconnectError(
-                                        runtimeRecordId = recordId,
-                                        phase = ReconnectPhase.RECONNECT_RUNTIME,
-                                        message = "Failed to sync runtime $recordId on resume: ${t.message}",
-                                        cause = t,
-                                    ),
-                                ),
-                            )
-                        }
-                    }
+                    async { syncRuntimeOnResume(record, timeoutPerRuntime) }
                 }.awaitAll()
             }
 
