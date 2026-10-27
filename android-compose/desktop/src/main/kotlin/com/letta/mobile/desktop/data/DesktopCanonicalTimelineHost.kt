@@ -44,7 +44,6 @@ class DesktopCanonicalTimelineHost(
      */
     internal fun installOn(controller: DesktopChatController, send: DesktopCanonicalSendInstall) {
         controller.canonicalEligible = ::servesConversation
-        controller.canonicalOpen = { request -> open(request) }
         // Reading history and writing to it are installed together on purpose. A route that can
         // page but not send is a transcript the user cannot reply in, and nothing downstream would
         // report that as broken.
@@ -75,6 +74,12 @@ class DesktopCanonicalTimelineHost(
             ),
         )
         controller.canonicalSendFor = coordinators::forAgent
+        controller.canonicalOpen = { request ->
+            // A passive view needs the same writer as a local send. Do not depend on the
+            // composer's optional queue collector to construct and attach its event owner.
+            coordinators.forAgent(request.agentId, request.transport).eventSubscription.select()
+            open(request)
+        }
     }
 
     /**
