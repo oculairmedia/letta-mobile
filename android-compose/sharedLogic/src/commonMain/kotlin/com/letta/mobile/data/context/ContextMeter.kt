@@ -103,9 +103,9 @@ private fun ContextWindowOverview.calibratedTo(total: Int): ContextWindowOvervie
 }
 
 /**
- * The section names the estimator's rows mean: "Tools & other" is a residual (tool schemas plus
- * reasoning and cache rounding), "Memory blocks" the rendered core memory, "Summary" the latest
- * compaction's summary.
+ * The estimator's residual is an unclassified estimation gap, not measured tool definitions.
+ * It can include section-estimation error as well as prompt components absent from disk.
+ * "Memory blocks" is rendered core memory; "Summary" is the latest compaction summary.
  */
 private fun ContextWindowUsage.withEstimateLabels(): ContextWindowUsage =
     copy(segments = segments.map { segment -> ESTIMATE_LABELS[segment.kind]?.let { segment.copy(label = it) } ?: segment })
@@ -115,5 +115,5 @@ private val ESTIMATE_LABELS = mapOf(
     ContextWindowSegmentKind.CoreMemory to "Memory blocks",
     ContextWindowSegmentKind.SummaryMemory to "Summary",
     ContextWindowSegmentKind.Messages to "Messages",
-    ContextWindowSegmentKind.ToolDefinitions to "Tools & other",
+    ContextWindowSegmentKind.ToolDefinitions to "Unclassified / estimation gap",
 )

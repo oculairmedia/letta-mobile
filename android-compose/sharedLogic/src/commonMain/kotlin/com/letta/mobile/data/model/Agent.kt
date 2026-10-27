@@ -39,7 +39,7 @@ data class ContextWindowOverview(
     @SerialName("source") val source: String? = null,
     /** The sections were matched to an exact total, so they sum to [contextWindowSizeCurrent]. */
     @SerialName("calibrated") val calibrated: Boolean? = null,
-    /** [numTokensFunctionsDefinitions] is the residual of an exact total ("Tools & other"), not a count. */
+    /** [numTokensFunctionsDefinitions] is an unclassified estimation residual, not measured tool tokens. */
     @SerialName("tools_derived") val toolsDerived: Boolean? = null,
     /** `client` or `recorded`: where the exact total came from. */
     @SerialName("total_source") val totalSource: String? = null,
