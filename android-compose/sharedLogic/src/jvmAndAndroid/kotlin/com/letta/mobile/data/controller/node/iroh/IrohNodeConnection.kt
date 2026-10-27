@@ -278,14 +278,7 @@ class IrohNodeConnection(
             viewerRegistration?.let { registration ->
                 runCatching { connectionRegistry?.release(registration) }
             }
-            Telemetry.event(
-                "IrohNode",
-                "connection.closed",
-                attrs = arrayOf(
-                    "remoteEndpointId" attr remoteEndpointId,
-                    "closeReason" attr IrohDiagnostics.closeReason(connection),
-                ) + IrohDiagnostics.connectionStatsAttributes(runCatching { connection.stats() }.getOrNull()).toTypedArray(),
-            )
+            recordConnectionClosed(remoteEndpointId, connection)
             runCatching { connection.close() }
         }
     }
