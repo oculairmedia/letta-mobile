@@ -188,6 +188,8 @@ class DesktopCanonicalTimelineRuntimeTest {
                 id = "late-done-1", ts = "", turnId = "turn-1", runId = "run-1", status = "completed",
             ))
             assertEquals(second, presentation.live.value, "late terminal must not clear the next remote turn")
+            reply("remote-2-tail", "turn-2", "run-2", "second remote reply tail")
+            presentation.live.first { rows -> rows.any { it.containsMessageId("remote-2-tail") } }
         } finally {
             presentation.close()
             controller.close()
