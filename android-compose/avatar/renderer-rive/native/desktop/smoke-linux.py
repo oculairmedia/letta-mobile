@@ -114,99 +114,115 @@ def test_fallback(library, asset, output, require_hardware):
     print('FALLBACK PASS: first candidate rejected; next candidate rendered actual mascot', flush=True)
 
 
-def smoke(library, asset, output, require_hardware=False):
-    output.mkdir(parents=True, exist_ok=True)
-    (output / 'render-evidence.json').unlink(missing_ok=True)
-    native = c.CDLL(str(library.resolve()))
-    signatures = {
-        'create': (c.c_void_p, [c.c_char_p, c.c_int]),
-        'destroy': (None, [c.c_void_p]),
-        'load': (c.c_int, [c.c_void_p, c.c_char_p, c.c_int, c.c_char_p]),
-        'advance': (None, [c.c_void_p, c.c_float]),
-        'render': (c.c_int, [c.c_void_p, c.c_int, c.c_int, c.c_uint32, c.c_void_p]),
-        'vm_set_enum': (c.c_int, [c.c_void_p, c.c_char_p, c.c_char_p]),
-        'vm_set_number': (c.c_int, [c.c_void_p, c.c_char_p, c.c_float]),
-        'vm_set_boolean': (c.c_int, [c.c_void_p, c.c_char_p, c.c_int]),
-        'vm_set_color': (c.c_int, [c.c_void_p, c.c_char_p, c.c_uint32]),
-        'vm_fire': (c.c_int, [c.c_void_p, c.c_char_p]),
-    }
-    for name, (result, args) in signatures.items():
-        function = getattr(native, 'rive_bridge_' + name)
-        function.restype, function.argtypes = result, args
-    data = asset.read_bytes()
-    scenes = []
-    frames = {}
-    adapter = c.create_string_buffer(2048)
+class SmokeScenes:
+    """Own the C ABI bindings, live scenes and rendered frame evidence for one smoke run."""
 
-    def create():
-        scene = native.rive_bridge_create(adapter, len(adapter))
-        require(scene, 'GPU SETUP UNAVAILABLE: ' + adapter.value.decode())
-        scenes.append(scene)
-        require(native.rive_bridge_load(scene, data, len(data), b'Avatar') == 0, 'Shipped mascot failed to load')
-        require(native.rive_bridge_vm_set_enum(scene, b'shape', b'roundedSquare') == 0, 'Missing identity shape')
-        require(native.rive_bridge_vm_set_color(scene, b'color', 0xff7189e6) == 0, 'Missing identity color')
-        require(native.rive_bridge_vm_set_enum(scene, b'state', b'idle') == 0, 'Missing state enum')
+    def __init__(self, library, asset, output):
+        self.native = c.CDLL(str(library.resolve()))
+        signatures = {
+            'create': (c.c_void_p, [c.c_char_p, c.c_int]),
+            'destroy': (None, [c.c_void_p]),
+            'load': (c.c_int, [c.c_void_p, c.c_char_p, c.c_int, c.c_char_p]),
+            'advance': (None, [c.c_void_p, c.c_float]),
+            'render': (c.c_int, [c.c_void_p, c.c_int, c.c_int, c.c_uint32, c.c_void_p]),
+            'vm_set_enum': (c.c_int, [c.c_void_p, c.c_char_p, c.c_char_p]),
+            'vm_set_number': (c.c_int, [c.c_void_p, c.c_char_p, c.c_float]),
+            'vm_set_boolean': (c.c_int, [c.c_void_p, c.c_char_p, c.c_int]),
+            'vm_set_color': (c.c_int, [c.c_void_p, c.c_char_p, c.c_uint32]),
+            'vm_fire': (c.c_int, [c.c_void_p, c.c_char_p]),
+        }
+        for name, (result, args) in signatures.items():
+            function = getattr(self.native, 'rive_bridge_' + name)
+            function.restype, function.argtypes = result, args
+        self.data = asset.read_bytes()
+        self.output = output
+        self.scenes = []
+        self.frames = {}
+        self.adapter = c.create_string_buffer(2048)
+
+    def create(self):
+        scene = self.native.rive_bridge_create(self.adapter, len(self.adapter))
+        require(scene, 'GPU SETUP UNAVAILABLE: ' + self.adapter.value.decode())
+        self.scenes.append(scene)
+        require(self.native.rive_bridge_load(scene, self.data, len(self.data), b'Avatar') == 0, 'Shipped mascot failed to load')
+        require(self.native.rive_bridge_vm_set_enum(scene, b'shape', b'roundedSquare') == 0, 'Missing identity shape')
+        require(self.native.rive_bridge_vm_set_color(scene, b'color', 0xff7189e6) == 0, 'Missing identity color')
+        require(self.native.rive_bridge_vm_set_enum(scene, b'state', b'idle') == 0, 'Missing state enum')
         return scene
 
-    def frame(scene, label, width=192, height=192, advance=1):
+    def frame(self, scene, label, size=(192, 192), advance=1):
+        width, height = size
         for _ in range(advance):
-            native.rive_bridge_advance(scene, 1 / 60)
+            self.native.rive_bridge_advance(scene, 1 / 60)
         out = (c.c_ubyte * (width * height * 4))()
-        require(native.rive_bridge_render(scene, width, height, 0, out) == 0, f'Render failed: {label}')
+        require(self.native.rive_bridge_render(scene, width, height, 0, out) == 0, f'Render failed: {label}')
         pixels = bytes(out)
+        self.frames[label] = self.validate_pixels(pixels, width, height, label)
+        (self.output / (label + '.rgba')).write_bytes(pixels)
+        write_png(self.output / (label + '.png'), pixels, width, height)
+        return pixels
+
+    @staticmethod
+    def validate_pixels(pixels, width, height, label):
         alpha = pixels[3::4]
         require(sum(a > 0 for a in alpha) > width * height // 100, f'Empty frame: {label}')
         require(0 in alpha and any(0 < a < 255 for a in alpha), f'Transparency/soft edges missing: {label}')
         require(all(max(pixels[i:i + 3]) <= pixels[i + 3] + 1 for i in range(0, len(pixels), 4)),
                 f'Pixels are not premultiplied: {label}')
-        frames[label] = dict(width=width, height=height, sha256=hashlib.sha256(pixels).hexdigest(),
-                             visible=sum(a > 0 for a in alpha), partial_alpha=sum(0 < a < 255 for a in alpha))
-        (output / (label + '.rgba')).write_bytes(pixels)
-        write_png(output / (label + '.png'), pixels, width, height)
-        return pixels
+        return dict(width=width, height=height, sha256=hashlib.sha256(pixels).hexdigest(),
+                    visible=sum(a > 0 for a in alpha), partial_alpha=sum(0 < a < 255 for a in alpha))
 
+    def destroy(self, scene):
+        self.native.rive_bridge_destroy(scene)
+        self.scenes.remove(scene)
+
+    def close(self):
+        for scene in reversed(self.scenes):
+            self.native.rive_bridge_destroy(scene)
+
+
+def smoke(library, asset, output, require_hardware=False):
+    output.mkdir(parents=True, exist_ok=True)
+    (output / 'render-evidence.json').unlink(missing_ok=True)
+    scenes = SmokeScenes(library, asset, output)
     try:
-        first, second = create(), create()
-        renderer = adapter.value.decode()
+        first, second = scenes.create(), scenes.create()
+        renderer = scenes.adapter.value.decode()
         software = any(name in renderer.lower() for name in ('llvmpipe', 'softpipe', 'swrast', 'software'))
         print(('SOFTWARE GL' if software else 'HARDWARE GL') + ': ' + renderer, flush=True)
         require(not (require_hardware and software), 'Hardware rendering required; software GL is not a hardware pass')
-        baseline = frame(first, 'idle', advance=30)
-        require(native.rive_bridge_vm_set_enum(first, b'state', b'thinking') == 0, 'Missing state enum')
-        thinking = frame(first, 'thinking', advance=20)
+        baseline = scenes.frame(first, 'idle', advance=30)
+        require(scenes.native.rive_bridge_vm_set_enum(first, b'state', b'thinking') == 0, 'Missing state enum')
+        thinking = scenes.frame(first, 'thinking', advance=20)
         require(thinking != baseline, 'State input did not change pixels')
-        require(frame(first, 'thinking-next', advance=8) != thinking, 'Animation did not advance')
-        require(native.rive_bridge_vm_set_enum(second, b'shape', b'cloud') == 0, 'Missing cloud identity')
+        require(scenes.frame(first, 'thinking-next', advance=8) != thinking, 'Animation did not advance')
+        require(scenes.native.rive_bridge_vm_set_enum(second, b'shape', b'cloud') == 0, 'Missing cloud identity')
         for name, value in ((b'lookX', 0.8), (b'mouthOpen', 0.9), (b'turnX', 0.5)):
-            require(native.rive_bridge_vm_set_number(second, name, value) == 0, 'Missing number input')
-        require(native.rive_bridge_vm_set_boolean(second, b'hovered', 1) == 0, 'Missing boolean input')
-        require(native.rive_bridge_vm_set_color(second, b'color', 0xff3ba4b0) == 0, 'Missing identity color')
-        require(native.rive_bridge_vm_fire(second, b'success') == 0, 'Missing reaction trigger')
-        require(frame(second, 'inputs', advance=12) != baseline, 'Independent scene inputs did not change pixels')
+            require(scenes.native.rive_bridge_vm_set_number(second, name, value) == 0, 'Missing number input')
+        require(scenes.native.rive_bridge_vm_set_boolean(second, b'hovered', 1) == 0, 'Missing boolean input')
+        require(scenes.native.rive_bridge_vm_set_color(second, b'color', 0xff3ba4b0) == 0, 'Missing identity color')
+        require(scenes.native.rive_bridge_vm_fire(second, b'success') == 0, 'Missing reaction trigger')
+        require(scenes.frame(second, 'inputs', advance=12) != baseline, 'Independent scene inputs did not change pixels')
         scratch = (c.c_ubyte * 4)()
-        require(native.rive_bridge_render(first, 0, 1, 0, scratch) != 0, 'Zero viewport accepted')
-        require(native.rive_bridge_render(first, 2**31 - 1, 1, 0, scratch) != 0, 'Oversized viewport accepted')
-        frame(first, 'resized', 128, 240, advance=1)
-        frame(second, 'other-scene', 96, 96, advance=1)
-        native.rive_bridge_destroy(first)
-        scenes.remove(first)
-        frame(second, 'survivor', advance=2)
-        native.rive_bridge_destroy(second)
-        scenes.remove(second)
+        require(scenes.native.rive_bridge_render(first, 0, 1, 0, scratch) != 0, 'Zero viewport accepted')
+        require(scenes.native.rive_bridge_render(first, 2**31 - 1, 1, 0, scratch) != 0, 'Oversized viewport accepted')
+        scenes.frame(first, 'resized', (128, 240), advance=1)
+        scenes.frame(second, 'other-scene', (96, 96), advance=1)
+        scenes.destroy(first)
+        scenes.frame(second, 'survivor', advance=2)
+        scenes.destroy(second)
         # Last-scene destruction releases files, targets, Rive and EGL; recreate to catch stale globals.
         for _ in range(3):
-            scene = create()
-            frame(scene, 'recreated', 64, 64)
-            native.rive_bridge_destroy(scene)
-            scenes.remove(scene)
-        evidence = dict(renderer=renderer, hardware=not software, asset_sha256=hashlib.sha256(data).hexdigest(),
-                        frames=frames, result='PASS')
+            scene = scenes.create()
+            scenes.frame(scene, 'recreated', (64, 64))
+            scenes.destroy(scene)
+        evidence = dict(renderer=renderer, hardware=not software, asset_sha256=hashlib.sha256(scenes.data).hexdigest(),
+                        frames=scenes.frames, result='PASS')
         (output / 'render-evidence.json').write_text(json.dumps(evidence, indent=2) + '\n')
         print(json.dumps(evidence, sort_keys=True), flush=True)
         return evidence
     finally:
-        for scene in reversed(scenes):
-            native.rive_bridge_destroy(scene)
+        scenes.close()
 
 
 if __name__ == '__main__':

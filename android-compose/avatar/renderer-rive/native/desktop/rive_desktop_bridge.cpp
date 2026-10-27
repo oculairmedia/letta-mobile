@@ -400,46 +400,13 @@ static bool ensure_target(RiveBridge* bridge, uint32_t width, uint32_t height)
 }
 #endif
 
-// Draws the current scene and copies it into `rgbaOut` (width * height * 4 bytes, premultiplied
-// RGBA, top row first). `clearArgb` 0 keeps the background transparent. Returns 0 on success.
-RIVE_BRIDGE_EXPORT int rive_bridge_render(RiveBridge* bridge, int width, int height, uint32_t clearArgb,
-                                             uint8_t* rgbaOut)
+// Flush and readback belong to the platform target; scene drawing is shared.
+static int read_pixels(RiveBridge* bridge, int width, int height, uint8_t* rgbaOut)
 {
-    if (!bridge->artboard || !rgbaOut || width <= 0 || height <= 0)
-        return 1;
-#ifndef _WIN32
-    auto* glImpl = bridge->shared->renderContext->static_impl_cast<RenderContextGLImpl>();
-    glImpl->unbindGLInternalResources();
-#endif
-    if (!ensure_target(bridge, (uint32_t)width, (uint32_t)height))
-        return 3;
-
-#ifndef _WIN32
-    glImpl->invalidateGLState();
-#endif
     RenderContext* renderContext = bridge->shared->renderContext.get();
 #ifdef _WIN32
     ID3D11DeviceContext* gpuContext = bridge->shared->gpuContext.Get();
 #endif
-    renderContext->beginFrame({
-        .renderTargetWidth = (uint32_t)width,
-        .renderTargetHeight = (uint32_t)height,
-        .loadAction = LoadAction::clear,
-        .clearColor = clearArgb,
-    });
-
-    RiveRenderer renderer(renderContext);
-    bridge->viewTransform = computeAlignment(Fit::contain, Alignment::center,
-                                             AABB(0, 0, (float)width, (float)height),
-                                             bridge->artboard->bounds());
-    renderer.save();
-    renderer.transform(bridge->viewTransform);
-    if (bridge->stateMachine)
-        bridge->stateMachine->draw(&renderer);
-    else
-        bridge->artboard->draw(&renderer);
-    renderer.restore();
-
 #ifdef _WIN32
     bridge->renderTarget->setTargetTexture(bridge->drawTexture);
     renderContext->flush({.renderTarget = bridge->renderTarget.get()});
@@ -460,6 +427,54 @@ RIVE_BRIDGE_EXPORT int rive_bridge_render(RiveBridge* bridge, int width, int hei
     return bridge->target.read(rgbaOut) ? 0 : 2;
 #endif
     return 0;
+}
+
+// Scene drawing is independent of target allocation and platform readback.
+static void draw_scene(RiveBridge* bridge, RiveRenderer& renderer, const AABB& viewport)
+{
+    bridge->viewTransform = computeAlignment(Fit::contain, Alignment::center,
+                                             viewport,
+                                             bridge->artboard->bounds());
+    renderer.save();
+    renderer.transform(bridge->viewTransform);
+    if (bridge->stateMachine)
+        bridge->stateMachine->draw(&renderer);
+    else
+        bridge->artboard->draw(&renderer);
+    renderer.restore();
+}
+
+// Draws the current scene and copies it into `rgbaOut` (width * height * 4 bytes, premultiplied
+// RGBA, top row first). `clearArgb` 0 keeps the background transparent. Returns 0 on success.
+RIVE_BRIDGE_EXPORT int rive_bridge_render(RiveBridge* bridge, int width, int height, uint32_t clearArgb,
+                                             uint8_t* rgbaOut)
+{
+    if (!bridge->artboard || !rgbaOut)
+        return 1;
+    if (width <= 0 || height <= 0)
+        return 1;
+#ifndef _WIN32
+    auto* glImpl = bridge->shared->renderContext->static_impl_cast<RenderContextGLImpl>();
+    glImpl->unbindGLInternalResources();
+#endif
+    if (!ensure_target(bridge, (uint32_t)width, (uint32_t)height))
+        return 3;
+
+#ifndef _WIN32
+    glImpl->invalidateGLState();
+#endif
+    RenderContext* renderContext = bridge->shared->renderContext.get();
+    renderContext->beginFrame({
+        .renderTargetWidth = (uint32_t)width,
+        .renderTargetHeight = (uint32_t)height,
+        .loadAction = LoadAction::clear,
+        .clearColor = clearArgb,
+    });
+
+    RiveRenderer renderer(renderContext);
+    draw_scene(bridge, renderer, AABB(0, 0, (float)width, (float)height));
+
+    return read_pixels(bridge, width, height, rgbaOut);
 }
 
 // Pointer events arrive in surface pixels; the state machine hit-tests in artboard space.

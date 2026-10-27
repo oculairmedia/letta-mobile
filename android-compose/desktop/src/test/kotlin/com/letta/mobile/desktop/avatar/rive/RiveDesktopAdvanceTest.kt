@@ -70,22 +70,22 @@ class RiveDesktopAdvanceTest {
         val before = evidence().size
         try {
             native.createFails = true
-            assertFailsWith<IllegalStateException> { RiveDesktopScene.create(native.bridge, path, true) }
+            assertFailsWith<IllegalStateException> { RiveDesktopScene.create(native.bridge, RiveLibraryPath(path), true) }
             assertEquals(before, evidence().size, "failed creation cannot claim a render")
             native.createFails = false
-            val first = RiveDesktopScene.create(native.bridge, path, true).also { scenes.add(it) }
-            val second = RiveDesktopScene.create(native.bridge, path, true).also { scenes.add(it) }
+            val first = RiveDesktopScene.create(native.bridge, RiveLibraryPath(path), true).also { scenes.add(it) }
+            val second = RiveDesktopScene.create(native.bridge, RiveLibraryPath(path), true).also { scenes.add(it) }
             assertEquals(before, evidence().size, "creation alone is not render evidence")
             native.renderResult = 1
-            assertFailsWith<IllegalStateException> { first.render(2, 2) }
+            assertFailsWith<IllegalStateException> { first.render(IntSize(2, 2)) }
             assertEquals(before, evidence().size, "failed rendering cannot claim readback")
             native.renderResult = 0
-            assertEquals(ByteArray(16).toList(), first.render(2, 2).toList())
+            assertEquals(ByteArray(16).toList(), first.render(IntSize(2, 2)).toList())
             assertEquals(before + 1, evidence().size)
-            first.render(3, 3)
-            second.render(2, 2)
+            first.render(IntSize(3, 3))
+            second.render(IntSize(2, 2))
             scenes.forEach { it.close() }
-            RiveDesktopScene.create(native.bridge, path, true).also { scenes.add(it) }.render(1, 1)
+            RiveDesktopScene.create(native.bridge, RiveLibraryPath(path), true).also { scenes.add(it) }.render(IntSize(1, 1))
             val events = evidence()
             assertEquals(before + 1, events.size, "all scenes share one process-wide report")
             assertEquals(Telemetry.Level.INFO, events.first().level)
@@ -153,15 +153,15 @@ class RiveDesktopAdvanceTest {
         val native = NativeFixture()
         val scene = RiveDesktopScene(native.bridge, Pointer(4), "linux-lifetime", advanceActivity = true)
         try {
-            scene.render(8, 8)
+            scene.render(IntSize(8, 8))
             val first = checkNotNull(native.lastBuffer)
             assertTrue(first.valid())
-            scene.render(16, 12)
+            scene.render(IntSize(16, 12))
             assertFalse(first.valid(), "viewport replacement closes the previous JNA allocation")
             val resized = checkNotNull(native.lastBuffer)
             scene.close()
             assertFalse(resized.valid(), "close releases the current JNA allocation before returning")
-            RiveThread.call { kotlin.test.assertFailsWith<IllegalStateException> { scene.render(8, 8) } }
+            RiveThread.call { kotlin.test.assertFailsWith<IllegalStateException> { scene.render(IntSize(8, 8)) } }
             scene.pointer(RivePointerEvent(RivePointer.MOVE, Offset.Zero))
             RiveThread.call { Unit }
             assertEquals(0, native.pointerCalls.get())

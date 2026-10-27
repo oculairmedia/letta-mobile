@@ -37,28 +37,9 @@ internal interface RiveBridgeNative : Library {
     fun rive_bridge_vm_set_boolean(bridge: Pointer, name: String, value: Int): Int
 
     companion object {
-        /** The platform's existing C ABI library; macOS has no native backend yet. */
-        internal fun libraryName(osName: String): String? = when {
-            osName.startsWith("Windows") -> "rive_desktop_bridge.dll"
-            osName.startsWith("Linux") -> "librive_desktop_bridge.so"
-            else -> null
-        }
-
-        /** Explicit overrides are authoritative: a typo must never load a different local bridge. */
-        internal fun findPath(osName: String, explicit: String?, resources: String?, workingDir: String): String? {
-            val name = libraryName(osName) ?: return null
-            if (explicit != null) {
-                check(java.io.File(explicit).isFile) { "Rive bridge not found: $explicit" }
-                return java.io.File(explicit).absolutePath
-            }
-            // A packaged app must use its payload; a developer's working directory cannot mask it.
-            val candidate = java.io.File(resources ?: workingDir, name)
-            return candidate.takeIf { it.isFile }?.absolutePath
-        }
-
         /** Platform library from an override, packaged resources, or the developer's working directory. */
         val PATH: String? by lazy {
-            findPath(
+            RiveLibraryLocator.findPath(
                 System.getProperty("os.name").orEmpty(),
                 System.getProperty("rive.bridge.path"),
                 System.getProperty("compose.application.resources.dir"),
@@ -68,7 +49,7 @@ internal interface RiveBridgeNative : Library {
 
         /** Missing renderers are reported explicitly; distribution inspection also requires the native payload. */
         val AVAILABLE: Boolean by lazy {
-            val name = libraryName(System.getProperty("os.name").orEmpty())
+            val name = RiveLibraryLocator.libraryName(System.getProperty("os.name").orEmpty())
             (name != null && PATH != null).also { available ->
                 if (name != null && !available) System.err.println("ERROR: Rive renderer missing: $name; set -Drive.bridge.path")
             }
@@ -99,6 +80,32 @@ internal interface RiveBridgeNative : Library {
         val ARTBOARD_BY_NAME: Boolean by lazy { exports(BridgeExport.LOAD_ARTBOARD) }
 
         val ADVANCE_ACTIVITY: Boolean by lazy { exports(BridgeExport.ADVANCE_ACTIVITY) }
+    }
+}
+
+/** Identifies the exact bridge payload used by a scene, distinct from adapter and input names. */
+@JvmInline
+internal value class RiveLibraryPath(val value: String)
+
+/** Pure library discovery, independent of JNA loading and optional export negotiation. */
+internal object RiveLibraryLocator {
+    /** The platform's existing C ABI library; macOS has no native backend yet. */
+    internal fun libraryName(osName: String): String? = when {
+        osName.startsWith("Windows") -> "rive_desktop_bridge.dll"
+        osName.startsWith("Linux") -> "librive_desktop_bridge.so"
+        else -> null
+    }
+
+    /** Explicit overrides are authoritative: a typo must never load a different local bridge. */
+    internal fun findPath(osName: String, explicit: String?, resources: String?, workingDir: String): String? {
+        val name = libraryName(osName) ?: return null
+        if (explicit != null) {
+            check(java.io.File(explicit).isFile) { "Rive bridge not found: $explicit" }
+            return java.io.File(explicit).absolutePath
+        }
+        // A packaged app must use its payload; a developer's working directory cannot mask it.
+        val candidate = java.io.File(resources ?: workingDir, name)
+        return candidate.takeIf { it.isFile }?.absolutePath
     }
 }
 

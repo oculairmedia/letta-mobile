@@ -9,6 +9,41 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <utility>
+
+// EGL discovery stays separate from context ownership: extension queries are lazy so a
+// successful hardware candidate never probes or initializes the remaining displays.
+struct EglDisplays
+{
+    PFNEGLGETPLATFORMDISPLAYEXTPROC platformDisplay = reinterpret_cast<PFNEGLGETPLATFORMDISPLAYEXTPROC>(
+        eglGetProcAddress("eglGetPlatformDisplayEXT"));
+    PFNEGLQUERYDEVICESEXTPROC queryDevices = reinterpret_cast<PFNEGLQUERYDEVICESEXTPROC>(
+        eglGetProcAddress("eglQueryDevicesEXT"));
+    PFNEGLQUERYDEVICESTRINGEXTPROC deviceString = reinterpret_cast<PFNEGLQUERYDEVICESTRINGEXTPROC>(
+        eglGetProcAddress("eglQueryDeviceStringEXT"));
+    EGLDeviceEXT devices[16];
+    EGLint count = 0;
+
+    bool enumerate()
+    {
+        if (!platformDisplay || !queryDevices) return false;
+        return queryDevices(16, devices, &count);
+    }
+
+    bool isSoftware(EGLDeviceEXT device) const
+    {
+        const char* extensions = deviceString ? deviceString(device, EGL_EXTENSIONS) : nullptr;
+        return extensions && std::strstr(extensions, "EGL_MESA_device_software");
+    }
+};
+
+struct EglCandidate
+{
+    EGLenum platform;
+    void* device;
+    std::string label;
+};
 
 struct SharedGpu
 {
@@ -34,32 +69,57 @@ struct SharedGpu
         eglReleaseThread();
     }
 
+    static std::string joinShaderSource(GLsizei count, const GLchar* const* strings, const GLint* lengths)
+    {
+        std::string source;
+        for (GLsizei i = 0; i < count; ++i)
+        {
+            const size_t size = lengths && lengths[i] >= 0 ? lengths[i] : std::strlen(strings[i]);
+            source.append(strings[i], size);
+        }
+        return source;
+    }
+
+    static std::string separateShaderTokens(const std::string& source)
+    {
+        // ASCII spelling is intentional: GLSL identifiers must not depend on the process locale.
+        constexpr std::string_view identifierChars =
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
+        std::string separated;
+        char previous = '\0';
+        for (char ch : source)
+        {
+            if (previous == ')' && identifierChars.find(ch) != std::string_view::npos) separated += ' ';
+            separated += ch;
+            previous = ch;
+        }
+        return separated;
+    }
+
     static void shaderSource(GLuint shader, GLsizei count, const GLchar* const* strings, const GLint* lengths)
     {
         // The pinned minifier emits OUT(vec2)value. Mesa rejects the resulting joined tokens;
         // a separator after ')' preserves the intended "out vec2 value" on every GL driver.
         // Join first so a source-string boundary cannot hide the same spelling.
-        std::string source;
-        for (GLsizei i = 0; i < count; ++i)
-        {
-            const size_t size = lengths && lengths[i] >= 0 ? lengths[i] : std::strlen(strings[i]);
-            for (size_t j = 0; j < size; ++j)
-            {
-                const char ch = strings[i][j];
-                const bool identifier = (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
-                    (ch >= '0' && ch <= '9') || ch == '_';
-                if (identifier && !source.empty() && source.back() == ')') source += ' ';
-                source += ch;
-            }
-        }
+        const auto source = separateShaderTokens(joinShaderSource(count, strings, lengths));
         const char* text = source.c_str();
         auto rawShaderSource = reinterpret_cast<PFNGLSHADERSOURCEPROC>(eglGetProcAddress("glShaderSource"));
         rawShaderSource(shader, 1, &text, nullptr);
     }
 
-    // A candidate owns the entire sequence. Returning any reason destroys it before Make
-    // tries another display, including failures after eglInitialize or after GL becomes current.
-    const char* initialize()
+    const char* createContext(EGLConfig config)
+    {
+        const EGLint contextAttrs[] = {EGL_CONTEXT_MAJOR_VERSION, 4, EGL_CONTEXT_MINOR_VERSION, 2,
+            EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT, EGL_NONE};
+        context = eglCreateContext(display, config, EGL_NO_CONTEXT, contextAttrs);
+        if (context == EGL_NO_CONTEXT) return "GL 4.2 core context unavailable";
+        const EGLint surfaceAttrs[] = {EGL_WIDTH, 1, EGL_HEIGHT, 1, EGL_NONE};
+        surface = eglCreatePbufferSurface(display, config, surfaceAttrs);
+        if (surface == EGL_NO_SURFACE) return "1x1 pbuffer unavailable";
+        return eglMakeCurrent(display, surface, surface, context) ? nullptr : "makeCurrent failed";
+    }
+
+    const char* initializeEgl()
     {
         if (display == EGL_NO_DISPLAY) return "display unavailable";
         if (!eglInitialize(display, nullptr, nullptr)) return "initialize failed";
@@ -71,14 +131,14 @@ struct SharedGpu
         EGLint count = 0;
         if (!eglChooseConfig(display, configAttrs, &config, 1, &count) || count == 0)
             return "RGBA8 config unavailable";
-        const EGLint contextAttrs[] = {EGL_CONTEXT_MAJOR_VERSION, 4, EGL_CONTEXT_MINOR_VERSION, 2,
-            EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT, EGL_NONE};
-        context = eglCreateContext(display, config, EGL_NO_CONTEXT, contextAttrs);
-        if (context == EGL_NO_CONTEXT) return "GL 4.2 core context unavailable";
-        const EGLint surfaceAttrs[] = {EGL_WIDTH, 1, EGL_HEIGHT, 1, EGL_NONE};
-        surface = eglCreatePbufferSurface(display, config, surfaceAttrs);
-        if (surface == EGL_NO_SURFACE) return "1x1 pbuffer unavailable";
-        if (!eglMakeCurrent(display, surface, surface, context)) return "makeCurrent failed";
+        return createContext(config);
+    }
+
+    // A candidate owns the entire sequence. Returning any reason destroys it before Make
+    // tries another display, including failures after eglInitialize or after GL becomes current.
+    const char* initialize()
+    {
+        if (const char* reason = initializeEgl()) return reason;
         if (!gladLoadCustomLoader(reinterpret_cast<GLADloadfunc>(eglGetProcAddress)))
             return "GL entry points unavailable";
         glad_glShaderSource = shaderSource;
@@ -90,47 +150,48 @@ struct SharedGpu
         return glGetError() == GL_NO_ERROR ? nullptr : "Rive GL setup error";
     }
 
+    static std::unique_ptr<SharedGpu> fromDisplay(PFNEGLGETPLATFORMDISPLAYEXTPROC platformDisplay,
+                                                 const EglCandidate& candidate, std::string& error)
+    {
+        auto gpu = std::make_unique<SharedGpu>();
+        gpu->display = platformDisplay(candidate.platform, candidate.device, nullptr);
+        if (const char* reason = gpu->initialize())
+        {
+            error += "; " + candidate.label + ": " + reason;
+            return nullptr; // RAII cleans up before the next candidate.
+        }
+        gpu->adapterName += " [" + candidate.label + "]";
+        error.clear();
+        return gpu;
+    }
+
+    static std::unique_ptr<SharedGpu> fromDevices(EglDisplays& displays, std::string& error)
+    {
+        if (!displays.enumerate()) return nullptr;
+        // Device displays avoid Xlib entirely, including its process-wide error handlers.
+        // Mesa may enumerate a software device before a real GPU. Prefer hardware explicitly.
+        for (int pass = 0; pass < 2; ++pass)
+            for (EGLint i = 0; i < displays.count; ++i)
+            {
+                const bool software = displays.isSoftware(displays.devices[i]);
+                if (software != (pass == 1)) continue;
+                const auto label = "device" + std::to_string(i) + (software ? " software" : " hardware");
+                if (auto gpu = fromDisplay(displays.platformDisplay,
+                                           {EGL_PLATFORM_DEVICE_EXT, displays.devices[i], label}, error)) return gpu;
+            }
+        return nullptr;
+    }
+
     static std::unique_ptr<SharedGpu> Make(std::string& error)
     {
         error = "Linux Rive: GPU setup unavailable";
-        auto platformDisplay = reinterpret_cast<PFNEGLGETPLATFORMDISPLAYEXTPROC>(
-            eglGetProcAddress("eglGetPlatformDisplayEXT"));
-        auto queryDevices = reinterpret_cast<PFNEGLQUERYDEVICESEXTPROC>(
-            eglGetProcAddress("eglQueryDevicesEXT"));
-        auto deviceString = reinterpret_cast<PFNEGLQUERYDEVICESTRINGEXTPROC>(
-            eglGetProcAddress("eglQueryDeviceStringEXT"));
-        auto attempt = [&](EGLenum platform, void* device, const std::string& label) {
-            auto gpu = std::make_unique<SharedGpu>();
-            gpu->display = platformDisplay(platform, device, nullptr);
-            if (const char* reason = gpu->initialize())
-            {
-                error += "; " + label + ": " + reason;
-                return std::unique_ptr<SharedGpu>(); // RAII cleans up before the next candidate.
-            }
-            gpu->adapterName += " [" + label + "]";
-            error.clear();
-            return gpu;
-        };
-        // Device displays avoid Xlib entirely, including its process-wide error handlers.
-        EGLDeviceEXT devices[16];
-        EGLint count = 0;
-        if (platformDisplay && queryDevices && queryDevices(16, devices, &count))
-        {
-            // Mesa may enumerate a software device before a real GPU. Prefer hardware explicitly.
-            for (int pass = 0; pass < 2; ++pass)
-                for (EGLint i = 0; i < count; ++i)
-                {
-                    const char* extensions = deviceString ? deviceString(devices[i], EGL_EXTENSIONS) : nullptr;
-                    const bool software = extensions && std::strstr(extensions, "EGL_MESA_device_software");
-                    if (software != (pass == 1)) continue;
-                    const auto label = "device" + std::to_string(i) + (software ? " software" : " hardware");
-                    if (auto gpu = attempt(EGL_PLATFORM_DEVICE_EXT, devices[i], label)) return gpu;
-                }
-        }
+        EglDisplays displays;
+        if (auto gpu = fromDevices(displays, error)) return gpu;
         // Mesa surfaceless is tried last, even if a device initialized but failed a later step.
-        if (platformDisplay)
+        if (displays.platformDisplay)
         {
-            if (auto gpu = attempt(EGL_PLATFORM_SURFACELESS_MESA, nullptr, "surfaceless Mesa")) return gpu;
+            if (auto gpu = fromDisplay(displays.platformDisplay,
+                                       {EGL_PLATFORM_SURFACELESS_MESA, nullptr, "surfaceless Mesa"}, error)) return gpu;
         }
         else error += "; EGL platform entry point unavailable";
         // Also release EGL thread state when discovery itself found no usable candidates.
@@ -156,7 +217,7 @@ struct LinuxTarget
 
     bool resize(uint32_t w, uint32_t h)
     {
-        if (renderTarget && width == w && height == h) return true;
+        if (renderTarget && std::make_pair(width, height) == std::make_pair(w, h)) return true;
         reset();
         GLint maxSize = 0;
         glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxSize);

@@ -2,6 +2,8 @@ package com.letta.mobile.desktop.avatar.rive
 
 import androidx.compose.ui.unit.IntSize
 import com.letta.mobile.avatar.rive.RiveInputSink
+import com.letta.mobile.avatar.rive.RiveWrite
+import com.letta.mobile.avatar.rive.RiveWriteSink
 import com.letta.mobile.ui.mascot.frame.RiveFrameScene
 import com.letta.mobile.ui.mascot.frame.RiveFrameStep
 import com.letta.mobile.ui.mascot.frame.RivePointer
@@ -28,7 +30,7 @@ class RiveDesktopScene internal constructor(
     private val handle: Pointer,
     val adapterName: String,
     private val advanceActivity: Boolean = RiveBridgeNative.ADVANCE_ACTIVITY,
-    private val libraryPath: String? = RiveBridgeNative.PATH,
+    private val libraryPath: RiveLibraryPath? = RiveBridgeNative.PATH?.let(::RiveLibraryPath),
 ) : RiveFrameScene(), AutoCloseable {
     /** The bridge's `kind` argument for a pointer event. */
     private val RivePointer.code: Int
@@ -80,7 +82,9 @@ class RiveDesktopScene internal constructor(
      * RGBA, top row first. The array is the scene's and is overwritten by the next render - read it
      * before then (the surface rasterises it into a Skia image at once).
      */
-    fun render(width: Int, height: Int, clearArgb: Int = 0): ByteArray = RiveThread.call {
+    fun render(viewport: IntSize, clearArgb: Int = 0): ByteArray = RiveThread.call {
+        val width = viewport.width
+        val height = viewport.height
         openHandle()
         val pixelCount = width.toLong() * height
         require(width > 0 && height > 0 && pixelCount <= Int.MAX_VALUE / 4) { "Invalid Rive viewport: ${width}x$height" }
@@ -97,7 +101,7 @@ class RiveDesktopScene internal constructor(
             rendererActiveReported = true
             Telemetry.event(
                 "Rive", "[mascot] Rive native renderer active:",
-                "adapter" to adapterName, "lib" to libraryPath,
+                "adapter" to adapterName, "lib" to libraryPath?.value,
                 level = Telemetry.Level.INFO,
             )
         }
@@ -110,15 +114,19 @@ class RiveDesktopScene internal constructor(
      */
     override fun renderImage(size: IntSize): Image = RiveThread.call {
         val info = ImageInfo(size.width, size.height, ColorType.RGBA_8888, ColorAlphaType.PREMUL)
-        Image.makeRaster(info, render(size.width, size.height), size.width * 4)
+        Image.makeRaster(info, render(size), size.width * 4)
     }
 
     override fun pointer(event: RivePointerEvent) =
         RiveThread.post { if (!closed) native.rive_bridge_pointer(handle, event.kind.code, event.position.x, event.position.y) }
 
-    fun fireTrigger(name: String): Boolean = RiveThread.call { native.rive_bridge_fire_trigger(openHandle(), name) == 0 }
+    fun fireTrigger(write: RiveWrite.Fire): Boolean = RiveThread.call {
+        native.rive_bridge_fire_trigger(openHandle(), write.input) == 0
+    }
 
-    fun setNumber(name: String, value: Float): Boolean = RiveThread.call { native.rive_bridge_set_number(openHandle(), name, value) == 0 }
+    fun setNumber(write: RiveWrite.Number): Boolean = RiveThread.call {
+        native.rive_bridge_set_number(openHandle(), write.input, write.value) == 0
+    }
 
     /**
      * Reads a view-model number back: the probe path of MOTION-PIPELINE section 0, where a two-way
@@ -140,25 +148,17 @@ class RiveDesktopScene internal constructor(
     }
 
     /** The view-model path [com.letta.mobile.avatar.rive.RiveAvatarRuntime] writes through. */
-    override val inputSink: RiveInputSink = object : RiveInputSink {
-        override fun setNumber(input: String, value: Float) = RiveThread.post {
-            if (!closed) native.rive_bridge_vm_set_number(handle, input, value)
-        }
+    override val inputSink: RiveInputSink = RiveWriteSink { write ->
+        RiveThread.post { if (!closed) applyWrite(write) }
+    }
 
-        override fun setBoolean(input: String, value: Boolean) = RiveThread.post {
-            if (!closed) native.rive_bridge_vm_set_boolean(handle, input, if (value) 1 else 0)
-        }
-
-        override fun setEnum(input: String, key: String) = RiveThread.post {
-            if (!closed) native.rive_bridge_vm_set_enum(handle, input, key)
-        }
-
-        override fun setColor(input: String, argb: Int) = RiveThread.post {
-            if (!closed) native.rive_bridge_vm_set_color(handle, input, argb)
-        }
-
-        override fun fire(input: String) = RiveThread.post {
-            if (!closed) native.rive_bridge_vm_fire(handle, input)
+    private fun applyWrite(write: RiveWrite) {
+        when (write) {
+            is RiveWrite.Number -> native.rive_bridge_vm_set_number(handle, write.input, write.value)
+            is RiveWrite.Bool -> native.rive_bridge_vm_set_boolean(handle, write.input, if (write.value) 1 else 0)
+            is RiveWrite.Enum -> native.rive_bridge_vm_set_enum(handle, write.input, write.key)
+            is RiveWrite.Color -> native.rive_bridge_vm_set_color(handle, write.input, write.argb)
+            is RiveWrite.Fire -> native.rive_bridge_vm_fire(handle, write.input)
         }
     }
 
@@ -183,10 +183,18 @@ class RiveDesktopScene internal constructor(
         internal var rendererActiveReported = false
 
         fun create(): RiveDesktopScene = RiveThread.call {
-            create(RiveBridgeNative.INSTANCE, checkNotNull(RiveBridgeNative.PATH), RiveBridgeNative.ADVANCE_ACTIVITY)
+            create(
+                RiveBridgeNative.INSTANCE,
+                RiveLibraryPath(checkNotNull(RiveBridgeNative.PATH)),
+                RiveBridgeNative.ADVANCE_ACTIVITY,
+            )
         }
 
-        internal fun create(native: RiveBridgeNative, libraryPath: String, advanceActivity: Boolean): RiveDesktopScene = RiveThread.call {
+        internal fun create(
+            native: RiveBridgeNative,
+            libraryPath: RiveLibraryPath,
+            advanceActivity: Boolean,
+        ): RiveDesktopScene = RiveThread.call {
             val name = ByteArray(NAME_BUFFER_BYTES)
             val handle = native.rive_bridge_create(name, name.size)
                 ?: error("rive_bridge_create failed: ${Native.toString(name)}")

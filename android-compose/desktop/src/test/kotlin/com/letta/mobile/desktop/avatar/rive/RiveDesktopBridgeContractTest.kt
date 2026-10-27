@@ -30,16 +30,16 @@ class RiveDesktopBridgeContractTest {
         try {
             val linux = File(root, "librive_desktop_bridge.so").apply { writeBytes(byteArrayOf(1)) }
             val windows = File(root, "rive_desktop_bridge.dll").apply { writeBytes(byteArrayOf(2)) }
-            assertEquals(linux.absolutePath, RiveBridgeNative.findPath("Linux", null, root.path, "/missing"))
-            assertEquals(windows.absolutePath, RiveBridgeNative.findPath("Windows 11", null, root.path, "/missing"))
-            assertEquals(null, RiveBridgeNative.findPath("Mac OS X", null, root.path, root.path))
-            assertEquals(null, RiveBridgeNative.findPath("Linux", null, File(root, "missing-package").path, root.path))
+            assertEquals(linux.absolutePath, RiveLibraryLocator.findPath("Linux", null, root.path, "/missing"))
+            assertEquals(windows.absolutePath, RiveLibraryLocator.findPath("Windows 11", null, root.path, "/missing"))
+            assertEquals(null, RiveLibraryLocator.findPath("Mac OS X", null, root.path, root.path))
+            assertEquals(null, RiveLibraryLocator.findPath("Linux", null, File(root, "missing-package").path, root.path))
             kotlin.test.assertFailsWith<IllegalStateException> {
-                RiveBridgeNative.findPath("Linux", File(root, "missing.so").path, root.path, root.path)
+                RiveLibraryLocator.findPath("Linux", File(root, "missing.so").path, root.path, root.path)
             }
-            assertEquals(windows.absolutePath, RiveBridgeNative.findPath("Linux", windows.path, root.path, root.path))
+            assertEquals(windows.absolutePath, RiveLibraryLocator.findPath("Linux", windows.path, root.path, root.path))
             linux.delete()
-            assertEquals(null, RiveBridgeNative.findPath("Linux", null, root.path, root.path))
+            assertEquals(null, RiveLibraryLocator.findPath("Linux", null, root.path, root.path))
         } finally {
             root.deleteRecursively()
         }
