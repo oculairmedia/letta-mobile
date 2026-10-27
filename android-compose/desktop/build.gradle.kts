@@ -940,33 +940,35 @@ tasks.configureEach {
 
 /*
  * The native Rive mascot renderer (avatar/renderer-rive/native/desktop). It is built outside Gradle -
- * VS 2022 plus a rive-runtime checkout, scripted by build-bridge.sh - and handed in by path:
+ * VS 2022 or Linux EGL/OpenGL, scripted by build-bridge.sh - and handed in by path:
  *   -PriveBridge=C:\path\to\rive_desktop_bridge.dll   or   LETTA_RIVE_BRIDGE_DLL
  * It is staged into the app resources, so `:desktop:run` and the installed app both find it through
  * compose.application.resources.dir (RiveBridgeNative.PATH). Without it every agent draws the
- * gradient orb, so packaging refuses to run without one unless -PallowMissingRiveBridge=true.
+ * gradient orb, so Linux packaging always requires it; Windows permits -PallowMissingRiveBridge=true.
  */
 val riveBridgeSource: String? = providers.gradleProperty("riveBridge")
+    .orElse(providers.environmentVariable("LETTA_RIVE_BRIDGE"))
     .orElse(providers.environmentVariable("LETTA_RIVE_BRIDGE_DLL"))
     .orNull
     ?.takeIf { it.isNotBlank() }
 val allowMissingRiveBridge = providers.gradleProperty("allowMissingRiveBridge").orNull.toBoolean()
-val stagedRiveBridge = desktopAppResourcesDir.map { it.file("windows/rive_desktop_bridge.dll") }
+val riveBridgeFileName = if (isWindowsHost) "rive_desktop_bridge.dll" else "librive_desktop_bridge.so"
+val stagedRiveBridge = desktopAppResourcesDir.map { it.file("$desktopRuntimePlatform/$riveBridgeFileName") }
 val stageDesktopRiveBridge = tasks.register("stageDesktopRiveBridge") {
     val source = riveBridgeSource?.let(::File)
     val target = stagedRiveBridge.get().asFile
-    enabled = isWindowsHost
+    enabled = isDesktopRuntimeHost
     inputs.property("source", riveBridgeSource.orEmpty())
     source?.takeIf { it.isFile }?.let { inputs.file(it) }
     outputs.file(target)
     doLast {
         if (source == null) {
-            // Nothing handed in: make sure a DLL staged by an earlier build does not linger silently.
+            // Nothing handed in: make sure a library staged by an earlier build does not linger silently.
             target.delete()
-            logger.lifecycle("stageDesktopRiveBridge: no -PriveBridge / LETTA_RIVE_BRIDGE_DLL; mascots fall back to orbs.")
+            logger.warn("stageDesktopRiveBridge: missing native mascot renderer; pass -PriveBridge / LETTA_RIVE_BRIDGE")
             return@doLast
         }
-        require(source.isFile) { "Rive bridge DLL not found at $source (-PriveBridge / LETTA_RIVE_BRIDGE_DLL)" }
+        require(source.isFile) { "Rive bridge not found at $source (-PriveBridge / LETTA_RIVE_BRIDGE)" }
         target.parentFile.mkdirs()
         source.copyTo(target, overwrite = true)
         logger.lifecycle("stageDesktopRiveBridge: staged $source")
@@ -984,11 +986,11 @@ tasks.configureEach {
             name.startsWith("packageReleaseDistributionForCurrentOS"))) return@configureEach
     val staged = stagedRiveBridge
     doFirst {
-        if (!isWindowsHost || allowMissingRiveBridge) return@doFirst
+        if (!isDesktopRuntimeHost || (isWindowsHost && allowMissingRiveBridge)) return@doFirst
         check(staged.get().asFile.isFile) {
-            "No rive_desktop_bridge.dll staged: this installer would ship without the mascot renderer. " +
+            "No $riveBridgeFileName staged: this installer would ship without the mascot renderer. " +
                 "Build it with avatar/renderer-rive/native/desktop/build-bridge.sh and pass " +
-                "-PriveBridge=<dll> (or LETTA_RIVE_BRIDGE_DLL), or -PallowMissingRiveBridge=true to package orbs only."
+                "-PriveBridge=<native library> (or LETTA_RIVE_BRIDGE)."
         }
     }
 }
@@ -1219,7 +1221,7 @@ val desktopJbrLauncher: Provider<JavaLauncher> = provider {
 }
 
 /** The git-ignored native Rive bridge, when one was copied into the module (see avatar/renderer-rive/native/desktop). */
-val phoneRiveBridge = layout.projectDirectory.file("rive_desktop_bridge.dll").asFile
+val phoneRiveBridge = layout.projectDirectory.file(riveBridgeFileName).asFile
 
 /** What both phone launchers share: the JBR, the app's JVM flags, the Rive bridge and its warning. */
 fun JavaExec.configurePhoneLaunch() {
@@ -1240,7 +1242,7 @@ fun JavaExec.configurePhoneLaunch() {
     } else {
         doFirst {
             logger.warn(
-                "WARNING: no rive_desktop_bridge.dll (copy it to ${phoneRiveBridge.path}, or pass -PriveBridge=<dll>); " +
+                "WARNING: no $riveBridgeFileName (copy it to ${phoneRiveBridge.path}, or pass -PriveBridge=<library>); " +
                     "mascots fall back to orbs in the phone preview.",
             )
         }

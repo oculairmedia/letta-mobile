@@ -1,10 +1,10 @@
-# Native Rive on desktop (spike, letta-mobile-0s5bi)
+# Native Rive on desktop
 
-`rive_desktop_bridge.dll` runs a `.riv` natively inside Compose Desktop, with no webview:
+`rive_desktop_bridge.dll` (Windows) or `librive_desktop_bridge.so` (Linux) runs a `.riv` natively inside Compose Desktop, with no webview:
 
 ```
 rive-runtime (state machine, data binding)
-  -> Rive Renderer, D3D11 backend, offscreen texture
+  -> Rive Renderer, D3D11 (Windows) / EGL + OpenGL (Linux), offscreen texture
   -> pixel readback (premultiplied RGBA)
   -> JNA -> Skia bitmap -> an ordinary Compose node (RiveDesktopSurface)
 ```
@@ -16,6 +16,47 @@ Canvas2D build silently draw feathered art flat.
 The Kotlin side lives in `desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/`. Its
 input sink implements the same `RiveInputSink` Android uses, so `RiveAvatarRuntime` and
 `RiveAvatarContract` are unchanged.
+
+## Building and verifying Linux (x86-64)
+
+The same pinned Rive source supports a desktop OpenGL 4.2 GPU backend. The bridge creates its
+own EGL device display, context and offscreen RGBA8 texture on the existing `rive-render` thread;
+Mesa's surfaceless display is also supported. It never borrows Compose's context, opens an X11
+window, replaces an X11 error handler, or changes compositor settings. Rive's own feathering
+shaders run before premultiplied RGBA readback, with rows flipped for the existing JNA/Skia ABI.
+
+Build prerequisites: Git, Python 3, Clang/LLVM (including the LTO linker plugin), GNU make,
+pkg-config and EGL/OpenGL development headers (`clang`, `libegl1-mesa-dev`, `libgl1-mesa-dev` on
+Ubuntu). The build downloads pinned dependencies into the supplied work directory, runs at most
+two compiler jobs and reuses its outputs. No system installation happens in the build script.
+
+```bash
+cd android-compose
+bash avatar/renderer-rive/native/desktop/build-bridge.sh avatar/renderer-rive/native/desktop/build /tmp/rive-linux
+python3 avatar/renderer-rive/native/desktop/smoke-linux.py /tmp/rive-linux/librive_desktop_bridge.so \
+  avatar/renderer-rive/src/androidMain/res/raw/mascot.riv avatar/renderer-rive/native/desktop/build/frames --require-hardware
+./gradlew :desktop:run -PriveBridge=/tmp/rive-linux/librive_desktop_bridge.so
+```
+
+`-PriveBridge=<so>` or `LETTA_RIVE_BRIDGE` stages the renderer into Linux app resources. Linux
+packaging requires it, including when `allowMissingRiveBridge` is set. Package inspection checks
+its ELF architecture/dependencies, calls it through JNA inside the shipped JVM, and renders the
+shipped asset through the C ABI. CI records labelled software OpenGL frames on runners without a
+hardware GPU; these are **not** hardware acceptance. `--require-hardware` fails on llvmpipe or
+other software implementations. A headless host with usable device EGL can render; a host without
+an EGL/OpenGL context fails explicitly rather than being counted as a rendering pass.
+
+The smoke writes PNGs, original premultiplied `.rgba` frames and `render-evidence.json`: animated
+thinking frames, shared input/identity changes, differently sized simultaneous scenes and a
+survivor after its peer closes. It then destroys/recreates the last scene to check context/cache
+teardown. Packaged frame evidence is retained with the Linux smoke artifacts.
+
+Every C ABI call stays on the serialized render thread. Scene destruction releases its target,
+artboard/state machine and view model; last-scene destruction clears the file cache before the
+shared Rive/EGL context and EGL thread state (`eglReleaseThread`, needed before JNA unload/thread
+exit). Kotlin closes replaced JNA buffers and waits for disposal to finish.
+GPU initialization failures report a reason through the existing create-call output buffer; the
+ABI signatures and Windows D3D11 renderer are unchanged.
 
 ## Building (Windows, VS 2022 MSVC)
 
@@ -111,7 +152,7 @@ checks it is in the app image and uploads it as the `rive-desktop-bridge-<run>` 
 
 ## Open questions for productionising
 
-- macOS (Metal) and Linux (Vulkan/GL) offscreen backends; the bridge is D3D11-only.
-- CI builds for macOS and Linux (Windows is built and packaged by the desktop workflow).
+- macOS (Metal) offscreen backend; Windows D3D11 and Linux EGL/OpenGL are implemented.
+- CI builds for macOS (Windows and Linux are built and packaged by the desktop workflow).
 - Readback cost at large sizes; a shared GPU texture into Skiko would remove it.
 - Pinning rive-runtime to the version rive-android ships, so both platforms read the same files.
