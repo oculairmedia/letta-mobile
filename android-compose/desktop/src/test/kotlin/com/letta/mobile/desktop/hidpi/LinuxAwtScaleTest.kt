@@ -2,6 +2,7 @@ package com.letta.mobile.desktop.hidpi
 
 import androidx.compose.ui.configureSwingGlobalsForCompose
 import androidx.compose.ui.ExperimentalComposeUiApi
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -26,6 +27,7 @@ class LinuxAwtScaleTest {
     @Test
     @OptIn(ExperimentalComposeUiApi::class)
     fun `selected Linux scale survives Compose and Skiko initialization`() {
+        assumeTrue(original["os.name"].orEmpty().contains("Linux", ignoreCase = true), "requires Linux native Skiko")
         System.setProperty("os.name", "Linux")
         System.setProperty("sun.java2d.uiScale", "2")
         System.setProperty("skiko.linux.autodpi", "true")
