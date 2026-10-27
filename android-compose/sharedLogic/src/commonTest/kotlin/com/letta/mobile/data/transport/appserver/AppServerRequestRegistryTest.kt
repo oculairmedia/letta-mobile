@@ -150,16 +150,23 @@ class AppServerRequestRegistryTest {
     @Test
     fun failAllInterruptsStreamFrameWait() = runTest {
         val registry = registry()
-        assertSendFailsOnDisconnect(
-            request = {
+        var requestFailed = false
+        val job = launch {
+            try {
                 registry.requestStream(
                     "stream-frame-failed",
                     { it as? AppServerInboundFrame.SyncResponse },
                     { true },
                 ) { }
-            },
-            disconnect = { registry.failAll(IllegalStateException("generation lost")) },
-        )
+            } catch (_: AppServerRequestFailedException) {
+                requestFailed = true
+            }
+        }
+        runCurrent()
+        registry.failAll(IllegalStateException("generation lost"))
+        runCurrent()
+        assertTrue(job.isCompleted)
+        assertTrue(requestFailed)
     }
 
     @Test
