@@ -85,14 +85,19 @@ internal class AppServerRequestRegistry(
         send: suspend () -> Unit,
     ): T {
         val pending = PendingRequest(CompletableDeferred<T>(), response)
-        return awaitRegistered(requestId, pending, send) { pending.result() }
+        return awaitRegistered(requestId, pending) {
+            withTimeout(timeoutMs.milliseconds) {
+                sendRegistered(pending, send)
+                pending.result()
+            }
+        }
     }
 
     /**
      * A request the server answers with several frames sharing one request_id, the last of
      * which [isFinal] recognises (`list_memory` pages carry `done`).
-     * Returns every matched frame in arrival order. [timeoutMs] bounds send and the first
-     * response frame as one budget, then bounds the wait for EACH later frame, so a long
+     * Returns every matched frame in arrival order. [timeoutMs] bounds send independently,
+     * then bounds the wait for EACH response frame, so a long
      * listing that keeps producing pages is never cut off, while a stalled one surfaces
      * [AppServerRequestTimeoutException] instead of a partial result.
      */
@@ -103,7 +108,8 @@ internal class AppServerRequestRegistry(
         send: suspend () -> Unit,
     ): List<T> {
         val entry = PendingStream(response, isFinal)
-        return awaitRegistered(requestId, entry, send) {
+        return awaitRegistered(requestId, entry) {
+            withTimeout(timeoutMs.milliseconds) { sendRegistered(entry, send) }
             entry.collectStream()
         }
     }
@@ -125,7 +131,6 @@ internal class AppServerRequestRegistry(
     private suspend fun <T> awaitRegistered(
         requestId: String,
         entry: Pending,
-        send: suspend () -> Unit,
         await: suspend () -> T,
     ): T = coroutineScope {
         synchronized(lock) {
@@ -141,10 +146,7 @@ internal class AppServerRequestRegistry(
         val localCollector = if (collectorJob == null) launch { routeFrames() } else null
 
         try {
-            withTimeout(timeoutMs.milliseconds) {
-                sendRegistered(entry, send)
-                await()
-            }
+            await()
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             // Must precede the CancellationException clause below:
             // TimeoutCancellationException IS a CancellationException, and

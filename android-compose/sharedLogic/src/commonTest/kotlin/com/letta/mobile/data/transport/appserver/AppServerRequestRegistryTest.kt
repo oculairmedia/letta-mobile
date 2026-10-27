@@ -455,6 +455,13 @@ class AppServerRequestRegistryTest {
         val registry = registry()
         registry.failAll(RuntimeException("first"))
         registry.failAll(RuntimeException("second"))
+        assertFailsWith<IllegalStateException> {
+            registry.request<AppServerInboundFrame.SyncResponse>(
+                requestId = "after-repeated-failure",
+                response = { it as? AppServerInboundFrame.SyncResponse },
+                send = { error("failed generation must not send") },
+            )
+        }
     }
 
     @Test
