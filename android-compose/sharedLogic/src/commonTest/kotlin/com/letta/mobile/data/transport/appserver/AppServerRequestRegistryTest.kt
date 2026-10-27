@@ -88,7 +88,7 @@ class AppServerRequestRegistryTest {
                         sendCancelled = true
                     }
                 }
-            } catch (e: Exception) {
+            } catch (e: AppServerRequestFailedException) {
                 failure = e
             }
         }
@@ -109,7 +109,7 @@ class AppServerRequestRegistryTest {
                 registry.request("cancel-send", { it as? AppServerInboundFrame.SyncResponse }) {
                     CompletableDeferred<Unit>().await()
                 }
-            } catch (e: Exception) {
+            } catch (e: CancellationException) {
                 failure = e
                 throw e
             }
