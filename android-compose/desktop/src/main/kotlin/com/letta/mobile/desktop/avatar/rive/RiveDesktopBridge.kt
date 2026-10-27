@@ -39,7 +39,7 @@ internal interface RiveBridgeNative : Library {
     companion object {
         /** Platform library from an override, packaged resources, or the developer's working directory. */
         val PATH: String? by lazy {
-            RiveLibraryLocator.findPath(
+            RiveLibraryLocator.findPathOrNull(
                 System.getProperty("os.name").orEmpty(),
                 System.getProperty("rive.bridge.path"),
                 System.getProperty("compose.application.resources.dir"),
@@ -50,7 +50,7 @@ internal interface RiveBridgeNative : Library {
         /** Missing renderers are reported explicitly; distribution inspection also requires the native payload. */
         val AVAILABLE: Boolean by lazy {
             val name = RiveLibraryLocator.libraryName(System.getProperty("os.name").orEmpty())
-            (name != null && PATH != null).also { available ->
+            RiveLibraryLocator.isAvailable(name, PATH).also { available ->
                 if (name != null && !available) System.err.println("ERROR: Rive renderer missing: $name; set -Drive.bridge.path")
             }
         }
@@ -95,6 +95,15 @@ internal object RiveLibraryLocator {
         osName.startsWith("Linux") -> "librive_desktop_bridge.so"
         else -> null
     }
+
+    /** True only when the platform has a bridge and its library was resolved; never throws. */
+    internal fun isAvailable(name: String?, path: String?): Boolean = name != null && path != null
+
+    /** The resolved path, or null when discovery fails (a bad explicit override included) instead of throwing. */
+    internal fun findPathOrNull(osName: String, explicit: String?, resources: String?, workingDir: String): String? =
+        runCatching { findPath(osName, explicit, resources, workingDir) }
+            .onFailure { System.err.println("ERROR: ${it.message}") }
+            .getOrNull()
 
     /** Explicit overrides are authoritative: a typo must never load a different local bridge. */
     internal fun findPath(osName: String, explicit: String?, resources: String?, workingDir: String): String? {

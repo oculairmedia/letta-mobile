@@ -356,12 +356,7 @@ jobs:
         working-directory: .
         run: python3 scripts/tests/test_desktop_packaging.py
 
-      - name: Cache pinned Linux Rive build
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/rive-linux
-          key: ubuntu-22.04-rive-gl-${{ hashFiles('android-compose/avatar/renderer-rive/native/desktop/rive-runtime.version', 'android-compose/avatar/renderer-rive/native/desktop/build-linux.sh', 'android-compose/avatar/renderer-rive/native/desktop/tools/**') }}
-
+      # No build cache here: a release artifact must be built from the pinned source, never from objects another run wrote.
       - name: Build and render Linux Rive bridge
         run: |
           bash avatar/renderer-rive/native/desktop/build-bridge.sh "$RUNNER_TEMP/rive-linux" "$RUNNER_TEMP/rive-out"
