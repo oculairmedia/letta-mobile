@@ -258,6 +258,8 @@ object Telemetry {
     }
 
     private fun logToLogcat(ev: Event) {
+        // Browser/desktop fallback output is not a debug sink. Keep debug events in the ring only.
+        if (delegate == null && ev.level == Level.DEBUG) return
         val tagStr = "$TAG_PREFIX/${ev.tag}"
         val body = buildString {
             append(ev.name)
