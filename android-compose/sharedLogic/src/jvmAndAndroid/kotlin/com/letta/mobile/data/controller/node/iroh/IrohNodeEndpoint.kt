@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.model.HostId
 import com.letta.mobile.data.transport.iroh.IrohDiagnostics
@@ -108,7 +109,7 @@ class IrohNodeEndpoint(
      */
     fun agentChangeTarget(): AgentChangeTarget = AgentChangeTarget { frame ->
         val result = connectionRegistry.broadcast(frame) { it.receivesAgentEvents() }
-        Telemetry.event("IrohNode", "agent_updated.broadcast", "recipients" to result.recipients, "delivered" to result.delivered)
+        Telemetry.event("IrohNode", "agent_updated.broadcast", "recipients" attr result.recipients, "delivered" attr result.delivered)
     }
 
     /**
@@ -117,7 +118,12 @@ class IrohNodeEndpoint(
      */
     fun conversationChangeTarget(): ConversationChangeTarget = ConversationChangeTarget { frame ->
         val result = connectionRegistry.broadcast(frame) { it.receivesConversationEvents() }
-        Telemetry.event("IrohNode", "conversation_updated.broadcast", "recipients" to result.recipients, "delivered" to result.delivered)
+        Telemetry.event(
+            "IrohNode",
+            "conversation_updated.broadcast",
+            "recipients" attr result.recipients,
+            "delivered" attr result.delivered,
+        )
     }
 
     /**
@@ -244,9 +250,9 @@ class IrohNodeEndpoint(
                 override suspend fun onChange(addr: EndpointAddr) {
                     Telemetry.event(
                         "IrohNode", "addr.changed",
-                        "nodeId" to nodeIdHex(addr),
-                        "relay" to (addr.relayUrl() ?: ""),
-                        "directAddresses" to addr.directAddresses().joinToString(","),
+                        "nodeId" attr nodeIdHex(addr),
+                        "relay" attr (addr.relayUrl() ?: ""),
+                        "directAddresses" attr addr.directAddresses().joinToString(","),
                     )
                 }
             })
@@ -254,7 +260,7 @@ class IrohNodeEndpoint(
         runCatching {
             ep.watchHomeRelay(object : HomeRelayCallback {
                 override suspend fun onChange(relays: List<String>) {
-                    Telemetry.event("IrohNode", "homeRelay.changed", "relays" to relays.joinToString(","))
+                    Telemetry.event("IrohNode", "homeRelay.changed", "relays" attr relays.joinToString(","))
                 }
             })
         }
@@ -272,10 +278,10 @@ class IrohNodeEndpoint(
         val endpointAddr = ep.addr()
         Telemetry.event(
             "IrohNode", "endpoint.status",
-            "status" to status,
-            "nodeId" to nodeIdHex(endpointAddr),
-            "relay" to (endpointAddr.relayUrl() ?: ""),
-            "directAddresses" to endpointAddr.directAddresses().joinToString(","),
+            "status" attr status,
+            "nodeId" attr nodeIdHex(endpointAddr),
+            "relay" attr (endpointAddr.relayUrl() ?: ""),
+            "directAddresses" attr endpointAddr.directAddresses().joinToString(","),
         )
     }
 
@@ -283,7 +289,12 @@ class IrohNodeEndpoint(
         IrohDiagnostics.endpointIdHex(endpointAddr.id())
 
     private val irohExceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        Telemetry.event("IrohNode", "crash.caught", "error" to (throwable.message ?: throwable.toString()), "class" to throwable::class.simpleName)
+        Telemetry.event(
+            "IrohNode",
+            "crash.caught",
+            "error" attr (throwable.message ?: throwable.toString()),
+            "class" attr throwable::class.simpleName,
+        )
     }
 
     fun start(controller: AppServerController) {
@@ -325,7 +336,12 @@ class IrohNodeEndpoint(
                     throw e
                 } catch (e: Exception) {
                     if (!isActive) break
-                    Telemetry.event("IrohNode", "incoming.accept.failed", "error" to (e.message ?: e.toString()), "class" to e::class.simpleName)
+                    Telemetry.event(
+                        "IrohNode",
+                        "incoming.accept.failed",
+                        "error" attr (e.message ?: e.toString()),
+                        "class" attr e::class.simpleName,
+                    )
                     delay(ACCEPT_FAILURE_RETRY_MS.milliseconds)
                 }
             }
@@ -341,14 +357,14 @@ class IrohNodeEndpoint(
             offeredAlpn = peerAlpn.decodeToString()
             val connection = withTimeout(HANDSHAKE_TIMEOUT_MS.milliseconds) { accepting.connect() }
             val remoteId = IrohDiagnostics.endpointIdHex(connection.remoteId())
-            Telemetry.event("IrohNode", "incoming.connected", "remoteEndpointId" to remoteId)
+            Telemetry.event("IrohNode", "incoming.connected", "remoteEndpointId" attr remoteId)
             val handler = protocolHandlers.firstOrNull { it.alpn.contentEquals(peerAlpn) }
             if (handler != null) {
                 serveProtocol(handler, connection, remoteId)
                 return
             }
             if (!isPeerAllowed(remoteId)) {
-                Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteId, "reason" to "peer_not_allowed")
+                Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" attr remoteId, "reason" attr "peer_not_allowed")
                 runCatching { connection.close(4403L, "peer_not_allowed".encodeToByteArray()) }
                 return
             }
@@ -393,7 +409,7 @@ class IrohNodeEndpoint(
         remoteId: String,
     ) {
         if (!handler.authorize(remoteId)) {
-            Telemetry.event("IrohNode", "protocol.rejected", "remoteEndpointId" to remoteId)
+            Telemetry.event("IrohNode", "protocol.rejected", "remoteEndpointId" attr remoteId)
             connection.close(4403L, "protocol_not_authorized".encodeToByteArray())
             return
         }
@@ -444,11 +460,11 @@ class IrohNodeEndpoint(
     ) {
         val authenticated = appServerConnections[remoteId].orEmpty().any { it.isAuthenticated }
         if (!authenticated) {
-            Telemetry.event("IrohNode", "canvas.rejected", "remoteEndpointId" to remoteId, "reason" to "not_authenticated")
+            Telemetry.event("IrohNode", "canvas.rejected", "remoteEndpointId" attr remoteId, "reason" attr "not_authenticated")
             runCatching { connection.close(4401L, "not_authenticated".encodeToByteArray()) }
             return
         }
-        Telemetry.event("IrohNode", "canvas.accepted", "remoteEndpointId" to remoteId, "alpn" to alpn.decodeToString())
+        Telemetry.event("IrohNode", "canvas.accepted", "remoteEndpointId" attr remoteId, "alpn" attr alpn.decodeToString())
         relay.accept(alpn, connection, origin = remoteId, hostNodeId = HostId(nodeIdHex()))
     }
 

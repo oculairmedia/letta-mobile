@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline.snapshot
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.timeline.ApprovalDecision
@@ -49,7 +50,7 @@ object TimelineSnapshotCodec {
         }.onFailure { error ->
             Telemetry.error(
                 "TimelineSnapshotCodec", "decode.corruptPayload", error,
-                "payloadLength" to payload.length,
+                "payloadLength" attr payload.length,
             )
         }.getOrNull()
     }
@@ -58,8 +59,8 @@ object TimelineSnapshotCodec {
         if (envelope.schemaVersion > StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION) {
             Telemetry.event(
                 "TimelineSnapshotCodec", "decode.unsupportedFutureSchema",
-                "schemaVersion" to envelope.schemaVersion,
-                "targetVersion" to StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION,
+                "schemaVersion" attr envelope.schemaVersion,
+                "targetVersion" attr StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION,
                 level = Telemetry.Level.WARN,
             )
             return null
@@ -328,8 +329,8 @@ private suspend fun persistImageBody(
 } catch (error: Exception) {
     Telemetry.error(
         "TimelineImageBody", "persist.failed", error,
-        "scope" to scope.storageKey,
-        "base64Length" to base64.length,
+        "scope" attr scope.storageKey,
+        "base64Length" attr base64.length,
     )
     null
 }
@@ -378,7 +379,7 @@ suspend fun StoredTimelineEvent.toConfirmedTimelineEventWithImageBodies(
             val resolved = if (pointer.byteSize == reference.decodedBytes) bodies?.resolveImage(reference) else null
             if (resolved == null) com.letta.mobile.util.Telemetry.event(
                 "TimelineImageBody", "resolve.unavailable",
-                "bytes" to reference.decodedBytes,
+                "bytes" attr reference.decodedBytes,
                 level = com.letta.mobile.util.Telemetry.Level.WARN,
             )
             pointer.copy(thumbnailBase64 = resolved)

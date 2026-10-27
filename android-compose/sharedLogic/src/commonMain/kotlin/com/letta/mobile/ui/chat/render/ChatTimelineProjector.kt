@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.render
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.a2ui.A2uiHistoryExtractor
 import com.letta.mobile.data.a2ui.A2uiMessage
 import com.letta.mobile.data.chat.projection.CanvasArtifactReceipt
@@ -522,11 +523,11 @@ class ChatTimelineProjector {
                 Telemetry.event(
                     "TimelineSync",
                     "uiProjection.suppressed",
-                    "conversationId" to timeline.conversationId,
-                    "eventsTotal" to timeline.events.size,
-                    "suppressedRunCount" to suppressedProjectionTick,
-                    "toolCardCount" to projection.toolCardCount,
-                    "isStreaming" to previousState.isStreaming,
+                    "conversationId" attr timeline.conversationId,
+                    "eventsTotal" attr timeline.events.size,
+                    "suppressedRunCount" attr suppressedProjectionTick,
+                    "toolCardCount" attr projection.toolCardCount,
+                    "isStreaming" attr previousState.isStreaming,
                 )
             }
             return
@@ -539,23 +540,23 @@ class ChatTimelineProjector {
         Telemetry.event(
             "TimelineSync",
             "uiProjection.snapshot",
-            "conversationId" to timeline.conversationId,
-            "eventsTotal" to timeline.events.size,
-            "eventsReused" to projection.eventsReused,
-            "eventsProjected" to projection.eventsProjected,
-            "prefixEventsChecked" to projection.prefixEventsChecked,
-            "messageCount" to projection.ui.size,
-            "prefixCount" to prefix.size,
-            "toolCardCount" to projection.toolCardCount,
-            "fastPath" to projection.fastPath,
-            "isStreaming" to previousState.isStreaming,
-            "isLoadingMessages" to previousState.isLoadingMessages,
-            "isLoadingOlderMessages" to previousState.isLoadingOlderMessages,
-            "isHydrating" to previousState.isLoadingMessages,
+            "conversationId" attr timeline.conversationId,
+            "eventsTotal" attr timeline.events.size,
+            "eventsReused" attr projection.eventsReused,
+            "eventsProjected" attr projection.eventsProjected,
+            "prefixEventsChecked" attr projection.prefixEventsChecked,
+            "messageCount" attr projection.ui.size,
+            "prefixCount" attr prefix.size,
+            "toolCardCount" attr projection.toolCardCount,
+            "fastPath" attr projection.fastPath,
+            "isStreaming" attr previousState.isStreaming,
+            "isLoadingMessages" attr previousState.isLoadingMessages,
+            "isLoadingOlderMessages" attr previousState.isLoadingOlderMessages,
+            "isHydrating" attr previousState.isLoadingMessages,
             // The timeline observer is downstream of reconcile emissions today;
             // no in-flight reconcile flag is exposed here yet. Keep the field
             // present so load-pressure telemetry has a stable schema.
-            "isReconciling" to false,
+            "isReconciling" attr false,
             durationMs = kotlin.time.Clock.System.now().toEpochMilliseconds() - startedAtMs,
         )
     }

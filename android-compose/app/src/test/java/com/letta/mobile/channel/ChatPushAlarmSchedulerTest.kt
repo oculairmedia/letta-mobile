@@ -1,5 +1,7 @@
 package com.letta.mobile.channel
 
+import com.letta.mobile.util.textOrNull
+
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
@@ -22,6 +24,18 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
 class ChatPushAlarmSchedulerTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     private lateinit var context: Context
     private lateinit var appContext: Context
@@ -63,7 +77,7 @@ class ChatPushAlarmSchedulerTest {
         val events = Telemetry.snapshot()
         val event = events.firstOrNull { it.tag == "ChatPushAlarm" && it.name == "scheduleSkipped" }
         assertNotNull(event)
-        assertEquals("missingAlarmManager", event!!.attrs["reason"])
+        assertEquals("missingAlarmManager", event!!.attrs["reason"]?.textOrNull)
     }
 
     @Test
@@ -77,7 +91,7 @@ class ChatPushAlarmSchedulerTest {
         val events = Telemetry.snapshot()
         val event = events.firstOrNull { it.tag == "ChatPushAlarm" && it.name == "scheduleSkipped" }
         assertNotNull(event)
-        assertEquals("missingPendingIntent", event!!.attrs["reason"])
+        assertEquals("missingPendingIntent", event!!.attrs["reason"]?.textOrNull)
     }
 
     @Test
@@ -96,7 +110,7 @@ class ChatPushAlarmSchedulerTest {
         val events = Telemetry.snapshot()
         val event = events.firstOrNull { it.tag == "ChatPushAlarm" && it.name == "scheduled" }
         assertNotNull(event)
-        assertEquals(15L, event!!.attrs["intervalMinutes"])
+        assertEquals(15L, event!!.attrs["intervalMinutes"]?.textOrNull)
     }
 
     @Test

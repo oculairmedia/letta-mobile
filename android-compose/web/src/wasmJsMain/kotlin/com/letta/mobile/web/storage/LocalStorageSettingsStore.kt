@@ -1,5 +1,6 @@
 package com.letta.mobile.web.storage
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.util.Telemetry
@@ -48,7 +49,7 @@ class LocalStorageSettingsStore(private val prefix: String = DEFAULT_PREFIX) : S
             action()
         } catch (error: JsException) {
             available = false
-            Telemetry.error(TAG, "unavailable", error, "operation" to what)
+            Telemetry.error(TAG, "unavailable", error, "operation" attr what)
             null
         }
     }

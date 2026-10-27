@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
@@ -31,10 +32,10 @@ internal class IncomingTurnProjection(
         val resolution = turnRegistry.resolveDelta(event, binding?.state, foreground.visibleConversation)
         Telemetry.event(
             "IrohGate", "gate3.coordinatorMessageDelta",
-            "resolvedConversationId" to resolution?.conversation?.value,
-            "messageId" to event.message.id,
-            "messageType" to event.message.messageType,
-            "isReplay" to event.isReplay,
+            "resolvedConversationId" attr resolution?.conversation?.value,
+            "messageId" attr event.message.id,
+            "messageType" attr event.message.messageType,
+            "isReplay" attr event.isReplay,
         )
         if (resolution == null) {
             preConversationMessageDeltas.addLast(event)
@@ -48,9 +49,9 @@ internal class IncomingTurnProjection(
             // latching typing here re-lit Thinking/Stop run with no terminal left to clear them.
             Telemetry.event(
                 "AdminChatVM", "ws.event.retiredTurnTailDelta",
-                "turnId" to event.turnId,
-                "messageType" to event.message.messageType,
-                "conversationId" to resolution.conversation.value,
+                "turnId" attr event.turnId,
+                "messageType" attr event.message.messageType,
+                "conversationId" attr resolution.conversation.value,
             )
             return null
         }
@@ -79,9 +80,9 @@ internal class IncomingTurnProjection(
             }
             Telemetry.event(
                 "AdminChatVM", "ws.turnStarted.staleOtidSettled",
-                "staleOtid" to staleOtid,
-                "newTurnId" to event.turnId,
-                "conversationId" to effectiveConversationId,
+                "staleOtid" attr staleOtid,
+                "newTurnId" attr event.turnId,
+                "conversationId" attr effectiveConversationId,
             )
         }
         turnRegistry.lastActiveConversationId = effectiveConversationId
@@ -130,11 +131,11 @@ internal class IncomingTurnProjection(
         state.bufferError(event)
         Telemetry.event(
             "AdminChatVM", "ws.error.buffered",
-            "conversationId" to state.conversationId,
-            "code" to event.code,
-            "message" to (event.message),
-            "turnId" to (event.turnId ?: ""),
-            "runId" to (event.runId ?: ""),
+            "conversationId" attr state.conversationId,
+            "code" attr event.code,
+            "message" attr (event.message),
+            "turnId" attr (event.turnId ?: ""),
+            "runId" attr (event.runId ?: ""),
         )
         return true
     }
@@ -165,17 +166,17 @@ internal class IncomingTurnProjection(
         repaired.onSuccess {
             Telemetry.event(
                 "AdminChatVM", "ws.cursorExpired.repaired",
-                "conversationId" to conversation.value,
-                "afterSeq" to (event.afterSeq ?: -1L),
-                "oldestSeq" to (event.oldestSeq ?: -1L),
-                "lastSeq" to (event.lastSeq ?: -1L),
+                "conversationId" attr conversation.value,
+                "afterSeq" attr (event.afterSeq ?: -1L),
+                "oldestSeq" attr (event.oldestSeq ?: -1L),
+                "lastSeq" attr (event.lastSeq ?: -1L),
             )
             foreground.error(conversation, null)
         }.onFailure { failure ->
             if (failure is CancellationException) throw failure
             Telemetry.error(
                 "AdminChatVM", "ws.cursorExpired.repairFailed", failure,
-                "conversationId" to conversation.value,
+                "conversationId" attr conversation.value,
             )
             foreground.error(conversation, "Timeline repair failed: ${failure.message ?: "unknown"}")
         }

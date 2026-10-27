@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -144,10 +145,10 @@ internal class AppServerQueueHygiene(
         if (next.paused && !wasPaused) {
             Telemetry.event(
                 TELEMETRY_TAG, "queue.paused",
-                "key" to key.toString(),
-                "items" to next.items.size,
-                "pausedItems" to next.items.count { it.paused },
-                "ownItems" to next.items.count { item -> item.clientMessageId?.let(::isOwnInput) == true },
+                "key" attr key.toString(),
+                "items" attr next.items.size,
+                "pausedItems" attr next.items.count { it.paused },
+                "ownItems" attr next.items.count { item -> item.clientMessageId?.let(::isOwnInput) == true },
             )
         }
         // An item that left the queue is no longer ours to clean up.
@@ -186,8 +187,8 @@ internal class AppServerQueueHygiene(
         if (item == null) {
             Telemetry.event(
                 TELEMETRY_TAG, "queue.item_not_found",
-                "key" to key.toString(),
-                "clientMessageId" to clientMessageId,
+                "key" attr key.toString(),
+                "clientMessageId" attr clientMessageId,
                 level = Telemetry.Level.WARN,
             )
             return false
@@ -205,10 +206,10 @@ internal class AppServerQueueHygiene(
         val success = response?.success == true
         Telemetry.event(
             TELEMETRY_TAG, "queue.item_removed",
-            "key" to key.toString(),
-            "itemId" to item.id,
-            "clientMessageId" to clientMessageId,
-            "success" to success,
+            "key" attr key.toString(),
+            "itemId" attr item.id,
+            "clientMessageId" attr clientMessageId,
+            "success" attr success,
             level = if (success) Telemetry.Level.INFO else Telemetry.Level.WARN,
         )
         if (!success) return false
@@ -230,10 +231,10 @@ internal class AppServerQueueHygiene(
         }
         Telemetry.event(
             TELEMETRY_TAG, "queue.resumed",
-            "key" to key.toString(),
-            "success" to (response?.success == true),
-            "resumed" to response?.resumed,
-            "error" to response?.error,
+            "key" attr key.toString(),
+            "success" attr (response?.success == true),
+            "resumed" attr response?.resumed,
+            "error" attr response?.error,
             level = if (response?.success == true) Telemetry.Level.INFO else Telemetry.Level.WARN,
         )
     }
@@ -247,9 +248,9 @@ internal class AppServerQueueHygiene(
         } catch (error: Exception) {
             Telemetry.event(
                 TELEMETRY_TAG, "queue.command_failed",
-                "key" to key.toString(),
-                "command" to command,
-                "error" to (error.message ?: error::class.simpleName),
+                "key" attr key.toString(),
+                "command" attr command,
+                "error" attr (error.message ?: error::class.simpleName),
                 level = Telemetry.Level.WARN,
             )
             null

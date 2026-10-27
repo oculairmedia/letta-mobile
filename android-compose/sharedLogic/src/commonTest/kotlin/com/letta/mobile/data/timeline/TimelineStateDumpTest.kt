@@ -1,5 +1,9 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.numberOrNull
+
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
 import kotlin.test.AfterTest
@@ -9,6 +13,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class TimelineStateDumpTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     @BeforeTest
     fun setUp() {
@@ -41,9 +57,9 @@ class TimelineStateDumpTest {
         val event = snapshot.first()
         assertEquals("TimelineState", event.tag)
         assertEquals("testPhase.summary", event.name)
-        assertEquals("conv1", event.attrs["conversationId"])
-        assertEquals(0, event.attrs["eventCount"])
-        assertEquals("<null>", event.attrs["liveCursor"])
+        assertEquals("conv1", event.attrs["conversationId"]?.textOrNull)
+        assertEquals(0, event.attrs["eventCount"]?.numberOrNull)
+        assertEquals("<null>", event.attrs["liveCursor"]?.textOrNull)
     }
 
     @Test
@@ -80,25 +96,25 @@ class TimelineStateDumpTest {
         val summary = snapshot[0]
         assertEquals("TimelineState", summary.tag)
         assertEquals("testPhase.summary", summary.name)
-        assertEquals(2, summary.attrs["eventCount"])
-        assertEquals("cursor_1", summary.attrs["liveCursor"])
+        assertEquals(2, summary.attrs["eventCount"]?.numberOrNull)
+        assertEquals("cursor_1", summary.attrs["liveCursor"]?.textOrNull)
         
         val localDump = snapshot[1]
         assertEquals("testPhase.event", localDump.name)
-        assertEquals("Local", localDump.attrs["kind"])
-        assertEquals(1.0, localDump.attrs["position"])
-        assertEquals("otid_local", localDump.attrs["otid"])
-        assertEquals("<none>", localDump.attrs["serverId"])
-        assertEquals(26, localDump.attrs["contentLen"])
-        assertEquals("local content with newline", localDump.attrs["contentPrefix"]) // Newline replaced
+        assertEquals("Local", localDump.attrs["kind"]?.textOrNull)
+        assertEquals(1.0, localDump.attrs["position"]?.numberOrNull)
+        assertEquals("otid_local", localDump.attrs["otid"]?.textOrNull)
+        assertEquals("<none>", localDump.attrs["serverId"]?.textOrNull)
+        assertEquals(26, localDump.attrs["contentLen"]?.numberOrNull)
+        assertEquals("local content with newline", localDump.attrs["contentPrefix"]?.textOrNull) // Newline replaced
         
         val confDump = snapshot[2]
         assertEquals("testPhase.event", confDump.name)
-        assertEquals("Confirmed", confDump.attrs["kind"])
-        assertEquals(2.0, confDump.attrs["position"])
-        assertEquals("otid_conf", confDump.attrs["otid"])
-        assertEquals("srv_1", confDump.attrs["serverId"])
-        assertEquals(50, confDump.attrs["contentLen"])
-        assertEquals("1234567890123456789012345678901234567890", confDump.attrs["contentPrefix"]) // Truncated to 40
+        assertEquals("Confirmed", confDump.attrs["kind"]?.textOrNull)
+        assertEquals(2.0, confDump.attrs["position"]?.numberOrNull)
+        assertEquals("otid_conf", confDump.attrs["otid"]?.textOrNull)
+        assertEquals("srv_1", confDump.attrs["serverId"]?.textOrNull)
+        assertEquals(50, confDump.attrs["contentLen"]?.numberOrNull)
+        assertEquals("1234567890123456789012345678901234567890", confDump.attrs["contentPrefix"]?.textOrNull) // Truncated to 40
     }
 }

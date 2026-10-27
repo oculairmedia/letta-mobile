@@ -1,5 +1,7 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.controller.node.FakeAppServerController
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
@@ -46,6 +48,18 @@ import kotlin.time.Duration.Companion.seconds
  * Server ALPN (one endpoint, one relay registration, demultiplexed by ALPN).
  */
 class IrohAgentMessageReceiveE2ETest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     @Before fun requireOptIn() {
         assumeTrue("set -DrunIrohLiveE2E=true", System.getProperty("runIrohLiveE2E") == "true")
@@ -151,15 +165,15 @@ class IrohAgentMessageReceiveE2ETest {
         // The recv and route telemetry must pair 1:1 (a route without a recv is a bug).
         val recvEvents = com.letta.mobile.util.Telemetry.events.value
             .drop(initialEventCount)
-            .filter { it.name == "a2a.recv" && it.attrs["msgId"] == "m-1" }
+            .filter { it.name == "a2a.recv" && it.attrs["msgId"]?.textOrNull == "m-1" }
         assertEquals(
             1,
             recvEvents.size,
             "exactly one a2a.recv event for the inbound message; got: $recvEvents",
         )
-        assertEquals("agent-sender", recvEvents[0].attrs["fromAgentId"])
-        assertEquals("agent-recv", recvEvents[0].attrs["toAgentId"])
-        assertEquals("m-1", recvEvents[0].attrs["msgId"])
+        assertEquals("agent-sender", recvEvents[0].attrs["fromAgentId"]?.textOrNull)
+        assertEquals("agent-recv", recvEvents[0].attrs["toAgentId"]?.textOrNull)
+        assertEquals("m-1", recvEvents[0].attrs["msgId"]?.textOrNull)
         Unit
     }
 

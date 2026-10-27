@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
@@ -62,8 +63,8 @@ internal suspend fun runStreamSubscriber(
                 // so budget/dispatcher starvation can be verified.
                 Telemetry.event(
                     "TimelineSync", "streamSubscriber.opened",
-                    "conversationId" to conversationId,
-                    "activeStreamCount" to activeStreamCountOnOpen,
+                    "conversationId" attr conversationId,
+                    "activeStreamCount" attr activeStreamCountOnOpen,
                 )
                 var lastLivenessAtMs = runOpenedAtMs
                 coroutineScope {
@@ -79,11 +80,11 @@ internal suspend fun runStreamSubscriber(
                             streamTimedOut = true
                             Telemetry.event(
                                 "TimelineSync", "streamSubscriber.silenceTimeout",
-                                "conversationId" to conversationId,
-                                "silenceMs" to timedOutSilenceMs,
-                                "timeoutMs" to streamSilenceTimeoutMs,
-                                "eventsReceived" to runEventsCount,
-                                "heartbeatsReceived" to runHeartbeatCount,
+                                "conversationId" attr conversationId,
+                                "silenceMs" attr timedOutSilenceMs,
+                                "timeoutMs" attr streamSilenceTimeoutMs,
+                                "eventsReceived" attr runEventsCount,
+                                "heartbeatsReceived" attr runHeartbeatCount,
                             )
                             frames.cancel(CancellationException("SSE silence timeout"))
                             break
@@ -101,9 +102,9 @@ internal suspend fun runStreamSubscriber(
                                     lastHeartbeatTelemetryAtMs = now
                                     Telemetry.event(
                                         "TimelineSync", "streamSubscriber.heartbeat",
-                                        "conversationId" to conversationId,
-                                        "sinceOpenMs" to (now - runOpenedAtMs),
-                                        "heartbeatsReceived" to runHeartbeatCount,
+                                        "conversationId" attr conversationId,
+                                        "sinceOpenMs" attr (now - runOpenedAtMs),
+                                        "heartbeatsReceived" attr runHeartbeatCount,
                                     )
                                 }
                             }
@@ -113,9 +114,9 @@ internal suspend fun runStreamSubscriber(
                                 runEventsCount++
                                 Telemetry.event(
                                     "TimelineSync", "streamSubscriber.eventReceived",
-                                    "conversationId" to conversationId,
-                                    "messageType" to message.messageType,
-                                    "runId" to (message.runId ?: "<null>"),
+                                    "conversationId" attr conversationId,
+                                    "messageType" attr message.messageType,
+                                    "runId" attr (message.runId ?: "<null>"),
                                 )
                                 // Detect a new run_id: this is a run we didn't start
                                 // ourselves (the locally-initiated send path tracks its
@@ -131,8 +132,8 @@ internal suspend fun runStreamSubscriber(
                                     runCatching { reconcileForExternalRun(runId) }.onFailure { t ->
                                         Telemetry.error(
                                             "TimelineSync", "externalRunReconcile.failed", t,
-                                            "conversationId" to conversationId,
-                                            "runId" to runId,
+                                            "conversationId" attr conversationId,
+                                            "runId" attr runId,
                                         )
                                     }
                                 }
@@ -154,11 +155,11 @@ internal suspend fun runStreamSubscriber(
                 val reconnectDelayMs = STREAM_BACKOFF_START_MS + Random.nextLong(STREAM_BACKOFF_START_MS)
                 Telemetry.event(
                     "TimelineSync", "streamSubscriber.watchdogReconnect",
-                    "conversationId" to conversationId,
-                    "reason" to "silenceTimeout",
-                    "silenceMs" to timedOutSilenceMs,
-                    "delayMs" to reconnectDelayMs,
-                    "activeStreamCount" to activeStreamCountAfterClose,
+                    "conversationId" attr conversationId,
+                    "reason" attr "silenceTimeout",
+                    "silenceMs" attr timedOutSilenceMs,
+                    "delayMs" attr reconnectDelayMs,
+                    "activeStreamCount" attr activeStreamCountAfterClose,
                 )
                 delay(reconnectDelayMs.milliseconds)
                 continue
@@ -170,11 +171,11 @@ internal suspend fun runStreamSubscriber(
             // detect runs that close with zero events (mechanism broken).
             Telemetry.event(
                 "TimelineSync", "streamSubscriber.closed",
-                "conversationId" to conversationId,
-                "durationMs" to (timelineCurrentTimeMillis() - runOpenedAtMs),
-                "eventsReceived" to runEventsCount,
-                "heartbeatsReceived" to runHeartbeatCount,
-                "activeStreamCount" to activeStreamCountAfterClose,
+                "conversationId" attr conversationId,
+                "durationMs" attr (timelineCurrentTimeMillis() - runOpenedAtMs),
+                "eventsReceived" attr runEventsCount,
+                "heartbeatsReceived" attr runHeartbeatCount,
+                "activeStreamCount" attr activeStreamCountAfterClose,
             )
             backoffMs = STREAM_BACKOFF_START_MS
         } catch (e: CancellationException) {
@@ -185,8 +186,8 @@ internal suspend fun runStreamSubscriber(
             // activity-density ratio (eventReceived / idle404).
             Telemetry.event(
                 "TimelineSync", "streamSubscriber.idle404",
-                "conversationId" to conversationId,
-                "backoffMs" to backoffMs,
+                "conversationId" attr conversationId,
+                "backoffMs" attr backoffMs,
             )
             delay(backoffMs.milliseconds)
             // letta-mobile-qv6d: idle path uses the longer cap.
@@ -194,7 +195,7 @@ internal suspend fun runStreamSubscriber(
         } catch (t: Throwable) {
             Telemetry.error(
                 "TimelineSync", "streamSubscriber.networkError", t,
-                "conversationId" to conversationId,
+                "conversationId" attr conversationId,
             )
             // M5 (data-efficiency-audit): jitter the error-path backoff so 5
             // concurrent persistent streams don't all retry on the same

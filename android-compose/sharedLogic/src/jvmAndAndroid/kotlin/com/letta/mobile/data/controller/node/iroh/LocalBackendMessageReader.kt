@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonArray
@@ -290,11 +291,11 @@ internal class LocalBackendMessageReader(
         Telemetry.event(
             "LocalBackendMessageReader",
             "message.list.transcript_truncated",
-            "path" to file.path,
-            "keptMessages" to keptMessages,
-            "scannedBytes" to scannedBytes,
-            "maxBytes" to maxTranscriptBytes,
-            "maxMessages" to maxTranscriptMessages,
+            "path" attr file.path,
+            "keptMessages" attr keptMessages,
+            "scannedBytes" attr scannedBytes,
+            "maxBytes" attr maxTranscriptBytes,
+            "maxMessages" attr maxTranscriptMessages,
             level = Telemetry.Level.WARN,
         )
     }

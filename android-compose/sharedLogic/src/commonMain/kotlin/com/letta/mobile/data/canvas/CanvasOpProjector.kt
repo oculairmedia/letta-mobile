@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElements
 import kotlinx.serialization.json.Json
@@ -694,9 +695,9 @@ object CanvasOpProjector {
     private fun reportDropped(element: JsonElement) {
         com.letta.mobile.util.Telemetry.event(
             "Canvas", "scene.elementDropped",
-            "elementId" to null,
-            "type" to null,
-            "reason" to "not a JSON object: ${element.toString().take(DROPPED_PREVIEW_CHARS)}",
+            "elementId" attr com.letta.mobile.util.TelemetryValue.Null,
+            "type" attr com.letta.mobile.util.TelemetryValue.Null,
+            "reason" attr "not a JSON object: ${element.toString().take(DROPPED_PREVIEW_CHARS)}",
             level = com.letta.mobile.util.Telemetry.Level.WARN,
         )
     }

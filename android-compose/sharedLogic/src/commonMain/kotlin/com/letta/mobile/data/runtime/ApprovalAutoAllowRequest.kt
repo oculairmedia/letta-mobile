@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.ApprovalSubmission
 import com.letta.mobile.data.meridian.MeridianShellAllowList
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
@@ -68,10 +69,10 @@ internal fun ApprovalAutoAllowRequest.autoAllowSubmission(scope: AppServerRuntim
 internal fun recordAutoAllowSkippedUnrestricted(approval: ApprovalAutoAllowRequest) {
     Telemetry.event(
         "IrohTurn", "approval.auto_allow_skipped_unrestricted",
-        "approvalId" to approval.requestId,
-        "toolCallId" to (approval.toolCallId ?: ""),
-        "tool" to (approval.toolName ?: ""),
-        "source" to approval.source,
+        "approvalId" attr approval.requestId,
+        "toolCallId" attr (approval.toolCallId ?: ""),
+        "tool" attr (approval.toolName ?: ""),
+        "source" attr approval.source,
     )
 }
 

@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.coordination
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 
 /**
@@ -183,27 +184,27 @@ internal object ChatHydrationTrace {
         Telemetry.event(
             TAG,
             name,
-            "generation" to state.generation.id,
-            "agentId" to (state.generation.identity.agentId ?: UNKNOWN),
-            "conversationId" to state.generation.identity.conversationId,
-            "backendId" to state.generation.identity.backendId,
-            "runtimeId" to state.generation.identity.runtimeId,
-            "elapsedMs" to elapsedMs(state),
-            "publicationCount" to state.published,
-            "layoutPassCount" to state.layouts,
-            "scrollCorrectionCount" to state.scrolls,
-            "thinkingTransitionCount" to state.thinkingTransitions,
-            "staleCount" to state.stale,
-            "missingOptionalSources" to details.missingOptionalSources,
-            "commitReason" to details.commitReason,
-            "source" to details.source,
-            "sourceLatencyMs" to details.sourceLatencyMs,
-            "sourceCount" to details.sourceCount,
-            "messageCount" to details.messageCount,
-            "activity" to details.activity,
-            "renderItemCount" to details.renderItemCount,
-            "scrollCorrection" to details.scrollCorrection,
-            "isStale" to details.isStale,
+            "generation" attr state.generation.id,
+            "agentId" attr (state.generation.identity.agentId ?: UNKNOWN),
+            "conversationId" attr state.generation.identity.conversationId,
+            "backendId" attr state.generation.identity.backendId,
+            "runtimeId" attr state.generation.identity.runtimeId,
+            "elapsedMs" attr elapsedMs(state),
+            "publicationCount" attr state.published,
+            "layoutPassCount" attr state.layouts,
+            "scrollCorrectionCount" attr state.scrolls,
+            "thinkingTransitionCount" attr state.thinkingTransitions,
+            "staleCount" attr state.stale,
+            "missingOptionalSources" attr details.missingOptionalSources,
+            "commitReason" attr details.commitReason,
+            "source" attr details.source,
+            "sourceLatencyMs" attr details.sourceLatencyMs,
+            "sourceCount" attr details.sourceCount,
+            "messageCount" attr details.messageCount,
+            "activity" attr details.activity,
+            "renderItemCount" attr details.renderItemCount,
+            "scrollCorrection" attr details.scrollCorrection,
+            "isStale" attr details.isStale,
             level = Telemetry.Level.DEBUG,
         )
     }

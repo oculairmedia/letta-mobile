@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.util.Telemetry
 
@@ -26,11 +27,11 @@ internal class TurnSettlementOwnership(
         if (state.isTracking && !state.reachedTerminal) {
             Telemetry.event(
                 "AdminChatVM", "ws.turnState.clearedBeforeTerminal",
-                "conversationId" to state.conversationId,
-                "reason" to reason,
-                "turnId" to (state.turnId ?: ""),
-                "runId" to (state.runId ?: ""),
-                "otid" to (state.otid ?: ""),
+                "conversationId" attr state.conversationId,
+                "reason" attr reason,
+                "turnId" attr (state.turnId ?: ""),
+                "runId" attr (state.runId ?: ""),
+                "otid" attr (state.otid ?: ""),
             )
         }
         state.retainSettledRun()

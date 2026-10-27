@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.conversations.ConversationListHost
 import com.letta.mobile.data.chat.conversations.ConversationManagement
@@ -1127,7 +1128,7 @@ class DesktopChatController(
                 }
             }
             observeConversationUpdates(transport) { frame ->
-                Telemetry.event(TELEMETRY_TAG, "roster.pushReceived", "reason" to frame.reason)
+                Telemetry.event(TELEMETRY_TAG, "roster.pushReceived", "reason" attr frame.reason)
                 rosterRefreshRequests.trySend(Unit)
             }
         }
@@ -1274,10 +1275,10 @@ class DesktopChatController(
         val selectionToSnapshotMs = System.currentTimeMillis() - selectionStart
         Telemetry.event(
             "ChatPerformance", "selection_to_snapshot",
-            "conversationId" to conversationId,
-            "durationMs" to selectionToSnapshotMs,
-            "eventCount" to snapshotEventCount,
-            "hasSnapshot" to (snapshotEventCount > 0),
+            "conversationId" attr conversationId,
+            "durationMs" attr selectionToSnapshotMs,
+            "eventCount" attr snapshotEventCount,
+            "hasSnapshot" attr (snapshotEventCount > 0),
         )
 
         timelineJob = scope.launch {
@@ -1297,8 +1298,8 @@ class DesktopChatController(
             val refreshDurationMs = System.currentTimeMillis() - refreshStart
             Telemetry.event(
                 "ChatPerformance", "remote_refresh",
-                "conversationId" to conversationId,
-                "durationMs" to refreshDurationMs,
+                "conversationId" attr conversationId,
+                "durationMs" attr refreshDurationMs,
             )
             if (!isActiveSelection(generation)) return
             _state.update {

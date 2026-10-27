@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.fanout
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.RuntimeSyncScheduler
 import com.letta.mobile.data.controller.RuntimeSyncScheduler.SyncReason
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -39,10 +40,10 @@ class StreamIntegrityMonitor(
         if (observation is EventSeqGapDetector.Observation.Gap) {
             Telemetry.event(
                 "StreamIntegrityMonitor", "eventSeq.gap",
-                "expected" to observation.expected,
-                "received" to observation.received,
-                "missing" to observation.missing,
-                "frameType" to (frame.type ?: ""),
+                "expected" attr observation.expected,
+                "received" attr observation.received,
+                "missing" attr observation.missing,
+                "frameType" attr (frame.type ?: ""),
                 level = Telemetry.Level.WARN,
             )
             scheduler.request(SyncReason.Gap)

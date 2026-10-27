@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.runtime.ApprovalRelay
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.data.runtime.RelayedPendingApprovals
@@ -59,7 +60,7 @@ class PendingApprovalsPublisher(
         val frames = parked.map { (key, details) -> frame(key, details) }
             .ifEmpty { listOf(frame(TurnRuntimeKey(agentId = "", conversationId = conversationId), emptyList())) }
         val written = frames.count { viewer.writeFrame(it) }
-        Telemetry.event("ApprovalPush", "replay", "frames" to written, "entries" to parked.values.sumOf { it.size })
+        Telemetry.event("ApprovalPush", "replay", "frames" attr written, "entries" attr parked.values.sumOf { it.size })
         return written
     }
 
@@ -75,7 +76,7 @@ class PendingApprovalsPublisher(
             if (lastSent[key].orEmpty() == current) return@forEach
             val delivered = sink.publish(key.conversationId, frame(key, current))
             if (current.isEmpty()) lastSent.remove(key) else lastSent[key] = current
-            Telemetry.event("ApprovalPush", "published", "entries" to current.size, "delivered" to delivered)
+            Telemetry.event("ApprovalPush", "published", "entries" attr current.size, "delivered" attr delivered)
         }
     }
 

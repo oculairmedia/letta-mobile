@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
-/** Telemetry's legacy attribute boundary; reducer-facing records remain explicitly typed. */
-@Suppress("NoAnyType")
-internal typealias TelemetryAttribute = Pair<String, Any?>
+import com.letta.mobile.util.TelemetryValue
+
+/** Reducer diagnostics use the same scalar-only boundary as other telemetry callers. */
+internal typealias TelemetryAttribute = Pair<String, TelemetryValue>

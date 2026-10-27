@@ -19,6 +19,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimelineHydrationReducerTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     @After
     fun tearDown() {

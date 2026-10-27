@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -65,9 +66,9 @@ class NodeTurnHost internal constructor(
         turn.fanout.detachInitiator()
         Telemetry.event(
             "IrohNode", "turn.detached",
-            "conversationId" to turn.conversationId,
-            "clientMessageId" to (turn.clientMessageId ?: "<none>"),
-            "liveTurns" to live.get(),
+            "conversationId" attr turn.conversationId,
+            "clientMessageId" attr (turn.clientMessageId ?: "<none>"),
+            "liveTurns" attr live.get(),
         )
         job.invokeOnCompletion { cause -> parkForRedial(turn, cause) }
     }
@@ -82,11 +83,11 @@ class NodeTurnHost internal constructor(
         turn.tracker.parkFrames(turn.parkedTerminals, key, terminal)
         Telemetry.event(
             "IrohNode", "turn.detached_parked",
-            "conversationId" to turn.conversationId,
-            "clientMessageId" to key,
-            "frameCount" to turn.tracker.frameCount(),
-            "serverTerminal" to (terminal == null),
-            "cause" to (cause?.let { it::class.simpleName } ?: ""),
+            "conversationId" attr turn.conversationId,
+            "clientMessageId" attr key,
+            "frameCount" attr turn.tracker.frameCount(),
+            "serverTerminal" attr (terminal == null),
+            "cause" attr (cause?.let { it::class.simpleName } ?: ""),
         )
     }
 
@@ -94,8 +95,8 @@ class NodeTurnHost internal constructor(
         private val handler = CoroutineExceptionHandler { _, throwable ->
             Telemetry.event(
                 "IrohNode", "turn.host_crash",
-                "error" to (throwable.message ?: throwable.toString()),
-                "class" to throwable::class.simpleName,
+                "error" attr (throwable.message ?: throwable.toString()),
+                "class" attr throwable::class.simpleName,
                 level = Telemetry.Level.WARN,
             )
         }

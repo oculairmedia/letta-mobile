@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.timeline.api.TimelineOutboundPendingPersistence
 import com.letta.mobile.data.timeline.api.TimelineOutboundStreamCallbacks
 import com.letta.mobile.data.model.ConversationId
@@ -103,7 +104,7 @@ internal class TimelineOutboundSendProcessor(
                     )
                 )
             }.onFailure { t ->
-                Telemetry.error(logTag, "send.persistFailed", t, "otid" to otid)
+                Telemetry.error(logTag, "send.persistFailed", t, "otid" attr otid)
             }
         }
         if (!appendLocal) {
@@ -112,8 +113,8 @@ internal class TimelineOutboundSendProcessor(
             sendQueue.send(pending)
             Telemetry.event(
                 logTag, "send.optimisticLocalSkippedEventQueue",
-                "otid" to otid,
-                "conversationId" to conversationId,
+                "otid" attr otid,
+                "conversationId" attr conversationId,
             )
         }
     }
@@ -123,19 +124,19 @@ internal class TimelineOutboundSendProcessor(
             val roundtrip = Telemetry.startTimer("TimelineSync", "send.roundtrip")
             Telemetry.event(
                 "TimelineSync", "send.dequeued",
-                "otid" to pending.otid,
-                "conversationId" to conversationId,
+                "otid" attr pending.otid,
+                "conversationId" attr conversationId,
             )
             try {
                 streamAndReconcile(pending)
-                roundtrip.stop("otid" to pending.otid)
+                roundtrip.stop("otid" attr pending.otid)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
                 Telemetry.error(
                     "TimelineSync", "send.failed", t,
-                    "otid" to pending.otid,
-                    "conversationId" to conversationId,
+                    "otid" attr pending.otid,
+                    "conversationId" attr conversationId,
                 )
                 val ack = CompletableDeferred<Unit>()
                 eventQueue.send(TimelineGatewayEvent.MarkFailed(pending.otid, ack))
@@ -172,7 +173,7 @@ internal class TimelineOutboundSendProcessor(
         )
         val postTimer = Telemetry.startTimer("TimelineSync", "send.post")
         val stream = messageApi.sendConversationMessage(ConversationId(conversationId), request)
-        postTimer.stop("otid" to otid)
+        postTimer.stop("otid" attr otid)
 
         val streamTimer = Telemetry.startTimer("TimelineSync", "send.stream")
         var eventCount = 0
@@ -190,7 +191,7 @@ internal class TimelineOutboundSendProcessor(
                 eventCount++
                 if (!firstEventLogged) {
                     firstEventLogged = true
-                    firstEventTimer.stop("otid" to otid)
+                    firstEventTimer.stop("otid" attr otid)
                 }
                 streamCallbacks.ingestStreamEvent(message)
                 events.emit(TimelineSyncEvent.ServerEvent(message))
@@ -206,7 +207,7 @@ internal class TimelineOutboundSendProcessor(
             }
         }
 
-        streamTimer.stop("otid" to otid, "eventCount" to eventCount)
+        streamTimer.stop("otid" attr otid, "eventCount" attr eventCount)
 
         val markSentAck = CompletableDeferred<Unit>()
         eventQueue.send(TimelineGatewayEvent.MarkSent(otid, markSentAck))
@@ -222,15 +223,15 @@ internal class TimelineOutboundSendProcessor(
             val serverMessages = listMessagesWithRetry(pending).reversed()
             val result = submitReconcileSnapshot(pending, serverMessages)
             timer.stop(
-                "otid" to otid,
-                "serverCount" to serverMessages.size,
-                "confirmedLocal" to result.confirmedLocal,
-                "appendedMissing" to result.appendedMissing,
+                "otid" attr otid,
+                "serverCount" attr serverMessages.size,
+                "confirmedLocal" attr result.confirmedLocal,
+                "appendedMissing" attr result.appendedMissing,
             )
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Throwable) {
-            timer.stopError(failure, "otid" to otid)
+            timer.stopError(failure, "otid" attr otid)
             events.emit(TimelineSyncEvent.ReconcileError(failure.message ?: "unknown"))
         }
     }
@@ -272,8 +273,8 @@ internal class TimelineOutboundSendProcessor(
                 lastError = t
                 Telemetry.error(
                     "TimelineSync", "reconcile.retry", t,
-                    "otid" to otid,
-                    "attempt" to attempt + 1,
+                    "otid" attr otid,
+                    "attempt" attr attempt + 1,
                 )
                 delay((RECONCILE_RETRY_BACKOFF_MS shl attempt).milliseconds)
             }

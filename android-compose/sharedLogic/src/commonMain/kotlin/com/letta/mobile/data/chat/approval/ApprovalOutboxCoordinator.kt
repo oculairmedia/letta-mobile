@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.approval
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -93,7 +94,13 @@ class ApprovalOutboxCoordinator(
     /** Sends what is queued now (also called on reconnect). */
     suspend fun flushNow(): OutboxFlushReport {
         val report = outbox.flush(stillPending, send)
-        Telemetry.event("ApprovalOutbox", "flushed", "sent" to report.sent.size, "dropped" to report.dropped.size, "queued" to report.stillQueued.size)
+        Telemetry.event(
+            "ApprovalOutbox",
+            "flushed",
+            "sent" attr report.sent.size,
+            "dropped" attr report.dropped.size,
+            "queued" attr report.stillQueued.size,
+        )
         if (report.sent.isNotEmpty()) _notices.tryEmit(OutboxNotice.Sent(report.sent.size))
         if (report.dropped.isNotEmpty()) _notices.tryEmit(OutboxNotice.Dropped(report.dropped.size))
         return report

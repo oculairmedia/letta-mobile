@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface.ambient
 
+import com.letta.mobile.util.attr
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -112,7 +113,7 @@ private class SkiaAmbientGlowShader(private val builder: RuntimeShaderBuilder) :
                 Telemetry.event(
                     AMBIENT_GLOW_TELEMETRY_TAG,
                     "shader.compileFailed",
-                    "error" to (failure.message ?: failure::class.simpleName.orEmpty()),
+                    "error" attr (failure.message ?: failure::class.simpleName.orEmpty()),
                     level = Telemetry.Level.WARN,
                 )
             }.getOrNull()

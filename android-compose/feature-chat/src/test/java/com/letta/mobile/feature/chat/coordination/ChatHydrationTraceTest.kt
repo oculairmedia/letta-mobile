@@ -1,5 +1,7 @@
 package com.letta.mobile.feature.chat.coordination
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.util.Telemetry
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -9,6 +11,18 @@ import org.junit.Before
 import org.junit.Test
 
 class ChatHydrationTraceTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     @Before
     fun enableTrace() {
         Telemetry.clear()
@@ -41,13 +55,13 @@ class ChatHydrationTraceTest {
             missingOptionalSources = "none",
         )
 
-        val stale = Telemetry.snapshot().single { it.attrs["isStale"] == true }
+        val stale = Telemetry.snapshot().single { it.attrs["isStale"]?.textOrNull == true }
         assertEquals("presentation_published", stale.name)
-        assertEquals(oldGeneration.id, stale.attrs["generation"])
+        assertEquals(oldGeneration.id, stale.attrs["generation"]?.textOrNull)
         assertTrue(oldGeneration.id != currentGeneration.id)
-        assertEquals("agent-a", stale.attrs["agentId"])
-        assertEquals("conversation-a", stale.attrs["conversationId"])
-        assertEquals(1, stale.attrs["staleCount"])
+        assertEquals("agent-a", stale.attrs["agentId"]?.textOrNull)
+        assertEquals("conversation-a", stale.attrs["conversationId"]?.textOrNull)
+        assertEquals(1, stale.attrs["staleCount"]?.textOrNull)
     }
 
     @Test

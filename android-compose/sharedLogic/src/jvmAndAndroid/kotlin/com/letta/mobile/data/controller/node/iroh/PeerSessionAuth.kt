@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import java.util.concurrent.atomic.AtomicBoolean
 import com.letta.mobile.data.controller.node.iroh.auth.IrohAuthPolicy
@@ -121,7 +122,7 @@ internal class PeerSessionAuth(
     fun revoke() {
         authenticated.set(false)
         if (revoked.compareAndSet(false, true)) {
-            Telemetry.event("IrohNode", "auth.revoked", "remoteEndpointId" to remoteId)
+            Telemetry.event("IrohNode", "auth.revoked", "remoteEndpointId" attr remoteId)
             runCatching { onRevoked() }
         }
     }

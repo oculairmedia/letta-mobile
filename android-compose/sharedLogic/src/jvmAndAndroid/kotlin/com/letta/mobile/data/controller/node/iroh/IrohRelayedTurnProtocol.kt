@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.runtime.TurnBoundaryGate
 import com.letta.mobile.data.runtime.TurnInputAcknowledgement
@@ -117,10 +118,10 @@ internal class IrohRelayedTurnProtocol(
         if (!first) return
         Telemetry.event(
             "IrohNode", "input.ack",
-            "conversationId" to runtime.conversationId,
-            "accepted" to ack.accepted,
-            "disposition" to (ack.disposition ?: ""),
-            "hasRequestId" to (requestId != null),
+            "conversationId" attr runtime.conversationId,
+            "accepted" attr ack.accepted,
+            "disposition" attr (ack.disposition ?: ""),
+            "hasRequestId" attr (requestId != null),
         )
         requestId?.let { id -> writeControlSafely(inputAcceptedFrame(id, runtime, ack)) }
         if (ack.accepted) afterAccepted()
@@ -206,9 +207,9 @@ internal class IrohRelayedTurnProtocol(
         fanout.writeInitiatorProtocolFrame("turn_finished", turnFinished, drain = true)
         Telemetry.event(
             "IrohNode", "turn.finished_relayed",
-            "conversationId" to runtime.conversationId,
-            "stopReason" to end.stopReason,
-            "runId" to (runId ?: "<none>"),
+            "conversationId" attr runtime.conversationId,
+            "stopReason" attr end.stopReason,
+            "runId" attr (runId ?: "<none>"),
         )
     }
 
@@ -269,10 +270,10 @@ internal class IrohRelayedTurnProtocol(
         fanout.writeInitiatorProtocolFrame("turn_finished", fields, drain = true)
         Telemetry.event(
             "IrohNode", "turn.finished_relayed",
-            "conversationId" to runtime.conversationId,
-            "stopReason" to ((fields["stop_reason"] as? JsonPrimitive)?.contentOrNull ?: ""),
-            "runId" to (runId ?: "<none>"),
-            "source" to "app_server",
+            "conversationId" attr runtime.conversationId,
+            "stopReason" attr ((fields["stop_reason"] as? JsonPrimitive)?.contentOrNull ?: ""),
+            "runId" attr (runId ?: "<none>"),
+            "source" attr "app_server",
         )
     }
 
@@ -284,8 +285,8 @@ internal class IrohRelayedTurnProtocol(
         } catch (error: Exception) {
             Telemetry.event(
                 "IrohNode", "input.ack_write_failed",
-                "conversationId" to runtime.conversationId,
-                "error" to (error.message ?: error.toString()),
+                "conversationId" attr runtime.conversationId,
+                "error" attr (error.message ?: error.toString()),
                 level = Telemetry.Level.WARN,
             )
         }
@@ -389,8 +390,8 @@ internal suspend fun relayDraft(
     if (fanout.anyTerminalWritten && fanout.isTerminalLifecycle(payload)) {
         Telemetry.event(
             "IrohNode", "stream.terminal_duplicate_skipped",
-            "agentId" to draft.agentId?.value,
-            "conversationId" to draft.conversationId?.value,
+            "agentId" attr draft.agentId?.value,
+            "conversationId" attr draft.conversationId?.value,
         )
         return
     }

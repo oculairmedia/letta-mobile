@@ -1,5 +1,6 @@
 package com.letta.mobile.data.capability
 
+import com.letta.mobile.util.attr
 import android.util.Log
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
@@ -120,8 +121,8 @@ class CapabilityRepository(
     private suspend fun probeProjects(configId: String): ProbeOutcome {
         Telemetry.event(
             "Capability", "probe.attempted",
-            "capability" to "projects",
-            "configId" to configId,
+            "capability" attr "projects",
+            "configId" attr configId,
         )
         val outcome = try {
             val source = irohProjectSource
@@ -140,16 +141,16 @@ class CapabilityRepository(
         if (outcome is ProbeOutcome.Definitive) {
             Telemetry.event(
                 "Capability", "probe.result",
-                "capability" to "projects",
-                "configId" to configId,
-                "supported" to outcome.supported,
+                "capability" attr "projects",
+                "configId" attr configId,
+                "supported" attr outcome.supported,
             )
         } else {
             Telemetry.event(
                 "Capability", "probe.deferred",
-                "capability" to "projects",
-                "configId" to configId,
-                "reason" to "transport-not-ready",
+                "capability" attr "projects",
+                "configId" attr configId,
+                "reason" attr "transport-not-ready",
             )
         }
         return outcome
@@ -173,9 +174,9 @@ class CapabilityRepository(
         _projectsSupported.value = false
         Telemetry.event(
             "Capability", "probe.skipped",
-            "capability" to "projects",
-            "configId" to configId,
-            "reason" to reason,
+            "capability" attr "projects",
+            "configId" attr configId,
+            "reason" attr reason,
         )
     }
 

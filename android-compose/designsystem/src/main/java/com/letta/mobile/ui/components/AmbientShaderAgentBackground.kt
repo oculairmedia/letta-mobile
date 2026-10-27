@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.components
 
+import com.letta.mobile.util.attr
 import android.graphics.RuntimeShader
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
@@ -177,16 +178,15 @@ fun AmbientShaderAgentBackground(
         val hct = runCatching { Hct.fromInt(targetColor.toOpaqueArgbForTelemetry()) }.getOrNull()
         Telemetry.event(
             AMBIENT_TELEMETRY_TAG, "tint.resolved",
-            "status" to status.name,
-            "argb" to targetColor.toOpaqueArgbForTelemetry().toUInt().toString(16),
-            "hue" to (hct?.hue?.toInt() ?: -1),
-            "chroma" to (hct?.chroma?.toInt() ?: -1),
-            "tone" to (hct?.tone?.toInt() ?: -1),
-            "onDark" to onDark,
-            "renderer" to if (shaderAvailable) "agsl" else "fallback",
+            "status" attr status.name,
+            "argb" attr targetColor.toOpaqueArgbForTelemetry().toUInt().toString(16),
+            "hue" attr (hct?.hue?.toInt() ?: -1),
+            "chroma" attr (hct?.chroma?.toInt() ?: -1),
+            "tone" attr (hct?.tone?.toInt() ?: -1),
+            "onDark" attr onDark,
+            "renderer" attr if (shaderAvailable) "agsl" else "fallback",
         )
     }
-
     Box(modifier = modifier) {
         if (tint.alpha > HiddenAlpha) {
             AmbientCanvas(
@@ -302,7 +302,7 @@ private fun rememberAmbientShader(): RuntimeShader? {
                 Telemetry.event(
                     AMBIENT_TELEMETRY_TAG,
                     "shader.compileFailed",
-                    "error" to (failure.message ?: failure::class.simpleName.orEmpty()),
+                    "error" attr (failure.message ?: failure::class.simpleName.orEmpty()),
                     level = Telemetry.Level.WARN,
                 )
             }.getOrNull()

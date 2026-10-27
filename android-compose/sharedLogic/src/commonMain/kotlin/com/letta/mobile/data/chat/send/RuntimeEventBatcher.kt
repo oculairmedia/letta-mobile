@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
@@ -37,8 +38,8 @@ internal class RuntimeEventBatcher(
         if (result.isFailure) {
             Telemetry.event(
                 "AdminChatVM", "runtimeEvent.enqueueRejected",
-                "eventType" to (event::class.simpleName ?: ""),
-                "conversationId" to (conversationId ?: ""),
+                "eventType" attr (event::class.simpleName ?: ""),
+                "conversationId" attr (conversationId ?: ""),
             )
         }
     }
@@ -65,9 +66,9 @@ internal class RuntimeEventBatcher(
         } catch (error: Throwable) {
             Telemetry.error(
                 "AdminChatVM", "runtimeEvent.recordFailed", error,
-                "eventType" to (batch.firstOrNull()?.event?.let { it::class.simpleName } ?: ""),
-                "conversationId" to (batch.firstOrNull()?.conversationId ?: ""),
-                "batchSize" to batch.size,
+                "eventType" attr (batch.firstOrNull()?.event?.let { it::class.simpleName } ?: ""),
+                "conversationId" attr (batch.firstOrNull()?.conversationId ?: ""),
+                "batchSize" attr batch.size,
             )
         }
     }

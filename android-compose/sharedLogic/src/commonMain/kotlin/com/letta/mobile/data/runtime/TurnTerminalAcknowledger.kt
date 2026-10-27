@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -102,10 +103,10 @@ internal class TurnTerminalAcknowledger(
     private fun report(pending: PendingAck, outcome: String) {
         Telemetry.event(
             TELEMETRY_TAG, "terminal.acknowledged",
-            "conversationId" to pending.frame.runtime.conversationId,
-            "turnId" to pending.frame.turnId,
-            "generation" to pending.delivery.generation,
-            "outcome" to outcome,
+            "conversationId" attr pending.frame.runtime.conversationId,
+            "turnId" attr pending.frame.turnId,
+            "generation" attr pending.delivery.generation,
+            "outcome" attr outcome,
             level = if (outcome == SENT) Telemetry.Level.INFO else Telemetry.Level.WARN,
         )
     }

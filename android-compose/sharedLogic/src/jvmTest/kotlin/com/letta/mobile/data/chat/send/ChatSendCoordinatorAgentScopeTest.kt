@@ -1,5 +1,7 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
@@ -24,6 +26,18 @@ import kotlin.test.assertEquals
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatSendCoordinatorAgentScopeTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private val wire = AgentScopeWire()
 
     @Test
@@ -67,7 +81,7 @@ class ChatSendCoordinatorAgentScopeTest {
     }
 
     private fun foreignDrops(): Int = Telemetry.events.value.count {
-        it.name == "ws.event.foreignAgentDropped" && it.attrs["boundAgentId"] in setOf(AGENT_A.value, AGENT_B.value)
+        it.name == "ws.event.foreignAgentDropped" && it.attrs["boundAgentId"]?.textOrNull in setOf(AGENT_A.value, AGENT_B.value)
     }
 
     private inner class Chat(scope: CoroutineScope, agent: AgentId) {

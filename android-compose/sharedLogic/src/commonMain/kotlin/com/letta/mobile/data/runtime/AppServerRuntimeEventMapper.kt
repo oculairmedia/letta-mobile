@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
@@ -135,12 +136,12 @@ open class AppServerRuntimeEventMapper {
     ): List<RuntimeEventDraft> {
         Telemetry.event(
             "AppServerRuntimeEventMapper", "frame.unprojectable_delta",
-            "reason" to "delta_not_an_object",
-            "deltaKind" to (delta::class.simpleName ?: "JsonElement"),
-            "conversationId" to runtime.conversationId,
-            "agentId" to runtime.agentId,
-            "eventSeq" to eventSeq,
-            "idempotencyKey" to idempotencyKey,
+            "reason" attr "delta_not_an_object",
+            "deltaKind" attr (delta::class.simpleName ?: "JsonElement"),
+            "conversationId" attr runtime.conversationId,
+            "agentId" attr runtime.agentId,
+            "eventSeq" attr eventSeq,
+            "idempotencyKey" attr idempotencyKey,
         )
         return listOf(
             AppServerReceivedFrame(

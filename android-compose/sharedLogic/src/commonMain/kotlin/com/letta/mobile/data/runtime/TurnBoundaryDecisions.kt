@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -27,10 +28,10 @@ internal fun TurnBoundaryGate.decideOrDrop(
     if (decision !is TurnBoundaryDecision.Drop) return decision
     Telemetry.event(
         "AppServerTurnEngine", "terminal.boundary_dropped",
-        "frameType" to (input.received.frame.type ?: "<unknown>"),
-        "reason" to decision.reason,
-        "conversationId" to scope.conversationId,
-        "eventSeq" to input.received.eventSeqOrNull(),
+        "frameType" attr (input.received.frame.type ?: "<unknown>"),
+        "reason" attr decision.reason,
+        "conversationId" attr scope.conversationId,
+        "eventSeq" attr input.received.eventSeqOrNull(),
     )
     return null
 }

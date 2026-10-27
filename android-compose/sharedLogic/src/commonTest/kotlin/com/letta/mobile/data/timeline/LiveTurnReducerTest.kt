@@ -19,6 +19,18 @@ import kotlin.test.assertTrue
  * replaced by `text_seq` (never concatenated), an id appends once, and a tool return joins `tc-<id>`.
  */
 class LiveTurnReducerTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     @Test
     fun firstFrameAppendsOnce() {

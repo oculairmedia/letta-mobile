@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface.ambient
 
+import com.letta.mobile.util.attr
 import android.graphics.RuntimeShader
 import android.os.Build
 import androidx.annotation.RequiresApi
@@ -49,7 +50,7 @@ private class AgslAmbientGlowShader(private val shader: RuntimeShader) : Ambient
                     Telemetry.event(
                         AMBIENT_GLOW_TELEMETRY_TAG,
                         "shader.compileFailed",
-                        "error" to (failure.message ?: failure::class.simpleName.orEmpty()),
+                        "error" attr (failure.message ?: failure::class.simpleName.orEmpty()),
                         level = Telemetry.Level.WARN,
                     )
                 }.getOrNull()

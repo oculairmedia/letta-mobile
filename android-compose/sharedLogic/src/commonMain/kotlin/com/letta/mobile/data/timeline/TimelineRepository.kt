@@ -1,5 +1,8 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.telemetryAttributes
+
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.session.BackendScopedCache
@@ -155,9 +158,9 @@ open class TimelineRepository(
         publishLoopSnapshotLocked()
         Telemetry.event(
             "TimelineRepo", "loop.aliasResolved",
-            "requestedAgentId" to key.agentId.orEmpty(),
-            "canonicalAgentId" to promotedKey.agentId.orEmpty(),
-            "conversationId" to key.conversationId,
+            "requestedAgentId" attr key.agentId.orEmpty(),
+            "canonicalAgentId" attr promotedKey.agentId.orEmpty(),
+            "conversationId" attr key.conversationId,
         )
         return loop
     }
@@ -187,16 +190,18 @@ open class TimelineRepository(
     ) {
         if (existing.agentId == null || requested.agentId == null) return
         Telemetry.event(
-            "TimelineRepo", "loop.aliasRefused",
-            "existingAgentId" to existing.agentId,
-            "requestedAgentId" to requested.agentId,
-            "conversationId" to requested.conversationId,
+            "TimelineRepo",
+            "loop.aliasRefused",
             // Provenance of the REQUESTING acquisition, correlated to its
             // acquisition.entry and to the cacheMiss that follows this refusal.
-            *TimelineAcquisitionTelemetry.baseAttrs(
+            attrs = arrayOf(
+                "existingAgentId" attr existing.agentId,
+                "requestedAgentId" attr requested.agentId,
+                "conversationId" attr requested.conversationId,
+            ) + TimelineAcquisitionTelemetry.baseAttrs(
                 TimelineAcquisitionTarget(requested.agentId, requested.conversationId),
                 provenance,
-            ),
+            ).telemetryAttributes(),
             level = Telemetry.Level.WARN,
         )
     }
@@ -243,11 +248,11 @@ open class TimelineRepository(
         loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key, provenance) }?.let { cached ->
             Telemetry.event(
                 "TimelineRepo", "getOrCreate.cacheHit",
-                "agentId" to agentId.orEmpty(),
-                "conversationId" to conversationId,
-                "hydrated" to cached.hasHydratedSuccessfully,
-                "acquisitionId" to TimelineProvenanceRedaction.boundedIdentifier(provenance.acquisitionId),
-                "source" to provenance.source.name,
+                "agentId" attr agentId.orEmpty(),
+                "conversationId" attr conversationId,
+                "hydrated" attr cached.hasHydratedSuccessfully,
+                "acquisitionId" attr TimelineProvenanceRedaction.boundedIdentifier(provenance.acquisitionId),
+                "source" attr provenance.source.name,
             )
             if (!cached.hasHydratedSuccessfully) {
                 hydrateSingleFlight(cached, key)
@@ -324,8 +329,8 @@ open class TimelineRepository(
     private suspend fun joinHydration(flight: HydrateFlight, key: TimelineCacheKey) {
         Telemetry.event(
             "TimelineRepo", "hydrate.joined",
-            "agentId" to key.agentId.orEmpty(),
-            "conversationId" to key.conversationId,
+            "agentId" attr key.agentId.orEmpty(),
+            "conversationId" attr key.conversationId,
         )
         try {
             flight.completion.await()
@@ -334,8 +339,8 @@ open class TimelineRepository(
         } catch (failure: Throwable) {
             Telemetry.error(
                 "TimelineRepo", "hydrate.joinedFailed", failure,
-                "agentId" to key.agentId.orEmpty(),
-                "conversationId" to key.conversationId,
+                "agentId" attr key.agentId.orEmpty(),
+                "conversationId" attr key.conversationId,
             )
         }
     }
@@ -367,8 +372,8 @@ open class TimelineRepository(
         flight.completion.completeExceptionally(failure)
         Telemetry.error(
             "TimelineRepo", "hydrate.failed", failure,
-            "agentId" to key.agentId.orEmpty(),
-            "conversationId" to key.conversationId,
+            "agentId" attr key.agentId.orEmpty(),
+            "conversationId" attr key.conversationId,
         )
         runCatching { flight.loop.emitHydrateFailed(failure.message ?: "unknown") }
     }
@@ -432,8 +437,8 @@ open class TimelineRepository(
             } catch (failure: Throwable) {
                 Telemetry.error(
                     "TimelineRepo", "snapshot.readFailed", failure,
-                    "backendId" to timelineScope.backendId,
-                    "conversationId" to timelineScope.conversationId,
+                    "backendId" attr timelineScope.backendId,
+                    "conversationId" attr timelineScope.conversationId,
                 )
                 ConfirmedTimelineReadResult.ReconciliationRequired(SnapshotReadFailure.STORAGE_FAILURE)
             }
@@ -457,18 +462,18 @@ open class TimelineRepository(
         // of a holder that found another agent's head for this conversation.
         Telemetry.event(
             "TimelineRepo", "getOrCreate.cacheMiss",
-            "agentId" to key.agentId.orEmpty(),
-            "conversationId" to key.conversationId,
-            "snapshotOutcome" to readResult::class.simpleName.orEmpty(),
-            "snapshotHighWaterRevision" to readResult.highWaterRevision,
-            "remoteReconciliationReason" to recoveryFailure?.name.orEmpty(),
-            "acquisitionId" to TimelineProvenanceRedaction.boundedIdentifier(provenance.acquisitionId),
-            "source" to provenance.source.name,
-            "operation" to TimelineProvenanceRedaction.boundedIdentifier(provenance.operation),
-            "callSite" to TimelineProvenanceRedaction.boundedIdentifier(provenance.callSite),
-            "frameFamily" to provenance.frameFamily.name,
-            "selectionMode" to provenance.selectionMode.name,
-            "attribution" to (
+            "agentId" attr key.agentId.orEmpty(),
+            "conversationId" attr key.conversationId,
+            "snapshotOutcome" attr readResult::class.simpleName.orEmpty(),
+            "snapshotHighWaterRevision" attr readResult.highWaterRevision,
+            "remoteReconciliationReason" attr recoveryFailure?.name.orEmpty(),
+            "acquisitionId" attr TimelineProvenanceRedaction.boundedIdentifier(provenance.acquisitionId),
+            "source" attr provenance.source.name,
+            "operation" attr TimelineProvenanceRedaction.boundedIdentifier(provenance.operation),
+            "callSite" attr TimelineProvenanceRedaction.boundedIdentifier(provenance.callSite),
+            "frameFamily" attr provenance.frameFamily.name,
+            "selectionMode" attr provenance.selectionMode.name,
+            "attribution" attr (
                 provenance.attribution?.attribution?.name
                     ?: TimelineConversationAttribution.UNKNOWN.name
                 ),
@@ -476,10 +481,10 @@ open class TimelineRepository(
         if (recoveryFailure != null) {
             Telemetry.event(
                 "TimelineRepo", "snapshot.remoteReconciliationRequested",
-                "agentId" to key.agentId.orEmpty(),
-                "conversationId" to key.conversationId,
-                "reason" to recoveryFailure.name,
-                "fallbackAvailable" to (readResult.snapshot != null),
+                "agentId" attr key.agentId.orEmpty(),
+                "conversationId" attr key.conversationId,
+                "reason" attr recoveryFailure.name,
+                "fallbackAvailable" attr (readResult.snapshot != null),
                 level = Telemetry.Level.WARN,
             )
         }
@@ -551,7 +556,7 @@ open class TimelineRepository(
         }
         loops.clear()
         publishLoopSnapshotLocked()
-        Telemetry.event("TimelineRepo", "clearAll", "clearedLoopCount" to count)
+        Telemetry.event("TimelineRepo", "clearAll", "clearedLoopCount" attr count)
     }
 
     override suspend fun clearForBackendSwitch() {
@@ -716,10 +721,10 @@ open class TimelineRepository(
     ) {
         Telemetry.event(
             "IrohGate", "gate4.repositoryIngest",
-            "agentId" to agentId,
-            "conversationId" to conversationId,
-            "messageId" to message.id,
-            "messageType" to message.messageType,
+            "agentId" attr agentId,
+            "conversationId" attr conversationId,
+            "messageId" attr message.id,
+            "messageType" attr message.messageType,
         )
         if (markExternalFrameDuplicate(agentId, conversationId, message, source)) return
         getOrCreate(agentId, conversationId).ingestStreamEvent(message, source)
@@ -899,16 +904,16 @@ open class TimelineRepository(
         }.onSuccess {
             Telemetry.event(
                 "TimelineRepo", "cursorExpired.repaired",
-                "agentId" to agentId.orEmpty(),
-                "conversationId" to conversationId,
-                "fallbackSeq" to (fallbackSeq ?: -1L),
+                "agentId" attr agentId.orEmpty(),
+                "conversationId" attr conversationId,
+                "fallbackSeq" attr (fallbackSeq ?: -1L),
             )
         }.onFailure { t ->
             Telemetry.error(
                 "TimelineRepo", "cursorExpired.repairFailed", t,
-                "agentId" to agentId.orEmpty(),
-                "conversationId" to conversationId,
-                "fallbackSeq" to (fallbackSeq ?: -1L),
+                "agentId" attr agentId.orEmpty(),
+                "conversationId" attr conversationId,
+                "fallbackSeq" attr (fallbackSeq ?: -1L),
             )
             throw t
         }
@@ -922,7 +927,7 @@ open class TimelineRepository(
             loop.closeAndJoin()
             Telemetry.event(
                 "TimelineRepo", "loop.cleared",
-                "conversationId" to conversationId,
+                "conversationId" attr conversationId,
             )
         }
     }
@@ -934,8 +939,8 @@ open class TimelineRepository(
             loop.closeAndJoin()
             Telemetry.event(
                 "TimelineRepo", "loop.cleared",
-                "agentId" to agentId.orEmpty(),
-                "conversationId" to conversationId,
+                "agentId" attr agentId.orEmpty(),
+                "conversationId" attr conversationId,
             )
         }
     }
@@ -948,10 +953,10 @@ open class TimelineRepository(
                 loop.close()
                 Telemetry.event(
                     "TimelineRepo", "loop.evicted",
-                    "agentId" to eldestKey.agentId.orEmpty(),
-                    "conversationId" to eldestKey.conversationId,
-                    "cachedLoopCount" to loops.size,
-                    "maxCachedLoops" to maxCachedLoops,
+                    "agentId" attr eldestKey.agentId.orEmpty(),
+                    "conversationId" attr eldestKey.conversationId,
+                    "cachedLoopCount" attr loops.size,
+                    "maxCachedLoops" attr maxCachedLoops,
                 )
             }
         }
@@ -985,15 +990,15 @@ open class TimelineRepository(
         if (duplicate) {
             Telemetry.event(
                 "TimelineRepo", "externalFrame.exactDuplicateDropped",
-                "conversationId" to conversationId,
-                "agentId" to agentId.orEmpty(),
-                "dedupeScope" to scopedConversationKey,
-                "messageId" to message.id,
-                "messageType" to message.messageType,
-                "runId" to message.runId.orEmpty(),
-                "stepId" to message.stepId.orEmpty(),
-                "seqId" to (message.seqId ?: -1),
-                "source" to source,
+                "conversationId" attr conversationId,
+                "agentId" attr agentId.orEmpty(),
+                "dedupeScope" attr scopedConversationKey,
+                "messageId" attr message.id,
+                "messageType" attr message.messageType,
+                "runId" attr message.runId.orEmpty(),
+                "stepId" attr message.stepId.orEmpty(),
+                "seqId" attr (message.seqId ?: -1),
+                "source" attr source,
             )
         }
         return duplicate

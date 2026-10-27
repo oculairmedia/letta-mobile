@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.CronTask
 import com.letta.mobile.data.repository.api.AgentScheduleScope
 import com.letta.mobile.data.repository.api.CronResumeTarget
@@ -240,8 +241,8 @@ open class CronRepository(
                     Telemetry.event(
                         TAG,
                         "crons_updated.refresh.failed",
-                        "agentId" to scope.agentId,
-                        "error" to (e.message ?: e::class.simpleName),
+                        "agentId" attr scope.agentId,
+                        "error" attr (e.message ?: e::class.simpleName),
                         level = Telemetry.Level.WARN,
                     )
                 }
@@ -264,8 +265,8 @@ open class CronRepository(
                         Telemetry.event(
                             TAG,
                             "reconnect.refresh.failed",
-                            "agentId" to scope.agentId,
-                            "error" to (e.message ?: e::class.simpleName),
+                            "agentId" attr scope.agentId,
+                            "error" attr (e.message ?: e::class.simpleName),
                             level = Telemetry.Level.WARN,
                         )
                     }

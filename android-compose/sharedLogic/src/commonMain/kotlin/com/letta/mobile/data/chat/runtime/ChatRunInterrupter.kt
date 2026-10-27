@@ -1,5 +1,8 @@
 package com.letta.mobile.data.chat.runtime
 
+import com.letta.mobile.util.telemetryAttributes
+
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -116,7 +119,11 @@ class ChatRunInterrupter<K : Any>(
         _cancelling.value = stop.key
         requestedAtMs = nowMs()
         host.onCancelling(stop.key)
-        Telemetry.event(telemetry.tag, "interrupt.cancelRequested", *attributes(stop.key), "transport" to stop.transport)
+        Telemetry.event(
+            telemetry.tag,
+            "interrupt.cancelRequested",
+            attrs = attributes(stop.key).telemetryAttributes() + arrayOf("transport" attr stop.transport),
+        )
         return attempt
     }
 
@@ -130,7 +137,12 @@ class ChatRunInterrupter<K : Any>(
         }
         if (!isCurrent(key, current) || outcome.dispatched) return
         outcome.failure?.let { failure ->
-            Telemetry.error(telemetry.tag, "interrupt.abortDispatchFailed", failure, *attributes(key))
+            Telemetry.error(
+                telemetry.tag,
+                "interrupt.abortDispatchFailed",
+                failure,
+                attrs = attributes(key).telemetryAttributes(),
+            )
             host.onAbortFailed(key, failure)
         }
         forceClear(key, REASON_NOT_DISPATCHED)
@@ -149,7 +161,7 @@ class ChatRunInterrupter<K : Any>(
         Telemetry.event(
             telemetry.tag,
             "interrupt.terminalTimeout",
-            *attributes(key),
+            attrs = attributes(key).telemetryAttributes(),
             durationMs = terminalTimeoutMs,
             level = Telemetry.Level.WARN,
         )
@@ -159,7 +171,12 @@ class ChatRunInterrupter<K : Any>(
     private fun settled(key: K) {
         watchJob = null
         _cancelling.value = null
-        Telemetry.event(telemetry.tag, "interrupt.terminalAfterCancel", *attributes(key), durationMs = nowMs() - requestedAtMs)
+        Telemetry.event(
+            telemetry.tag,
+            "interrupt.terminalAfterCancel",
+            attrs = attributes(key).telemetryAttributes(),
+            durationMs = nowMs() - requestedAtMs,
+        )
         host.onSettled(key)
     }
 
@@ -170,8 +187,7 @@ class ChatRunInterrupter<K : Any>(
         Telemetry.event(
             telemetry.tag,
             "interrupt.forcedLocalClear",
-            *attributes(key),
-            "reason" to reason,
+            attrs = attributes(key).telemetryAttributes() + arrayOf("reason" attr reason),
             level = Telemetry.Level.WARN,
         )
     }

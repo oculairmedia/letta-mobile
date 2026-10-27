@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 internal data class ForwardGrowthMergeResult(
     val timeline: Timeline,
     val stableServerId: String,
@@ -72,11 +73,11 @@ internal fun applyForwardGrowthMerge(
     val nextTimeline = timeline.replaceByServerId(merged).copy(liveCursor = liveAssistant.serverId)
     hotPathTelemetry(
         "streamSubscriber.forwardGrowthMerged",
-        "serverId" to liveAssistant.serverId,
-        "incomingServerId" to confirmed.serverId,
-        "runId" to (confirmed.runId ?: "<null>"),
-        "mergedLen" to confirmed.content.length,
-        "conversationId" to conversationId,
+        "serverId" attr liveAssistant.serverId,
+        "incomingServerId" attr confirmed.serverId,
+        "runId" attr (confirmed.runId ?: "<null>"),
+        "mergedLen" attr confirmed.content.length,
+        "conversationId" attr conversationId,
     )
     return ForwardGrowthMergeResult(
         timeline = nextTimeline,

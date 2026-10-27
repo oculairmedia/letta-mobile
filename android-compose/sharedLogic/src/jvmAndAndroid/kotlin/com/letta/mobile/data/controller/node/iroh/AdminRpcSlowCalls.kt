@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 
 private const val SLOW_HANDLER_MS = 250L
@@ -11,7 +12,7 @@ internal fun reportIfSlow(invocation: AdminRpcInvocation, startedNs: Long, respo
     if (tookMs < SLOW_HANDLER_MS) return
     Telemetry.event(
         "AdminRpc", "handler.slow",
-        "method" to invocation.method, "responseChars" to responseChars,
+        "method" attr invocation.method, "responseChars" attr responseChars,
         durationMs = tookMs, level = Telemetry.Level.WARN,
     )
 }

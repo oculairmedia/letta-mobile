@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import computer.iroh.Incoming
 import computer.iroh.IncomingAddr
@@ -34,12 +35,12 @@ class IrohFailureLog(
         if (!shouldLog(count)) return
         Telemetry.event(
             tag, event,
-            "error" to message,
-            "errorKind" to errorKind(error),
-            "count" to count,
-            "alpn" to alpn,
-            "path" to origin?.path,
-            "remote" to origin?.remote,
+            "error" attr message,
+            "errorKind" attr errorKind(error),
+            "count" attr count,
+            "alpn" attr alpn,
+            "path" attr origin?.path,
+            "remote" attr origin?.remote,
             level = Telemetry.Level.WARN,
         )
     }

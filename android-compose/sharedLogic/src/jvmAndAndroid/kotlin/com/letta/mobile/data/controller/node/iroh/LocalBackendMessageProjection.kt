@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -127,7 +128,7 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
             Telemetry.event(
                 IMAGE_PIPELINE_TAG,
                 "hydrate.image_dropped",
-                "reason" to if (o["image_ref"] != null) "image_ref_pointer" else "no_base64_data",
+                "reason" attr if (o["image_ref"] != null) "image_ref_pointer" else "no_base64_data",
                 level = Telemetry.Level.WARN,
             )
             return null

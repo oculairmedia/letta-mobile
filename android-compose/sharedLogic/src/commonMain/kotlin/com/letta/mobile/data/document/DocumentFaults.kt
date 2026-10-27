@@ -1,5 +1,6 @@
 package com.letta.mobile.data.document
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +23,7 @@ internal class DocumentFaults(
     fun report(kind: SharedDocumentFault.Kind, message: String) {
         val fault = SharedDocumentFault(kind, documentKey, message, clock())
         Telemetry.event(
-            tag, "fault.${kind.name.lowercase()}", "documentId" to documentKey, "message" to message,
+            tag, "fault.${kind.name.lowercase()}", "documentId" attr documentKey, "message" attr message,
             level = if (fault.isError) Telemetry.Level.ERROR else Telemetry.Level.INFO,
         )
         held.value = (held.value + fault).takeLast(MAX_FAULTS)
@@ -30,7 +31,7 @@ internal class DocumentFaults(
 
     /** [error] while doing [what], reported as a [kind] fault with its stack in telemetry. */
     fun failed(kind: SharedDocumentFault.Kind, what: String, error: Throwable) {
-        Telemetry.error(tag, "storage.$what", error, "documentId" to documentKey)
+        Telemetry.error(tag, "storage.$what", error, "documentId" attr documentKey)
         report(kind, "$what failed: ${error.message ?: error::class.simpleName}")
     }
 

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.pairing.PairedHost
 import com.letta.mobile.data.pairing.PairingError
 import com.letta.mobile.data.pairing.RedeemOutcome
@@ -33,13 +34,13 @@ internal suspend fun presentInvite(
 ): RedeemOutcome {
     val response = runCatching { withTimeout(timeoutMs) { exchange() } }.getOrElse { failure ->
         when (failure) {
-            is TimeoutCancellationException -> Telemetry.event(PAIRING_TAG, "redeem.timeout", "host" to invite.hostFingerprint)
+            is TimeoutCancellationException -> Telemetry.event(PAIRING_TAG, "redeem.timeout", "host" attr invite.hostFingerprint)
             is CancellationException, !is Exception -> throw failure
             else -> Telemetry.event(
                 PAIRING_TAG,
                 "redeem.unreachable",
-                "host" to invite.hostFingerprint,
-                "class" to failure::class.simpleName,
+                "host" attr invite.hostFingerprint,
+                "class" attr failure::class.simpleName,
             )
         }
         return RedeemOutcome.Failed(PairingError.HOST_UNREACHABLE)
@@ -56,7 +57,7 @@ internal fun inviteOutcomeOf(response: AppServerInboundFrame.AuthResponse, host:
         "rate_limited" -> PairingError.RATE_LIMITED
         else -> PairingError.DENIED
     }
-    Telemetry.event(PAIRING_TAG, "redeem.rejected", "reason" to error.name)
+    Telemetry.event(PAIRING_TAG, "redeem.rejected", "reason" attr error.name)
     return RedeemOutcome.Failed(error)
 }
 

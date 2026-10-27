@@ -1,5 +1,9 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.textOrNull
+
+import com.letta.mobile.util.booleanOrNull
+
 import app.cash.turbine.test
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
@@ -58,6 +62,18 @@ import kotlinx.serialization.json.put
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppServerTurnEngineTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     /**
      * letta-mobile-4rxis: letta-code owns context management from the agent's own compaction
      * settings. A user turn goes straight to runtime_start + input; the engine never reads the
@@ -295,7 +311,10 @@ class AppServerTurnEngineTest {
             expectNoEvents()
 
             client.emit(streamDelta(messageType = "assistant_message", runId = "run-1"))
-            assertEquals("requires_approval", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).body.jsonDeltaString("stop_reason"))
+            assertEquals(
+                "requires_approval",
+                assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).body.jsonDeltaString("stop_reason"),
+            )
             assertEquals("assistant_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
 
             client.emit(streamDelta(messageType = "stop_reason", runId = "run-1", stopReason = "end_turn"))
@@ -936,10 +955,10 @@ class AppServerTurnEngineTest {
         val released = com.letta.mobile.util.Telemetry.snapshot().first {
             it.tag == "AppServerTurnEngine" && it.name == "activeTurn.released"
         }
-        assertEquals(RuntimeRunStatus.Completed.name, released.attrs["lastTerminal"])
-        assertEquals(true, released.attrs["lastTerminalScopeMatched"])
-        assertNotNull(released.attrs["lastTerminalSource"])
-        assertEquals("normal_completion", released.attrs["releaseReason"])
+        assertEquals(RuntimeRunStatus.Completed.name, released.attrs["lastTerminal"]?.textOrNull)
+        assertEquals(true, released.attrs["lastTerminalScopeMatched"]?.booleanOrNull)
+        assertNotNull(released.attrs["lastTerminalSource"]?.textOrNull)
+        assertEquals("normal_completion", released.attrs["releaseReason"]?.textOrNull)
     }
 
     @Test
@@ -971,7 +990,7 @@ class AppServerTurnEngineTest {
         val released = com.letta.mobile.util.Telemetry.snapshot().first {
             it.tag == "AppServerTurnEngine" && it.name == "activeTurn.released"
         }
-        assertEquals("watchdog_timeout", released.attrs["releaseReason"])
+        assertEquals("watchdog_timeout", released.attrs["releaseReason"]?.textOrNull)
     }
 
     @Test
@@ -1029,9 +1048,9 @@ class AppServerTurnEngineTest {
         val released = com.letta.mobile.util.Telemetry.snapshot().first {
             it.tag == "AppServerTurnEngine" && it.name == "activeTurn.released"
         }
-        assertEquals(RuntimeRunStatus.Failed.name, released.attrs["lastTerminal"])
-        assertEquals(false, released.attrs["lastTerminalScopeMatched"])
-        assertEquals("authoritative_terminal_scope_mismatched", released.attrs["lastTerminalSource"])
+        assertEquals(RuntimeRunStatus.Failed.name, released.attrs["lastTerminal"]?.textOrNull)
+        assertEquals(false, released.attrs["lastTerminalScopeMatched"]?.booleanOrNull)
+        assertEquals("authoritative_terminal_scope_mismatched", released.attrs["lastTerminalSource"]?.textOrNull)
     }
 
     @Test

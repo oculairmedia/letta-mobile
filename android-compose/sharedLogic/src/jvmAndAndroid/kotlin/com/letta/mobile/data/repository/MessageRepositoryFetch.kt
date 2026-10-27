@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.mapper.toAppMessages
 import com.letta.mobile.data.model.AgentId
@@ -53,7 +54,7 @@ internal object MessageRepositoryFetch {
             Telemetry.event(
                 "MessageRepository",
                 "fetchMessages failed",
-                "error" to (e.message ?: e.toString()),
+                "error" attr (e.message ?: e.toString()),
                 level = Telemetry.Level.WARN,
             )
             emptyList()

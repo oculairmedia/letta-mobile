@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.send
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.Job
@@ -19,17 +20,17 @@ internal class ChatSendStrategySelector(
     ): Job {
         Telemetry.event(
             "AdminChatVM", "sendMessage.route",
-            "via" to channelStrategy.routeName,
-            "length" to text.length,
-            "attachments" to attachments.size,
-            "conversationId" to context.explicitConversationId,
-            "backendKind" to context.backendKind.name,
+            "via" attr channelStrategy.routeName,
+            "length" attr text.length,
+            "attachments" attr attachments.size,
+            "conversationId" attr context.explicitConversationId,
+            "backendKind" attr context.backendKind.name,
         )
         Telemetry.event(
             "IrohTrace", "send.route",
-            "via" to channelStrategy.routeName,
-            "conversationId" to context.explicitConversationId,
-            "backendKind" to context.backendKind.name,
+            "via" attr channelStrategy.routeName,
+            "conversationId" attr context.explicitConversationId,
+            "backendKind" attr context.backendKind.name,
         )
         return channelStrategy.send(text, attachments)
     }

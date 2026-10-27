@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.coordination
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.RosterNameResolver
 import com.letta.mobile.data.repository.RosterNameTelemetry
@@ -378,7 +379,7 @@ internal class ChatConversationCoordinator(
             isLoadingOlderMessages = false,
             hasMoreOlderMessages = false,
         )
-        loadTimer.stop("result" to "noConversation")
+        loadTimer.stop("result" attr "noConversation")
         return true
     }
 
@@ -400,7 +401,7 @@ internal class ChatConversationCoordinator(
 
     private fun loadRemoteConversation(conversationId: CoordinatorConversationId, loadTimer: Telemetry.Timer): Boolean {
         if (!isCurrentConversation(conversationId)) {
-            loadTimer.stop("result" to "staleConversation")
+            loadTimer.stop("result" attr "staleConversation")
             return false
         }
         completeRemoteConversationLoad(
@@ -429,7 +430,7 @@ internal class ChatConversationCoordinator(
         hydratedConversationId = conversationId.value
         startTimelineObserver(conversationId.value)
         recentMessagesReconcileLauncher.launch(ConversationOpenReconcileRequest(conversationId.value))
-        loadTimer.stop("conversationId" to conversationId.value, "mode" to "timeline")
+        loadTimer.stop("conversationId" attr conversationId.value, "mode" attr "timeline")
     }
 
     private fun isCurrentConversation(conversationId: CoordinatorConversationId): Boolean =

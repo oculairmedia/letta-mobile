@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.Job
@@ -32,10 +33,10 @@ internal class BusyOwnerReconciler(
         val liveness = probe.probe(scope)
         Telemetry.event(
             "AppServerTurnEngine", "activeTurn.reconciled",
-            "key" to slot.key.toString(),
-            "leaseToken" to owner.token,
-            "ownerPhase" to owner.phase.name,
-            "liveness" to liveness.name,
+            "key" attr slot.key.toString(),
+            "leaseToken" attr owner.token,
+            "ownerPhase" attr owner.phase.name,
+            "liveness" attr liveness.name,
         )
         if (liveness != OwnerLiveness.Dead) return false
         return releaseDeadOwner(slot, owner)
@@ -50,13 +51,13 @@ internal class BusyOwnerReconciler(
         val holder = slot.lease
         Telemetry.event(
             "AppServerTurnEngine", "activeTurn.rejectedSameKey",
-            "key" to slot.key.toString(),
-            "rejectedLeaseToken" to rejected.token,
-            "ownerLeaseToken" to holder?.token,
-            "ownerPhase" to holder?.phase?.name,
-            "ownerRunId" to (holder?.runId ?: "<none>"),
-            "ownerHeldForMs" to holder?.acquiredAtMs?.let { rejected.acquiredAtMs - it },
-            "otherBusyKeys" to otherBusyKeys(slot.key).joinToString(",") { it.toString() },
+            "key" attr slot.key.toString(),
+            "rejectedLeaseToken" attr rejected.token,
+            "ownerLeaseToken" attr holder?.token,
+            "ownerPhase" attr holder?.phase?.name,
+            "ownerRunId" attr (holder?.runId ?: "<none>"),
+            "ownerHeldForMs" attr holder?.acquiredAtMs?.let { rejected.acquiredAtMs - it },
+            "otherBusyKeys" attr otherBusyKeys(slot.key).joinToString(",") { it.toString() },
             level = Telemetry.Level.WARN,
         )
         throw IllegalStateException(
@@ -78,12 +79,12 @@ internal class BusyOwnerReconciler(
         // terminal frame. Scoped to ONE key so it also proves it never reaches across runtimes.
         Telemetry.event(
             "AppServerTurnEngine", "activeTurn.releasedByReconciler",
-            "key" to slot.key.toString(),
-            "leaseToken" to owner.token,
-            "runId" to (owner.runId ?: "<none>"),
-            "reason" to "loop_waiting_on_input",
-            "lastTerminal" to (owner.lastTerminal ?: "<none>"),
-            "otherBusyKeys" to otherBusyKeys(slot.key).joinToString(",") { it.toString() },
+            "key" attr slot.key.toString(),
+            "leaseToken" attr owner.token,
+            "runId" attr (owner.runId ?: "<none>"),
+            "reason" attr "loop_waiting_on_input",
+            "lastTerminal" attr (owner.lastTerminal ?: "<none>"),
+            "otherBusyKeys" attr otherBusyKeys(slot.key).joinToString(",") { it.toString() },
             level = Telemetry.Level.WARN,
         )
         return slot.lease?.token != owner.token

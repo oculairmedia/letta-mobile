@@ -1,5 +1,6 @@
 package com.letta.mobile.channel
 
+import com.letta.mobile.util.attr
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -68,15 +69,15 @@ class ApprovalNotificationPublisher @Inject constructor(
             .setAutoCancel(true)
             .build()
         return runCatching { manager.notify(TAG_PREFIX + event.conversationId, NOTIFICATION_ID, notification) }
-            .onFailure { Telemetry.error("ApprovalNotificationPublisher", "publishFailed", it, "conversationId" to event.conversationId) }
+            .onFailure { Telemetry.error("ApprovalNotificationPublisher", "publishFailed", it, "conversationId" attr event.conversationId) }
             .isSuccess
     }
 
     private fun blocked(event: AttentionEvent.ApprovalNeeded, reason: String): Boolean {
         Telemetry.event(
             "ApprovalNotificationPublisher", "publishBlocked",
-            "reason" to reason,
-            "conversationId" to event.conversationId,
+            "reason" attr reason,
+            "conversationId" attr event.conversationId,
         )
         return false
     }

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.view
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 
 /** Which way a message went across the bridge. */
@@ -30,12 +31,12 @@ fun interface ViewAuditSink {
             Telemetry.event(
                 TAG,
                 EVENT,
-                "pluginId" to entry.view.pluginId,
-                "pageId" to entry.view.pageId,
-                "elementId" to entry.view.elementId,
-                "direction" to entry.direction.name,
-                "method" to entry.method,
-                "refusal" to entry.refusal?.name,
+                "pluginId" attr entry.view.pluginId,
+                "pageId" attr entry.view.pageId,
+                "elementId" attr entry.view.elementId,
+                "direction" attr entry.direction.name,
+                "method" attr entry.method,
+                "refusal" attr entry.refusal?.name,
                 level = if (entry.refusal == null) Telemetry.Level.INFO else Telemetry.Level.WARN,
             )
         }

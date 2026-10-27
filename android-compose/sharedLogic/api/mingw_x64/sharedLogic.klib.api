@@ -23178,6 +23178,53 @@ sealed interface com.letta.mobile.ui.chat.session/ChatSurfaceIntent { // com.let
     }
 }
 
+sealed interface com.letta.mobile.util/TelemetryValue { // com.letta.mobile.util/TelemetryValue|null[0]
+    final class Flag : com.letta.mobile.util/TelemetryValue { // com.letta.mobile.util/TelemetryValue.Flag|null[0]
+        constructor <init>(kotlin/Boolean) // com.letta.mobile.util/TelemetryValue.Flag.<init>|<init>(kotlin.Boolean){}[0]
+
+        final val value // com.letta.mobile.util/TelemetryValue.Flag.value|{}value[0]
+            final fun <get-value>(): kotlin/Boolean // com.letta.mobile.util/TelemetryValue.Flag.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): kotlin/Boolean // com.letta.mobile.util/TelemetryValue.Flag.component1|component1(){}[0]
+        final fun copy(kotlin/Boolean = ...): com.letta.mobile.util/TelemetryValue.Flag // com.letta.mobile.util/TelemetryValue.Flag.copy|copy(kotlin.Boolean){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.util/TelemetryValue.Flag.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.util/TelemetryValue.Flag.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.util/TelemetryValue.Flag.toString|toString(){}[0]
+    }
+
+    final class Numeric : com.letta.mobile.util/TelemetryValue { // com.letta.mobile.util/TelemetryValue.Numeric|null[0]
+        constructor <init>(kotlin/Number) // com.letta.mobile.util/TelemetryValue.Numeric.<init>|<init>(kotlin.Number){}[0]
+
+        final val value // com.letta.mobile.util/TelemetryValue.Numeric.value|{}value[0]
+            final fun <get-value>(): kotlin/Number // com.letta.mobile.util/TelemetryValue.Numeric.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): kotlin/Number // com.letta.mobile.util/TelemetryValue.Numeric.component1|component1(){}[0]
+        final fun copy(kotlin/Number = ...): com.letta.mobile.util/TelemetryValue.Numeric // com.letta.mobile.util/TelemetryValue.Numeric.copy|copy(kotlin.Number){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.util/TelemetryValue.Numeric.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.util/TelemetryValue.Numeric.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.util/TelemetryValue.Numeric.toString|toString(){}[0]
+    }
+
+    final class Text : com.letta.mobile.util/TelemetryValue { // com.letta.mobile.util/TelemetryValue.Text|null[0]
+        constructor <init>(kotlin/String) // com.letta.mobile.util/TelemetryValue.Text.<init>|<init>(kotlin.String){}[0]
+
+        final val value // com.letta.mobile.util/TelemetryValue.Text.value|{}value[0]
+            final fun <get-value>(): kotlin/String // com.letta.mobile.util/TelemetryValue.Text.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): kotlin/String // com.letta.mobile.util/TelemetryValue.Text.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): com.letta.mobile.util/TelemetryValue.Text // com.letta.mobile.util/TelemetryValue.Text.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.util/TelemetryValue.Text.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.util/TelemetryValue.Text.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.util/TelemetryValue.Text.toString|toString(){}[0]
+    }
+
+    final object Null : com.letta.mobile.util/TelemetryValue { // com.letta.mobile.util/TelemetryValue.Null|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.util/TelemetryValue.Null.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.letta.mobile.util/TelemetryValue.Null.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.letta.mobile.util/TelemetryValue.Null.toString|toString(){}[0]
+    }
+}
+
 abstract class com.letta.mobile.data.backend/UnservedStandIn : com.letta.mobile.data.backend/UnservedRoute { // com.letta.mobile.data.backend/UnservedStandIn|null[0]
     constructor <init>(com.letta.mobile.data.backend/SessionRoute, kotlin/String) // com.letta.mobile.data.backend/UnservedStandIn.<init>|<init>(com.letta.mobile.data.backend.SessionRoute;kotlin.String){}[0]
 
@@ -62617,8 +62664,8 @@ final class com.letta.mobile.util/AgentConversationFleetPaging { // com.letta.mo
 final class com.letta.mobile.util/TelemetryContext { // com.letta.mobile.util/TelemetryContext|null[0]
     constructor <init>() // com.letta.mobile.util/TelemetryContext.<init>|<init>(){}[0]
 
-    final inline fun error(kotlin/String, kotlin/String, kotlin/Throwable, kotlin/Array<out kotlin/Pair<kotlin/String, kotlin/Any?>>...) // com.letta.mobile.util/TelemetryContext.error|error(kotlin.String;kotlin.String;kotlin.Throwable;kotlin.Array<out|kotlin.Pair<kotlin.String,kotlin.Any?>>...){}[0]
-    final inline fun event(kotlin/String, kotlin/String, kotlin/Array<out kotlin/Pair<kotlin/String, kotlin/Any?>>..., kotlin/Long? = ..., com.letta.mobile.util/Telemetry.Level = ...) // com.letta.mobile.util/TelemetryContext.event|event(kotlin.String;kotlin.String;kotlin.Array<out|kotlin.Pair<kotlin.String,kotlin.Any?>>...;kotlin.Long?;com.letta.mobile.util.Telemetry.Level){}[0]
+    final inline fun error(kotlin/String, kotlin/String, kotlin/Throwable, kotlin/Array<out kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue>>...) // com.letta.mobile.util/TelemetryContext.error|error(kotlin.String;kotlin.String;kotlin.Throwable;kotlin.Array<out|kotlin.Pair<kotlin.String,com.letta.mobile.util.TelemetryValue>>...){}[0]
+    final inline fun event(kotlin/String, kotlin/String, kotlin/Array<out kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue>>..., kotlin/Long? = ..., com.letta.mobile.util/Telemetry.Level = ...) // com.letta.mobile.util/TelemetryContext.event|event(kotlin.String;kotlin.String;kotlin.Array<out|kotlin.Pair<kotlin.String,com.letta.mobile.util.TelemetryValue>>...;kotlin.Long?;com.letta.mobile.util.Telemetry.Level){}[0]
     final inline fun startTimer(kotlin/String, kotlin/String): com.letta.mobile.util/Telemetry.Timer // com.letta.mobile.util/TelemetryContext.startTimer|startTimer(kotlin.String;kotlin.String){}[0]
 }
 
@@ -62627,6 +62674,17 @@ final class com.letta.mobile.util/TelemetryFlag { // com.letta.mobile.util/Telem
 
     final fun get(): kotlin/Boolean // com.letta.mobile.util/TelemetryFlag.get|get(){}[0]
     final fun set(kotlin/Boolean) // com.letta.mobile.util/TelemetryFlag.set|set(kotlin.Boolean){}[0]
+}
+
+final class com.letta.mobile.util/TelemetryRecorder { // com.letta.mobile.util/TelemetryRecorder|null[0]
+    constructor <init>() // com.letta.mobile.util/TelemetryRecorder.<init>|<init>(){}[0]
+
+    final val events // com.letta.mobile.util/TelemetryRecorder.events|{}events[0]
+        final fun <get-events>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<com.letta.mobile.util/Telemetry.Event>> // com.letta.mobile.util/TelemetryRecorder.events.<get-events>|<get-events>(){}[0]
+
+    final fun clear() // com.letta.mobile.util/TelemetryRecorder.clear|clear(){}[0]
+    final fun record(com.letta.mobile.util/Telemetry.Event) // com.letta.mobile.util/TelemetryRecorder.record|record(com.letta.mobile.util.Telemetry.Event){}[0]
+    final fun snapshot(): kotlin.collections/List<com.letta.mobile.util/Telemetry.Event> // com.letta.mobile.util/TelemetryRecorder.snapshot|snapshot(){}[0]
 }
 
 final value class com.letta.mobile.data.canvas/CanvasConversationTarget { // com.letta.mobile.data.canvas/CanvasConversationTarget|null[0]
@@ -67150,12 +67208,12 @@ final object com.letta.mobile.data.repository/RosterNameTelemetry { // com.letta
     final fun cacheMiss(kotlin/String, kotlin/Int, kotlin/String) // com.letta.mobile.data.repository/RosterNameTelemetry.cacheMiss|cacheMiss(kotlin.String;kotlin.Int;kotlin.String){}[0]
     final fun classifyCompleteness(kotlin/Int, kotlin/Int?, kotlin/String = ...): com.letta.mobile.data.repository/RosterNameTelemetry.Completeness // com.letta.mobile.data.repository/RosterNameTelemetry.classifyCompleteness|classifyCompleteness(kotlin.Int;kotlin.Int?;kotlin.String){}[0]
     final fun classifyCompleteness(kotlin/Int, kotlin/Result<kotlin/Int?>): com.letta.mobile.data.repository/RosterNameTelemetry.Completeness // com.letta.mobile.data.repository/RosterNameTelemetry.classifyCompleteness|classifyCompleteness(kotlin.Int;kotlin.Result<kotlin.Int?>){}[0]
-    final fun completenessAttrs(com.letta.mobile.data.repository/RosterNameTelemetry.Completeness): kotlin.collections/List<kotlin/Pair<kotlin/String, kotlin/Any?>> // com.letta.mobile.data.repository/RosterNameTelemetry.completenessAttrs|completenessAttrs(com.letta.mobile.data.repository.RosterNameTelemetry.Completeness){}[0]
+    final fun completenessAttrs(com.letta.mobile.data.repository/RosterNameTelemetry.Completeness): kotlin.collections/List<kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue>> // com.letta.mobile.data.repository/RosterNameTelemetry.completenessAttrs|completenessAttrs(com.letta.mobile.data.repository.RosterNameTelemetry.Completeness){}[0]
     final fun completenessLevel(com.letta.mobile.data.repository/RosterNameTelemetry.Completeness): com.letta.mobile.util/Telemetry.Level // com.letta.mobile.data.repository/RosterNameTelemetry.completenessLevel|completenessLevel(com.letta.mobile.data.repository.RosterNameTelemetry.Completeness){}[0]
     final fun nameFallback(com.letta.mobile.data.repository/RosterNameTelemetry.NameFallbackSite, kotlin/String, kotlin/String, kotlin/Int) // com.letta.mobile.data.repository/RosterNameTelemetry.nameFallback|nameFallback(com.letta.mobile.data.repository.RosterNameTelemetry.NameFallbackSite;kotlin.String;kotlin.String;kotlin.Int){}[0]
     final fun resolveOutcome(kotlin/String, com.letta.mobile.data.repository/RosterNameTelemetry.ResolveOutcome, kotlin/String, kotlin/String? = ...) // com.letta.mobile.data.repository/RosterNameTelemetry.resolveOutcome|resolveOutcome(kotlin.String;com.letta.mobile.data.repository.RosterNameTelemetry.ResolveOutcome;kotlin.String;kotlin.String?){}[0]
     final fun rosterCompleteness(com.letta.mobile.data.repository/RosterNameTelemetry.Completeness, kotlin/String) // com.letta.mobile.data.repository/RosterNameTelemetry.rosterCompleteness|rosterCompleteness(com.letta.mobile.data.repository.RosterNameTelemetry.Completeness;kotlin.String){}[0]
-    final fun sweepStopAttrs(com.letta.mobile.data.repository/RosterNameTelemetry.SweepStop, kotlin/Int, kotlin/Int, kotlin/Int): kotlin.collections/List<kotlin/Pair<kotlin/String, kotlin/Any?>> // com.letta.mobile.data.repository/RosterNameTelemetry.sweepStopAttrs|sweepStopAttrs(com.letta.mobile.data.repository.RosterNameTelemetry.SweepStop;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+    final fun sweepStopAttrs(com.letta.mobile.data.repository/RosterNameTelemetry.SweepStop, kotlin/Int, kotlin/Int, kotlin/Int): kotlin.collections/List<kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue>> // com.letta.mobile.data.repository/RosterNameTelemetry.sweepStopAttrs|sweepStopAttrs(com.letta.mobile.data.repository.RosterNameTelemetry.SweepStop;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
     final fun sweepStopped(com.letta.mobile.data.repository/RosterNameTelemetry.SweepStop, kotlin/Int, kotlin/Int, kotlin/Int, kotlin/String) // com.letta.mobile.data.repository/RosterNameTelemetry.sweepStopped|sweepStopped(com.letta.mobile.data.repository.RosterNameTelemetry.SweepStop;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.String){}[0]
 
     final enum class NameFallbackSite : kotlin/Enum<com.letta.mobile.data.repository/RosterNameTelemetry.NameFallbackSite> { // com.letta.mobile.data.repository/RosterNameTelemetry.NameFallbackSite|null[0]
@@ -67887,10 +67945,6 @@ final object com.letta.mobile.data.workspace/WorkspacePaths { // com.letta.mobil
     final fun resolve(kotlin/String, kotlin/String?): kotlin/String // com.letta.mobile.data.workspace/WorkspacePaths.resolve|resolve(kotlin.String;kotlin.String?){}[0]
 }
 
-final object com.letta.mobile.runtime.iroh/IrohAndroidInit { // com.letta.mobile.runtime.iroh/IrohAndroidInit|null[0]
-    final fun install(kotlin/Any?) // com.letta.mobile.runtime.iroh/IrohAndroidInit.install|install(kotlin.Any?){}[0]
-}
-
 final object com.letta.mobile.ui.ambient/AmbientMotion { // com.letta.mobile.ui.ambient/AmbientMotion|null[0]
     final const val BASE_PERIOD_MILLIS // com.letta.mobile.ui.ambient/AmbientMotion.BASE_PERIOD_MILLIS|{}BASE_PERIOD_MILLIS[0]
         final fun <get-BASE_PERIOD_MILLIS>(): kotlin/Int // com.letta.mobile.ui.ambient/AmbientMotion.BASE_PERIOD_MILLIS.<get-BASE_PERIOD_MILLIS>|<get-BASE_PERIOD_MILLIS>(){}[0]
@@ -68278,9 +68332,10 @@ final object com.letta.mobile.util/Telemetry { // com.letta.mobile.util/Telemetr
     final fun clear() // com.letta.mobile.util/Telemetry.clear|clear(){}[0]
     final fun endAsyncTraceSection(kotlin/String, kotlin/Int) // com.letta.mobile.util/Telemetry.endAsyncTraceSection|endAsyncTraceSection(kotlin.String;kotlin.Int){}[0]
     final fun endTraceSection() // com.letta.mobile.util/Telemetry.endTraceSection|endTraceSection(){}[0]
-    final fun error(kotlin/String, kotlin/String, kotlin/Throwable, kotlin/Array<out kotlin/Pair<kotlin/String, kotlin/Any?>>...) // com.letta.mobile.util/Telemetry.error|error(kotlin.String;kotlin.String;kotlin.Throwable;kotlin.Array<out|kotlin.Pair<kotlin.String,kotlin.Any?>>...){}[0]
-    final fun event(kotlin/String, kotlin/String, kotlin/Array<out kotlin/Pair<kotlin/String, kotlin/Any?>>..., kotlin/Long? = ..., com.letta.mobile.util/Telemetry.Level = ...) // com.letta.mobile.util/Telemetry.event|event(kotlin.String;kotlin.String;kotlin.Array<out|kotlin.Pair<kotlin.String,kotlin.Any?>>...;kotlin.Long?;com.letta.mobile.util.Telemetry.Level){}[0]
+    final fun error(kotlin/String, kotlin/String, kotlin/Throwable, kotlin/Array<out kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue>>...) // com.letta.mobile.util/Telemetry.error|error(kotlin.String;kotlin.String;kotlin.Throwable;kotlin.Array<out|kotlin.Pair<kotlin.String,com.letta.mobile.util.TelemetryValue>>...){}[0]
+    final fun event(kotlin/String, kotlin/String, kotlin/Array<out kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue>>..., kotlin/Long? = ..., com.letta.mobile.util/Telemetry.Level = ...) // com.letta.mobile.util/Telemetry.event|event(kotlin.String;kotlin.String;kotlin.Array<out|kotlin.Pair<kotlin.String,com.letta.mobile.util.TelemetryValue>>...;kotlin.Long?;com.letta.mobile.util.Telemetry.Level){}[0]
     final fun exportText(): kotlin/String // com.letta.mobile.util/Telemetry.exportText|exportText(){}[0]
+    final fun installRecorder(com.letta.mobile.util/TelemetryRecorder): kotlin/AutoCloseable // com.letta.mobile.util/Telemetry.installRecorder|installRecorder(com.letta.mobile.util.TelemetryRecorder){}[0]
     final fun isChatHotPathDebugEnabled(): kotlin/Boolean // com.letta.mobile.util/Telemetry.isChatHotPathDebugEnabled|isChatHotPathDebugEnabled(){}[0]
     final fun isChatHydrationTraceEnabled(): kotlin/Boolean // com.letta.mobile.util/Telemetry.isChatHydrationTraceEnabled|isChatHydrationTraceEnabled(){}[0]
     final fun isFrameFlowDiagEnabled(): kotlin/Boolean // com.letta.mobile.util/Telemetry.isFrameFlowDiagEnabled|isFrameFlowDiagEnabled(){}[0]
@@ -68291,7 +68346,7 @@ final object com.letta.mobile.util/Telemetry { // com.letta.mobile.util/Telemetr
     final fun snapshot(): kotlin.collections/List<com.letta.mobile.util/Telemetry.Event> // com.letta.mobile.util/Telemetry.snapshot|snapshot(){}[0]
     final fun startTimer(kotlin/String, kotlin/String): com.letta.mobile.util/Telemetry.Timer // com.letta.mobile.util/Telemetry.startTimer|startTimer(kotlin.String;kotlin.String){}[0]
     final fun traceSectionName(kotlin/String, kotlin/String): kotlin/String // com.letta.mobile.util/Telemetry.traceSectionName|traceSectionName(kotlin.String;kotlin.String){}[0]
-    final inline fun <#A1: kotlin/Any?> measure(kotlin/String, kotlin/String, kotlin/Array<out kotlin/Pair<kotlin/String, kotlin/Any?>>..., kotlin/Function0<#A1>): #A1 // com.letta.mobile.util/Telemetry.measure|measure(kotlin.String;kotlin.String;kotlin.Array<out|kotlin.Pair<kotlin.String,kotlin.Any?>>...;kotlin.Function0<0:0>){0§<kotlin.Any?>}[0]
+    final inline fun <#A1: kotlin/Any?> measure(kotlin/String, kotlin/String, kotlin/Array<out kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue>>..., kotlin/Function0<#A1>): #A1 // com.letta.mobile.util/Telemetry.measure|measure(kotlin.String;kotlin.String;kotlin.Array<out|kotlin.Pair<kotlin.String,com.letta.mobile.util.TelemetryValue>>...;kotlin.Function0<0:0>){0§<kotlin.Any?>}[0]
 
     final enum class Level : kotlin/Enum<com.letta.mobile.util/Telemetry.Level> { // com.letta.mobile.util/Telemetry.Level|null[0]
         enum entry DEBUG // com.letta.mobile.util/Telemetry.Level.DEBUG|null[0]
@@ -68307,10 +68362,10 @@ final object com.letta.mobile.util/Telemetry { // com.letta.mobile.util/Telemetr
     }
 
     final class Event { // com.letta.mobile.util/Telemetry.Event|null[0]
-        constructor <init>(kotlin/Long, kotlin/String, kotlin/String, kotlin/Long?, kotlin.collections/Map<kotlin/String, kotlin/Any?>, com.letta.mobile.util/Telemetry.Level, kotlin/Throwable? = ...) // com.letta.mobile.util/Telemetry.Event.<init>|<init>(kotlin.Long;kotlin.String;kotlin.String;kotlin.Long?;kotlin.collections.Map<kotlin.String,kotlin.Any?>;com.letta.mobile.util.Telemetry.Level;kotlin.Throwable?){}[0]
+        constructor <init>(kotlin/Long, kotlin/String, kotlin/String, kotlin/Long?, kotlin.collections/Map<kotlin/String, com.letta.mobile.util/TelemetryValue>, com.letta.mobile.util/Telemetry.Level, kotlin/Throwable? = ...) // com.letta.mobile.util/Telemetry.Event.<init>|<init>(kotlin.Long;kotlin.String;kotlin.String;kotlin.Long?;kotlin.collections.Map<kotlin.String,com.letta.mobile.util.TelemetryValue>;com.letta.mobile.util.Telemetry.Level;kotlin.Throwable?){}[0]
 
         final val attrs // com.letta.mobile.util/Telemetry.Event.attrs|{}attrs[0]
-            final fun <get-attrs>(): kotlin.collections/Map<kotlin/String, kotlin/Any?> // com.letta.mobile.util/Telemetry.Event.attrs.<get-attrs>|<get-attrs>(){}[0]
+            final fun <get-attrs>(): kotlin.collections/Map<kotlin/String, com.letta.mobile.util/TelemetryValue> // com.letta.mobile.util/Telemetry.Event.attrs.<get-attrs>|<get-attrs>(){}[0]
         final val durationMs // com.letta.mobile.util/Telemetry.Event.durationMs|{}durationMs[0]
             final fun <get-durationMs>(): kotlin/Long? // com.letta.mobile.util/Telemetry.Event.durationMs.<get-durationMs>|<get-durationMs>(){}[0]
         final val level // com.letta.mobile.util/Telemetry.Event.level|{}level[0]
@@ -68328,10 +68383,10 @@ final object com.letta.mobile.util/Telemetry { // com.letta.mobile.util/Telemetr
         final fun component2(): kotlin/String // com.letta.mobile.util/Telemetry.Event.component2|component2(){}[0]
         final fun component3(): kotlin/String // com.letta.mobile.util/Telemetry.Event.component3|component3(){}[0]
         final fun component4(): kotlin/Long? // com.letta.mobile.util/Telemetry.Event.component4|component4(){}[0]
-        final fun component5(): kotlin.collections/Map<kotlin/String, kotlin/Any?> // com.letta.mobile.util/Telemetry.Event.component5|component5(){}[0]
+        final fun component5(): kotlin.collections/Map<kotlin/String, com.letta.mobile.util/TelemetryValue> // com.letta.mobile.util/Telemetry.Event.component5|component5(){}[0]
         final fun component6(): com.letta.mobile.util/Telemetry.Level // com.letta.mobile.util/Telemetry.Event.component6|component6(){}[0]
         final fun component7(): kotlin/Throwable? // com.letta.mobile.util/Telemetry.Event.component7|component7(){}[0]
-        final fun copy(kotlin/Long = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Long? = ..., kotlin.collections/Map<kotlin/String, kotlin/Any?> = ..., com.letta.mobile.util/Telemetry.Level = ..., kotlin/Throwable? = ...): com.letta.mobile.util/Telemetry.Event // com.letta.mobile.util/Telemetry.Event.copy|copy(kotlin.Long;kotlin.String;kotlin.String;kotlin.Long?;kotlin.collections.Map<kotlin.String,kotlin.Any?>;com.letta.mobile.util.Telemetry.Level;kotlin.Throwable?){}[0]
+        final fun copy(kotlin/Long = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Long? = ..., kotlin.collections/Map<kotlin/String, com.letta.mobile.util/TelemetryValue> = ..., com.letta.mobile.util/Telemetry.Level = ..., kotlin/Throwable? = ...): com.letta.mobile.util/Telemetry.Event // com.letta.mobile.util/Telemetry.Event.copy|copy(kotlin.Long;kotlin.String;kotlin.String;kotlin.Long?;kotlin.collections.Map<kotlin.String,com.letta.mobile.util.TelemetryValue>;com.letta.mobile.util.Telemetry.Level;kotlin.Throwable?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.letta.mobile.util/Telemetry.Event.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.letta.mobile.util/Telemetry.Event.hashCode|hashCode(){}[0]
         final fun toLine(): kotlin/String // com.letta.mobile.util/Telemetry.Event.toLine|toLine(){}[0]
@@ -68339,8 +68394,8 @@ final object com.letta.mobile.util/Telemetry { // com.letta.mobile.util/Telemetr
     }
 
     final class Timer { // com.letta.mobile.util/Telemetry.Timer|null[0]
-        final fun stop(kotlin/Array<out kotlin/Pair<kotlin/String, kotlin/Any?>>...) // com.letta.mobile.util/Telemetry.Timer.stop|stop(kotlin.Array<out|kotlin.Pair<kotlin.String,kotlin.Any?>>...){}[0]
-        final fun stopError(kotlin/Throwable, kotlin/Array<out kotlin/Pair<kotlin/String, kotlin/Any?>>...) // com.letta.mobile.util/Telemetry.Timer.stopError|stopError(kotlin.Throwable;kotlin.Array<out|kotlin.Pair<kotlin.String,kotlin.Any?>>...){}[0]
+        final fun stop(kotlin/Array<out kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue>>...) // com.letta.mobile.util/Telemetry.Timer.stop|stop(kotlin.Array<out|kotlin.Pair<kotlin.String,com.letta.mobile.util.TelemetryValue>>...){}[0]
+        final fun stopError(kotlin/Throwable, kotlin/Array<out kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue>>...) // com.letta.mobile.util/Telemetry.Timer.stopError|stopError(kotlin.Throwable;kotlin.Array<out|kotlin.Pair<kotlin.String,com.letta.mobile.util.TelemetryValue>>...){}[0]
     }
 }
 
@@ -68539,6 +68594,12 @@ final val com.letta.mobile.data.transport.appserver/snapshot // com.letta.mobile
     final fun (com.letta.mobile.data.transport.appserver/AppServerInboundFrame.UpdateDeviceStatus).<get-snapshot>(): com.letta.mobile.data.transport.appserver/AppServerDeviceStatusSnapshot // com.letta.mobile.data.transport.appserver/snapshot.<get-snapshot>|<get-snapshot>@com.letta.mobile.data.transport.appserver.AppServerInboundFrame.UpdateDeviceStatus(){}[0]
 final val com.letta.mobile.ui.ambient/LocalThinkingGlowStyle // com.letta.mobile.ui.ambient/LocalThinkingGlowStyle|{}LocalThinkingGlowStyle[0]
     final fun <get-LocalThinkingGlowStyle>(): androidx.compose.runtime/ProvidableCompositionLocal<com.letta.mobile.ui.ambient/ThinkingGlowStyle> // com.letta.mobile.ui.ambient/LocalThinkingGlowStyle.<get-LocalThinkingGlowStyle>|<get-LocalThinkingGlowStyle>(){}[0]
+final val com.letta.mobile.util/booleanOrNull // com.letta.mobile.util/booleanOrNull|@com.letta.mobile.util.TelemetryValue{}booleanOrNull[0]
+    final fun (com.letta.mobile.util/TelemetryValue).<get-booleanOrNull>(): kotlin/Boolean? // com.letta.mobile.util/booleanOrNull.<get-booleanOrNull>|<get-booleanOrNull>@com.letta.mobile.util.TelemetryValue(){}[0]
+final val com.letta.mobile.util/numberOrNull // com.letta.mobile.util/numberOrNull|@com.letta.mobile.util.TelemetryValue{}numberOrNull[0]
+    final fun (com.letta.mobile.util/TelemetryValue).<get-numberOrNull>(): kotlin/Number? // com.letta.mobile.util/numberOrNull.<get-numberOrNull>|<get-numberOrNull>@com.letta.mobile.util.TelemetryValue(){}[0]
+final val com.letta.mobile.util/textOrNull // com.letta.mobile.util/textOrNull|@com.letta.mobile.util.TelemetryValue{}textOrNull[0]
+    final fun (com.letta.mobile.util/TelemetryValue).<get-textOrNull>(): kotlin/String? // com.letta.mobile.util/textOrNull.<get-textOrNull>|<get-textOrNull>@com.letta.mobile.util.TelemetryValue(){}[0]
 
 final fun (com.letta.mobile.data.a2ui/A2uiAction).com.letta.mobile.data.a2ui/toToolApprovalSubmission(): com.letta.mobile.data.a2ui/A2uiToolApprovalSubmission? // com.letta.mobile.data.a2ui/toToolApprovalSubmission|toToolApprovalSubmission@com.letta.mobile.data.a2ui.A2uiAction(){}[0]
 final fun (com.letta.mobile.data.agenteditor/AgentEditorState).com.letta.mobile.data.agenteditor/errorNote(): com.letta.mobile.data.settings/SettingsRow.Note? // com.letta.mobile.data.agenteditor/errorNote|errorNote@com.letta.mobile.data.agenteditor.AgentEditorState(){}[0]
@@ -68678,6 +68739,7 @@ final fun (com.letta.mobile.ui.chat.session/TimelineLocalState).com.letta.mobile
 final fun (com.letta.mobile.ui.chat.session/TimelineLocalState).com.letta.mobile.ui.chat.session/pageError(kotlin/String?): kotlin/String? // com.letta.mobile.ui.chat.session/pageError|pageError@com.letta.mobile.ui.chat.session.TimelineLocalState(kotlin.String?){}[0]
 final fun (io.ktor.client.plugins.websocket/WebSockets.Config).com.letta.mobile.data.transport.appserver/applyAppServerFrameLimits() // com.letta.mobile.data.transport.appserver/applyAppServerFrameLimits|applyAppServerFrameLimits@io.ktor.client.plugins.websocket.WebSockets.Config(){}[0]
 final fun (kotlin.collections/Iterable<com.letta.mobile.data.model/Conversation>).com.letta.mobile.data.chat.runtime/toChatConversationSummaries(kotlin.collections/Map<kotlin/String, kotlin/String> = ...): kotlin.collections/List<com.letta.mobile.data.chat.runtime/ChatConversationSummary> // com.letta.mobile.data.chat.runtime/toChatConversationSummaries|toChatConversationSummaries@kotlin.collections.Iterable<com.letta.mobile.data.model.Conversation>(kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+final fun (kotlin.collections/Iterable<kotlin/Pair<kotlin/String, kotlin/String?>>).com.letta.mobile.util/telemetryAttributes(): kotlin/Array<kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue>> // com.letta.mobile.util/telemetryAttributes|telemetryAttributes@kotlin.collections.Iterable<kotlin.Pair<kotlin.String,kotlin.String?>>(){}[0]
 final fun (kotlin.collections/List<com.letta.mobile.data.canvas/CanvasStorageFault>).com.letta.mobile.data.canvas/affecting(com.letta.mobile.data.model/CanvasId): kotlin.collections/List<com.letta.mobile.data.canvas/CanvasStorageFault> // com.letta.mobile.data.canvas/affecting|affecting@kotlin.collections.List<com.letta.mobile.data.canvas.CanvasStorageFault>(com.letta.mobile.data.model.CanvasId){}[0]
 final fun (kotlin.collections/List<com.letta.mobile.data.chat.projection/ToolTimelineGroup>).com.letta.mobile.data.chat.projection/aggregateState(): com.letta.mobile.data.chat.projection/ToolTimelineState // com.letta.mobile.data.chat.projection/aggregateState|aggregateState@kotlin.collections.List<com.letta.mobile.data.chat.projection.ToolTimelineGroup>(){}[0]
 final fun (kotlin.collections/List<com.letta.mobile.data.memory/MemoryTextLink>).com.letta.mobile.data.memory/segmentsForText(kotlin/String): kotlin.collections/List<com.letta.mobile.data.memory/MemoryTextSegment> // com.letta.mobile.data.memory/segmentsForText|segmentsForText@kotlin.collections.List<com.letta.mobile.data.memory.MemoryTextLink>(kotlin.String){}[0]
@@ -68695,6 +68757,7 @@ final fun (kotlin.collections/List<kotlinx.serialization.json/JsonElement>).com.
 final fun (kotlin.collections/Map<com.letta.mobile.data.context/ContextReadingKey, kotlin/Int>).com.letta.mobile.data.context/readingFor(kotlin/String?, kotlin/String?): kotlin/Int? // com.letta.mobile.data.context/readingFor|readingFor@kotlin.collections.Map<com.letta.mobile.data.context.ContextReadingKey,kotlin.Int>(kotlin.String?;kotlin.String?){}[0]
 final fun (kotlin.collections/Map<kotlin/String, com.letta.mobile.data.presence/AgentPresence>).com.letta.mobile.data.presence/runningAgentIds(): kotlin.collections/Set<kotlin/String> // com.letta.mobile.data.presence/runningAgentIds|runningAgentIds@kotlin.collections.Map<kotlin.String,com.letta.mobile.data.presence.AgentPresence>(){}[0]
 final fun (kotlin.collections/Map<kotlin/String, com.letta.mobile.data.presence/ConversationRunState>).com.letta.mobile.data.presence/presenceByAgent(): kotlin.collections/Map<kotlin/String, com.letta.mobile.data.presence/AgentPresence> // com.letta.mobile.data.presence/presenceByAgent|presenceByAgent@kotlin.collections.Map<kotlin.String,com.letta.mobile.data.presence.ConversationRunState>(){}[0]
+final fun (kotlin/Array<out kotlin/Pair<kotlin/String, kotlin/String?>>).com.letta.mobile.util/telemetryAttributes(): kotlin/Array<kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue>> // com.letta.mobile.util/telemetryAttributes|telemetryAttributes@kotlin.Array<out|kotlin.Pair<kotlin.String,kotlin.String?>>(){}[0]
 final fun (kotlin/String).com.letta.mobile.data.a2ui/clampToA2uiTextLimit(): kotlin/String // com.letta.mobile.data.a2ui/clampToA2uiTextLimit|clampToA2uiTextLimit@kotlin.String(){}[0]
 final fun (kotlin/String).com.letta.mobile.data.chat.projection/toChatDisplayMode(): com.letta.mobile.data.chat.projection/ChatDisplayMode // com.letta.mobile.data.chat.projection/toChatDisplayMode|toChatDisplayMode@kotlin.String(){}[0]
 final fun (kotlin/String).com.letta.mobile.data.chat.tools.shell/isShellProgram(): kotlin/Boolean // com.letta.mobile.data.chat.tools.shell/isShellProgram|isShellProgram@kotlin.String(){}[0]
@@ -68702,6 +68765,10 @@ final fun (kotlin/String).com.letta.mobile.data.chat.tools.shell/isShellScriptFl
 final fun (kotlin/String).com.letta.mobile.data.chat.tools.shell/shellQuoted(): kotlin/String // com.letta.mobile.data.chat.tools.shell/shellQuoted|shellQuoted@kotlin.String(){}[0]
 final fun (kotlin/String).com.letta.mobile.data.swarm/withSenderLine(com.letta.mobile.data.swarm/SenderLabel?): kotlin/String // com.letta.mobile.data.swarm/withSenderLine|withSenderLine@kotlin.String(com.letta.mobile.data.swarm.SenderLabel?){}[0]
 final fun (kotlin/String).com.letta.mobile.data.timeline/stripEnvelopeReminders(): kotlin/String // com.letta.mobile.data.timeline/stripEnvelopeReminders|stripEnvelopeReminders@kotlin.String(){}[0]
+final fun (kotlin/String).com.letta.mobile.util/attr(com.letta.mobile.util/TelemetryValue): kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue> // com.letta.mobile.util/attr|attr@kotlin.String(com.letta.mobile.util.TelemetryValue){}[0]
+final fun (kotlin/String).com.letta.mobile.util/attr(kotlin/Boolean?): kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue> // com.letta.mobile.util/attr|attr@kotlin.String(kotlin.Boolean?){}[0]
+final fun (kotlin/String).com.letta.mobile.util/attr(kotlin/Number?): kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue> // com.letta.mobile.util/attr|attr@kotlin.String(kotlin.Number?){}[0]
+final fun (kotlin/String).com.letta.mobile.util/attr(kotlin/String?): kotlin/Pair<kotlin/String, com.letta.mobile.util/TelemetryValue> // com.letta.mobile.util/attr|attr@kotlin.String(kotlin.String?){}[0]
 final fun (kotlin/Throwable).com.letta.mobile.data.controller.fanout/isRuntimeStreamDetached(): kotlin/Boolean // com.letta.mobile.data.controller.fanout/isRuntimeStreamDetached|isRuntimeStreamDetached@kotlin.Throwable(){}[0]
 final fun (kotlin/Throwable).com.letta.mobile.data.controller.fanout/isRuntimeSubscriberOverflow(): kotlin/Boolean // com.letta.mobile.data.controller.fanout/isRuntimeSubscriberOverflow|isRuntimeSubscriberOverflow@kotlin.Throwable(){}[0]
 final fun (kotlinx.coroutines.flow/Flow<com.letta.mobile.data.context/ContextReadingInputs>).com.letta.mobile.data.context/contextUsageStates(): kotlinx.coroutines.flow/Flow<com.letta.mobile.data.context/ContextWindowUsageState> // com.letta.mobile.data.context/contextUsageStates|contextUsageStates@kotlinx.coroutines.flow.Flow<com.letta.mobile.data.context.ContextReadingInputs>(){}[0]

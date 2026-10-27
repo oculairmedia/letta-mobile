@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.IdFormats
@@ -133,8 +134,8 @@ class ChatSendCoordinator(
         } catch (failure: Throwable) {
             Telemetry.error(
                 "AdminChatVM", "ws.event.handlerFailed", failure,
-                "eventType" to (frame ?: ""),
-                "agentId" to agentId,
+                "eventType" attr (frame ?: ""),
+                "agentId" attr agentId,
             )
         }
     }
@@ -171,9 +172,9 @@ class ChatSendCoordinator(
         if (others.isEmpty()) return
         Telemetry.event(
             "AdminChatVM", "ws.send.crossConversationOverlap",
-            "conversationId" to conversationId,
-            "otherConversations" to others.size,
-            "otherTurnIds" to others.joinToString(",") { it.turnId ?: "<awaiting-turn-started>" },
+            "conversationId" attr conversationId,
+            "otherConversations" attr others.size,
+            "otherTurnIds" attr others.joinToString(",") { it.turnId ?: "<awaiting-turn-started>" },
         )
     }
 
@@ -185,10 +186,10 @@ class ChatSendCoordinator(
     private fun reportUnmatchedFrame(event: WsTimelineEvent, tail: TurnTail) {
         Telemetry.event(
             "AdminChatVM", "ws.event.unmatchedConversation",
-            "eventType" to (event::class.simpleName ?: ""),
-            "turnId" to (tail.turnId ?: ""),
-            "runId" to (tail.runId ?: ""),
-            "trackedConversations" to turnRegistry.trackedConversationCount,
+            "eventType" attr (event::class.simpleName ?: ""),
+            "turnId" attr (tail.turnId ?: ""),
+            "runId" attr (tail.runId ?: ""),
+            "trackedConversations" attr turnRegistry.trackedConversationCount,
         )
     }
 
@@ -225,10 +226,10 @@ class ChatSendCoordinator(
         healStaleVisualPresence(targetConversationId?.let(::ConversationId))
         Telemetry.event(
             "IrohTrace", "coordinator.send.begin",
-            "agentId" to agentId,
-            "textLength" to text.length,
-            "attachments" to attachments.size,
-            "activeConversationId" to targetConversationId,
+            "agentId" attr agentId,
+            "textLength" attr text.length,
+            "attachments" attr attachments.size,
+            "activeConversationId" attr targetConversationId,
         )
         // No bearer-token gate: the Iroh transport authenticates the paired
         // peer by NodeID and ignores the token (d6e8g.9). The legacy shim WS
@@ -252,7 +253,7 @@ class ChatSendCoordinator(
                     targetConversationId?.let(::ConversationId),
                     "Failed to create a new conversation: ${err.message ?: "unknown"}",
                 )
-                timer.stop("accepted" to false, "reason" to "create_failed")
+                timer.stop("accepted" attr false, "reason" attr "create_failed")
                 return
             }
         }
@@ -265,7 +266,7 @@ class ChatSendCoordinator(
                 targetConversationId?.let(::ConversationId),
                 "Conversation is not ready: ${failure.message ?: "unknown"}",
             )
-            timer.stop("accepted" to false, "reason" to "conversation_not_ready")
+            timer.stop("accepted" attr false, "reason" attr "conversation_not_ready")
             return
         }
         turnRegistry.stateFor(ConversationId(conversationId))
@@ -273,12 +274,12 @@ class ChatSendCoordinator(
         turnRegistry.lastActiveConversationId = conversationId
         showConversation(ConversationId(conversationId), targetConversationId?.let(::ConversationId))
 
-        Telemetry.event("IrohTrace", "coordinator.ensureConnected.begin", "conversationId" to conversationId)
+        Telemetry.event("IrohTrace", "coordinator.ensureConnected.begin", "conversationId" attr conversationId)
         val connected = queueTurns.ensureConnected(config, clientVersion)
-        Telemetry.event("IrohTrace", "coordinator.ensureConnected.done", "conversationId" to conversationId, "connected" to connected)
+        Telemetry.event("IrohTrace", "coordinator.ensureConnected.done", "conversationId" attr conversationId, "connected" attr connected)
         if (!connected) {
             foreground.sendFailed(ConversationId(conversationId), "Chat channel is not connected")
-            timer.stop("accepted" to false, "reason" to "not_connected")
+            timer.stop("accepted" attr false, "reason" attr "not_connected")
             return
         }
 
@@ -293,11 +294,11 @@ class ChatSendCoordinator(
         val queuePosition = queueDriver.submitLocked(pending)
         if (queuePosition != null) reportQueuedSend(pending, queuePosition)
         timer.stop(
-            "accepted" to true,
-            "conversationId" to conversationId,
-            "otid" to pending.id.value,
-            "attachments" to attachments.size,
-            "queued" to (queuePosition != null),
+            "accepted" attr true,
+            "conversationId" attr conversationId,
+            "otid" attr pending.id.value,
+            "attachments" attr attachments.size,
+            "queued" attr (queuePosition != null),
         )
     }
 
@@ -315,10 +316,10 @@ class ChatSendCoordinator(
         val config = activeConfig()
         Telemetry.event(
             "IrohTrace", "coordinator.config",
-            "hasConfig" to (config != null),
-            "mode" to config?.mode?.name,
-            "serverUrl" to backendUrlTelemetryDescriptor(config?.serverUrl),
-            "hasToken" to !config?.accessToken.isNullOrBlank(),
+            "hasConfig" attr (config != null),
+            "mode" attr config?.mode?.name,
+            "serverUrl" attr backendUrlTelemetryDescriptor(config?.serverUrl),
+            "hasToken" attr !config?.accessToken.isNullOrBlank(),
         )
         if (config == null) {
             foreground.sendFailed(conversation, "No active backend is configured")
@@ -338,10 +339,10 @@ class ChatSendCoordinator(
     ): Boolean {
         Telemetry.event(
             "IrohTrace", "dispatchPendingSend.bridgeSend.begin",
-            "agentId" to agentId,
-            "conversationId" to pending.conversationId.value,
-            "otid" to pending.id.value,
-            "clearComposer" to clearComposer,
+            "agentId" attr agentId,
+            "conversationId" attr pending.conversationId.value,
+            "otid" attr pending.id.value,
+            "clearComposer" attr clearComposer,
         )
         val state = turnRegistry.stateFor(ConversationId(pending.conversationId.value))
         val accepted = state.acceptSend(
@@ -362,9 +363,9 @@ class ChatSendCoordinator(
         )
         Telemetry.event(
             "IrohTrace", "dispatchPendingSend.bridgeSend.done",
-            "conversationId" to pending.conversationId.value,
-            "otid" to pending.id.value,
-            "accepted" to accepted,
+            "conversationId" attr pending.conversationId.value,
+            "otid" attr pending.id.value,
+            "accepted" attr accepted,
         )
         if (!accepted) return false
 
@@ -387,9 +388,9 @@ class ChatSendCoordinator(
         foreground.queued(pending)
         Telemetry.event(
             "AdminChatVM", "ws.send.enqueued",
-            "conversationId" to pending.conversationId.value,
-            "otid" to pending.id.value,
-            "position" to position,
+            "conversationId" attr pending.conversationId.value,
+            "otid" attr pending.id.value,
+            "position" attr position,
         )
     }
 
@@ -402,9 +403,9 @@ class ChatSendCoordinator(
         if (event.isForeignTo(agentId)) return
         Telemetry.event(
             "IrohTrace", "coordinator.event",
-            "type" to (event::class.simpleName ?: ""),
-            "lastActiveConversationId" to turnRegistry.lastActiveConversationId,
-            "trackedConversations" to turnRegistry.trackedConversationCount,
+            "type" attr (event::class.simpleName ?: ""),
+            "lastActiveConversationId" attr turnRegistry.lastActiveConversationId,
+            "trackedConversations" attr turnRegistry.trackedConversationCount,
         )
         if (bridgeEventDeduplicator.isDuplicate(event, messageDeduplicationScope(event))) return
         when (event) {
@@ -438,18 +439,18 @@ class ChatSendCoordinator(
         if (state.usageRecorded) {
             Telemetry.event(
                 "AdminChatVM", "ws.usage.duplicate",
-                "turnId" to event.turnId,
+                "turnId" attr event.turnId,
             )
         } else {
             state.usageRecorded = true
             foreground.usage(ConversationId(state.ownerConversationId), event)
             Telemetry.event(
                 "AdminChatVM", "ws.usage",
-                "prompt" to event.promptTokens,
-                "completion" to event.completionTokens,
-                "total" to event.totalTokens,
-                "turnId" to event.turnId,
-                "runId" to event.runId,
+                "prompt" attr event.promptTokens,
+                "completion" attr event.completionTokens,
+                "total" attr event.totalTokens,
+                "turnId" attr event.turnId,
+                "runId" attr event.runId,
             )
         }
     }
@@ -470,8 +471,8 @@ class ChatSendCoordinator(
         if (event.willReconnect && !event.isAuthFailure) {
             Telemetry.event(
                 "AdminChatVM", "ws.disconnected.transient",
-                "code" to event.code,
-                "attempt" to event.reconnectAttempt,
+                "code" attr event.code,
+                "attempt" attr event.reconnectAttempt,
             )
             foreground.transientDisconnect(turnRegistry.statesSnapshot)
             return
@@ -546,19 +547,19 @@ class ChatSendCoordinator(
             is RecentMessagesReconcileOutcome.Skipped -> {
                 Telemetry.event(
                     "AdminChatVM", "ws.redialRecovery.reconcileSkipped",
-                    "conversationId" to event.conversationId,
-                    "turnId" to event.turnId,
-                    "runId" to event.runId,
-                    "reason" to outcome.reason,
+                    "conversationId" attr event.conversationId,
+                    "turnId" attr event.turnId,
+                    "runId" attr event.runId,
+                    "reason" attr outcome.reason,
                 )
                 return
             }
             is RecentMessagesReconcileOutcome.Failed -> {
                 Telemetry.error(
                     "AdminChatVM", "ws.redialRecovery.reconcileFailed", outcome.cause,
-                    "conversationId" to event.conversationId,
-                    "turnId" to event.turnId,
-                    "runId" to event.runId,
+                    "conversationId" attr event.conversationId,
+                    "turnId" attr event.turnId,
+                    "runId" attr event.runId,
                 )
                 return
             }
@@ -591,10 +592,10 @@ class ChatSendCoordinator(
         if (event.turnId.isBlank() || event.turnId == activeTurn) return false
         Telemetry.event(
             "AdminChatVM", "ws.stopReason.foreignTurnIgnored",
-            "conversationId" to state.conversationId,
-            "received" to event.stopReason,
-            "turnId" to event.turnId,
-            "activeTurnId" to activeTurn,
+            "conversationId" attr state.conversationId,
+            "received" attr event.stopReason,
+            "turnId" attr event.turnId,
+            "activeTurnId" attr activeTurn,
         )
         return true
     }
@@ -614,9 +615,9 @@ class ChatSendCoordinator(
                 state.stopReason = event.stopReason
                 Telemetry.event(
                     "AdminChatVM", "ws.stopReason",
-                    "value" to event.stopReason,
-                    "turnId" to event.turnId,
-                    "runId" to event.runId,
+                    "value" attr event.stopReason,
+                    "turnId" attr event.turnId,
+                    "runId" attr event.runId,
                 )
             }
             TurnFailureNotices.isCompletedMainReplyStopReason(event.stopReason) &&
@@ -624,17 +625,17 @@ class ChatSendCoordinator(
                 state.stopReason = event.stopReason
                 Telemetry.event(
                     "AdminChatVM", "ws.stopReason.upgraded",
-                    "previous" to previous,
-                    "received" to event.stopReason,
-                    "turnId" to event.turnId,
+                    "previous" attr previous,
+                    "received" attr event.stopReason,
+                    "turnId" attr event.turnId,
                 )
             }
             else -> {
                 Telemetry.event(
                     "AdminChatVM", "ws.stopReason.duplicate",
-                    "previous" to previous,
-                    "received" to event.stopReason,
-                    "turnId" to event.turnId,
+                    "previous" attr previous,
+                    "received" attr event.stopReason,
+                    "turnId" attr event.turnId,
                 )
             }
         }
@@ -653,7 +654,7 @@ class ChatSendCoordinator(
     private suspend fun releaseTerminalQueue(conversationId: QueueConversationId, writes: List<Result<*>>) {
         val failures = writes.mapNotNull { it.exceptionOrNull() }
         failures.filterNot { it is CancellationException }.forEach { failure ->
-            Telemetry.error("AdminChatVM", "ws.turnSettlement.failed", failure, "conversationId" to conversationId.value)
+            Telemetry.error("AdminChatVM", "ws.turnSettlement.failed", failure, "conversationId" attr conversationId.value)
         }
         // Never consume cancellation, including one thrown by a writer inside NonCancellable.
         failures.firstOrNull { it is CancellationException }?.let { throw it }

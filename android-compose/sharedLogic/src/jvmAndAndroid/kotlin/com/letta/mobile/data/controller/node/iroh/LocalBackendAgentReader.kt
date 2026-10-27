@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.node.agentfiles.AgentFileIndex
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonArray
@@ -52,7 +53,7 @@ internal class LocalBackendAgentReader(
         if (limit == null && entries.size - from > MAX_PROJECTED_AGENTS) {
             Telemetry.event(
                 "LocalBackendAgents", "unpaged_list_truncated",
-                "agents" to entries.size, "max" to MAX_PROJECTED_AGENTS, level = Telemetry.Level.WARN,
+                "agents" attr entries.size, "max" attr MAX_PROJECTED_AGENTS, level = Telemetry.Level.WARN,
             )
         }
         // A record that vanished or cannot be parsed since the index saw it is skipped and the

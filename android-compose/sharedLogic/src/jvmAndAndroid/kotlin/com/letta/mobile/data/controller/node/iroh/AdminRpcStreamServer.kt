@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.runCatchingCancellable
@@ -175,9 +176,9 @@ internal class AdminRpcStreamServer(
                 .onFailure { writeError ->
                     Telemetry.event(
                         "IrohNode", "admin_rpc.stream.error_response_failed",
-                        "remoteEndpointId" to remoteEndpointId,
-                        "error" to (writeError.message ?: writeError.toString()),
-                        "class" to writeError::class.simpleName,
+                        "remoteEndpointId" attr remoteEndpointId,
+                        "error" attr (writeError.message ?: writeError.toString()),
+                        "class" attr writeError::class.simpleName,
                     )
                 }
         } catch (ce: CancellationException) {
@@ -185,9 +186,9 @@ internal class AdminRpcStreamServer(
         } catch (error: Exception) {
             Telemetry.event(
                 "IrohNode", "admin_rpc.stream.failed",
-                "remoteEndpointId" to remoteEndpointId,
-                "error" to (error.message ?: error.toString()),
-                "class" to error::class.simpleName,
+                "remoteEndpointId" attr remoteEndpointId,
+                "error" attr (error.message ?: error.toString()),
+                "class" attr error::class.simpleName,
             )
             runCatching {
                 sendStream.writeAll(
@@ -241,10 +242,10 @@ internal class AdminRpcStreamServer(
         }.getOrNull().orEmpty()
         Telemetry.event(
             "IrohNode", "admin_rpc.stream.response_too_large",
-            "remoteEndpointId" to remoteEndpointId,
-            "requestId" to requestId,
-            "bytes" to bytes,
-            "maxFrameBytes" to maxFrameBytes,
+            "remoteEndpointId" attr remoteEndpointId,
+            "requestId" attr requestId,
+            "bytes" attr bytes,
+            "maxFrameBytes" attr maxFrameBytes,
             level = Telemetry.Level.WARN,
         )
         return listOf(IrohFrameCodec.encodeFrame(errorEnvelope(requestId, detail), maxFrameBytes))
@@ -282,8 +283,8 @@ internal class AdminRpcStreamServer(
                 val id = requestId ?: ""
                 Telemetry.event(
                     "IrohNode", "auth.required",
-                    "remoteEndpointId" to remoteEndpointId,
-                    "requestId" to id, "reason" to "missing_token",
+                    "remoteEndpointId" attr remoteEndpointId,
+                    "requestId" attr id, "reason" attr "missing_token",
                 )
                 errorEnvelope(id, "unauthorized")
             } else if (method == null || requestId == null) {
@@ -304,10 +305,10 @@ internal class AdminRpcStreamServer(
         if (method == HEALTH_CHECK_METHOD) return
         Telemetry.event(
             "IrohNode", "admin_rpc.stream.recv",
-            "remoteEndpointId" to remoteEndpointId,
-            "type" to frame["type"]?.jsonPrimitive?.contentOrNull,
-            "requestId" to frame["request_id"]?.jsonPrimitive?.contentOrNull,
-            "method" to method,
+            "remoteEndpointId" attr remoteEndpointId,
+            "type" attr frame["type"]?.jsonPrimitive?.contentOrNull,
+            "requestId" attr frame["request_id"]?.jsonPrimitive?.contentOrNull,
+            "method" attr method,
         )
     }
 
@@ -323,9 +324,9 @@ internal class AdminRpcStreamServer(
         if (deniedCapability != null) {
             Telemetry.event(
                 "IrohNode", "authz.denied",
-                "remoteEndpointId" to remoteEndpointId,
-                "method" to method,
-                "capability" to deniedCapability,
+                "remoteEndpointId" attr remoteEndpointId,
+                "method" attr method,
+                "capability" attr deniedCapability,
             )
             return forbiddenEnvelope(requestId, deniedCapability)
         }
@@ -344,9 +345,9 @@ internal class AdminRpcStreamServer(
                     runCatchingCancellable { settle(succeeded) }.onFailure { rollbackError ->
                         Telemetry.event(
                             "IrohNode", "admin_rpc.method_observer.rollback_failed",
-                            "remoteEndpointId" to remoteEndpointId,
-                            "method" to method,
-                            "error" to (rollbackError.message ?: rollbackError.toString()),
+                            "remoteEndpointId" attr remoteEndpointId,
+                            "method" attr method,
+                            "error" attr (rollbackError.message ?: rollbackError.toString()),
                             level = Telemetry.Level.WARN,
                         )
                     }
@@ -380,9 +381,9 @@ internal class AdminRpcStreamServer(
         } catch (hookError: Exception) {
             Telemetry.event(
                 "IrohNode", "admin_rpc.method_observer.failed",
-                "remoteEndpointId" to remoteEndpointId,
-                "method" to method,
-                "error" to (hookError.message ?: hookError.toString()),
+                "remoteEndpointId" attr remoteEndpointId,
+                "method" attr method,
+                "error" attr (hookError.message ?: hookError.toString()),
                 level = Telemetry.Level.WARN,
             )
             return null

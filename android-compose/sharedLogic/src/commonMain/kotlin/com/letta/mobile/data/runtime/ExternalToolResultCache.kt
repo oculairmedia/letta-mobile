@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerExternalToolResult
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -63,9 +64,9 @@ class ExternalToolResultCache(
                 Telemetry.event(
                     "ExternalToolResultCache",
                     "result.evictedOverCap",
-                    "requestId" to oldest.requestId,
-                    "toolCallId" to (oldest.toolCallId ?: ""),
-                    "cap" to maxEntries,
+                    "requestId" attr oldest.requestId,
+                    "toolCallId" attr (oldest.toolCallId ?: ""),
+                    "cap" attr maxEntries,
                     level = Telemetry.Level.WARN,
                 )
             }
@@ -97,8 +98,8 @@ class ExternalToolResultCache(
         Telemetry.event(
             "ExternalToolResultCache",
             "result.orphanExpired",
-            "count" to expired.size,
-            "ttlMs" to ttlMs,
+            "count" attr expired.size,
+            "ttlMs" attr ttlMs,
             level = Telemetry.Level.WARN,
         )
     }

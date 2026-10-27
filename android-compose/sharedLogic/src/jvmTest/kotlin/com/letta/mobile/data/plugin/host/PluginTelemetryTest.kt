@@ -1,5 +1,7 @@
 package com.letta.mobile.data.plugin.host
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.canvas.compose.Sha256
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.model.PluginId
@@ -54,6 +56,18 @@ class PluginTelemetryTap {
 
 /** The plugin host's typed telemetry (letta-mobile-cdgpr.10): every event in [PluginHostEvent] has a live emitter. */
 class PluginTelemetryTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     @Test
     fun everyEventInTheSetIsEmittedBySomePath() {
         val tap = PluginTelemetryTap()
@@ -70,13 +84,13 @@ class PluginTelemetryTest {
         assertTrue(missing.isEmpty(), "dead events, nothing emitted them: $missing")
         assertEquals(PluginHostEvent.entries.map { it.eventName }.toSet(), emitted, "every plugin event is one of the typed set")
 
-        val invoke = tap.named(PluginHostEvent.INVOKE).first { it.attrs["plugin"] == ID }
-        assertEquals("plot", invoke.attrs["action"])
-        assertEquals("ok", invoke.attrs["outcome"])
+        val invoke = tap.named(PluginHostEvent.INVOKE).first { it.attrs["plugin"]?.textOrNull == ID }
+        assertEquals("plot", invoke.attrs["action"]?.textOrNull)
+        assertEquals("ok", invoke.attrs["outcome"]?.textOrNull)
         assertNotNull(invoke.durationMs, "an invoke carries its latency")
-        assertTrue(tap.named(PluginHostEvent.REFUSED).any { it.attrs["reason"] == PluginRefusal.CANVAS_READ.wire })
-        assertEquals("100", tap.named(PluginHostEvent.ASSET).single().attrs["bytes"])
-        assertEquals("runtime", tap.named(PluginHostEvent.KILL_SWITCH).single().attrs["scope"])
+        assertTrue(tap.named(PluginHostEvent.REFUSED).any { it.attrs["reason"]?.textOrNull == PluginRefusal.CANVAS_READ.wire })
+        assertEquals("100", tap.named(PluginHostEvent.ASSET).single().attrs["bytes"]?.textOrNull)
+        assertEquals("runtime", tap.named(PluginHostEvent.KILL_SWITCH).single().attrs["scope"]?.textOrNull)
         assertTrue(tap.named(PluginHostEvent.STDERR).all { it.level == Telemetry.Level.WARN })
     }
 
@@ -129,7 +143,9 @@ class PluginTelemetryTest {
                 runtime.consent(PluginId(CRASHING), canvasOnly, emptySet())
                 runtime.enable(PluginId(CRASHING))
                 // FAULT is recorded just after the registry commits the Faulted state; await the event itself.
-                withTimeout(60.seconds) { while (tap.named(PluginHostEvent.FAULT).none { it.attrs["plugin"] == CRASHING }) delay(20) }
+                withTimeout(60.seconds) {
+                    while (tap.named(PluginHostEvent.FAULT).none { it.attrs["plugin"]?.textOrNull == CRASHING }) delay(20)
+                }
             }
         } finally {
             runtime.close()

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
@@ -44,9 +45,9 @@ private fun TimelineMessageType.carriesStreamedText(): Boolean =
 private fun TimelineReducerInput.dropUnstamped(row: TimelineEvent.Confirmed): TimelineReducerOutput {
     Telemetry.event(
         "LiveTurnReducer", "live.unstampedFrame",
-        "messageType" to row.messageType.name,
-        "serverId" to row.serverId,
-        "conversationId" to prev.conversationId,
+        "messageType" attr row.messageType.name,
+        "serverId" attr row.serverId,
+        "conversationId" attr prev.conversationId,
         level = Telemetry.Level.WARN,
     )
     return unchanged()
@@ -104,10 +105,10 @@ private fun TimelineReducerInput.dropStale(
     if (incoming.messageType.carriesStreamedText()) {
         Telemetry.event(
             "LiveTurnReducer", "live.staleTextFrame",
-            "logicalId" to existing.logicalId,
-            "heldTextSeq" to existing.textSeq,
-            "incomingTextSeq" to incoming.textSeq,
-            "conversationId" to prev.conversationId,
+            "logicalId" attr existing.logicalId,
+            "heldTextSeq" attr existing.textSeq,
+            "incomingTextSeq" attr incoming.textSeq,
+            "conversationId" attr prev.conversationId,
             level = Telemetry.Level.WARN,
         )
     }

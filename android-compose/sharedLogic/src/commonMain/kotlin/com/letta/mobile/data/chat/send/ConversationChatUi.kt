@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
@@ -82,9 +83,9 @@ internal class ConversationChatUi(
     fun suppressed(conversationId: ConversationId?, callback: String) {
         Telemetry.event(
             "AdminChatVM", "ws.ui.backgroundConversationSuppressed",
-            "conversationId" to conversationId?.value,
-            "visibleConversationId" to activeConversationId(),
-            "callback" to callback,
+            "conversationId" attr conversationId?.value,
+            "visibleConversationId" attr activeConversationId(),
+            "callback" attr callback,
         )
     }
 }

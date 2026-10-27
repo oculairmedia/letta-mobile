@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -34,9 +35,9 @@ internal class PostSendReconciler(
                 if (hasLiveIngestSince(conversationId, sentAtMillis)) {
                     Telemetry.event(
                         "AdminChatVM", "ws.postSendReconcile.skippedLiveStream",
-                        "conversationId" to conversationId,
-                        "otid" to otid,
-                        "delayMs" to delayMs,
+                        "conversationId" attr conversationId,
+                        "otid" attr otid,
+                        "delayMs" attr delayMs,
                     )
                     continue
                 }
@@ -50,16 +51,16 @@ internal class PostSendReconciler(
                 }.onSuccess {
                     Telemetry.event(
                         "AdminChatVM", "ws.postSendReconcile.ok",
-                        "conversationId" to conversationId,
-                        "otid" to otid,
-                        "delayMs" to delayMs,
+                        "conversationId" attr conversationId,
+                        "otid" attr otid,
+                        "delayMs" attr delayMs,
                     )
                 }.onFailure { error ->
                     Telemetry.error(
                         "AdminChatVM", "ws.postSendReconcile.failed", error,
-                        "conversationId" to conversationId,
-                        "otid" to otid,
-                        "delayMs" to delayMs,
+                        "conversationId" attr conversationId,
+                        "otid" attr otid,
+                        "delayMs" attr delayMs,
                     )
                 }
             }

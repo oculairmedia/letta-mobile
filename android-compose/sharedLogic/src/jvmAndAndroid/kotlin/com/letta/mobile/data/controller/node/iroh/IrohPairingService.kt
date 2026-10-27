@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import java.security.SecureRandom
 import java.util.concurrent.CopyOnWriteArrayList
@@ -89,10 +90,10 @@ class IrohPairingService(
         invites.add(invite)
         Telemetry.event(
             "IrohPairing", "invite.created",
-            "inviteId" to invite.id.value,
-            "expiresAtMs" to invite.expiresAtMs,
-            "capabilities" to invite.capabilities.sorted().joinToString(","),
-            "agentScoped" to (invite.agentIds != null),
+            "inviteId" attr invite.id.value,
+            "expiresAtMs" attr invite.expiresAtMs,
+            "capabilities" attr invite.capabilities.sorted().joinToString(","),
+            "agentScoped" attr (invite.agentIds != null),
         )
         return PairingInvite(
             secret = secret,
@@ -110,17 +111,17 @@ class IrohPairingService(
 
     fun redeem(secret: String, nodeId: String, name: String? = null): RedeemResult {
         store.get(nodeId)?.let { existing ->
-            Telemetry.event("IrohPairing", "redeem.already_paired", "nodeId" to nodeId)
+            Telemetry.event("IrohPairing", "redeem.already_paired", "nodeId" attr nodeId)
             return RedeemResult.AlreadyPaired(existing)
         }
         // Consume atomically: exactly one caller wins a given invite.
         val invite = invites.consume(PendingPairingInvite.secretHash(secret))
         if (invite == null) {
-            Telemetry.event("IrohPairing", "redeem.rejected", "reason" to "invalid_or_replayed")
+            Telemetry.event("IrohPairing", "redeem.rejected", "reason" attr "invalid_or_replayed")
             return RedeemResult.Rejected("invalid")
         }
         if (nowMs() >= invite.expiresAtMs) {
-            Telemetry.event("IrohPairing", "redeem.rejected", "reason" to "expired", "inviteId" to invite.id.value)
+            Telemetry.event("IrohPairing", "redeem.rejected", "reason" attr "expired", "inviteId" attr invite.id.value)
             return RedeemResult.Rejected("expired")
         }
         val peer = PairedPeer(
@@ -134,10 +135,10 @@ class IrohPairingService(
         store.save(peer)
         Telemetry.event(
             "IrohPairing", "peer.paired",
-            "nodeId" to nodeId,
-            "name" to peer.name,
-            "inviteId" to invite.id.value,
-            "capabilities" to peer.capabilities.sorted().joinToString(","),
+            "nodeId" attr nodeId,
+            "name" attr peer.name,
+            "inviteId" attr invite.id.value,
+            "capabilities" attr peer.capabilities.sorted().joinToString(","),
         )
         return RedeemResult.Paired(peer)
     }
@@ -153,7 +154,7 @@ class IrohPairingService(
     /** Revoke an unredeemed invite by its non-secret id (protocol §11). */
     fun revokeInvite(id: InviteId): Boolean {
         val removed = invites.remove(id)
-        if (removed) Telemetry.event("IrohPairing", "invite.revoked", "inviteId" to id.value)
+        if (removed) Telemetry.event("IrohPairing", "invite.revoked", "inviteId" attr id.value)
         return removed
     }
 
@@ -178,7 +179,7 @@ class IrohPairingService(
         val existing = store.get(nodeId) ?: return null
         val updated = existing.copy(name = name)
         store.save(updated)
-        Telemetry.event("IrohPairing", "peer.renamed", "nodeId" to nodeId, "name" to name)
+        Telemetry.event("IrohPairing", "peer.renamed", "nodeId" attr nodeId, "name" attr name)
         return updated
     }
 
@@ -193,7 +194,7 @@ class IrohPairingService(
         val existing = store.get(nodeId) ?: return null
         val updated = existing.copy(capabilities = capabilities)
         store.save(updated)
-        Telemetry.event("IrohPairing", "peer.capabilities_set", "nodeId" to nodeId)
+        Telemetry.event("IrohPairing", "peer.capabilities_set", "nodeId" attr nodeId)
         return updated
     }
 
@@ -202,7 +203,7 @@ class IrohPairingService(
         val existing = store.get(nodeId) ?: return null
         val updated = existing.copy(agentIds = agentIds)
         store.save(updated)
-        Telemetry.event("IrohPairing", "peer.agents_set", "nodeId" to nodeId, "agentScoped" to (agentIds != null))
+        Telemetry.event("IrohPairing", "peer.agents_set", "nodeId" attr nodeId, "agentScoped" attr (agentIds != null))
         return updated
     }
 
@@ -213,7 +214,7 @@ class IrohPairingService(
     fun revoke(nodeId: String): Boolean {
         val removed = store.remove(nodeId)
         if (removed) {
-            Telemetry.event("IrohPairing", "peer.revoked", "nodeId" to nodeId)
+            Telemetry.event("IrohPairing", "peer.revoked", "nodeId" attr nodeId)
             revocationListeners.forEach { listener -> runCatching { listener(nodeId) } }
         }
         return removed

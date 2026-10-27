@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.util.Telemetry
@@ -137,8 +138,8 @@ class AgentEventAttachment internal constructor(
             emitAll(scopes.eventsFor(agentId, ::shouldStayAttached))
             Telemetry.event(
                 "AgentEventScopes", "ws.route.detached",
-                "agentId" to agentId.value,
-                "liveForAgent" to scopes.liveSubscriberCount(agentId),
+                "agentId" attr agentId.value,
+                "liveForAgent" attr scopes.liveSubscriberCount(agentId),
             )
         }
     }
@@ -170,11 +171,11 @@ private class AgentSubscriberCensus {
         val suspicious = change.delta > 0 && snapshot.looksLeaked()
         Telemetry.event(
             "AgentEventScopes", change.eventName,
-            "agentId" to agentId.value,
-            "liveForAgent" to snapshot.forAgent,
-            "liveAgents" to snapshot.agents,
-            "liveTotal" to snapshot.total,
-            "foreignSuppressed" to snapshot.suppressed,
+            "agentId" attr agentId.value,
+            "liveForAgent" attr snapshot.forAgent,
+            "liveAgents" attr snapshot.agents,
+            "liveTotal" attr snapshot.total,
+            "foreignSuppressed" attr snapshot.suppressed,
             level = if (suspicious) Telemetry.Level.WARN else Telemetry.Level.INFO,
         )
     }

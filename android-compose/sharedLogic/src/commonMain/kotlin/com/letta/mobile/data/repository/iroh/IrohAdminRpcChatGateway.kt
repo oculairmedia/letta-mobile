@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.chat.branch.ConversationForkGateway
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
@@ -221,8 +222,8 @@ class IrohAdminRpcChatGateway(
         if (result is JsonObject) {
             Telemetry.event(
                 "IrohGate", "conversation_list.unexpected_object_shape",
-                "keyCount" to result.size,
-                "keys" to result.keys.sorted().take(12).joinToString(","),
+                "keyCount" attr result.size,
+                "keys" attr result.keys.sorted().take(12).joinToString(","),
                 level = Telemetry.Level.WARN,
             )
         }
@@ -301,9 +302,9 @@ class IrohAdminRpcChatGateway(
         if (messagesElement is JsonObject) {
             Telemetry.event(
                 "IrohGate", "message_list.unexpected_object_shape",
-                "conversationId" to conversationId,
-                "keyCount" to messagesElement.size,
-                "keys" to messagesElement.keys.sorted().take(12).joinToString(","),
+                "conversationId" attr conversationId,
+                "keyCount" attr messagesElement.size,
+                "keys" attr messagesElement.keys.sorted().take(12).joinToString(","),
                 level = Telemetry.Level.WARN,
             )
         }
@@ -318,8 +319,8 @@ class IrohAdminRpcChatGateway(
     ): List<LettaMessage> {
         Telemetry.event(
             "IrohChatGateway", "listAgentMessages.gated",
-            "agentId.value" to agentId.value,
-            "conversationId?.value" to (conversationId?.value ?: "<null>"),
+            "agentId.value" attr agentId.value,
+            "conversationId?.value" attr (conversationId?.value ?: "<null>"),
         )
         return emptyList()
     }
@@ -465,10 +466,10 @@ class IrohAdminRpcChatGateway(
         }
         Telemetry.event(
             "IrohChatGateway", "send.dispatched",
-            "conversationId" to conversationId.value,
-            "agentId" to agentId.value,
-            "otid" to (outbound.otid ?: "<null>"),
-            "device" to deviceLabel.value,
+            "conversationId" attr conversationId.value,
+            "agentId" attr agentId.value,
+            "otid" attr (outbound.otid ?: "<null>"),
+            "device" attr deviceLabel.value,
         )
     }
 
@@ -599,9 +600,9 @@ class IrohAdminRpcChatGateway(
             if (notice == null) {
                 Telemetry.event(
                     "IrohChatGateway", "turn.failedAfterDelivery",
-                    "conversationId" to conversationId.value,
-                    "turnId" to (turnId?.value ?: ""),
-                    "reasonKind" to (failureKind?.value ?: terminalReasonKind(failureReason?.value) ?: "<none>"),
+                    "conversationId" attr conversationId.value,
+                    "turnId" attr (turnId?.value ?: ""),
+                    "reasonKind" attr (failureKind?.value ?: terminalReasonKind(failureReason?.value) ?: "<none>"),
                 )
                 terminal.complete(Unit)
                 return

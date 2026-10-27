@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.controller.SyncBudgetPolicy
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
@@ -159,9 +160,9 @@ class IrohChannelTransport(
         adminRpcExecutor.recordStreamActivity()
         Telemetry.event(
             "IrohGate", "gate1.emitBoth",
-            "frame" to (frame::class.simpleName ?: ""),
-            "messageId" to IrohTransportSupport.frameMessageId(frame),
-            "conversationId" to IrohTransportSupport.frameConversationId(frame),
+            "frame" attr (frame::class.simpleName ?: ""),
+            "messageId" attr IrohTransportSupport.frameMessageId(frame),
+            "conversationId" attr IrohTransportSupport.frameConversationId(frame),
         )
         IrohTransportSupport.frameFlowContent(frame)?.let { (key, type, content) ->
             IrohFrameFlowDiagnostics.record("gate1.emit", key, type, content)
@@ -443,11 +444,11 @@ class IrohChannelTransport(
         if (result is IrohTurnRegistry.FrameOwnershipResult.Switched) {
             Telemetry.event(
                 "IrohObserver", "ingest.ownership_switched",
-                "conversationId" to conversationId,
-                "from" to result.from,
-                "to" to result.to,
-                "turnId" to (localTurn?.turnId ?: ""),
-                "otherActiveConversations" to IrohTransportSupport.otherActiveConversationsLabel(turnRegistry, conversationId),
+                "conversationId" attr conversationId,
+                "from" attr result.from.toString(),
+                "to" attr result.to.toString(),
+                "turnId" attr (localTurn?.turnId ?: ""),
+                "otherActiveConversations" attr IrohTransportSupport.otherActiveConversationsLabel(turnRegistry, conversationId),
             )
         }
     }
@@ -476,13 +477,13 @@ class IrohChannelTransport(
         )
         Telemetry.event(
             "IrohTrace", "transport.connect.begin",
-            "baseShimUrl" to baseShimUrl,
-            "forced" to DEBUG_FORCE_IROH_URL.isNotBlank(),
-            "state" to state.value::class.simpleName,
+            "baseShimUrl" attr baseShimUrl,
+            "forced" attr DEBUG_FORCE_IROH_URL.isNotBlank(),
+            "state" attr state.value::class.simpleName,
         )
         supervisor.refreshConfig()
         val handle = supervisor.ready()
-        Telemetry.event("IrohTrace", "transport.connect.done", "state" to "connected", "sessionId" to handle.sessionId)
+        Telemetry.event("IrohTrace", "transport.connect.done", "state" attr "connected", "sessionId" attr handle.sessionId)
     }
 
     override fun send(
@@ -495,10 +496,10 @@ class IrohChannelTransport(
     ): Boolean {
         Telemetry.event(
             "IrohTrace", "transport.send.called",
-            "agentId" to agentId,
-            "conversationId" to conversationId,
-            "textLength" to text.length,
-            "state" to state.value::class.simpleName,
+            "agentId" attr agentId,
+            "conversationId" attr conversationId,
+            "textLength" attr text.length,
+            "state" attr state.value::class.simpleName,
         )
         return turnDispatcher.submit(
             IrohTurnSubmission(
@@ -524,9 +525,9 @@ class IrohChannelTransport(
             if (!emitTerminalFrame(turn, frame, IrohTerminalSource.Engine)) {
                 Telemetry.event(
                     "IrohTrace", "transport.turn_done.duplicate_skipped",
-                    "turnId" to turn.turnId,
-                    "runId" to frame.runId,
-                    "status" to frame.status,
+                    "turnId" attr turn.turnId,
+                    "runId" attr frame.runId,
+                    "status" attr frame.status,
                 )
             }
             return
@@ -582,15 +583,15 @@ class IrohChannelTransport(
         val effectiveRunId = turn.runId
         Telemetry.event(
             "IrohTrace", "transport.emitDraft",
-            "payload" to (draft.payload::class.simpleName ?: ""),
-            "runId" to effectiveRunId,
-            "promoted" to promoted,
+            "payload" attr (draft.payload::class.simpleName ?: ""),
+            "runId" attr effectiveRunId,
+            "promoted" attr promoted,
         )
         val promotionFrames: List<ServerFrame> = if (promoted) {
             Telemetry.event(
                 "IrohTransport", "turn.run_id_promoted",
-                "turnId" to turnId,
-                "runId" to effectiveRunId,
+                "turnId" attr turnId,
+                "runId" attr effectiveRunId,
             )
             listOf(
                 ServerFrame.TurnStarted(
@@ -654,9 +655,9 @@ class IrohChannelTransport(
             ?: return cancelWithoutActiveTurn(conversationId)
         Telemetry.event(
             "IrohTransport", "cancel.begin",
-            "conversationId" to conversationId,
-            "turnId" to turn.turnId,
-            "runId" to turn.runId,
+            "conversationId" attr conversationId,
+            "turnId" attr turn.turnId,
+            "runId" attr turn.runId,
         )
         transportScope.launch {
             // Guard against stale ActiveTurn race: if send(A) was called twice
@@ -678,9 +679,9 @@ class IrohChannelTransport(
                 if (error is CancellationException) throw error
                 Telemetry.event(
                     "IrohTransport", "cancel.abort_failed",
-                    "turnId" to turn.turnId,
-                    "error" to (error.message ?: error.toString()),
-                    "class" to error::class.simpleName,
+                    "turnId" attr turn.turnId,
+                    "error" attr (error.message ?: error.toString()),
+                    "class" attr error::class.simpleName,
                 )
             }
             // 2. Bounded wait for the server terminal to flow through the normal
@@ -702,8 +703,8 @@ class IrohChannelTransport(
                 if (emitTerminalFrame(turn, cancelFrame, IrohTerminalSource.CancelSynthetic)) {
                     Telemetry.event(
                         "IrohTransport", "cancel.synthetic_terminal",
-                        "turnId" to turn.turnId,
-                        "runId" to turn.runId,
+                        "turnId" attr turn.turnId,
+                        "runId" attr turn.runId,
                     )
                 }
             }
@@ -715,9 +716,9 @@ class IrohChannelTransport(
             if (!turnRegistry.finish(turn.token)) {
                 Telemetry.event(
                     "IrohTransport", "cancel.turn_already_replaced",
-                    "conversationId" to conversationId,
-                    "turnId" to turn.turnId,
-                    "currentTurnId" to (turnRegistry.getActiveTurn(IrohConversationId(conversationId))?.turnId ?: ""),
+                    "conversationId" attr conversationId,
+                    "turnId" attr turn.turnId,
+                    "currentTurnId" attr (turnRegistry.getActiveTurn(IrohConversationId(conversationId))?.turnId ?: ""),
                 )
             }
         }
@@ -728,8 +729,8 @@ class IrohChannelTransport(
         turnRegistry.removeInterruptedTurn(IrohConversationId(conversationId))
         Telemetry.event(
             "IrohTransport", "cancel.no_active_turn",
-            "conversationId" to conversationId,
-            "otherActiveConversations" to IrohTransportSupport.otherActiveConversationsLabel(turnRegistry, conversationId),
+            "conversationId" attr conversationId,
+            "otherActiveConversations" attr IrohTransportSupport.otherActiveConversationsLabel(turnRegistry, conversationId),
         )
         turnRegistry.removeSendJob(IrohConversationId(conversationId))?.cancel()
         return false

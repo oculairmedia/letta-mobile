@@ -1,7 +1,9 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 
 @Immutable
 data class PendingIngestNotification(
@@ -29,11 +31,11 @@ class TimelineIngestNotificationDispatcher(
             val resolvedListener = listenerProvider?.invoke() ?: listener
             Telemetry.event(
                 "TimelineSync", "streamSubscriber.listenerDispatch",
-                "conversationId" to conversationId,
-                "serverId" to notification.serverId,
-                "messageType" to notification.messageType,
-                "hasListener" to (resolvedListener != null),
-                "previewLength" to (notification.contentPreview?.length ?: 0),
+                "conversationId" attr conversationId,
+                "serverId" attr notification.serverId,
+                "messageType" attr notification.messageType,
+                "hasListener" attr (resolvedListener != null),
+                "previewLength" attr (notification.contentPreview?.length ?: 0),
             )
             resolvedListener?.onMessageIngested(
                 conversationId = conversationId,
@@ -41,10 +43,12 @@ class TimelineIngestNotificationDispatcher(
                 messageType = notification.messageType,
                 contentPreview = notification.contentPreview,
             )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (t: Throwable) {
             Telemetry.error(
                 "TimelineSync", "streamSubscriber.listenerThrew", t,
-                "conversationId" to conversationId,
+                "conversationId" attr conversationId,
             )
         }
     }

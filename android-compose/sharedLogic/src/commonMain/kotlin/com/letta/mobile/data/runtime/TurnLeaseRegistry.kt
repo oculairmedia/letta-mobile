@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
@@ -140,9 +141,9 @@ internal class TurnLeaseRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS
             overflow -= 1
             Telemetry.event(
                 "AppServerTurnEngine", "leaseSlot.evicted",
-                "key" to victim.toString(),
-                "tracked" to slots.size,
-                "cap" to cap,
+                "key" attr victim.toString(),
+                "tracked" attr slots.size,
+                "cap" attr cap,
             )
         }
         if (slots.size > cap) {
@@ -150,8 +151,8 @@ internal class TurnLeaseRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS
             // yields rather than costing a running turn its state.
             Telemetry.event(
                 "AppServerTurnEngine", "leaseSlot.capExceededByLiveTurns",
-                "tracked" to slots.size,
-                "cap" to cap,
+                "tracked" attr slots.size,
+                "cap" attr cap,
                 level = Telemetry.Level.WARN,
             )
         }

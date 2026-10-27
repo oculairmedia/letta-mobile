@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import computer.iroh.PathSnapshot
 import java.util.concurrent.atomic.AtomicReference
@@ -68,13 +69,13 @@ internal data class SelectedPathAttributes(
 private fun emitSelectedPath(attributes: SelectedPathAttributes) = with(attributes) {
     Telemetry.event(
         "IrohTransport", "path.selected",
-        "trigger" to trigger,
-        "pathId" to pathId,
-        "pathKind" to kind,
-        "remoteAddr" to remoteAddr,
-        "isRelay" to isRelay,
-        "rttMs" to rttMs,
-        "pathCount" to pathCount,
-        "relayPathCount" to relayPathCount,
+        "trigger" attr trigger,
+        "pathId" attr pathId,
+        "pathKind" attr kind,
+        "remoteAddr" attr remoteAddr,
+        "isRelay" attr isRelay,
+        "rttMs" attr rttMs,
+        "pathCount" attr pathCount,
+        "relayPathCount" attr relayPathCount,
     )
 }

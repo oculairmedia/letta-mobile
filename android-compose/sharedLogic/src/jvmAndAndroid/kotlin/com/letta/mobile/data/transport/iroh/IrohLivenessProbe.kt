@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
@@ -136,18 +137,18 @@ internal class IrohLivenessProbe(
     fun start(handle: IrohConnectionHandle) {
         if (intervalMs <= 0L || timeoutMs <= 0L) {
             stop("probe_disabled")
-            Telemetry.event("IrohLiveness", "probe.disabled", "intervalMs" to intervalMs.toString())
+            Telemetry.event("IrohLiveness", "probe.disabled", "intervalMs" attr intervalMs.toString())
             return
         }
         val armed = generation.incrementAndGet()
         job?.cancel()
         Telemetry.event(
             "IrohLiveness", "probe.start",
-            "sessionId" to handle.sessionId,
-            "generation" to armed.toString(),
-            "intervalMs" to intervalMs.toString(),
-            "timeoutMs" to timeoutMs.toString(),
-            "failuresToDeclareDead" to failuresToDeclareDead.toString(),
+            "sessionId" attr handle.sessionId,
+            "generation" attr armed.toString(),
+            "intervalMs" attr intervalMs.toString(),
+            "timeoutMs" attr timeoutMs.toString(),
+            "failuresToDeclareDead" attr failuresToDeclareDead.toString(),
         )
         job = scope.launch { runLoop(handle, armed) }
     }
@@ -158,7 +159,7 @@ internal class IrohLivenessProbe(
         // Invalidate the generation so an in-flight iteration drops its result.
         generation.incrementAndGet()
         running.cancel()
-        Telemetry.event("IrohLiveness", "probe.stop", "reason" to reason)
+        Telemetry.event("IrohLiveness", "probe.stop", "reason" attr reason)
     }
 
     /**
@@ -225,11 +226,11 @@ internal class IrohLivenessProbe(
     private fun recordFailure(handle: IrohConnectionHandle, outcome: ProbeOutcome, consecutiveFailures: Int) {
         Telemetry.event(
             "IrohLiveness", "probe.failed",
-            "sessionId" to handle.sessionId,
-            "consecutiveFailures" to consecutiveFailures.toString(),
-            "timedOut" to (outcome == ProbeOutcome.TIMED_OUT),
-            "proofOfLifeAgeMs" to millisSinceLastProofOfLife().toString(),
-            "youngInFlightAdminRpc" to adminRpcPathEvidence(evidenceWindowMs).youngInFlight.toString(),
+            "sessionId" attr handle.sessionId,
+            "consecutiveFailures" attr consecutiveFailures.toString(),
+            "timedOut" attr (outcome == ProbeOutcome.TIMED_OUT),
+            "proofOfLifeAgeMs" attr millisSinceLastProofOfLife().toString(),
+            "youngInFlightAdminRpc" attr adminRpcPathEvidence(evidenceWindowMs).youngInFlight.toString(),
         )
     }
 
@@ -249,8 +250,8 @@ internal class IrohLivenessProbe(
         if (skip) {
             Telemetry.event(
                 "IrohLiveness", "probe.skipped",
-                "reason" to "recent_proof_of_life",
-                "ageMs" to ageMs.toString(),
+                "reason" attr "recent_proof_of_life",
+                "ageMs" attr ageMs.toString(),
             )
         }
         return skip
@@ -292,13 +293,13 @@ internal class IrohLivenessProbe(
         if (verdict == ProbeTimeoutVerdict.NO_IN_FLIGHT) return ProbeOutcome.TIMED_OUT
         Telemetry.event(
             "IrohLiveness", if (verdict.congested) "probe.congested" else "probe.escalated",
-            "sessionId" to handle.sessionId,
-            "verdict" to verdict.name,
-            "youngInFlightAdminRpc" to evidence.youngInFlight.toString(),
-            "oldestInFlightAgeMs" to evidence.oldestInFlightAgeMs?.toString(),
-            "recentRequestTimeouts" to evidence.recentRequestTimeouts.toString(),
-            "proofOfLifeAgeMs" to evidence.proofOfLifeAgeMs.toString(),
-            "timeoutMs" to timeoutMs.toString(),
+            "sessionId" attr handle.sessionId,
+            "verdict" attr verdict.name,
+            "youngInFlightAdminRpc" attr evidence.youngInFlight.toString(),
+            "oldestInFlightAgeMs" attr evidence.oldestInFlightAgeMs?.toString(),
+            "recentRequestTimeouts" attr evidence.recentRequestTimeouts.toString(),
+            "proofOfLifeAgeMs" attr evidence.proofOfLifeAgeMs.toString(),
+            "timeoutMs" attr timeoutMs.toString(),
         )
         return if (verdict.congested) ProbeOutcome.CONGESTED else ProbeOutcome.TIMED_OUT
     }
@@ -314,9 +315,9 @@ internal class IrohLivenessProbe(
         val alive = error.isAdminRpcPayloadError() || !error.isConnectionLostClass()
         Telemetry.event(
             "IrohLiveness", "probe.error",
-            "error" to (error.message ?: error.toString()),
-            "class" to error::class.simpleName,
-            "aliveDespiteError" to alive,
+            "error" attr (error.message ?: error.toString()),
+            "class" attr error::class.simpleName,
+            "aliveDespiteError" attr alive,
         )
         return if (alive) ProbeOutcome.ALIVE else ProbeOutcome.UNREACHABLE
     }
@@ -324,10 +325,10 @@ internal class IrohLivenessProbe(
     private fun declareDead(handle: IrohConnectionHandle, failures: Int) {
         Telemetry.event(
             "IrohLiveness", "probe.declared_dead",
-            "sessionId" to handle.sessionId,
-            "failures" to failures.toString(),
-            "proofOfLifeAgeMs" to millisSinceLastProofOfLife().toString(),
-            "youngInFlightAdminRpc" to adminRpcPathEvidence(evidenceWindowMs).youngInFlight.toString(),
+            "sessionId" attr handle.sessionId,
+            "failures" attr failures.toString(),
+            "proofOfLifeAgeMs" attr millisSinceLastProofOfLife().toString(),
+            "youngInFlightAdminRpc" attr adminRpcPathEvidence(evidenceWindowMs).youngInFlight.toString(),
         )
         reportConnectionLost(
             "liveness_probe_failed: no health.check response in ${timeoutMs}ms x $failures",

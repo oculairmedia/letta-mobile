@@ -1,5 +1,6 @@
 package com.letta.mobile.data.a2ui
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.runtime.ToolApprovalId
 import com.letta.mobile.runtime.ToolCallId
@@ -159,7 +160,13 @@ class PendingToolApprovalRegistry(private val retiredCap: Int = MAX_RETIRED) {
         while (retired.size > retiredCap) {
             val victim = retired.keys.first()
             retired.remove(victim)
-            Telemetry.event(TAG, "retired.evictedOverCap", "approvalRequestId" to victim.approvalId.value, "cap" to retiredCap, level = Telemetry.Level.WARN)
+            Telemetry.event(
+                TAG,
+                "retired.evictedOverCap",
+                "approvalRequestId" attr victim.approvalId.value,
+                "cap" attr retiredCap,
+                level = Telemetry.Level.WARN,
+            )
         }
     }
 
@@ -185,8 +192,8 @@ private fun logUnpersistedScope(submission: A2uiToolApprovalSubmission) {
     if (!submission.approve || scope !in PERSISTENT_SCOPES) return
     Telemetry.event(
         PendingToolApprovalRegistry.TAG, "approval.scopeAppliedOnce",
-        "scope" to scope,
-        "approvalRequestId" to submission.ref.approvalId.value,
+        "scope" attr scope,
+        "approvalRequestId" attr submission.ref.approvalId.value,
     )
 }
 
@@ -195,11 +202,11 @@ private val PERSISTENT_SCOPES = setOf("session", "forever", "always")
 private fun logRejection(action: A2uiAction, reason: ToolApprovalRejection, path: String = "admit") {
     Telemetry.event(
         PendingToolApprovalRegistry.TAG, "approval.rejected",
-        "reason" to reason.name,
-        "path" to path,
-        "origin" to action.origin.name,
-        "surfaceId" to action.surfaceId,
-        "conversationId" to action.conversationId,
+        "reason" attr reason.name,
+        "path" attr path,
+        "origin" attr action.origin.name,
+        "surfaceId" attr action.surfaceId,
+        "conversationId" attr action.conversationId,
         level = Telemetry.Level.WARN,
     )
 }

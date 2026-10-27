@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.util.attr
 import android.content.Context
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.model.BackendKind
@@ -55,8 +56,8 @@ class SessionChannelTransportFactory @Inject constructor(
     ): IChannelTransport {
         fun reportChoice(chosen: String) {
             com.letta.mobile.util.Telemetry.event(
-                "IrohSelect", "transport", "chosen" to chosen,
-                "mode" to activeConfig?.mode?.name, "url" to activeConfig?.serverUrl,
+                "IrohSelect", "transport", "chosen" attr chosen,
+                "mode" attr activeConfig?.mode?.name, "url" attr activeConfig?.serverUrl,
             )
         }
         return when (activeConfig.routedBackendKind()) {

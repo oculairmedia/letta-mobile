@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.storage.sha256Hex
 import java.nio.charset.StandardCharsets.UTF_8
@@ -315,7 +316,7 @@ internal class NotebookStorageHealth(
                 // Its chunks are all still on disk; the repository compacts them on next open.
                 Telemetry.event(
                     CanvasStorageFaults.TAG, "compaction_unsettled",
-                    "storageName" to name, "error" to error.toString(),
+                    "storageName" attr name, "error" attr error.toString(),
                     level = Telemetry.Level.WARN,
                 )
             }
@@ -331,8 +332,8 @@ internal class NotebookStorageHealth(
             if (retiredOffers.add(documentKey)) {
                 Telemetry.event(
                     CanvasStorageFaults.TAG, "retired_document_refused",
-                    "documentId" to documentKey,
-                    "reason" to "moved to a new document; a peer's copy is not stored",
+                    "documentId" attr documentKey,
+                    "reason" attr "moved to a new document; a peer's copy is not stored",
                     level = Telemetry.Level.WARN,
                 )
             }

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.sync.withLock
@@ -186,8 +187,8 @@ class CanonicalTimelineCoordinator(
         val folded = owner.residentSettledFence()?.let { owner.session.engine.ingestSettledTail(it, message) } ?: false
         com.letta.mobile.util.Telemetry.event(
             "CanonicalTimeline", "external.settledTailAbsorbed",
-            "messageType" to message.messageType, "runId" to (message.runId ?: ""),
-            "folded" to folded, "signalled" to retiredTail,
+            "messageType" attr message.messageType, "runId" attr (message.runId ?: ""),
+            "folded" attr folded, "signalled" attr retiredTail,
         )
         return true
     }

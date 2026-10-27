@@ -1,5 +1,8 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.util.attr
+import com.letta.mobile.util.TelemetryValue
+
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.sync.Mutex
@@ -145,23 +148,23 @@ object RosterNameTelemetry {
     )
 
     /** Attribute shaping for a completeness outcome. Pure; no emission. */
-    fun completenessAttrs(outcome: Completeness): List<Pair<String, Any?>> = when (outcome) {
+    fun completenessAttrs(outcome: Completeness): List<Pair<String, TelemetryValue>> = when (outcome) {
         is Completeness.Match -> listOf(
-            "completeness" to outcome.wireName,
-            "sweptSize" to outcome.sweptSize,
-            "authoritativeCount" to outcome.authoritativeCount,
+            "completeness" attr outcome.wireName,
+            "sweptSize" attr outcome.sweptSize,
+            "authoritativeCount" attr outcome.authoritativeCount,
         )
         is Completeness.Mismatch -> listOf(
-            "completeness" to outcome.wireName,
-            "sweptSize" to outcome.sweptSize,
-            "authoritativeCount" to outcome.authoritativeCount,
-            "delta" to outcome.delta,
+            "completeness" attr outcome.wireName,
+            "sweptSize" attr outcome.sweptSize,
+            "authoritativeCount" attr outcome.authoritativeCount,
+            "delta" attr outcome.delta,
         )
         is Completeness.Unknown -> listOf(
-            "completeness" to outcome.wireName,
-            "sweptSize" to outcome.sweptSize,
-            "authoritativeCount" to "unknown",
-            "unknownReason" to outcome.reason,
+            "completeness" attr outcome.wireName,
+            "sweptSize" attr outcome.sweptSize,
+            "authoritativeCount" attr "unknown",
+            "unknownReason" attr outcome.reason,
         )
     }
 
@@ -181,11 +184,11 @@ object RosterNameTelemetry {
         offset: Int,
         pageSize: Int,
         mergedSize: Int,
-    ): List<Pair<String, Any?>> = listOf(
-        "stop" to stop.wireName,
-        "offset" to offset,
-        "pageSize" to pageSize,
-        "mergedSize" to mergedSize,
+    ): List<Pair<String, TelemetryValue>> = listOf(
+        "stop" attr stop.wireName,
+        "offset" attr offset,
+        "pageSize" attr pageSize,
+        "mergedSize" attr mergedSize,
     )
 
     /**
@@ -201,7 +204,7 @@ object RosterNameTelemetry {
         mergedSize: Int,
         source: String,
     ) {
-        val attrs = sweepStopAttrs(stop, offset, pageSize, mergedSize) + ("source" to source)
+        val attrs = sweepStopAttrs(stop, offset, pageSize, mergedSize) + ("source" attr source)
         Telemetry.event(
             CATEGORY,
             "roster.sweepStopped",
@@ -212,7 +215,7 @@ object RosterNameTelemetry {
 
     /** Record the roster-completeness invariant for a finished sweep. */
     fun rosterCompleteness(outcome: Completeness, source: String) {
-        val attrs = completenessAttrs(outcome) + ("source" to source)
+        val attrs = completenessAttrs(outcome) + ("source" attr source)
         Telemetry.event(
             CATEGORY,
             "roster.completeness",
@@ -231,9 +234,9 @@ object RosterNameTelemetry {
         Telemetry.event(
             CATEGORY,
             "agentCache.miss",
-            "agentId" to agentId,
-            "cacheSize" to cacheSize,
-            "source" to source,
+            "agentId" attr agentId,
+            "cacheSize" attr cacheSize,
+            "source" attr source,
             level = Telemetry.Level.WARN,
         )
     }
@@ -243,10 +246,10 @@ object RosterNameTelemetry {
         Telemetry.event(
             CATEGORY,
             "name.resolveOutcome",
-            "agentId" to agentId,
-            "outcome" to outcome.wireName,
-            "source" to source,
-            "errorType" to errorType,
+            "agentId" attr agentId,
+            "outcome" attr outcome.wireName,
+            "source" attr source,
+            "errorType" attr errorType,
             level = if (outcome == ResolveOutcome.SUCCESS) Telemetry.Level.INFO else Telemetry.Level.WARN,
         )
     }
@@ -273,10 +276,10 @@ object RosterNameTelemetry {
         Telemetry.event(
             CATEGORY,
             "name.fallback",
-            "site" to site.wireName,
-            "agentId" to agentId,
-            "fallbackKind" to fallbackKind,
-            "rosterSize" to rosterSize,
+            "site" attr site.wireName,
+            "agentId" attr agentId,
+            "fallbackKind" attr fallbackKind,
+            "rosterSize" attr rosterSize,
             level = Telemetry.Level.WARN,
         )
     }

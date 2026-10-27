@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
@@ -57,7 +58,7 @@ class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) :
     private fun refused(canvasId: CanvasId, error: NotebookReadOnlyException) {
         Telemetry.event(
             CanvasStorageFaults.TAG, "write_refused",
-            "canvasId" to canvasId.value, "reason" to error.message,
+            "canvasId" attr canvasId.value, "reason" attr error.message,
             level = Telemetry.Level.WARN,
         )
     }

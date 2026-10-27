@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
@@ -96,11 +97,11 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
         absorbOrphan(orphan, tail)
         Telemetry.event(
             "AdminChatVM", "ws.turnState.rekeyedByOtid",
-            "otid" to (otid ?: ""),
-            "serverConversationId" to serverConv.value,
-            "originatingConversationId" to originatingConv.value,
-            "turnId" to (this.turnId ?: ""),
-            "runId" to (this.runId ?: ""),
+            "otid" attr (otid ?: ""),
+            "serverConversationId" attr serverConv.value,
+            "originatingConversationId" attr originatingConv.value,
+            "turnId" attr (this.turnId ?: ""),
+            "runId" attr (this.runId ?: ""),
         )
         return originatingConv
     }
@@ -186,8 +187,8 @@ internal class ConversationTurnRegistry(private val fallbackConversationId: () -
             // send or turn, so the cap yields rather than clobbering one.
             Telemetry.event(
                 "AdminChatVM", "ws.turnState.capExceededByLiveTurns",
-                "tracked" to turnStates.size,
-                "cap" to MAX_TRACKED_CONVERSATION_TURN_STATES,
+                "tracked" attr turnStates.size,
+                "cap" attr MAX_TRACKED_CONVERSATION_TURN_STATES,
             )
         }
     }

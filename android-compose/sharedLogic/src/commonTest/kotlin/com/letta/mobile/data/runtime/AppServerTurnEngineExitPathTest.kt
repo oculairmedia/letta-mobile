@@ -1,5 +1,7 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -34,6 +36,18 @@ import kotlinx.coroutines.test.runTest
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppServerTurnEngineExitPathTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     @Test
     fun refusedRuntimeStartFailsTheTurnAndReleasesAsStartFailed() = runTest {
@@ -166,7 +180,7 @@ class AppServerTurnEngineExitPathTest {
 
     private fun releaseReason(): Any? = Telemetry.snapshot().last {
         it.tag == "AppServerTurnEngine" && it.name == "activeTurn.released"
-    }.attrs["releaseReason"]
+    }.attrs["releaseReason"]?.textOrNull
 
     private fun RuntimeEventDraft.lifecycle(): RuntimeEventPayload.RunLifecycleChanged =
         payload as? RuntimeEventPayload.RunLifecycleChanged ?: error("not a lifecycle draft: $payload")

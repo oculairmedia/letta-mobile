@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ToolAdvertisementState
 import com.letta.mobile.data.controller.extras.ToolAudience
@@ -185,7 +186,7 @@ class DefaultAppServerController(
                                 if (error is kotlinx.coroutines.CancellationException) throw error
                                 Telemetry.error(
                                     "DefaultAppServerController", "approval.unleasedAnswerFailed", error,
-                                    "requestId" to frame.requestId,
+                                    "requestId" attr frame.requestId,
                                 )
                             }
                     }

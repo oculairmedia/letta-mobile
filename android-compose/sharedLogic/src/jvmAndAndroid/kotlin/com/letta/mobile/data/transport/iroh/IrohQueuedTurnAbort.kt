@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.TurnRuntimeKey
 import com.letta.mobile.util.Telemetry
@@ -15,7 +16,7 @@ import com.letta.mobile.util.Telemetry
  */
 internal suspend fun AppServerTurnEngine.abortUnlessQueued(turn: IrohActiveTurn) {
     if (isQueued(TurnRuntimeKey(turn.agentId, turn.conversationId))) {
-        Telemetry.event("IrohTransport", "cancel.queued_turn", "conversationId" to turn.conversationId, "turnId" to turn.turnId)
+        Telemetry.event("IrohTransport", "cancel.queued_turn", "conversationId" attr turn.conversationId, "turnId" attr turn.turnId)
         return
     }
     abort(

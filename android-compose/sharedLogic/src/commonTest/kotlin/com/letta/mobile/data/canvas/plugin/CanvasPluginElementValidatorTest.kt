@@ -36,6 +36,18 @@ import kotlin.test.assertTrue
  * with a WARN, never refused, so a board relayed by a host without the plugin still converges.
  */
 class CanvasPluginElementValidatorTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private val board = CanvasOpProjector.emptySceneJson()
 
     /** The paths [op] is refused at on the validator path. */

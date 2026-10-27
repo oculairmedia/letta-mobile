@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.reconnect
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.AppServerControllerState
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
@@ -9,6 +10,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -96,6 +98,8 @@ class ReconnectCoordinator(
         // Load all active runtime records
         val records = try {
             registry.list()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             return ReconnectResult(
                 reconnectedCount = 0,
@@ -115,6 +119,8 @@ class ReconnectCoordinator(
             try {
                 reconnectRuntime(record)
                 successCount++
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 errors += ReconnectError(
                     runtimeRecordId = record.id,
@@ -153,7 +159,7 @@ class ReconnectCoordinator(
         if (isReconnectNeeded()) {
             Telemetry.event(
                 "AppServer", "resume.sync.skipped",
-                "reason" to "reconnect_needed",
+                "reason" attr "reconnect_needed",
             )
             return ResumeSyncResult.Skipped(reason = "reconnect_needed")
         }
@@ -161,7 +167,7 @@ class ReconnectCoordinator(
         if (reconnectMutex.isLocked) {
             Telemetry.event(
                 "AppServer", "resume.sync.skipped",
-                "reason" to "reconnect_in_flight",
+                "reason" attr "reconnect_in_flight",
             )
             return ResumeSyncResult.Skipped(reason = "reconnect_in_flight")
         }
@@ -169,7 +175,7 @@ class ReconnectCoordinator(
         if (!resumeSyncMutex.tryLock()) {
             Telemetry.event(
                 "AppServer", "resume.sync.skipped",
-                "reason" to "resume_sync_in_flight",
+                "reason" attr "resume_sync_in_flight",
             )
             return ResumeSyncResult.Skipped(reason = "resume_sync_in_flight")
         }
@@ -178,7 +184,7 @@ class ReconnectCoordinator(
             if (reconnectMutex.isLocked || isReconnectNeeded()) {
                 Telemetry.event(
                     "AppServer", "resume.sync.skipped",
-                    "reason" to "reconnect_in_flight",
+                    "reason" attr "reconnect_in_flight",
                 )
                 return ResumeSyncResult.Skipped(reason = "reconnect_in_flight")
             }
@@ -188,8 +194,8 @@ class ReconnectCoordinator(
             if (last != null && (now - last) < cooldown) {
                 Telemetry.event(
                     "AppServer", "resume.sync.skipped",
-                    "reason" to "cooldown_active",
-                    "elapsedMs" to (now - last).inWholeMilliseconds,
+                    "reason" attr "cooldown_active",
+                    "elapsedMs" attr (now - last).inWholeMilliseconds,
                 )
                 return ResumeSyncResult.Skipped(reason = "cooldown_active")
             }
@@ -197,11 +203,13 @@ class ReconnectCoordinator(
 
             val records = try {
                 registry.list()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Telemetry.event(
                     "AppServer", "resume.sync.failed",
-                    "reason" to "load_records_failed",
-                    "error" to (e.message ?: "unknown"),
+                    "reason" attr "load_records_failed",
+                    "error" attr (e.message ?: "unknown"),
                     level = Telemetry.Level.WARN,
                 )
                 return ResumeSyncResult.Failed(
@@ -220,7 +228,7 @@ class ReconnectCoordinator(
             if (eligibleRecords.isEmpty()) {
                 Telemetry.event(
                     "AppServer", "resume.sync.success",
-                    "syncedCount" to 0,
+                    "syncedCount" attr 0,
                 )
                 return ResumeSyncResult.Success(syncedCount = 0)
             }
@@ -254,6 +262,8 @@ class ReconnectCoordinator(
                             } else {
                                 Result.success(recordId)
                             }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
                         } catch (t: Throwable) {
                             Result.failure(
                                 ResumeSyncException(
@@ -298,9 +308,9 @@ class ReconnectCoordinator(
 
             Telemetry.event(
                 "AppServer", "resume.sync",
-                "successCount" to successCount,
-                "errorCount" to errors.size,
-                "status" to result::class.simpleName,
+                "successCount" attr successCount,
+                "errorCount" attr errors.size,
+                "status" attr result::class.simpleName,
                 level = if (errors.isNotEmpty()) Telemetry.Level.WARN else Telemetry.Level.INFO,
             )
 

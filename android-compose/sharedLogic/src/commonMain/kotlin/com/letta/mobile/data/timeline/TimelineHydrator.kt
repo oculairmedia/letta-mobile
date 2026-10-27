@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.LettaMessage
@@ -54,7 +55,7 @@ internal class TimelineHydrator(
                 ),
             )
         } catch (t: Throwable) {
-            timer.stopError(t, "conversationId" to conversationId)
+            timer.stopError(t, "conversationId" attr conversationId)
             throw t
         }
     }
@@ -76,7 +77,7 @@ internal class TimelineHydrator(
         } catch (failure: Throwable) {
             Telemetry.error(
                 "TimelineSync", "hydrate.pendingLocalLoadFailed", failure,
-                "conversationId" to conversationId,
+                "conversationId" attr conversationId,
             )
             events.emit(TimelineSyncEvent.StreamError(PENDING_LOCAL_UNAVAILABLE, PENDING_LOCAL_UNAVAILABLE_MESSAGE))
             return emptyList()
@@ -95,8 +96,8 @@ internal class TimelineHydrator(
         } catch (failure: Throwable) {
             Telemetry.error(
                 "TimelineSync", "hydrate.pendingLocalDeleteFailed", failure,
-                "conversationId" to conversationId,
-                "otid" to otid,
+                "conversationId" attr conversationId,
+                "otid" attr otid,
             )
         }
     }
@@ -104,18 +105,18 @@ internal class TimelineHydrator(
     private suspend fun acceptDefaultShim(timer: Telemetry.Timer): TimelineHydrationOutcome {
         Telemetry.event(
             "TimelineSync", "hydrate.skipped",
-            "conversationId" to conversationId,
-            "reason" to "defaultShimConversation",
+            "conversationId" attr conversationId,
+            "reason" attr "defaultShimConversation",
             level = Telemetry.Level.WARN,
         )
         events.emit(TimelineSyncEvent.Hydrated(0))
         timer.stop(
-            "conversationId" to conversationId,
-            "rawCount" to 0,
-            "eventCount" to 0,
-            "cursorSeq" to -1L,
-            "skipped" to true,
-            "skipReason" to "defaultShimConversation",
+            "conversationId" attr conversationId,
+            "rawCount" attr 0,
+            "eventCount" attr 0,
+            "cursorSeq" attr -1L,
+            "skipped" attr true,
+            "skipReason" attr "defaultShimConversation",
         )
         return TimelineHydrationOutcome.DefaultShimAccepted
     }
@@ -142,10 +143,10 @@ internal class TimelineHydrator(
         notifyHydrationCommitted()
         events.emit(TimelineSyncEvent.Hydrated(hydrated.visibleEventCount))
         timer.stop(
-            "conversationId" to conversationId,
-            "rawCount" to context.responseCount,
-            "eventCount" to hydrated.visibleEventCount,
-            "cursorSeq" to (context.cursorSequence ?: -1L),
+            "conversationId" attr conversationId,
+            "rawCount" attr context.responseCount,
+            "eventCount" attr hydrated.visibleEventCount,
+            "cursorSeq" attr (context.cursorSequence ?: -1L),
         )
         dumpTimelineState("hydrate", conversationId, timelineProcessor.state.value.timeline)
         return TimelineHydrationOutcome.Accepted
@@ -158,12 +159,12 @@ internal class TimelineHydrator(
     ): TimelineHydrationOutcome {
         Telemetry.event(
             "TimelineSync", "hydrate.rejected",
-            "conversationId" to conversationId,
-            "generation" to generation,
-            "reason" to acknowledgement.reason.toString(),
+            "conversationId" attr conversationId,
+            "generation" attr generation,
+            "reason" attr acknowledgement.reason.toString(),
             level = Telemetry.Level.WARN,
         )
-        timer.stop("conversationId" to conversationId, "rejected" to true)
+        timer.stop("conversationId" attr conversationId, "rejected" attr true)
         return TimelineHydrationOutcome.Rejected
     }
 

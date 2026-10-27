@@ -25,6 +25,18 @@ import kotlin.test.assertTrue
  * Kotlin/Native commonTest naming: punctuation-free camelCase function names.
  */
 class ChannelRestoreCoordinatorTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     // Tokens that appear in the fake's account config. No log line, telemetry
     // attribute, result object, or toString() may ever contain these.
     private val secretAccessToken = "syt_TOTALLY_SECRET_ACCESS_TOKEN"

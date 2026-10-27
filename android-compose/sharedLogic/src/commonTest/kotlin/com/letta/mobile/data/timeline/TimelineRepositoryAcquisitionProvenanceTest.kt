@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.SnapshotReadFailure
@@ -32,6 +34,18 @@ import kotlinx.coroutines.withContext
  * holder decision, and that genuinely distinct agents still cannot alias.
  */
 class TimelineRepositoryAcquisitionProvenanceTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     private val parentAgent = "agent-c356b54a"
     private val childAgent = "agent-597b5756"
@@ -137,30 +151,30 @@ class TimelineRepositoryAcquisitionProvenanceTest {
 
                 // 1. acquisition entry
                 val entry = events("acquisition.entry").last()
-                assertEquals("acq-child", entry.attrs["acquisitionId"])
-                assertEquals(TimelineAcquisitionSource.UI_RESOLVED_ROUTE.name, entry.attrs["source"])
+                assertEquals("acq-child", entry.attrs["acquisitionId"]?.textOrNull)
+                assertEquals(TimelineAcquisitionSource.UI_RESOLVED_ROUTE.name, entry.attrs["source"]?.textOrNull)
 
                 // 1b. the resolver/route decision, same id
                 val attributionEvent = events("acquisition.conversationAttribution").last()
-                assertEquals("acq-child", attributionEvent.attrs["acquisitionId"])
+                assertEquals("acq-child", attributionEvent.attrs["acquisitionId"]?.textOrNull)
                 assertEquals(
                     TimelineConversationAttribution.PARENT_AGENT_ONLY.name,
-                    attributionEvent.attrs["attribution"],
+                    attributionEvent.attrs["attribution"]?.textOrNull,
                 )
 
                 // 2. alias refusal, same id, with both competing agents named
                 val refusal = events("loop.aliasRefused").lastOrNull()
                 assertNotNull(refusal, "the child-scoped acquisition must refuse to alias the parent holder")
-                assertEquals("acq-child", refusal.attrs["acquisitionId"])
-                assertEquals(parentAgent, refusal.attrs["existingAgentId"])
-                assertEquals(childAgent, refusal.attrs["requestedAgentId"])
+                assertEquals("acq-child", refusal.attrs["acquisitionId"]?.textOrNull)
+                assertEquals(parentAgent, refusal.attrs["existingAgentId"]?.textOrNull)
+                assertEquals(childAgent, refusal.attrs["requestedAgentId"]?.textOrNull)
 
                 // 3. second-holder creation, same id, with the METADATA_INVALID signature
                 val miss = events("getOrCreate.cacheMiss").lastOrNull()
                 assertNotNull(miss, "the refusal must be followed by a second holder")
-                assertEquals("acq-child", miss.attrs["acquisitionId"])
-                assertEquals("ReconciliationRequired", miss.attrs["snapshotOutcome"])
-                assertEquals(SnapshotReadFailure.METADATA_INVALID.name, miss.attrs["remoteReconciliationReason"])
+                assertEquals("acq-child", miss.attrs["acquisitionId"]?.textOrNull)
+                assertEquals("ReconciliationRequired", miss.attrs["snapshotOutcome"]?.textOrNull)
+                assertEquals(SnapshotReadFailure.METADATA_INVALID.name, miss.attrs["remoteReconciliationReason"]?.textOrNull)
             } finally {
                 scope.cancel()
             }
@@ -194,26 +208,26 @@ class TimelineRepositoryAcquisitionProvenanceTest {
                 // An UNSPECIFIED acquisition: no provenance argument at all.
                 repo.getOrCreate(parentAgent, "c-unspecified")
 
-                val byId = events("acquisition.entry").associateBy { it.attrs["acquisitionId"] }
-                assertEquals(TimelineAcquisitionSource.UI_NAVIGATION.name, byId["a1"]?.attrs?.get("source"))
+                val byId = events("acquisition.entry").associateBy { it.attrs["acquisitionId"]?.textOrNull }
+                assertEquals(TimelineAcquisitionSource.UI_NAVIGATION.name, byId["a1"]?.attrs?.get("source")?.textOrNull)
                 assertEquals(
                     TimelineConversationSelectionMode.EXPLICIT_CONVERSATION_ID.name,
-                    byId["a1"]?.attrs?.get("selectionMode"),
+                    byId["a1"]?.attrs?.get("selectionMode")?.textOrNull,
                 )
-                assertEquals(TimelineAcquisitionSource.UI_RESOLVED_ROUTE.name, byId["a2"]?.attrs?.get("source"))
+                assertEquals(TimelineAcquisitionSource.UI_RESOLVED_ROUTE.name, byId["a2"]?.attrs?.get("source")?.textOrNull)
                 assertEquals(
                     TimelineConversationSelectionMode.MOST_RECENT_FALLBACK.name,
-                    byId["a2"]?.attrs?.get("selectionMode"),
+                    byId["a2"]?.attrs?.get("selectionMode")?.textOrNull,
                 )
-                assertEquals(TimelineAcquisitionSource.REPLAY_RECONCILE.name, byId["a3"]?.attrs?.get("source"))
-                assertEquals("true", byId["a3"]?.attrs?.get("isReplay"))
-                assertEquals(TimelineAcquisitionSource.RUNTIME_FANOUT.name, byId["a4"]?.attrs?.get("source"))
-                assertEquals("false", byId["a4"]?.attrs?.get("isReplay"))
+                assertEquals(TimelineAcquisitionSource.REPLAY_RECONCILE.name, byId["a3"]?.attrs?.get("source")?.textOrNull)
+                assertEquals("true", byId["a3"]?.attrs?.get("isReplay")?.textOrNull)
+                assertEquals(TimelineAcquisitionSource.RUNTIME_FANOUT.name, byId["a4"]?.attrs?.get("source")?.textOrNull)
+                assertEquals("false", byId["a4"]?.attrs?.get("isReplay")?.textOrNull)
 
                 // UNSPECIFIED is OBSERVABLE, not dropped.
                 val unspecified = events("acquisition.entry")
-                    .single { it.attrs["conversationId"] == "c-unspecified" }
-                assertEquals(TimelineAcquisitionSource.UNSPECIFIED.name, unspecified.attrs["source"])
+                    .single { it.attrs["conversationId"]?.textOrNull == "c-unspecified" }
+                assertEquals(TimelineAcquisitionSource.UNSPECIFIED.name, unspecified.attrs["source"]?.textOrNull)
             } finally {
                 scope.cancel()
             }
@@ -232,9 +246,9 @@ class TimelineRepositoryAcquisitionProvenanceTest {
                 // passing through getOrCreate. It has no production caller today;
                 // it is covered so the blind spot cannot return silently.
                 repo.warmConversations(listOf(parentAgent to "c-warm"))
-                val warm = events("acquisition.entry").single { it.attrs["conversationId"] == "c-warm" }
-                assertEquals(TimelineAcquisitionSource.WARM.name, warm.attrs["source"])
-                assertEquals("getOrCreateLoopWithoutHydrate", warm.attrs["creator"])
+                val warm = events("acquisition.entry").single { it.attrs["conversationId"]?.textOrNull == "c-warm" }
+                assertEquals(TimelineAcquisitionSource.WARM.name, warm.attrs["source"]?.textOrNull)
+                assertEquals("getOrCreateLoopWithoutHydrate", warm.attrs["creator"]?.textOrNull)
             } finally {
                 scope.cancel()
             }
@@ -250,10 +264,10 @@ class TimelineRepositoryAcquisitionProvenanceTest {
                 runCatching {
                     repo.repairExpiredConversationCursorScoped(parentAgent, "c-repair", fallbackSeq = null)
                 }
-                val entry = events("acquisition.entry").single { it.attrs["conversationId"] == "c-repair" }
-                assertEquals(TimelineAcquisitionSource.REPLAY_RECONCILE.name, entry.attrs["source"])
-                assertEquals("acq-repair", entry.attrs["acquisitionId"])
-                assertEquals("true", entry.attrs["isReplay"])
+                val entry = events("acquisition.entry").single { it.attrs["conversationId"]?.textOrNull == "c-repair" }
+                assertEquals(TimelineAcquisitionSource.REPLAY_RECONCILE.name, entry.attrs["source"]?.textOrNull)
+                assertEquals("acq-repair", entry.attrs["acquisitionId"]?.textOrNull)
+                assertEquals("true", entry.attrs["isReplay"]?.textOrNull)
             } finally {
                 scope.cancel()
             }
@@ -365,8 +379,9 @@ class TimelineRepositoryAcquisitionProvenanceTest {
                     ),
                 )
                 val entry = events("acquisition.entry").single()
-                entry.attrs.forEach { (key, value) ->
-                    if (value is String) {
+                entry.attrs.forEach { (key, attribute) ->
+                    val value = attribute.textOrNull
+                    if (value != null) {
                         assertTrue(
                             value.length <= TimelineProvenanceRedaction.MAX_IDENTIFIER_LENGTH,
                             "attr '$key' exceeded the identifier cap: ${value.length}",

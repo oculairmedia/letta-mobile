@@ -1,5 +1,6 @@
 package com.letta.mobile.debug
 
+import com.letta.mobile.util.attr
 import androidx.compose.ui.Modifier
 import ca.oculair.meridian.BuildConfig
 import androidx.compose.ui.input.pointer.PointerEvent
@@ -53,11 +54,11 @@ private fun logRootPointerEvent(event: PointerEvent, beforeMain: List<PointerCha
     Telemetry.event(
         TouchDispatchDiagnostics.TAG,
         "pointer.root",
-        "type" to event.type.toString(),
-        "changes" to summarizePointerChanges(after),
-        "pressed" to after.count { it.pressed },
-        "consumedBeforeMain" to beforeMain.filter { it.consumed }.map { it.id },
-        "consumed" to after.filter { it.consumed }.map { it.id },
+        "type" attr event.type.toString(),
+        "changes" attr summarizePointerChanges(after),
+        "pressed" attr after.count { it.pressed },
+        "consumedBeforeMain" attr beforeMain.filter { it.consumed }.map { it.id },
+        "consumed" attr after.filter { it.consumed }.map { it.id },
     )
 }
 

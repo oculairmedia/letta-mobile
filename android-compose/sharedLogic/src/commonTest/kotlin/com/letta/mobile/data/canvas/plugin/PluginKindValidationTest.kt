@@ -1,5 +1,9 @@
 package com.letta.mobile.data.canvas.plugin
 
+import com.letta.mobile.util.numberOrNull
+
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.canvas.CanvasBatchCheck
 import com.letta.mobile.data.canvas.CanvasBatchValidator
 import com.letta.mobile.data.canvas.CanvasOp
@@ -28,6 +32,18 @@ import kotlin.test.assertTrue
  * with a WARN (D11); the envelope's caps still refusing whatever the catalog.
  */
 class PluginKindValidationTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private val board = CanvasOpProjector.emptySceneJson()
 
     private val widgetProps: JsonObject = Json.parseToJsonElement(
@@ -113,8 +129,8 @@ class PluginKindValidationTest {
         assertIs<CanvasBatchCheck.Valid>(CanvasBatchValidator.check(board, listOf(unknown), catalog))
         val warning = unknownKindWarnings().single()
         assertEquals(Telemetry.Level.WARN, warning.level)
-        assertEquals("unknown", warning.attrs["plugin"])
-        assertEquals("ext:someone.else/gadget", warning.attrs["type"])
+        assertEquals("unknown", warning.attrs["plugin"]?.textOrNull)
+        assertEquals("ext:someone.else/gadget", warning.attrs["type"]?.textOrNull)
     }
 
     @Test
@@ -123,8 +139,8 @@ class PluginKindValidationTest {
         val newer = place(1).copy(v = 2, props = props("status" to "paused", "extra" to 1))
         assertIs<CanvasBatchCheck.Valid>(CanvasBatchValidator.check(board, listOf(newer), catalog))
         val warning = unknownKindWarnings().single()
-        assertEquals("known", warning.attrs["plugin"])
-        assertEquals(2, warning.attrs["v"])
+        assertEquals("known", warning.attrs["plugin"]?.textOrNull)
+        assertEquals(2, warning.attrs["v"]?.numberOrNull)
 
         Telemetry.clear()
         assertIs<CanvasBatchCheck.Valid>(CanvasBatchValidator.check(board, listOf(place(1)), catalog))

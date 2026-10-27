@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -38,8 +39,8 @@ internal class IngestFrameDeduplicator(
         if (duplicate) {
             Telemetry.event(
                 "IrohGate", "ingest.exactDuplicateDropped",
-                "eventType" to (timelineEvent::class.simpleName ?: ""),
-                "keyHash" to key.hashCode().toString(),
+                "eventType" attr (timelineEvent::class.simpleName ?: ""),
+                "keyHash" attr key.hashCode().toString(),
             )
         }
         return duplicate

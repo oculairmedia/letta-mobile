@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -61,7 +62,7 @@ internal class IrohQueueControlRelay(private val controller: AppServerController
         throw cancelled
     } catch (error: Exception) {
         val message = error.message ?: error::class.simpleName.orEmpty()
-        Telemetry.event("IrohNode", "queue_control.failed", "type" to type, "error" to message, level = Telemetry.Level.WARN)
+        Telemetry.event("IrohNode", "queue_control.failed", "type" attr type, "error" attr message, level = Telemetry.Level.WARN)
         onFailure(message)
     }
 

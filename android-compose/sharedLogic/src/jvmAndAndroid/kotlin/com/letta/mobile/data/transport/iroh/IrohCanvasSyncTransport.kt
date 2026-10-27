@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.CanvasSyncTransport
@@ -93,7 +94,7 @@ class IrohCanvasSyncTransport(
             }
         }.onFailure { t ->
             val errorMsg = t.message ?: t.toString()
-            Telemetry.event("CanvasSync", "incoming.error", "error" to errorMsg)
+            Telemetry.event("CanvasSync", "incoming.error", "error" attr errorMsg)
         }
     }
 
@@ -130,7 +131,7 @@ class IrohCanvasSyncTransport(
             throw cancelled
         } catch (t: Throwable) {
             val errorMsg = t.message ?: t.toString()
-            Telemetry.event("CanvasSync", "connection.error", "error" to errorMsg)
+            Telemetry.event("CanvasSync", "connection.error", "error" attr errorMsg)
         }
     }
 

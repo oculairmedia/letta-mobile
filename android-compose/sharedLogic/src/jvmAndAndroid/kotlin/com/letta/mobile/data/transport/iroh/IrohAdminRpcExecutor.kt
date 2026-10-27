@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
@@ -108,12 +109,12 @@ internal class IrohAdminRpcExecutor(
     private fun recordRetry(event: String, call: TrackedCall, error: Throwable, metrics: RetryMetrics) {
         Telemetry.event(
             "IrohTransport", event,
-            "method" to call.request.method,
-            "path" to call.request.path,
-            "error" to error.description(),
-            "class" to error::class.simpleName,
-            "consecutiveFailures" to metrics.failures.toString(),
-            "idleMs" to metrics.idleMs.toString(),
+            "method" attr call.request.method,
+            "path" attr call.request.path,
+            "error" attr error.description(),
+            "class" attr error::class.simpleName,
+            "consecutiveFailures" attr metrics.failures.toString(),
+            "idleMs" attr metrics.idleMs.toString(),
         )
     }
 
@@ -196,11 +197,24 @@ internal class IrohAdminRpcExecutor(
             if (!call.request.method.isReadOnlyAdminRpcMethod()) return RetryEligibility.Rejected
             if (call.handle.isConnectionAlive) {
                 call.retryState.recordIsolatedFailure()
-                Telemetry.event("IrohTransport", "admin_rpc.request_isolated", "method" to call.request.method, "path" to call.request.path, "error" to error.description(), "class" to error::class.simpleName)
+                Telemetry.event(
+                    "IrohTransport",
+                    "admin_rpc.request_isolated",
+                    "method" attr call.request.method,
+                    "path" attr call.request.path,
+                    "error" attr error.description(),
+                    "class" attr error::class.simpleName,
+                )
                 return RetryEligibility.Rejected
             }
             if (currentGeneration() != call.generation) {
-                Telemetry.event("IrohTransport", "admin_rpc.stale_generation_ignored", "callGeneration" to call.generation.toString(), "currentGeneration" to currentGeneration().toString(), "method" to call.request.method)
+                Telemetry.event(
+                    "IrohTransport",
+                    "admin_rpc.stale_generation_ignored",
+                    "callGeneration" attr call.generation.toString(),
+                    "currentGeneration" attr currentGeneration().toString(),
+                    "method" attr call.request.method,
+                )
                 return RetryEligibility.StaleGeneration
             }
             return RetryEligibility.Eligible

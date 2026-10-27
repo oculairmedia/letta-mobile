@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -195,9 +196,9 @@ internal class QueuedSendDriver(
     private fun report(event: QueueEvent, conversationId: QueueConversationId, id: QueuedSendId? = null) {
         Telemetry.event(
             TELEMETRY_TAG, event.wireName,
-            "conversationId" to conversationId.value,
-            "otid" to id?.value,
-            "depth" to queue.queueFor(conversationId).items.size,
+            "conversationId" attr conversationId.value,
+            "otid" attr id?.value,
+            "depth" attr queue.queueFor(conversationId).items.size,
         )
     }
 

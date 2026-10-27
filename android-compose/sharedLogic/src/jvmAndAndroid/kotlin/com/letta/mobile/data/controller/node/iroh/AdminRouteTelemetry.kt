@@ -1,5 +1,8 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.telemetryAttributes
+
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 
 /**
@@ -35,17 +38,21 @@ internal object AdminRouteTelemetry {
             "outcome" to selection.outcome,
         )
         selection.reason?.let { fields += "reason" to it }
-        Telemetry.event(CATEGORY, "selected", *fields.toTypedArray())
+        Telemetry.event(
+            CATEGORY,
+            "selected",
+            attrs = fields.toTypedArray().telemetryAttributes(),
+        )
     }
 
     fun fallback(fallback: Fallback) {
         Telemetry.event(
             CATEGORY,
             "fallback",
-            "method" to fallback.method,
-            "from" to fallback.fromRoute,
-            "to" to fallback.toRoute,
-            "reason" to fallback.reason,
+            "method" attr fallback.method,
+            "from" attr fallback.fromRoute,
+            "to" attr fallback.toRoute,
+            "reason" attr fallback.reason,
         )
     }
 }

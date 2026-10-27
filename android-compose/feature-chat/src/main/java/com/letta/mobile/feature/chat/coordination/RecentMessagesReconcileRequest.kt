@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.coordination
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -66,7 +67,7 @@ internal class RecentMessagesReconcileLauncher(
     private fun reportFailure(openRequest: ConversationOpenReconcileRequest, error: Throwable) {
         Telemetry.error(
             "AdminChatVM", "loadMessages.reconcileOnOpenFailed", error,
-            "conversationId" to openRequest.conversationId,
+            "conversationId" attr openRequest.conversationId,
         )
     }
 }

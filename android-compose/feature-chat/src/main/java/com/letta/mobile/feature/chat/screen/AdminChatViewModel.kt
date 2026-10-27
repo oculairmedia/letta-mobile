@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.screen
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.context.ContextReadingKey
 import com.letta.mobile.data.presence.RunScope
 import androidx.compose.runtime.Composable
@@ -482,7 +483,7 @@ internal class AdminChatViewModel @Inject constructor(
             } catch (failure: Throwable) {
                 Telemetry.event(
                     "AdminChatVM", "resume.sync.error",
-                    "error" to (failure.message ?: "unknown"),
+                    "error" attr (failure.message ?: "unknown"),
                     level = Telemetry.Level.WARN,
                 )
             }

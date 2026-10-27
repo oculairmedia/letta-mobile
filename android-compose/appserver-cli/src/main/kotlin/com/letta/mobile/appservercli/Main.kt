@@ -11,11 +11,13 @@ class AppServerCli : CliktCommand(name = "meridian-app-server") {
 object Main {
     @JvmStatic
     fun main(args: Array<String>) {
-        AppServerCli()
-            .subcommands(
-                AppServerServeCommand(),
-                AppServerSmokeCommand(),
-            )
-            .main(args)
+        com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder()).use {
+            AppServerCli()
+                .subcommands(
+                    AppServerServeCommand(),
+                    AppServerSmokeCommand(),
+                )
+                .main(args)
+        }
     }
 }

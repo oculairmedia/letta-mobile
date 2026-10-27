@@ -2,6 +2,7 @@ package com.letta.mobile.util
 
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
+import java.util.concurrent.atomic.AtomicInteger
 import java.lang.reflect.Proxy
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -9,6 +10,18 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TelemetryConsoleTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     @Test
     fun fallbackConsoleOmitsDebugButRetainsDiagnosticsAndWarnings() {
         withTelemetryCapture { output ->
@@ -71,6 +84,26 @@ class TelemetryConsoleTest {
         }
     }
 
+    @Test
+    fun delegateSnapshotSurvivesAttributeRenderingWithoutLeakingDebugToConsole() {
+        withTelemetryCapture { output ->
+            val delegate = RecordingTelemetryDelegate()
+            Telemetry.delegate = delegate.instance
+            val count = object : AtomicInteger(1) {
+                override fun toShort(): Short = get().toShort()
+                override fun toByte(): Byte = get().toByte()
+                override fun toString(): String {
+                    Telemetry.delegate = null
+                    return super.toString()
+                }
+            }
+            Telemetry.event("ConsoleTest", "debug-marker", "count" attr count, level = Telemetry.Level.DEBUG)
+            assertEquals("debug-marker count=1", delegate.events.single().body)
+            assertFalse(output.toString().contains("debug-marker"))
+            assertTrue(Telemetry.snapshot().any { it.name == "debug-marker" })
+        }
+    }
+
     private fun withTelemetryCapture(block: (ByteArrayOutputStream) -> Unit) {
         val originalOut = System.out
         val originalDelegate = Telemetry.delegate
@@ -111,7 +144,7 @@ class TelemetryConsoleTest {
         ) { _, method, args ->
             if (method.name == "logToLogcat") {
                 events += RecordedEvent(
-                    args[0] as Telemetry.Level, args[1] as String, args[2] as String, args[3] as Throwable?,
+                    args[0] as Telemetry.Level, args[1] as String, args[2] as String, args[3] as? Throwable,
                 )
             }
             if (method.returnType == Boolean::class.javaPrimitiveType) false else null

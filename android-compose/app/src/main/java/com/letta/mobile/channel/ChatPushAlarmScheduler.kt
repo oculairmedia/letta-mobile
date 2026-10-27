@@ -1,5 +1,6 @@
 package com.letta.mobile.channel
 
+import com.letta.mobile.util.attr
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
@@ -27,14 +28,14 @@ object ChatPushAlarmScheduler {
         val appContext = context.applicationContext
         val alarmManager = appContext.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
         if (alarmManager == null) {
-            Telemetry.event("ChatPushAlarm", "scheduleSkipped", "reason" to "missingAlarmManager")
+            Telemetry.event("ChatPushAlarm", "scheduleSkipped", "reason" attr "missingAlarmManager")
             return
         }
 
         val triggerAt = SystemClock.elapsedRealtime() + INTERVAL_MS
         val pendingIntent = recoveryPendingIntent(appContext, PendingIntent.FLAG_UPDATE_CURRENT)
             ?: run {
-                Telemetry.event("ChatPushAlarm", "scheduleSkipped", "reason" to "missingPendingIntent")
+                Telemetry.event("ChatPushAlarm", "scheduleSkipped", "reason" attr "missingPendingIntent")
                 return
             }
 
@@ -46,8 +47,8 @@ object ChatPushAlarmScheduler {
             )
             Telemetry.event(
                 "ChatPushAlarm", "scheduled",
-                "intervalMinutes" to (INTERVAL_MS / 60_000L),
-                "triggerElapsedMs" to triggerAt,
+                "intervalMinutes" attr (INTERVAL_MS / 60_000L),
+                "triggerElapsedMs" attr triggerAt,
             )
         } catch (t: Throwable) {
             Log.w(TAG, "Failed to schedule chat push recovery alarm", t)

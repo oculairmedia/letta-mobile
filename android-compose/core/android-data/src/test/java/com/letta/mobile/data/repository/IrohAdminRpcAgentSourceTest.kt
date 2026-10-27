@@ -1,5 +1,9 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.util.numberOrNull
+
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -17,6 +21,18 @@ import org.junit.Test
  * screen does not hard-fail at the P4 purity choke-point in iroh:// mode.
  */
 class IrohAdminRpcAgentSourceTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private fun source(transport: FakeChannelTransport): IrohAdminRpcAgentSource {
         val settings = FakeSettingsRepository(
             initialActiveConfig = LettaConfig(
@@ -123,13 +139,13 @@ class IrohAdminRpcAgentSourceTest {
         assertEquals(2, agents.size)
 
         val stop = Telemetry.snapshot().first { it.name == "roster.sweepStopped" }
-        assertEquals("shortPage", stop.attrs["stop"])
-        assertEquals(2, stop.attrs["mergedSize"])
+        assertEquals("shortPage", stop.attrs["stop"]?.textOrNull)
+        assertEquals(2, stop.attrs["mergedSize"]?.numberOrNull)
 
         val completeness = Telemetry.snapshot().first { it.name == "roster.completeness" }
-        assertEquals("match", completeness.attrs["completeness"])
-        assertEquals(2, completeness.attrs["sweptSize"])
-        assertEquals(2, completeness.attrs["authoritativeCount"])
+        assertEquals("match", completeness.attrs["completeness"]?.textOrNull)
+        assertEquals(2, completeness.attrs["sweptSize"]?.numberOrNull)
+        assertEquals(2, completeness.attrs["authoritativeCount"]?.numberOrNull)
         Telemetry.clear()
     }
 
@@ -148,9 +164,9 @@ class IrohAdminRpcAgentSourceTest {
         assertEquals(1, agents.size)
 
         val completeness = Telemetry.snapshot().first { it.name == "roster.completeness" }
-        assertEquals("mismatch", completeness.attrs["completeness"])
-        assertEquals(131, completeness.attrs["authoritativeCount"])
-        assertEquals(-130, completeness.attrs["delta"])
+        assertEquals("mismatch", completeness.attrs["completeness"]?.textOrNull)
+        assertEquals(131, completeness.attrs["authoritativeCount"]?.numberOrNull)
+        assertEquals(-130, completeness.attrs["delta"]?.numberOrNull)
         Telemetry.clear()
     }
 
@@ -173,8 +189,8 @@ class IrohAdminRpcAgentSourceTest {
         assertEquals(1, agents.size)
 
         val completeness = Telemetry.snapshot().first { it.name == "roster.completeness" }
-        assertEquals("unknown", completeness.attrs["completeness"])
-        assertEquals("unknown", completeness.attrs["authoritativeCount"])
+        assertEquals("unknown", completeness.attrs["completeness"]?.textOrNull)
+        assertEquals("unknown", completeness.attrs["authoritativeCount"]?.textOrNull)
         Telemetry.clear()
     }
 
@@ -193,9 +209,9 @@ class IrohAdminRpcAgentSourceTest {
         assertEquals(50, agents.size)
 
         val stop = Telemetry.snapshot().first { it.name == "roster.sweepStopped" }
-        assertEquals("noFreshIgnoredOffset", stop.attrs["stop"])
-        assertEquals(50, stop.attrs["pageSize"])
-        assertEquals(50, stop.attrs["mergedSize"])
+        assertEquals("noFreshIgnoredOffset", stop.attrs["stop"]?.textOrNull)
+        assertEquals(50, stop.attrs["pageSize"]?.numberOrNull)
+        assertEquals(50, stop.attrs["mergedSize"]?.numberOrNull)
         Telemetry.clear()
     }
 }

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
@@ -339,10 +340,10 @@ class AppServerTurnEngine(
         if (validatedGeneration == null) {
             Telemetry.event(
                 "AppServerTurnEngine", "externalTool.leaseGenerationUnavailable",
-                "requestId" to toolRequest.requestId,
-                "toolCallId" to toolRequest.toolCallId,
-                "leaseToken" to lease.token,
-                "key" to lease.key.toString(),
+                "requestId" attr toolRequest.requestId,
+                "toolCallId" attr toolRequest.toolCallId,
+                "leaseToken" attr lease.token,
+                "key" attr lease.key.toString(),
                 level = Telemetry.Level.WARN,
             )
             return
@@ -374,9 +375,9 @@ class AppServerTurnEngine(
         val activity = com.letta.mobile.data.subagents.SubagentParentProjection.activityLine(childDelta.delta)
         Telemetry.event(
             "AppServerTurnEngine", "subagent.frame_suppressed",
-            "subagentId" to subagentId,
-            "conversationId" to childDelta.runtime.conversationId,
-            "activityBytes" to (activity?.encodeToByteArray()?.size ?: 0),
+            "subagentId" attr subagentId,
+            "conversationId" attr childDelta.runtime.conversationId,
+            "activityBytes" attr (activity?.encodeToByteArray()?.size ?: 0),
         )
         return true
     }
@@ -413,11 +414,11 @@ class AppServerTurnEngine(
         if (leaseHeld) return false
         Telemetry.event(
             "AppServerTurnEngine", "externalTool.unleasedAnswer",
-            "requestId" to request.requestId,
-            "toolCallId" to request.toolCallId,
-            "toolName" to request.toolName,
-            "agentId" to (runtime?.agentId ?: ""),
-            "conversationId" to (runtime?.conversationId ?: ""),
+            "requestId" attr request.requestId,
+            "toolCallId" attr request.toolCallId,
+            "toolName" attr request.toolName,
+            "agentId" attr (runtime?.agentId ?: ""),
+            "conversationId" attr (runtime?.conversationId ?: ""),
             level = Telemetry.Level.WARN,
         )
         externalTools.answer(
@@ -568,9 +569,9 @@ class AppServerTurnEngine(
         if (busy.size < 2) return
         Telemetry.event(
             "AppServerTurnEngine", "activeTurn.concurrentLeases",
-            "count" to busy.size,
-            "keys" to busy.joinToString(",") { it.toString() },
-            "acquiredKey" to acquired.key.toString(),
+            "count" attr busy.size,
+            "keys" attr busy.joinToString(",") { it.toString() },
+            "acquiredKey" attr acquired.key.toString(),
         )
     }
 
@@ -689,15 +690,15 @@ class AppServerTurnEngine(
         slot.owner = lease.toInitialOwner()
         Telemetry.event(
             "AppServerTurnEngine", "activeTurn.acquired",
-            "runtimeId" to command.runtimeId.value,
-            "agentId" to command.agentId.value,
-            "conversationId" to command.conversationId.value,
-            "key" to slot.key.toString(),
-            "acquiredAtMs" to acquiredAtMs,
-            "processRole" to ownerProcessRole,
-            "leaseToken" to leaseToken,
-            "settleDeadlineMs" to terminalSettleQuietMs,
-            "watchdogDeadlineMs" to turnIdleTimeoutMs,
+            "runtimeId" attr command.runtimeId.value,
+            "agentId" attr command.agentId.value,
+            "conversationId" attr command.conversationId.value,
+            "key" attr slot.key.toString(),
+            "acquiredAtMs" attr acquiredAtMs,
+            "processRole" attr ownerProcessRole,
+            "leaseToken" attr leaseToken,
+            "settleDeadlineMs" attr terminalSettleQuietMs,
+            "watchdogDeadlineMs" attr turnIdleTimeoutMs,
         )
         noteConcurrentLeases(slot)
 
@@ -801,33 +802,33 @@ class AppServerTurnEngine(
         if (releasedOwner?.lastTerminal == null || releaseReason != TurnReleaseReason.NORMAL_COMPLETION) {
             Telemetry.event(
                 "AppServerTurnEngine", "activeTurn.releasedWithoutTerminal",
-                "key" to slot.key.toString(),
-                "leaseToken" to leaseToken,
-                "releaseReason" to releaseReason,
-                "lastTerminal" to (releasedOwner?.lastTerminal ?: "<none>"),
-                "otherBusyKeys" to busyRuntimeKeys().filter { it != slot.key }
+                "key" attr slot.key.toString(),
+                "leaseToken" attr leaseToken,
+                "releaseReason" attr releaseReason,
+                "lastTerminal" attr (releasedOwner?.lastTerminal ?: "<none>"),
+                "otherBusyKeys" attr busyRuntimeKeys().filter { it != slot.key }
                     .joinToString(",") { it.toString() },
                 level = Telemetry.Level.WARN,
             )
         }
         Telemetry.event(
             "AppServerTurnEngine", "activeTurn.released",
-            "runtimeId" to command.runtimeId.value,
-            "agentId" to command.agentId.value,
-            "conversationId" to command.conversationId.value,
-            "key" to slot.key.toString(),
-            "leaseToken" to leaseToken,
-            "acquiredAtMs" to (releasedOwner?.acquiredAtMs),
-            "heldMs" to (releasedOwner?.acquiredAtMs?.let { currentTimeMs() - it }),
-            "lastTerminal" to (releasedOwner?.lastTerminal),
-            "lastTerminalSource" to (releasedOwner?.lastTerminalSource),
-            "lastTerminalAtMs" to (releasedOwner?.lastTerminalAtMs),
-            "lastTerminalSeq" to (releasedOwner?.lastTerminalSeq),
-            "lastTerminalScopeMatched" to (releasedOwner?.lastTerminalScopeMatched),
-            "settleDeadlineMs" to (releasedOwner?.settleDeadlineMs),
-            "watchdogDeadlineMs" to (releasedOwner?.watchdogDeadlineMs),
-            "processRole" to (releasedOwner?.processRole),
-            "releaseReason" to releaseReason,
+            "runtimeId" attr command.runtimeId.value,
+            "agentId" attr command.agentId.value,
+            "conversationId" attr command.conversationId.value,
+            "key" attr slot.key.toString(),
+            "leaseToken" attr leaseToken,
+            "acquiredAtMs" attr (releasedOwner?.acquiredAtMs),
+            "heldMs" attr (releasedOwner?.acquiredAtMs?.let { currentTimeMs() - it }),
+            "lastTerminal" attr (releasedOwner?.lastTerminal),
+            "lastTerminalSource" attr (releasedOwner?.lastTerminalSource),
+            "lastTerminalAtMs" attr (releasedOwner?.lastTerminalAtMs),
+            "lastTerminalSeq" attr (releasedOwner?.lastTerminalSeq),
+            "lastTerminalScopeMatched" attr (releasedOwner?.lastTerminalScopeMatched),
+            "settleDeadlineMs" attr (releasedOwner?.settleDeadlineMs),
+            "watchdogDeadlineMs" attr (releasedOwner?.watchdogDeadlineMs),
+            "processRole" attr (releasedOwner?.processRole),
+            "releaseReason" attr releaseReason,
         )
     }
 
@@ -839,7 +840,7 @@ class AppServerTurnEngine(
             TurnOutcome.IdleTimedOut -> {
                 run.release.record(TurnReleaseReason.WATCHDOG_TIMEOUT)
                 Telemetry.event(
-                    "IrohTurn", "turn.idle_timeout", "agent" to run.command.agentId.value, "idleMs" to turnIdleTimeoutMs,
+                    "IrohTurn", "turn.idle_timeout", "agent" attr run.command.agentId.value, "idleMs" attr turnIdleTimeoutMs,
                 )
                 noteOwnerTerminal(OwnerTerminalNote(RuntimeRunStatus.Failed, source = "idle_timeout"), run.lease)
                 run.emit(run.command.failedDraft("App Server turn idle for ${turnIdleTimeoutMs}ms (no terminal stop_reason)"))
@@ -870,9 +871,9 @@ class AppServerTurnEngine(
         lease.slot.updateLease { cur ->
             if (cur?.token == lease.token) cur.copy(phase = TurnLeasePhase.Starting) else cur
         }
-        Telemetry.event("IrohTurn", "ensureRuntime.begin", "agent" to command.agentId.value)
+        Telemetry.event("IrohTurn", "ensureRuntime.begin", "agent" attr command.agentId.value)
         return ensureRuntime(command, turnPermissionMode, lease.slot).also { scope ->
-            Telemetry.event("IrohTurn", "ensureRuntime.ok", "scopeAgent" to scope.agentId, "scopeConv" to scope.conversationId)
+            Telemetry.event("IrohTurn", "ensureRuntime.ok", "scopeAgent" attr scope.agentId, "scopeConv" attr scope.conversationId)
         }
     }
 
@@ -880,9 +881,9 @@ class AppServerTurnEngine(
         run.release.record(TurnReleaseReason.START_FAILED, error)
         Telemetry.event(
             "AppServerTurnEngine", "turn.start_failed",
-            "key" to run.lease.key.toString(),
-            "error" to (error::class.simpleName ?: "Throwable"),
-            "message" to (error.message ?: ""),
+            "key" attr run.lease.key.toString(),
+            "error" attr (error::class.simpleName ?: "Throwable"),
+            "message" attr (error.message ?: ""),
             level = Telemetry.Level.WARN,
         )
         noteOwnerTerminal(OwnerTerminalNote(RuntimeRunStatus.Failed, source = "start_failed"), run.lease)
@@ -1200,13 +1201,13 @@ class AppServerTurnEngine(
             val rethrown = consecutive > FrameProjectionErrorBudget.MAX_CONSECUTIVE
             Telemetry.event(
                 "AppServerTurnEngine", "frame.projection_failed",
-                "frameType" to (received.frame.type ?: "<unknown>"),
-                "conversationId" to context.runtimeScope.conversationId,
-                "error" to (e::class.simpleName ?: "Throwable"),
-                "message" to (e.message ?: ""),
-                "consecutive" to consecutive,
-                "budget" to FrameProjectionErrorBudget.MAX_CONSECUTIVE,
-                "rethrown" to rethrown,
+                "frameType" attr (received.frame.type ?: "<unknown>"),
+                "conversationId" attr context.runtimeScope.conversationId,
+                "error" attr (e::class.simpleName ?: "Throwable"),
+                "message" attr (e.message ?: ""),
+                "consecutive" attr consecutive,
+                "budget" attr FrameProjectionErrorBudget.MAX_CONSECUTIVE,
+                "rethrown" attr rethrown,
             )
             if (rethrown) throw e
             null
@@ -1386,11 +1387,11 @@ class AppServerTurnEngine(
         )
         Telemetry.event(
             "AppServerTurnEngine", "terminal.scope_rejected",
-            "expectedAgent" to scope.agentId,
-            "expectedConv" to scope.conversationId,
-            "frameAgent" to received.frame.runtime?.agentId,
-            "frameConv" to received.frame.runtime?.conversationId,
-            "eventSeq" to received.eventSeqOrNull(),
+            "expectedAgent" attr scope.agentId,
+            "expectedConv" attr scope.conversationId,
+            "frameAgent" attr received.frame.runtime?.agentId,
+            "frameConv" attr received.frame.runtime?.conversationId,
+            "eventSeq" attr received.eventSeqOrNull(),
         )
         // Authoritative terminal release for the SAME conversation closes the
         // passive-observer stuck-for-5-min gap (letta-mobile-kyqdt STEP 2).
@@ -1458,10 +1459,10 @@ class AppServerTurnEngine(
         if (!autoAllowApprovals || !approval.autoAllowPermitted(permissionModeProvider(command))) return false
         Telemetry.event(
             "IrohTurn", "approval.auto_allow",
-            "approvalId" to approval.requestId,
-            "toolCallId" to (approval.toolCallId ?: ""),
-            "tool" to (approval.toolName ?: ""),
-            "source" to approval.source,
+            "approvalId" attr approval.requestId,
+            "toolCallId" attr (approval.toolCallId ?: ""),
+            "tool" attr (approval.toolName ?: ""),
+            "source" attr approval.source,
         )
         // lgns8.22.4.1.4: capture the generation the approval is being ANSWERED ON
         // before the send. Reading it back after the send would attribute the
@@ -1512,7 +1513,13 @@ class AppServerTurnEngine(
                 externalToolRegistry,
             ),
         )
-        Telemetry.event("IrohTurn", "runtimeStart.response", "success" to response.success, "hasRuntime" to (response.runtime != null), "error" to response.error)
+        Telemetry.event(
+            "IrohTurn",
+            "runtimeStart.response",
+            "success" attr response.success,
+            "hasRuntime" attr (response.runtime != null),
+            "error" attr response.error,
+        )
         if (!response.success) {
             error(response.error ?: "App Server runtime_start failed.")
         }
@@ -1681,8 +1688,8 @@ class AppServerTurnEngine(
             Telemetry.event(
                 "IrohTurn",
                 "settlement.synthesized",
-                "toolCallId" to toolCallId,
-                "reason" to reasonText,
+                "toolCallId" attr toolCallId,
+                "reason" attr reasonText,
             )
         }
     }
@@ -1844,20 +1851,20 @@ class AppServerTurnEngine(
         Telemetry.event(
             "AppServerTurnEngine",
             "terminal.failure",
-            "status" to status.name,
-            "hasReason" to !reason.isNullOrBlank(),
+            "status" attr status.name,
+            "hasReason" attr !reason.isNullOrBlank(),
             // letta-mobile-aktss: classified failure family. The raw reason stays
             // redacted (o0atv), but a category token alone would have made the
             // 2026-07-29 provider-refusal and stale-approval incidents a one-line
             // grep instead of a multi-layer log hunt.
-            "reasonKind" to (terminalReasonKind(reason) ?: "<none>"),
-            "exceptionType" to (exceptionTypeToken(reason) ?: "<none>"),
-            "provider" to (provider ?: "<none>"),
-            "handle" to (handle ?: "<none>"),
-            "runId" to (runId ?: owner?.runId ?: "<none>"),
-            "agentId" to agentId,
-            "conversationId" to conversationId,
-            "processRole" to (owner?.processRole ?: "<none>"),
+            "reasonKind" attr (terminalReasonKind(reason) ?: "<none>"),
+            "exceptionType" attr (exceptionTypeToken(reason) ?: "<none>"),
+            "provider" attr (provider ?: "<none>"),
+            "handle" attr (handle ?: "<none>"),
+            "runId" attr (runId ?: owner?.runId ?: "<none>"),
+            "agentId" attr agentId,
+            "conversationId" attr conversationId,
+            "processRole" attr (owner?.processRole ?: "<none>"),
             level = Telemetry.Level.WARN,
         )
     }

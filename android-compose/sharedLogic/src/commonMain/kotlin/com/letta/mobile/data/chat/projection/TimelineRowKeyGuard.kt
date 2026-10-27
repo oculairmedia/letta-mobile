@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.projection
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 
 /**
@@ -28,12 +29,12 @@ object TimelineRowKeyGuard {
             }
             Telemetry.event(
                 "Timeline", "timeline.duplicateKeyDropped",
-                "key" to key,
-                "sources" to "${sources(first)}+${sources(index)}",
+                "key" attr key,
+                "sources" attr "${sources(first)}+${sources(index)}",
                 // The first occurrence keeps the content; this one renders empty.
-                "kept" to sources(first),
-                "dropped" to sources(index),
-                "index" to index,
+                "kept" attr sources(first),
+                "dropped" attr sources(index),
+                "index" attr index,
                 level = Telemetry.Level.WARN,
             )
             val map = duplicates ?: mutableMapOf<Int, String>().also { duplicates = it }

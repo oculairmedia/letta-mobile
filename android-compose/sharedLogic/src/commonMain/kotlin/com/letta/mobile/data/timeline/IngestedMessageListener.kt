@@ -12,8 +12,8 @@ interface IngestedMessageListener {
     /**
      * Called on the TimelineSyncLoop's coroutine context.
      * after the event has been appended to state and the write lock has been
-     * released. Implementations may do slow lookup/network work; exceptions
-     * are swallowed and logged.
+     * released. Implementations may do slow lookup/network work; ordinary failures
+     * are swallowed and logged, while coroutine cancellation propagates.
      */
     suspend fun onMessageIngested(
         conversationId: String,

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.a2ui
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.A2uiComponentId
 import com.letta.mobile.data.model.A2uiSurfaceId
 import com.letta.mobile.util.Telemetry
@@ -61,10 +62,10 @@ internal fun logSurfaceRejected(surfaceId: A2uiSurfaceId, violation: A2uiSurface
     when (violation) {
         is A2uiSurfaceLimitViolation.TooManyComponents -> Telemetry.event(
             A2uiSurfaceLimits.TELEMETRY_TAG, "surface.rejected",
-            "surfaceId" to surfaceId.value,
-            "reason" to "tooManyComponents",
-            "count" to violation.count,
-            "limit" to violation.limit,
+            "surfaceId" attr surfaceId.value,
+            "reason" attr "tooManyComponents",
+            "count" attr violation.count,
+            "limit" attr violation.limit,
             level = Telemetry.Level.WARN,
         )
     }
@@ -128,9 +129,9 @@ class A2uiRenderBudget(
         fun forSurface(surfaceId: A2uiSurfaceId): A2uiRenderBudget = A2uiRenderBudget { componentId, claim ->
             Telemetry.event(
                 A2uiSurfaceLimits.TELEMETRY_TAG, "render.truncated",
-                "surfaceId" to surfaceId.value,
-                "componentId" to componentId.value,
-                "reason" to claim.name,
+                "surfaceId" attr surfaceId.value,
+                "componentId" attr componentId.value,
+                "reason" attr claim.name,
                 level = Telemetry.Level.WARN,
             )
         }

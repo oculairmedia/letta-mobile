@@ -1,5 +1,8 @@
 package com.letta.mobile.data.controller.channels
 
+import com.letta.mobile.util.attr
+import com.letta.mobile.util.TelemetryValue
+
 import com.letta.mobile.data.transport.appserver.AppServerChannelAccount
 import com.letta.mobile.data.transport.appserver.AppServerChannelAccountPatch
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -152,10 +155,10 @@ class ChannelRestoreCoordinator(
         Telemetry.event(
             TELEMETRY_TAG,
             "restore_complete",
-            "channels" to channelIds.size,
-            "started" to started,
-            "rewired" to rewired.size,
-            "failed" to failures.size,
+            "channels" attr channelIds.size,
+            "started" attr started,
+            "rewired" attr rewired.size,
+            "failed" attr failures.size,
         )
         log(
             "[channels] restore complete: channels=${channelIds.size} started=$started " +
@@ -195,16 +198,16 @@ class ChannelRestoreCoordinator(
             reassertEnabled(ref)
             warn(
                 "fast_path_start_failed",
-                "channelId" to ref.channelId,
-                "accountId" to ref.accountId,
-                "reason" to error,
+                "channelId" attr ref.channelId,
+                "accountId" attr ref.accountId,
+                "reason" attr error,
             )
         }
         Telemetry.event(
             TELEMETRY_TAG,
             "fast_path_complete",
-            "attempted" to cached.size,
-            "rewired" to rewired.size,
+            "attempted" attr cached.size,
+            "rewired" attr rewired.size,
         )
         log("[channels] fast-path re-wire: attempted=${cached.size} rewired=${rewired.size}")
         return rewired
@@ -226,8 +229,8 @@ class ChannelRestoreCoordinator(
             if (ref in stillEnabled) continue
             warn(
                 "fast_path_started_stale_account",
-                "channelId" to ref.channelId,
-                "accountId" to ref.accountId,
+                "channelId" attr ref.channelId,
+                "accountId" attr ref.accountId,
             )
             log(
                 "[channels] WARN fast-path started $ref but the enumeration no longer reports it " +
@@ -245,7 +248,7 @@ class ChannelRestoreCoordinator(
             block = { client.channelsList(AppServerCommand.ChannelsList(requestId = requestIdFactory())) },
             onFailure = { e ->
                 failures += ChannelRestoreFailure(null, ChannelRestorePhase.LIST_CHANNELS, e.messageOrClass())
-                warn("list_channels_failed", "reason" to e.messageOrClass())
+                warn("list_channels_failed", "reason" attr e.messageOrClass())
                 return null
             },
         )
@@ -255,7 +258,7 @@ class ChannelRestoreCoordinator(
                 ChannelRestorePhase.LIST_CHANNELS,
                 response.error ?: "channels_list reported failure",
             )
-            warn("list_channels_failed", "reason" to (response.error ?: "unknown"))
+            warn("list_channels_failed", "reason" attr (response.error ?: "unknown"))
             return null
         }
         return response.channels.filter { it.configured }.map { it.channelId }
@@ -288,7 +291,7 @@ class ChannelRestoreCoordinator(
                     ChannelRestorePhase.LIST_ACCOUNTS,
                     e.messageOrClass(),
                 )
-                warn("list_accounts_failed", "channelId" to channelId, "reason" to e.messageOrClass())
+                warn("list_accounts_failed", "channelId" attr channelId, "reason" attr e.messageOrClass())
                 return emptyList()
             },
         )
@@ -298,7 +301,7 @@ class ChannelRestoreCoordinator(
                 ChannelRestorePhase.LIST_ACCOUNTS,
                 response.error ?: "channel_accounts_list reported failure",
             )
-            warn("list_accounts_failed", "channelId" to channelId, "reason" to (response.error ?: "unknown"))
+            warn("list_accounts_failed", "channelId" attr channelId, "reason" attr (response.error ?: "unknown"))
             return emptyList()
         }
         // NEVER log `response.accounts` itself — each element carries the plugin
@@ -325,9 +328,9 @@ class ChannelRestoreCoordinator(
                 Telemetry.event(
                     TELEMETRY_TAG,
                     "account_started",
-                    "channelId" to ref.channelId,
-                    "accountId" to ref.accountId,
-                    "attempt" to attempt,
+                    "channelId" attr ref.channelId,
+                    "accountId" attr ref.accountId,
+                    "attempt" attr attempt,
                 )
                 log("[channels] started $ref (attempt ${attempt + 1})")
                 return true
@@ -344,10 +347,10 @@ class ChannelRestoreCoordinator(
         failures += ChannelRestoreFailure(ref, ChannelRestorePhase.START_ACCOUNT, lastError)
         warn(
             "account_start_gave_up",
-            "channelId" to ref.channelId,
-            "accountId" to ref.accountId,
-            "attempts" to maxAttemptsPerAccount,
-            "reason" to lastError,
+            "channelId" attr ref.channelId,
+            "accountId" attr ref.accountId,
+            "attempts" attr maxAttemptsPerAccount,
+            "reason" attr lastError,
         )
         log(
             "[channels] gave up starting $ref after $maxAttemptsPerAccount attempts " +
@@ -395,9 +398,9 @@ class ChannelRestoreCoordinator(
         )
         warn(
             "reassert_enabled_failed",
-            "channelId" to ref.channelId,
-            "accountId" to ref.accountId,
-            "reason" to reason,
+            "channelId" attr ref.channelId,
+            "accountId" attr ref.accountId,
+            "reason" attr reason,
         )
     }
 
@@ -423,7 +426,7 @@ class ChannelRestoreCoordinator(
     // Telemetry.event defines this heterogeneous vararg boundary; values are limited to ids,
     // counts, booleans, and bounded server error strings by this coordinator's call sites.
     @Suppress("NoAnyType")
-    private fun warn(name: String, vararg attrs: Pair<String, Any?>) {
+    private fun warn(name: String, vararg attrs: Pair<String, TelemetryValue>) {
         Telemetry.event(TELEMETRY_TAG, name, *attrs, level = Telemetry.Level.WARN)
     }
 

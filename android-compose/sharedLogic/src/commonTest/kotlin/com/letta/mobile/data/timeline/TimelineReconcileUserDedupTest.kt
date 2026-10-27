@@ -15,6 +15,18 @@ import kotlin.test.assertEquals
  * fallback when otid is missing).
  */
 class TimelineReconcileUserDedupTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     @AfterTest
     fun tearDown() {
         Telemetry.clear()

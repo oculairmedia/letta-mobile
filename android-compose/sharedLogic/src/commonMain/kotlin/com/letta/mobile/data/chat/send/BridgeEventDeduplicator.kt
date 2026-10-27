@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.transport.TimelineEventKeys
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
@@ -53,8 +54,8 @@ internal class BridgeEventDeduplicator {
                 synchronized(eventLock) { exactDuplicates++ }
                 Telemetry.event(
                     "AdminChatVM", "ws.event.exactDuplicateDropped",
-                    "eventType" to (event::class.simpleName ?: ""),
-                    "keyHash" to key.hashCode().toString(),
+                    "eventType" attr (event::class.simpleName ?: ""),
+                    "keyHash" attr key.hashCode().toString(),
                 )
             }
         }

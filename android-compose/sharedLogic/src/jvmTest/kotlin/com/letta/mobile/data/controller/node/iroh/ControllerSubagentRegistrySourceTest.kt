@@ -1,5 +1,9 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.numberOrNull
+
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.model.SubagentActivitySnapshot
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
@@ -21,6 +25,18 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ControllerSubagentRegistrySourceTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private val codexChild = "codex_01a1686b-8ec9-7f72-8e79-bd42f1ff3237"
 
     private fun stream(agent: String, conversation: String, raw: String) = AppServerInboundFrame.StreamDelta(
@@ -119,8 +135,8 @@ class ControllerSubagentRegistrySourceTest {
         assertEquals(before, source.registry.replaySnapshot("conversation"))
         val warning = Telemetry.snapshot().single { it.tag == "SubagentRegistry" && it.name == "terminal.ambiguous" }
         assertEquals(Telemetry.Level.WARN, warning.level)
-        assertEquals("task_15", warning.attrs["taskId"])
-        assertEquals(2, warning.attrs["matchCount"])
+        assertEquals("task_15", warning.attrs["taskId"]?.textOrNull)
+        assertEquals(2, warning.attrs["matchCount"]?.numberOrNull)
     }
 
     @Test

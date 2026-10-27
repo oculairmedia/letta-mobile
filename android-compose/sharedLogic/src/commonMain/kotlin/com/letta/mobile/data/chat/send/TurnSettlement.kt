@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ErrorMessage
@@ -81,16 +82,16 @@ internal class TurnSettlement(
             if (error is CancellationException) throw error
             Telemetry.error(
                 "AdminChatVM", "ws.turnFailureNotice.failed", error,
-                "conversationId" to conversationId,
-                "reasonKind" to notice.kind,
+                "conversationId" attr conversationId,
+                "reasonKind" attr notice.kind,
             )
         }
         Telemetry.event(
             "AdminChatVM", "ws.turnFailureNotice.rendered",
-            "conversationId" to conversationId,
-            "turnId" to turnId,
-            "runId" to runId,
-            "reasonKind" to notice.kind,
+            "conversationId" attr conversationId,
+            "turnId" attr turnId,
+            "runId" attr runId,
+            "reasonKind" attr notice.kind,
         )
     }
 
@@ -107,21 +108,21 @@ internal class TurnSettlement(
             )
             Telemetry.event(
                 "AdminChatVM", "cleanupAbandonedAssistantFragments.completed",
-                "conversationId" to conversationId,
-                "runId" to (tail.runId ?: ""),
-                "turnId" to (tail.turnId ?: ""),
-                "candidateRunIds" to candidateRunIds.joinToString(","),
-                "removedCount" to removed,
-                "reason" to reason,
+                "conversationId" attr conversationId,
+                "runId" attr (tail.runId ?: ""),
+                "turnId" attr (tail.turnId ?: ""),
+                "candidateRunIds" attr candidateRunIds.joinToString(","),
+                "removedCount" attr removed,
+                "reason" attr reason,
             )
         }.onFailure { error ->
             if (error is CancellationException) throw error
             Telemetry.error(
                 "AdminChatVM", "cleanupAbandonedAssistantFragments.failed", error,
-                "conversationId" to conversationId,
-                "runId" to (tail.runId ?: ""),
-                "turnId" to (tail.turnId ?: ""),
-                "reason" to reason,
+                "conversationId" attr conversationId,
+                "runId" attr (tail.runId ?: ""),
+                "turnId" attr (tail.turnId ?: ""),
+                "reason" attr reason,
             )
         }
     }
@@ -159,13 +160,13 @@ internal class TurnSettlement(
         val retirementWrites = retireTerminalTurn(state, ConversationId(conversationId), request, outcome)
         Telemetry.event(
             "AdminChatVM", "ws.turnComplete",
-            "conversationId" to conversationId,
-            "status" to event.status,
-            "turnId" to event.turnId,
-            "runId" to event.runId,
-            "stopReason" to (stopReason ?: ""),
-            "lossy" to event.lossy,
-            "reason" to request.reason,
+            "conversationId" attr conversationId,
+            "status" attr event.status.toString(),
+            "turnId" attr event.turnId,
+            "runId" attr event.runId,
+            "stopReason" attr (stopReason ?: ""),
+            "lossy" attr event.lossy,
+            "reason" attr request.reason,
         )
         return listOf(terminalWrites) + retirementWrites
     }
@@ -189,10 +190,10 @@ internal class TurnSettlement(
         if (request.event.status is BridgeTurnStatus.Failed && outcome.notice == null) {
             Telemetry.event(
                 "AdminChatVM", "ws.turnDone.failedAfterDelivery",
-                "turnId" to request.event.turnId,
-                "runId" to request.event.runId,
+                "turnId" attr request.event.turnId,
+                "runId" attr request.event.runId,
                 // Sanitized family only — never the raw reason (letta-mobile-o0atv).
-                "reasonKind" to (state.bufferedErrorKind ?: terminalReasonKind(state.bufferedErrorMessage) ?: "<none>"),
+                "reasonKind" attr (state.bufferedErrorKind ?: terminalReasonKind(state.bufferedErrorMessage) ?: "<none>"),
             )
         }
         outcome.notice?.let { notice ->
@@ -207,9 +208,9 @@ internal class TurnSettlement(
     ) {
         Telemetry.event(
             "AdminChatVM", "ws.turnDone.lossy",
-            "dropCount" to event.dropCount,
-            "turnId" to event.turnId,
-            "runId" to event.runId,
+            "dropCount" attr event.dropCount,
+            "turnId" attr event.turnId,
+            "runId" attr event.runId,
         )
         state.otid?.let { otid ->
             timelineRepository.reconcileExternalTransportSend(
@@ -279,8 +280,8 @@ internal class TurnSettlement(
         if (localConversationId == null) {
             Telemetry.event(
                 "AdminChatVM", "ws.activeSend.failedWithoutConversation",
-                "otid" to otid,
-                "disconnectCode" to event.code,
+                "otid" attr otid,
+                "disconnectCode" attr event.code,
             )
             return
         }
@@ -319,9 +320,9 @@ internal class TurnSettlement(
         foreground.visuallyComplete(ConversationId(conversationId))
         Telemetry.event(
             "AdminChatVM", "ws.turnVisuallyComplete",
-            "conversationId" to conversationId,
-            "reason" to reason,
-            "turnId" to (state.turnId ?: ""),
+            "conversationId" attr conversationId,
+            "reason" attr reason,
+            "turnId" attr (state.turnId ?: ""),
         )
     }
 
@@ -338,8 +339,8 @@ internal class TurnSettlement(
         }
         Telemetry.event(
             "IrohTrace", "coordinator.send.stalePresenceHealed",
-            "conversationId" to conversation?.value,
-            "settledOtid" to (orphanedOtid != null),
+            "conversationId" attr conversation?.value,
+            "settledOtid" attr (orphanedOtid != null),
         )
     }
 
@@ -358,12 +359,12 @@ internal class TurnSettlement(
         }
         Telemetry.event(
             "AdminChatVM", "ws.turnDone.staleIgnored",
-            "incomingTurnId" to event.turnId,
-            "incomingRunId" to event.runId,
-            "ownerConversationId" to (owner?.conversationId ?: ""),
-            "activeTurnId" to (owner?.turnId ?: ""),
-            "activeRunId" to (owner?.runId ?: ""),
-            "status" to event.status,
+            "incomingTurnId" attr event.turnId,
+            "incomingRunId" attr event.runId,
+            "ownerConversationId" attr (owner?.conversationId ?: ""),
+            "activeTurnId" attr (owner?.turnId ?: ""),
+            "activeRunId" attr (owner?.runId ?: ""),
+            "status" attr event.status.toString(),
         )
     }
 

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas.plugin
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.schema.JsonSchemaCheck
@@ -84,11 +85,11 @@ object PluginKindProps {
         val known = kinds.knows(PluginId(pluginId))
         Telemetry.event(
             "Canvas", UNKNOWN_KIND_EVENT,
-            "elementId" to elementId,
-            "type" to kind.type,
-            "v" to kind.v,
-            "plugin" to if (known) "known" else "unknown",
-            "detail" to if (known) "no props schema for this version here; accepted on the envelope alone"
+            "elementId" attr elementId,
+            "type" attr kind.type,
+            "v" attr kind.v,
+            "plugin" attr if (known) "known" else "unknown",
+            "detail" attr if (known) "no props schema for this version here; accepted on the envelope alone"
             else "no props schema for this kind here; accepted on the envelope alone",
             level = Telemetry.Level.WARN,
         )

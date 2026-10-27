@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,14 +43,14 @@ class CanvasStorageFaults {
         if (throwable != null) {
             Telemetry.error(
                 TAG, name, throwable,
-                "documentId" to fault.documentId, "canvasId" to fault.canvasId?.value,
-                "documentBytes" to fault.documentBytes, "message" to fault.message,
+                "documentId" attr fault.documentId, "canvasId" attr fault.canvasId?.value,
+                "documentBytes" attr fault.documentBytes, "message" attr fault.message,
             )
         } else {
             Telemetry.event(
                 TAG, name,
-                "documentId" to fault.documentId, "canvasId" to fault.canvasId?.value,
-                "documentBytes" to fault.documentBytes, "message" to fault.message,
+                "documentId" attr fault.documentId, "canvasId" attr fault.canvasId?.value,
+                "documentBytes" attr fault.documentBytes, "message" attr fault.message,
                 level = if (fault.isError) Telemetry.Level.ERROR else Telemetry.Level.WARN,
             )
         }

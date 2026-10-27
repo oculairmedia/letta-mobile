@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.ApprovalSubmission
 import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
@@ -60,10 +61,10 @@ internal class ApprovalResponseSender(
     private fun recordAlreadyResolved(submission: ApprovalSubmission) {
         Telemetry.event(
             TELEMETRY_TAG, "approval.already_resolved",
-            "approvalId" to submission.approvalRequestId,
-            "conversationId" to submission.runtime.conversationId,
-            "toolName" to (submission.toolName ?: ""),
-            "source" to submission.source,
+            "approvalId" attr submission.approvalRequestId,
+            "conversationId" attr submission.runtime.conversationId,
+            "toolName" attr (submission.toolName ?: ""),
+            "source" attr submission.source,
             level = Telemetry.Level.INFO,
         )
     }
@@ -77,9 +78,9 @@ internal class ApprovalResponseSender(
         val result = deliver(cached)
         Telemetry.event(
             TELEMETRY_TAG, "approval.replay_reanswered",
-            "approvalId" to cached.requestId,
-            "conversationId" to cached.runtime.conversationId,
-            "outcome" to result.outcome(),
+            "approvalId" attr cached.requestId,
+            "conversationId" attr cached.runtime.conversationId,
+            "outcome" attr result.outcome(),
         )
         record(cached, result, source = "replay")
         return result
@@ -89,8 +90,8 @@ internal class ApprovalResponseSender(
     private fun coalescedWithInFlight(cached: ApprovalDecisionCache.CachedDecision): ApprovalSubmitResult {
         Telemetry.event(
             TELEMETRY_TAG, "approval.replay_in_flight",
-            "approvalId" to cached.requestId,
-            "conversationId" to cached.runtime.conversationId,
+            "approvalId" attr cached.requestId,
+            "conversationId" attr cached.runtime.conversationId,
         )
         return ApprovalSubmitResult.Unacknowledged(IN_FLIGHT_REASON)
     }
@@ -124,27 +125,27 @@ internal class ApprovalResponseSender(
         when (result) {
             ApprovalSubmitResult.Accepted -> Telemetry.event(
                 TELEMETRY_TAG, "approval.accepted",
-                "approvalId" to cached.requestId,
-                "conversationId" to cached.runtime.conversationId,
-                "source" to source,
+                "approvalId" attr cached.requestId,
+                "conversationId" attr cached.runtime.conversationId,
+                "source" attr source,
             )
             is ApprovalSubmitResult.Rejected -> {
                 decisions.forget(cached)
                 Telemetry.event(
                     TELEMETRY_TAG, "approval.rejected",
-                    "approvalId" to cached.requestId,
-                    "conversationId" to cached.runtime.conversationId,
-                    "source" to source,
-                    "error" to result.error,
+                    "approvalId" attr cached.requestId,
+                    "conversationId" attr cached.runtime.conversationId,
+                    "source" attr source,
+                    "error" attr result.error,
                     level = Telemetry.Level.WARN,
                 )
             }
             is ApprovalSubmitResult.Unacknowledged -> Telemetry.event(
                 TELEMETRY_TAG, "approval.unacknowledged",
-                "approvalId" to cached.requestId,
-                "conversationId" to cached.runtime.conversationId,
-                "source" to source,
-                "reason" to result.reason,
+                "approvalId" attr cached.requestId,
+                "conversationId" attr cached.runtime.conversationId,
+                "source" attr source,
+                "reason" attr result.reason,
             )
         }
     }

@@ -1,5 +1,6 @@
 package com.letta.mobile.debug
 
+import com.letta.mobile.util.attr
 import android.view.MotionEvent
 import ca.oculair.meridian.BuildConfig
 import com.letta.mobile.util.InputDiagnostics
@@ -36,16 +37,16 @@ internal object TouchDispatchDiagnostics {
         Telemetry.event(
             TAG,
             "touch.dispatch",
-            "action" to touchActionName(action),
-            "handled" to handled,
-            "source" to "0x" + event.source.toString(HEX),
-            "deviceId" to event.deviceId,
-            "toolType" to event.getToolType(0),
-            "flags" to touchFlagNames(event.flags),
-            "pointerCount" to event.pointerCount,
-            "x" to event.x,
-            "y" to event.y,
-            "eventTimeMs" to event.eventTime,
+            "action" attr touchActionName(action),
+            "handled" attr handled,
+            "source" attr "0x" + event.source.toString(HEX),
+            "deviceId" attr event.deviceId,
+            "toolType" attr event.getToolType(0),
+            "flags" attr touchFlagNames(event.flags),
+            "pointerCount" attr event.pointerCount,
+            "x" attr event.x,
+            "y" attr event.y,
+            "eventTimeMs" attr event.eventTime,
         )
     }
 }

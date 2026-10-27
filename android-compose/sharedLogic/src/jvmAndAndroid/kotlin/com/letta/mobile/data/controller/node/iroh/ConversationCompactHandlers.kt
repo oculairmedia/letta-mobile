@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.compaction.CompactCommandOutput
 import com.letta.mobile.data.compaction.CompactionMode
 import com.letta.mobile.data.compaction.CompactionPath
@@ -70,8 +71,8 @@ internal object ConversationCompactHandlers {
         val tokensAfter = store?.transcriptTokens(request.query)
         Telemetry.event(
             "IrohNode", "conversation_compact.ok",
-            "path" to result.path,
-            "noChange" to result.noChange,
+            "path" attr result.path,
+            "noChange" attr result.noChange,
         )
         val estimated = result.copy(
             contextTokensBefore = tokensBefore?.takeIf { tokensAfter != null },
@@ -149,7 +150,7 @@ internal object ConversationCompactHandlers {
     private fun fail(outcome: String, error: Exception, message: String): Nothing {
         Telemetry.event(
             "IrohNode", "conversation_compact.$outcome",
-            "class" to error::class.simpleName,
+            "class" attr error::class.simpleName,
             level = Telemetry.Level.WARN,
         )
         adminError(message)

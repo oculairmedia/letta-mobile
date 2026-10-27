@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -143,8 +144,8 @@ internal fun InputAcceptance.recordAndFailure(conversationId: ConversationId): I
     is InputAcceptance.Unacknowledged -> {
         Telemetry.event(
             TELEMETRY_TAG, "input.unacknowledged",
-            "conversationId" to conversationId.value,
-            "reason" to reason,
+            "conversationId" attr conversationId.value,
+            "reason" attr reason,
         )
         null
     }
@@ -153,8 +154,8 @@ internal fun InputAcceptance.recordAndFailure(conversationId: ConversationId): I
 private fun recordAccepted(conversationId: ConversationId, disposition: String): InputAcceptance.Failure? {
     Telemetry.event(
         TELEMETRY_TAG, "input.accepted",
-        "conversationId" to conversationId.value,
-        "disposition" to disposition,
+        "conversationId" attr conversationId.value,
+        "disposition" attr disposition,
     )
     return null
 }
@@ -165,9 +166,9 @@ private fun recordRejected(
 ): InputAcceptance.Failure {
     Telemetry.event(
         TELEMETRY_TAG, "input.rejected",
-        "conversationId" to conversationId.value,
-        "error" to failure.failureReason,
-        "kind" to failure.kind,
+        "conversationId" attr conversationId.value,
+        "error" attr failure.failureReason,
+        "kind" attr failure.kind,
         level = Telemetry.Level.WARN,
     )
     return failure
@@ -286,9 +287,9 @@ internal suspend fun enterQueued(
     }
     Telemetry.event(
         "AppServerTurnEngine", "turn.queued",
-        "key" to lease.key.toString(),
-        "leaseToken" to lease.token,
-        "clientMessageId" to (lease.queuedInput.clientMessageId ?: "<none>"),
+        "key" attr lease.key.toString(),
+        "leaseToken" attr lease.token,
+        "clientMessageId" attr (lease.queuedInput.clientMessageId ?: "<none>"),
     )
     emit(command.queuedInputDraft())
 }
@@ -312,9 +313,9 @@ internal fun leaveQueued(lease: LeaseRef, source: String) {
 internal fun recordDequeued(lease: LeaseRef, source: String) {
     Telemetry.event(
         "AppServerTurnEngine", "turn.dequeued",
-        "key" to lease.key.toString(),
-        "leaseToken" to lease.token,
-        "source" to source,
+        "key" attr lease.key.toString(),
+        "leaseToken" attr lease.token,
+        "source" attr source,
     )
 }
 
@@ -425,8 +426,8 @@ internal class TurnInputSender(
         if (!durable.resumption.awaitRestoredAfter(epoch)) return first
         Telemetry.event(
             TELEMETRY_TAG, "input.resent",
-            "key" to lease.key.toString(),
-            "clientMessageId" to (lease.queuedInput.clientMessageId ?: "<none>"),
+            "key" attr lease.key.toString(),
+            "clientMessageId" attr (lease.queuedInput.clientMessageId ?: "<none>"),
         )
         return client.sendInputAwaitingAcceptance(input, requestIdFactory())
     }

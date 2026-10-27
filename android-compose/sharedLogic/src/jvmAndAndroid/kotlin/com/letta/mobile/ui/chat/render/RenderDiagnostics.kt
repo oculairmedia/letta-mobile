@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.render
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.ToolTimelineGroup
 import com.letta.mobile.util.Telemetry
@@ -140,15 +141,15 @@ object RenderDiagnostics {
         }
         Telemetry.event(
             "RenderDiag", "renderItems.built",
-            "conversationId" to conversationId,
-            "generation" to gen,
-            "path" to path,
-            "listIdentity" to System.identityHashCode(items),
-            "count" to items.size,
-            "duplicateKeys" to dupKeys.joinToString("|").ifEmpty { "<none>" },
-            "contentDupes" to contentDupesDescription,
-            "contentDupesScanSampled" to scanNow,
-            "keys" to keys.take(300),
+            "conversationId" attr conversationId,
+            "generation" attr gen,
+            "path" attr path,
+            "listIdentity" attr System.identityHashCode(items),
+            "count" attr items.size,
+            "duplicateKeys" attr dupKeys.joinToString("|").ifEmpty { "<none>" },
+            "contentDupes" attr contentDupesDescription,
+            "contentDupesScanSampled" attr scanNow,
+            "keys" attr keys.take(300),
             level = if (dupKeys.isNotEmpty() || (scanNow && contentDupesDescription != "<none>")) Telemetry.Level.WARN else Telemetry.Level.DEBUG,
         )
     }
@@ -179,11 +180,11 @@ object RenderDiagnostics {
             if (foreign) foreignCount++
             Telemetry.event(
                 "RenderScope", if (foreign) "item.foreign" else "item.scoped",
-                "conversationId" to conversationId,
-                "activeAgentId" to (activeAgentId ?: "<null>"),
-                "itemAgentId" to (itemAgentId ?: "<null>"),
-                "kind" to kind,
-                "key" to item.key,
+                "conversationId" attr conversationId,
+                "activeAgentId" attr (activeAgentId ?: "<null>"),
+                "itemAgentId" attr (itemAgentId ?: "<null>"),
+                "kind" attr kind,
+                "key" attr item.key,
                 level = if (foreign) Telemetry.Level.WARN else Telemetry.Level.DEBUG,
             )
         }
@@ -204,11 +205,11 @@ object RenderDiagnostics {
         if (!enabled()) return
         Telemetry.event(
             "RenderDiag", "displayedText",
-            "conversationId" to conversationId,
-            "site" to site,
-            "serverId" to serverId,
-            "len" to text.length,
-            "head" to text.take(160).replace("\n", "\\n"),
+            "conversationId" attr conversationId,
+            "site" attr site,
+            "serverId" attr serverId,
+            "len" attr text.length,
+            "head" attr text.take(160).replace("\n", "\\n"),
         )
     }
 
@@ -218,11 +219,11 @@ object RenderDiagnostics {
         val doubled = synchronized(lock) { !composedKeysThisGeneration.add(key) }
         Telemetry.event(
             "RenderDiag", if (doubled) "lazyItem.doubleComposed" else "lazyItem.composed",
-            "conversationId" to conversationId,
-            "generation" to gen,
-            "key" to key,
-            "contentType" to contentType,
-            "doubled" to doubled,
+            "conversationId" attr conversationId,
+            "generation" attr gen,
+            "key" attr key,
+            "contentType" attr contentType,
+            "doubled" attr doubled,
             level = if (doubled) Telemetry.Level.WARN else Telemetry.Level.DEBUG,
         )
     }
@@ -242,11 +243,11 @@ object RenderDiagnostics {
         val durationMs = durationNs / 1_000_000.0
         Telemetry.event(
             "RenderDiag", "toolProjection.completed",
-            "conversationId" to conversationId,
-            "durationMs" to durationMs,
-            "groupCount" to groupCount,
-            "callCount" to callCount,
-            "changedCallCount" to changedCallCount,
+            "conversationId" attr conversationId,
+            "durationMs" attr durationMs,
+            "groupCount" attr groupCount,
+            "callCount" attr callCount,
+            "changedCallCount" attr changedCallCount,
             level = Telemetry.Level.DEBUG,
         )
     }
@@ -263,10 +264,10 @@ object RenderDiagnostics {
         if (!enabled()) return
         Telemetry.event(
             "RenderDiag", "toolTimeline.counts",
-            "conversationId" to conversationId,
-            "totalMessages" to totalMessages,
-            "totalGroups" to totalGroups,
-            "totalCalls" to totalCalls,
+            "conversationId" attr conversationId,
+            "totalMessages" attr totalMessages,
+            "totalGroups" attr totalGroups,
+            "totalCalls" attr totalCalls,
             level = Telemetry.Level.DEBUG,
         )
     }
@@ -283,10 +284,10 @@ object RenderDiagnostics {
         if (!enabled()) return
         Telemetry.event(
             "RenderDiag", "toolCall.changed",
-            "conversationId" to conversationId,
-            "callKey" to callKey,
-            "previousState" to (previousState ?: "<new>"),
-            "newState" to newState,
+            "conversationId" attr conversationId,
+            "callKey" attr callKey,
+            "previousState" attr (previousState ?: "<new>"),
+            "newState" attr newState,
             level = Telemetry.Level.DEBUG,
         )
     }
@@ -303,10 +304,10 @@ object RenderDiagnostics {
         if (!enabled()) return
         Telemetry.event(
             "RenderDiag", "toolState.transition",
-            "conversationId" to conversationId,
-            "entityKey" to entityKey,
-            "fromState" to fromState,
-            "toState" to toState,
+            "conversationId" attr conversationId,
+            "entityKey" attr entityKey,
+            "fromState" attr fromState,
+            "toState" attr toState,
             level = Telemetry.Level.DEBUG,
         )
     }
@@ -322,9 +323,9 @@ object RenderDiagnostics {
         if (!enabled()) return
         Telemetry.event(
             "RenderDiag", "key.collision",
-            "conversationId" to conversationId,
-            "key" to key,
-            "dupIndex" to dupIndex,
+            "conversationId" attr conversationId,
+            "key" attr key,
+            "dupIndex" attr dupIndex,
             level = Telemetry.Level.WARN,
         )
     }
@@ -341,10 +342,10 @@ object RenderDiagnostics {
         if (!enabled()) return
         Telemetry.event(
             "RenderDiag", "key.fallback",
-            "conversationId" to conversationId,
-            "key" to key,
-            "fallbackType" to fallbackType,
-            "index" to index,
+            "conversationId" attr conversationId,
+            "key" attr key,
+            "fallbackType" attr fallbackType,
+            "index" attr index,
             level = Telemetry.Level.DEBUG,
         )
     }
@@ -360,9 +361,9 @@ object RenderDiagnostics {
         if (!enabled()) return
         Telemetry.event(
             "RenderDiag", "legacy.fallback",
-            "conversationId" to conversationId,
-            "callKey" to callKey,
-            "fallbackReason" to fallbackReason,
+            "conversationId" attr conversationId,
+            "callKey" attr callKey,
+            "fallbackReason" attr fallbackReason,
             level = Telemetry.Level.DEBUG,
         )
     }
@@ -378,9 +379,9 @@ object RenderDiagnostics {
         if (!enabled()) return
         Telemetry.event(
             "RenderDiag", "visibleGroups.projected",
-            "conversationId" to conversationId,
-            "totalGroups" to totalGroups,
-            "visibleGroups" to visibleGroups,
+            "conversationId" attr conversationId,
+            "totalGroups" attr totalGroups,
+            "visibleGroups" attr visibleGroups,
             level = Telemetry.Level.DEBUG,
         )
     }
@@ -397,10 +398,10 @@ object RenderDiagnostics {
         if (!enabled()) return
         Telemetry.event(
             "RenderDiag", "toolRow.recomposed",
-            "conversationId" to conversationId,
-            "callKey" to callKey,
-            "state" to state,
-            "isExpanded" to isExpanded,
+            "conversationId" attr conversationId,
+            "callKey" attr callKey,
+            "state" attr state,
+            "isExpanded" attr isExpanded,
             level = Telemetry.Level.DEBUG,
         )
     }

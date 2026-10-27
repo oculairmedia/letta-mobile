@@ -1,5 +1,9 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.numberOrNull
+
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
@@ -68,6 +72,18 @@ import kotlin.test.assertTrue
  * jvmAndAndroid and the fixture corpus is a jvmTest resource.
  */
 class IrohFanoutFrameShapeParityTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
     private val runtime = AppServerRuntimeScope("agent-1", "conv-fixture")
@@ -355,9 +371,9 @@ class IrohFanoutFrameShapeParityTest {
         replayThroughReducer(deltaBodiesOf(sinkObs), source = "iroh-observer")
 
         val events = Telemetry.snapshot().filter { it.tag == "FrameFlowDiag" && it.name == "gate" }
-        val emitCount = events.count { (it.attrs["gate"] as? String) == "gate1.emit" }
+        val emitCount = events.count { (it.attrs["gate"]?.textOrNull) == "gate1.emit" }
         val ingestCount = events.count {
-            (it.attrs["gate"] as? String)?.startsWith("gate.reduceIngest") == true
+            (it.attrs["gate"]?.textOrNull)?.startsWith("gate.reduceIngest") == true
         }
 
         // Every emitted observer assistant delta is ingested EXACTLY once — no
@@ -371,8 +387,8 @@ class IrohFanoutFrameShapeParityTest {
         // character the fanout emitted reached the reducer, so NO characters were
         // dropped on the observer emit->ingest path.
         fun maxLenAt(prefix: String) = events
-            .filter { (it.attrs["gate"] as? String)?.startsWith(prefix) == true }
-            .maxOf { (it.attrs["len"] as? Int) ?: 0 }
+            .filter { (it.attrs["gate"]?.textOrNull)?.startsWith(prefix) == true }
+            .maxOf { (it.attrs["len"]?.numberOrNull as? Int) ?: 0 }
         val maxEmitLen = maxLenAt("gate1.emit")
         val maxIngestLen = maxLenAt("gate.reduceIngest")
         val longestObserverBodyLen = obsAssistantDeltas.maxOf { contentTextOf(it).length }

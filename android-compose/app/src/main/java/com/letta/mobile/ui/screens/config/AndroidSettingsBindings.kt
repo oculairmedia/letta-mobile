@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.config
 
+import com.letta.mobile.util.attr
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -95,16 +96,16 @@ internal fun requestBatteryOptimizationExemption(
     exempt: Boolean,
     onFailure: (String) -> Unit,
 ) {
-    Telemetry.event("BatteryOptimization", "requestTapped", "exemptBefore" to exempt)
+    Telemetry.event("BatteryOptimization", "requestTapped", "exemptBefore" attr exempt)
     try {
         launcher.launch(BatteryOptimizationHelper.requestExemptionIntent(context))
-        Telemetry.event("BatteryOptimization", "requestLaunched", "target" to "requestExemption")
+        Telemetry.event("BatteryOptimization", "requestLaunched", "target" attr "requestExemption")
     } catch (primaryError: ActivityNotFoundException) {
         try {
             launcher.launch(BatteryOptimizationHelper.batteryOptimizationSettingsIntent())
-            Telemetry.event("BatteryOptimization", "requestLaunched", "target" to "settingsFallback")
+            Telemetry.event("BatteryOptimization", "requestLaunched", "target" attr "settingsFallback")
         } catch (fallbackError: ActivityNotFoundException) {
-            Telemetry.error("BatteryOptimization", "requestFailed", fallbackError, "primaryError" to primaryError.javaClass.simpleName)
+            Telemetry.error("BatteryOptimization", "requestFailed", fallbackError, "primaryError" attr primaryError.javaClass.simpleName)
             onFailure(context.getString(R.string.screen_config_battery_optimization_request_failed))
         }
     }

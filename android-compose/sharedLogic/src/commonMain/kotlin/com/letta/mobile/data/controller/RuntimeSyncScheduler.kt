@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.runtime.LoopPhase
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.util.Telemetry
@@ -96,8 +97,8 @@ class RuntimeSyncScheduler(
             } catch (error: Throwable) {
                 Telemetry.error(
                     "RuntimeSyncScheduler", "sync.failed", error,
-                    "reason" to reason.name,
-                    "conversationId" to runtime.conversationId,
+                    "reason" attr reason.name,
+                    "conversationId" attr runtime.conversationId,
                 )
             }
         }

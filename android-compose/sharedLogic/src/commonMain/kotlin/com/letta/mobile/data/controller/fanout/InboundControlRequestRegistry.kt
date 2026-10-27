@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.fanout
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -356,10 +357,10 @@ class InboundControlRequestRegistry {
             Telemetry.event(
                 "InboundControlRequestRegistry",
                 "completedHistory.evicted",
-                "requestId" to oldest.ref.requestId,
-                "toolCallId" to (oldest.ref.toolCallId ?: ""),
-                "generation" to oldest.connectionGeneration,
-                "cap" to MAX_COMPLETED_HISTORY,
+                "requestId" attr oldest.ref.requestId,
+                "toolCallId" attr (oldest.ref.toolCallId ?: ""),
+                "generation" attr oldest.connectionGeneration,
+                "cap" attr MAX_COMPLETED_HISTORY,
                 level = Telemetry.Level.WARN,
             )
         }

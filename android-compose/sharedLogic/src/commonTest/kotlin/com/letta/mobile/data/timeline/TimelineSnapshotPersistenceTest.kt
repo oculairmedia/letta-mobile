@@ -1,5 +1,9 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.numberOrNull
+
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
@@ -29,6 +33,18 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimelineSnapshotPersistenceTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     private data class SnapshotIdentity(
         val conversationId: String,
         val backendId: String = "test-backend",
@@ -174,12 +190,12 @@ class TimelineSnapshotPersistenceTest {
         advanceUntilIdle()
         val first = mutationShapeEvents()
         assertEquals(1, first.size)
-        assertEquals(0, first.single().attrs["previousCount"])
-        assertEquals(0, first.single().attrs["eventCount"])
-        assertEquals(0, first.single().attrs["inserted"])
-        assertEquals(0, first.single().attrs["durableRows"])
-        assertEquals(0, first.single().attrs["residentRows"])
-        assertEquals(0, first.single().attrs["settledEventsVisited"])
+        assertEquals(0, first.single().attrs["previousCount"]?.numberOrNull)
+        assertEquals(0, first.single().attrs["eventCount"]?.numberOrNull)
+        assertEquals(0, first.single().attrs["inserted"]?.numberOrNull)
+        assertEquals(0, first.single().attrs["durableRows"]?.numberOrNull)
+        assertEquals(0, first.single().attrs["residentRows"]?.numberOrNull)
+        assertEquals(0, first.single().attrs["settledEventsVisited"]?.numberOrNull)
 
         fixture.loop.ingestStreamEvent(ConfirmedMessageFixture("raw-server-id", "private message content").message())
         store.rejectNextWrite = true
@@ -191,16 +207,16 @@ class TimelineSnapshotPersistenceTest {
         val shapes = mutationShapeEvents()
         assertEquals(2, shapes.size)
         val afterRejectedWrite = shapes.last()
-        assertEquals(0, afterRejectedWrite.attrs["previousCount"])
+        assertEquals(0, afterRejectedWrite.attrs["previousCount"]?.numberOrNull)
         // A successful follow-up is the evidence the rejected write did not
         // advance the baseline; conflation may legitimately persist either
         // the pending event or the latest empty state.
-        assertEquals(afterRejectedWrite.attrs["eventCount"], afterRejectedWrite.attrs["inserted"])
-        assertEquals(afterRejectedWrite.attrs["eventCount"], afterRejectedWrite.attrs["durableRows"])
-        assertEquals(afterRejectedWrite.attrs["eventCount"], afterRejectedWrite.attrs["residentRows"])
+        assertEquals(afterRejectedWrite.attrs["eventCount"]?.numberOrNull, afterRejectedWrite.attrs["inserted"]?.numberOrNull)
+        assertEquals(afterRejectedWrite.attrs["eventCount"]?.numberOrNull, afterRejectedWrite.attrs["durableRows"]?.numberOrNull)
+        assertEquals(afterRejectedWrite.attrs["eventCount"]?.numberOrNull, afterRejectedWrite.attrs["residentRows"]?.numberOrNull)
         assertEquals(
-            afterRejectedWrite.attrs["comparisonEvents"],
-            afterRejectedWrite.attrs["settledEventsVisited"],
+            afterRejectedWrite.attrs["comparisonEvents"]?.numberOrNull,
+            afterRejectedWrite.attrs["settledEventsVisited"]?.numberOrNull,
         )
         assertMutationTelemetryIsBounded(shapes)
         fixture.loop.closeAndJoin()
@@ -555,11 +571,12 @@ class TimelineSnapshotPersistenceTest {
         events.forEach { event ->
             assertEquals(expectedAttrs, event.attrs.keys)
             assertTrue(event.attrs.values.all {
-                it is Int || it is Long || it is Boolean || it == "unavailable"
+                it.numberOrNull is Int || it.numberOrNull is Long ||
+                    it is com.letta.mobile.util.TelemetryValue.Flag || it.textOrNull == "unavailable"
             })
-            assertEquals("unavailable", event.attrs["pagesCopied"])
-            assertEquals("unavailable", event.attrs["liveProjected"])
-            assertEquals("unavailable", event.attrs["boundaryRebuilt"])
+            assertEquals("unavailable", event.attrs["pagesCopied"]?.textOrNull)
+            assertEquals("unavailable", event.attrs["liveProjected"]?.textOrNull)
+            assertEquals("unavailable", event.attrs["boundaryRebuilt"]?.textOrNull)
             assertFalse(event.attrs.values.any { value ->
                 value.toString().contains("private message content") || value.toString().contains("raw-server-id")
             })

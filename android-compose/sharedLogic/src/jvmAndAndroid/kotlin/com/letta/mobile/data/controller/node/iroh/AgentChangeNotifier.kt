@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.util.Telemetry
 import java.time.Instant
 import java.util.UUID
@@ -69,7 +70,7 @@ class AgentChangeNotifier(
         }
         val sink = target
         if (sink == null) {
-            Telemetry.event("AgentChangeNotifier", "broadcast.no_target", "agents" to batch.size)
+            Telemetry.event("AgentChangeNotifier", "broadcast.no_target", "agents" attr batch.size)
             return
         }
         batch.forEach { (agentId, kind) -> sink.broadcast(frame(agentId, kind)) }

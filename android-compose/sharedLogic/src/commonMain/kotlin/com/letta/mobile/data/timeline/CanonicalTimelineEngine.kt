@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
@@ -107,7 +108,7 @@ class CanonicalTimelineEngine(
         if (overflow != null) {
             Telemetry.event(
                 "CanonicalTimeline", "live.overlayFrameDropped",
-                "reason" to overflow, "rows" to events.size,
+                "reason" attr overflow, "rows" attr events.size,
             )
             return@withLock true
         }

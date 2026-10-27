@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.approval
 
+import com.letta.mobile.util.attr
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
@@ -98,12 +99,12 @@ class SettingsApprovalOutboxStore(
 ) : ApprovalOutboxStore {
     override fun load(): ApprovalOutboxSnapshot =
         runCatching { store.getString(key)?.let { json.decodeFromString(ApprovalOutboxSnapshot.serializer(), it) } }
-            .onFailure { Telemetry.event("ApprovalOutbox", "load.failed", "error" to it.message, level = Telemetry.Level.WARN) }
+            .onFailure { Telemetry.event("ApprovalOutbox", "load.failed", "error" attr it.message, level = Telemetry.Level.WARN) }
             .getOrNull() ?: ApprovalOutboxSnapshot()
 
     override fun save(snapshot: ApprovalOutboxSnapshot) {
         runCatching { store.putString(key, json.encodeToString(ApprovalOutboxSnapshot.serializer(), snapshot)) }
-            .onFailure { Telemetry.event("ApprovalOutbox", "save.failed", "error" to it.message, level = Telemetry.Level.WARN) }
+            .onFailure { Telemetry.event("ApprovalOutbox", "save.failed", "error" attr it.message, level = Telemetry.Level.WARN) }
     }
 
     companion object {
@@ -201,7 +202,7 @@ class ApprovalOutbox(
             setState(entry, OutboxApprovalState.Queued)
             throw cancelled
         } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            Telemetry.event("ApprovalOutbox", "send.failed", "class" to error::class.simpleName, level = Telemetry.Level.WARN)
+            Telemetry.event("ApprovalOutbox", "send.failed", "class" attr error::class.simpleName, level = Telemetry.Level.WARN)
             OutboxSendOutcome.Offline
         }
         return when (outcome) {

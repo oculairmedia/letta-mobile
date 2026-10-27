@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.AppServerSubagentSnapshotAdapter
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentParentIdentity
@@ -177,7 +178,7 @@ class ControllerSubagentRegistrySource(
             if (size > 1) {
                 Telemetry.event(
                     "SubagentRegistry", "terminal.ambiguous",
-                    "taskId" to notification.taskId, "matchCount" to size,
+                    "taskId" attr notification.taskId, "matchCount" attr size,
                     level = Telemetry.Level.WARN,
                 )
             }

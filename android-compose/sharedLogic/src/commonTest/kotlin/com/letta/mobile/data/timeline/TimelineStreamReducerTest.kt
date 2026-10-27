@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.AssistantMessage
@@ -25,6 +27,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class TimelineStreamReducerTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
     @AfterTest
     fun tearDown() {
         Telemetry.clear()
@@ -763,7 +777,7 @@ class TimelineStreamReducerTest {
         Telemetry.snapshot().any {
             it.tag == "TimelineSync" &&
                 it.name == "streamSubscriber.eventDeduped" &&
-            it.attrs["reason"] == "semanticIdentitySeen"
+            it.attrs["reason"]?.textOrNull == "semanticIdentitySeen"
         } shouldBe true
     }
 

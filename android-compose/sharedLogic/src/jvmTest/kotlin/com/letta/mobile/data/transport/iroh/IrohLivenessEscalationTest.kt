@@ -1,5 +1,7 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CompletableDeferred
@@ -32,6 +34,18 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class IrohLivenessEscalationTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     /** Fake admin_rpc lane on the test scheduler's clock. */
     private class Lane(private val clock: () -> Long) {
@@ -108,8 +122,8 @@ class IrohLivenessEscalationTest {
     }
 
     private fun verdictsFor(sessionId: String): List<String> = Telemetry.events.value
-        .filter { it.tag == "IrohLiveness" && it.attrs["sessionId"] == sessionId }
-        .mapNotNull { it.attrs["verdict"] as? String }
+        .filter { it.tag == "IrohLiveness" && it.attrs["sessionId"]?.textOrNull == sessionId }
+        .mapNotNull { it.attrs["verdict"]?.textOrNull }
 
     // ============================================================
     // 1. Black-holed path with in-flight admin_rpcs → dead, redial

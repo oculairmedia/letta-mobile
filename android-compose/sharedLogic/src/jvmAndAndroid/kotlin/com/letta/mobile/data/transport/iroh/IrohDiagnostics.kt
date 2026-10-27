@@ -1,5 +1,7 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.util.TelemetryValue
+import com.letta.mobile.util.attr
 import computer.iroh.Connection
 import computer.iroh.ConnectionStats
 import computer.iroh.EndpointId
@@ -35,26 +37,26 @@ object IrohDiagnostics {
 
     fun endpointIdHex(bytes: ByteArray?): String = bytes?.toHex().orEmpty()
 
-    fun connectionAttributes(connection: Connection): List<Pair<String, Any?>> {
+    fun connectionAttributes(connection: Connection): List<Pair<String, TelemetryValue>> {
         val paths = runCatching { connection.paths() }.getOrDefault(emptyList())
         val summary = summarizePaths(paths)
         val stats = runCatching { connection.stats() }.getOrNull()
         return listOf(
-            "remoteEndpointId" to runCatching { endpointIdHex(connection.remoteId()) }.getOrDefault(""),
-            "rttMs" to runCatching { connection.rtt()?.toLong() }.getOrNull(),
-            "selectedPathKind" to summary.selectedKind,
-            "selectedPathId" to summary.selectedPathId,
-            "pathCount" to summary.pathCount,
-            "relayPathCount" to summary.relayPathCount,
-            "directPathCount" to summary.directPathCount,
-            "lostPackets" to (stats?.lostPackets ?: summary.lostPackets),
-            "lostBytes" to (stats?.lostBytes ?: summary.lostBytes),
+            "remoteEndpointId" attr runCatching { endpointIdHex(connection.remoteId()) }.getOrDefault(""),
+            "rttMs" attr runCatching { connection.rtt()?.toLong() }.getOrNull(),
+            "selectedPathKind" attr summary.selectedKind,
+            "selectedPathId" attr summary.selectedPathId,
+            "pathCount" attr summary.pathCount,
+            "relayPathCount" attr summary.relayPathCount,
+            "directPathCount" attr summary.directPathCount,
+            "lostPackets" attr (stats?.lostPackets ?: summary.lostPackets),
+            "lostBytes" attr (stats?.lostBytes ?: summary.lostBytes),
         )
     }
 
-    fun closeAttributes(connection: Connection): List<Pair<String, Any?>> = listOf(
-        "remoteEndpointId" to runCatching { endpointIdHex(connection.remoteId()) }.getOrDefault(""),
-        "closeReason" to closeReason(connection),
+    fun closeAttributes(connection: Connection): List<Pair<String, TelemetryValue>> = listOf(
+        "remoteEndpointId" attr runCatching { endpointIdHex(connection.remoteId()) }.getOrDefault(""),
+        "closeReason" attr closeReason(connection),
     )
 
     fun closeReason(connection: Connection): String =
@@ -93,27 +95,27 @@ object IrohDiagnostics {
         )
     }
 
-    fun pathEventAttributes(event: PathEvent): List<Pair<String, Any?>> = when (event) {
+    fun pathEventAttributes(event: PathEvent): List<Pair<String, TelemetryValue>> = when (event) {
         is PathEvent.Opened -> listOf(
-            "event" to "opened",
-            "pathId" to event.id,
-            "pathKind" to pathKind(event.remoteAddr),
+            "event" attr "opened",
+            "pathId" attr event.id,
+            "pathKind" attr pathKind(event.remoteAddr),
         )
         is PathEvent.Selected -> listOf(
-            "event" to "selected",
-            "pathId" to event.id,
-            "pathKind" to pathKind(event.remoteAddr),
+            "event" attr "selected",
+            "pathId" attr event.id,
+            "pathKind" attr pathKind(event.remoteAddr),
         )
         is PathEvent.Closed -> listOf(
-            "event" to "closed",
-            "pathId" to event.id,
-            "pathKind" to pathKind(event.remoteAddr),
-            "lostPackets" to event.lastStats.lostPackets.toLong(),
-            "lostBytes" to event.lastStats.lostBytes.toLong(),
+            "event" attr "closed",
+            "pathId" attr event.id,
+            "pathKind" attr pathKind(event.remoteAddr),
+            "lostPackets" attr event.lastStats.lostPackets.toLong(),
+            "lostBytes" attr event.lastStats.lostBytes.toLong(),
         )
         is PathEvent.Lagged -> listOf(
-            "event" to "lagged",
-            "missed" to event.missed.toLong(),
+            "event" attr "lagged",
+            "missed" attr event.missed.toLong(),
         )
     }
 
@@ -133,16 +135,16 @@ object IrohDiagnostics {
         }
     }
 
-    fun redactedFrameAttributes(frameType: String?, bytes: Int): List<Pair<String, Any?>> = listOf(
-        "type" to frameType,
-        "bytes" to bytes,
+    fun redactedFrameAttributes(frameType: String?, bytes: Int): List<Pair<String, TelemetryValue>> = listOf(
+        "type" attr frameType,
+        "bytes" attr bytes,
     )
 
-    fun connectionStatsAttributes(stats: ConnectionStats?): List<Pair<String, Any?>> = listOf(
-        "lostPackets" to (stats?.lostPackets ?: 0L),
-        "lostBytes" to (stats?.lostBytes ?: 0L),
-        "udpTxDatagrams" to (stats?.udpTxDatagrams ?: 0L),
-        "udpRxDatagrams" to (stats?.udpRxDatagrams ?: 0L),
+    fun connectionStatsAttributes(stats: ConnectionStats?): List<Pair<String, TelemetryValue>> = listOf(
+        "lostPackets" attr (stats?.lostPackets ?: 0L),
+        "lostBytes" attr (stats?.lostBytes ?: 0L),
+        "udpTxDatagrams" attr (stats?.udpTxDatagrams ?: 0L),
+        "udpRxDatagrams" attr (stats?.udpRxDatagrams ?: 0L),
     )
 
     private fun sanitizeReason(reason: String?): String {

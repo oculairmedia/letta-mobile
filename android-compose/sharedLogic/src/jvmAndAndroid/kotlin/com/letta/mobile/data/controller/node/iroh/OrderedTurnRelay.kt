@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.NonCancellable
@@ -82,16 +83,16 @@ internal class OrderedTurnRelay(
     private fun recordLateDraft(draft: RuntimeEventDraft) {
         Telemetry.event(
             "IrohNode", "stream.late_draft_before_terminal",
-            "conversationId" to draft.conversationId?.value,
-            "payload" to draft.payload::class.simpleName,
+            "conversationId" attr draft.conversationId?.value,
+            "payload" attr draft.payload::class.simpleName,
         )
     }
 
     private fun recordDuplicateTerminal(draft: RuntimeEventDraft) {
         Telemetry.event(
             "IrohNode", "stream.terminal_duplicate_skipped",
-            "agentId" to draft.agentId?.value,
-            "conversationId" to draft.conversationId?.value,
+            "agentId" attr draft.agentId?.value,
+            "conversationId" attr draft.conversationId?.value,
         )
     }
 

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.security
 
+import com.letta.mobile.util.attr
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -44,7 +45,7 @@ class KeystoreIrohIdentityStore(
             .onFailure {
                 // The Keystore key is gone (e.g. device restore): the identity cannot be
                 // recovered. A new one is minted; the user re-pairs this device.
-                Telemetry.event("IrohIdentity", "sealed.unreadable", "class" to it::class.simpleName, level = Telemetry.Level.WARN)
+                Telemetry.event("IrohIdentity", "sealed.unreadable", "class" attr it::class.simpleName, level = Telemetry.Level.WARN)
             }
             .getOrNull()
     }

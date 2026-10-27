@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
@@ -67,7 +68,13 @@ class IrohAgentRepository(
         runCatchingCancellable { directory.getAgent(agentId) }
             .onSuccess { agent -> agent?.let(::updateAgentInCache) }
             .onFailure { e ->
-                Telemetry.event("IrohAgentRepository", "agent_updated.refetch_failed", "agentId" to agentId.value, "error" to (e.message ?: e::class.simpleName), level = Telemetry.Level.WARN)
+                Telemetry.event(
+                    "IrohAgentRepository",
+                    "agent_updated.refetch_failed",
+                    "agentId" attr agentId.value,
+                    "error" attr (e.message ?: e::class.simpleName),
+                    level = Telemetry.Level.WARN,
+                )
             }
     }
 

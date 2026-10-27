@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
@@ -218,9 +219,9 @@ object TimelineHydrationReducer {
         if (deduped.size != events.size) {
             Telemetry.event(
                 "Timeline", "hydrate.duplicateOtidDropped",
-                "conversationId" to conversationId,
-                "eventCount" to events.size,
-                "dedupedCount" to deduped.size,
+                "conversationId" attr conversationId,
+                "eventCount" attr events.size,
+                "dedupedCount" attr deduped.size,
                 level = Telemetry.Level.WARN,
             )
         }
@@ -273,9 +274,9 @@ object TimelineHydrationReducer {
         if (supersededIndices.isEmpty()) return events
         Telemetry.event(
             "Timeline", "hydrate.reconcileFinalSupersetCollapsed",
-            "conversationId" to conversationId,
-            "eventCount" to events.size,
-            "collapsedCount" to supersededIndices.size,
+            "conversationId" attr conversationId,
+            "eventCount" attr events.size,
+            "collapsedCount" attr supersededIndices.size,
             level = Telemetry.Level.WARN,
         )
         return events.filterIndexed { index, _ -> index !in supersededIndices }

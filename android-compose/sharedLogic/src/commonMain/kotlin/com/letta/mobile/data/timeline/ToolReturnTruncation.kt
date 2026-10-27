@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.ToolReturnMessage
 
 /**
@@ -109,10 +110,10 @@ private class ToolReturnFold(
         )
         com.letta.mobile.util.Telemetry.event(
             "TimelineToolReturn", "inbound.truncated",
-            "callId" to callId,
-            "messageId" to toolReturn.id,
-            "byteLen" to bodyBytes.size,
-            "cap" to maxInboundBodyBytes,
+            "callId" attr callId,
+            "messageId" attr toolReturn.id,
+            "byteLen" attr bodyBytes.size,
+            "cap" attr maxInboundBodyBytes,
         )
     }
 }

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.host
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.util.Telemetry
 
@@ -92,6 +93,12 @@ object PluginHostEvents {
         emit(event, Telemetry.Level.WARN, null, arrayOf("plugin" to pluginId.value, "refused" to message))
 
     private fun emit(event: PluginHostEvent, level: Telemetry.Level, durationMs: Long?, attrs: Array<Pair<String, String>>) {
-        Telemetry.event(TAG, event.eventName, *attrs, durationMs = durationMs, level = level)
+        Telemetry.event(
+            TAG,
+            event.eventName,
+            attrs = attrs.map { (key, value) -> key attr value }.toTypedArray(),
+            durationMs = durationMs,
+            level = level,
+        )
     }
 }

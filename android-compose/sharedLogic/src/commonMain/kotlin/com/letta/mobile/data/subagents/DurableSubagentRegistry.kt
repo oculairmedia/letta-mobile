@@ -1,5 +1,6 @@
 package com.letta.mobile.data.subagents
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.util.Telemetry
 import kotlin.time.Clock
@@ -71,10 +72,10 @@ class DurableSubagentRegistry(
             Telemetry.event(
                 TAG,
                 "ttl.expired",
-                "conversationId" to record.conversationId,
-                "toolCallId" to record.toolCallId,
-                "subagentType" to record.subagentType,
-                "lastSeenEpochMs" to record.lastSeenEpochMs,
+                "conversationId" attr record.conversationId,
+                "toolCallId" attr record.toolCallId,
+                "subagentType" attr record.subagentType,
+                "lastSeenEpochMs" attr record.lastSeenEpochMs,
                 level = Telemetry.Level.WARN,
             )
         }
@@ -106,8 +107,8 @@ class DurableSubagentRegistry(
             Telemetry.event(
                 TAG,
                 "rehydrated",
-                "chips" to loaded.size,
-                "live" to loaded.count { !it.state.isTerminal },
+                "chips" attr loaded.size,
+                "live" attr loaded.count { !it.state.isTerminal },
             )
         }
     }
@@ -151,22 +152,22 @@ class DurableSubagentRegistry(
             is ObserveResult.RejectedBySource -> Telemetry.event(
                 TAG,
                 "source.rejected",
-                "conversationId" to observation.conversationId,
-                "toolCallId" to observation.toolCallId,
-                "attemptedSource" to observation.source.name,
-                "attemptedState" to observation.state.name,
-                "heldBySource" to result.existing.source.name,
-                "heldState" to result.existing.state.name,
+                "conversationId" attr observation.conversationId,
+                "toolCallId" attr observation.toolCallId,
+                "attemptedSource" attr observation.source.name,
+                "attemptedState" attr observation.state.name,
+                "heldBySource" attr result.existing.source.name,
+                "heldState" attr result.existing.state.name,
                 level = Telemetry.Level.WARN,
             )
             is ObserveResult.IllegalTransition -> Telemetry.event(
                 TAG,
                 "lifecycle.illegalTransition",
-                "conversationId" to observation.conversationId,
-                "toolCallId" to observation.toolCallId,
-                "from" to result.existing.state.name,
-                "to" to observation.state.name,
-                "source" to observation.source.name,
+                "conversationId" attr observation.conversationId,
+                "toolCallId" attr observation.toolCallId,
+                "from" attr result.existing.state.name,
+                "to" attr observation.state.name,
+                "source" attr observation.source.name,
                 level = Telemetry.Level.WARN,
             )
         }
@@ -397,11 +398,11 @@ class DurableSubagentRegistry(
             Telemetry.event(
                 TAG,
                 "reconcile.orphaned",
-                "conversationId" to record.conversationId,
-                "agentId" to (record.agentId ?: ""),
-                "toolCallId" to record.toolCallId,
-                "source" to record.source.name,
-                "generation" to record.generation,
+                "conversationId" attr record.conversationId,
+                "agentId" attr (record.agentId ?: ""),
+                "toolCallId" attr record.toolCallId,
+                "source" attr record.source.name,
+                "generation" attr record.generation,
                 level = Telemetry.Level.WARN,
             )
         }
@@ -409,10 +410,10 @@ class DurableSubagentRegistry(
         Telemetry.event(
             TAG,
             "reconciled",
-            "conversationId" to conversationId,
-            "orphaned" to result.orphaned.size,
-            "liveRetained" to result.liveRetained,
-            "generation" to generation,
+            "conversationId" attr conversationId,
+            "orphaned" attr result.orphaned.size,
+            "liveRetained" attr result.liveRetained,
+            "generation" attr generation,
         )
     }
 
@@ -435,8 +436,8 @@ class DurableSubagentRegistry(
             Telemetry.event(
                 TAG,
                 "parentTurnEnded.runningRetained",
-                "conversationId" to conversationId,
-                "retained" to retained.size,
+                "conversationId" attr conversationId,
+                "retained" attr retained.size,
             )
         }
         return retained
@@ -512,10 +513,10 @@ class DurableSubagentRegistry(
             Telemetry.event(
                 TAG,
                 "capacity.evicted",
-                "conversationId" to victim.conversationId,
-                "toolCallId" to victim.toolCallId,
-                "state" to victim.state.name,
-                "cap" to maxEntries,
+                "conversationId" attr victim.conversationId,
+                "toolCallId" attr victim.toolCallId,
+                "state" attr victim.state.name,
+                "cap" attr maxEntries,
                 level = Telemetry.Level.WARN,
             )
         }
@@ -523,8 +524,8 @@ class DurableSubagentRegistry(
             Telemetry.event(
                 TAG,
                 "capacity.allLive",
-                "size" to entries.size,
-                "cap" to maxEntries,
+                "size" attr entries.size,
+                "cap" attr maxEntries,
                 level = Telemetry.Level.WARN,
             )
         }

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.util.attr
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
 import com.letta.mobile.data.model.CanvasActorId
 import com.letta.mobile.data.model.CanvasCheckpointId
@@ -280,7 +281,7 @@ class CanvasSession(
         if (!mayApplyRemote(current.acl, op, vouchedActor)) {
             com.letta.mobile.util.Telemetry.event(
                 "CanvasSession", "remote.rejected",
-                "canvasId" to canvasId.value, "opId" to op.opId, "actorId" to op.actorId,
+                "canvasId" attr canvasId.value, "opId" attr op.opId, "actorId" attr op.actorId,
                 level = com.letta.mobile.util.Telemetry.Level.WARN,
             )
             return null
@@ -299,8 +300,8 @@ class CanvasSession(
     private fun reportContentNeutral(op: CanvasOp) {
         com.letta.mobile.util.Telemetry.event(
             "CanvasSession", "remote.contentNeutral",
-            "canvasId" to canvasId.value, "actorId" to op.actorId, "opIdPrefix" to op.opIdPrefix,
-            "kind" to op.kind, "subject" to op.subjectId,
+            "canvasId" attr canvasId.value, "actorId" attr op.actorId, "opIdPrefix" attr op.opIdPrefix,
+            "kind" attr op.kind, "subject" attr op.subjectId,
             level = com.letta.mobile.util.Telemetry.Level.DEBUG,
         )
     }

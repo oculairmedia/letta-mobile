@@ -1,5 +1,7 @@
 package com.letta.mobile.channel
 
+import com.letta.mobile.util.attr
+import com.letta.mobile.util.TelemetryValue
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.channel.NotificationCandidatePhase
 import com.letta.mobile.data.channel.NotificationCandidateSource
@@ -75,8 +77,9 @@ class NotificationDeliveryCoordinator @Inject constructor(
 
     private fun NotificationDeliveryCandidate.published(notificationId: String): NotificationDeliveryDecision.Published {
         Telemetry.event(
-            "NotificationDelivery", "published",
-            *telemetryAttrs(notificationId),
+            "NotificationDelivery",
+            "published",
+            attrs = telemetryAttrs(notificationId),
         )
         return NotificationDeliveryDecision.Published(notificationId)
     }
@@ -86,9 +89,9 @@ class NotificationDeliveryCoordinator @Inject constructor(
         notificationId: String?,
     ): NotificationDeliveryDecision.Deferred {
         Telemetry.event(
-            "NotificationDelivery", "deferred",
-            *telemetryAttrs(notificationId),
-            "reason" to reason.name,
+            "NotificationDelivery",
+            "deferred",
+            attrs = telemetryAttrs(notificationId) + arrayOf("reason" attr reason.name),
         )
         return NotificationDeliveryDecision.Deferred(reason)
     }
@@ -98,27 +101,27 @@ class NotificationDeliveryCoordinator @Inject constructor(
         notificationId: String? = null,
     ): NotificationDeliveryDecision.Suppressed {
         Telemetry.event(
-            "NotificationDelivery", "suppressed",
-            *telemetryAttrs(notificationId),
-            "reason" to reason.name,
+            "NotificationDelivery",
+            "suppressed",
+            attrs = telemetryAttrs(notificationId) + arrayOf("reason" attr reason.name),
         )
         return NotificationDeliveryDecision.Suppressed(reason)
     }
 
     /** Telemetry attributes, rendered as text so the list stays one concrete type. */
-    private fun NotificationDeliveryCandidate.telemetryAttrs(notificationId: String?): Array<Pair<String, String>> {
+    private fun NotificationDeliveryCandidate.telemetryAttrs(notificationId: String?): Array<Pair<String, TelemetryValue>> {
         val sanitizedPreview = NotificationContentSanitizer.sanitizePreview(previewText)
         return arrayOf(
-            "conversationId" to conversationId,
-            "notificationId" to (notificationId ?: "<none>"),
-            "messageIdPresent" to (!messageId.isNullOrBlank()).toString(),
-            "runIdPresent" to (!runId.isNullOrBlank()).toString(),
-            "source" to source.name,
-            "phase" to phase.name,
-            "isFinal" to isFinal.toString(),
-            "rawPreviewLength" to previewText.length.toString(),
-            "normalizedPreviewLength" to sanitizedPreview.normalizedLength.toString(),
-            "previewFallbackReason" to sanitizedPreview.fallbackReason.name,
+            "conversationId" attr conversationId,
+            "notificationId" attr (notificationId ?: "<none>"),
+            "messageIdPresent" attr (!messageId.isNullOrBlank()).toString(),
+            "runIdPresent" attr (!runId.isNullOrBlank()).toString(),
+            "source" attr source.name,
+            "phase" attr phase.name,
+            "isFinal" attr isFinal.toString(),
+            "rawPreviewLength" attr previewText.length.toString(),
+            "normalizedPreviewLength" attr sanitizedPreview.normalizedLength.toString(),
+            "previewFallbackReason" attr sanitizedPreview.fallbackReason.name,
         )
     }
 

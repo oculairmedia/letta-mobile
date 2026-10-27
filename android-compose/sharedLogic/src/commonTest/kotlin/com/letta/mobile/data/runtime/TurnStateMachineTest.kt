@@ -1,5 +1,7 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.util.textOrNull
+
 import com.letta.mobile.util.Telemetry
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,6 +14,18 @@ import kotlin.test.assertTrue
  * `turn.illegal_transition`), never silently accepted.
  */
 class TurnStateMachineTest {
+    private var ownedTelemetryHistory: AutoCloseable? = null
+
+    @kotlin.test.BeforeTest
+    fun installOwnedTelemetryHistory() {
+        ownedTelemetryHistory = com.letta.mobile.util.Telemetry.installRecorder(com.letta.mobile.util.TelemetryRecorder())
+    }
+
+    @kotlin.test.AfterTest
+    fun detachOwnedTelemetryHistory() {
+        ownedTelemetryHistory?.close()
+    }
+
 
     /** The whole table, written out. A pair missing here is expected to be illegal. */
     private val expected: Map<Pair<TurnPhase, TurnEvent>, TurnPhase> = mapOf(
@@ -53,9 +67,9 @@ class TurnStateMachineTest {
         assertEquals(TurnPhase.Terminal, machine.phase)
         val recorded = Telemetry.snapshot().filter { it.name == "turn.illegal_transition" }
         // The snapshot's order is the telemetry buffer's, so compare as a set.
-        assertEquals(setOf("TerminalPublished", "CompletionHeld"), recorded.map { it.attrs["event"] }.toSet())
+        assertEquals(setOf("TerminalPublished", "CompletionHeld"), recorded.map { it.attrs["event"]?.textOrNull }.toSet())
         assertEquals(2, recorded.size)
-        assertTrue(recorded.all { it.attrs["machine"] == "test" && it.attrs["phase"] == "Terminal" })
+        assertTrue(recorded.all { it.attrs["machine"]?.textOrNull == "test" && it.attrs["phase"]?.textOrNull == "Terminal" })
     }
 
     @Test
