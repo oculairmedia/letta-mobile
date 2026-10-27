@@ -2,6 +2,7 @@ package com.letta.mobile.util
 
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
+import java.lang.reflect.Proxy
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -29,7 +30,7 @@ class TelemetryConsoleTest {
     fun delegateReceivesDebugAndConsoleRemainsSilent() {
         withTelemetryCapture { output ->
             val delegate = RecordingTelemetryDelegate()
-            Telemetry.delegate = delegate
+            Telemetry.delegate = delegate.instance
 
             Telemetry.event("ConsoleTest", "debug-marker", level = Telemetry.Level.DEBUG)
 
@@ -47,7 +48,7 @@ class TelemetryConsoleTest {
     fun debugRemainsInRingWithDelegateWhenLogcatDisabled() {
         withTelemetryCapture { output ->
             val delegate = RecordingTelemetryDelegate()
-            Telemetry.delegate = delegate
+            Telemetry.delegate = delegate.instance
             Telemetry.logcatEnabled.set(false)
 
             Telemetry.event("ConsoleTest", "debug-marker", level = Telemetry.Level.DEBUG)
@@ -101,18 +102,19 @@ class TelemetryConsoleTest {
         val throwable: Throwable?,
     )
 
-    private class RecordingTelemetryDelegate : TelemetryDelegate {
+    private class RecordingTelemetryDelegate {
         val events = mutableListOf<RecordedEvent>()
-
-        override fun logToLogcat(level: Telemetry.Level, tag: String, body: String, throwable: Throwable?) {
-            events += RecordedEvent(level, tag, body, throwable)
-        }
-
-        override fun isLoggable(tag: String, level: Int): Boolean = false
-        override fun isTraceEnabled(): Boolean = false
-        override fun beginSection(name: String) = Unit
-        override fun endSection() = Unit
-        override fun beginAsyncSection(name: String, cookie: Int) = Unit
-        override fun endAsyncSection(name: String, cookie: Int) = Unit
+        // Only logging is observed here; tracing methods remain inert without a native platform delegate.
+        val instance: TelemetryDelegate = Proxy.newProxyInstance(
+            TelemetryDelegate::class.java.classLoader,
+            arrayOf(TelemetryDelegate::class.java),
+        ) { _, method, args ->
+            if (method.name == "logToLogcat") {
+                events += RecordedEvent(
+                    args[0] as Telemetry.Level, args[1] as String, args[2] as String, args[3] as Throwable?,
+                )
+            }
+            if (method.returnType == Boolean::class.javaPrimitiveType) false else null
+        } as TelemetryDelegate
     }
 }
