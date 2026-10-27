@@ -46,6 +46,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -411,6 +412,8 @@ internal fun DockedChatPanel(
                     CompositionLocalProvider(
                         LocalContentColor provides MaterialTheme.colorScheme.onSurface,
                         LocalMinimisedBarLayout provides barLayout,
+                        // The panel already lifted above the keyboard; its composer must not lift again.
+                        LocalChatKeyboardLift provides rememberUpdatedState(0.dp),
                     ) {
                         content.composer(collapsed)
                     }
