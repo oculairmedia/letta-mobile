@@ -85,7 +85,7 @@ class AgentContextCardUiTest {
         onNodeWithTag(AgentContextTags.CARD).performClick()
         waitForIdle()
         onNodeWithTag(AgentContextTags.PROVENANCE).assertTextEquals("Estimated, matched to provider total")
-        onNodeWithText("Tools & other").assertExists()
+        onNodeWithText("Unclassified / estimation gap").assertExists()
         onNodeWithText("Memory blocks").assertExists()
     }
 

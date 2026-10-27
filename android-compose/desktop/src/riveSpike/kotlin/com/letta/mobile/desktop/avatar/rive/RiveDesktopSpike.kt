@@ -75,6 +75,7 @@ import com.letta.mobile.avatar.core.MascotShape
 import com.letta.mobile.avatar.rive.MASCOT_MODEL
 import com.letta.mobile.avatar.rive.RiveAvatarContract
 import com.letta.mobile.avatar.rive.RiveAvatarRuntime
+import com.letta.mobile.avatar.rive.RiveWrite
 import com.letta.mobile.ui.mascot.frame.RiveFrameSurface
 import com.letta.mobile.ui.mascot.frame.RiveOnionSkin
 import java.io.File
@@ -149,7 +150,7 @@ private fun SceneColumn(file: File, stateMachine: String?, triggers: List<String
         if (!SELF_TEST || triggers.isEmpty()) return@LaunchedEffect
         while (true) {
             for (name in triggers) {
-                println("rive-spike self-test: trigger $name fired=${scene.fireTrigger(name)}")
+                println("rive-spike self-test: trigger $name fired=${scene.fireTrigger(RiveWrite.Fire(name))}")
                 delay(2000)
             }
         }
@@ -158,7 +159,7 @@ private fun SceneColumn(file: File, stateMachine: String?, triggers: List<String
         Text("${file.name}  |  ${scene.adapterName}  |  render+readback %.2f ms".format(nativeMs), color = Color.LightGray)
         RiveFrameSurface(scene, RiveThread.dispatcher, Modifier.weight(1f).fillMaxSize(), onFrameStats = { nativeMs = it })
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            triggers.forEach { name -> OutlinedButton(onClick = { scene.fireTrigger(name) }) { Text(name) } }
+            triggers.forEach { name -> OutlinedButton(onClick = { scene.fireTrigger(RiveWrite.Fire(name)) }) { Text(name) } }
         }
     }
 }

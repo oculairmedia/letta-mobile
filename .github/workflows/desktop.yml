@@ -10,7 +10,8 @@ on:
       - ".github/workflows/desktop.yml"
       - ".github/workflows/release.yml"
       - "scripts/desktop/**"
-      - "scripts/tests/test_desktop_packaging.py"
+      - "scripts/tests/test_desktop_packaging*.py"
+      - "scripts/tests/desktop_packaging_fixtures.py"
       - "scripts/tests/desktop_smoke_fixtures.py"
       - "scripts/tests/test_linux_startup_diagnostic.py"
       - "scripts/tests/test_nucleus_hotkey.py"
@@ -32,7 +33,8 @@ on:
       - ".github/workflows/desktop.yml"
       - ".github/workflows/release.yml"
       - "scripts/desktop/**"
-      - "scripts/tests/test_desktop_packaging.py"
+      - "scripts/tests/test_desktop_packaging*.py"
+      - "scripts/tests/desktop_packaging_fixtures.py"
       - "scripts/tests/desktop_smoke_fixtures.py"
       - "scripts/tests/test_linux_startup_diagnostic.py"
       - "scripts/tests/test_nucleus_hotkey.py"
@@ -273,7 +275,7 @@ jobs:
       - name: Install Linux packaging and X11 smoke dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc pkg-config patch libx11-dev libglib2.0-dev binutils gdb xvfb xauth xdotool x11-utils openbox dbus-x11 desktop-file-utils patchelf \
+          sudo apt-get install -y g++ clang make libegl1-mesa-dev libgl1-mesa-dev gcc pkg-config patch libx11-dev libglib2.0-dev binutils gdb xvfb xauth xdotool x11-utils openbox dbus-x11 desktop-file-utils patchelf \
             libgtk-3-0 libasound2 libdbusmenu-gtk3-4 libsystemd0 libx11-6 libxext6 libxi6 libxrender1 libxtst6 \
             libfontconfig1 libfreetype6 libgl1 libegl1 libnss3 libgbm1 libxkbcommon0 \
             libnotify4 libsecret-1-0 libdbus-glib-1-2
@@ -285,9 +287,31 @@ jobs:
           python3 scripts/tests/test_linux_startup_diagnostic.py
           python3 scripts/tests/test_nucleus_hotkey.py
 
+      - name: Cache pinned Linux Rive build
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/rive-linux
+          key: ubuntu-22.04-rive-gl-${{ hashFiles('android-compose/avatar/renderer-rive/native/desktop/rive-runtime.version', 'android-compose/avatar/renderer-rive/native/desktop/build-linux.sh', 'android-compose/avatar/renderer-rive/native/desktop/tools/**') }}
+
+      - name: Build and render Linux Rive bridge
+        run: |
+          bash avatar/renderer-rive/native/desktop/build-bridge.sh "$RUNNER_TEMP/rive-linux" "$RUNNER_TEMP/rive-out"
+          echo "LETTA_RIVE_BRIDGE=$RUNNER_TEMP/rive-out/librive_desktop_bridge.so" >> "$GITHUB_ENV"
+          python3 avatar/renderer-rive/native/desktop/smoke-linux.py \
+            "$RUNNER_TEMP/rive-out/librive_desktop_bridge.so" avatar/renderer-rive/src/androidMain/res/raw/mascot.riv \
+            "$RUNNER_TEMP/linux-rive-smoke"
+
+      - name: Upload Linux Rive frames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-rive-frames-${{ github.run_number }}
+          path: ${{ runner.temp }}/linux-rive-smoke/
+          if-no-files-found: warn
+
       - name: Build Linux x86-64 AppImage
         # Nucleus AppImage uses the real jpackage app image, JBR, Node and shared UI.
-        # Rive's D3D11 bridge is Windows-only; Linux retains the existing fallback mascot.
+        # Includes the native EGL/OpenGL Rive renderer; packaging rejects a missing bridge.
         run: ./gradlew --no-configuration-cache :desktop:packageDistributionForCurrentOS
 
       - name: Verify the shipped Linux desktop
