@@ -1,6 +1,8 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.util.textOrNull
+import com.letta.mobile.util.booleanOrNull
+import com.letta.mobile.util.numberOrNull
 
 import com.letta.mobile.util.Telemetry
 import org.junit.After
@@ -55,13 +57,13 @@ class ChatHydrationTraceTest {
             missingOptionalSources = "none",
         )
 
-        val stale = Telemetry.snapshot().single { it.attrs["isStale"]?.textOrNull == true }
+        val stale = Telemetry.snapshot().single { it.attrs["isStale"]?.booleanOrNull == true }
         assertEquals("presentation_published", stale.name)
-        assertEquals(oldGeneration.id, stale.attrs["generation"]?.textOrNull)
+        assertEquals(oldGeneration.id, stale.attrs["generation"]?.numberOrNull)
         assertTrue(oldGeneration.id != currentGeneration.id)
         assertEquals("agent-a", stale.attrs["agentId"]?.textOrNull)
         assertEquals("conversation-a", stale.attrs["conversationId"]?.textOrNull)
-        assertEquals(1, stale.attrs["staleCount"]?.textOrNull)
+        assertEquals(1, stale.attrs["staleCount"]?.numberOrNull)
     }
 
     @Test
