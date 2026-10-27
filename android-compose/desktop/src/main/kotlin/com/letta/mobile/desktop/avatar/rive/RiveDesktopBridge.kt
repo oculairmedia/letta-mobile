@@ -38,19 +38,12 @@ internal interface RiveBridgeNative : Library {
 
     companion object {
         /** Platform library from an override, packaged resources, or the developer's working directory. */
-        val PATH: String? by lazy {
-            RiveLibraryLocator.findPathOrNull(
-                System.getProperty("os.name").orEmpty(),
-                System.getProperty("rive.bridge.path"),
-                System.getProperty("compose.application.resources.dir"),
-                System.getProperty("user.dir"),
-            )
-        }
+        val PATH: String? by lazy { RiveLibraryLocator.findOrNull(RiveLibrarySearch.fromSystem()) }
 
         /** Missing renderers are reported explicitly; distribution inspection also requires the native payload. */
         val AVAILABLE: Boolean by lazy {
             val name = RiveLibraryLocator.libraryName(System.getProperty("os.name").orEmpty())
-            RiveLibraryLocator.isAvailable(name, PATH).also { available ->
+            (name != null && PATH != null).also { available ->
                 if (name != null && !available) System.err.println("ERROR: Rive renderer missing: $name; set -Drive.bridge.path")
             }
         }
@@ -87,6 +80,23 @@ internal interface RiveBridgeNative : Library {
 @JvmInline
 internal value class RiveLibraryPath(val value: String)
 
+/** Where to look for the bridge library: the platform, an explicit override, the packaged resources and the cwd. */
+internal data class RiveLibrarySearch(
+    val osName: String,
+    val explicit: String?,
+    val resources: String?,
+    val workingDir: String,
+) {
+    companion object {
+        fun fromSystem(): RiveLibrarySearch = RiveLibrarySearch(
+            osName = System.getProperty("os.name").orEmpty(),
+            explicit = System.getProperty("rive.bridge.path"),
+            resources = System.getProperty("compose.application.resources.dir"),
+            workingDir = System.getProperty("user.dir"),
+        )
+    }
+}
+
 /** Pure library discovery, independent of JNA loading and optional export negotiation. */
 internal object RiveLibraryLocator {
     /** The platform's existing C ABI library; macOS has no native backend yet. */
@@ -96,11 +106,15 @@ internal object RiveLibraryLocator {
         else -> null
     }
 
-    /** True only when the platform has a bridge and its library was resolved; never throws. */
-    internal fun isAvailable(name: String?, path: String?): Boolean = name != null && path != null
-
     /** The resolved path, or null when discovery fails (a bad explicit override included) instead of throwing. */
-    internal fun findPathOrNull(osName: String, explicit: String?, resources: String?, workingDir: String): String? =
+    internal fun findOrNull(search: RiveLibrarySearch): String? = findPathOrNull(
+        search.osName,
+        search.explicit,
+        search.resources,
+        search.workingDir,
+    )
+
+    private fun findPathOrNull(osName: String, explicit: String?, resources: String?, workingDir: String): String? =
         runCatching { findPath(osName, explicit, resources, workingDir) }
             .onFailure { System.err.println("ERROR: ${it.message}") }
             .getOrNull()

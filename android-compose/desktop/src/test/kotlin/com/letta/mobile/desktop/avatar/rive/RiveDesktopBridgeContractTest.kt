@@ -26,14 +26,17 @@ class RiveDesktopBridgeContractTest {
 
     @Test
     fun anInvalidOverrideReportsUnavailableInsteadOfThrowing() {
-        val missing = "/nonexistent/letta-no-such-librive_desktop_bridge.so"
+        val search = RiveLibrarySearch("Linux", "/nonexistent/letta-no-such-librive_desktop_bridge.so", null, "/missing")
         // The strict locator still fails loudly for a typo; availability must not, so the orb fallback shows.
         kotlin.test.assertFailsWith<IllegalStateException> {
-            RiveLibraryLocator.findPath("Linux", missing, null, "/missing")
+            RiveLibraryLocator.findPath(
+                search.osName,
+                search.explicit,
+                search.resources,
+                search.workingDir,
+            )
         }
-        val path = RiveLibraryLocator.findPathOrNull("Linux", missing, null, "/missing")
-        assertEquals(null, path)
-        assertEquals(false, RiveLibraryLocator.isAvailable(RiveLibraryLocator.libraryName("Linux"), path))
+        assertEquals(null, RiveLibraryLocator.findOrNull(search))
     }
 
     @Test
