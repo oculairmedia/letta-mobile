@@ -227,29 +227,15 @@ class TimelineStreamMergeTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `stale cumulative prefix frames are dropped instead of appended`() {
-        val seeded = reduce(
-            frame = AssistantMessage(
-                id = "assistant-1",
-                contentRaw = JsonPrimitive("Standing by. Send a message."),
-                seqId = 1,
-            )
-        ).next
-
-        val output = reduce(
-            prev = seeded,
-            frame = AssistantMessage(
-                id = "assistant-1",
-                contentRaw = JsonPrimitive("Standing by."),
-                seqId = 2,
-            ),
-        )
-
-        (output.next.events.single() as TimelineEvent.Confirmed).content shouldBe
-            "Standing by. Send a message."
+        assertRepeatedTextDropped("Standing by.")
     }
 
     @Test
     fun `matching-tail frames are dropped instead of duplicated`() {
+        assertRepeatedTextDropped("Send a message.")
+    }
+
+    private fun assertRepeatedTextDropped(incoming: String) {
         val seeded = reduce(
             frame = AssistantMessage(
                 id = "assistant-1",
@@ -262,7 +248,7 @@ class TimelineStreamMergeTest : TimelineStreamReducerFixture() {
             prev = seeded,
             frame = AssistantMessage(
                 id = "assistant-1",
-                contentRaw = JsonPrimitive("Send a message."),
+                contentRaw = JsonPrimitive(incoming),
                 seqId = 2,
             ),
         )

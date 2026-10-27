@@ -1,11 +1,9 @@
 package com.letta.mobile.data.timeline
 
 
-import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.util.Telemetry
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 
 
@@ -15,7 +13,7 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
         Telemetry.chatHotPathDebugEnabled.set(false)
         Telemetry.clear()
 
-        reduce(frame = AssistantMessage(id = "assistant-default", contentRaw = JsonPrimitive("hello")))
+        reduce(frame = textAssistant(id = "assistant-default", content = "hello"))
 
         Telemetry.snapshot().none {
             it.tag == "TimelineSync" && it.name.startsWith("streamSubscriber")
@@ -27,7 +25,7 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
         Telemetry.chatHotPathDebugEnabled.set(true)
         Telemetry.clear()
 
-        reduce(frame = AssistantMessage(id = "assistant-debug", contentRaw = JsonPrimitive("hello")))
+        reduce(frame = textAssistant(id = "assistant-debug", content = "hello"))
 
         Telemetry.snapshot().any {
             it.tag == "TimelineSync" &&
@@ -38,20 +36,18 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `late same-run assistant prefix with a new server id is dropped`() {
-        val seeded = reduce(
-            frame = AssistantMessage(
+        val seeded = seedAssistant(textAssistant(
                 id = "assistant-full",
-                contentRaw = JsonPrimitive("Opening line\n\nFinal body"),
+                content = "Opening line\n\nFinal body",
                 runId = "run-1",
                 seqId = 20,
-            )
-        ).next
+            ))
 
         val output = reduce(
             prev = seeded,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "assistant-prefix",
-                contentRaw = JsonPrimitive("Opening line"),
+                content = "Opening line",
                 runId = "run-1",
                 seqId = 21,
             ),
@@ -68,20 +64,18 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `late same-run blank assistant with a new server id is dropped after nonblank assistant`() {
-        val seeded = reduce(
-            frame = AssistantMessage(
+        val seeded = seedAssistant(textAssistant(
                 id = "assistant-full",
-                contentRaw = JsonPrimitive("Opening line\n\nFinal body"),
+                content = "Opening line\n\nFinal body",
                 runId = "run-1",
                 seqId = 20,
-            )
-        ).next
+            ))
 
         val output = reduce(
             prev = seeded,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "assistant-empty",
-                contentRaw = JsonPrimitive(""),
+                content = "",
                 runId = "run-1",
                 seqId = 21,
             ),
@@ -95,20 +89,18 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `post install replay prefix with seq one is dropped`() {
-        val seeded = reduce(
-            frame = AssistantMessage(
+        val seeded = seedAssistant(textAssistant(
                 id = "rest-assistant",
-                contentRaw = JsonPrimitive("Got it — I can check the latest build and keep going."),
+                content = "Got it — I can check the latest build and keep going.",
                 runId = "run-replayed-after-install",
                 seqId = 24,
-            )
-        ).next
+            ))
 
         val output = reduce(
             prev = seeded,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "ws-replayed-prefix",
-                contentRaw = JsonPrimitive("Got"),
+                content = "Got",
                 runId = "run-replayed-after-install",
                 seqId = 1,
             ),
@@ -124,20 +116,18 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `assistant prefix from a different run is preserved`() {
-        val seeded = reduce(
-            frame = AssistantMessage(
+        val seeded = seedAssistant(textAssistant(
                 id = "assistant-full",
-                contentRaw = JsonPrimitive("Opening line\n\nFinal body"),
+                content = "Opening line\n\nFinal body",
                 runId = "run-1",
                 seqId = 20,
-            )
-        ).next
+            ))
 
         val output = reduce(
             prev = seeded,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "assistant-prefix-next-run",
-                contentRaw = JsonPrimitive("Opening line"),
+                content = "Opening line",
                 runId = "run-2",
                 seqId = 1,
             ),
@@ -155,7 +145,7 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
     @Test
     fun `plain append adds new confirmed event and emits notification for assistant`() {
         val output = reduce(
-            frame = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("hello"))
+            frame = textAssistant(id = "assistant-1", content = "hello")
         )
 
         val event = output.next.events.single() as TimelineEvent.Confirmed
@@ -175,23 +165,21 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
     @Test
     fun `ujz3x first content delta after tool_return not dropped as prefix orphan`() {
         // Setup: a previous assistant message in the same run starts with "Yes — the"
-        val seeded = reduce(
-            frame = AssistantMessage(
+        val seeded = seedAssistant(textAssistant(
                 id = "assistant-before-tool",
-                contentRaw = JsonPrimitive("Yes — the `Agent` tool takes an optional `model` parameter"),
+                content = "Yes — the `Agent` tool takes an optional `model` parameter",
                 runId = "run-1",
                 seqId = 1,
-            )
-        ).next
+            ))
 
         // Now the post-tool-return content stream starts. The first delta is just "Y"
         // — a single character that coincidentally is a prefix of the previous
         // assistant message. This must NOT be dropped.
         val output1 = reduce(
             prev = seeded,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "cm-stream-post-tool-otid",
-                contentRaw = JsonPrimitive("Y"),
+                content = "Y",
                 runId = "run-1",
                 seqId = 1,  // FIRST frame for this new otid — genuinely new message
                 logicalMessageId = "post-tool-otid",
@@ -207,9 +195,9 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
         // Second delta continues: "es — confirmed working at both layers:"
         val output2 = reduce(
             prev = output1.next,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "cm-stream-post-tool-otid",
-                contentRaw = JsonPrimitive("es — confirmed working at both layers:"),
+                content = "es — confirmed working at both layers:",
                 runId = "run-1",
                 seqId = 2,
                 logicalMessageId = "post-tool-otid",
@@ -226,19 +214,17 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `assistant one character prefix replay is dropped after reconciled final without run id`() {
-        val seeded = reduce(
-            frame = AssistantMessage(
+        val seeded = seedAssistant(textAssistant(
                 id = "assistant-final",
-                contentRaw = JsonPrimitive("Nah, that was just the bit. Real answer: agents stay off the relay."),
+                content = "Nah, that was just the bit. Real answer: agents stay off the relay.",
                 runId = null,
-            ),
-        ).next
+            ))
 
         val output = reduce(
             prev = seeded,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "assistant-prefix",
-                contentRaw = JsonPrimitive("N"),
+                content = "N",
                 runId = "local-run-39",
                 seqId = 1,
             ),
@@ -253,20 +239,18 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `assistant prefix replay from local run is dropped after iroh final`() {
-        val seeded = reduce(
-            frame = AssistantMessage(
+        val seeded = seedAssistant(textAssistant(
                 id = "assistant-full",
-                contentRaw = JsonPrimitive("Yeah — still seeing it. Smells like a dedup issue."),
+                content = "Yeah — still seeing it. Smells like a dedup issue.",
                 runId = "iroh-run-123",
                 seqId = 12,
-            ),
-        ).next
+            ))
 
         val output = reduce(
             prev = seeded,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "assistant-prefix",
-                contentRaw = JsonPrimitive("Yeah"),
+                content = "Yeah",
                 runId = "local-run-12",
                 seqId = 1,
             ),
@@ -283,14 +267,12 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `failed turn with sole short assistant fragment removes tail row`() {
-        val seeded = reduce(
-            frame = AssistantMessage(
+        val seeded = seedAssistant(textAssistant(
                 id = "assistant-fragment",
-                contentRaw = JsonPrimitive("No"),
+                content = "No",
                 runId = "run-failed",
                 seqId = 1,
-            ),
-        ).next
+            ))
 
         val cleaned = seeded.cleanupAbandonedAssistantFragments(
             runId = "run-failed",
@@ -306,14 +288,12 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `cleanup uses observed real run id when terminal frame carries synthetic run id`() {
-        val seeded = reduce(
-            frame = AssistantMessage(
+        val seeded = seedAssistant(textAssistant(
                 id = "assistant-fragment",
-                contentRaw = JsonPrimitive("Ok"),
+                content = "Ok",
                 runId = "run-real-observed",
                 seqId = 1,
-            ),
-        ).next
+            ))
 
         val cleaned = seeded.cleanupAbandonedAssistantFragments(
             runId = "iroh-run-terminal",
@@ -327,14 +307,12 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `tail-only cleanup preserves earlier legitimate short assistant before tool event`() {
-        val shortAssistant = reduce(
-            frame = AssistantMessage(
+        val shortAssistant = seedAssistant(textAssistant(
                 id = "assistant-ok",
-                contentRaw = JsonPrimitive("OK"),
+                content = "OK",
                 runId = "run-legit",
                 seqId = 1,
-            ),
-        ).next
+            ))
         val withTool = reduce(
             prev = shortAssistant,
             frame = ToolCallMessage(
@@ -356,14 +334,12 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `terminal disconnect without cleanup target preserves legitimate short tail reply`() {
-        val seeded = reduce(
-            frame = AssistantMessage(
+        val seeded = seedAssistant(textAssistant(
                 id = "assistant-ok",
-                contentRaw = JsonPrimitive("OK"),
+                content = "OK",
                 runId = "run-legit",
                 seqId = 1,
-            ),
-        ).next
+            ))
 
         val cleaned = seeded.cleanupAbandonedAssistantFragments(
             runId = null,
@@ -377,18 +353,16 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `terminal failed turn cleanup removes one character assistant fragment`() {
-        val withFull = reduce(
-            frame = AssistantMessage(
+        val withFull = seedAssistant(textAssistant(
                 id = "assistant-full",
-                contentRaw = JsonPrimitive("I can help clean up the lifecycle."),
+                content = "I can help clean up the lifecycle.",
                 runId = "run-terminal",
                 seqId = 12,
-            ),
-        ).next
+            ))
         val withFragment = withFull.append(
-            (AssistantMessage(
+            (textAssistant(
                 id = "assistant-orphan-i",
-                contentRaw = JsonPrimitive("I"),
+                content = "I",
                 runId = "run-terminal",
                 seqId = 13,
             ).toTimelineEvent(position = withFull.nextLocalPosition())!!),
@@ -404,18 +378,16 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `terminal disconnect cleanup removes strict prefix assistant fragment`() {
-        val withFull = reduce(
-            frame = AssistantMessage(
+        val withFull = seedAssistant(textAssistant(
                 id = "assistant-full",
-                contentRaw = JsonPrimitive("Nah, that was the full response."),
+                content = "Nah, that was the full response.",
                 runId = "run-disconnect",
                 seqId = 20,
-            ),
-        ).next
+            ))
         val withFragment = withFull.append(
-            AssistantMessage(
+            textAssistant(
                 id = "assistant-orphan-n",
-                contentRaw = JsonPrimitive("N"),
+                content = "N",
                 runId = "run-disconnect",
                 seqId = 21,
             ).toTimelineEvent(position = withFull.nextLocalPosition())!!,
@@ -429,14 +401,12 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `terminal failed turn cleanup removes sole one character assistant fragment`() {
-        val withFragment = reduce(
-            frame = AssistantMessage(
+        val withFragment = seedAssistant(textAssistant(
                 id = "assistant-orphan-i",
-                contentRaw = JsonPrimitive("I"),
+                content = "I",
                 runId = "local-run-terminal",
                 seqId = 1,
-            ),
-        ).next
+            ))
 
         val cleaned = withFragment.cleanupAbandonedAssistantFragments("iroh-run-terminal", "turn-terminal", "turn_done_failed").timeline
 
@@ -446,14 +416,12 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `terminal cleanup with synthetic run id removes observed real run fragment`() {
-        val withFragment = reduce(
-            frame = AssistantMessage(
+        val withFragment = seedAssistant(textAssistant(
                 id = "assistant-real-run-fragment",
-                contentRaw = JsonPrimitive("I"),
+                content = "I",
                 runId = "run-app",
                 seqId = 1,
-            ),
-        ).next
+            ))
 
         val cleaned = withFragment.cleanupAbandonedAssistantFragments(
             runId = "iroh-run-terminal",
@@ -467,14 +435,12 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `abandoned fragment suppression prevents recent reconcile reinsert`() {
-        val withFragment = reduce(
-            frame = AssistantMessage(
+        val withFragment = seedAssistant(textAssistant(
                 id = "assistant-orphan-reconcile",
-                contentRaw = JsonPrimitive("I"),
+                content = "I",
                 runId = "run-reconcile",
                 seqId = 1,
-            ),
-        ).next
+            ))
         val cleaned = withFragment.cleanupAbandonedAssistantFragments(
             runId = "run-reconcile",
             turnId = "turn-reconcile",
@@ -483,9 +449,9 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
         val (mergedTimeline, changed) = cleaned.mergeServerMessages(
             listOf(
-                AssistantMessage(
+                textAssistant(
                     id = "assistant-orphan-reconcile",
-                    contentRaw = JsonPrimitive("I"),
+                    content = "I",
                     runId = "run-reconcile",
                     seqId = 1,
                 )
@@ -498,14 +464,12 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `terminal cleanup only removes tail assistant fragments`() {
-        val earlier = reduce(
-            frame = AssistantMessage(
+        val earlier = seedAssistant(textAssistant(
                 id = "assistant-ok",
-                contentRaw = JsonPrimitive("OK"),
+                content = "OK",
                 runId = "run-terminal",
                 seqId = 1,
-            ),
-        ).next
+            ))
         val withToolCall = earlier.append(
             ToolCallMessage(
                 id = "tool-call",
@@ -521,19 +485,17 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `successful post tool one character continuation is preserved before terminal cleanup`() {
-        val seeded = reduce(
-            frame = AssistantMessage(
+        val seeded = seedAssistant(textAssistant(
                 id = "assistant-before-tool",
-                contentRaw = JsonPrimitive("Yes — earlier answer before tool."),
+                content = "Yes — earlier answer before tool.",
                 runId = "run-success",
                 seqId = 1,
-            ),
-        ).next
+            ))
         val withContinuation = reduce(
             prev = seeded,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "assistant-post-tool",
-                contentRaw = JsonPrimitive("Y"),
+                content = "Y",
                 runId = "run-success",
                 seqId = 1,
                 otid = "post-tool",
@@ -541,9 +503,9 @@ class TimelineStreamCleanupTest : TimelineStreamReducerFixture() {
         ).next
         val completed = reduce(
             prev = withContinuation,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "assistant-post-tool",
-                contentRaw = JsonPrimitive("es, that worked."),
+                content = "es, that worked.",
                 runId = "run-success",
                 seqId = 2,
                 otid = "post-tool",

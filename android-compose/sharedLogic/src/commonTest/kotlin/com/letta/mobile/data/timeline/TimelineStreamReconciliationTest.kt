@@ -2,7 +2,6 @@ package com.letta.mobile.data.timeline
 
 import com.letta.mobile.util.textOrNull
 
-import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonPrimitive
@@ -12,13 +11,11 @@ import kotlin.test.Test
 class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
     @Test
     fun `seqId dedup skips already-ingested stream frame`() {
-        val seeded = reduce(
-            frame = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("Hello"), seqId = 3)
-        ).next
+        val seeded = seedAssistant(textAssistant(id = "assistant-1", content = "Hello", seqId = 3))
 
         val output = reduce(
             prev = seeded,
-            frame = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("Hel"), seqId = 2),
+            frame = textAssistant(id = "assistant-1", content = "Hel", seqId = 2),
         )
         (output.next.events.single() as TimelineEvent.Confirmed).content shouldBe "Hello"
         output.emittedEvents shouldBe emptyList()
@@ -48,7 +45,7 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
             serverMessagesChronological = listOf(
                 UserMessage(id = "user-question", contentRaw = JsonPrimitive("What is the router status?")),
                 UserMessage(id = "skill-envelope", contentRaw = JsonPrimitive(realCapturedSkillEnvelope())),
-                AssistantMessage(id = "assistant-answer", contentRaw = JsonPrimitive("The router is online.")),
+                textAssistant(id = "assistant-answer", content = "The router is online."),
             ),
             timelineBeforeFetch = Timeline("conv-test"),
             currentTimeline = Timeline("conv-test"),
@@ -74,8 +71,8 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
             conversationId = "conv-test",
             serverMessagesChronological = listOf(
                 UserMessage(id = "question", contentRaw = JsonPrimitive("Check performance")),
-                AssistantMessage(id = "skill-content", contentRaw = JsonPrimitive(skillContent)),
-                AssistantMessage(id = "answer", contentRaw = JsonPrimitive("Performance is healthy.")),
+                textAssistant(id = "skill-content", content = skillContent),
+                textAssistant(id = "answer", content = "Performance is healthy."),
             ),
             timelineBeforeFetch = Timeline("conv-test"),
             currentTimeline = Timeline("conv-test"),
@@ -112,9 +109,9 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
         val hydrated = TimelineHydrationReducer.reduce(
             conversationId = "conv-test",
             serverMessagesChronological = listOf(
-                AssistantMessage(
+                textAssistant(
                     id = "rest-assistant",
-                    contentRaw = JsonPrimitive("Let me check the more recent one then."),
+                    content = "Let me check the more recent one then.",
                     runId = "run-reopen",
                     seqId = 1,
                 )
@@ -128,9 +125,9 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
 
         val output = reduce(
             prev = hydrated,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "ws-assistant",
-                contentRaw = JsonPrimitive("Let me check the more recent one then."),
+                content = "Let me check the more recent one then.",
                 runId = "run-reopen",
                 seqId = 2,
             ),
@@ -148,20 +145,18 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `reconciled final with real run id replaces iroh synthetic live row`() {
-        val live = reduce(
-            frame = AssistantMessage(
+        val live = seedAssistant(textAssistant(
                 id = "letta-msg-300",
-                contentRaw = JsonPrimitive("Hello"),
+                content = "Hello",
                 runId = "iroh-run-client-synthetic",
                 seqId = 1,
-            ),
-        ).next
+            ))
 
         val output = reduce(
             prev = live,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "letta-msg-300",
-                contentRaw = JsonPrimitive("Hello!"),
+                content = "Hello!",
                 runId = "server-run-real",
                 seqId = 2,
             ),
@@ -179,20 +174,18 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `synthetic live to real final uses incoming snapshot on content conflict`() {
-        val live = reduce(
-            frame = AssistantMessage(
+        val live = seedAssistant(textAssistant(
                 id = "letta-msg-302",
-                contentRaw = JsonPrimitive("synthetic partial that should not survive"),
+                content = "synthetic partial that should not survive",
                 runId = "iroh-run-client-synthetic",
                 seqId = null,
-            ),
-        ).next
+            ))
 
         val output = reduce(
             prev = live,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "letta-msg-302",
-                contentRaw = JsonPrimitive("final"),
+                content = "final",
                 runId = "server-run-real",
                 seqId = null,
             ),
@@ -206,20 +199,18 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `synthetic duplicate seq still reconciles real run id`() {
-        val live = reduce(
-            frame = AssistantMessage(
+        val live = seedAssistant(textAssistant(
                 id = "letta-msg-303",
-                contentRaw = JsonPrimitive("Hello!"),
+                content = "Hello!",
                 runId = "iroh-run-client-synthetic",
                 seqId = 2,
-            ),
-        ).next
+            ))
 
         val output = reduce(
             prev = live,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "letta-msg-303",
-                contentRaw = JsonPrimitive("Hello!"),
+                content = "Hello!",
                 runId = "server-run-real",
                 seqId = 2,
             ),
@@ -239,20 +230,18 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
         // message.list reconcile snapshot the synthetic->real path was written
         // for. It must merge as a forward delta (append) rather than a snapshot
         // keep-longer, which would drop the earlier tokens.
-        val live = reduce(
-            frame = AssistantMessage(
+        val live = seedAssistant(textAssistant(
                 id = "letta-msg-700",
-                contentRaw = JsonPrimitive("Hello"),
+                content = "Hello",
                 runId = "iroh-run-client-synthetic",
                 seqId = 1,
-            ),
-        ).next
+            ))
 
         val output = reduce(
             prev = live,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "letta-msg-700",
-                contentRaw = JsonPrimitive(" world"),
+                content = " world",
                 runId = "run-real-app-server",
                 seqId = 2,
             ),
@@ -271,20 +260,18 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
         // The message.list reconcile final carries no seq id, so it must stay on
         // the snapshot-replacement path (keep the complete final) and NOT be
         // treated as a forward delta appended to the partial.
-        val live = reduce(
-            frame = AssistantMessage(
+        val live = seedAssistant(textAssistant(
                 id = "letta-msg-701",
-                contentRaw = JsonPrimitive("Hel"),
+                content = "Hel",
                 runId = "iroh-run-client-synthetic",
                 seqId = 5,
-            ),
-        ).next
+            ))
 
         val output = reduce(
             prev = live,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "letta-msg-701",
-                contentRaw = JsonPrimitive("Hello, world"),
+                content = "Hello, world",
                 runId = "run-real-app-server",
                 seqId = null,
             ),
@@ -298,20 +285,18 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `reconcile copy without run id does not duplicate live row with real run id`() {
-        val live = reduce(
-            frame = AssistantMessage(
+        val live = seedAssistant(textAssistant(
                 id = "letta-msg-166",
-                contentRaw = JsonPrimitive("Hey"),
+                content = "Hey",
                 runId = "run-real-app-server",
                 seqId = 3,
-            ),
-        ).next
+            ))
 
         val (mergedTimeline, changed) = live.mergeServerMessages(
             listOf(
-                AssistantMessage(
+                textAssistant(
                     id = "letta-msg-166",
-                    contentRaw = JsonPrimitive("Hey"),
+                    content = "Hey",
                     runId = null,
                     seqId = null,
                 )
@@ -327,20 +312,18 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `ui-msg final without exact alias preserves identical live row`() {
-        val live = reduce(
-            frame = AssistantMessage(
+        val live = seedAssistant(textAssistant(
                 id = "letta-msg-166",
-                contentRaw = JsonPrimitive("Hey"),
+                content = "Hey",
                 runId = "run-real-app-server",
                 seqId = 3,
-            ),
-        ).next
+            ))
 
         val (mergedTimeline, changed) = live.mergeServerMessages(
             listOf(
-                AssistantMessage(
+                textAssistant(
                     id = "ui-msg-55781",
-                    contentRaw = JsonPrimitive("Hey"),
+                    content = "Hey",
                     runId = null,
                     seqId = null,
                 )
@@ -354,20 +337,18 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `recent reconcile final assistant replaces live prefix row`() {
-        val live = reduce(
-            frame = AssistantMessage(
+        val live = seedAssistant(textAssistant(
                 id = "letta-msg-624",
-                contentRaw = JsonPrimitive("Let"),
+                content = "Let",
                 runId = "local-run-15",
                 seqId = 1,
-            ),
-        ).next
+            ))
 
         val (mergedTimeline, changed) = live.mergeServerMessages(
             listOf(
-                AssistantMessage(
+                textAssistant(
                     id = "letta-msg-640",
-                    contentRaw = JsonPrimitive("Let's find out — no duplicate here."),
+                    content = "Let's find out — no duplicate here.",
                     runId = null,
                     seqId = null,
                 )
@@ -384,21 +365,19 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
 
     @Test
     fun `recent reconcile real run replaces iroh synthetic live row`() {
-        val live = reduce(
-            frame = AssistantMessage(
+        val live = seedAssistant(textAssistant(
                 id = "letta-msg-301",
-                contentRaw = JsonPrimitive("Hello"),
+                content = "Hello",
                 runId = "iroh-run-client-synthetic",
                 seqId = 1,
                 logicalMessageId = "lm-301",
-            ),
-        ).next
+            ))
 
         val (mergedTimeline, changed) = live.mergeServerMessages(
             listOf(
-                AssistantMessage(
+                textAssistant(
                     id = "letta-msg-301",
-                    contentRaw = JsonPrimitive("Hello!"),
+                    content = "Hello!",
                     runId = "server-run-real",
                     seqId = 2,
                 )
@@ -427,26 +406,24 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
         // startsWith-based prefix replace. Both rows share the SAME real run id, so
         // the reconcile must collapse the snapshot into the draft row instead of
         // appending a second, near-identical row.
-        val streamedDraft = reduce(
-            frame = AssistantMessage(
+        val streamedDraft = seedAssistant(textAssistant(
                 // Last rotating backend id observed on the live stream.
                 id = "letta-msg-5021",
                 // Draft is missing the leading word ("Still") — first-word lag.
-                contentRaw = JsonPrimitive(" kicking. Did anything else break?"),
+                content = " kicking. Did anything else break?",
                 runId = "run-real-app-server",
                 otid = "iroh-assistant-turn-42",
                 seqId = 7,
-            ),
-        ).next
+            ))
 
         streamedDraft.events shouldHaveSize 1
 
         val (mergedTimeline, changed) = streamedDraft.mergeServerMessages(
             listOf(
-                AssistantMessage(
+                textAssistant(
                     // Reconcile mints its OWN id, distinct from the streamed one.
                     id = "letta-msg-final-99",
-                    contentRaw = JsonPrimitive("Still kicking. Did anything else break?"),
+                    content = "Still kicking. Did anything else break?",
                     runId = "run-real-app-server",
                     otid = null,
                     seqId = null,
@@ -467,9 +444,9 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
         val hydrated = TimelineHydrationReducer.reduce(
             conversationId = "conv-test",
             serverMessagesChronological = listOf(
-                AssistantMessage(
+                textAssistant(
                     id = "letta-msg-203",
-                    contentRaw = JsonPrimitive("old answer from a prior app server run"),
+                    content = "old answer from a prior app server run",
                     runId = "local-run-old",
                     seqId = 146,
                 )
@@ -481,9 +458,9 @@ class TimelineStreamReconciliationTest : TimelineStreamReducerFixture() {
 
         val output = reduce(
             prev = hydrated,
-            frame = AssistantMessage(
+            frame = textAssistant(
                 id = "letta-msg-203",
-                contentRaw = JsonPrimitive("hello from iro"),
+                content = "hello from iro",
                 runId = "local-run-new",
                 seqId = 1,
                 logicalMessageId = "lm-203-new",

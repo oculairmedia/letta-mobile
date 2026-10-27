@@ -235,6 +235,20 @@ abstract class TimelineStreamReducerFixture : com.letta.mobile.util.TelemetryRec
         Telemetry.chatHotPathDebugEnabled.set(false)
     }
 
+    protected fun textAssistant(
+        id: String,
+        content: String,
+        runId: String? = null,
+        seqId: Int? = null,
+        otid: String? = null,
+        logicalMessageId: String? = null,
+    ): AssistantMessage = AssistantMessage(
+        id = id, contentRaw = JsonPrimitive(content), runId = runId,
+        seqId = seqId, otid = otid, logicalMessageId = logicalMessageId,
+    )
+
+    protected fun seedAssistant(frame: AssistantMessage): Timeline = reduce(frame = frame).next
+
     protected fun reduce(
         prev: Timeline = timeline(),
         frame: com.letta.mobile.data.model.LettaMessage,
