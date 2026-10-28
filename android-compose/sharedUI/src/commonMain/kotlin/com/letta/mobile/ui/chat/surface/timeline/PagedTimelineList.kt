@@ -2,6 +2,7 @@ package com.letta.mobile.ui.chat.surface.timeline
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -41,6 +42,7 @@ import com.letta.mobile.sharedui.resources.timeline_history_error
 import com.letta.mobile.sharedui.resources.timeline_missing_target
 import com.letta.mobile.sharedui.resources.timeline_retry_history
 import com.letta.mobile.sharedui.resources.run_error_action_retry
+import com.letta.mobile.sharedui.resources.rows_dismiss
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.surface.timeline.rows.isUserRole
 import com.letta.mobile.ui.mascot.MascotLoading
@@ -300,8 +302,13 @@ private fun PagedRow(item: ChatRenderItem, older: ChatRenderItem?, scope: PagedR
         TimelineItemRow(item, scope.bindings)
         val failed = (item as? ChatRenderItem.Single)?.message?.takeIf { it.isSendFailed }
         failed?.clientMessageId?.let { identity ->
-            TextButton(onClick = { retryScope.launch { scope.params.presentation.retry(MessageId(identity)) } }) {
-                Text(stringResource(Res.string.run_error_action_retry))
+            Row {
+                TextButton(onClick = { retryScope.launch { scope.params.presentation.retry(MessageId(identity)) } }) {
+                    Text(stringResource(Res.string.run_error_action_retry))
+                }
+                TextButton(onClick = { retryScope.launch { scope.params.presentation.dismiss(MessageId(identity)) } }) {
+                    Text(stringResource(Res.string.rows_dismiss))
+                }
             }
         }
     }

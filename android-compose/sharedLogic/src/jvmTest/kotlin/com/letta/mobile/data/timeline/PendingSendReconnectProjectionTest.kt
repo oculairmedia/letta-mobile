@@ -46,6 +46,47 @@ import kotlin.test.fail
 /** The send queue, bridge, scoped writer, history adapter, reducer, pager and rendered row assembly. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PendingSendReconnectProjectionTest {
+    @Test fun dismissLiveFailureIsScopedToItsOwnConversationAndOtid() = runTest {
+        val f = Fixture(this)
+        val first = f.screen(FIRST)
+        val second = f.screen(SECOND)
+        f.sendQueued("original")
+        assertFalse(first.dismiss(MessageId("cm-test-1")), "in-flight sends cannot be dismissed")
+        f.dropAndReconnect()
+        f.failed(FIRST, "cm-extra", "keep this failure")
+        f.failed(SECOND, "cm-test-1", "same OTID in another conversation")
+        runCurrent()
+        assertEquals(2, first.live.value.filterIsInstance<ChatRenderItem.Single>().count { it.message.isSendFailed })
+        f.selected = SECOND
+        assertFalse(second.dismiss(MessageId("cm-extra")), "another conversation cannot dismiss this bubble")
+        assertTrue(first.dismiss(MessageId("cm-test-1")))
+        runCurrent()
+        assertEquals(listOf("cm-extra"), f.pending(FIRST).map { it.otid })
+        assertEquals(listOf("cm-test-1"), f.pending(SECOND).map { it.otid })
+        assertEquals(listOf("msg-cm-extra"), first.live.value.map { it.key })
+        assertFalse(first.dismiss(MessageId("cm-test-1")), "a second click is harmless")
+        first.close()
+        second.close()
+    }
+
+    @Test fun dismissPagedFailureRemovesOnlyItsPendingRow() = runTest {
+        val f = Fixture(this)
+        val screen = f.screen(FIRST)
+        f.sendQueued("dismiss from history")
+        f.dropAndReconnect()
+        f.history[FIRST] = listOf(f.reply("newer", 30))
+        f.reload(FIRST)
+        val rows = f.render(screen)
+        assertEquals(2, rows.size)
+        assertTrue(rows.first().containsMessageId("newer"))
+        assertEquals("msg-cm-test-1", rows.last().key)
+        assertTrue(screen.live.value.none { it.key == "msg-cm-test-1" }, "failure must be in the paged path")
+        assertTrue(screen.dismiss(MessageId("cm-test-1")))
+        assertEquals(emptyList(), f.pending(FIRST))
+        assertTrue(f.render(screen).none { it.key == "msg-cm-test-1" })
+        screen.close()
+    }
+
     @Test fun retryReachesCapturedSenderThroughAnUnrecognisedWrapperWriter() = runTest {
         // ChatSendCoordinator binds before the first conversation is acquired or sent to.
         val f = Fixture(this)
@@ -226,6 +267,11 @@ class PendingSendReconnectProjectionTest {
             assertIs<RecentMessagesReconcileOutcome.Applied>(writer.reconcileRecentMessages(
                 "agent", conversation, "redial-recovery", forceRefresh = true, connectionGeneration = 2,
             ))
+        }
+
+        suspend fun failed(conversation: String, otid: String, content: String) {
+            writer.appendExternalTransportLocal("agent", conversation, content, otid, emptyList())
+            writer.markExternalTransportLocalFailed("agent", conversation, otid)
         }
 
         suspend fun pending(conversation: String) = CanonicalPendingLocalStore(store).load(scope(conversation))

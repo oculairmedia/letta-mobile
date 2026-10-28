@@ -135,6 +135,12 @@ class CanonicalTimelinePresentation private constructor(
         return coordinator.retryPending(owner, identity)
     }
 
+    /** Explicitly discard only this conversation's failed prompt. */
+    suspend fun dismiss(identity: MessageId): Boolean {
+        check(job.isActive) { "Presentation closed" }
+        return coordinator.dismissPending(owner, identity)
+    }
+
     // Bounded by pending storage: pruned to the records still awaiting their durable echo. Each
     // otid remembers the turn whose overlay echoed it.
     private val echoedOtids = mutableMapOf<String, TimelineLiveFence>()

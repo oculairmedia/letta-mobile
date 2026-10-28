@@ -46,6 +46,11 @@ class CanonicalTimelineCoordinator(
         return result.isSuccess
     }
 
+    internal suspend fun dismissPending(owner: Owner, identity: MessageId): Boolean = mutex.withLock {
+        check(owners[owner.selection.scope] === owner) { "Stale canonical owner" }
+        owner.session.discardFailed(identity)
+    }
+
     /** Runtime generation retirement, unlike viewport disposal, invalidates every owner. */
     suspend fun revoke() = mutex.withLock {
         revoked = true
@@ -308,6 +313,15 @@ class CanonicalTimelineSession(
         pendingStore.mark(scope, otid, delivery)
         if (delivery == CanonicalPendingLocalStore.Delivery.Sending) recoveryCandidates -= MessageId(otid)
         mutablePending.value = pendingStore.load(scope)
+    }
+
+    internal suspend fun discardFailed(identity: MessageId): Boolean = pendingMutex.withLock {
+        val discarded = pendingStore.discardFailed(scope, identity.value)
+        if (discarded) {
+            recoveryCandidates -= identity
+            mutablePending.value = pendingStore.load(scope)
+        }
+        discarded
     }
 
     private suspend fun refreshPending(historyLoaded: Boolean = false) = pendingMutex.withLock {
