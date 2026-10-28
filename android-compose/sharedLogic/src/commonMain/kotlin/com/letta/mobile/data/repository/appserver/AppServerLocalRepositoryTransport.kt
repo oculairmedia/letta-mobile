@@ -57,14 +57,13 @@ class DefaultAppServerLocalRepositoryTransport(
         return response.agents ?: error("Bundled App Server agent listing returned no agents")
     }
 
-    override suspend fun getAgent(agentId: AgentId): JsonObject =
-        adminRpc(
-            LocalAdminCall(
-                operation = "agent-get",
-                method = "agent.get",
-                params = buildJsonObject { put("agent_id", agentId.value) },
-            ),
-        ) as? JsonObject ?: error("Bundled App Server agent detail returned no agent")
+    override suspend fun getAgent(agentId: AgentId): JsonObject {
+        val response = clientProvider().agentRetrieve(
+            AppServerCommand.AgentRetrieve(requestId = requestId("agent-get"), agentId = agentId.value),
+        )
+        check(response.success) { response.error ?: "Bundled App Server agent detail failed" }
+        return response.agent ?: error("Bundled App Server agent detail returned no agent")
+    }
 
     override suspend fun getContext(agentId: String, conversationId: String?): JsonObject? =
         getContextBreakdown(ContextBreakdownRequest(AgentId(agentId), conversationId?.let(::ConversationId), reportedTotal = null))

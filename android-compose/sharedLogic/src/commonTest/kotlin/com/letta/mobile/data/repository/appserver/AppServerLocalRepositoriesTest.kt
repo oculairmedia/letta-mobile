@@ -100,21 +100,33 @@ class AppServerLocalRepositoriesTest {
     }
 
     @Test
-    fun `fresh detail uses agent get without refreshing the roster`() = runTest {
+    fun `fresh detail uses native agent retrieve without refreshing the roster`() = runTest {
         val agent = Agent(id = AgentId("agent-1"), name = "Detail", system = "Full system")
-        val client = FakeClient {
-            AppServerInboundFrame.AdminRpcResponse(
-                requestId = "agent-get", success = true,
-                result = AppServerProtocol.json.encodeToJsonElement(Agent.serializer(), agent),
-            )
+        val client = FakeClient { error("Unexpected admin RPC") }.apply {
+            agentDetail = AppServerProtocol.json.encodeToJsonElement(Agent.serializer(), agent).jsonObject
         }
         val repository = AppServerAgentRepository(DefaultAppServerLocalRepositoryTransport({ client }) { it })
 
         assertEquals(agent, repository.getFreshAgent(agent.id, force = true))
-        val request = client.adminRpcCalls.single()
-        assertEquals("agent.get", request.method)
-        assertEquals("agent-1", request.params?.get("agent_id")?.jsonPrimitive?.content)
+        val request = client.agentRetrieveCalls.single()
+        assertEquals("agent-1", request.agentId)
+        assertEquals(emptyList(), client.adminRpcCalls)
         assertEquals(agent, repository.getCachedAgent(agent.id))
+    }
+
+    @Test
+    fun `native detail failure preserves cache and propagates instead of returning it`() = runTest {
+        val agent = Agent(id = AgentId("agent-1"), name = "Detail", system = "Full system")
+        val client = FakeClient { error("Unexpected admin RPC") }.apply {
+            agentDetail = AppServerProtocol.json.encodeToJsonElement(Agent.serializer(), agent).jsonObject
+        }
+        val repository = AppServerAgentRepository(DefaultAppServerLocalRepositoryTransport({ client }) { it })
+        repository.getFreshAgent(agent.id, force = true)
+        client.agentDetail = null
+
+        assertFailsWith<IllegalStateException> { repository.getFreshAgent(agent.id, force = true) }
+        assertEquals(agent, repository.getCachedAgent(agent.id))
+        assertEquals(2, client.agentRetrieveCalls.size)
     }
 
     @Test
@@ -284,6 +296,18 @@ class AppServerLocalRepositoriesTest {
     ) : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = emptyFlow()
         val adminRpcCalls = mutableListOf<AppServerCommand.AdminRpc>()
+        val agentRetrieveCalls = mutableListOf<AppServerCommand.AgentRetrieve>()
+        var agentDetail: JsonObject? = null
+
+        override suspend fun agentRetrieve(command: AppServerCommand.AgentRetrieve): AppServerInboundFrame.AgentRetrieveResponse {
+            agentRetrieveCalls += command
+            return AppServerInboundFrame.AgentRetrieveResponse(
+                requestId = command.requestId,
+                success = agentDetail != null,
+                agent = agentDetail,
+                error = "Agent not found".takeIf { agentDetail == null },
+            )
+        }
 
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) = unsupported()
         override suspend fun input(command: AppServerCommand.Input): Unit = unsupported()
