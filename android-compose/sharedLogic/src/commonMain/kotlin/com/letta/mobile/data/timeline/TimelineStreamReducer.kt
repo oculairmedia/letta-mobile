@@ -615,11 +615,12 @@ private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
             val existingRunId = existing.runId?.takeIf { it.isNotBlank() }
             if (existingRunId != null && !existingRunId.isCompatibleAssistantPrefixRunId(incomingRunId)) return@firstOrNull false
 
-            val existingText = existing.content.trim()
-            val isReplayPrefix = existingText.isNotBlank() &&
-                (incomingText.isBlank() ||
-                    (existingText.length > incomingText.length && existingText.startsWith(incomingText)))
-            if (!isReplayPrefix) return@firstOrNull false
+            // A stamped text frame belongs to its logical message, even when its
+            // opening text happens to prefix an earlier reply in the same run.
+            // Keep the prefix replay guard for unstamped frames, whose rotating
+            // server ids do not identify separate messages by themselves.
+            if (existing.hasDifferentStampedLogicalId(incoming)) return@firstOrNull false
+            if (!existing.content.trim().containsAssistantReplayPrefix(incomingText)) return@firstOrNull false
 
             // letta-mobile-ujz3x: preserve the one-character first token of a
             // genuine post-tool assistant continuation ("Y" -> "Yes ...") even
@@ -630,6 +631,13 @@ private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
             true
         }
 }
+
+private fun TimelineEvent.Confirmed.hasDifferentStampedLogicalId(incoming: TimelineEvent.Confirmed): Boolean =
+    textSeq > 0 && incoming.textSeq > 0 && logicalId != incoming.logicalId
+
+private fun String.containsAssistantReplayPrefix(incomingText: String): Boolean =
+    isNotBlank() && (incomingText.isBlank() ||
+        (length > incomingText.length && startsWith(incomingText)))
 
 /**
  * When a cursor re-emit or hydration backfill
