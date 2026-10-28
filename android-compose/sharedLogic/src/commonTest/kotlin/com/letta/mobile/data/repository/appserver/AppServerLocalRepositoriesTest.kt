@@ -115,6 +115,28 @@ class AppServerLocalRepositoriesTest {
     }
 
     @Test
+    fun `fresh detail does not wait for a slow roster refresh`() = runTest {
+        val agent = Agent(id = AgentId("agent-1"), name = "Ada")
+        val release = CompletableDeferred<Unit>()
+        val transport = FakeTransport(
+            agents = JsonArray(listOf(AppServerProtocol.json.encodeToJsonElement(Agent.serializer(), agent))),
+            agentRelease = release,
+        )
+        val repository = AppServerAgentRepository(transport)
+        val roster = async { repository.refreshAgents() }
+        runCurrent()
+        assertEquals(1, transport.agentListCalls)
+
+        val detail = async { repository.getFreshAgent(agent.id, force = true) }
+        runCurrent()
+
+        assertEquals(true, detail.isCompleted, "detail read must not queue behind the roster mutex")
+        assertEquals(agent, detail.await())
+        release.complete(Unit)
+        roster.await()
+    }
+
+    @Test
     fun `native detail failure preserves cache and propagates instead of returning it`() = runTest {
         val agent = Agent(id = AgentId("agent-1"), name = "Detail", system = "Full system")
         val client = FakeClient { error("Unexpected admin RPC") }.apply {

@@ -212,6 +212,23 @@ class AgentEditorFreshLoadTest {
         assertEquals(1, remote.getCalls.size)
     }
 
+    @Test
+    fun detailSurvivesARosterRefreshThatOmitsTheAgent() = runTest {
+        val remote = AgentRepositoryTestSource()
+        val repository = repository(remote)
+        val detailGate = CompletableDeferred<Unit>()
+        val fresh = agent(ID, "Fresh detail")
+        remote.read = { detailGate.await(); fresh }
+        val detail = async { repository.getFreshAgent(ID, force = true) }
+        runCurrent()
+        remote.roster = emptyList()
+        repository.refreshAgents()
+        detailGate.complete(Unit)
+
+        assertEquals(fresh, detail.await())
+        assertEquals(emptyList(), repository.agents.value.map { it.id })
+    }
+
     private fun TestScope.editor(repository: CachedAgentRepository) = AgentEditorController(
         RepositoryAgentEditorBackend(AgentEditorRepositories(repository, tools = null, models = null)),
         backgroundScope,
