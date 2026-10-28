@@ -156,6 +156,7 @@ class DesktopChatControllerConversationPushTest {
         runCurrent()
 
         assertEquals("conv-mobile", controller.state.value.selectedConversationId)
+        assertEquals("Agent 0", controller.state.value.conversations.single().agentName)
         assertEquals(DesktopChatConnectionState.Live, controller.state.value.connectionState)
         controller.close()
     }

@@ -54,6 +54,7 @@ class AgentConversationFleet(
     private val mutex = Mutex()
     private val permits = Semaphore(paging.parallelism)
     private var listed: Map<AgentId, AgentListing> = emptyMap()
+    private var lastRoster: List<Agent> = emptyList()
 
     /** The merged list as last read. */
     val conversations: List<Conversation> get() = listed.merged()
@@ -70,14 +71,15 @@ class AgentConversationFleet(
         }
         // An agent whose read failed keeps what it last listed, so one bad read does not empty its chats.
         listed = read.mapValues { (agent, listing) -> if (listing.failure != null) listed[agent] ?: listing else listing }
+        lastRoster = agents.toList()
         listed.merged()
     }
 
     /**
      * Shared push/reconciliation policy. Dirty identities read only their owners; when ownership
      * cannot be read on this backend, [roster] supplies a full reconciliation. Null [dirty] is an
-     * explicit initial/reconnect read. The result carries rows and, only for a reconciliation,
-     * the roster that named them, so hosts can retain their existing labels on scoped updates.
+     * explicit initial/reconnect read. The result carries rows and the last reconciled roster,
+     * including agents with no earlier conversations, so scoped updates retain their labels.
      */
     suspend fun refreshForInvalidations(
         dirty: Map<ConversationId, AgentId?>?,
@@ -85,7 +87,7 @@ class AgentConversationFleet(
         resolve: suspend (ConversationId) -> Conversation? = { null },
     ): Pair<List<Conversation>, List<Agent>> {
         val changed = dirty?.let { refreshChanged(it, resolve) }
-        if (changed != null) return changed to emptyList()
+        if (changed != null) return changed to lastRoster
         val agents = roster()
         return refresh(agents) to agents
     }
