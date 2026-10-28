@@ -306,8 +306,10 @@ private fun PagedRow(item: ChatRenderItem, older: ChatRenderItem?, scope: PagedR
 /** The same failed-prompt controls for the full timeline and docked overlay. */
 @Composable
 internal fun PendingPromptActions(item: ChatRenderItem, presentation: CanonicalTimelinePresentation) {
-    val identity = (item as? ChatRenderItem.Single)?.message?.takeIf { it.isSendFailed }?.clientMessageId ?: return
+    // Retry changes the row to Sending before its sender finishes. Keep the action's scope
+    // mounted through that state change so hiding the buttons cannot cancel the send.
     val actions = rememberCoroutineScope()
+    val identity = (item as? ChatRenderItem.Single)?.message?.takeIf { it.isSendFailed }?.clientMessageId ?: return
     Row {
         TextButton(onClick = { actions.launch { presentation.retry(MessageId(identity)) } }) {
             Text(stringResource(Res.string.run_error_action_retry))

@@ -95,7 +95,7 @@ class PendingSendReconnectProjectionTest {
         val screen = f.screen(FIRST)
         assertTrue(screen.retry(MessageId("cm-test-1")), "Retry binding must cross any writer wrapper")
         runCurrent()
-        assertEquals(listOf(FIRST to "cm-test-1", FIRST to "cm-test-1"), f.channel.accepted)
+        assertEquals(listOf<Pair<String, String?>>(FIRST to "cm-test-1", FIRST to "cm-test-1"), f.channel.accepted.toList())
         assertEquals(1, f.minted)
         screen.close()
     }

@@ -31,6 +31,7 @@ import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.DockedReplyCard
 import com.letta.mobile.ui.chat.surface.DockedReplyParams
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -80,7 +81,13 @@ class PendingTimelineActionsUiTest {
         val maintenance = IndexedCanonicalTimelineMaintenance(coordinator, ui, { _, _, _ -> }, { throw it })
         val writer = CanonicalExternalTransportWriter(coordinator, { _, _ -> scope }, maintenance)
         val retried = CopyOnWriteArrayList<Pair<String, String>>()
-        writer.bindPendingRetry(AgentId("agent")) { conversation, record -> retried += conversation.value to record.otid }
+        val retryStarted = CompletableDeferred<Unit>()
+        val finishRetry = CompletableDeferred<Unit>()
+        writer.bindPendingRetry(AgentId("agent")) { conversation, record ->
+            retryStarted.complete(Unit)
+            finishRetry.await()
+            retried += conversation.value to record.otid
+        }
         val record = CanonicalPendingLocalStore.Record("own-otid", "Prompt to dismiss", emptyList(), "2026-10-28T12:00:00Z")
         val presentation = runBlocking {
             coordinator.appendPending(owner, record)
@@ -114,12 +121,22 @@ class PendingTimelineActionsUiTest {
                 onAllNodesWithText("Retry").fetchSemanticsNodes().size == 1
             }
             awaitRetry()
+            // The live bubble can draw before Paging has reported resident history. Wait for
+            // the intended path so this test cannot pass by clicking its transient overlay twin.
+            waitUntil(timeoutMillis = 10_000) {
+                main.drain()
+                presentation.live.value.any { it.key == "msg-own-otid" } == !inHistory
+            }
+            awaitRetry()
             onNodeWithText("Dismiss").assertExists()
             assertEquals(!inHistory, presentation.live.value.any { it.key == "msg-own-otid" }, "exercise the intended row path")
             onNodeWithText("Retry").performClick()
+            waitUntil(timeoutMillis = 10_000) { main.drain(); retryStarted.isCompleted }
+            waitUntil(timeoutMillis = 10_000) { main.drain(); onAllNodesWithText("Retry").fetchSemanticsNodes().isEmpty() }
+            assertEquals(CanonicalPendingLocalStore.Delivery.Sending, owner.session.pending.value.single().delivery)
+            finishRetry.complete(Unit)
             waitUntil(timeoutMillis = 10_000) { main.drain(); retried.isNotEmpty() }
             assertEquals(listOf(scope.conversationId to record.otid), retried.toList())
-            assertEquals(CanonicalPendingLocalStore.Delivery.Sending, owner.session.pending.value.single().delivery)
             runBlocking { coordinator.markPending(owner, record.otid, CanonicalPendingLocalStore.Delivery.Failed) }
             awaitRetry()
             onNodeWithText("Dismiss").performClick()
