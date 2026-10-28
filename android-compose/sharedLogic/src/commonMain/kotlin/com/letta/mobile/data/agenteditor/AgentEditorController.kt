@@ -150,39 +150,20 @@ class AgentEditorController(
     private fun load() {
         val agentId = _state.value.agentId ?: return
         loadJob?.cancel()
-        showCached(AgentId(agentId))
+        _state.update { it.withCachedAgent(backend.agents.value) }
         loadJob = scope.launch {
             try {
-                showLoaded(loadAgent(agentId))
+                val agent = loadAgent(agentId)
+                _state.update { it.withFreshAgent(agent) }
             } catch (e: CancellationException) {
                 if (currentCoroutineContext().isActive) {
-                    showLoadFailure(e)
+                    _state.update { it.withLoadFailure(e) }
                 }
                 throw e
             } catch (e: Exception) {
-                showLoadFailure(e)
+                _state.update { it.withLoadFailure(e) }
             }
         }
-    }
-
-    private fun showCached(agentId: AgentId) {
-        val cached = _state.value.agent ?: backend.agents.value.firstOrNull { it.id == agentId }
-        _state.update {
-            val form = if (it.agent == null && cached != null) AgentEditorParams.formOf(cached) else it.form
-            it.copy(loading = true, loadError = null, agent = cached, form = form, original = null)
-        }
-    }
-
-    private fun showLoaded(agent: Agent) {
-        val form = AgentEditorParams.formOf(agent)
-        _state.update {
-            val displayed = it.agent?.let(AgentEditorParams::formOf) ?: it.form
-            it.copy(loading = false, agent = agent, form = AgentEditorParams.rebase(displayed, it.form, form), original = form)
-        }
-    }
-
-    private fun showLoadFailure(failure: Exception) {
-        _state.update { it.copy(loading = false, loadError = failure.message ?: "Could not load the agent") }
     }
 
     /** Runs [block], reporting a failure as the page's error in [fallback]'s words when it has none. */
@@ -230,3 +211,18 @@ class AgentEditorController(
         const val LOAD_TIMED_OUT = "The agent did not load. Check the connection and try again."
     }
 }
+
+private fun AgentEditorState.withCachedAgent(cachedAgents: List<Agent>): AgentEditorState {
+    val cached = agent ?: cachedAgents.firstOrNull { it.id.value == agentId }
+    val displayed = if (agent == null && cached != null) AgentEditorParams.formOf(cached) else form
+    return copy(loading = true, loadError = null, agent = cached, form = displayed, original = null)
+}
+
+private fun AgentEditorState.withFreshAgent(loaded: Agent): AgentEditorState {
+    val fresh = AgentEditorParams.formOf(loaded)
+    val displayed = agent?.let(AgentEditorParams::formOf) ?: form
+    return copy(loading = false, agent = loaded, form = AgentEditorParams.rebase(displayed, form, fresh), original = fresh)
+}
+
+private fun AgentEditorState.withLoadFailure(failure: Exception): AgentEditorState =
+    copy(loading = false, loadError = failure.message ?: "Could not load the agent")
