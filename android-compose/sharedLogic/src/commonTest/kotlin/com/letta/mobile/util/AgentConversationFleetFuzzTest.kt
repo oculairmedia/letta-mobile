@@ -86,6 +86,16 @@ class AgentConversationFleetFuzzTest {
         ctx.check(condition = !fleet.hasMore) {
             "hasMore still true after budget=$maxLoadMore fetches=${backend.totalFetches}"
         }
+        assertFleetOutput(ctx, listed, visibleAgents, store, backend)
+    }
+
+    private fun assertFleetOutput(
+        ctx: FuzzScenarioContext,
+        listed: List<Conversation>,
+        visibleAgents: List<Agent>,
+        store: Map<AgentId, List<Conversation>>,
+        backend: PagingBackend,
+    ) {
         val listedIds = listed.map { it.id }
         ctx.check(condition = listedIds.size == listedIds.distinct().size) {
             "duplicate conversation ids in fleet output: ${listedIds.groupingBy { it }.eachCount().filter { it.value > 1 }}"
