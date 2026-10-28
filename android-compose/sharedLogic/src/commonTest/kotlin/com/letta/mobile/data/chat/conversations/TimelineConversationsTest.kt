@@ -107,6 +107,24 @@ class TimelineConversationsTest {
     }
 
     @Test
+    fun hiddenOnlyRosterArrivingAfterStartupSettlesToLoadedEmpty() = runTest {
+        val owner = TimelineConversations(
+            backgroundScope,
+            IrohHost().chatGateway(backgroundScope),
+            emptyList(),
+        )
+        runCurrent()
+        assertEquals(false, owner.state.value.loaded)
+
+        owner.roster = listOf(Agent(id = nora, name = "Nora", hidden = true))
+        runCurrent()
+
+        assertTrue(owner.state.value.loaded)
+        assertTrue(owner.state.value.conversations.isEmpty())
+        assertNull(owner.state.value.error)
+    }
+
+    @Test
     fun changingVisibilityOfAnExistingAgentReloadsMembership() = runTest {
         val host = IrohHost(HostConversation("c1", "agent-1"), HostConversation("c2", "agent-2"))
         val owner = owner(host)

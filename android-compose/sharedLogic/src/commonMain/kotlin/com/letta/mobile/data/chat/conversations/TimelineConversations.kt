@@ -78,12 +78,13 @@ class TimelineConversations(
     /** The agents whose conversations the list shows (and whose names title the chats); new agents list again. */
     var roster: List<Agent> = roster
         set(agents) {
-            // Names and roster ordering enrich the existing rows; only visible membership changes
-            // require another fleet read. Include visibility so hiding an existing agent also reloads.
+            // Reordering and names do not require a fleet read. The first nonempty roster must
+            // settle loading even when every agent is hidden; visibility changes reload membership.
+            val initialRosterArrived = field.isEmpty() && agents.isNotEmpty()
             val changed = agents.visibleInLists().mapTo(mutableSetOf()) { it.id } !=
                 field.visibleInLists().mapTo(mutableSetOf()) { it.id }
             field = agents
-            if (changed) scope.launch { refresh() }
+            if (changed || initialRosterArrived) scope.launch { refresh() }
         }
 
     /** Each agent's conversations, read through: the web's list has no "load more". */
