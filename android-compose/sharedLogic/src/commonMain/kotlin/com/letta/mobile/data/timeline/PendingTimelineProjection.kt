@@ -5,6 +5,7 @@ import androidx.paging.TerminalSeparatorType
 import androidx.paging.flatMap
 import androidx.paging.insertSeparators
 import androidx.paging.map
+import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.parseTimestampEpochMillis
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 
@@ -28,4 +29,23 @@ internal fun PagingData<CanonicalTimelinePresentation.Row>.insertPending(
                 row.otid != newer?.single()?.otid && row.otid != older?.single()?.otid
         }.takeIf { it.isNotEmpty() }
     }.flatMap { it }
+}
+
+/** Position only local records by send time; the stream's established row order is authoritative. */
+internal fun positionPendingInLive(active: List<ChatRenderItem>, pending: List<ChatRenderItem>): List<ChatRenderItem> {
+    if (pending.isEmpty()) return active
+    val ordered = pending.sortedByDescending { parseTimestampEpochMillis(it.boundaryTimestamp) ?: 0L }
+    return buildList {
+        var next = 0
+        active.forEach { item ->
+            // A stream without a usable clock remains ahead of older local records. Never sort
+            // active rows together: even valid server dates can regress during a turn.
+            val boundary = parseTimestampEpochMillis(item.boundaryTimestamp) ?: Long.MAX_VALUE
+            while (next < ordered.size && (parseTimestampEpochMillis(ordered[next].boundaryTimestamp) ?: 0L) > boundary) {
+                add(ordered[next++])
+            }
+            add(item)
+        }
+        addAll(ordered.drop(next))
+    }
 }

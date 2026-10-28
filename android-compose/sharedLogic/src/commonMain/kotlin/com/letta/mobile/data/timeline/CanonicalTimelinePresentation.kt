@@ -204,7 +204,7 @@ class CanonicalTimelinePresentation private constructor(
             mode = ChatDisplayMode.Interactive,
             activeAgentId = owner.selection.scope.agentId,
         ).renderItems
-        return (active + optimistic.asReversed()).sortedByDescending { parseTimestampEpochMillis(it.boundaryTimestamp) ?: 0L }
+        return positionPendingInLive(active, optimistic.asReversed())
     }
 
     private fun filterUnsettledEvents(
