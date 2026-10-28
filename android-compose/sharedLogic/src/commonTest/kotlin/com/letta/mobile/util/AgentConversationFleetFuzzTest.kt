@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.visibleInLists
 import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
  * Seeded property tests for [AgentConversationFleet] against fixture-derived expectations.
@@ -32,9 +33,11 @@ class AgentConversationFleetFuzzTest {
                 runScenario(FleetFuzzScenario(seed, scenario, scenarioRandom(seed, scenario)))
             }
         }
-        check(totalCases == FuzzCorpus.paginationSeeds.size * FuzzCorpus.SCENARIOS_PER_SEED) {
-            "expected ${FuzzCorpus.paginationSeeds.size * FuzzCorpus.SCENARIOS_PER_SEED} cases, got $totalCases"
-        }
+        assertEquals(
+            FuzzCorpus.paginationSeeds.size * FuzzCorpus.SCENARIOS_PER_SEED,
+            totalCases,
+            "Every generated fleet scenario must run",
+        )
     }
 
     private suspend fun runScenario(scenario: FleetFuzzScenario) {
