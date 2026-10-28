@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -169,12 +170,15 @@ class AgentEditorFreshLoadTest {
         val repository = repository(remote)
         val gate = CompletableDeferred<Unit>()
         remote.read = { gate.await(); agent(ID, "Older detail").copy(system = "Detail system") }
+        val ordinary = async { repository.getAgent(ID).toList() }
+        runCurrent()
         val detail = async { repository.getFreshAgent(ID, force = true) }
         runCurrent()
         repository.refreshAgents()
         gate.complete(Unit)
 
         assertEquals("Detail system", detail.await().system)
+        assertEquals(listOf(agent(ID)), ordinary.await())
         assertEquals("Agent", repository.getCachedAgent(ID)?.name)
         assertEquals(1, remote.getCalls.size)
     }
