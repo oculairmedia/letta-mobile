@@ -1,6 +1,7 @@
 package com.letta.mobile.channel
 
 import com.letta.mobile.util.textOrNull
+import com.letta.mobile.util.numberOrNull
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -110,7 +111,7 @@ class ChatPushAlarmSchedulerTest {
         val events = Telemetry.snapshot()
         val event = events.firstOrNull { it.tag == "ChatPushAlarm" && it.name == "scheduled" }
         assertNotNull(event)
-        assertEquals(15L, event!!.attrs["intervalMinutes"]?.textOrNull)
+        assertEquals(15L, event!!.attrs["intervalMinutes"]?.numberOrNull)
     }
 
     @Test
