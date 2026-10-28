@@ -6,6 +6,11 @@ import com.letta.mobile.data.chat.runtime.MapSettingsStore
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.transport.appserver.AppServerChannel
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -22,6 +27,30 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimelineConversationsIrohTest {
+    @Test
+    fun hostConversationPushReachesTheWebOwnerAndListsOnlyItsAgent() = runTest {
+        val host = IrohHost(HostConversation("c1", "agent-1", "Plans"), HostConversation("c2", "agent-2", "Other"))
+        val owner = owner(host)
+        runCurrent()
+        owner.selectConversation(ConversationId("c2"))
+        owner.stageComposerText("keep draft")
+        val drafts = owner.state.value.drafts
+        host.calls.clear()
+        val raw = buildJsonObject {
+            put("type", "conversation_updated")
+            put("id", "push-c1")
+            put("ts", "2026-10-28T00:00:00Z")
+            put("conversation_id", "c1")
+            put("agent_id", "agent-1")
+        }
+        host.events.emit(AppServerReceivedFrame(AppServerChannel.Control, AppServerInboundFrame.Unknown(raw), raw))
+        runCurrent()
+        assertEquals(listOf("conversation.list"), host.calls.map { it.first })
+        assertEquals(listOf("agent-1"), host.calls.map { it.second.text("agent_id") })
+        assertEquals(ConversationId("c2"), owner.selectedConversation)
+        assertEquals(drafts, owner.state.value.drafts)
+    }
+
     @Test
     fun theListLoadsOverAdminRpcAndNoNativeCommandIsSent() = runTest {
         val host = IrohHost(HostConversation("c1", "agent-1", "Plans"), HostConversation("c2", "agent-2", "Ada's"))

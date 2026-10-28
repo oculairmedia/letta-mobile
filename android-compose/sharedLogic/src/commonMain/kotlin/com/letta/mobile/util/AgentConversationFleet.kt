@@ -73,6 +73,51 @@ class AgentConversationFleet(
         listed.merged()
     }
 
+    /**
+     * Re-reads only dirty conversations' owning agents, retaining other agents and loaded tails.
+     * A missing owner or an unsupported targeted read returns null so the caller can reconcile
+     * its roster. Ordinary failures retain cached rows and never widen the read to the fleet.
+     */
+    suspend fun refreshChanged(
+        dirty: Map<ConversationId, AgentId?>,
+        resolve: suspend (ConversationId) -> Conversation? = { null },
+    ): List<Conversation>? = mutex.withLock {
+        val owners = mutableSetOf<AgentId>()
+        for ((conversation, agent) in dirty) {
+            val owner = agent ?: listed.entries.firstOrNull { (_, listing) -> listing.rows.any { it.id == conversation } }?.key
+                ?: try {
+                    resolve(conversation)?.agentId
+                } catch (_: UnsupportedOperationException) {
+                    null
+                }
+            owners += owner ?: return@withLock null
+        }
+        val read = readAll(owners.associateWith { AgentListing() }, paging.eagerPagesPerAgent)
+        if (read.values.any { it.failure is UnsupportedOperationException }) return@withLock null
+        if (read.isNotEmpty() && read.values.all { it.failure != null }) throw read.values.first().failure ?: IllegalStateException(LIST_FAILED)
+        listed = listed + read.mapValues { (agent, fresh) ->
+            val previous = listed[agent] ?: AgentListing()
+            when {
+                fresh.failure != null -> previous
+                fresh.cursor == null -> fresh
+                else -> previous.copy(
+                    rows = fresh.rows + previous.rows.filterNot { old -> fresh.rows.any { it.id == old.id } },
+                    cursor = if (previous.read) previous.cursor else fresh.cursor,
+                    read = true,
+                    failure = null,
+                )
+            }
+        }
+        listed.merged()
+    }
+
+    /** Keeps a targeted row refetch in the same cache used by subsequent agent reads and paging. */
+    internal suspend fun record(conversation: Conversation) = mutex.withLock {
+        val previous = listed[conversation.agentId] ?: AgentListing()
+        val rows = listOf(conversation).visibleConversationsInLists() + previous.rows.filterNot { it.id == conversation.id }
+        listed = listed + (conversation.agentId to previous.copy(rows = rows))
+    }
+
     /** Reads the next page of every agent that has one; the list keeps what it had. */
     suspend fun loadMore(): List<Conversation> = mutex.withLock {
         val pending = listed.filterValues { it.cursor != null }

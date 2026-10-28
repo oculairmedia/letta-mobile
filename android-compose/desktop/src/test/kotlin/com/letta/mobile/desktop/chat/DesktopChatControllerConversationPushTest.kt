@@ -1,5 +1,9 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.runtime.AgentConversationPage
+import com.letta.mobile.data.chat.runtime.ConnectionStatusGateway
+import com.letta.mobile.data.transport.ChannelTransportState
+import kotlinx.coroutines.flow.MutableStateFlow
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
@@ -43,6 +47,22 @@ class DesktopChatControllerConversationPushTest {
                 )
             }
         }
+    }
+
+    private class CountingGateway : FakeDesktopChatGateway(), ConnectionStatusGateway {
+        override val connectionState = MutableStateFlow<ChannelTransportState>(
+            ChannelTransportState.Connected("server", "session", "device"),
+        )
+        var rows = listOf(
+            Conversation(ConversationId("target"), AgentId("agent-0"), summary = "Before"),
+            Conversation(ConversationId("unchanged"), AgentId("agent-1"), summary = "Other agent"),
+        )
+        val requests = mutableListOf<AgentId>()
+        override suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> {
+            requests += page.agent
+            return rows.filter { it.agentId == page.agent }
+        }
+        override suspend fun getConversation(conversationId: String): Conversation = rows.first { it.id.value == conversationId }
     }
 
     private class PushingTransport : NoOpChannelTransport() {
@@ -154,6 +174,62 @@ class DesktopChatControllerConversationPushTest {
         runCurrent()
 
         assertEquals(callsAtClose, gateway.listCalls)
+    }
+
+    @Test
+    fun onePushRefreshesOnlyItsAgentAndPreservesSelectionAndDraft() = runTest {
+        val gateway = CountingGateway()
+        val transport = PushingTransport()
+        var rosterCalls = 0
+        val controller = DesktopChatController(
+            bootstrapState = defaultDesktopBootstrapState(), scope = backgroundScope,
+            rosterProvider = {
+                rosterCalls++
+                listOf(Agent(AgentId("agent-0"), name = "Zero"), Agent(AgentId("agent-1"), name = "One"))
+            },
+            gatewayFactory = { gateway }, conversationChanges = transport,
+        )
+        controller.start()
+        runCurrent()
+        controller.selectConversation("unchanged")
+        runCurrent()
+        controller.updateComposerText("keep draft")
+        val generation = controller.state.value.selectionGeneration
+        val rosterBefore = rosterCalls
+        gateway.requests.clear()
+        gateway.rows = gateway.rows.map { if (it.id.value == "target") it.copy(summary = "Updated") else it }
+
+        transport.pushes.emit(push("target"))
+        runCurrent()
+
+        val afterPush = gateway.requests.toList()
+        val stateAfterPush = controller.state.value
+        val rosterAfterPush = rosterCalls
+        println("one-push dispatches target=${afterPush.count { it.value == "agent-0" }} unchanged=${afterPush.count { it.value == "agent-1" }} roster=${rosterAfterPush - rosterBefore}")
+        gateway.requests.clear()
+        repeat(10) { transport.pushes.tryEmit(push("target-$it")) }
+        runCurrent()
+        val afterBurst = gateway.requests.toList()
+        println("burst N=10 dispatches=${afterBurst.map { it.value }}")
+
+        gateway.requests.clear()
+        gateway.connectionState.value = ChannelTransportState.Disconnected(1006, "offline")
+        runCurrent()
+        gateway.connectionState.value = ChannelTransportState.Connected("server", "session-2", "device")
+        runCurrent()
+        println("reconnect dispatches=${gateway.requests.map { it.value }}")
+
+        assertEquals(0, afterPush.count { it.value == "agent-1" }, "an unchanged agent must get zero list requests")
+        assertEquals(listOf(AgentId("agent-0")), afterPush)
+        assertEquals(rosterBefore, rosterAfterPush)
+        assertEquals("Updated", stateAfterPush.conversations.first { it.id == "target" }.title)
+        assertEquals("unchanged", stateAfterPush.selectedConversationId)
+        assertEquals(generation, stateAfterPush.selectionGeneration)
+        assertEquals("keep draft", stateAfterPush.composerText)
+        assertEquals(listOf(AgentId("agent-0")), afterBurst, "one owning-agent read serves the entire queued burst")
+        assertEquals(setOf(AgentId("agent-0"), AgentId("agent-1")), gateway.requests.toSet())
+        assertEquals(2, gateway.requests.size, "reconnect reconciles both agents")
+        controller.close()
     }
 
     private fun TestScope.testController(gateway: DesktopChatGateway, transport: PushingTransport): DesktopChatController =
