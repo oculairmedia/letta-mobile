@@ -78,13 +78,9 @@ class TimelineConversations(
     /** The agents whose conversations the list shows (and whose names title the chats); new agents list again. */
     var roster: List<Agent> = roster
         set(agents) {
-            // Reordering and names do not require a fleet read. The first nonempty roster must
-            // settle loading even when every agent is hidden; visibility changes reload membership.
-            val initialRosterArrived = field.isEmpty() && agents.isNotEmpty()
-            val changed = agents.visibleInLists().mapTo(mutableSetOf()) { it.id } !=
-                field.visibleInLists().mapTo(mutableSetOf()) { it.id }
+            val changed = rosterNeedsConversationRefresh(field, agents)
             field = agents
-            if (changed || initialRosterArrived) scope.launch { refresh() }
+            if (changed) scope.launch { refresh() }
         }
 
     /** Each agent's conversations, read through: the web's list has no "load more". */
@@ -327,6 +323,14 @@ private fun TimelineConversationsState.without(conversation: ConversationId): Ti
 
 /** The roster's name for [agent], for the chat's title. */
 private fun List<Agent>.nameOf(agent: AgentId): String = firstOrNull { it.id == agent }?.name.orEmpty()
+
+/** Names and ordering enrich existing rows; first arrival and visible membership settle the list. */
+private fun rosterNeedsConversationRefresh(previous: List<Agent>, next: List<Agent>): Boolean {
+    val firstArrival = previous.isEmpty() && next.isNotEmpty()
+    val membershipChanged = previous.visibleInLists().mapTo(mutableSetOf()) { it.id } !=
+        next.visibleInLists().mapTo(mutableSetOf()) { it.id }
+    return firstArrival || membershipChanged
+}
 
 /** This list, then the [others] it does not carry (newest first within each). */
 private fun List<Conversation>.keeping(others: List<Conversation>): List<Conversation> {
