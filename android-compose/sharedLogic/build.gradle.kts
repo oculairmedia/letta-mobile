@@ -1,4 +1,7 @@
 import com.letta.mobile.kmp.hostNative
+import org.gradle.api.provider.MapProperty
+import org.gradle.api.tasks.Input
+import org.gradle.process.CommandLineArgumentProvider
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
@@ -207,6 +210,70 @@ contractReferenceJvmTests.configure {
     // Required CI runs these parity tests through jvmTest, including on docs-only changes.
     inputs.files(contractReferenceDocuments).withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("letta.contractReferenceDocs.mode", "check")
+    filter {
+        excludeTestsMatching("com.letta.mobile.util.PaginationReplayFuzzCampaignRunnerTest")
+    }
+}
+
+// Bounded seeded fuzz campaign (nightly / manual). Reuses commonTest generators; not part of PR jvmTest.
+val fuzzCampaignSeedBase = providers.gradleProperty("fuzzCampaignSeedBase")
+val fuzzCampaignSeedCount = providers.gradleProperty("fuzzCampaignSeedCount")
+val fuzzCampaignScenariosPerSeed = providers.gradleProperty("fuzzCampaignScenariosPerSeed")
+val fuzzCampaignManifestPath = providers.gradleProperty("fuzzCampaignManifestPath")
+val fuzzCampaignGitSha = providers.gradleProperty("fuzzCampaignGitSha").orElse("local")
+val fuzzCampaignWorkflowRun = providers.gradleProperty("fuzzCampaignWorkflowRun").orElse("local")
+val fuzzCampaignKind = providers.gradleProperty("fuzzCampaignKind").orElse("manual")
+
+abstract class FuzzCampaignJvmArguments : CommandLineArgumentProvider {
+    @get:Input
+    abstract val values: MapProperty<String, String>
+
+    override fun asArguments(): Iterable<String> =
+        values.get().map { (key, value) -> "-D$key=$value" }
+}
+
+tasks.register<Test>("paginationReplayFuzzCampaign") {
+    group = "verification"
+    description = "Runs the bounded pagination/replay fuzz campaign (seeded; not the PR corpus task)."
+    dependsOn("jvmTestClasses")
+    val jvmTests = contractReferenceJvmTests.get()
+    testClassesDirs = jvmTests.testClassesDirs
+    classpath = jvmTests.classpath
+    workingDir = rootProject.projectDir
+    filter {
+        includeTestsMatching("com.letta.mobile.util.PaginationReplayFuzzCampaignRunnerTest")
+        isFailOnNoMatchingTests = true
+    }
+    inputs.property("fuzzCampaignSeedBase", fuzzCampaignSeedBase)
+    inputs.property("fuzzCampaignSeedCount", fuzzCampaignSeedCount)
+    inputs.property("fuzzCampaignScenariosPerSeed", fuzzCampaignScenariosPerSeed)
+    inputs.property("fuzzCampaignManifestPath", fuzzCampaignManifestPath)
+    inputs.property("fuzzCampaignGitSha", fuzzCampaignGitSha)
+    inputs.property("fuzzCampaignWorkflowRun", fuzzCampaignWorkflowRun)
+    inputs.property("fuzzCampaignKind", fuzzCampaignKind)
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
+    val campaignJvmArgs = objects.newInstance(FuzzCampaignJvmArguments::class.java)
+    campaignJvmArgs.values.put(
+        "letta.fuzz.campaign.seedBase",
+        fuzzCampaignSeedBase.orElse("").map { it.trim() },
+    )
+    campaignJvmArgs.values.put(
+        "letta.fuzz.campaign.seedCount",
+        fuzzCampaignSeedCount.orElse("").map { it.trim() },
+    )
+    campaignJvmArgs.values.put(
+        "letta.fuzz.campaign.scenariosPerSeed",
+        fuzzCampaignScenariosPerSeed.orElse("").map { it.trim() },
+    )
+    campaignJvmArgs.values.put(
+        "letta.fuzz.campaign.manifestPath",
+        fuzzCampaignManifestPath.orElse("").map { it.trim() },
+    )
+    campaignJvmArgs.values.put("letta.fuzz.campaign.gitSha", fuzzCampaignGitSha)
+    campaignJvmArgs.values.put("letta.fuzz.campaign.workflowRun", fuzzCampaignWorkflowRun)
+    campaignJvmArgs.values.put("letta.fuzz.campaign.kind", fuzzCampaignKind)
+    jvmArgumentProviders.add(campaignJvmArgs)
 }
 
 listOf("check" to "checkContractReferenceDocs", "write" to "writeContractReferenceDocs").forEach { (mode, taskName) ->

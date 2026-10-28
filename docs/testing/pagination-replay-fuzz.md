@@ -28,7 +28,7 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt -Parch
 | Timeline replay | 6 (`FuzzCorpus.timelineSeeds`) | 50 | 300 |
 | Fuzz support | — | 6 unit tests | 6 |
 
-Failures print `seed=… scenario=…`. Timeline replay failures also print `op=…`, plus an optional minimized op trace (`index:label|…`). Assertions use `FuzzScenarioContext` in `DeterministicFuzzSupport.kt` so diagnostics stay attached without per-call seed plumbing.
+Failures print `seed=…` and `scenario=…`. Timeline replay failures also include `op=…` when the failing step is known, and may attach a minimized `trace=` (`index:label|…`). Pagination-family failures do not include `op=` in the message. Assertions use `FuzzScenarioContext` in `DeterministicFuzzSupport.kt` so diagnostics stay attached without per-call seed plumbing.
 
 ## Reproducing one scenario
 
@@ -67,9 +67,39 @@ git diff -- "$PROD"   # must be empty
 
 Invariant covered: offset exhaust stops on duplicate-only pages (`fresh.isEmpty()`). Not probed here: cursor sticky-cursor path, fleet merge, timeline stale-seq (separate oracles).
 
+## Bounded nightly / manual campaign
+
+PR `jvmTest` keeps the fixed corpus above (1200 generated cases + support tests). Larger campaigns reuse the same generators via internal `run*Campaign` helpers and the JVM-only runner `PaginationReplayFuzzCampaignRunnerTest`, invoked only from Gradle task `:sharedLogic:paginationReplayFuzzCampaign` (excluded from default `jvmTest`).
+
+| Profile | Seeds | Scenarios / seed | Families | Total cases |
+| --- | --- | --- | --- | --- |
+| PR corpus (`jvmTest`) | 6 per family space | 50 | 4 | 1200 |
+| PR workflow smoke | 2 | 3 | 4 | 24 |
+| Nightly (initial) | 32 | 200 | 4 | 25600 |
+
+Local smoke (24 cases):
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/jdk-26
+cd android-compose
+mkdir -p ../campaign
+python3 ../scripts/fuzz/resolve-pagination-replay-campaign-params.py --kind pr-smoke
+set -a && source ../campaign/fuzz-params.env && set +a
+./gradlew --no-daemon --max-workers=2 :sharedLogic:paginationReplayFuzzCampaign \
+  -PfuzzCampaignSeedBase="$FUZZ_CAMPAIGN_SEED_BASE" \
+  -PfuzzCampaignSeedCount="$FUZZ_CAMPAIGN_SEED_COUNT" \
+  -PfuzzCampaignScenariosPerSeed="$FUZZ_CAMPAIGN_SCENARIOS_PER_SEED" \
+  -PfuzzCampaignManifestPath="../campaign/fuzz-manifest.json" \
+  -PfuzzCampaignKind="$FUZZ_CAMPAIGN_KIND"
+```
+
+Scheduled workflow: `.github/workflows/pagination-replay-fuzz.yml` (`23 6 * * *` UTC). Seed base for schedule is derived from the UTC date in `scripts/fuzz/resolve-pagination-replay-campaign-params.py`. Manual `workflow_dispatch` uses validated Python bounds (1..256 seeds, 1..1000 scenarios); workflow inputs are never interpolated into shell.
+
+**Fleet ordering limitation:** the fleet family sorts expected output with production `ConversationRecency.sortKeyMillis` on generated valid ISO-8601 `Z` timestamps. That checks fleet ordering against the same recency policy the app uses; it does not independently fuzz date parsing.
+
 ## Extending campaigns
 
-Increase `FuzzCorpus.SCENARIOS_PER_SEED` or append seeds in `DeterministicFuzzSupport.kt`. Keep cases cheap for PR `shared-multiplatform` (`:sharedLogic:jvmTest`). Do not weaken invariants when a seed finds a production bug — capture the seed in the failure output and fix production separately.
+Adjust nightly bounds in `resolve-pagination-replay-campaign-params.py` and `FuzzCampaign.kt` (`FuzzCampaignLimits`). Do not change `FuzzCorpus` for larger nightly volume — use `-PfuzzCampaign*` / the workflow resolver instead. Do not weaken invariants when a seed finds a production bug — capture the seed in the failure output and fix production separately.
 
 ## Deliberate exclusions
 
