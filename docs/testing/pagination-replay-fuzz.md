@@ -28,7 +28,7 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt -Parch
 | Timeline replay | 6 (`FuzzCorpus.timelineSeeds`) | 50 | 300 |
 | Fuzz support | — | 6 unit tests | 6 |
 
-Failures print `seed=… scenario=… op=…` plus optional minimized op trace (`index:label|…`). Assertions use `FuzzScenarioContext` in `DeterministicFuzzSupport.kt` so diagnostics stay attached without per-call seed plumbing.
+Failures print `seed=… scenario=…`. Timeline replay failures also print `op=…`, plus an optional minimized op trace (`index:label|…`). Assertions use `FuzzScenarioContext` in `DeterministicFuzzSupport.kt` so diagnostics stay attached without per-call seed plumbing.
 
 ## Reproducing one scenario
 
