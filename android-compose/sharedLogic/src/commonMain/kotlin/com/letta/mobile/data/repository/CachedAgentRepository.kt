@@ -391,6 +391,7 @@ open class CachedAgentRepository(
 
     private fun startAgentRequestLocked(id: AgentId, persist: Boolean): Deferred<Result<Agent>> {
         val refreshRevisionAtStart = startedRefreshRevision
+        val persistRead: (suspend (Agent) -> Unit)? = if (persist) ::persistUpdatedAgent else null
         lateinit var request: Deferred<Result<Agent>>
         request = repositoryScope.async(start = CoroutineStart.LAZY) {
             try {
@@ -399,7 +400,7 @@ open class CachedAgentRepository(
                     refreshMutex.withLock {
                         request.ensureActive()
                         if (agentRequests[id] !== request) throw CancellationException("Agent cache invalidated")
-                        publishAgentReadLocked(id, fresh, persist, refreshRevisionAtStart)
+                        publishAgentReadLocked(id, fresh, persistRead, refreshRevisionAtStart)
                     }
                 }
             } finally {
@@ -420,12 +421,12 @@ open class CachedAgentRepository(
     private suspend fun publishAgentReadLocked(
         id: AgentId,
         fresh: Agent,
-        persist: Boolean,
+        persistRead: (suspend (Agent) -> Unit)?,
         refreshRevisionAtStart: Long,
     ): Agent {
         // A completed list requested after this ordinary read is authoritative.
         // Keep the waiter alive, but do not restore its older response to the roster.
-        if (!persist && completedRefreshRevision > refreshRevisionAtStart) {
+        if (persistRead == null && completedRefreshRevision > refreshRevisionAtStart) {
             val rosterAgent = refreshedAgentOrThrow(id)
             // An editor still needs the detail payload; it must not replace the newer roster.
             return if (id in detailRequests) fresh else rosterAgent
@@ -435,7 +436,7 @@ open class CachedAgentRepository(
         agentFetchedAt[id] = nowMillis()
         detailedAgents += id
         if (refreshRequest != null) changedDuringRefresh += id
-        if (persist) persistUpdatedAgent(fresh)
+        persistRead?.invoke(fresh)
         return fresh
     }
 
