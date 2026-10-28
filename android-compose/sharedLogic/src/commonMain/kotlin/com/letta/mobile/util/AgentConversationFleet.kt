@@ -82,6 +82,18 @@ class AgentConversationFleet(
         dirty: Map<ConversationId, AgentId?>,
         resolve: suspend (ConversationId) -> Conversation? = { null },
     ): List<Conversation>? = mutex.withLock {
+        val owners = changedOwners(dirty, resolve) ?: return@withLock null
+        val read = readAll(owners.associateWith { AgentListing() }, paging.eagerPagesPerAgent)
+        if (read.values.any { it.failure is UnsupportedOperationException }) return@withLock null
+        if (read.isNotEmpty() && read.values.all { it.failure != null }) throw read.values.first().failure ?: IllegalStateException(LIST_FAILED)
+        listed = listed + read.mapValues { (agent, fresh) -> (listed[agent] ?: AgentListing()).refreshed(fresh) }
+        listed.merged()
+    }
+
+    private suspend fun changedOwners(
+        dirty: Map<ConversationId, AgentId?>,
+        resolve: suspend (ConversationId) -> Conversation?,
+    ): Set<AgentId>? {
         val owners = mutableSetOf<AgentId>()
         for ((conversation, agent) in dirty) {
             val owner = agent ?: listed.entries.firstOrNull { (_, listing) -> listing.rows.any { it.id == conversation } }?.key
@@ -90,25 +102,9 @@ class AgentConversationFleet(
                 } catch (_: UnsupportedOperationException) {
                     null
                 }
-            owners += owner ?: return@withLock null
+            owners += owner ?: return null
         }
-        val read = readAll(owners.associateWith { AgentListing() }, paging.eagerPagesPerAgent)
-        if (read.values.any { it.failure is UnsupportedOperationException }) return@withLock null
-        if (read.isNotEmpty() && read.values.all { it.failure != null }) throw read.values.first().failure ?: IllegalStateException(LIST_FAILED)
-        listed = listed + read.mapValues { (agent, fresh) ->
-            val previous = listed[agent] ?: AgentListing()
-            when {
-                fresh.failure != null -> previous
-                fresh.cursor == null -> fresh
-                else -> previous.copy(
-                    rows = fresh.rows + previous.rows.filterNot { old -> fresh.rows.any { it.id == old.id } },
-                    cursor = if (previous.read) previous.cursor else fresh.cursor,
-                    read = true,
-                    failure = null,
-                )
-            }
-        }
-        listed.merged()
+        return owners
     }
 
     /** Keeps a targeted row refetch in the same cache used by subsequent agent reads and paging. */
@@ -179,6 +175,19 @@ private data class AgentListing(
     val read: Boolean = false,
     val failure: Throwable? = null,
 ) {
+    /** Replace an authoritative short read; otherwise keep already loaded older pages and their cursor. */
+    fun refreshed(fresh: AgentListing): AgentListing {
+        if (fresh.failure != null) return this
+        if (fresh.cursor == null) return fresh
+        val freshIds = fresh.rows.mapTo(mutableSetOf()) { it.id }
+        return copy(
+            rows = fresh.rows + rows.filterNot { it.id in freshIds },
+            cursor = if (read) cursor else fresh.cursor,
+            read = true,
+            failure = null,
+        )
+    }
+
     /** These rows and a page more: only [agent]'s own, visible ones; a [full] page may have more after it. */
     fun plus(agent: AgentId, page: List<Conversation>, full: Boolean): AgentListing {
         val ids = rows.mapTo(mutableSetOf()) { it.id }

@@ -1,11 +1,17 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.backend.bound
+import com.letta.mobile.data.backend.RemoteRoute
+import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.repository.api.ConversationRemoteSource
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.serialization.LettaJson
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
@@ -37,10 +43,11 @@ class ConversationInvalidationTest {
     @Test
     fun cachedListScopesPushesCoalescesBurstsAndReconcilesOnReconnect() = runTest {
         val remote = Backend(listOf(row("a"), row("b", b)))
-        val transport = Pushes()
+        val transport = remote
         var rosterCalls = 0
         val repository = CachedAllConversationsRepository(
-            roster = { rosterCalls++; roster }, remote = remote.bound(), repositoryScope = backgroundScope, transport = transport,
+            roster = { rosterCalls++; roster }, remote = RemoteRoute.Absent(SessionRoute.CONVERSATIONS), repositoryScope = backgroundScope,
+            irohConversationListSource = remote.source(), transport = transport,
         )
         runCurrent()
         repository.refresh()
@@ -67,9 +74,11 @@ class ConversationInvalidationTest {
     @Test
     fun unknownOwnerWithoutTargetedReadReconcilesTheFleet() = runTest {
         val remote = Backend(listOf(row("a"), row("b", b)))
-        val transport = Pushes()
+        val transport = remote
+        remote.supportsGet = false
         val repository = CachedAllConversationsRepository(
-            roster = { roster }, remote = remote.bound(), repositoryScope = backgroundScope, transport = transport,
+            roster = { roster }, remote = RemoteRoute.Absent(SessionRoute.CONVERSATIONS), repositoryScope = backgroundScope,
+            irohConversationListSource = remote.source(), transport = transport,
         )
         runCurrent()
         repository.refresh()
@@ -145,18 +154,32 @@ class ConversationInvalidationTest {
         assertNull(fleet.refreshChanged(mapOf(ConversationId("a") to a)))
     }
 
-    private class Pushes : NoOpChannelTransport() {
+    private class Backend(var rows: List<Conversation>) : NoOpChannelTransport() {
         override val events = MutableSharedFlow<ServerFrame>(extraBufferCapacity = 32)
         override val state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Connected("server", "session", "device"))
-    }
-
-    private class Backend(var rows: List<Conversation>) : ConversationRemoteSource {
-        val requests = mutableListOf<AgentId?>()
-        override suspend fun listConversations(
-            agentId: AgentId?, limit: Int?, after: String?, archiveStatus: String?, summarySearch: String?, order: String?, orderBy: String?,
-        ): List<Conversation> {
-            requests += agentId
-            return rows.filter { it.agentId == agentId }.take(limit ?: rows.size)
+        val requests = mutableListOf<AgentId>()
+        var supportsGet = true
+        fun source() = IrohAdminRpcConversationListSource(
+            this,
+            ActiveConfigSettingsRepository(LettaConfig(id = "test", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://fake")),
+        )
+        override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
+            val result = when (method) {
+                "conversation.list" -> {
+                    val params = LettaJson.wire.parseToJsonElement(body.orEmpty()).jsonObject
+                    val agent = AgentId(params.getValue("agent_id").jsonPrimitive.content)
+                    requests += agent
+                    LettaJson.wire.encodeToJsonElement(rows.filter { it.agentId == agent })
+                }
+                "conversation.get" -> {
+                    if (!supportsGet) throw UnsupportedOperationException("targeted retrieval unavailable")
+                    val row = rows.first { it.id.value == path.substringAfterLast('/') }
+                    requests += row.agentId
+                    LettaJson.wire.encodeToJsonElement(row)
+                }
+                else -> error("unexpected $method")
+            }
+            return AppServerInboundFrame.AdminRpcResponse("request", success = true, result = result)
         }
     }
 }

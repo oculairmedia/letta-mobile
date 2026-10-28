@@ -59,6 +59,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.data.chat.runtime.agentConversationReader
+import com.letta.mobile.util.runCatchingCancellable
 import com.letta.mobile.util.ReadThroughConversationFleets
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -1108,7 +1109,6 @@ class DesktopChatController(
         val agentNamesById = _state.value.conversations.mapNotNull { row -> row.agentId?.let { it to row.agentName } }.toMap() +
             roster.filter { it.name.isNotBlank() }.associate { it.id.value to it.name }
         return conversations.toChatConversationSummaries(agentNamesById)
-            .distinctBy { it.id }
             .map { if (it.id in locallyArchivedIds) it.copy(archived = true) else it }
     }
 
@@ -1116,13 +1116,8 @@ class DesktopChatController(
     private fun observeConversationPushes(transport: IChannelTransport) {
         conversationPushJob = scope.launch {
             observeConversationInvalidations(transport.conversationChanges()) { dirty ->
-                try {
-                    refreshConversationRoster(dirty)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (t: Throwable) {
-                    Telemetry.error(TELEMETRY_TAG, "roster.refreshFailed", t)
-                }
+                runCatchingCancellable { refreshConversationRoster(dirty) }
+                    .onFailure { Telemetry.error(TELEMETRY_TAG, "roster.refreshFailed", it) }
             }
         }
     }
@@ -1141,6 +1136,14 @@ class DesktopChatController(
         val deleting = _deletingConversationIds.value
         val summaries = loadConversationSummaries(nextGateway, dirty).filterNot { it.id in deleting }
         if (closed || gateway !== nextGateway) return false
+        mergeConversationRoster(summaries)
+        if (runtime.selectedConversationId == null) {
+            summaries.firstOrNull()?.let { selectRemoteConversation(it.id, _state.value.selectionGeneration) }
+        }
+        return true
+    }
+
+    private fun mergeConversationRoster(summaries: List<ChatConversationSummary>) {
         _state.update { current ->
             val next = if (current.runtimeState.selectedConversationId == null) {
                 ChatSessionReducer.conversationsLoaded(current.runtimeState, summaries)
@@ -1149,10 +1152,6 @@ class DesktopChatController(
             }
             current.withRuntimeState(next)
         }
-        if (runtime.selectedConversationId == null) {
-            summaries.firstOrNull()?.let { selectRemoteConversation(it.id, _state.value.selectionGeneration) }
-        }
-        return true
     }
 
     /**

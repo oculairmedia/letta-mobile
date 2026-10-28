@@ -92,28 +92,30 @@ open class CachedAllConversationsRepository(
         }
     }
 
-    /** A single Iroh row keeps its cheap refetch; a batch lists each owning agent once. */
+    /** A legacy push without an agent keeps its row refetch; scoped pushes list each owning agent once. */
     private suspend fun applyPush(dirty: Map<ConversationId, AgentId?>) {
         if (!hasLoadedAtLeastOnce) return
         try {
-            refreshMutex.withLock {
-                if (!hasLoadedAtLeastOnce) return@withLock
-                val source = irohConversationListSource?.takeIf { it.shouldUseIroh() }
-                if (dirty.size == 1 && source != null) {
-                    val fresh = source.getConversation(dirty.keys.single())
-                    fleet.record(fresh)
-                    handleOptimisticUpdate(fresh)
-                } else {
-                    val listed = fleet.refreshChanged(dirty) { id -> source?.getConversation(id) }
-                    if (listed == null) refreshLocked() else publish(listed)
-                }
-            }
+            refreshPushedLocked(dirty)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (unsupported: UnsupportedOperationException) {
             refreshAfterPush("unsupported")
         } catch (e: Exception) {
             Telemetry.event(TAG, "conversation_updated.refetch_failed", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
+        }
+    }
+
+    private suspend fun refreshPushedLocked(dirty: Map<ConversationId, AgentId?>) = refreshMutex.withLock {
+        if (!hasLoadedAtLeastOnce) return@withLock
+        val source = irohConversationListSource?.takeIf { it.shouldUseIroh() }
+        if (dirty.size == 1 && dirty.values.single() == null && source != null) {
+            val fresh = source.getConversation(dirty.keys.single())
+            fleet.record(fresh)
+            handleOptimisticUpdate(fresh)
+        } else {
+            val listed = fleet.refreshChanged(dirty) { id -> source?.getConversation(id) }
+            if (listed == null) refreshLocked() else publish(listed)
         }
     }
 
