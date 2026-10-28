@@ -29,7 +29,7 @@ class AgentConversationFleetFuzzTest {
         FuzzCorpus.paginationSeeds.forEach { seed ->
             repeat(FuzzCorpus.SCENARIOS_PER_SEED) { scenario ->
                 totalCases++
-                runScenario(seed, scenario, scenarioRandom(seed, scenario))
+                runScenario(FleetFuzzScenario(seed, scenario, scenarioRandom(seed, scenario)))
             }
         }
         check(totalCases == FuzzCorpus.paginationSeeds.size * FuzzCorpus.SCENARIOS_PER_SEED) {
@@ -37,15 +37,17 @@ class AgentConversationFleetFuzzTest {
         }
     }
 
-    private suspend fun runScenario(seed: Long, scenarioIndex: Int, random: Random) {
+    private suspend fun runScenario(scenario: FleetFuzzScenario) {
+        val random = scenario.random
+        val ctx = scenario.ctx
         val agentCount = when {
-            scenarioIndex % 17 == 0 -> 1
+            scenario.scenarioIndex % 17 == 0 -> 1
             else -> random.nextInt(1, 5)
         }
         val agents = List(agentCount) { index ->
             val hidden = random.nextBoolean() && index > 0
             Agent(
-                id = AgentId("agent-$seed-$scenarioIndex-$index"),
+                id = AgentId("agent-${scenario.seed}-${scenario.scenarioIndex}-$index"),
                 name = "A$index",
                 hidden = if (hidden) true else null,
             )
@@ -54,14 +56,14 @@ class AgentConversationFleetFuzzTest {
         val pageSize = random.nextInt(1, 8)
         val eagerPages = random.nextInt(1, 4)
         val store = mutableMapOf<AgentId, MutableList<Conversation>>()
+        val fixture = scenario.rowFixture()
         visibleAgents.forEach { agent ->
             val rowCount = when {
-                scenarioIndex % 7 == 0 -> 0
-                scenarioIndex % 11 == 0 && agent == visibleAgents.first() -> random.nextInt(3, 10)
+                scenario.scenarioIndex % 7 == 0 -> 0
+                scenario.scenarioIndex % 11 == 0 && agent == visibleAgents.first() -> random.nextInt(3, 10)
                 else -> random.nextInt(0, 25)
             }
-            val rows = buildAgentRows(seed, scenarioIndex, agent.id, rowCount, random, scenarioIndex % 11 == 0)
-            store[agent.id] = rows.toMutableList()
+            store[agent.id] = fixture.rowsFor(agent.id, rowCount).toMutableList()
         }
         val backend = PagingBackend(store)
         val fleet = AgentConversationFleet(
@@ -72,47 +74,81 @@ class AgentConversationFleetFuzzTest {
         var listed = fleet.refresh(agents)
         var loadMoreSteps = 0
         while (fleet.hasMore) {
-            checkFuzz(seed, scenarioIndex, condition = loadMoreSteps < maxLoadMore) {
+            ctx.check(condition = loadMoreSteps < maxLoadMore) {
                 "exceeded loadMore budget=$maxLoadMore steps after ${loadMoreSteps} fetches=${backend.totalFetches}"
             }
             listed = fleet.loadMore()
             loadMoreSteps++
         }
-        checkFuzz(seed, scenarioIndex, condition = !fleet.hasMore) {
+        ctx.check(condition = !fleet.hasMore) {
             "hasMore still true after budget=$maxLoadMore fetches=${backend.totalFetches}"
         }
         val listedIds = listed.map { it.id }
-        checkFuzz(seed, scenarioIndex, condition = listedIds.size == listedIds.distinct().size) {
+        ctx.check(condition = listedIds.size == listedIds.distinct().size) {
             "duplicate conversation ids in fleet output: ${listedIds.groupingBy { it }.eachCount().filter { it.value > 1 }}"
         }
-        checkFuzz(seed, scenarioIndex, condition = listed == listed.sortedWith(recencyOrder)) {
+        ctx.check(condition = listed == listed.sortedWith(recencyOrder)) {
             "fleet output not sorted by recency policy (sortKeyMillis then id)"
         }
         val expectedVisible = expectedVisibleIds(visibleAgents, store)
-        checkFuzz(seed, scenarioIndex, condition = listedIds.toSet() == expectedVisible) {
+        ctx.check(condition = listedIds.toSet() == expectedVisible) {
             "membership mismatch listed=${listedIds.size} expectedVisible=${expectedVisible.size}"
         }
     }
 
-    private fun buildAgentRows(
-        seed: Long,
-        scenarioIndex: Int,
-        agentId: AgentId,
-        rowCount: Int,
-        random: Random,
-        hiddenLeadingPage: Boolean,
-    ): List<Conversation> {
-        if (rowCount == 0) return emptyList()
-        val rows = List(rowCount) { rowIndex ->
-            val forceHidden = hiddenLeadingPage && rowIndex < 2
-            conversationRow(
-                id = "c-$seed-$scenarioIndex-${agentId.value}-$rowIndex",
-                agentId = agentId,
+    private class FleetFuzzScenario(
+        val seed: Long,
+        val scenarioIndex: Int,
+        val random: Random,
+    ) {
+        val ctx = FuzzScenarioContext(seed, scenarioIndex)
+
+        fun rowFixture(): AgentConversationRowFixture =
+            AgentConversationRowFixture(
+                seed = seed,
+                scenarioIndex = scenarioIndex,
                 random = random,
-                hidden = forceHidden || random.nextInt(10) == 0,
+                hiddenLeadingPage = scenarioIndex % 11 == 0,
+            )
+    }
+
+    private class AgentConversationRowFixture(
+        private val seed: Long,
+        private val scenarioIndex: Int,
+        private val random: Random,
+        private val hiddenLeadingPage: Boolean,
+    ) {
+        private val recencyOrder = compareByDescending<Conversation> {
+            ConversationRecency.sortKeyMillis(it.lastMessageAt, it.updatedAt, it.createdAt)
+        }.thenBy { it.id.value }
+
+        fun rowsFor(agentId: AgentId, rowCount: Int): List<Conversation> {
+            if (rowCount == 0) return emptyList()
+            val rows = List(rowCount) { rowIndex ->
+                val forceHidden = hiddenLeadingPage && rowIndex < 2
+                conversationRow(
+                    id = "c-$seed-$scenarioIndex-${agentId.value}-$rowIndex",
+                    agentId = agentId,
+                    hidden = forceHidden || random.nextInt(10) == 0,
+                )
+            }
+            return rows.sortedWith(recencyOrder)
+        }
+
+        private fun conversationRow(id: String, agentId: AgentId, hidden: Boolean): Conversation {
+            val day = random.nextInt(1, 29).toString().padStart(2, '0')
+            val hour = random.nextInt(0, 24).toString().padStart(2, '0')
+            val stamp = "2026-03-${day}T${hour}:00:00Z"
+            return Conversation(
+                id = ConversationId(id),
+                agentId = agentId,
+                lastMessageAt = if (random.nextBoolean()) stamp else null,
+                updatedAt = if (random.nextBoolean()) stamp else null,
+                createdAt = stamp,
+                hidden = if (hidden) true else null,
+                archived = if (random.nextInt(20) == 0) true else null,
             )
         }
-        return rows.sortedWith(recencyOrder)
     }
 
     /** Every list-visible row stored for visible agents (hidden rows excluded). */
@@ -140,26 +176,6 @@ class AgentConversationFleetFuzzTest {
             val pagesNeeded = if (rowCount == 0) 1 else (rowCount + pageSize - 1) / pageSize
             (pagesNeeded - eagerPages).coerceAtLeast(0)
         } + 1
-
-    private fun conversationRow(
-        id: String,
-        agentId: AgentId,
-        random: Random,
-        hidden: Boolean,
-    ): Conversation {
-        val day = random.nextInt(1, 29).toString().padStart(2, '0')
-        val hour = random.nextInt(0, 24).toString().padStart(2, '0')
-        val stamp = "2026-03-${day}T${hour}:00:00Z"
-        return Conversation(
-            id = ConversationId(id),
-            agentId = agentId,
-            lastMessageAt = if (random.nextBoolean()) stamp else null,
-            updatedAt = if (random.nextBoolean()) stamp else null,
-            createdAt = stamp,
-            hidden = if (hidden) true else null,
-            archived = if (random.nextInt(20) == 0) true else null,
-        )
-    }
 
     private class PagingBackend(
         private val store: Map<AgentId, List<Conversation>>,

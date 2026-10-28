@@ -53,15 +53,23 @@ internal class FuzzCaseFailure(
     },
 )
 
-internal inline fun checkFuzz(
-    seed: Long,
-    scenarioIndex: Int,
-    operationIndex: Int? = null,
-    condition: Boolean,
-    lazyMessage: () -> String,
+/** Seed, scenario index, and optional operation index for fuzz assertion messages. */
+internal class FuzzScenarioContext(
+    val seed: Long,
+    val scenarioIndex: Int,
 ) {
-    if (!condition) {
-        throw FuzzCaseFailure(seed, scenarioIndex, operationIndex, lazyMessage())
+    var operationIndex: Int? = null
+
+    inline fun check(condition: Boolean, lazyMessage: () -> String) {
+        if (!condition) {
+            throw FuzzCaseFailure(seed, scenarioIndex, operationIndex, lazyMessage())
+        }
+    }
+
+    inline fun checkAt(operationIndex: Int, condition: Boolean, lazyMessage: () -> String) {
+        if (!condition) {
+            throw FuzzCaseFailure(seed, scenarioIndex, operationIndex, lazyMessage())
+        }
     }
 }
 

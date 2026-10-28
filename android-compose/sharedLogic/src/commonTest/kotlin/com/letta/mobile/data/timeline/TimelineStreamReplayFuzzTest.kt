@@ -4,7 +4,7 @@ import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.util.FuzzCaseFailure
 import com.letta.mobile.util.FuzzCorpus
-import com.letta.mobile.util.checkFuzz
+import com.letta.mobile.util.FuzzScenarioContext
 import com.letta.mobile.util.minimizeBySuffixDeletion
 import com.letta.mobile.util.scenarioRandom
 import com.letta.mobile.data.model.ToolReturnMessage
@@ -40,15 +40,17 @@ class TimelineStreamReplayFuzzTest {
         FuzzCorpus.timelineSeeds.forEach { seed ->
             repeat(FuzzCorpus.SCENARIOS_PER_SEED) { scenario ->
                 totalCases++
-                val random = scenarioRandom(seed, scenario)
-                val ops = generateOperations(seed, scenario, random)
+                val replayScenario = StreamReplayScenario(seed, scenario, scenarioRandom(seed, scenario))
+                val ops = replayScenario.generateOperations()
                 try {
-                    assertScenario(seed, scenario, ops)
+                    assertScenario(replayScenario, ops)
                 } catch (failure: FuzzCaseFailure) {
                     val shrunk = minimizeBySuffixDeletion(
                         operations = ops,
                         isValid = { minimizedOps -> minimizedOps.all { it.isStructurallyValid() } },
-                        invokeScenario = { minimizedOps -> assertScenario(seed, scenario, minimizedOps) },
+                        invokeScenario = { minimizedOps ->
+                            assertScenario(replayScenario, minimizedOps)
+                        },
                         formatOp = { it.label() },
                     )
                     throw FuzzCaseFailure(
@@ -63,23 +65,23 @@ class TimelineStreamReplayFuzzTest {
         check(totalCases == FuzzCorpus.timelineSeeds.size * FuzzCorpus.SCENARIOS_PER_SEED)
     }
 
-    private fun assertScenario(seed: Long, scenarioIndex: Int, ops: List<StreamReplayOp>) {
-        val conversationId = "conv-fuzz-$seed-$scenarioIndex"
-        var timeline = Timeline(conversationId = conversationId)
+    private fun assertScenario(scenario: StreamReplayScenario, ops: List<StreamReplayOp>) {
+        val ctx = scenario.ctx
+        var timeline = Timeline(conversationId = scenario.conversationId)
         var pending: PersistentMap<String, ToolReturnMessage> = persistentMapOf()
         val oracle = StreamOracle()
         ops.forEachIndexed { opIndex, op ->
             val stepped = applyStreamOp(timeline, pending, oracle, op)
             timeline = stepped.timeline
             pending = stepped.pending
-            assertSnapshotMatchesOracle(seed, scenarioIndex, opIndex, timeline, oracle)
+            assertSnapshotMatchesOracle(ctx, opIndex, timeline, oracle)
         }
-        val runB = "run-$seed-$scenarioIndex-b"
+        val runB = scenario.runB
         if (ops.any { it is StreamReplayOp.AssistantCumulative && it.message.runId == runB }) {
             val runIds = timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
                 .mapNotNull { it.runId }
                 .distinct()
-            checkFuzz(seed, scenarioIndex, condition = runIds.contains(runB)) {
+            ctx.check(condition = runIds.contains(runB)) {
                 "expected runB in confirmed events, got $runIds"
             }
         }
@@ -125,25 +127,22 @@ class TimelineStreamReplayFuzzTest {
     }
 
     private fun assertSnapshotMatchesOracle(
-        seed: Long,
-        scenarioIndex: Int,
+        ctx: FuzzScenarioContext,
         opIndex: Int,
         timeline: Timeline,
         oracle: StreamOracle,
     ) {
         val production = timeline.confirmedSnapshot()
         val expected = oracle.snapshot()
-        checkFuzz(seed, scenarioIndex, opIndex, condition = production.keys == expected.keys) {
+        ctx.checkAt(opIndex, condition = production.keys == expected.keys) {
             "serverId set mismatch prod=${production.keys} oracle=${expected.keys}"
         }
         expected.forEach { (serverId, body) ->
-            checkFuzz(seed, scenarioIndex, opIndex, condition = production[serverId] == body) {
+            ctx.checkAt(opIndex, condition = production[serverId] == body) {
                 "content mismatch for $serverId prod=${production[serverId]} oracle=$body"
             }
         }
-        checkFuzz(
-            seed,
-            scenarioIndex,
+        ctx.checkAt(
             opIndex,
             condition = timeline.events.filterIsInstance<TimelineEvent.Confirmed>().size == production.size,
         ) {
@@ -151,78 +150,96 @@ class TimelineStreamReplayFuzzTest {
         }
     }
 
-    private fun generateOperations(seed: Long, scenarioIndex: Int, random: Random): List<StreamReplayOp> {
-        val opCount = random.nextInt(3, 18)
+    private class StreamReplayScenario(
+        val seed: Long,
+        val scenarioIndex: Int,
+        val random: Random,
+    ) {
+        val ctx = FuzzScenarioContext(seed, scenarioIndex)
+        val conversationId = "conv-fuzz-$seed-$scenarioIndex"
         val runA = "run-$seed-$scenarioIndex-a"
         val runB = "run-$seed-$scenarioIndex-b"
-        val ops = mutableListOf<StreamReplayOp>()
-        var assistantSeq = 0
-        var streamIdCounter = 0
-        repeat(opCount) {
-            when (random.nextInt(5)) {
-                0, 1 -> {
-                    val id = "user-$seed-$scenarioIndex-${ops.size}"
-                    ops += StreamReplayOp.User(
-                        UserMessage(
-                            id = id,
-                            contentRaw = JsonPrimitive(random.pickText()),
-                            runId = if (random.nextBoolean()) runA else runB,
-                        ),
-                    )
-                }
-                else -> {
-                    val generated = generateAssistantStream(
-                        seed,
-                        scenarioIndex,
-                        random,
-                        runA,
-                        runB,
-                        streamIdCounter + 1,
-                        assistantSeq,
-                    )
-                    streamIdCounter = generated.nextStreamId
-                    assistantSeq = generated.nextSeq
-                    ops += generated.ops
+        private var nextStreamId = 0
+        private var assistantSeq = 0
+
+        fun generateOperations(): List<StreamReplayOp> {
+            val opCount = random.nextInt(3, 18)
+            val ops = mutableListOf<StreamReplayOp>()
+            repeat(opCount) {
+                when (random.nextInt(5)) {
+                    0, 1 -> ops += nextUserOp(ops.size)
+                    else -> ops += nextAssistantStreamOps()
                 }
             }
+            return ops
         }
-        return ops
-    }
 
-    private data class AssistantGen(val ops: List<StreamReplayOp>, val nextStreamId: Int, val nextSeq: Int)
-
-    private fun generateAssistantStream(
-        seed: Long,
-        scenarioIndex: Int,
-        random: Random,
-        runA: String,
-        runB: String,
-        streamIdCounter: Int,
-        startSeq: Int,
-    ): AssistantGen {
-        val serverId = "asst-$seed-$scenarioIndex-$streamIdCounter"
-        val otid = "otid-$seed-$scenarioIndex-$streamIdCounter"
-        val assistantRun = if (random.nextBoolean()) runA else runB
-        val chunks = random.nextInt(1, 6)
-        var text = ""
-        var assistantSeq = startSeq
-        var lastMsg: AssistantMessage? = null
-        val out = mutableListOf<StreamReplayOp>()
-        repeat(chunks) { chunkIndex ->
-            text += random.pickToken()
-            assistantSeq++
-            val msg = AssistantMessage(
-                id = serverId,
-                contentRaw = JsonPrimitive(text),
-                otid = otid,
-                runId = assistantRun,
-                seqId = assistantSeq,
-                textSeq = assistantSeq,
+        private fun nextUserOp(opIndex: Int): StreamReplayOp.User {
+            val id = "user-$seed-$scenarioIndex-$opIndex"
+            return StreamReplayOp.User(
+                UserMessage(
+                    id = id,
+                    contentRaw = JsonPrimitive(random.fuzzPickText()),
+                    runId = if (random.nextBoolean()) runA else runB,
+                ),
             )
-            lastMsg = msg
-            out += StreamReplayOp.AssistantCumulative(msg)
-            if (chunkIndex > 0 && random.nextInt(4) == 0) {
-                val replaySeq = assistantSeq - random.nextInt(1, assistantSeq.coerceAtLeast(1))
+        }
+
+        private fun nextAssistantStreamOps(): List<StreamReplayOp> {
+            nextStreamId++
+            val generator = AssistantCumulativeGenerator(
+                scenario = this,
+                serverId = "asst-$seed-$scenarioIndex-$nextStreamId",
+                otid = "otid-$seed-$scenarioIndex-$nextStreamId",
+                assistantRun = if (random.nextBoolean()) runA else runB,
+            )
+            val generated = generator.generate()
+            assistantSeq = generated.nextSeq
+            return generated.ops
+        }
+
+        private class AssistantCumulativeGenerator(
+            private val scenario: StreamReplayScenario,
+            private val serverId: String,
+            private val otid: String,
+            private val assistantRun: String,
+        ) {
+            private val random = scenario.random
+
+            fun generate(): AssistantGenResult {
+                val chunks = random.nextInt(1, 6)
+                var text = ""
+                var seq = scenario.assistantSeq
+                var lastMsg: AssistantMessage? = null
+                val out = mutableListOf<StreamReplayOp>()
+                repeat(chunks) { chunkIndex ->
+                    text += random.fuzzPickToken()
+                    seq++
+                    val msg = AssistantMessage(
+                        id = serverId,
+                        contentRaw = JsonPrimitive(text),
+                        otid = otid,
+                        runId = assistantRun,
+                        seqId = seq,
+                        textSeq = seq,
+                    )
+                    lastMsg = msg
+                    out += StreamReplayOp.AssistantCumulative(msg)
+                    appendStaleReplayIfNeeded(out, msg, text, seq, chunkIndex)
+                }
+                val finalSeq = appendLatePrefixIfScheduled(out, lastMsg, text, seq, chunks)
+                return AssistantGenResult(out, finalSeq)
+            }
+
+            private fun appendStaleReplayIfNeeded(
+                out: MutableList<StreamReplayOp>,
+                msg: AssistantMessage,
+                text: String,
+                seq: Int,
+                chunkIndex: Int,
+            ) {
+                if (chunkIndex == 0 || random.nextInt(4) != 0) return
+                val replaySeq = seq - random.nextInt(1, seq.coerceAtLeast(1))
                 val replayText = text.dropLast(random.nextInt(0, text.length.coerceAtLeast(1)))
                 out += StreamReplayOp.AssistantCumulative(
                     msg.copy(
@@ -232,28 +249,29 @@ class TimelineStreamReplayFuzzTest {
                     ),
                 )
             }
+
+            private fun appendLatePrefixIfScheduled(
+                out: MutableList<StreamReplayOp>,
+                lastMsg: AssistantMessage?,
+                text: String,
+                seq: Int,
+                chunks: Int,
+            ): Int {
+                if (scenario.scenarioIndex % 9 != 0 || chunks < 2 || lastMsg == null) return seq
+                val latePrefix = text.dropLast(1)
+                out += StreamReplayOp.AssistantCumulative(
+                    lastMsg.copy(
+                        seqId = seq + 1,
+                        textSeq = seq + 1,
+                        contentRaw = JsonPrimitive(latePrefix),
+                    ),
+                )
+                return seq + 1
+            }
         }
-        if (scenarioIndex % 9 == 0 && chunks >= 2 && lastMsg != null) {
-            val latePrefix = text.dropLast(1)
-            out += StreamReplayOp.AssistantCumulative(
-                lastMsg!!.copy(
-                    seqId = assistantSeq + 1,
-                    textSeq = assistantSeq + 1,
-                    contentRaw = JsonPrimitive(latePrefix),
-                ),
-            )
-            assistantSeq++
-        }
-        return AssistantGen(out, streamIdCounter, assistantSeq)
     }
 
-    private fun Random.pickText(): String = pickToken() + " " + pickToken()
-    private fun Random.pickToken(): String {
-        val len = 3 + nextInt(5)
-        return buildString(len) {
-            repeat(len) { append(('a'..'z').random(this@pickToken)) }
-        }
-    }
+    private data class AssistantGenResult(val ops: List<StreamReplayOp>, val nextSeq: Int)
 
     private sealed class StreamReplayOp {
         abstract fun isStructurallyValid(): Boolean
@@ -286,26 +304,35 @@ class TimelineStreamReplayFuzzTest {
 
         fun ingestAssistantCumulative(message: AssistantMessage) {
             val seq = message.seqId ?: return
-            val serverId = message.otid?.let { otid ->
-                otidToServerId[otid] ?: message.id.also { otidToServerId[otid] = it }
-            } ?: message.id
+            val serverId = resolveServerId(message)
             val existing = assistants[serverId]
             if (existing == null) {
                 assistants[serverId] = AssistantState(message.otid, message.runId, seq, message.content)
                 return
             }
-            if (seq <= existing.maxSeq) {
-                return
-            }
-            val incoming = message.content
-            if (incoming.length < existing.text.length && existing.text.startsWith(incoming)) {
-                return
-            }
+            if (!shouldAdvanceAssistant(existing, message, seq)) return
             assistants[serverId] = existing.copy(
                 maxSeq = seq,
-                text = incoming,
+                text = message.content,
                 runId = message.runId ?: existing.runId,
             )
+        }
+
+        private fun resolveServerId(message: AssistantMessage): String {
+            val otid = message.otid
+            if (otid != null) {
+                return otidToServerId.getOrPut(otid) { message.id }
+            }
+            return message.id
+        }
+
+        private fun shouldAdvanceAssistant(existing: AssistantState, message: AssistantMessage, seq: Int): Boolean {
+            if (seq <= existing.maxSeq) return false
+            val incoming = message.content
+            if (incoming.length < existing.text.length && existing.text.startsWith(incoming)) {
+                return false
+            }
+            return true
         }
 
         fun snapshot(): Map<String, String> {
@@ -325,4 +352,13 @@ class TimelineStreamReplayFuzzTest {
 
     private fun Timeline.confirmedSnapshot(): Map<String, String> =
         events.filterIsInstance<TimelineEvent.Confirmed>().associate { it.serverId to it.content }
+}
+
+private fun Random.fuzzPickText(): String = fuzzPickToken() + " " + fuzzPickToken()
+
+private fun Random.fuzzPickToken(): String {
+    val len = 3 + nextInt(5)
+    return buildString(len) {
+        repeat(len) { append(('a'..'z').random(this@fuzzPickToken)) }
+    }
 }

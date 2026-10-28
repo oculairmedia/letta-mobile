@@ -16,6 +16,7 @@ class PaginationHelpersFuzzTest {
         FuzzCorpus.paginationSeeds.forEach { seed ->
             repeat(FuzzCorpus.SCENARIOS_PER_SEED) { scenario ->
                 cases++
+                val ctx = FuzzScenarioContext(seed, scenario)
                 val random = scenarioRandom(seed xor OFFSET_XOR, scenario)
                 val pageSize = random.nextInt(1, 12)
                 val itemCount = random.nextInt(0, 80)
@@ -30,13 +31,13 @@ class PaginationHelpersFuzzTest {
                     dedupKey = { it },
                 )
                 val (expected, scheduleFetches) = expectedPrefix(items, pageSize, maxPages, ignoreOffsetAfter)
-                checkFuzz(seed, scenario, condition = merged == expected) {
+                ctx.check(condition = merged == expected) {
                     "offset exhaust mismatch size=${merged.size} expected=${expected.size} fetches=${server.fetchCount}"
                 }
-                checkFuzz(seed, scenario, condition = merged.size == merged.distinct().size) {
+                ctx.check(condition = merged.size == merged.distinct().size) {
                     "duplicate keys in offset exhaust"
                 }
-                checkFuzz(seed, scenario, condition = server.fetchCount == scheduleFetches) {
+                ctx.check(condition = server.fetchCount == scheduleFetches) {
                     "offset fetch count ${server.fetchCount} != schedule $scheduleFetches"
                 }
             }
@@ -50,6 +51,7 @@ class PaginationHelpersFuzzTest {
         FuzzCorpus.paginationSeeds.forEach { seed ->
             repeat(FuzzCorpus.SCENARIOS_PER_SEED) { scenario ->
                 cases++
+                val ctx = FuzzScenarioContext(seed, scenario)
                 val random = scenarioRandom(seed xor CURSOR_XOR, scenario)
                 val pageSize = random.nextInt(1, 12)
                 val itemCount = random.nextInt(0, 80)
@@ -64,13 +66,13 @@ class PaginationHelpersFuzzTest {
                     itemKey = { it.key },
                 )
                 val (expected, scheduleFetches) = expectedPrefix(items, pageSize, maxPages, stickyCursorAfter)
-                checkFuzz(seed, scenario, condition = merged == expected) {
+                ctx.check(condition = merged == expected) {
                     "cursor exhaust mismatch fetches=${server.fetchCount} schedule=$scheduleFetches"
                 }
-                checkFuzz(seed, scenario, condition = merged.size == merged.distinctBy { it.key }.size) {
+                ctx.check(condition = merged.size == merged.distinctBy { it.key }.size) {
                     "duplicate keys in cursor exhaust"
                 }
-                checkFuzz(seed, scenario, condition = server.fetchCount == scheduleFetches) {
+                ctx.check(condition = server.fetchCount == scheduleFetches) {
                     "cursor fetch count ${server.fetchCount} != schedule $scheduleFetches"
                 }
             }
