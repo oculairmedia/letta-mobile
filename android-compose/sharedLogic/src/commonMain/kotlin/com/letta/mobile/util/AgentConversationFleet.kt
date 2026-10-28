@@ -74,11 +74,28 @@ class AgentConversationFleet(
     }
 
     /**
+     * Shared push/reconciliation policy. Dirty identities read only their owners; when ownership
+     * cannot be read on this backend, [roster] supplies a full reconciliation. Null [dirty] is an
+     * explicit initial/reconnect read. The result carries rows and, only for a reconciliation,
+     * the roster that named them, so hosts can retain their existing labels on scoped updates.
+     */
+    suspend fun refreshForInvalidations(
+        dirty: Map<ConversationId, AgentId?>?,
+        roster: suspend () -> List<Agent>,
+        resolve: suspend (ConversationId) -> Conversation? = { null },
+    ): Pair<List<Conversation>, List<Agent>> {
+        val changed = dirty?.let { refreshChanged(it, resolve) }
+        if (changed != null) return changed to emptyList()
+        val agents = roster()
+        return refresh(agents) to agents
+    }
+
+    /**
      * Re-reads only dirty conversations' owning agents, retaining other agents and loaded tails.
      * A missing owner or an unsupported targeted read returns null so the caller can reconcile
      * its roster. Ordinary failures retain cached rows and never widen the read to the fleet.
      */
-    suspend fun refreshChanged(
+    internal suspend fun refreshChanged(
         dirty: Map<ConversationId, AgentId?>,
         resolve: suspend (ConversationId) -> Conversation? = { null },
     ): List<Conversation>? = mutex.withLock {

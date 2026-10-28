@@ -115,8 +115,8 @@ open class CachedAllConversationsRepository(
             fleet.record(fresh)
             handleOptimisticUpdate(fresh)
         } else {
-            val listed = fleet.refreshChanged(dirty) { id -> source?.getConversation(id) }
-            if (listed == null) refreshLocked() else publish(listed)
+            val (listed, _) = fleet.refreshForInvalidations(dirty, roster) { id -> source?.getConversation(id) }
+            publish(listed)
         }
     }
 

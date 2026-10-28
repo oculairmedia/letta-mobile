@@ -108,7 +108,7 @@ class TimelineConversations(
 
     private suspend fun refreshChanged(dirty: Map<ConversationId, AgentId?>) {
         runCatchingCancellable {
-            fleet.refreshChanged(dirty) { gateway.getConversation(it.value) } ?: fleet.refresh(roster)
+            fleet.refreshForInvalidations(dirty, { roster }) { gateway.getConversation(it.value) }.first
         }.onSuccess { listed ->
             mutableState.update { current ->
                 current.copy(conversations = listed.keeping(current.conversations.filter { it.id == current.selected }), loaded = true, error = null)

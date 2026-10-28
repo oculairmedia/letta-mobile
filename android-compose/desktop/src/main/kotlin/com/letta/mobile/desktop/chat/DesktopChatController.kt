@@ -1107,10 +1107,9 @@ class DesktopChatController(
         nextGateway: DesktopChatGateway,
         dirty: Map<ConversationId, AgentId?>? = null,
     ): List<ChatConversationSummary> {
-        val fleet = fleets.fleetFor(nextGateway)
-        val changed = dirty?.let { fleet.refreshChanged(it) { id -> nextGateway.getConversation(id.value) } }
-        val roster = if (changed == null) rosterProvider() else emptyList()
-        val conversations = changed ?: fleet.refresh(roster)
+        val (conversations, roster) = fleets.fleetFor(nextGateway).refreshForInvalidations(dirty, rosterProvider) {
+            nextGateway.getConversation(it.value)
+        }
         models.picks.seedFromHost(conversations) // dxz5s: host overrides, before any selection reads them
         // Every listed conversation is a roster agent's, so the roster names them all.
         val agentNamesById = _state.value.conversations.mapNotNull { row -> row.agentId?.let { it to row.agentName } }.toMap() +
