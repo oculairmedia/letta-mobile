@@ -102,7 +102,10 @@ class TimelineConversationsTest {
             assertEquals(0, currentTime - warmStart)
             owner.selectConversation(rows.first().id)
             assertEquals("Renamed Agent 0", owner.selectedTarget()?.agentName)
-            println("fleet sample=$sample coldCalls=137 coldFirst=$cold coldComplete=$cold warmCalls=${calls - 137} warmFirst=0 warmComplete=${currentTime - warmStart} rows=883")
+            println(
+                "fleet sample=$sample coldCalls=137 coldFirst=$cold coldComplete=$cold " +
+                    "warmCalls=${calls - 137} warmFirst=0 warmComplete=${currentTime - warmStart} rows=883",
+            )
         }
     }
 
