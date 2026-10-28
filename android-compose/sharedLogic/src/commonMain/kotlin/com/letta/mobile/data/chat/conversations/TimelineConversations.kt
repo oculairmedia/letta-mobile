@@ -16,6 +16,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.visibleConversationsInLists
+import com.letta.mobile.data.model.visibleInLists
 import com.letta.mobile.data.shell.ShellChatPort
 import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.ui.chat.session.ChatActions
@@ -77,7 +78,10 @@ class TimelineConversations(
     /** The agents whose conversations the list shows (and whose names title the chats); new agents list again. */
     var roster: List<Agent> = roster
         set(agents) {
-            val changed = agents.map { it.id } != field.map { it.id }
+            // Names and roster ordering enrich the existing rows; only visible membership changes
+            // require another fleet read. Include visibility so hiding an existing agent also reloads.
+            val changed = agents.visibleInLists().mapTo(mutableSetOf()) { it.id } !=
+                field.visibleInLists().mapTo(mutableSetOf()) { it.id }
             field = agents
             if (changed) scope.launch { refresh() }
         }

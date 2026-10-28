@@ -5,6 +5,14 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.currentTime
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import com.letta.mobile.data.model.ConversationRecency
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -100,6 +108,71 @@ class AgentConversationFleetTest {
 
         assertTrue(AgentConversationFleet(host).refresh(emptyList()).isEmpty())
         assertTrue(host.reads.isEmpty())
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun workerOnlyGlobalWindowsAndHeavyHistoryDoNotLoseTheRosterRows() = runTest {
+        repeat(5) { sample ->
+            val agents = List(137) { Agent(AgentId("agent-$it"), name = "Agent $it") }
+            val visible = List(501) { row("heavy-${it.toString().padStart(3, '0')}", agents.first().id.value) } +
+                List(382) { row("other-$it", agents[1 + it % 136].id.value) }
+            val workers = List(5_000) { row("worker-$it", null, "2026-10-22T10:00:00Z") }
+            val host = Host(workers + visible)
+            val fleet = AgentConversationFleet(
+                AgentConversationReader { agent, after, limit ->
+                    delay(100)
+                    host.read(agent, after, limit)
+                },
+                AgentConversationFleetPaging(eagerPagesPerAgent = READ_THROUGH_PAGES),
+            )
+            val start = currentTime
+            val initial = fleet.refresh(agents)
+            // The existing eager bound is not completeness: 501 rows need an eleventh page.
+            assertEquals(882, initial.size)
+            assertTrue(fleet.hasMore)
+            val all = fleet.loadMore()
+            assertEquals(883, all.size)
+            assertFalse(fleet.hasMore)
+            assertEquals(visible.map { it.second }.sortedWith(ConversationRecency.newestFirst), all)
+            assertEquals(147, host.reads.size)
+            assertTrue(host.reads.all { it.agent in agents.map(Agent::id) })
+            println("heavy sample=$sample requests=${host.reads.size} complete=${currentTime - start} rows=${all.size} workerRows=5000")
+
+            // Comparative full-scan model only, not a replacement gateway: a single global window
+            // contains no roster rows. A complete scan is correct but pays for every worker window.
+            val globalStart = currentTime
+            var globalCalls = 0
+            val global = mutableListOf<Conversation>()
+            (workers + visible).chunked(50).forEach { page ->
+                globalCalls++
+                delay(100)
+                global += page.filter { it.first != null }.map { it.second }
+            }
+            assertEquals(all, global.sortedWith(ConversationRecency.newestFirst))
+            assertEquals(118, globalCalls)
+            assertEquals(11_800, currentTime - globalStart)
+            println("global-model sample=$sample requests=$globalCalls complete=${currentTime - globalStart} rows=${global.size}")
+        }
+    }
+
+    @Test
+    fun cancellingARefreshReleasesTheFleetAndPublishesNoPartialRoster() = runTest {
+        val started = CompletableDeferred<Unit>()
+        var waiting = true
+        val fleet = AgentConversationFleet(AgentConversationReader { _, _, _ ->
+            if (waiting) {
+                started.complete(Unit)
+                awaitCancellation()
+            }
+            listOf(row("n0", nora.id.value).second)
+        })
+        val refresh = launch { fleet.refresh(listOf(nora)) }
+        started.await()
+        refresh.cancelAndJoin()
+        assertTrue(fleet.conversations.isEmpty())
+        waiting = false
+        assertEquals(listOf("n0"), fleet.refresh(listOf(nora)).map { it.id.value })
     }
 
     /** Rows as a host's App Server lists them (worker rows have no agent and match no agent's read). */
