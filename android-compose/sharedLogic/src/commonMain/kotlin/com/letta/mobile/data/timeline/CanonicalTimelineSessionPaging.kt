@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 
+private const val STALE_RECENT_RETRIES = 5
+
 /**
  * One Paging generation per selection. A durable revision invalidates the active source in place, so
  * Paging swaps loaders while keeping the presented list on screen. Rebuilding the [Pager] instead would
@@ -171,9 +173,5 @@ internal class TimelineHistoryMediator(
             TimelineEnginePageOutcome.NoProgress -> MediatorResult.Success(endOfPaginationReached = true)
             TimelineEnginePageOutcome.Stale -> null
         }
-    }
-
-    private companion object {
-        private const val STALE_RECENT_RETRIES = 5
     }
 }
