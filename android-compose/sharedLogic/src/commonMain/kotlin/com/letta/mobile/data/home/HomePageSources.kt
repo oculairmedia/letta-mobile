@@ -1,36 +1,39 @@
 package com.letta.mobile.data.home
 
-import com.letta.mobile.data.session.ifSupported
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.ParsedSearchMessage
+import com.letta.mobile.data.model.Step
+import com.letta.mobile.data.repository.api.IBlockRepository
+import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.search.MessageSearchQuery
 import com.letta.mobile.data.search.searchBackend
-import com.letta.mobile.data.repository.api.IBlockRepository
-import com.letta.mobile.runtime.RunId
-import com.letta.mobile.data.repository.api.IRunRepository
+import com.letta.mobile.data.session.HomeAggregateSession
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
-import com.letta.mobile.data.session.connectionReadiness
+import com.letta.mobile.data.session.ifSupported
+import com.letta.mobile.data.session.isUnsupportedHomeStatistic
 import com.letta.mobile.data.storage.SecureSettingsStore
+import com.letta.mobile.runtime.RunId
 import com.letta.mobile.util.Telemetry
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.hours
 
 /** Searches the backend's messages for Home; hosts without a message repository pass none. */
 fun interface HomeMessageSearch {
@@ -49,9 +52,10 @@ fun interface HomeMessageSearch {
 /**
  * [HomePageSource] over the session graph, shared by every host: the agent, tool and (where the
  * backend has a global block store) block catalogs, the tool / block counts and the last day's token
- * usage. A graph switch (backend change) and each transport reconnection reload the figures;
- * [refresh] coalesces page-entry and Retry requests while a load is active. A local runtime has no server-side
- * tools, blocks or runs, so it reports zeros without asking.
+ * usage. Catalog subscriptions remain live while Home is hidden; aggregates wait for page-entry
+ * demand. Completed figures are reused for 60 seconds. A new connection or capability epoch
+ * forgets unsupported figures; [refresh] bypasses the TTL and coalesces overlapping requests.
+ * Routes outside the session capabilities are never asked for.
  */
 class SessionHomePageSource<Graph : SessionRepositoryGraph>(
     private val sessionGraphProvider: SessionRepositoryGraphProvider<Graph>,
@@ -64,6 +68,10 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
     private val blocks = MutableStateFlow<List<Block>>(emptyList())
     private var followJob: Job? = null
     private var statsJob: Job? = null
+    private var statsGraph: Graph? = null
+    private var aggregatesDemanded = false
+    private val session = HomeAggregateSession()
+    private var aggregateCache = HomeAggregateCache(clock)
 
     override val catalog: StateFlow<HomeSearchCatalog> = catalogFlow.asStateFlow()
     override val stats: StateFlow<HomeStats> = statsFlow.asStateFlow()
@@ -73,20 +81,22 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
         if (followJob != null) return
         followJob = scope.launch {
             sessionGraphProvider.currentGraph.collectLatest { graph ->
-                reloadStats(graph)
                 coroutineScope {
                     launch { followCatalog(graph) }
-                    graph.connectionReadiness()
-                        .drop(1)
-                        .collect { connected -> if (connected) reloadStats(graph) }
+                    graph.channelTransport.state.collect { reloadStats(graph, automatic = true) }
                 }
             }
         }
     }
 
     override fun refresh() {
-        // Entering Home during the initial load shares that request instead of restarting it.
-        if (statsJob?.isActive != true) reloadStats(sessionGraphProvider.current)
+        aggregatesDemanded = true
+        reloadStats(sessionGraphProvider.current, force = true)
+    }
+
+    override fun loadIfStale() {
+        aggregatesDemanded = true
+        reloadStats(sessionGraphProvider.current)
     }
 
     override suspend fun searchMessages(query: String): List<ParsedSearchMessage> =
@@ -97,6 +107,8 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
         statsJob?.cancel()
         followJob = null
         statsJob = null
+        statsGraph = null
+        aggregatesDemanded = false
     }
 
     /** A catalog the session does not serve is empty, never asked for. */
@@ -110,10 +122,34 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
         }.collect { catalogFlow.value = it }
     }
 
-    private fun reloadStats(graph: Graph) {
+    private fun reloadStats(graph: Graph, force: Boolean = false, automatic: Boolean = false) {
+        if (graph !== sessionGraphProvider.current) return
+        resetForNewSession(graph)
+        // A replaced graph closes its repositories. Only completed results can survive that swap.
+        if (statsGraph !== graph) {
+            statsJob?.cancel()
+            statsJob = null
+            statsGraph = graph
+        }
+        if (!shouldLoadStats(force, automatic)) return
+        val cache = aggregateCache
+        statsJob = scope.launch { loadStats(graph, cache) }
+    }
+
+    private fun shouldLoadStats(force: Boolean, automatic: Boolean): Boolean {
+        if (!aggregatesDemanded) return false
+        if (automatic && !session.isConnected) return false
+        if (statsJob?.isActive == true) return false
+        return force || !aggregateCache.isFresh()
+    }
+
+    private fun resetForNewSession(graph: Graph) {
+        if (!session.update(graph)) return
         statsJob?.cancel()
+        statsJob = null
+        aggregateCache = HomeAggregateCache(clock)
         blocks.value = emptyList()
-        statsJob = scope.launch { loadStats(graph) }
+        statsFlow.value = HomeStats()
     }
 
     /**
@@ -121,26 +157,38 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
      * figure that fails (say a route the backend has no admin_rpc path for under iroh://) stays null,
      * so its tile drops out; [HomeStats.error] is raised only when every figure failed.
      */
-    private suspend fun loadStats(graph: Graph) {
+    private suspend fun loadStats(graph: Graph, cache: HomeAggregateCache) {
         statsFlow.value = HomeStats(loading = true)
         // letta-mobile-by4vm.13: a figure the session does not serve is not asked for; its tile drops out.
-        val tools = graph.ifSupported(SessionRoute.TOOLS) { toolRepository }
-        val blockRepository = graph.ifSupported(SessionRoute.BLOCKS) { blockRepository } as? IBlockRepository
-        val runs = graph.ifSupported(SessionRoute.RUNS) { runRepository }
+        val tools = graph.ifSupported(SessionRoute.TOOLS) { toolRepository }?.takeIf { cache.supports(SessionRoute.TOOLS) }
+        val blockRepository = (graph.ifSupported(SessionRoute.BLOCKS) { blockRepository } as? IBlockRepository)
+            ?.takeIf { cache.supports(SessionRoute.BLOCKS) }
+        val runs = graph.ifSupported(SessionRoute.RUNS) { runRepository }?.takeIf { cache.supports(SessionRoute.RUNS) }
         val failures = coroutineScope {
             listOfNotNull(
-                tools?.let { repo -> async { record(attempt { repo.countTools() }) { stats, count -> stats.copy(toolCount = count) } } },
-                blockRepository?.let { async { record(attempt { loadBlocks(it) }) { stats, count -> stats.copy(blockCount = count) } } },
-                runs?.let { repo -> async { record(attempt { loadUsage(repo) }) { stats, usage -> stats.copy(usage = usage) } } },
+                tools?.let { repo -> async {
+                    record(cache, SessionRoute.TOOLS, attempt { repo.countTools() }) { stats, count -> stats.copy(toolCount = count) }
+                } },
+                blockRepository?.let { repo -> async {
+                    record(cache, SessionRoute.BLOCKS, attempt { loadBlocks(repo) }) { stats, count -> stats.copy(blockCount = count) }
+                } },
+                runs?.let { repo -> async {
+                    record(cache, SessionRoute.RUNS, attempt { loadUsage(repo) }) { stats, usage -> stats.copy(usage = usage) }
+                } },
             ).awaitAll()
         }
         val error = failures.takeIf { results -> results.all { it != null } }?.firstNotNullOfOrNull { it?.message }
+        currentCoroutineContext().ensureActive()
+        cache.complete()
         statsFlow.update { it.copy(loading = false, error = error) }
     }
 
     private suspend fun loadBlocks(repository: IBlockRepository): Int {
         val count = repository.countBlocks()
-        blocks.value = repository.listAllBlocks()
+        currentCoroutineContext().ensureActive()
+        val loaded = repository.listAllBlocks()
+        currentCoroutineContext().ensureActive()
+        blocks.value = loaded
         return count
     }
 
@@ -150,36 +198,53 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
         val window = (windowEnd - USAGE_WINDOW_HOURS.hours)..windowEnd
         val recent = runs.getRecentRuns(limit = USAGE_RUN_LIMIT)
             .filter { run -> run.createdAt?.let(::parseConversationInstant)?.let { it in window } == true }
-        val steps = recent.chunked(USAGE_STEPS_CONCURRENCY).flatMap { batch ->
+        // Probe step support once before fan-out: one unsupported endpoint must not cost 100 attempts.
+        currentCoroutineContext().ensureActive()
+        val first = recent.firstOrNull()?.let { loadSteps(runs, RunId(it.id)) }.orEmpty()
+        val steps = recent.drop(1).chunked(USAGE_STEPS_CONCURRENCY).flatMap { batch ->
             coroutineScope {
-                batch.map { run -> async { attempt { runs.getRunSteps(RunId(run.id)) }.getOrDefault(emptyList()) } }.awaitAll()
+                batch.map { run -> async { loadSteps(runs, RunId(run.id)) } }.awaitAll()
             }
         }
-        return HomeUsageCalculator.calculate(steps.flatten())
+        return HomeUsageCalculator.calculate(first + steps.flatten())
+    }
+
+    /** Transient per-run failures retain the existing partial-usage behavior; absence stops fan-out. */
+    private suspend fun loadSteps(runs: IRunRepository, runId: RunId): List<Step> {
+        val result = attempt { runs.getRunSteps(runId) }
+        result.exceptionOrNull()?.takeIf { it.isUnsupportedHomeStatistic() }?.let { throw it }
+        return result.getOrDefault(emptyList())
     }
 
     /** Applies a figure that loaded; returns the failure of one that did not. */
-    private fun <T> record(result: Result<T>, apply: (HomeStats, T) -> HomeStats): Throwable? {
+    private fun <T> record(
+        cache: HomeAggregateCache,
+        figure: SessionRoute,
+        result: Result<T>,
+        apply: (HomeStats, T) -> HomeStats,
+    ): Throwable? {
         result.onSuccess { value -> statsFlow.update { apply(it, value) } }
-        result.onFailure { Telemetry.error(TAG, "stat.failed", it) }
+        result.onFailure {
+            cache.remember(figure, it)
+            Telemetry.event(
+                TAG, "stat.failed", "figure" to figure.name, "failureType" to it::class.simpleName,
+                level = Telemetry.Level.ERROR,
+            )
+        }
         return result.exceptionOrNull()
     }
-
-    private companion object {
-        const val TAG = "SessionHomePageSource"
-
-        /** Runs sampled for the usage summary. */
-        const val USAGE_RUN_LIMIT = 100
-
-        /** Concurrent /runs/{id}/steps requests; more starves the other screens' requests. */
-        const val USAGE_STEPS_CONCURRENCY = 5
-    }
 }
+
+private const val TAG = "SessionHomePageSource"
+private const val USAGE_RUN_LIMIT = 100
+// More concurrent step reads would starve requests from other screens.
+private const val USAGE_STEPS_CONCURRENCY = 5
 
 /** [runCatching] that never swallows cancellation. */
 private suspend fun <T> attempt(block: suspend () -> T): Result<T> {
     val result = runCatching { block() }
     (result.exceptionOrNull() as? CancellationException)?.let { throw it }
+    currentCoroutineContext().ensureActive()
     return result
 }
 

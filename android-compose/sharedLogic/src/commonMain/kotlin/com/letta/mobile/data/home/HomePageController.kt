@@ -29,6 +29,9 @@ interface HomePageSource : AutoCloseable {
 
     fun refresh()
 
+    /** Requests aggregates on page entry, reusing a completed result while it is fresh. */
+    fun loadIfStale() = refresh()
+
     suspend fun searchMessages(query: String): List<ParsedSearchMessage> = emptyList()
 }
 
@@ -53,6 +56,9 @@ private val NoPersistedNames: StateFlow<Map<String, String>> = MutableStateFlow(
 /** What the shared Home page can ask of its controller. Navigation stays with the host. */
 interface HomePageActions {
     fun refresh()
+
+    /** Page-entry demand; explicit refresh continues to bypass the completed-result TTL. */
+    fun loadIfStale() = refresh()
 
     fun updateSearchQuery(query: String)
 
@@ -205,6 +211,10 @@ class HomePageController(
 
     override fun refresh() {
         source.refresh()
+    }
+
+    override fun loadIfStale() {
+        source.loadIfStale()
     }
 
     override fun updateSearchQuery(query: String) {
