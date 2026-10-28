@@ -109,8 +109,9 @@ open class CachedAllConversationsRepository(
     private suspend fun refreshPushedLocked(dirty: Map<ConversationId, AgentId?>) = refreshMutex.withLock {
         if (!hasLoadedAtLeastOnce) return@withLock
         val source = irohConversationListSource?.takeIf { it.shouldUseIroh() }
-        if (dirty.size == 1 && dirty.values.single() == null && source != null) {
-            val fresh = source.getConversation(dirty.keys.single())
+        val legacy = dirty.keys.singleOrNull()?.takeIf { dirty[it] == null }
+        if (legacy != null && source != null) {
+            val fresh = source.getConversation(legacy)
             fleet.record(fresh)
             handleOptimisticUpdate(fresh)
         } else {

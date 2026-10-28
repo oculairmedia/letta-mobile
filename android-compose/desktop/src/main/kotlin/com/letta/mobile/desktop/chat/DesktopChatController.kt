@@ -467,7 +467,14 @@ class DesktopChatController(
         if (started || closed) return
         started = true
         loadJob = scope.launch { connectAndLoad() }
-        conversationChanges?.let(::observeConversationPushes)
+        conversationPushJob = conversationChanges?.let { transport ->
+            scope.launch {
+                observeConversationInvalidations(transport.conversationChanges()) { dirty ->
+                    runCatchingCancellable { refreshConversationRoster(dirty) }
+                        .onFailure { Telemetry.error(TELEMETRY_TAG, "roster.refreshFailed", it) }
+                }
+            }
+        }
     }
 
     fun retryConnection() {
@@ -1110,16 +1117,6 @@ class DesktopChatController(
             roster.filter { it.name.isNotBlank() }.associate { it.id.value to it.name }
         return conversations.toChatConversationSummaries(agentNamesById)
             .map { if (it.id in locallyArchivedIds) it.copy(archived = true) else it }
-    }
-
-    /** Binds the channel to shared dirty-ID collection and scoped fleet reads. */
-    private fun observeConversationPushes(transport: IChannelTransport) {
-        conversationPushJob = scope.launch {
-            observeConversationInvalidations(transport.conversationChanges()) { dirty ->
-                runCatchingCancellable { refreshConversationRoster(dirty) }
-                    .onFailure { Telemetry.error(TELEMETRY_TAG, "roster.refreshFailed", it) }
-            }
-        }
     }
 
     /**
