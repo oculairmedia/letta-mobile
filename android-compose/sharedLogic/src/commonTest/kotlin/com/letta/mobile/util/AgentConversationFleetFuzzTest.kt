@@ -17,6 +17,9 @@ import kotlin.test.assertEquals
  * listings but still advancing cursors, empty and hidden-only pages, exact full final pages.
  * Excluded: worker/agent-free rows (never read), archive-only filtering (archived rows remain listable),
  * cancellation mid-read (no reliable virtual-time seam in this slice).
+ *
+ * Ordering oracle uses production [ConversationRecency.sortKeyMillis] on generated ISO-Z timestamps;
+ * that path does not independently fuzz date parsing (see docs/testing/pagination-replay-fuzz.md).
  */
 class AgentConversationFleetFuzzTest {
     private val recencyOrder = compareByDescending<Conversation> {
@@ -25,21 +28,28 @@ class AgentConversationFleetFuzzTest {
 
     @Test
     fun seededFleetPaginationMatchesFixtureExpectations() = runTest {
-        var totalCases = 0
-        FuzzCorpus.paginationSeeds.forEach { seed ->
-            repeat(FuzzCorpus.SCENARIOS_PER_SEED) { scenario ->
-                totalCases++
-                runScenario(FleetFuzzScenario(seed, scenario, scenarioRandom(seed, scenario)))
-            }
-        }
-        assertEquals(
-            FuzzCorpus.paginationSeeds.size * FuzzCorpus.SCENARIOS_PER_SEED,
-            totalCases,
-            "Every generated fleet scenario must run",
-        )
+        val expectedCases = FuzzCorpus.paginationSeeds.size * FuzzCorpus.SCENARIOS_PER_SEED
+        val totalCases = runFleetPaginationCampaign(FuzzCorpus.paginationSeeds, FuzzCorpus.SCENARIOS_PER_SEED)
+        assertEquals(expectedCases, totalCases, "Every generated fleet scenario must run")
     }
 
-    private suspend fun runScenario(scenario: FleetFuzzScenario) {
+    companion object {
+        internal suspend fun runFleetPaginationCampaign(seeds: List<Long>, scenariosPerSeed: Int): Int {
+            val harness = AgentConversationFleetFuzzTest()
+            var totalCases = 0
+            seeds.forEach { seed ->
+                repeat(scenariosPerSeed) { scenario ->
+                    totalCases++
+                    harness.runFleetScenario(
+                        FleetFuzzScenario(seed, scenario, scenarioRandom(seed, scenario)),
+                    )
+                }
+            }
+            return totalCases
+        }
+    }
+
+    private suspend fun runFleetScenario(scenario: FleetFuzzScenario) {
         val random = scenario.random
         val ctx = scenario.ctx
         val agentCount = when {

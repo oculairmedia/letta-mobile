@@ -14,6 +14,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.random.Random
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import com.letta.mobile.util.Telemetry
 
 /**
@@ -36,33 +37,46 @@ class TimelineStreamReplayFuzzTest {
 
     @Test
     fun seededStreamReplayMatchesIndependentOracle() {
-        var totalCases = 0
-        FuzzCorpus.timelineSeeds.forEach { seed ->
-            repeat(FuzzCorpus.SCENARIOS_PER_SEED) { scenario ->
-                totalCases++
-                val replayScenario = StreamReplayScenario(seed, scenario, scenarioRandom(seed, scenario))
-                val ops = replayScenario.generateOperations()
-                try {
-                    assertScenario(replayScenario, ops)
-                } catch (failure: FuzzCaseFailure) {
-                    val shrunk = minimizeBySuffixDeletion(
-                        operations = ops,
-                        isValid = { minimizedOps -> minimizedOps.all { it.isStructurallyValid() } },
-                        invokeScenario = { minimizedOps ->
-                            assertScenario(replayScenario, minimizedOps)
-                        },
-                        formatOp = { it.label() },
-                    )
-                    throw FuzzCaseFailure(
-                        seed = failure.seed,
-                        scenarioIndex = failure.scenarioIndex,
-                        operationIndex = failure.operationIndex,
-                        detail = "${failure.message} minimized=${shrunk.minimized.size}/${ops.size} trace=${shrunk.trace}",
-                    ).also { it.addSuppressed(failure) }
+        val expectedCases = FuzzCorpus.timelineSeeds.size * FuzzCorpus.SCENARIOS_PER_SEED
+        val totalCases = runTimelineReplayCampaign(FuzzCorpus.timelineSeeds, FuzzCorpus.SCENARIOS_PER_SEED)
+        assertEquals(expectedCases, totalCases, "Every generated timeline scenario must run")
+    }
+
+    companion object {
+        internal fun runTimelineReplayCampaign(seeds: List<Long>, scenariosPerSeed: Int): Int {
+            val harness = TimelineStreamReplayFuzzTest()
+            var totalCases = 0
+            seeds.forEach { seed ->
+                repeat(scenariosPerSeed) { scenario ->
+                    totalCases++
+                    harness.runTimelineScenario(seed, scenario)
                 }
             }
+            return totalCases
         }
-        check(totalCases == FuzzCorpus.timelineSeeds.size * FuzzCorpus.SCENARIOS_PER_SEED)
+    }
+
+    private fun runTimelineScenario(seed: Long, scenario: Int) {
+        val replayScenario = StreamReplayScenario(seed, scenario, scenarioRandom(seed, scenario))
+        val ops = replayScenario.generateOperations()
+        try {
+            assertScenario(replayScenario, ops)
+        } catch (failure: FuzzCaseFailure) {
+            val shrunk = minimizeBySuffixDeletion(
+                operations = ops,
+                isValid = { minimizedOps -> minimizedOps.all { it.isStructurallyValid() } },
+                invokeScenario = { minimizedOps ->
+                    assertScenario(replayScenario, minimizedOps)
+                },
+                formatOp = { it.label() },
+            )
+            throw FuzzCaseFailure(
+                seed = failure.seed,
+                scenarioIndex = failure.scenarioIndex,
+                operationIndex = failure.operationIndex,
+                detail = "${failure.message} minimized=${shrunk.minimized.size}/${ops.size} trace=${shrunk.trace}",
+                    ).also { it.addSuppressed(failure) }
+        }
     }
 
     private fun assertScenario(scenario: StreamReplayScenario, ops: List<StreamReplayOp>) {
