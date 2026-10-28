@@ -62,6 +62,26 @@ class DocumentWorkspaceControllerTest {
         assertEquals(DocumentWorkspaceProblem.UNAVAILABLE, rejectCachedFailedTarget(NotebookNoteLoad.Unavailable("read failed")))
     }
 
+    @Test
+    fun previouslyLoadedTargetMustLoadAgainBeforeItCanOpen() = runTest {
+        val fixture = WorkspaceFixture()
+        val cached = fixture.sessions(fixture.second)
+        val controller = fixture.controller()
+        assertTrue(controller.open(fixture.first))
+        val mounted = controller.state.value.current
+        fixture.overrideSessions = cached
+        fixture.loadFailure = NotebookNoteLoad.Unavailable("later read failed")
+        assertFalse(controller.open(fixture.second))
+        assertSame(mounted, controller.state.value.current)
+        assertEquals(DocumentWorkspaceProblem.UNAVAILABLE, controller.state.value.problem)
+        assertEquals("later read failed", cached.note.state.value.error)
+        assertEquals(0, fixture.saves)
+        fixture.loadFailure = null
+        assertTrue(controller.open(fixture.second))
+        assertSame(cached, controller.state.value.current)
+        assertNull(cached.note.state.value.error)
+    }
+
     private suspend fun rejectCachedFailedTarget(failure: NotebookNoteLoad) = kotlinx.coroutines.coroutineScope {
         val fixture = WorkspaceFixture()
         val controller = fixture.controller()

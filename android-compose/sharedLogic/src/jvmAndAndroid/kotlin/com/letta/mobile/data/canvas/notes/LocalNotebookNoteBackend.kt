@@ -9,7 +9,8 @@ import org.automerge.repo.DocumentId
 
 /**
  * Adapter for a trusted local-owned [notebooks] store, never a remote authorization boundary.
- * IDs are the store's actual lowercase hex DocumentId bytes, not generated notebook/Canvas aliases.
+ * IDs are lowercase hex DocumentId bytes; after compaction the original ID remains the note's
+ * logical identity and the store resolves it to the current storage generation.
  * The store's serialized document transaction guards stale Markdown. Its filesystem lock covers
  * this adapter's mutation and flush, but does not make independent repositories merge disk state
  * or lock remote peers. Later peer merges follow Automerge; explicit refresh discovers them.
@@ -24,7 +25,8 @@ class LocalNotebookNoteBackend(private val notebooks: NotebookLocalStore) : Note
     }
 
     override suspend fun save(id: NotebookDocumentId, expected: String, replacement: String): NotebookNoteSave = guarded {
-        val documentId = storageId(id)
+        val documentId = notebooks.resolveStorageId(storageId(id))
+            ?: return@guarded NotebookNoteSave.Unavailable("Local notebook not found")
         val before = snapshot(id) ?: return@guarded NotebookNoteSave.Unavailable("Local notebook not found")
         if (!notebooks.replaceMarkdown(documentId, expected, replacement)) {
             return@guarded snapshot(id)?.let { NotebookNoteSave.Conflict(it) }
@@ -35,7 +37,9 @@ class LocalNotebookNoteBackend(private val notebooks: NotebookLocalStore) : Note
     }
 
     override suspend fun flush(applied: NotebookNoteSnapshot): NotebookNoteSave = guarded {
-        persist(applied, storageId(applied.id))
+        val documentId = notebooks.resolveStorageId(storageId(applied.id))
+            ?: return@guarded NotebookNoteSave.Unavailable("Local notebook not found")
+        persist(applied, documentId)
     }
 
     private fun persist(applied: NotebookNoteSnapshot, id: DocumentId): NotebookNoteSave {

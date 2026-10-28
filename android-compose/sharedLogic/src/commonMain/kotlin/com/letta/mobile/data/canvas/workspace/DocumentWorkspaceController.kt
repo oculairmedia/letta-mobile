@@ -94,9 +94,9 @@ class DocumentWorkspaceController(private val opener: DocumentWorkspaceOpener) {
             val current = state.value.current
             return when {
                 target.id != id || target.references?.id?.let { it != id } == true -> fail(DocumentWorkspaceProblem.IDENTITY_MISMATCH)
+                !ready(target) -> fail(DocumentWorkspaceProblem.UNAVAILABLE)
                 // A freshly authorized self-open must not replace the live draft with a new session.
                 current?.id == id -> true
-                !ready(target) -> fail(DocumentWorkspaceProblem.UNAVAILABLE)
                 current != null && !current.note.prepareClose() -> checkedFailure(DocumentWorkspaceProblem.SAVE_FAILED)
                 else -> commit(target, back)
             }
@@ -116,7 +116,8 @@ class DocumentWorkspaceController(private val opener: DocumentWorkspaceOpener) {
 
     private suspend fun ready(target: DocumentWorkspaceSessions): Boolean {
         // References may be the first presentation; close must not depend on visiting Note first.
-        if (target.note.state.value.baseline == null) target.note.refresh()
+        // A retained baseline proves only an earlier load. Every open needs a current read result.
+        target.note.refresh()
         currentCoroutineContext().ensureActive()
         val loaded = target.note.state.value
         return loaded.baseline != null && !loaded.loading && !loaded.notFound && loaded.error == null
