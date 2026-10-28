@@ -82,6 +82,7 @@ class SessionHomePageSourceTest {
         val graph = HomeGraph(tools = tools, channelTransport = transport)
         val source = SessionHomePageSource(FixedGraphProvider(graph), backgroundScope)
         source.start()
+        source.loadIfStale()
         runCurrent()
         assertEquals(1, tools.countCalls)
         tools.count = Result.success(7)
@@ -111,12 +112,13 @@ class SessionHomePageSourceTest {
     @Test
     fun entrySharesAnActiveRequestAndRetryRecoversAFailure() = runTest {
         val pending = CompletableDeferred<Unit>()
-        val tools = FakeTools(Result.failure(IrohGuardException()), beforeCount = { pending.await() })
+        val tools = FakeTools(Result.failure(IllegalStateException("temporarily unavailable")), beforeCount = { pending.await() })
         val source = SessionHomePageSource(
-            FixedGraphProvider(HomeGraph(tools = tools, runs = FakeRuns(IrohGuardException()))),
+            FixedGraphProvider(HomeGraph(tools = tools, runs = FakeRuns(IllegalStateException("temporarily unavailable")))),
             backgroundScope,
         )
         source.start()
+        source.loadIfStale()
         runCurrent()
         source.refresh()
         runCurrent()
@@ -195,6 +197,7 @@ class SessionHomePageSourceTest {
         val graph = HomeGraph(tools = tools, runs = runs, capabilities = capabilities)
         val source = SessionHomePageSource(sessionGraphProvider = FixedGraphProvider(graph), scope = backgroundScope)
         source.start()
+        source.loadIfStale()
         runCurrent()
         val stats = source.stats.value
         assertFalse(stats.loading)
@@ -209,15 +212,15 @@ class SessionHomePageSourceTest {
         "Admin API call attempted while the active backend is an Iroh endpoint (iroh://node). This route has no admin_rpc path",
     )
 
-    private class FixedGraphProvider(graph: HomeGraph) : SessionRepositoryGraphProvider<HomeGraph> {
-        override val currentGraph: StateFlow<HomeGraph> = MutableStateFlow(graph)
+    internal class FixedGraphProvider(graph: HomeGraph) : SessionRepositoryGraphProvider<HomeGraph> {
+        override val currentGraph: MutableStateFlow<HomeGraph> = MutableStateFlow(graph)
         override val sessionError: StateFlow<Throwable?> = MutableStateFlow(null)
         override val current: HomeGraph get() = currentGraph.value
         override fun rebuild(): HomeGraph = current
         override suspend fun <T> withCurrentSession(block: suspend (HomeGraph) -> T): T = block(current)
     }
 
-    private class HomeGraph(
+    internal class HomeGraph(
         tools: IToolRepository = FakeTools(),
         runs: IRunRepository = FakeRuns(),
         override val channelTransport: IChannelTransport = FakeIrohAdminTransport(),
@@ -262,13 +265,13 @@ class SessionHomePageSourceTest {
         private fun unused(): Nothing = error("Home does not read this repository")
     }
 
-    private class FakeTools(
+    internal class FakeTools(
         var count: Result<Int> = Result.success(0),
         private val beforeCount: suspend () -> Unit = {},
     ) : IToolRepository {
         var countCalls = 0
-        private val tools = MutableStateFlow<List<Tool>>(emptyList())
-        override fun getTools(): StateFlow<List<Tool>> = tools
+        val catalog = MutableStateFlow<List<Tool>>(emptyList())
+        override fun getTools(): StateFlow<List<Tool>> = catalog
         override fun getAgentTools(agentId: AgentId): Flow<List<Tool>> = flowOf(emptyList())
         override suspend fun countTools(): Int {
             countCalls += 1
@@ -285,15 +288,28 @@ class SessionHomePageSourceTest {
         override suspend fun deleteTool(toolId: ToolId) = Unit
     }
 
-    private class FakeRuns(private val failure: Throwable? = null) : IRunRepository {
+    internal class FakeRuns(
+        private val failure: Throwable? = null,
+        private val stepFailure: Throwable? = null,
+    ) : IRunRepository {
+        var recent: List<Run> = emptyList()
+        var recentCalls = 0
+        var stepCalls = 0
         override val runs: StateFlow<List<Run>> = MutableStateFlow(emptyList())
         override suspend fun refreshRuns(params: RunListParams) = Unit
-        override suspend fun getRecentRuns(limit: Int): List<Run> = failure?.let { throw it } ?: emptyList()
+        override suspend fun getRecentRuns(limit: Int): List<Run> {
+            recentCalls += 1
+            return failure?.let { throw it } ?: recent.take(limit)
+        }
         override suspend fun getRun(runId: RunId): Run = error("unused")
         override suspend fun getRunMessages(runId: RunId): List<LettaMessage> = emptyList()
         override suspend fun getRunUsage(runId: RunId): UsageStatistics = error("unused")
         override suspend fun getRunMetrics(runId: RunId): RunMetrics = error("unused")
-        override suspend fun getRunSteps(runId: RunId): List<Step> = emptyList()
+        override suspend fun getRunSteps(runId: RunId): List<Step> {
+            stepCalls += 1
+            stepFailure?.let { throw it }
+            return emptyList()
+        }
         override suspend fun cancelRun(run: Run): Run = run
         override suspend fun deleteRun(runId: RunId) = Unit
         override fun upsertRun(run: Run) = Unit

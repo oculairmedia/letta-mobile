@@ -18199,12 +18199,17 @@ public final class com/letta/mobile/data/home/HomeMessageSearch$Companion {
 
 public abstract interface class com/letta/mobile/data/home/HomePageActions {
 	public abstract fun clearSearch ()V
+	public fun loadIfStale ()V
 	public abstract fun refresh ()V
 	public abstract fun reorderPins (Ljava/util/List;)V
 	public abstract fun selectSort (Lcom/letta/mobile/data/home/FleetSortKey;)V
 	public abstract fun setAgentPinned (Ljava/lang/String;Z)V
 	public abstract fun setShortcutPinned (Lcom/letta/mobile/data/home/HomeShortcut;Z)V
 	public abstract fun updateSearchQuery (Ljava/lang/String;)V
+}
+
+public final class com/letta/mobile/data/home/HomePageActions$DefaultImpls {
+	public static fun loadIfStale (Lcom/letta/mobile/data/home/HomePageActions;)V
 }
 
 public final class com/letta/mobile/data/home/HomePageConfig {
@@ -18226,6 +18231,7 @@ public final class com/letta/mobile/data/home/HomePageController : com/letta/mob
 	public fun clearSearch ()V
 	public fun close ()V
 	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun loadIfStale ()V
 	public fun refresh ()V
 	public fun reorderPins (Ljava/util/List;)V
 	public fun selectSort (Lcom/letta/mobile/data/home/FleetSortKey;)V
@@ -18254,6 +18260,7 @@ public abstract interface class com/letta/mobile/data/home/HomePageSource : java
 	public abstract fun getCatalog ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun getStats ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getSupportsMessageSearch ()Z
+	public fun loadIfStale ()V
 	public abstract fun refresh ()V
 	public fun searchMessages (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun start ()V
@@ -18261,6 +18268,7 @@ public abstract interface class com/letta/mobile/data/home/HomePageSource : java
 
 public final class com/letta/mobile/data/home/HomePageSource$DefaultImpls {
 	public static fun getSupportsMessageSearch (Lcom/letta/mobile/data/home/HomePageSource;)Z
+	public static fun loadIfStale (Lcom/letta/mobile/data/home/HomePageSource;)V
 	public static fun searchMessages (Lcom/letta/mobile/data/home/HomePageSource;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -18558,6 +18566,7 @@ public final class com/letta/mobile/data/home/SessionHomePageSource : com/letta/
 	public fun getCatalog ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getStats ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getSupportsMessageSearch ()Z
+	public fun loadIfStale ()V
 	public fun refresh ()V
 	public fun searchMessages (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun start ()V

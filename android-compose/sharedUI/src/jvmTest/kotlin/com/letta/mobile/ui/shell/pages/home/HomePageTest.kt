@@ -118,7 +118,7 @@ class HomePageTest {
             }
         }
         waitForIdle()
-        assertEquals(listOf("refresh"), actions.events, "entering Home refreshes it once")
+        assertEquals(listOf("loadIfStale"), actions.events, "entering Home requests aggregates without forcing a reload")
         actions.events.clear()
     }
 
@@ -143,7 +143,7 @@ class HomePageTest {
     }
 
     @Test
-    fun returningHomeRefreshesButRecompositionDoesNot() = runComposeUiTest {
+    fun returningHomeRequestsFreshAggregatesButRecompositionDoesNot() = runComposeUiTest {
         val visible = mutableStateOf(true)
         val state = mutableStateOf(baseState())
         setContent {
@@ -152,15 +152,15 @@ class HomePageTest {
             }
         }
         waitForIdle()
-        assertEquals(listOf("refresh"), actions.events)
+        assertEquals(listOf("loadIfStale"), actions.events)
         runOnIdle { state.value = state.value.copy(stats = HomeStats(loading = false, toolCount = 14)) }
         waitForIdle()
-        assertEquals(listOf("refresh"), actions.events)
+        assertEquals(listOf("loadIfStale"), actions.events)
         runOnIdle { visible.value = false }
         waitForIdle()
         runOnIdle { visible.value = true }
         waitForIdle()
-        assertEquals(listOf("refresh", "refresh"), actions.events)
+        assertEquals(listOf("loadIfStale", "loadIfStale"), actions.events)
     }
 
     @Test
@@ -308,7 +308,7 @@ class HomePageTest {
         onNodeWithText("Backend unreachable").assertExists()
         onNodeWithTag(HomePageTags.SEARCH).assertDoesNotExist()
         onNodeWithText("Retry").performClick()
-        assertEquals(listOf("refresh", "refresh"), actions.events, "entry and error Retry use the shared action")
+        assertEquals(listOf("loadIfStale", "refresh"), actions.events, "entry uses the TTL and error Retry forces refresh")
     }
 
     /** Desktop: the header's field searches Home (letta-mobile-xuhmy), so the page draws no field of its own. */
@@ -408,6 +408,10 @@ class HomePageTest {
 
     private class RecordingActions : HomePageActions {
         val events = mutableListOf<String>()
+
+        override fun loadIfStale() {
+            events += "loadIfStale"
+        }
 
         override fun refresh() {
             events += "refresh"

@@ -4536,6 +4536,7 @@ abstract interface com.letta.mobile.data.home/HomePageActions { // com.letta.mob
     abstract fun setAgentPinned(kotlin/String, kotlin/Boolean) // com.letta.mobile.data.home/HomePageActions.setAgentPinned|setAgentPinned(kotlin.String;kotlin.Boolean){}[0]
     abstract fun setShortcutPinned(com.letta.mobile.data.home/HomeShortcut, kotlin/Boolean) // com.letta.mobile.data.home/HomePageActions.setShortcutPinned|setShortcutPinned(com.letta.mobile.data.home.HomeShortcut;kotlin.Boolean){}[0]
     abstract fun updateSearchQuery(kotlin/String) // com.letta.mobile.data.home/HomePageActions.updateSearchQuery|updateSearchQuery(kotlin.String){}[0]
+    open fun loadIfStale() // com.letta.mobile.data.home/HomePageActions.loadIfStale|loadIfStale(){}[0]
 }
 
 abstract interface com.letta.mobile.data.home/HomePageSource : kotlin/AutoCloseable { // com.letta.mobile.data.home/HomePageSource|null[0]
@@ -4548,6 +4549,7 @@ abstract interface com.letta.mobile.data.home/HomePageSource : kotlin/AutoClosea
 
     abstract fun refresh() // com.letta.mobile.data.home/HomePageSource.refresh|refresh(){}[0]
     abstract fun start() // com.letta.mobile.data.home/HomePageSource.start|start(){}[0]
+    open fun loadIfStale() // com.letta.mobile.data.home/HomePageSource.loadIfStale|loadIfStale(){}[0]
     open suspend fun searchMessages(kotlin/String): kotlin.collections/List<com.letta.mobile.data.model/ParsedSearchMessage> // com.letta.mobile.data.home/HomePageSource.searchMessages|searchMessages(kotlin.String){}[0]
 }
 
@@ -23354,6 +23356,7 @@ final class <#A: com.letta.mobile.data.session/SessionRepositoryGraph> com.letta
         final fun <get-supportsMessageSearch>(): kotlin/Boolean // com.letta.mobile.data.home/SessionHomePageSource.supportsMessageSearch.<get-supportsMessageSearch>|<get-supportsMessageSearch>(){}[0]
 
     final fun close() // com.letta.mobile.data.home/SessionHomePageSource.close|close(){}[0]
+    final fun loadIfStale() // com.letta.mobile.data.home/SessionHomePageSource.loadIfStale|loadIfStale(){}[0]
     final fun refresh() // com.letta.mobile.data.home/SessionHomePageSource.refresh|refresh(){}[0]
     final fun start() // com.letta.mobile.data.home/SessionHomePageSource.start|start(){}[0]
     final suspend fun searchMessages(kotlin/String): kotlin.collections/List<com.letta.mobile.data.model/ParsedSearchMessage> // com.letta.mobile.data.home/SessionHomePageSource.searchMessages|searchMessages(kotlin.String){}[0]
@@ -34233,6 +34236,7 @@ final class com.letta.mobile.data.home/HomePageController : com.letta.mobile.dat
 
     final fun clearSearch() // com.letta.mobile.data.home/HomePageController.clearSearch|clearSearch(){}[0]
     final fun close() // com.letta.mobile.data.home/HomePageController.close|close(){}[0]
+    final fun loadIfStale() // com.letta.mobile.data.home/HomePageController.loadIfStale|loadIfStale(){}[0]
     final fun refresh() // com.letta.mobile.data.home/HomePageController.refresh|refresh(){}[0]
     final fun reorderPins(kotlin.collections/List<kotlin/String>) // com.letta.mobile.data.home/HomePageController.reorderPins|reorderPins(kotlin.collections.List<kotlin.String>){}[0]
     final fun selectSort(com.letta.mobile.data.home/FleetSortKey) // com.letta.mobile.data.home/HomePageController.selectSort|selectSort(com.letta.mobile.data.home.FleetSortKey){}[0]
