@@ -206,6 +206,7 @@ offline and fails on stale titles, paths, missing rows or duplicate rows.
 - [lgns8.10 acceptance evidence ledger](testing/lgns8-acceptance-evidence-ledger.md)
 - [lgns8 App Server v2 — On-Device End-to-End Acceptance Protocol](testing/lgns8-e2e-device-protocol.md)
 - [On-device App Server: model ids and test-agent cleanup](testing/on-device-local-backend.md)
+- [Seeded pagination and timeline-replay fuzz tests](testing/pagination-replay-fuzz.md)
 
 ### tooling
 
