@@ -58,7 +58,7 @@ class TimelineStreamReplayFuzzTest {
                         scenarioIndex = failure.scenarioIndex,
                         operationIndex = failure.operationIndex,
                         detail = "${failure.message} minimized=${shrunk.minimized.size}/${ops.size} trace=${shrunk.trace}",
-                    ).also { it.initCause(failure) }
+                    ).also { it.addSuppressed(failure) }
                 }
             }
         }
