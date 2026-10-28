@@ -11,12 +11,15 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.AtomicRef
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
+
+private const val STALE_RECENT_RETRIES = 5
 
 /**
  * One Paging generation per selection. A durable revision invalidates the active source in place, so
@@ -137,16 +140,38 @@ internal class TimelineHistoryMediator(
      * end is asked again - until a page appends nothing and the walk settles.
      */
     private suspend fun refreshNewest(): MediatorResult = try {
-        val result = session.reconcileRecentDetailed(selection)
-        when (result.outcome) {
-            TimelineEnginePageOutcome.Applied -> MediatorResult.Success(result.appended == 0)
-            // Refused mid-stream: the turn in flight owns those rows and will settle them itself.
-            TimelineEnginePageOutcome.NoProgress -> MediatorResult.Success(true)
-            TimelineEnginePageOutcome.Stale -> MediatorResult.Error(IllegalStateException("Stale recent request"))
-        }
+        reconcileRecentTail()
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (failure: Exception) {
         MediatorResult.Error(failure)
+    }
+
+    /**
+     * A newer [CanonicalTimelineSession.reconcileRecentDetailed] for the same selection supersedes the
+     * in-flight reconcile ([CanonicalTimelineEngine.pendingReconcile]) and answers [TimelineEnginePageOutcome.Stale]
+     * with no durable effect. That is not a transport failure: the winner already applied (or will apply)
+     * the page. Retry while this paging generation still owns the active selection; retire orphaned
+     * generations without a sticky prepend error.
+     */
+    private suspend fun reconcileRecentTail(): MediatorResult {
+        repeat(STALE_RECENT_RETRIES) {
+            reconcileRecentAttempt()?.let { return it }
+            yield()
+        }
+        return reconcileRecentAttempt()
+            ?: MediatorResult.Error(IllegalStateException("Stale recent request"))
+    }
+
+    private suspend fun reconcileRecentAttempt(): MediatorResult? {
+        if (session.publication.value.selection !== selection) {
+            return MediatorResult.Success(endOfPaginationReached = true)
+        }
+        val result = session.reconcileRecentDetailed(selection)
+        return when (result.outcome) {
+            TimelineEnginePageOutcome.Applied -> MediatorResult.Success(result.appended == 0)
+            TimelineEnginePageOutcome.NoProgress -> MediatorResult.Success(endOfPaginationReached = true)
+            TimelineEnginePageOutcome.Stale -> null
+        }
     }
 }
