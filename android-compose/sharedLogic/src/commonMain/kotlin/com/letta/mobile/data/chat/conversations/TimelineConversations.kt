@@ -16,6 +16,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.visibleConversationsInLists
+import com.letta.mobile.data.model.visibleInLists
 import com.letta.mobile.data.shell.ShellChatPort
 import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.ui.chat.session.ChatActions
@@ -77,7 +78,7 @@ class TimelineConversations(
     /** The agents whose conversations the list shows (and whose names title the chats); new agents list again. */
     var roster: List<Agent> = roster
         set(agents) {
-            val changed = agents.map { it.id } != field.map { it.id }
+            val changed = rosterNeedsConversationRefresh(field, agents)
             field = agents
             if (changed) scope.launch { refresh() }
         }
@@ -322,6 +323,14 @@ private fun TimelineConversationsState.without(conversation: ConversationId): Ti
 
 /** The roster's name for [agent], for the chat's title. */
 private fun List<Agent>.nameOf(agent: AgentId): String = firstOrNull { it.id == agent }?.name.orEmpty()
+
+/** Names and ordering enrich existing rows; first arrival and visible membership settle the list. */
+private fun rosterNeedsConversationRefresh(previous: List<Agent>, next: List<Agent>): Boolean {
+    val firstArrival = previous.isEmpty() && next.isNotEmpty()
+    val membershipChanged = previous.visibleInLists().mapTo(mutableSetOf()) { it.id } !=
+        next.visibleInLists().mapTo(mutableSetOf()) { it.id }
+    return firstArrival || membershipChanged
+}
 
 /** This list, then the [others] it does not carry (newest first within each). */
 private fun List<Conversation>.keeping(others: List<Conversation>): List<Conversation> {
