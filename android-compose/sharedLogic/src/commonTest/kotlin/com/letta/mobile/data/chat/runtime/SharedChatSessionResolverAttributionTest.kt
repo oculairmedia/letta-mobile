@@ -4,7 +4,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.InMemoryAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.TimelineCandidateListFreshness
 import com.letta.mobile.data.timeline.TimelineCandidateListSource
@@ -217,7 +217,7 @@ class SharedChatSessionResolverAttributionTest {
         createdAt = createdAt,
     )
 
-    private object StubAgents : IAgentRepository {
+    private object StubAgents : InMemoryAgentRepository() {
         override val agents: StateFlow<List<Agent>> = MutableStateFlow(emptyList())
         override val isRefreshing: StateFlow<Boolean> = MutableStateFlow(false)
         override val refreshError: StateFlow<Throwable?> = MutableStateFlow(null)

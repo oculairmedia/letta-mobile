@@ -64,7 +64,10 @@ open class CachedAgentRepository(
     private var lastRefreshAtMillis: Long? = null
     // Entries live only as long as the cached agents or their active requests.
     private val agentFetchedAt = mutableMapOf<AgentId, Long>()
-    private val agentRequests = mutableMapOf<AgentId, Deferred<Result<Agent>>>()
+    // Detail provenance shares agentFetchedAt's TTL; a roster publication removes it.
+    private val detailedAgents = mutableSetOf<AgentId>()
+    // Each request retains full detail and the snapshot ordinary cache readers should observe.
+    private val agentRequests = mutableMapOf<AgentId, Deferred<Result<Pair<Agent, Agent?>>>>()
     private var refreshRequest: Deferred<Result<Unit>>? = null
     private val changedDuringRefresh = mutableSetOf<AgentId>()
     private var cacheGeneration = 0L
@@ -168,6 +171,7 @@ open class CachedAgentRepository(
     private fun startRefreshLocked(): Deferred<Result<Unit>> {
         startedRefreshRevision += 1
         agentFetchedAt.clear()
+        detailedAgents.clear()
         changedDuringRefresh.clear()
         lateinit var request: Deferred<Result<Unit>>
         request = repositoryScope.async(start = CoroutineStart.LAZY) {
@@ -219,6 +223,7 @@ open class CachedAgentRepository(
         val current = _agents.value.filter { it.id in changedDuringRefresh }
         _agents.value = fresh.filterNot { it.id in changedDuringRefresh } + current
         cachePublicationRevision += 1
+        detailedAgents.retainAll(changedDuringRefresh)
         agentFetchedAt.keys.retainAll(_agents.value.map { it.id }.toSet())
         if (completed) {
             completedRefreshRevision = startedRefreshRevision
@@ -236,6 +241,7 @@ open class CachedAgentRepository(
             refreshRequest = null
             agentRequests.values.forEach { it.cancel() }
             agentRequests.clear()
+            detailedAgents.clear()
             agentFetchedAt.clear()
             changedDuringRefresh.clear()
             _agents.value = emptyList()
@@ -354,24 +360,39 @@ open class CachedAgentRepository(
             _agents.value.find { it.id == id } to isAgentFreshLocked(id)
         }
         if (cached != null) emit(cached)
-        if (!fresh) emit(getFreshAgent(id))
+        if (!fresh) emit(getAgentSnapshot(id))
     }
 
     private fun isAgentFreshLocked(id: AgentId): Boolean =
         agentFetchedAt[id]?.let { nowMillis() - it <= SINGLE_AGENT_FRESH_WINDOW_MS } == true
 
-    private suspend fun getFreshAgent(id: AgentId, force: Boolean = false): Agent {
+    override suspend fun getFreshAgent(id: AgentId, force: Boolean): Agent {
+        val request = refreshMutex.withLock {
+            if (!force && hasFreshDetailLocked(id)) {
+                _agents.value.find { it.id == id }?.let { return it }
+            }
+            agentRequests[id]?.takeUnless { it.isCompleted } ?: startAgentRequestLocked(id, persist = false)
+        }
+        val (detail, _) = request.await().getOrThrow()
+        return detail
+    }
+
+    private fun hasFreshDetailLocked(id: AgentId): Boolean = id in detailedAgents && isAgentFreshLocked(id)
+
+    private suspend fun getAgentSnapshot(id: AgentId, force: Boolean = false): Agent {
         val request = refreshMutex.withLock {
             if (force) invalidateAgentLocked(id)
             if (isAgentFreshLocked(id)) _agents.value.find { it.id == id }?.let { return it }
             agentRequests[id]?.takeUnless { it.isCompleted } ?: startAgentRequestLocked(id, persist = force)
         }
-        return request.await().getOrThrow()
+        val (_, snapshot) = request.await().getOrThrow()
+        return snapshot ?: throw NoSuchElementException("Agent ${id.value} missing from refreshed roster")
     }
 
-    private fun startAgentRequestLocked(id: AgentId, persist: Boolean): Deferred<Result<Agent>> {
+    private fun startAgentRequestLocked(id: AgentId, persist: Boolean): Deferred<Result<Pair<Agent, Agent?>>> {
         val refreshRevisionAtStart = startedRefreshRevision
-        lateinit var request: Deferred<Result<Agent>>
+        val persistRead: (suspend (Agent) -> Unit)? = if (persist) ::persistUpdatedAgent else null
+        lateinit var request: Deferred<Result<Pair<Agent, Agent?>>>
         request = repositoryScope.async(start = CoroutineStart.LAZY) {
             try {
                 runCatchingCancellable {
@@ -379,23 +400,15 @@ open class CachedAgentRepository(
                     refreshMutex.withLock {
                         request.ensureActive()
                         if (agentRequests[id] !== request) throw CancellationException("Agent cache invalidated")
-                        // A completed list requested after this ordinary read is authoritative.
-                        // Keep the waiter alive, but do not restore its older response to the roster.
-                        if (!persist && completedRefreshRevision > refreshRevisionAtStart) {
-                            return@withLock refreshedAgentOrThrow(id)
-                        }
-                        updateAgentInCache(fresh)
-                        cachePublicationRevision += 1
-                        agentFetchedAt[id] = nowMillis()
-                        if (refreshRequest != null) changedDuringRefresh += id
-                        if (persist) persistUpdatedAgent(fresh)
-                        fresh
+                        publishAgentReadLocked(id, fresh, persistRead, refreshRevisionAtStart)
                     }
                 }
             } finally {
                 withContext(NonCancellable) {
                     refreshMutex.withLock {
-                        if (agentRequests[id] === request) agentRequests.remove(id)
+                        if (agentRequests[id] === request) {
+                            agentRequests.remove(id)
+                        }
                     }
                 }
             }
@@ -404,9 +417,26 @@ open class CachedAgentRepository(
         return request
     }
 
-    private fun refreshedAgentOrThrow(id: AgentId): Agent =
-        _agents.value.find { it.id == id }
-            ?: throw NoSuchElementException("Agent ${id.value} missing from refreshed roster")
+    private suspend fun publishAgentReadLocked(
+        id: AgentId,
+        fresh: Agent,
+        persistRead: (suspend (Agent) -> Unit)?,
+        refreshRevisionAtStart: Long,
+    ): Pair<Agent, Agent?> {
+        // A completed list requested after this ordinary read is authoritative.
+        // Keep the waiter alive, but do not restore its older response to the roster.
+        if (persistRead == null && completedRefreshRevision > refreshRevisionAtStart) {
+            // Editors keep their successful detail; ordinary readers see the newer roster, which may omit it.
+            return fresh to _agents.value.find { it.id == id }
+        }
+        updateAgentInCache(fresh)
+        cachePublicationRevision += 1
+        agentFetchedAt[id] = nowMillis()
+        detailedAgents += id
+        if (refreshRequest != null) changedDuringRefresh += id
+        persistRead?.invoke(fresh)
+        return fresh to fresh
+    }
 
     private suspend fun persistUpdatedAgent(agent: Agent) {
         runCatchingCancellable { localCache?.invoke()?.upsert(agent) }
@@ -415,6 +445,7 @@ open class CachedAgentRepository(
 
     private fun invalidateAgentLocked(id: AgentId) {
         agentFetchedAt.remove(id)
+        detailedAgents.remove(id)
         agentRequests.remove(id)?.cancel()
         if (refreshRequest != null) changedDuringRefresh += id
     }
@@ -442,7 +473,7 @@ open class CachedAgentRepository(
         }
 
     private suspend fun refreshAgent(agentId: AgentId): Result<Agent> = runCatchingCancellable {
-        getFreshAgent(agentId, force = true)
+        getAgentSnapshot(agentId, force = true)
     }
 
     private suspend fun observeAgentUpdated(channelTransport: IChannelTransport) {

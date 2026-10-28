@@ -22,6 +22,7 @@ import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.ToolUpdateParams
 import com.letta.mobile.data.model.UsageStatistics
+import com.letta.mobile.data.repository.InMemoryAgentRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ICronRepository
@@ -298,7 +299,7 @@ class SessionHomePageSourceTest {
         override fun upsertRun(run: Run) = Unit
     }
 
-    private class FakeAgents : IAgentRepository {
+    private class FakeAgents : InMemoryAgentRepository() {
         override val agents: StateFlow<List<Agent>> = MutableStateFlow(emptyList())
         override val isRefreshing: StateFlow<Boolean> = MutableStateFlow(false)
         override val refreshError: StateFlow<Throwable?> = MutableStateFlow(null)

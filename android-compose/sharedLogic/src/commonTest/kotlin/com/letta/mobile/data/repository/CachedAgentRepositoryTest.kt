@@ -2,19 +2,13 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.backend.bound
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AgentImportParams
-import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
-import com.letta.mobile.data.model.ContextWindowOverview
-import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.ImportedAgentsResponse
-import com.letta.mobile.data.repository.api.AgentRemoteSource
 import com.letta.mobile.data.repository.api.AgentLocalCache
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -35,14 +29,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlin.time.Clock
-import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CachedAgentRepositoryTest {
     @Test
     fun completedReadMakesImmediateRecollectionFreshAfterBulkExpiry() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val repository = CachedAgentRepository(remote.bound(), repositoryScope = backgroundScope)
         repository.refreshAgents()
         repository.setLastRefreshForTest(0)
@@ -55,7 +47,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun concurrentCollectorsOfSameIdShareOneRequest() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.read = { id -> gate.await(); agent(id) }
         val repository = CachedAgentRepository(remote.bound(), repositoryScope = backgroundScope)
@@ -72,52 +64,17 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun targetedReadCompletingBeforeOverlappingBulkRefreshWinsItsOlderSnapshot() = runTest {
-        val remote = FakeAgentSource()
-        val readGate = CompletableDeferred<Unit>()
-        val listGate = CompletableDeferred<Unit>()
-        remote.read = { id -> readGate.await(); agent(id, "Targeted") }
-        remote.listGate = listGate
-        val repository = repository(remote)
-        val targeted = async { repository.getAgent(ID).toList() }
-        runCurrent()
-        val bulk = async { repository.refreshAgents() }
-        runCurrent()
-        assertEquals(1, remote.getCalls.size)
-        assertEquals(1, remote.listCalls)
-
-        readGate.complete(Unit)
-        assertEquals(listOf(agent(ID, "Targeted")), targeted.await())
-        listGate.complete(Unit)
-        bulk.await()
-        assertEquals(listOf(agent(ID, "Targeted")), repository.agents.value)
+        verifyReadRace(CompletesFirst.Detail)
     }
 
     @Test
     fun bulkRefreshCompletingBeforeOverlappingTargetedReadKeepsItsNewerSnapshot() = runTest {
-        val remote = FakeAgentSource()
-        val readGate = CompletableDeferred<Unit>()
-        val listGate = CompletableDeferred<Unit>()
-        remote.read = { id -> readGate.await(); agent(id, "Old targeted") }
-        remote.listGate = listGate
-        val repository = repository(remote)
-        val targeted = async { repository.getAgent(ID).toList() }
-        runCurrent()
-        remote.roster = listOf(agent(ID, "Fresh bulk"))
-        val bulk = async { repository.refreshAgents() }
-        runCurrent()
-        assertEquals(1, remote.getCalls.size)
-        assertEquals(1, remote.listCalls)
-
-        listGate.complete(Unit)
-        bulk.await()
-        readGate.complete(Unit)
-        assertEquals(listOf(agent(ID, "Fresh bulk")), targeted.await())
-        assertEquals(listOf(agent(ID, "Fresh bulk")), repository.agents.value)
+        verifyReadRace(CompletesFirst.Roster)
     }
 
     @Test
     fun targetedReadStartedAfterBulkRequestKeepsItsNewerResult() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val readGate = CompletableDeferred<Unit>()
         val listGate = CompletableDeferred<Unit>()
         remote.read = { id -> readGate.await(); agent(id, "New targeted") }
@@ -137,7 +94,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun differentIdsFetchInParallel() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.read = { id -> gate.await(); agent(id) }
         val repository = repository(remote)
@@ -152,7 +109,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun expiryIsPerAgentAndMeasuredFromCompletedRead() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         remote.roster += agent(OTHER_ID)
         val repository = repository(remote)
         repository.getAgent(ID).toList()
@@ -169,7 +126,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun slowSuccessfulReadGetsAFullFreshnessWindowOnCompletion() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.read = { id -> gate.await(); agent(id) }
         val repository = repository(remote)
@@ -184,7 +141,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun firstCollectorLeavesRefreshedValueCachedBeforeReturning() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val repository = repository(remote)
         assertEquals(agent(ID), repository.getAgent(ID).first())
         assertEquals(listOf(agent(ID)), repository.agents.value)
@@ -194,7 +151,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun cacheOnlyCollectorDoesNotStartAnUnobservedRequest() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val repository = repository(remote)
         repository.refreshAgents()
         repository.setLastRefreshForTest(0)
@@ -207,7 +164,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun freshBulkSuppressesReadsButForcedRefreshStillFetches() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val repository = repository(remote)
         repository.refreshAgents()
         assertFalse(repository.refreshAgentsIfStale(60_000))
@@ -221,7 +178,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun concurrentStaleBulkCallersRecheckTheCompletedRefresh() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.listGate = gate
         val repository = repository(remote)
@@ -235,7 +192,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun failureRetainsCachedCopyAndRetryDoesNotTrustFailedRead() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val repository = repository(remote)
         repository.refreshAgents()
         repository.setLastRefreshForTest(0)
@@ -252,7 +209,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun concurrentFailureIsSharedAndNextCollectionRetries() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.read = { gate.await(); error("offline") }
         val repository = repository(remote)
@@ -268,7 +225,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun cancelingTheFirstWaiterDoesNotCancelSharedWork() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.read = { id -> gate.await(); agent(id) }
         val repository = repository(remote)
@@ -286,7 +243,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun repositoryCancellationCancelsTheRequestAndReleasesItsWaiters() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         var canceled = false
         remote.read = {
             try { CompletableDeferred<Agent>().await() } finally { canceled = true }
@@ -304,7 +261,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun clearDropsLateResponseAndOldCleanupCannotRemoveNewRequest() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val oldGate = CompletableDeferred<Unit>()
         val newGate = CompletableDeferred<Unit>()
         remote.read = { id -> withContext(NonCancellable) { oldGate.await() }; agent(id, "Old session") }
@@ -329,7 +286,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun clearInvalidatesAnAlreadyCompletedFreshnessStamp() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val repository = repository(remote)
         repository.getAgent(ID).toList()
         repository.clearForBackendSwitch()
@@ -340,7 +297,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun clearDuringBulkFetchCannotPublishOrPersistItsOldRoster() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.listGate = gate
         remote.ignoreListCancellation = true
@@ -363,25 +320,14 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun clearDuringInitialLocalReadCannotRestoreOldRows() = runTest {
-        val remote = FakeAgentSource()
-        val gate = CompletableDeferred<Unit>()
-        val local = FakeAgentCache().apply { rows = listOf(agent(ID, "Old disk")); readGate = gate }
-        val repository = repository(remote, local = local)
-        runCurrent()
-        repository.clearForBackendSwitch()
-        gate.complete(Unit)
-        runCurrent()
-        assertTrue(repository.agents.value.isEmpty())
-        assertTrue(local.rows.isEmpty())
+        verifyLocalReadInvalidation { it.clearForBackendSwitch() }
     }
 
     @Test
     fun emptyRemoteRefreshDuringInitialLocalReadDoesNotRestoreOldRows() = runTest {
-        val remote = FakeAgentSource().apply { roster = emptyList() }
+        val remote = AgentRepositoryTestSource().apply { roster = emptyList() }
         val gate = CompletableDeferred<Unit>()
-        val local = FakeAgentCache().apply { rows = listOf(agent(ID, "Old disk")); readGate = gate }
-        val repository = repository(remote, local = local)
-        runCurrent() // getAllOnce has captured the old disk row.
+        val (repository, local) = hydratingRepository(remote, gate)
 
         repository.refreshAgents()
         assertTrue(repository.agents.value.isEmpty())
@@ -394,22 +340,12 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun deleteDuringInitialLocalReadDoesNotRestoreDeletedRow() = runTest {
-        val remote = FakeAgentSource()
-        val gate = CompletableDeferred<Unit>()
-        val local = FakeAgentCache().apply { rows = listOf(agent(ID, "Old disk")); readGate = gate }
-        val repository = repository(remote, local = local)
-        runCurrent() // getAllOnce has captured the row before deletion.
-
-        repository.deleteAgent(ID)
-        gate.complete(Unit)
-        runCurrent()
-        assertTrue(local.rows.isEmpty())
-        assertTrue(repository.agents.value.isEmpty())
+        verifyLocalReadInvalidation { it.deleteAgent(ID) }
     }
 
     @Test
     fun pushRefreshBypassesFreshnessAndStampsTheNewCopy() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val transport = PushingTransport()
         val local = FakeAgentCache()
         val repository = repository(remote, transport, local)
@@ -424,7 +360,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun failedPushInvalidatesFreshStampAndAllowsRetry() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val transport = PushingTransport()
         val repository = repository(remote, transport)
         repository.refreshAgents()
@@ -439,7 +375,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun pushSupersedesAnOlderReadWithoutItsCleanupRemovingTheNewRequest() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val transport = PushingTransport()
         val repository = repository(remote, transport)
         val oldGate = CompletableDeferred<Unit>()
@@ -462,7 +398,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun targetedPushAndDeleteWinOverAnOlderBulkSnapshot() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         remote.roster += agent(OTHER_ID)
         val transport = PushingTransport()
         val repository = repository(remote, transport)
@@ -485,7 +421,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun deleteInvalidatesPendingReadAndAFollowingReadMustReachRemote() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.read = { id -> withContext(NonCancellable) { gate.await() }; agent(id, "Deleted") }
         val repository = repository(remote)
@@ -503,7 +439,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun updateInvalidatesPendingReadAndBulkRefreshesTheNewAgent() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.read = { id -> withContext(NonCancellable) { gate.await() }; agent(id, "Old") }
         val repository = repository(remote)
@@ -518,17 +454,78 @@ class CachedAgentRepositoryTest {
         assertEquals(1, remote.listCalls)
     }
 
+    private suspend fun TestScope.verifyReadRace(first: CompletesFirst) {
+        val remote = AgentRepositoryTestSource()
+        val readGate = CompletableDeferred<Unit>()
+        val listGate = CompletableDeferred<Unit>()
+        val targetedName = if (first == CompletesFirst.Detail) "Targeted" else "Old targeted"
+        remote.read = { id -> readGate.await(); agent(id, targetedName) }
+        remote.listGate = listGate
+        val repository = repository(remote)
+        val (targeted, bulk) = overlappingReads(repository, remote) {
+            if (first == CompletesFirst.Roster) remote.roster = listOf(agent(ID, "Fresh bulk"))
+        }
+        val observed = when (first) {
+            CompletesFirst.Detail -> {
+                readGate.complete(Unit)
+                val result = targeted.await() // Observe the detail before the older roster can finish.
+                listGate.complete(Unit)
+                bulk.await()
+                result
+            }
+            CompletesFirst.Roster -> {
+                listGate.complete(Unit)
+                bulk.await()
+                readGate.complete(Unit)
+                targeted.await()
+            }
+        }
+        val expected = agent(ID, if (first == CompletesFirst.Detail) "Targeted" else "Fresh bulk")
+        assertEquals(listOf(expected), observed)
+        assertEquals(listOf(expected), repository.agents.value)
+    }
+
+    private suspend fun TestScope.verifyLocalReadInvalidation(invalidate: suspend (CachedAgentRepository) -> Unit) {
+        val remote = AgentRepositoryTestSource()
+        val gate = CompletableDeferred<Unit>()
+        val (repository, local) = hydratingRepository(remote, gate)
+        invalidate(repository)
+        gate.complete(Unit)
+        runCurrent()
+        assertTrue(repository.agents.value.isEmpty())
+        assertTrue(local.rows.isEmpty())
+    }
+
+    private fun TestScope.overlappingReads(
+        repository: CachedAgentRepository,
+        remote: AgentRepositoryTestSource,
+        beforeRoster: () -> Unit = {},
+    ): Pair<Deferred<List<Agent>>, Deferred<Unit>> {
+        val targeted = async { repository.getAgent(ID).toList() }
+        runCurrent()
+        beforeRoster()
+        val bulk = async { repository.refreshAgents() }
+        runCurrent()
+        assertEquals(1, remote.getCalls.size)
+        assertEquals(1, remote.listCalls)
+        return targeted to bulk
+    }
+
+    private fun TestScope.hydratingRepository(
+        remote: AgentRepositoryTestSource,
+        gate: CompletableDeferred<Unit>,
+    ): Pair<CachedAgentRepository, FakeAgentCache> {
+        val local = FakeAgentCache().apply { rows = listOf(agent(ID, "Old disk")); readGate = gate }
+        val repository = repository(remote, local = local)
+        runCurrent() // getAllOnce has captured the old disk row and is waiting on gate.
+        return repository to local
+    }
+
     private fun TestScope.repository(
-        remote: FakeAgentSource,
+        remote: AgentRepositoryTestSource,
         transport: PushingTransport? = null,
         local: FakeAgentCache? = null,
-    ): CachedAgentRepository = CachedAgentRepository(
-        remote.bound(), localCache = local?.let { { it } }, repositoryScope = backgroundScope, transport = transport,
-    ).also { repository ->
-        repository.clock = object : Clock {
-            override fun now(): Instant = Instant.fromEpochMilliseconds(1_000_000 + testScheduler.currentTime)
-        }
-    }
+    ): CachedAgentRepository = cachedAgentRepository(remote, transport, local)
 
     private class PushingTransport : NoOpChannelTransport() {
         override val events = MutableSharedFlow<ServerFrame>(extraBufferCapacity = 8)
@@ -552,37 +549,6 @@ class CachedAgentRepositoryTest {
         override suspend fun deleteAll() { rows = emptyList() }
     }
 
-    private class FakeAgentSource : AgentRemoteSource {
-        val getCalls = mutableListOf<AgentId>()
-        var roster = listOf(agent(ID))
-        var listCalls = 0
-        var listGate: CompletableDeferred<Unit>? = null
-        var ignoreListCancellation = false
-        var read: suspend (AgentId) -> Agent = { id -> roster.first { it.id == id } }
-        override suspend fun getAgent(agentId: AgentId): Agent {
-            getCalls += agentId
-            return read(agentId)
-        }
-        override suspend fun listAgents(limit: Int?, offset: Int?, tags: List<String>?): List<Agent> {
-            listCalls += 1
-            val snapshot = roster
-            val gate = listGate
-            if (ignoreListCancellation) withContext(NonCancellable) { gate?.await() } else gate?.await()
-            return snapshot
-        }
-        override suspend fun listAgentsSlim(limit: Int?, offset: Int?, tags: List<String>?) =
-            roster.map { AgentSummary(it.id, it.name, it.description) }
-        override suspend fun countAgents() = roster.size
-        override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?) = ContextWindowOverview()
-        override suspend fun updateAgent(agentId: AgentId, params: AgentUpdateParams): Agent =
-            agent(agentId, params.name ?: "Updated").also { updated -> roster = roster.map { if (it.id == agentId) updated else it } }
-        override suspend fun deleteAgent(agentId: AgentId) { roster = roster.filterNot { it.id == agentId } }
-        override suspend fun createAgent(params: AgentCreateParams): Agent = error("unused")
-        override suspend fun exportAgent(agentId: AgentId): String = error("unused")
-        override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse = error("unused")
-        override suspend fun attachArchive(agentId: AgentId, archiveId: String) = Unit
-        override suspend fun detachArchive(agentId: AgentId, archiveId: String) = Unit
-    }
 
     private companion object {
         val ID = AgentId("agent-1")
@@ -590,3 +556,5 @@ class CachedAgentRepositoryTest {
         fun agent(id: AgentId, name: String = "Agent") = Agent(id = id, name = name)
     }
 }
+
+private enum class CompletesFirst { Detail, Roster }

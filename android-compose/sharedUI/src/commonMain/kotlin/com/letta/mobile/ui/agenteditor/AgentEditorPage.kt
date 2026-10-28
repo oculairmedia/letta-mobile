@@ -118,8 +118,8 @@ fun AgentEditorPage(
         BoxWithConstraints(Modifier.fillMaxSize().padding(insets)) {
             val layout = SettingsLayout.of(maxWidth)
             when {
-                state.loading -> AgentEditorLoading(state.agentId)
-                state.loadError != null -> AgentEditorLoadFailed(state.loadError.orEmpty(), actions::retry)
+                state.loading && state.agent == null -> AgentEditorLoading(state.agentId)
+                state.loadError != null && state.agent == null -> AgentEditorLoadFailed(state.loadError.orEmpty(), actions::retry)
                 else -> AgentEditorBody(AgentEditorBodyInputs(state, actions, options, identity, layout)) { pane = it }
             }
         }
@@ -169,7 +169,7 @@ private fun AgentEditorLoadFailed(message: String, onRetry: () -> Unit) {
             SettingsRow.Actions("load-actions", listOf(SettingsAction("retry", "Try again", primary = true) { onRetry() })),
         ),
     )
-    Box(Modifier.fillMaxSize().padding(LettaDimens.Space.lg), contentAlignment = Alignment.TopCenter) {
+    Box(Modifier.fillMaxWidth().padding(LettaDimens.Space.lg), contentAlignment = Alignment.TopCenter) {
         SettingsModelSection(section, Modifier.widthIn(max = LettaDimens.Pane.settingsColumnMaxWidth))
     }
 }
@@ -201,6 +201,16 @@ private fun AgentEditorBody(inputs: AgentEditorBodyInputs, onOpen: (AgentEditorP
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             AgentEditorHero(inputs, onOpen)
+            if (inputs.state.loading) {
+                SettingsModelSection(
+                    SettingsSectionModel(
+                        key = "agent-refresh",
+                        title = "Refreshing agent",
+                        rows = listOf(SettingsRow.Note("refreshing", SettingsStatus("Loading the latest settings before saving…"))),
+                    ),
+                )
+            }
+            inputs.state.loadError?.let { AgentEditorLoadFailed(it, inputs.actions::retry) }
             inputs.state.errorNote()?.let { note ->
                 SettingsModelSection(SettingsSectionModel("agent-error", "Something went wrong", listOf(note)))
             }

@@ -60,6 +60,9 @@ class FakeAgentRepository(
         return agentsState.value.find { it.id == id }
     }
 
+    override suspend fun getFreshAgent(id: AgentId, force: Boolean): Agent =
+        getCachedAgent(id) ?: error("No agent ${id.value}")
+
     override fun getAgent(id: AgentId): Flow<Agent> = flow {
         calls += "getAgent:${id.value}"
         emit(requireAgent(id))
