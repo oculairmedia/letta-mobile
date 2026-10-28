@@ -64,38 +64,12 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun targetedReadCompletingBeforeOverlappingBulkRefreshWinsItsOlderSnapshot() = runTest {
-        val remote = AgentRepositoryTestSource()
-        val readGate = CompletableDeferred<Unit>()
-        val listGate = CompletableDeferred<Unit>()
-        remote.read = { id -> readGate.await(); agent(id, "Targeted") }
-        remote.listGate = listGate
-        val repository = repository(remote)
-        val (targeted, bulk) = overlappingReads(repository, remote)
-
-        readGate.complete(Unit)
-        assertEquals(listOf(agent(ID, "Targeted")), targeted.await())
-        listGate.complete(Unit)
-        bulk.await()
-        assertEquals(listOf(agent(ID, "Targeted")), repository.agents.value)
+        verifyReadRace(CompletesFirst.Detail)
     }
 
     @Test
     fun bulkRefreshCompletingBeforeOverlappingTargetedReadKeepsItsNewerSnapshot() = runTest {
-        val remote = AgentRepositoryTestSource()
-        val readGate = CompletableDeferred<Unit>()
-        val listGate = CompletableDeferred<Unit>()
-        remote.read = { id -> readGate.await(); agent(id, "Old targeted") }
-        remote.listGate = listGate
-        val repository = repository(remote)
-        val (targeted, bulk) = overlappingReads(repository, remote) {
-            remote.roster = listOf(agent(ID, "Fresh bulk"))
-        }
-
-        listGate.complete(Unit)
-        bulk.await()
-        readGate.complete(Unit)
-        assertEquals(listOf(agent(ID, "Fresh bulk")), targeted.await())
-        assertEquals(listOf(agent(ID, "Fresh bulk")), repository.agents.value)
+        verifyReadRace(CompletesFirst.Roster)
     }
 
     @Test
@@ -346,14 +320,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun clearDuringInitialLocalReadCannotRestoreOldRows() = runTest {
-        val remote = AgentRepositoryTestSource()
-        val gate = CompletableDeferred<Unit>()
-        val (repository, local) = hydratingRepository(remote, gate)
-        repository.clearForBackendSwitch()
-        gate.complete(Unit)
-        runCurrent()
-        assertTrue(repository.agents.value.isEmpty())
-        assertTrue(local.rows.isEmpty())
+        verifyLocalReadInvalidation { it.clearForBackendSwitch() }
     }
 
     @Test
@@ -373,15 +340,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun deleteDuringInitialLocalReadDoesNotRestoreDeletedRow() = runTest {
-        val remote = AgentRepositoryTestSource()
-        val gate = CompletableDeferred<Unit>()
-        val (repository, local) = hydratingRepository(remote, gate)
-
-        repository.deleteAgent(ID)
-        gate.complete(Unit)
-        runCurrent()
-        assertTrue(local.rows.isEmpty())
-        assertTrue(repository.agents.value.isEmpty())
+        verifyLocalReadInvalidation { it.deleteAgent(ID) }
     }
 
     @Test
@@ -495,6 +454,48 @@ class CachedAgentRepositoryTest {
         assertEquals(1, remote.listCalls)
     }
 
+    private suspend fun TestScope.verifyReadRace(first: CompletesFirst) {
+        val remote = AgentRepositoryTestSource()
+        val readGate = CompletableDeferred<Unit>()
+        val listGate = CompletableDeferred<Unit>()
+        val targetedName = if (first == CompletesFirst.Detail) "Targeted" else "Old targeted"
+        remote.read = { id -> readGate.await(); agent(id, targetedName) }
+        remote.listGate = listGate
+        val repository = repository(remote)
+        val (targeted, bulk) = overlappingReads(repository, remote) {
+            if (first == CompletesFirst.Roster) remote.roster = listOf(agent(ID, "Fresh bulk"))
+        }
+        val observed = when (first) {
+            CompletesFirst.Detail -> {
+                readGate.complete(Unit)
+                val result = targeted.await() // Observe the detail before the older roster can finish.
+                listGate.complete(Unit)
+                bulk.await()
+                result
+            }
+            CompletesFirst.Roster -> {
+                listGate.complete(Unit)
+                bulk.await()
+                readGate.complete(Unit)
+                targeted.await()
+            }
+        }
+        val expected = agent(ID, if (first == CompletesFirst.Detail) "Targeted" else "Fresh bulk")
+        assertEquals(listOf(expected), observed)
+        assertEquals(listOf(expected), repository.agents.value)
+    }
+
+    private suspend fun TestScope.verifyLocalReadInvalidation(invalidate: suspend (CachedAgentRepository) -> Unit) {
+        val remote = AgentRepositoryTestSource()
+        val gate = CompletableDeferred<Unit>()
+        val (repository, local) = hydratingRepository(remote, gate)
+        invalidate(repository)
+        gate.complete(Unit)
+        runCurrent()
+        assertTrue(repository.agents.value.isEmpty())
+        assertTrue(local.rows.isEmpty())
+    }
+
     private fun TestScope.overlappingReads(
         repository: CachedAgentRepository,
         remote: AgentRepositoryTestSource,
@@ -555,3 +556,5 @@ class CachedAgentRepositoryTest {
         fun agent(id: AgentId, name: String = "Agent") = Agent(id = id, name = name)
     }
 }
+
+private enum class CompletesFirst { Detail, Roster }
