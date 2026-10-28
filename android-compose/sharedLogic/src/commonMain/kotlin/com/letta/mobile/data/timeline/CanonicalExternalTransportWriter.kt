@@ -11,17 +11,6 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
-/** Reach canonical retry ownership through shared admission wrappers; legacy writers have no ledger. */
-internal fun TimelineExternalTransportWriter.bindPendingRetry(
-    agent: AgentId,
-    sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit,
-) {
-    when (this) {
-        is CanonicalExternalTransportWriter -> bindPendingRetry(agent, sender)
-        is AdmittedTimelineExternalWriter -> bindPendingRetry(agent, sender)
-    }
-}
-
 /** Required indexed maintenance; implementations must never acquire a legacy sync loop. */
 /** The four facts that identify one abandoned turn, carried together rather than as a parameter list. */
 data class TimelineTurnCleanup(
@@ -62,7 +51,7 @@ class CanonicalExternalTransportWriter(
     private val maintenance: CanonicalTimelineMaintenance,
     private val now: () -> String = { timelineNow().toString() },
 ) : TimelineExternalTransportWriter {
-    internal fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
+    override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
         coordinator.bindPendingRetry(agent, sender)
 
     private suspend fun owner(agentId: String?, conversationId: String) =

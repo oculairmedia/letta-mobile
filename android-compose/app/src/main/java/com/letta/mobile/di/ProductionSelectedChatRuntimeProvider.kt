@@ -7,6 +7,8 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.session.SessionGraph
 import com.letta.mobile.data.session.SessionManager
+import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
+import com.letta.mobile.data.timeline.api.TimelinePendingRetryBinding
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.feature.chat.coordination.SelectedChatRuntime
@@ -142,9 +144,11 @@ internal class SelectedRuntimeWriter(
     private val agent: String,
     private val resolve: suspend (String) -> TimelineExternalTransportWriter,
 ) : TimelineExternalTransportWriter {
+    private val pendingRetry = TimelinePendingRetryBinding()
+    override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) = pendingRetry.bind(agent, sender)
     private suspend fun writer(id: ConversationId, suppliedAgent: AgentId?): TimelineExternalTransportWriter {
         require(suppliedAgent == null || suppliedAgent.value == agent) { "Foreign agent on captured writer" }
-        return resolve(id.value)
+        return resolve(id.value).also(pendingRetry::resolved)
     }
     override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>) =
         appendExternalTransportLocal(agent, conversationId, content, otid, attachments)

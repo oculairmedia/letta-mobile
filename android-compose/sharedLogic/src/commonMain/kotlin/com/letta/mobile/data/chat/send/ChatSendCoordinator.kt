@@ -8,7 +8,6 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
-import com.letta.mobile.data.timeline.bindPendingRetry
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsChatBridge

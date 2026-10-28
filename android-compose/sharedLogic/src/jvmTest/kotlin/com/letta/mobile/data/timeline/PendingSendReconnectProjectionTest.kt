@@ -13,6 +13,8 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.timeline.api.TimelinePendingRetryBinding
+import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
@@ -44,6 +46,19 @@ import kotlin.test.fail
 /** The send queue, bridge, scoped writer, history adapter, reducer, pager and rendered row assembly. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PendingSendReconnectProjectionTest {
+    @Test fun retryReachesCapturedSenderThroughAnUnrecognisedWrapperWriter() = runTest {
+        // ChatSendCoordinator binds before the first conversation is acquired or sent to.
+        val f = Fixture(this)
+        f.sendQueued("retry through wrapper")
+        f.dropAndReconnect()
+        val screen = f.screen(FIRST)
+        assertTrue(screen.retry(MessageId("cm-test-1")), "Retry binding must cross any writer wrapper")
+        runCurrent()
+        assertEquals(listOf(FIRST to "cm-test-1", FIRST to "cm-test-1"), f.channel.accepted)
+        assertEquals(1, f.minted)
+        screen.close()
+    }
+
     @Test fun neverAcknowledgedQueuedSendSurvivesReloadAsNotSentInSendTimeOrder() = runTest {
         val f = Fixture(this)
         val screen = f.screen(FIRST)
@@ -161,10 +176,17 @@ class PendingSendReconnectProjectionTest {
         }
         private val coordinator = CanonicalTimelineCoordinator(store, transport)
         private val maintenance = IndexedCanonicalTimelineMaintenance(coordinator, test.backgroundScope, { _, _, _ -> }, { throw it })
-        private val writer = AdmittedTimelineExternalWriter(
+        private val admitted = AdmittedTimelineExternalWriter(
             CanonicalExternalTransportWriter(coordinator, { _, conversation -> scope(conversation) }, maintenance, { at(10) }),
             TimelineLegacyAdmission(),
         )
+        private val writer = object : TimelineExternalTransportWriter by admitted {
+            private val pendingRetry = TimelinePendingRetryBinding()
+            override fun bindPendingRetry(agent: AgentId, sender: suspend (com.letta.mobile.data.model.ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
+                pendingRetry.bind(agent, sender)
+            override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>) =
+                admitted.also(pendingRetry::resolved).appendExternalTransportLocal(agentId, conversationId, content, otid, attachments)
+        }
         val sender = ChatSendCoordinator(
             scope = test.backgroundScope, agentId = "agent",
             activeConfig = { LettaConfig("test", LettaConfig.Mode.SELF_HOSTED, "http://localhost:8291", "token") },

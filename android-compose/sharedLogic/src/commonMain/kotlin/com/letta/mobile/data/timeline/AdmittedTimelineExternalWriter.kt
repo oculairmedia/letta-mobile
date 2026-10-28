@@ -11,7 +11,7 @@ class AdmittedTimelineExternalWriter(
     private val delegate: TimelineExternalTransportWriter,
     private val admission: TimelineLegacyAdmission,
 ) : TimelineExternalTransportWriter {
-    internal fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
+    override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
         delegate.bindPendingRetry(agent, sender)
 
     override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>) =

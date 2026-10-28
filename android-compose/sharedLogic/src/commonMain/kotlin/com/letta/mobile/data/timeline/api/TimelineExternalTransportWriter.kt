@@ -1,5 +1,8 @@
 package com.letta.mobile.data.timeline.api
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.timeline.CanonicalPendingLocalStore
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
@@ -10,6 +13,9 @@ import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
  * process-wide TimelineRepository and its cached TimelineSyncLoop state.
  */
 interface TimelineExternalTransportWriter {
+    /** Bind the captured sender through wrappers; writers without pending storage may ignore it. */
+    fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) {}
+
     suspend fun appendExternalTransportLocal(
         conversationId: String,
         content: String,
