@@ -6,8 +6,14 @@ import com.letta.mobile.data.canvas.NotebookLocalStore
 import java.io.IOException
 import java.nio.file.Files
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.automerge.ObjectId
 import org.automerge.repo.DocumentId
 import org.automerge.repo.Storage
@@ -20,6 +26,59 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LocalNotebookNoteBackendTest {
+    @Test
+    fun cancelledSaveAfterMutationRequiresStorageAcknowledgementBeforeClose() = runBlocking {
+        val path = Files.createTempDirectory("note-editor-cancel-ack-")
+        val blockWrites = AtomicBoolean(false)
+        val enteredBarrier = CompletableFuture<Unit>()
+        val pendingAck = CompletableFuture<Void>()
+        val wrapper = { delegate: Storage ->
+            object : Storage by delegate {
+                override fun put(key: StorageKey, value: ByteArray): CompletableFuture<Void> {
+                    val explicitBarrier = Thread.currentThread().stackTrace.any {
+                        it.className.endsWith("NotebookStorageHealth") && it.methodName == "persistChunk"
+                    }
+                    if (!blockWrites.get() || !explicitBarrier) return delegate.put(key, value)
+                    return if (enteredBarrier.complete(Unit)) pendingAck
+                    else CompletableFuture.failedFuture(IOException("acknowledgement unavailable"))
+                }
+            }
+        }
+        NotebookLocalStore(path, "cancel-ack-peer", storage = wrapper).use { store ->
+            val storageId = store.create("Cancellation")
+            assertTrue(store.persistCanvas(storageId))
+            val id = assertNotNull(store.read(storageId)).id
+            val session = NotebookNoteSession(id, LocalNotebookNoteBackend(store))
+            session.refresh()
+            session.edit("applied but not acknowledged")
+            blockWrites.set(true)
+            val saving = async { session.save() }
+            try {
+                withContext(Dispatchers.IO) { enteredBarrier.get(5, TimeUnit.SECONDS) }
+                saving.cancelAndJoin()
+                assertTrue(saving.isCancelled)
+                assertFalse(pendingAck.isDone)
+                assertEquals("applied but not acknowledged", store.read(storageId)?.markdown)
+                assertTrue(session.state.value.dirty)
+                assertEquals("applied but not acknowledged", session.state.value.indeterminateWrite?.markdown)
+
+                assertFalse(withTimeout(5_000) { session.prepareClose() })
+                assertTrue(session.state.value.dirty)
+                assertNotNull(session.state.value.error)
+                blockWrites.set(false)
+                assertTrue(withTimeout(5_000) { session.retryPersistence() })
+                assertFalse(session.state.value.dirty)
+                assertTrue(session.prepareClose())
+                NotebookLocalStore(path, "cancel-ack-reader").use { reader ->
+                    assertEquals("applied but not acknowledged", reader.read(storageId)?.markdown)
+                }
+            } finally {
+                saving.cancelAndJoin()
+                pendingAck.completeExceptionally(IOException("test cleanup"))
+            }
+        }
+    }
+
     @Test
     fun realStoreSessionSaveClosesAndReopensSameDocumentWithOpaqueFieldsIntact() = runBlocking {
         val path = Files.createTempDirectory("note-editor-reopen-")
