@@ -37,7 +37,7 @@ fun IChannelTransport.conversationChanges(): Flow<Pair<ConversationId, AgentId?>
 
 /**
  * Keeps dirty identities while a read is in flight. Queued bursts drain into one batch, so each
- * owning agent needs at most one list read per batch. A push arriving during that read remains
+ * owning agent needs at most one refresh per batch. A push arriving during that read remains
  * queued for the next batch, including another push for the same conversation.
  */
 suspend fun observeConversationInvalidations(

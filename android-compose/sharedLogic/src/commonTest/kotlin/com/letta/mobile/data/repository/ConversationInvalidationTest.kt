@@ -53,7 +53,7 @@ class ConversationInvalidationTest {
         repository.refresh()
         remote.requests.clear()
         remote.rows = listOf(row("a").copy(summary = "updated"), row("b", b))
-        transport.events.emit(push("a", agent = null)) // ownership comes from the loaded fleet
+        transport.events.emit(push("a", agent = null)) // legacy pushes can still use the single-row refetch
         runCurrent()
         assertEquals(listOf(a), remote.requests)
         assertEquals("updated", repository.conversations.value.first { it.id == ConversationId("a") }.summary)
