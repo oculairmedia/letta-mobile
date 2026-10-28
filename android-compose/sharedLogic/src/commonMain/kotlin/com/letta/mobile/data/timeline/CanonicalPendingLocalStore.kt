@@ -55,20 +55,15 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
                 }
                 return@transaction
             }
-            // At most one failed send is worth keeping, and only the newest one. Sending again is
-            // the ordinary way a user abandons the last failure, so a new attempt supersedes it
-            // rather than stacking another permanent bubble beneath the conversation.
-            writePending(previous.filterNot { it.delivery == Delivery.Failed } + record)
+            // A later send is not permission to discard an earlier, unconfirmed prompt.
+            writePending(previous + record)
             nextRevision()
         }
     }
 
     /**
-     * Retire sends whose echo never came. `Sent` means the transport accepted the message and the
-     * server echo will remove the record; if that echo is long overdue the send has demonstrably
-     * lost it, and leaving the record `Sent` makes it immortal — it is neither superseded by a new
-     * attempt nor dismissible. Past the horizon it becomes an ordinary failure, so the newest-only
-     * rule applies to it like any other. A send still within the horizon is left alone.
+     * Mark overdue unconfirmed sends as failed, retaining every prompt for explicit Retry or
+     * dismissal. A transport drop can leave either Sending or Sent without an echo.
      */
     suspend fun retireLostEchoes(
         scope: TimelineScope,
@@ -80,7 +75,7 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
         // Callers already hold a freshly loaded list, so decide from that: refresh runs on ordinary
         // traffic and must not bill a read, a commit and a revision when nothing is stale.
         fun stale(records: List<Record>) = records.filter { record ->
-            record.delivery == Delivery.Sent && overdue(record.sentAt, now, horizonMillis)
+            record.delivery != Delivery.Failed && overdue(record.sentAt, now, horizonMillis)
         }
         if (stale(loaded).isEmpty()) return 0
         return store.transaction(scope) {
@@ -91,22 +86,10 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
             val retired = previous.map { record ->
                 if (record.otid in staleOtids) record.copy(delivery = Delivery.Failed) else record
             }
-            writePending(keepNewestFailure(retired))
+            writePending(retired)
             nextRevision()
             stale.size
         }
-    }
-
-    /**
-     * Keep only the newest failure, judged by position: records are appended in send order, so the
-     * last failed entry is the most recent send that failed. Picking the record a caller happens to
-     * be acting on instead would retain an older one whenever transport outcomes arrive out of
-     * order — an earlier send failing after a later one already had.
-     */
-    private fun keepNewestFailure(records: List<Record>): List<Record> {
-        val newest = records.indexOfLast { it.delivery == Delivery.Failed }
-        if (newest < 0) return records
-        return records.filterIndexed { index, record -> record.delivery != Delivery.Failed || index == newest }
     }
 
     /** An unparsable timestamp is not evidence of staleness, so such a record is left alone. */
@@ -118,8 +101,12 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
     suspend fun mark(scope: TimelineScope, otid: String, delivery: Delivery) {
         store.transaction(scope) {
             val previous = readPending()
-            val marked = previous.map { if (it.otid == otid) it.copy(delivery = delivery) else it }
-            val next = if (delivery == Delivery.Failed) keepNewestFailure(marked) else marked
+            val next = previous.map {
+                // A delayed terminal is not a persisted echo. Only an explicit Retry may move a
+                // failed record back to Sending, after which normal transport outcomes apply.
+                if (it.otid != otid || (it.delivery == Delivery.Failed && delivery == Delivery.Sent)) it
+                else it.copy(delivery = delivery)
+            }
             if (next != previous) {
                 writePending(next)
                 nextRevision()

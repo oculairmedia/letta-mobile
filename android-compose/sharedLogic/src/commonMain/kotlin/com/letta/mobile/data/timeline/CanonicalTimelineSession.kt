@@ -1,6 +1,9 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.sync.withLock
 
@@ -12,6 +15,36 @@ class CanonicalTimelineCoordinator(
     private val mutex = kotlinx.coroutines.sync.Mutex()
     private val owners = mutableMapOf<TimelineScope, Owner>()
     private var revoked = false
+    private val retryLock = kotlinx.atomicfu.locks.SynchronizedObject()
+    private val retrySenders = mutableMapOf<AgentId, suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit>()
+
+    internal fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) {
+        kotlinx.atomicfu.locks.synchronized(retryLock) { retrySenders[agent] = sender }
+    }
+
+    internal suspend fun retryPending(owner: Owner, identity: MessageId): Boolean {
+        val (record, sender) = mutex.withLock {
+            check(owners[owner.selection.scope] === owner) { "Stale canonical owner" }
+            val record = owner.session.pending.value.singleOrNull {
+                it.otid == identity.value && it.delivery == CanonicalPendingLocalStore.Delivery.Failed
+            } ?: return false
+            val agent = owner.selection.scope.agentId?.let(::AgentId) ?: return false
+            val sender = kotlinx.atomicfu.locks.synchronized(retryLock) { retrySenders[agent] } ?: return false
+            owner.session.markPending(record.otid, CanonicalPendingLocalStore.Delivery.Sending)
+            record to sender
+        }
+        val result = runCatching {
+            // Never hold the canonical mutex while dispatch calls back into appendPending.
+            sender(ConversationId(owner.selection.scope.conversationId), record)
+        }
+        result.exceptionOrNull()?.let { failure ->
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                owner.session.markPending(record.otid, CanonicalPendingLocalStore.Delivery.Failed)
+            }
+            if (failure is kotlinx.coroutines.CancellationException) throw failure
+        }
+        return result.isSuccess
+    }
 
     /** Runtime generation retirement, unlike viewport disposal, invalidates every owner. */
     suspend fun revoke() = mutex.withLock {
@@ -251,12 +284,18 @@ class CanonicalTimelineSession(
     val settling = engine.settling
     private val pendingStore = CanonicalPendingLocalStore(store)
     private val pendingMutex = kotlinx.coroutines.sync.Mutex()
+    private var recoveryCandidates = emptySet<MessageId>()
     private val mutablePending = kotlinx.coroutines.flow.MutableStateFlow<List<CanonicalPendingLocalStore.Record>>(emptyList())
     val pending: kotlinx.coroutines.flow.StateFlow<List<CanonicalPendingLocalStore.Record>> = mutablePending
 
     suspend fun open(target: TimelineMessageId? = null): TimelineEngineOpen {
         val opened = engine.open(scope, target)
-        if (opened is TimelineEngineOpen.Opened) refreshPending()
+        if (opened is TimelineEngineOpen.Opened) {
+            refreshPending()
+            // These sends predate this session. Only a successful history read can decide whether
+            // they persisted; a failed/offline read must leave them available for recovery.
+            recoveryCandidates = pending.value.mapTo(mutableSetOf()) { MessageId(it.otid) }
+        }
         return opened
     }
 
@@ -267,16 +306,23 @@ class CanonicalTimelineSession(
 
     suspend fun markPending(otid: String, delivery: CanonicalPendingLocalStore.Delivery) = pendingMutex.withLock {
         pendingStore.mark(scope, otid, delivery)
+        if (delivery == CanonicalPendingLocalStore.Delivery.Sending) recoveryCandidates -= MessageId(otid)
         mutablePending.value = pendingStore.load(scope)
     }
 
-    private suspend fun refreshPending() = pendingMutex.withLock {
-        // A send whose echo never arrived would otherwise sit here forever: neither superseded by
-        // a new attempt nor dismissible. Retiring it on refresh means reopening the conversation
-        // is enough to clear one, without a restart or a repair pass.
+    private suspend fun refreshPending(historyLoaded: Boolean = false) = pendingMutex.withLock {
         val loaded = pendingStore.load(scope)
+        val abandoned = if (historyLoaded) loaded.filter {
+            MessageId(it.otid) in recoveryCandidates && it.delivery != CanonicalPendingLocalStore.Delivery.Failed
+        } else emptyList()
+        if (historyLoaded) {
+            abandoned.forEach {
+                pendingStore.mark(scope, it.otid, CanonicalPendingLocalStore.Delivery.Failed)
+            }
+            recoveryCandidates = emptySet()
+        }
         val retired = pendingStore.retireLostEchoes(scope, loaded)
-        mutablePending.value = if (retired > 0) pendingStore.load(scope) else loaded
+        mutablePending.value = if (abandoned.isNotEmpty() || retired > 0) pendingStore.load(scope) else loaded
     }
 
     suspend fun loadOlder(selection: TimelineEngineSelection): TimelineEnginePageOutcome {
@@ -284,7 +330,7 @@ class CanonicalTimelineSession(
         try {
             return when (val response = transport.listConversationMessagePage(request.remote)) {
                 is TimelineRemotePageResult.Page -> engine.applyPage(request, response).also {
-                    if (it == TimelineEnginePageOutcome.Applied) refreshPending()
+                    if (it == TimelineEnginePageOutcome.Applied) refreshPending(historyLoaded = true)
                 }
                 is TimelineRemotePageResult.NoProgress -> engine.rejectNoProgress(request, response)
             }
@@ -303,7 +349,7 @@ class CanonicalTimelineSession(
         try {
             return when (val response = transport.listConversationMessagePage(request.remote)) {
                 is TimelineRemotePageResult.Page -> engine.reconcilePageDetailed(request, response).also {
-                    if (it.outcome == TimelineEnginePageOutcome.Applied) refreshPending()
+                    if (it.outcome == TimelineEnginePageOutcome.Applied) refreshPending(historyLoaded = true)
                 }
                 is TimelineRemotePageResult.NoProgress -> TimelineEngineReconcileResult(engine.rejectReconcileNoProgress(request, response))
             }

@@ -34,11 +34,13 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_history_error
 import com.letta.mobile.sharedui.resources.timeline_missing_target
 import com.letta.mobile.sharedui.resources.timeline_retry_history
+import com.letta.mobile.sharedui.resources.run_error_action_retry
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.surface.timeline.rows.isUserRole
 import com.letta.mobile.ui.mascot.MascotLoading
@@ -290,11 +292,18 @@ private fun DeferredSettledRow(scope: PagedRowsScope, row: CanonicalTimelinePres
 /** A row plus the divider that begins its day, decided against its older neighbour only. */
 @Composable
 private fun PagedRow(item: ChatRenderItem, older: ChatRenderItem?, scope: PagedRowsScope, modifier: Modifier) {
+    val retryScope = rememberCoroutineScope()
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         pagedBoundaryDate(item, older)?.let { date ->
             DayDividerRow(date, scope.today)
         }
         TimelineItemRow(item, scope.bindings)
+        val failed = (item as? ChatRenderItem.Single)?.message?.takeIf { it.isSendFailed }
+        failed?.clientMessageId?.let { identity ->
+            TextButton(onClick = { retryScope.launch { scope.params.presentation.retry(MessageId(identity)) } }) {
+                Text(stringResource(Res.string.run_error_action_retry))
+            }
+        }
     }
 }
 

@@ -1,6 +1,8 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.timeline.api.TimelineIngestSources
@@ -8,6 +10,17 @@ import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+
+/** Reach canonical retry ownership through shared admission wrappers; legacy writers have no ledger. */
+internal fun TimelineExternalTransportWriter.bindPendingRetry(
+    agent: AgentId,
+    sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit,
+) {
+    when (this) {
+        is CanonicalExternalTransportWriter -> bindPendingRetry(agent, sender)
+        is AdmittedTimelineExternalWriter -> bindPendingRetry(agent, sender)
+    }
+}
 
 /** Required indexed maintenance; implementations must never acquire a legacy sync loop. */
 /** The four facts that identify one abandoned turn, carried together rather than as a parameter list. */
@@ -49,6 +62,9 @@ class CanonicalExternalTransportWriter(
     private val maintenance: CanonicalTimelineMaintenance,
     private val now: () -> String = { timelineNow().toString() },
 ) : TimelineExternalTransportWriter {
+    internal fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
+        coordinator.bindPendingRetry(agent, sender)
+
     private suspend fun owner(agentId: String?, conversationId: String) =
         coordinator.acquire(resolveScope(agentId, conversationId))
 
@@ -138,7 +154,10 @@ class CanonicalExternalTransportWriter(
 
     override suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean, connectionGeneration: Long): RecentMessagesReconcileOutcome =
         try {
-            val result = coordinator.reconcileRecentDetailed(owner(agentId, conversationId))
+            val owner = owner(agentId, conversationId)
+            // A redial retires the old stream before history becomes the source of truth.
+            if (reason == "redial-recovery") coordinator.completeExternal(owner)
+            val result = coordinator.reconcileRecentDetailed(owner)
             when (result.outcome) {
                 TimelineEnginePageOutcome.Applied -> RecentMessagesReconcileOutcome.Applied(result.appended)
                 TimelineEnginePageOutcome.Stale -> RecentMessagesReconcileOutcome.Skipped("stale")

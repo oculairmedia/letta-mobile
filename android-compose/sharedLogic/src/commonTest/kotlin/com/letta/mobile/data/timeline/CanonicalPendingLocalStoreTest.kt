@@ -68,6 +68,24 @@ class CanonicalPendingLocalStoreTest {
         assertEquals(listOf(record), pending.load(scope))
     }
 
+    @Test fun lostSendingAndSentRecordsBothRemainRetryableAndLateSentCannotUndoFailure() = runTest {
+        val pending = CanonicalPendingLocalStore(Store())
+        val scope = TimelineScope("backend", "conversation")
+        val sending = CanonicalPendingLocalStore.Record("sending", "first", emptyList(), "2026-01-01T00:00:00Z")
+        val sent = sending.copy(otid = "sent", content = "second")
+        pending.save(scope, sending)
+        pending.save(scope, sent)
+        pending.mark(scope, sent.otid, CanonicalPendingLocalStore.Delivery.Sent)
+        assertEquals(2, pending.retireLostEchoes(scope, pending.load(scope), parseTimelineInstant("2026-01-01T00:10:00Z")))
+        pending.mark(scope, sending.otid, CanonicalPendingLocalStore.Delivery.Sent)
+        assertEquals(listOf(sending.otid, sent.otid), pending.load(scope).map { it.otid })
+        assertEquals(listOf(CanonicalPendingLocalStore.Delivery.Failed, CanonicalPendingLocalStore.Delivery.Failed),
+            pending.load(scope).map { it.delivery })
+        pending.mark(scope, sending.otid, CanonicalPendingLocalStore.Delivery.Sending)
+        pending.mark(scope, sending.otid, CanonicalPendingLocalStore.Delivery.Sent)
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sent, pending.load(scope).first().delivery)
+    }
+
     private class Store : TimelineBoundedStore {
         private val values = mutableMapOf<TimelineScope, MutableMap<String, ByteArray>>()
         private val tools = mutableMapOf<TimelineScope, TestToolIndexState>()

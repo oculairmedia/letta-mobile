@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
+import com.letta.mobile.data.timeline.bindPendingRetry
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsChatBridge
@@ -111,6 +112,19 @@ class ChatSendCoordinator(
     )
 
     init {
+        timelineRepository.bindPendingRetry(AgentId(agentId)) { conversation, record ->
+            scope.coroutineContext.ensureActive()
+            turnStateMutex.withLock {
+                val config = validatedActiveConfig(conversation) ?: error("No active backend")
+                check(queueTurns.ensureConnected(config, clientVersion)) { "Chat channel is not connected" }
+                prepareConversation(conversation.value)
+                healStaleVisualPresence(conversation)
+                val pending = QueuedChatSend(
+                    QueuedSendId(record.otid), QueueConversationId(conversation.value), record.content, record.attachments,
+                )
+                queueDriver.submitLocked(pending)?.let { reportQueuedSend(pending, it) }
+            }
+        }
         scope.launch {
             wsChatBridge.redialWhileTurnActive.collect { event ->
                 contained("RedialWhileTurnActive") { turnStateMutex.withLock { handleRedialWhileTurnActiveLocked(event) } }
@@ -474,6 +488,13 @@ class ChatSendCoordinator(
                 "attempt" to event.reconnectAttempt,
             )
             foreground.transientDisconnect(turnRegistry.statesSnapshot)
+            // Local transport acceptance is not durable acknowledgement. Retain each interrupted
+            // prompt as Not sent; a subsequent exact-otid history echo can still confirm it.
+            turnRegistry.statesSnapshot.forEach { state ->
+                state.otid?.let { otid ->
+                    timelineRepository.markExternalTransportLocalFailed(agentId, state.ownerConversationId, otid)
+                }
+            }
             return
         }
         failActiveTurnForDisconnect(event)

@@ -1,6 +1,8 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 
@@ -9,6 +11,9 @@ class AdmittedTimelineExternalWriter(
     private val delegate: TimelineExternalTransportWriter,
     private val admission: TimelineLegacyAdmission,
 ) : TimelineExternalTransportWriter {
+    internal fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
+        delegate.bindPendingRetry(agent, sender)
+
     override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>) =
         admission.admitted(conversationId) { delegate.appendExternalTransportLocal(conversationId, content, otid, attachments) }
     override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>) =

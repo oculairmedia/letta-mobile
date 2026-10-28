@@ -46573,6 +46573,7 @@ public final class com/letta/mobile/data/timeline/CanonicalTimelinePresentation 
 	public final fun onResidentRows (Ljava/util/List;)V
 	public final fun readChunk (Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;JILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun readTextWindow (Lcom/letta/mobile/data/timeline/CanonicalTimelinePresentation$Row;Lcom/letta/mobile/data/timeline/TimelineSemanticField;JLkotlinx/coroutines/CoroutineDispatcher;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun retry-jmYxp0c (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun setViewport (Lkotlin/Pair;)V
 }
 
