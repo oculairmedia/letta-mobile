@@ -42,6 +42,11 @@ class TimelineStreamReplayFuzzTest {
         assertEquals(expectedCases, totalCases, "Every generated timeline scenario must run")
     }
 
+    @Test
+    fun nightlyFreshAssistantRegressionSeed() {
+        runTimelineScenario(seed = 180469547812560496L, scenario = 21)
+    }
+
     companion object {
         internal fun runTimelineReplayCampaign(seeds: List<Long>, scenariosPerSeed: Int): Int {
             val harness = TimelineStreamReplayFuzzTest()
@@ -233,6 +238,7 @@ class TimelineStreamReplayFuzzTest {
                         id = serverId,
                         contentRaw = JsonPrimitive(text),
                         otid = otid,
+                        logicalMessageId = otid,
                         runId = assistantRun,
                         seqId = seq,
                         textSeq = seq,
