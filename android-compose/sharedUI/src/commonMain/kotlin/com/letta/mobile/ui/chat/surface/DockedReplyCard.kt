@@ -2,6 +2,7 @@ package com.letta.mobile.ui.chat.surface
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -32,6 +33,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.surface.timeline.ObserveResidentRows
+import com.letta.mobile.ui.chat.surface.timeline.PendingPromptActions
 import com.letta.mobile.ui.chat.surface.timeline.rememberRowCallbacks
 import com.letta.mobile.ui.chat.surface.timeline.rememberRowContexts
 import com.letta.mobile.ui.chat.surface.timeline.rememberTimelineElasticOverscroll
@@ -106,7 +108,12 @@ internal fun DockedReplyCard(params: DockedReplyParams, modifier: Modifier = Mod
         contentPadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md, Alignment.Bottom),
     ) {
-        items(newestFirst, key = { it.key }) { item -> ChatRenderItemRow(item, contexts.forItem(item), callbacks) }
+        items(newestFirst, key = { it.key }) { item ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                ChatRenderItemRow(item, contexts.forItem(item), callbacks)
+                params.pagedTimeline?.let { PendingPromptActions(item, it) }
+            }
+        }
     }
 }
 

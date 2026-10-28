@@ -294,22 +294,26 @@ private fun DeferredSettledRow(scope: PagedRowsScope, row: CanonicalTimelinePres
 /** A row plus the divider that begins its day, decided against its older neighbour only. */
 @Composable
 private fun PagedRow(item: ChatRenderItem, older: ChatRenderItem?, scope: PagedRowsScope, modifier: Modifier) {
-    val retryScope = rememberCoroutineScope()
     Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         pagedBoundaryDate(item, older)?.let { date ->
             DayDividerRow(date, scope.today)
         }
         TimelineItemRow(item, scope.bindings)
-        val failed = (item as? ChatRenderItem.Single)?.message?.takeIf { it.isSendFailed }
-        failed?.clientMessageId?.let { identity ->
-            Row {
-                TextButton(onClick = { retryScope.launch { scope.params.presentation.retry(MessageId(identity)) } }) {
-                    Text(stringResource(Res.string.run_error_action_retry))
-                }
-                TextButton(onClick = { retryScope.launch { scope.params.presentation.dismiss(MessageId(identity)) } }) {
-                    Text(stringResource(Res.string.rows_dismiss))
-                }
-            }
+        PendingPromptActions(item, scope.params.presentation)
+    }
+}
+
+/** The same failed-prompt controls for the full timeline and docked overlay. */
+@Composable
+internal fun PendingPromptActions(item: ChatRenderItem, presentation: CanonicalTimelinePresentation) {
+    val identity = (item as? ChatRenderItem.Single)?.message?.takeIf { it.isSendFailed }?.clientMessageId ?: return
+    val actions = rememberCoroutineScope()
+    Row {
+        TextButton(onClick = { actions.launch { presentation.retry(MessageId(identity)) } }) {
+            Text(stringResource(Res.string.run_error_action_retry))
+        }
+        TextButton(onClick = { actions.launch { presentation.dismiss(MessageId(identity)) } }) {
+            Text(stringResource(Res.string.rows_dismiss))
         }
     }
 }

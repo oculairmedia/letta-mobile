@@ -28,6 +28,8 @@ import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
+import com.letta.mobile.ui.chat.surface.DockedReplyCard
+import com.letta.mobile.ui.chat.surface.DockedReplyParams
 import com.letta.mobile.ui.chat.surface.RecordingChatActions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,7 +58,10 @@ class PendingTimelineActionsUiTest {
     @Test fun liveFailureOffersWorkingRetryAndDismiss() = actions(inHistory = false)
     @Test fun pagedFailureOffersWorkingRetryAndDismiss() = actions(inHistory = true)
 
-    private fun actions(inHistory: Boolean) = runComposeUiTest {
+    @Test fun dockedLiveFailureOffersWorkingRetryAndDismiss() = actions(inHistory = false, docked = true)
+    @Test fun dockedPagedFailureOffersWorkingRetryAndDismiss() = actions(inHistory = true, docked = true)
+
+    private fun actions(inHistory: Boolean, docked: Boolean = false) = runComposeUiTest {
         val scope = TimelineScope("backend", "bubble-conversation", "agent")
         val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val store = UiFrameTimelineStore()
@@ -87,8 +92,14 @@ class PendingTimelineActionsUiTest {
             setContent {
                 MaterialTheme {
                     Box(Modifier.size(width = 420.dp, height = 720.dp)) {
-                        ChatTimeline(
-                            state = ChatUiState(conversationState = ConversationState.Ready(scope.conversationId), isLoadingMessages = false),
+                        val state = ChatUiState(conversationState = ConversationState.Ready(scope.conversationId), isLoadingMessages = false)
+                        if (docked) {
+                            DockedReplyCard(DockedReplyParams(
+                                state, presentation, RecordingChatActions(), ChatSurfaceCapabilities.Default,
+                                ChatSurfaceHost(), ChatSurfaceAppearance(), {},
+                            ))
+                        } else ChatTimeline(
+                            state = state,
                             pagedTimeline = presentation,
                             actions = RecordingChatActions(),
                             capabilities = ChatSurfaceCapabilities.Default,
