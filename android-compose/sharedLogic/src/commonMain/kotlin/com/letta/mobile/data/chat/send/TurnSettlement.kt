@@ -1,5 +1,7 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Delivery
+
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ErrorMessage
@@ -132,17 +134,14 @@ internal class TurnSettlement(
      */
     private suspend fun settlePendingSend(
         state: ConversationTurnState,
-        conversation: ConversationId,
         deadTurn: Boolean,
     ) {
-        val conversationId = conversation.value
         val otid = state.otid ?: return
         ownership.retainSettledOtid(QueuedSendId(otid))
-        val localConversationId = state.localConversationId ?: conversationId
         if (deadTurn) {
-            timelineRepository.markExternalTransportLocalFailed(agentId, localConversationId, otid)
+            state.markPendingOutcome(timelineRepository, agentId, Delivery.Failed)
         } else {
-            timelineRepository.markExternalTransportLocalSent(agentId, localConversationId, otid)
+            state.markPendingOutcome(timelineRepository, agentId, Delivery.Sent)
         }
     }
 
@@ -233,7 +232,7 @@ internal class TurnSettlement(
     ): List<Result<Unit>> {
         val status = request.event.status
         return withContext(NonCancellable) {
-            val localSettlement = runCatching { settlePendingSend(state, conversationId, outcome.deadTurn) }
+            val localSettlement = runCatching { settlePendingSend(state, outcome.deadTurn) }
             val foregroundPresence = runCatching {
                 // Evaluate after suspension: the user may have selected a different conversation.
                 foreground.turnFinished(conversationId) {
@@ -284,7 +283,7 @@ internal class TurnSettlement(
             )
             return
         }
-        timelineRepository.markExternalTransportLocalFailed(agentId, localConversationId, otid)
+        state.markPendingOutcome(timelineRepository, agentId, Delivery.Failed)
     }
 
     private suspend fun cleanupDisconnectedTurnFragments(state: ConversationTurnState, conversation: ConversationId) {
@@ -312,9 +311,7 @@ internal class TurnSettlement(
         val conversationId = state.ownerConversationId.takeIf { it.isNotBlank() }
             ?: foreground.visibleConversation?.value
             ?: defaultConversationId
-        state.otid?.let { otid ->
-            timelineRepository.markExternalTransportLocalSent(agentId, state.localConversationId ?: conversationId, otid)
-        }
+        state.markPendingOutcome(timelineRepository, agentId, Delivery.Sent)
         timelineRepository.clearExternalTransportActive(agentId, conversationId)
         foreground.visuallyComplete(ConversationId(conversationId))
         Telemetry.event(
@@ -332,7 +329,7 @@ internal class TurnSettlement(
         ui.onTurnVisuallyComplete()
         val orphanedOtid = state?.otid
         if (state != null && conversation != null) {
-            settlePendingSend(state, conversation, deadTurn = false)
+            settlePendingSend(state, deadTurn = false)
             timelineRepository.clearExternalTransportActive(agentId, conversation.value)
             ownership.clear(state, reason = "stalePresenceHealed")
         }

@@ -160,7 +160,7 @@ class ChatSendCoordinatorCleanupTest {
     }
 
     @Test
-    fun transientDisconnectRetainsFailedPromptWithoutCleaningOrFinalizingActiveTurn() = runTest(UnconfinedTestDispatcher()) {
+    fun transientDisconnectKeepsActivePromptWithoutCleaningOrFinalizingTurn() = runTest(UnconfinedTestDispatcher()) {
         val timeline = RecordingTimelineWriter()
         val ui = RecordingUiSink()
         val transport = FakeChannelTransport(sendResults = mutableListOf(true))
@@ -178,7 +178,7 @@ class ChatSendCoordinatorCleanupTest {
         assertEquals(listOf(true), ui.transientDisconnects)
         assertEquals(local.otid, timeline.externalLocals.single().otid)
         assertTrue(timeline.cleanupTails.isEmpty())
-        assertEquals(listOf(RecordingTimelineWriter.LocalMarker("conv-1", local.otid)), timeline.failedLocals)
+        assertTrue(timeline.failedLocals.isEmpty(), "an active stream survives a transient redial")
         assertTrue(timeline.clearedActiveConversations.isEmpty())
     }
 

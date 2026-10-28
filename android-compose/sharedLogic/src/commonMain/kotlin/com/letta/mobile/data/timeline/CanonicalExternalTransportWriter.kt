@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.timeline.api.TimelinePendingSendAttempt
+
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
@@ -54,6 +56,22 @@ class CanonicalExternalTransportWriter(
     override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
         coordinator.bindPendingRetry(agent, sender)
 
+    override suspend fun isPendingSendCurrent(attempt: TimelinePendingSendAttempt): Boolean {
+        val scope = resolveScope(attempt.agent.value, attempt.conversation.value)
+        return CanonicalPendingLocalStore(coordinator.pendingStorage).load(scope).any {
+            it.otid == attempt.identity.value && it.attempt == attempt.generation &&
+                it.delivery == CanonicalPendingLocalStore.Delivery.Sending
+        }
+    }
+
+    override suspend fun ownPendingSend(attempt: TimelinePendingSendAttempt, active: () -> Boolean) {
+        val scope = resolveScope(attempt.agent.value, attempt.conversation.value)
+        coordinator.dispatchOwners.retain(scope.backendId, scope.conversationId, attempt.identity.value, active)
+    }
+
+    override suspend fun markPendingSend(attempt: TimelinePendingSendAttempt, delivery: CanonicalPendingLocalStore.Delivery) =
+        coordinator.markPending(owner(attempt.agent.value, attempt.conversation.value), attempt.identity.value, delivery, attempt.generation)
+
     private suspend fun owner(agentId: String?, conversationId: String) =
         coordinator.acquire(resolveScope(agentId, conversationId))
 
@@ -69,13 +87,13 @@ class CanonicalExternalTransportWriter(
         markExternalTransportLocalSent(null, conversationId, otid)
 
     override suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String) =
-        coordinator.markPending(owner(agentId, conversationId), otid, CanonicalPendingLocalStore.Delivery.Sent)
+        coordinator.markPending(owner(agentId, conversationId), otid, CanonicalPendingLocalStore.Delivery.Sent, expectedAttempt = 0)
 
     override suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String) =
         markExternalTransportLocalFailed(null, conversationId, otid)
 
     override suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String) =
-        coordinator.markPending(owner(agentId, conversationId), otid, CanonicalPendingLocalStore.Delivery.Failed)
+        coordinator.markPending(owner(agentId, conversationId), otid, CanonicalPendingLocalStore.Delivery.Failed, expectedAttempt = 0)
 
     override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage, source: String) =
         ingestExternalTransportMessage(null, conversationId, message, source)

@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.timeline.api.TimelinePendingSendAttempt
+
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
@@ -14,6 +16,12 @@ class AdmittedTimelineExternalWriter(
     override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
         delegate.bindPendingRetry(agent, sender)
 
+    override suspend fun isPendingSendCurrent(attempt: TimelinePendingSendAttempt) =
+        admission.admitted(attempt.conversation.value) { delegate.isPendingSendCurrent(attempt) }
+    override suspend fun ownPendingSend(attempt: TimelinePendingSendAttempt, active: () -> Boolean) =
+        admission.admitted(attempt.conversation.value) { delegate.ownPendingSend(attempt, active) }
+    override suspend fun markPendingSend(attempt: TimelinePendingSendAttempt, delivery: CanonicalPendingLocalStore.Delivery) =
+        admission.admitted(attempt.conversation.value) { delegate.markPendingSend(attempt, delivery) }
     override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>) =
         admission.admitted(conversationId) { delegate.appendExternalTransportLocal(conversationId, content, otid, attachments) }
     override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>) =

@@ -1,5 +1,7 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Delivery
+
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
@@ -72,9 +74,10 @@ internal class IncomingTurnProjection(
         // PR2: only THIS conversation's unsettled otid is settled here. The old
         // global read settled (and then dropped) another conversation's live send.
         state.otid?.let { staleOtid ->
+            val attempt = state.inFlightSend?.pendingAttempt(agentId)
             scope.launch {
                 runCatching {
-                    timelineRepository.markExternalTransportLocalSent(agentId, effectiveConversationId, staleOtid)
+                    attempt?.let { timelineRepository.markPendingSend(it, Delivery.Sent) }
                 }
             }
             Telemetry.event(

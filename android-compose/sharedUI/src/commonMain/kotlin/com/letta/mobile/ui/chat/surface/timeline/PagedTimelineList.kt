@@ -43,6 +43,8 @@ import com.letta.mobile.sharedui.resources.timeline_missing_target
 import com.letta.mobile.sharedui.resources.timeline_retry_history
 import com.letta.mobile.sharedui.resources.run_error_action_retry
 import com.letta.mobile.sharedui.resources.rows_dismiss
+import com.letta.mobile.sharedui.resources.pending_retry_rejected
+import com.letta.mobile.sharedui.resources.pending_dismiss_rejected
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.surface.timeline.rows.isUserRole
 import com.letta.mobile.ui.mascot.MascotLoading
@@ -309,14 +311,34 @@ internal fun PendingPromptActions(item: ChatRenderItem, presentation: CanonicalT
     // Retry changes the row to Sending before its sender finishes. Keep the action's scope
     // mounted through that state change so hiding the buttons cannot cancel the send.
     val actions = rememberCoroutineScope()
-    val identity = (item as? ChatRenderItem.Single)?.message?.takeIf { it.isSendFailed }?.clientMessageId ?: return
-    Row {
-        TextButton(onClick = { actions.launch { presentation.retry(MessageId(identity)) } }) {
-            Text(stringResource(Res.string.run_error_action_retry))
+    val message = (item as? ChatRenderItem.Single)?.message ?: return
+    val identity = message.clientMessageId ?: return
+    var rejected by remember(identity) { mutableStateOf<String?>(null) }
+    var busy by remember(identity) { mutableStateOf(false) }
+    val retryRejected = stringResource(Res.string.pending_retry_rejected)
+    val dismissRejected = stringResource(Res.string.pending_dismiss_rejected)
+    if (!message.isSendFailed) return
+    fun perform(message: String, action: suspend () -> Boolean) {
+        busy = true
+        rejected = null
+        actions.launch {
+            try {
+                if (!action()) rejected = message
+            } finally {
+                busy = false
+            }
         }
-        TextButton(onClick = { actions.launch { presentation.dismiss(MessageId(identity)) } }) {
-            Text(stringResource(Res.string.rows_dismiss))
+    }
+    Column {
+        Row {
+            TextButton(enabled = !busy, onClick = { perform(retryRejected) { presentation.retry(MessageId(identity)) } }) {
+                Text(stringResource(Res.string.run_error_action_retry))
+            }
+            TextButton(enabled = !busy, onClick = { perform(dismissRejected) { presentation.dismiss(MessageId(identity)) } }) {
+                Text(stringResource(Res.string.rows_dismiss))
+            }
         }
+        rejected?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
     }
 }
 

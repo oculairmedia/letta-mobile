@@ -9,7 +9,7 @@ import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
  * This keeps WebSocket tests on deterministic fakes instead of mocking the
  * process-wide TimelineRepository and its cached TimelineSyncLoop state.
  */
-interface TimelineExternalTransportWriter : TimelinePendingRetryTarget {
+interface TimelineExternalTransportWriter : TimelinePendingRetryTarget, TimelinePendingSendTarget {
     suspend fun appendExternalTransportLocal(
         conversationId: String,
         content: String,
@@ -31,11 +31,11 @@ interface TimelineExternalTransportWriter : TimelinePendingRetryTarget {
 
     suspend fun markExternalTransportLocalSent(conversationId: String, otid: String)
 
-    suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String)
+    override suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String)
 
     suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String)
 
-    suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String)
+    override suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String)
 
     suspend fun reconcileExternalTransportSend(
         conversationId: String,

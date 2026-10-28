@@ -22,6 +22,7 @@ data class QueuedChatSend(
     val conversationId: QueueConversationId,
     val text: String,
     val attachments: List<MessageContentPart.Image> = emptyList(),
+    val attempt: Long = 0,
 )
 
 /**

@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
+import androidx.compose.ui.test.assertIsEnabled
+import com.letta.mobile.data.timeline.toRenderItem
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -62,6 +64,74 @@ class PendingTimelineActionsUiTest {
 
     @Test fun dockedLiveFailureOffersWorkingRetryAndDismiss() = actions(inHistory = false, docked = true)
     @Test fun dockedPagedFailureOffersWorkingRetryAndDismiss() = actions(inHistory = true, docked = true)
+
+    @Test fun rejectedRetryShowsFeedbackAndRemainsEnabled() = rejectedAction(retry = true)
+    @Test fun rejectedDismissShowsFeedbackAndRemainsEnabled() = rejectedAction(retry = false)
+
+    @Test fun rejectedRetryAfterSuspensionKeepsVisibleFeedback() = runComposeUiTest {
+        val scope = TimelineScope("suspended-rejection", "conversation", "agent")
+        val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val coordinator = CanonicalTimelineCoordinator(UiFrameTimelineStore(), historyTransport(false))
+        val owner = runBlocking { coordinator.acquire(scope) }
+        val writer = CanonicalExternalTransportWriter(coordinator, { _, _ -> scope },
+            IndexedCanonicalTimelineMaintenance(coordinator, ui, { _, _, _ -> }, { throw it }))
+        val started = CompletableDeferred<Unit>()
+        val finish = CompletableDeferred<Unit>()
+        writer.bindPendingRetry(AgentId("agent")) { _, _ ->
+            started.complete(Unit)
+            finish.await()
+            error("sender unavailable")
+        }
+        val record = CanonicalPendingLocalStore.Record("rejected", "prompt", emptyList(), "2026-10-28T12:00:00Z")
+        val presentation = runBlocking {
+            coordinator.appendPending(owner, record)
+            coordinator.markPending(owner, record.otid, CanonicalPendingLocalStore.Delivery.Failed)
+            CanonicalTimelinePresentation.open(coordinator, owner, ui)
+        }
+        try {
+            showTimeline(presentation, scope, docked = false)
+            awaitRetry()
+            onNodeWithText("Retry").performClick()
+            waitUntil(timeoutMillis = 10_000) { main.drain(); started.isCompleted }
+            waitUntil(timeoutMillis = 10_000) { main.drain(); onAllNodesWithText("Retry").fetchSemanticsNodes().isEmpty() }
+            finish.complete(Unit)
+            waitUntil(timeoutMillis = 10_000) {
+                main.drain()
+                onAllNodesWithText("Couldn’t retry this message. Try again.").fetchSemanticsNodes().isNotEmpty()
+            }
+            onNodeWithText("Retry").assertIsEnabled()
+        } finally {
+            runBlocking { presentation.close() }
+            ui.cancel()
+        }
+    }
+
+    private fun rejectedAction(retry: Boolean) = runComposeUiTest {
+        val scope = TimelineScope("rejection-backend", "conversation", "agent")
+        val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val coordinator = CanonicalTimelineCoordinator(UiFrameTimelineStore(), historyTransport(false))
+        val owner = runBlocking { coordinator.acquire(scope) }
+        val record = CanonicalPendingLocalStore.Record("rejected", "prompt", emptyList(), "2026-10-28T12:00:00Z")
+        val presentation = runBlocking {
+            coordinator.appendPending(owner, record)
+            coordinator.markPending(owner, record.otid, CanonicalPendingLocalStore.Delivery.Failed)
+            CanonicalTimelinePresentation.open(coordinator, owner, ui)
+        }
+        val row = record.copy(delivery = CanonicalPendingLocalStore.Delivery.Failed).toRenderItem()
+        try {
+            setContent { MaterialTheme { PendingPromptActions(row, presentation) } }
+            if (!retry) runBlocking { coordinator.markPending(owner, record.otid, CanonicalPendingLocalStore.Delivery.Sending) }
+            val button = if (retry) "Retry" else "Dismiss"
+            onNodeWithText(button).performClick()
+            val message = if (retry) "Couldn’t retry this message. Try again." else "Couldn’t dismiss this message. Try again."
+            waitUntil(timeoutMillis = 10_000) { main.drain(); onAllNodesWithText(message).fetchSemanticsNodes().isNotEmpty() }
+            onNodeWithText(button).assertIsEnabled()
+            assertEquals(1, owner.session.pending.value.size)
+        } finally {
+            runBlocking { presentation.close() }
+            ui.cancel()
+        }
+    }
 
     private fun actions(inHistory: Boolean, docked: Boolean = false) = runComposeUiTest {
         val scope = TimelineScope("backend", "bubble-conversation", "agent")

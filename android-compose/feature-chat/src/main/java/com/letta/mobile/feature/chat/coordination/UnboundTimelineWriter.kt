@@ -1,6 +1,6 @@
 package com.letta.mobile.feature.chat.coordination
 
-import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
+import com.letta.mobile.data.timeline.api.unboundTimelineWriterResult
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import java.lang.reflect.Proxy
 
@@ -13,9 +13,4 @@ import java.lang.reflect.Proxy
 internal val UnboundTimelineWriter: TimelineExternalTransportWriter = Proxy.newProxyInstance(
     TimelineExternalTransportWriter::class.java.classLoader,
     arrayOf(TimelineExternalTransportWriter::class.java),
-) { _, method, _ -> unbound(method.name) } as TimelineExternalTransportWriter
-
-private fun unbound(member: String): RecentMessagesReconcileOutcome = when (member) {
-    "reconcileRecentMessages" -> RecentMessagesReconcileOutcome.Skipped("no_runtime")
-    else -> error("No chat runtime is captured for this backend ($member)")
-}
+) { _, method, _ -> unboundTimelineWriterResult(method.name) } as TimelineExternalTransportWriter

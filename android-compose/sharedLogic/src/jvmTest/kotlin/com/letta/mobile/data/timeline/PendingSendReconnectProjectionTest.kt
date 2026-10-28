@@ -49,6 +49,99 @@ import kotlin.time.Duration.Companion.seconds
 /** The send queue, bridge, scoped writer, history adapter, reducer, pager and rendered row assembly. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PendingSendReconnectProjectionTest {
+    @Test fun confirmedRetryQueuedBehindActiveTurnNeverDispatchesAgain() = resolveQueuedRetry(dismiss = false)
+    @Test fun dismissedRetryQueuedBehindActiveTurnNeverDispatchesAgain() = resolveQueuedRetry(dismiss = true)
+
+    private fun resolveQueuedRetry(dismiss: Boolean) = runTest {
+        val f = Fixture(this)
+        f.sendQueued("active turn")
+        f.sender.handleEvent(WsTimelineEvent.TurnStarted(agentId = "agent", conversationId = FIRST.value, turnId = "turn-active", runId = "run-active"))
+        val screen = f.screen(FIRST)
+        val retry = Prompt(MessageId("retry-otid"), "already persisted")
+        f.failed(FIRST, retry)
+        f.channel.busy = true
+        assertTrue(screen.retry(retry.otid))
+        assertEquals(1, f.sender.sendQueue.state.value[QueueConversationId(FIRST.value)]?.items?.size)
+        if (dismiss) {
+            f.writer.markPendingSend(com.letta.mobile.data.timeline.api.TimelinePendingSendAttempt(
+                AgentId("agent"), FIRST, retry.otid, 1,
+            ), CanonicalPendingLocalStore.Delivery.Failed)
+            assertTrue(screen.dismiss(retry.otid))
+        } else {
+            f.history[FIRST] = listOf(f.user(HistoryUser(MessageId("echo"), retry, 20.seconds)))
+            f.reload(FIRST)
+        }
+        assertTrue(f.pending(FIRST).none { it.otid == retry.otid.value })
+        f.channel.busy = false
+        f.sender.handleEvent(WsTimelineEvent.TurnDone("turn-active", "run-active", com.letta.mobile.data.transport.BridgeTurnStatus.Completed))
+        runCurrent()
+        assertEquals(listOf("cm-test-1"), f.channel.accepted.map { it.otid?.value })
+        assertTrue(f.sender.sendQueue.state.value.isEmpty())
+        screen.close()
+    }
+
+    @Test fun transientRedialPreservesAnOwnedTurnButFailsAnUnownedUnacknowledgedSend() = runTest {
+        val f = Fixture(this)
+        f.sendQueued("survive redial")
+        f.channel.busy = true
+        try {
+            f.dropAndReconnect()
+            assertEquals(CanonicalPendingLocalStore.Delivery.Sending, f.pending(FIRST).single().delivery)
+        } finally {
+            f.channel.busy = false
+        }
+        f.dropAndReconnect()
+        assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.pending(FIRST).single().delivery)
+    }
+
+    @Test fun staleFailureAndSentCallbacksCannotChangeActiveRetry() = runTest {
+        val f = Fixture(this)
+        f.sendQueued("retry me")
+        f.dropAndReconnect()
+        val screen = f.screen(FIRST)
+        assertTrue(screen.retry(MessageId("cm-test-1")))
+        val stale = com.letta.mobile.data.timeline.api.TimelinePendingSendAttempt(
+            AgentId("agent"), FIRST, MessageId("cm-test-1"), 0,
+        )
+        f.writer.markPendingSend(stale, CanonicalPendingLocalStore.Delivery.Failed)
+        f.writer.markPendingSend(stale, CanonicalPendingLocalStore.Delivery.Sent)
+        f.writer.markExternalTransportLocalFailed("agent", FIRST.value, "cm-test-1")
+        f.writer.markExternalTransportLocalSent("agent", FIRST.value, "cm-test-1")
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sending, f.pending(FIRST).single().delivery)
+        f.writer.markPendingSend(stale.copy(generation = 1), CanonicalPendingLocalStore.Delivery.Failed)
+        assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.pending(FIRST).single().delivery)
+        screen.close()
+    }
+
+    @Test fun replacementRecoveryKeepsOwnedSendUntilDispatchEnds() = runTest {
+        val f = Fixture(this)
+        f.sendQueued("still active")
+        val replacement = CanonicalTimelineCoordinator(f.store, f.transport, f.dispatchOwners)
+        val owner = replacement.acquire(f.scope(FIRST))
+        assertEquals(TimelineEnginePageOutcome.Applied, replacement.reconcileRecent(owner))
+        assertEquals(CanonicalPendingLocalStore.Delivery.Sending, f.pending(FIRST).single().delivery)
+        f.retireSender()
+        assertEquals(TimelineEnginePageOutcome.Applied, replacement.reconcileRecent(owner))
+        assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.pending(FIRST).single().delivery)
+    }
+
+    @Test fun replacementRecoveryKeepsServerOwnedTurnAfterSenderRetirement() = runTest {
+        val f = Fixture(this)
+        f.sendQueued("accepted server turn")
+        f.channel.busy = true
+        f.retireSender(stopTransport = false)
+        val replacement = CanonicalTimelineCoordinator(f.store, f.transport, f.dispatchOwners)
+        val owner = replacement.acquire(f.scope(FIRST))
+        try {
+            assertEquals(TimelineEnginePageOutcome.Applied, replacement.reconcileRecent(owner))
+            assertEquals(CanonicalPendingLocalStore.Delivery.Sending, f.pending(FIRST).single().delivery)
+        } finally {
+            f.channel.busy = false
+        }
+        assertEquals(TimelineEnginePageOutcome.Applied, replacement.reconcileRecent(owner))
+        assertEquals(CanonicalPendingLocalStore.Delivery.Failed, f.pending(FIRST).single().delivery)
+    }
+
     @Test fun dismissLiveFailureIsScopedToItsOwnConversationAndOtid() = runTest {
         val f = Fixture(this)
         val first = f.screen(FIRST)
@@ -200,7 +293,8 @@ class PendingSendReconnectProjectionTest {
         f.sender.send("persisted")
         runCurrent()
         // Lose the send owner entirely: recovery cannot depend on its disconnect callback.
-        val restarted = CanonicalTimelineCoordinator(f.store, f.transport)
+        f.retireSender()
+        val restarted = CanonicalTimelineCoordinator(f.store, f.transport, f.dispatchOwners)
         val owner = restarted.acquire(f.scope(FIRST))
         f.history[FIRST] = listOf(
             f.user(HistoryUser(MessageId("persisted"), Prompt(MessageId("cm-test-3"), "persisted"), 10.seconds)),
@@ -228,21 +322,28 @@ class PendingSendReconnectProjectionTest {
             override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?) =
                 TimelineRemotePageAdapter.fromMessages(request, history[ConversationId(request.scope.conversationId)].orEmpty(), hasMore = false)
         }
-        private val coordinator = CanonicalTimelineCoordinator(store, transport)
+        val dispatchOwners = com.letta.mobile.data.timeline.api.PendingDispatchOwners()
+        private val coordinator = CanonicalTimelineCoordinator(store, transport, dispatchOwners)
         private val maintenance = IndexedCanonicalTimelineMaintenance(coordinator, test.backgroundScope, { _, _, _ -> }, { throw it })
         private val admitted = AdmittedTimelineExternalWriter(
             CanonicalExternalTransportWriter(coordinator, { _, conversation -> scope(ConversationId(conversation)) }, maintenance, { at(10.seconds) }),
             TimelineLegacyAdmission(),
         )
-        private val writer = object : TimelineExternalTransportWriter by admitted {
+        val writer = object : TimelineExternalTransportWriter by admitted {
             private val pendingRetry = TimelinePendingRetryBinding()
             override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
                 pendingRetry.bind(agent, sender)
             override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>) =
                 admitted.also(pendingRetry::resolved).appendExternalTransportLocal(agentId, conversationId, content, otid, attachments)
         }
+        private val senderJob = kotlinx.coroutines.SupervisorJob(test.backgroundScope.coroutineContext[kotlinx.coroutines.Job])
+        private val senderScope = kotlinx.coroutines.CoroutineScope(test.backgroundScope.coroutineContext + senderJob)
+        fun retireSender(stopTransport: Boolean = true) {
+            senderJob.cancel()
+            if (stopTransport) channel.busy = false
+        }
         val sender = ChatSendCoordinator(
-            scope = test.backgroundScope, agentId = "agent",
+            scope = senderScope, agentId = "agent",
             activeConfig = { LettaConfig("test", LettaConfig.Mode.SELF_HOSTED, "http://localhost:8291", "token") },
             wsChatBridge = WsChatBridge(channel.transport), timelineRepository = writer,
             conversationRepository = object : IConversationRepository {

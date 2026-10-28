@@ -1272,21 +1272,6 @@ class TimelineExactCanonicalWriterTest {
         return store to { n, at -> CanonicalPendingLocalStore.Record("otid-$n", "attempt $n", emptyList(), at) }
     }
 
-    @Test fun openRetiresLostSentEchoAndKeepsOneFailedRowStableAcrossReopens() = runTest {
-        val store = InMemoryTimelineStore()
-        val pending = CanonicalPendingLocalStore(store)
-        val stale = CanonicalPendingLocalStore.Record("stale-otid", "not sent", emptyList(), "2020-01-01T00:00:00Z")
-        pending.save(scope, stale)
-        pending.mark(scope, stale.otid, CanonicalPendingLocalStore.Delivery.Sent)
-        val session = CanonicalTimelineSession(store, PageTransport({ }), scope, enabled = true)
-        assertIs<TimelineEngineOpen.Opened>(session.open())
-        assertEquals(listOf(CanonicalPendingLocalStore.Delivery.Failed), session.pending.value.map { it.delivery })
-        assertEquals(listOf(true), session.pending.value.map { it.toRenderItem().message.isSendFailed })
-        assertIs<TimelineEngineOpen.Opened>(session.open())
-        assertEquals(listOf("stale-otid"), session.pending.value.map { it.otid })
-        assertEquals(listOf(CanonicalPendingLocalStore.Delivery.Failed), session.pending.value.map { it.delivery })
-    }
-
     @Test fun userEchoRetiresOnlyMatchingOtidAndEqualTextEchoesBothSurvive() = runTest {
         val store = InMemoryTimelineStore()
         val pending = CanonicalPendingLocalStore(store)

@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.timeline.api.PendingDispatchOwners
+
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
@@ -9,7 +11,11 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /** Bounded durable optimistic state, independent of screen residency and settled history. */
-class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
+class CanonicalPendingLocalStore(
+    private val store: TimelineBoundedStore,
+    private val dispatchOwners: PendingDispatchOwners = PendingDispatchOwners(),
+    private val recoveryProtected: (String) -> Boolean = { false },
+) {
     @Serializable
     data class Record(
         val otid: String,
@@ -17,6 +23,7 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
         val attachments: List<@Serializable(with = PendingImageSerializer::class) MessageContentPart.Image>,
         val sentAt: String,
         val delivery: Delivery = Delivery.Sending,
+        val attempt: Long = 0,
     )
 
     // Local persistence shape only; outbound images retain their existing wire encoding.
@@ -75,7 +82,9 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
         // Callers already hold a freshly loaded list, so decide from that: refresh runs on ordinary
         // traffic and must not bill a read, a commit and a revision when nothing is stale.
         fun stale(records: List<Record>) = records.filter { record ->
-            record.delivery != Delivery.Failed && overdue(record.sentAt, now, horizonMillis)
+            record.delivery != Delivery.Failed && !recoveryProtected(record.otid) &&
+                !dispatchOwners.isActive(scope.backendId, scope.conversationId, record.otid) &&
+                overdue(record.sentAt, now, horizonMillis)
         }
         if (stale(loaded).isEmpty()) return 0
         return store.transaction(scope) {
@@ -98,13 +107,13 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
         return timelineInstantDurationMillis(sent, now) >= horizonMillis
     }
 
-    suspend fun mark(scope: TimelineScope, otid: String, delivery: Delivery) {
+    suspend fun mark(scope: TimelineScope, otid: String, delivery: Delivery, expectedAttempt: Long? = null) {
         store.transaction(scope) {
             val previous = readPending()
             val next = previous.map {
                 // A delayed terminal is not a persisted echo. Only an explicit Retry may move a
                 // failed record back to Sending, after which normal transport outcomes apply.
-                if (it.otid != otid || it.ignoresLateSent(delivery)) it
+                if (it.otid != otid || it.ignoresOutcome(delivery, expectedAttempt)) it
                 else it.copy(delivery = delivery)
             }
             if (next != previous) {
@@ -114,8 +123,19 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
         }
     }
 
-    private fun Record.ignoresLateSent(incoming: Delivery): Boolean =
-        delivery == Delivery.Failed && incoming == Delivery.Sent
+    private fun Record.ignoresOutcome(incoming: Delivery, expectedAttempt: Long?): Boolean =
+        (expectedAttempt != null && attempt != expectedAttempt) ||
+            (delivery == Delivery.Failed && incoming == Delivery.Sent)
+
+    internal suspend fun retry(scope: TimelineScope, otid: String): Record? = store.transaction(scope) {
+        val previous = readPending()
+        val record = previous.singleOrNull { it.otid == otid && it.delivery == Delivery.Failed } ?: return@transaction null
+        check(record.attempt < Long.MAX_VALUE)
+        val retry = record.copy(delivery = Delivery.Sending, attempt = record.attempt + 1)
+        writePending(previous.map { if (it.otid == otid) retry else it })
+        nextRevision()
+        retry
+    }
 
     /**
      * Drop a send the user has given up on. An absent echo is never confirmation, so nothing else
@@ -182,7 +202,7 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
         if (records.isEmpty()) deleteEvidence(KEY) else putEvidence(KEY, bytes)
     }
 
-        /** Long enough that a slow but live send is never retired, short enough to not linger. */
+        /** Fallback timeout for unowned, unconfirmed sends. */
         const val LOST_ECHO_HORIZON_MILLIS = 5L * 60L * 1000L
 
         private const val KEY = "pending/local/v1"

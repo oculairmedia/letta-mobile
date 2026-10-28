@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.timeline.api.PendingDispatchOwners
+
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.test.runTest
@@ -84,6 +86,25 @@ class CanonicalPendingLocalStoreTest {
         pending.mark(scope, sending.otid, CanonicalPendingLocalStore.Delivery.Sending)
         pending.mark(scope, sending.otid, CanonicalPendingLocalStore.Delivery.Sent)
         assertEquals(CanonicalPendingLocalStore.Delivery.Sent, pending.load(scope).first().delivery)
+    }
+
+    @Test fun horizonRetiresAbandonedSendsButPreservesActiveDispatchesAndRetries() = runTest {
+        val dispatchOwners = PendingDispatchOwners()
+        val pending = CanonicalPendingLocalStore(Store(), dispatchOwners)
+        val scope = TimelineScope("horizon-backend", "conversation")
+        val record = CanonicalPendingLocalStore.Record("active", "prompt", emptyList(), "2026-01-01T00:00:00Z")
+        pending.save(scope, record)
+        pending.save(scope, record.copy(otid = "retry", attempt = 1))
+        pending.save(scope, record.copy(otid = "abandoned"))
+        var active = true
+        dispatchOwners.retain(scope.backendId, scope.conversationId, "active") { active }
+        dispatchOwners.retain(scope.backendId, scope.conversationId, "retry") { active }
+        val now = parseTimelineInstant("2026-01-01T00:10:00Z")
+        assertEquals(1, pending.retireLostEchoes(scope, pending.load(scope), now))
+        assertEquals(listOf(CanonicalPendingLocalStore.Delivery.Sending, CanonicalPendingLocalStore.Delivery.Sending,
+            CanonicalPendingLocalStore.Delivery.Failed), pending.load(scope).map { it.delivery })
+        active = false
+        assertEquals(2, pending.retireLostEchoes(scope, pending.load(scope), now))
     }
 
     private class Store : TimelineBoundedStore {

@@ -1,5 +1,7 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Delivery
+
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.IdFormats
@@ -119,8 +121,9 @@ class ChatSendCoordinator(
                 prepareConversation(conversation.value)
                 healStaleVisualPresence(conversation)
                 val pending = QueuedChatSend(
-                    QueuedSendId(record.otid), QueueConversationId(conversation.value), record.content, record.attachments,
+                    QueuedSendId(record.otid), QueueConversationId(conversation.value), record.content, record.attachments, record.attempt,
                 )
+                retainPendingOwner(pending)
                 queueDriver.submitLocked(pending)?.let { reportQueuedSend(pending, it) }
             }
         }
@@ -356,6 +359,7 @@ class ChatSendCoordinator(
             "otid" to pending.id.value,
             "clearComposer" to clearComposer,
         )
+        if (pending.attempt > 0 && !timelineRepository.isPendingSendCurrent(pending.pendingAttempt(agentId))) return true
         val state = turnRegistry.stateFor(ConversationId(pending.conversationId.value))
         val accepted = state.acceptSend(
             pending = pending,
@@ -390,10 +394,23 @@ class ChatSendCoordinator(
             otid = pending.id.value,
             attachments = pending.attachments,
         )
+        retainPendingOwner(pending)
         if (clearComposer) foreground.clearComposer(ConversationId(pending.conversationId.value))
         postSendReconciler.schedule(pending.conversationId.value, pending.id.value)
         foreground.dispatched(ConversationId(pending.conversationId.value))
         return true
+    }
+
+    private suspend fun retainPendingOwner(pending: QueuedChatSend) {
+        timelineRepository.ownPendingSend(pending.pendingAttempt(agentId)) {
+            val conversation = ConversationId(pending.conversationId.value)
+            val state = turnRegistry.peekState(conversation)
+            val localOwner = scope.isActive && (
+                queuedSends.queueFor(pending.conversationId).positionOf(pending.id) != null ||
+                    (state?.inFlightSend == pending && !state.reachedTerminal)
+                )
+            localOwner || wsChatBridge.hasActiveChatTurn(conversation.value)
+        }
     }
 
     private fun reportQueuedSend(pending: QueuedChatSend, position: Int) {
@@ -487,16 +504,20 @@ class ChatSendCoordinator(
                 "attempt" to event.reconnectAttempt,
             )
             foreground.transientDisconnect(turnRegistry.statesSnapshot)
-            // Local transport acceptance is not durable acknowledgement. Retain each interrupted
-            // prompt as Not sent; a subsequent exact-otid history echo can still confirm it.
-            turnRegistry.statesSnapshot.forEach { state ->
-                state.otid?.let { otid ->
-                    timelineRepository.markExternalTransportLocalFailed(agentId, state.ownerConversationId, otid)
-                }
+            // A redial preserves an owned or visibly streaming turn. Only an unacknowledged
+            // send without that presence fails here; an exact history echo may still confirm it.
+            turnRegistry.statesSnapshot.filterNot(::keepsActiveSendAcrossRedial).forEach { state ->
+                state.markPendingOutcome(timelineRepository, agentId, Delivery.Failed)
             }
             return
         }
         failActiveTurnForDisconnect(event)
+    }
+
+    private fun keepsActiveSendAcrossRedial(state: ConversationTurnState): Boolean {
+        val conversation = ConversationId(state.ownerConversationId)
+        if (wsChatBridge.hasActiveChatTurn(conversation.value)) return true
+        return foreground.owns(conversation) && ui.isStreaming()
     }
 
     private fun messageDeduplicationScope(event: WsTimelineEvent): String? {

@@ -62,6 +62,34 @@ class SelectedRuntimeBindingTest {
         coVerify(exactly = 1) { delegate.repairExpiredConversationCursorScoped("agent", "conversation", 12L) }
     }
 
+    @Test fun readyBindsRetryBeforeAnyCapturedWriterOperation() = retryAfterRecreation(open = false)
+    @Test fun openBindsRetryBeforeAnyCapturedWriterOperation() = retryAfterRecreation(open = true)
+
+    private fun retryAfterRecreation(open: Boolean) = runTest {
+        val delegate = mockk<com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter>(relaxed = true)
+        val presentation = ChatPagingPresentation(
+            settled = flowOf(androidx.paging.PagingData.empty()), live = MutableStateFlow(emptyList()), close = {},
+        )
+        val binding = mockk<AndroidCanonicalTimelineRuntime.Binding>()
+        every { binding.writer } returns delegate
+        every { binding.bindPresentation(any()) } answers {
+            (invocation.args[0] as ChatPagingHost).openCanonical = { _, _, _, _ -> presentation }
+        }
+        val captured = CapturedSelectedChatRuntime(
+            generation = 9L, config = mockk(relaxed = true), descriptor = mockk(relaxed = true),
+            parent = this, agent = "agent", hooks = ConversationBindHooks(bind = { binding }, retire = {}),
+        )
+        val agent = com.letta.mobile.data.model.AgentId("agent")
+        val sender: suspend (com.letta.mobile.data.model.ConversationId, com.letta.mobile.data.timeline.CanonicalPendingLocalStore.Record) -> Unit = { _, _ -> }
+        try {
+            captured.writer.bindPendingRetry(agent, sender)
+            if (open) captured.open("persisted-conversation", null, this) else captured.ready("persisted-conversation")
+            io.mockk.verify(exactly = 1) { delegate.bindPendingRetry(agent, sender) }
+        } finally {
+            captured.retire()
+        }
+    }
+
     @Test fun capturedOpenAndSendStayOnCanonicalTogether() = runTest {
         val canonicalWriter = FakeTimelineExternalTransportWriter()
         val presentation = ChatPagingPresentation(
