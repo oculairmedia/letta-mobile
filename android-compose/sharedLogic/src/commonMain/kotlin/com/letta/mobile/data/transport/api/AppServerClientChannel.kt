@@ -41,7 +41,7 @@ class AppServerClientChannel(
 
     /**
      * The host's pushes that are not App Server protocol frames (an Iroh
-     * host's `pending_approvals` and `permission_mode`), as the [ServerFrame]s a JVM Iroh channel
+     * host's approvals, mode and conversation changes), as the [ServerFrame]s a JVM Iroh channel
      * delivers, so the shared approval relay and mode chip fold them the same way.
      */
     override val events: SharedFlow<ServerFrame> = client.events
@@ -66,7 +66,10 @@ class AppServerClientChannel(
         fun hostPush(raw: JsonObject): ServerFrame? =
             runCatching { LettaJson.wire.decodeFromJsonElement(ServerFrameSerializer, raw) }
                 .getOrNull()
-                ?.takeIf { it is ServerFrame.PendingApprovalsUpdated || it is ServerFrame.PermissionModeUpdated }
+                ?.takeIf {
+                    it is ServerFrame.PendingApprovalsUpdated || it is ServerFrame.PermissionModeUpdated ||
+                        it is ServerFrame.ConversationUpdated
+                }
 
         val CONNECTED = ChannelTransportState.Connected(serverId = "app-server", sessionId = "app-server", deviceId = null)
         val DISCONNECTED = ChannelTransportState.Disconnected(code = 1000, reason = "App Server session closed")

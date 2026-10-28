@@ -17,6 +17,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.visibleConversationsInLists
 import com.letta.mobile.data.model.visibleInLists
+import com.letta.mobile.data.repository.observeConversationInvalidations
 import com.letta.mobile.data.shell.ShellChatPort
 import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.ui.chat.session.ChatActions
@@ -100,6 +101,21 @@ class TimelineConversations(
 
     init {
         scope.launch { refresh() }
+        scope.launch {
+            observeConversationInvalidations(gateway.conversationChanges) { dirty ->
+                runCatchingCancellable {
+                    fleet.refreshForInvalidations(dirty, { roster }) { gateway.getConversation(it.value) }.first
+                }.onSuccess { listed ->
+                    mutableState.update { current ->
+                        current.copy(
+                            conversations = listed.keeping(current.conversations.filter { it.id == current.selected }),
+                            loaded = true,
+                            error = null,
+                        )
+                    }
+                }.onFailure { failure -> mutableState.update { it.copy(error = failure.message ?: LIST_FAILED) } }
+            }
+        }
     }
 
     /**

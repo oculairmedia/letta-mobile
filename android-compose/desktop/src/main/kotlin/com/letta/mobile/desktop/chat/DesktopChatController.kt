@@ -29,7 +29,8 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.repository.observeConversationUpdates
+import com.letta.mobile.data.repository.conversationChanges
+import com.letta.mobile.data.repository.observeConversationInvalidations
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.model.MessageContentPart
@@ -58,10 +59,10 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.data.chat.runtime.agentConversationReader
+import com.letta.mobile.util.runCatchingCancellable
 import com.letta.mobile.util.ReadThroughConversationFleets
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -453,8 +454,6 @@ class DesktopChatController(
     private var createConversationJob: Job? = null
     private var conversationPushJob: Job? = null
 
-    // Conflated: pushes landing while a refresh runs collapse into one follow-up refresh.
-    private val rosterRefreshRequests = Channel<Unit>(Channel.CONFLATED)
     private var started = false
     private var closed = false
 
@@ -468,7 +467,14 @@ class DesktopChatController(
         if (started || closed) return
         started = true
         loadJob = scope.launch { connectAndLoad() }
-        conversationChanges?.let(::observeConversationPushes)
+        conversationPushJob = conversationChanges?.let { transport ->
+            scope.launch {
+                observeConversationInvalidations(transport.conversationChanges()) { dirty ->
+                    runCatchingCancellable { refreshConversationRoster(dirty) }
+                        .onFailure { Telemetry.error(TELEMETRY_TAG, "roster.refreshFailed", it) }
+                }
+            }
+        }
     }
 
     fun retryConnection() {
@@ -1097,40 +1103,19 @@ class DesktopChatController(
         selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
     }
 
-    private suspend fun loadConversationSummaries(nextGateway: DesktopChatGateway): List<ChatConversationSummary> {
-        val roster = rosterProvider()
-        val conversations = fleets.fleetFor(nextGateway).refresh(roster)
+    private suspend fun loadConversationSummaries(
+        nextGateway: DesktopChatGateway,
+        dirty: Map<ConversationId, AgentId?>? = null,
+    ): List<ChatConversationSummary> {
+        val (conversations, roster) = fleets.fleetFor(nextGateway).refreshForInvalidations(dirty, rosterProvider) {
+            nextGateway.getConversation(it.value)
+        }
         models.picks.seedFromHost(conversations) // dxz5s: host overrides, before any selection reads them
         // Every listed conversation is a roster agent's, so the roster names them all.
-        val agentNamesById = roster.filter { it.name.isNotBlank() }.associate { it.id.value to it.name }
+        val agentNamesById = _state.value.conversations.mapNotNull { row -> row.agentId?.let { it to row.agentName } }.toMap() +
+            roster.filter { it.name.isNotBlank() }.associate { it.id.value to it.name }
         return conversations.toChatConversationSummaries(agentNamesById)
-            .distinctBy { it.id }
             .map { if (it.id in locallyArchivedIds) it.copy(archived = true) else it }
-    }
-
-    /**
-     * letta-mobile-lks7m: every `conversation_updated` push asks for a roster re-read; one worker
-     * serves them in order, so a burst of pushes costs at most one read in flight plus one queued.
-     */
-    private fun observeConversationPushes(transport: IChannelTransport) {
-        conversationPushJob = scope.launch {
-            launch {
-                for (request in rosterRefreshRequests) {
-                    try {
-                        refreshConversationRoster()
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (t: Throwable) {
-                        // The next push or reconnect re-reads the roster; a failed refresh only waits for it.
-                        Telemetry.error(TELEMETRY_TAG, "roster.refreshFailed", t)
-                    }
-                }
-            }
-            observeConversationUpdates(transport) { frame ->
-                Telemetry.event(TELEMETRY_TAG, "roster.pushReceived", "reason" to frame.reason)
-                rosterRefreshRequests.trySend(Unit)
-            }
-        }
     }
 
     /**
@@ -1139,22 +1124,29 @@ class DesktopChatController(
      * composer draft are untouched. Only an empty session (nothing selected yet) takes the full load
      * path, because then there is no selection to preserve and the first conversation should open.
      */
-    private suspend fun refreshConversationRoster(): Boolean {
-        if (closed) return false
-        val nextGateway = gateway ?: return false
+    private suspend fun refreshConversationRoster(dirty: Map<ConversationId, AgentId?>? = null): Boolean {
+        val nextGateway = gateway?.takeUnless { closed } ?: return false
         val runtime = _state.value.runtimeState
         if (!runtime.isRemoteBacked || runtime.connectionState !in ROSTER_REFRESHABLE_STATES) return false
-        if (runtime.selectedConversationId == null) {
-            reloadConversationsAndSelect(preferConversationId = null)
-            return true
-        }
         val deleting = _deletingConversationIds.value
-        val summaries = loadConversationSummaries(nextGateway).filterNot { it.id in deleting }
+        val summaries = loadConversationSummaries(nextGateway, dirty).filterNot { it.id in deleting }
         if (closed || gateway !== nextGateway) return false
-        _state.update { current ->
-            current.withRuntimeState(ChatSessionReducer.conversationRosterRefreshed(current.runtimeState, summaries))
+        mergeConversationRoster(summaries)
+        if (runtime.selectedConversationId == null) {
+            summaries.firstOrNull()?.let { selectRemoteConversation(it.id, _state.value.selectionGeneration) }
         }
         return true
+    }
+
+    private fun mergeConversationRoster(summaries: List<ChatConversationSummary>) {
+        _state.update { current ->
+            val next = if (current.runtimeState.selectedConversationId == null) {
+                ChatSessionReducer.conversationsLoaded(current.runtimeState, summaries)
+            } else {
+                ChatSessionReducer.conversationRosterRefreshed(current.runtimeState, summaries)
+            }
+            current.withRuntimeState(next)
+        }
     }
 
     /**

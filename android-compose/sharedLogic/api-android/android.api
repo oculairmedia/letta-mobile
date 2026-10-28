@@ -10050,10 +10050,12 @@ public final class com/letta/mobile/data/chat/runtime/ChatConversationSummary {
 }
 
 public abstract interface class com/letta/mobile/data/chat/runtime/ChatGateway : com/letta/mobile/data/chat/runtime/ChatConversationStore, com/letta/mobile/data/timeline/TimelineTransport {
+	public fun getConversationChanges ()Lkotlinx/coroutines/flow/Flow;
 }
 
 public final class com/letta/mobile/data/chat/runtime/ChatGateway$DefaultImpls {
 	public static fun deleteConversation (Lcom/letta/mobile/data/chat/runtime/ChatGateway;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getConversationChanges (Lcom/letta/mobile/data/chat/runtime/ChatGateway;)Lkotlinx/coroutines/flow/Flow;
 	public static fun getDeleteBehavior (Lcom/letta/mobile/data/chat/runtime/ChatGateway;)Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;
 	public static fun getToolReturn-cWSMi4k (Lcom/letta/mobile/data/chat/runtime/ChatGateway;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun listConversationMessagePage (Lcom/letta/mobile/data/chat/runtime/ChatGateway;Lcom/letta/mobile/data/timeline/TimelineRemotePageRequest;Lcom/letta/mobile/data/timeline/TimelinePageProgress;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -36980,6 +36982,8 @@ public class com/letta/mobile/data/repository/CachedVibesyncEventStreamRepositor
 }
 
 public final class com/letta/mobile/data/repository/ConversationChangeObservationKt {
+	public static final fun conversationChanges (Lcom/letta/mobile/data/transport/api/IChannelTransport;)Lkotlinx/coroutines/flow/Flow;
+	public static final fun observeConversationInvalidations (Lkotlinx/coroutines/flow/Flow;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static final fun observeConversationUpdates (Lcom/letta/mobile/data/transport/api/IChannelTransport;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
@@ -38981,6 +38985,7 @@ public final class com/letta/mobile/data/repository/iroh/IrohAdminRpcChatGateway
 	public fun forkConversation (Lcom/letta/mobile/data/chat/branch/ConversationForkRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getConnectionState ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getConversation (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getConversationChanges ()Lkotlinx/coroutines/flow/Flow;
 	public fun getDeleteBehavior ()Lcom/letta/mobile/data/chat/runtime/ConversationDeleteBehavior;
 	public fun getPendingApprovalDetails ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getPermissionModeRuntime ()Lcom/letta/mobile/data/runtime/PermissionModeRuntime;
@@ -64770,6 +64775,8 @@ public final class com/letta/mobile/util/AgentConversationFleet {
 	public final fun getHasMore ()Z
 	public final fun loadMore (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun refresh (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun refreshForInvalidations (Ljava/util/Map;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun refreshForInvalidations$default (Lcom/letta/mobile/util/AgentConversationFleet;Ljava/util/Map;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/letta/mobile/util/AgentConversationFleetKt {

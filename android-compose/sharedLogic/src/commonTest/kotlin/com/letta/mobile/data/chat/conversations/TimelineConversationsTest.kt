@@ -19,6 +19,10 @@ import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.ui.chat.session.FakeChatSessionPort
 import com.letta.mobile.ui.chat.session.TimelineChatTarget
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -37,6 +41,34 @@ import kotlin.test.assertTrue
 class TimelineConversationsTest {
     private val nora = AgentId("agent-1")
     private val ivo = AgentId("agent-2")
+
+    @Test
+    fun pushedChangesUseTheSharedScopedPolicyAndKeepSelectionAndDraft() = runTest {
+        val changes = MutableSharedFlow<Pair<ConversationId, AgentId?>>(extraBufferCapacity = 16)
+        val base = IrohHost().chatGateway(backgroundScope)
+        var rows = listOf(Conversation(ConversationId("c1"), nora, summary = "Before"), Conversation(ConversationId("c2"), ivo))
+        val calls = mutableListOf<AgentId>()
+        val gateway = object : ChatGateway by base {
+            override val conversationChanges = changes
+            override suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> {
+                calls += page.agent
+                return rows.filter { it.agentId == page.agent }
+            }
+        }
+        val owner = TimelineConversations(backgroundScope, gateway, listOf(Agent(nora, name = "Nora"), Agent(ivo, name = "Ivo")))
+        runCurrent()
+        owner.selectConversation(ConversationId("c2"))
+        owner.stageComposerText("keep draft")
+        val drafts = owner.state.value.drafts
+        calls.clear()
+        rows = rows.map { if (it.id == ConversationId("c1")) it.copy(summary = "After") else it }
+        repeat(10) { changes.tryEmit(ConversationId("c1") to nora) }
+        runCurrent()
+        assertEquals(listOf(nora), calls)
+        assertEquals("After", owner.state.value.conversations.first { it.id == ConversationId("c1") }.summary)
+        assertEquals(ConversationId("c2"), owner.selectedConversation)
+        assertEquals(drafts, owner.state.value.drafts)
+    }
 
     @Test
     fun listsEveryAgentsConversationsAndRoutesToTheActiveOnes() = runTest {
@@ -83,7 +115,8 @@ class TimelineConversationsTest {
                 }
             }
             val start = currentTime
-            val owner = TimelineConversations(this, delayed, roster)
+            val ownerScope = CoroutineScope(coroutineContext + SupervisorJob())
+            val owner = TimelineConversations(ownerScope, delayed, roster)
             runCurrent()
             assertTrue(owner.state.value.conversations.isEmpty())
             advanceUntilIdle()
@@ -106,6 +139,7 @@ class TimelineConversationsTest {
                 "fleet sample=$sample coldCalls=137 coldFirst=$cold coldComplete=$cold " +
                     "warmCalls=${calls - 137} warmFirst=0 warmComplete=${currentTime - warmStart} rows=883",
             )
+            ownerScope.cancel()
         }
     }
 

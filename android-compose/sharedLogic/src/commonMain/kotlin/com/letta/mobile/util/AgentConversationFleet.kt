@@ -54,6 +54,7 @@ class AgentConversationFleet(
     private val mutex = Mutex()
     private val permits = Semaphore(paging.parallelism)
     private var listed: Map<AgentId, AgentListing> = emptyMap()
+    private var lastRoster: List<Agent> = emptyList()
 
     /** The merged list as last read. */
     val conversations: List<Conversation> get() = listed.merged()
@@ -70,7 +71,68 @@ class AgentConversationFleet(
         }
         // An agent whose read failed keeps what it last listed, so one bad read does not empty its chats.
         listed = read.mapValues { (agent, listing) -> if (listing.failure != null) listed[agent] ?: listing else listing }
+        lastRoster = agents.toList()
         listed.merged()
+    }
+
+    /**
+     * Shared push/reconciliation policy. Dirty identities read only their owners; when ownership
+     * cannot be read on this backend, [roster] supplies a full reconciliation. Null [dirty] is an
+     * explicit initial/reconnect read. The result carries rows and the last reconciled roster,
+     * including agents with no earlier conversations, so scoped updates retain their labels.
+     */
+    suspend fun refreshForInvalidations(
+        dirty: Map<ConversationId, AgentId?>?,
+        roster: suspend () -> List<Agent>,
+        resolve: suspend (ConversationId) -> Conversation? = { null },
+    ): Pair<List<Conversation>, List<Agent>> {
+        val changed = dirty?.let { refreshChanged(it, resolve) }
+        if (changed != null) return changed to lastRoster
+        val agents = roster()
+        return refresh(agents) to agents
+    }
+
+    /**
+     * Re-reads only dirty conversations' owning agents, retaining other agents and loaded tails.
+     * A missing owner or an unsupported targeted read returns null so the caller can reconcile
+     * its roster. Ordinary failures retain cached rows and never widen the read to the fleet.
+     */
+    internal suspend fun refreshChanged(
+        dirty: Map<ConversationId, AgentId?>,
+        resolve: suspend (ConversationId) -> Conversation? = { null },
+    ): List<Conversation>? = mutex.withLock {
+        val owners = changedOwners(dirty, resolve) ?: return@withLock null
+        val read = readAll(owners.associateWith { AgentListing() }, paging.eagerPagesPerAgent)
+        if (read.values.any { it.failure is UnsupportedOperationException }) return@withLock null
+        if (read.isNotEmpty() && read.values.all { it.failure != null }) {
+            throw read.values.first().failure ?: IllegalStateException(LIST_FAILED)
+        }
+        listed = listed + read.mapValues { (agent, fresh) -> (listed[agent] ?: AgentListing()).refreshed(fresh) }
+        listed.merged()
+    }
+
+    private suspend fun changedOwners(
+        dirty: Map<ConversationId, AgentId?>,
+        resolve: suspend (ConversationId) -> Conversation?,
+    ): Set<AgentId>? {
+        val owners = mutableSetOf<AgentId>()
+        for ((conversation, agent) in dirty) {
+            val owner = agent ?: listed.entries.firstOrNull { (_, listing) -> listing.rows.any { it.id == conversation } }?.key
+                ?: try {
+                    resolve(conversation)?.agentId
+                } catch (_: UnsupportedOperationException) {
+                    null
+                }
+            owners += owner ?: return null
+        }
+        return owners
+    }
+
+    /** Keeps a targeted row refetch in the same cache used by subsequent agent reads and paging. */
+    internal suspend fun record(conversation: Conversation) = mutex.withLock {
+        val previous = listed[conversation.agentId] ?: AgentListing()
+        val rows = listOf(conversation).visibleConversationsInLists() + previous.rows.filterNot { it.id == conversation.id }
+        listed = listed + (conversation.agentId to previous.copy(rows = rows))
     }
 
     /** Reads the next page of every agent that has one; the list keeps what it had. */
@@ -134,6 +196,19 @@ private data class AgentListing(
     val read: Boolean = false,
     val failure: Throwable? = null,
 ) {
+    /** Replace an authoritative short read; otherwise keep already loaded older pages and their cursor. */
+    fun refreshed(fresh: AgentListing): AgentListing {
+        if (fresh.failure != null) return this
+        if (fresh.cursor == null) return fresh
+        val freshIds = fresh.rows.mapTo(mutableSetOf()) { it.id }
+        return copy(
+            rows = fresh.rows + rows.filterNot { it.id in freshIds },
+            cursor = if (read) cursor else fresh.cursor,
+            read = true,
+            failure = null,
+        )
+    }
+
     /** These rows and a page more: only [agent]'s own, visible ones; a [full] page may have more after it. */
     fun plus(agent: AgentId, page: List<Conversation>, full: Boolean): AgentListing {
         val ids = rows.mapTo(mutableSetOf()) { it.id }
