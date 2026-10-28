@@ -51553,12 +51553,11 @@ public final class com/letta/mobile/data/timeline/ToolReturnTruncationKt {
 	public static final field DEFAULT_MAX_INBOUND_TOOL_RETURN_BYTES I
 }
 
-public abstract interface class com/letta/mobile/data/timeline/api/TimelineExternalTransportWriter {
+public abstract interface class com/letta/mobile/data/timeline/api/TimelineExternalTransportWriter : com/letta/mobile/data/timeline/api/TimelinePendingRetryTarget {
 	public abstract fun appendExternalTransportLocal (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun appendExternalTransportLocal (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun appendExternalTransportLocal$default (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static synthetic fun appendExternalTransportLocal$default (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public fun bindPendingRetry-gfLNG5k (Ljava/lang/String;Lkotlin/jvm/functions/Function3;)V
 	public abstract fun cleanupAbandonedAssistantFragments (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun cleanupAbandonedAssistantFragments$default (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public abstract fun clearExternalTransportActive (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -51607,6 +51606,14 @@ public final class com/letta/mobile/data/timeline/api/TimelinePendingRetryBindin
 	public fun <init> ()V
 	public final fun bind-gfLNG5k (Ljava/lang/String;Lkotlin/jvm/functions/Function3;)V
 	public final fun resolved (Lcom/letta/mobile/data/timeline/api/TimelineExternalTransportWriter;)V
+}
+
+public abstract interface class com/letta/mobile/data/timeline/api/TimelinePendingRetryTarget {
+	public fun bindPendingRetry-gfLNG5k (Ljava/lang/String;Lkotlin/jvm/functions/Function3;)V
+}
+
+public final class com/letta/mobile/data/timeline/api/TimelinePendingRetryTarget$DefaultImpls {
+	public static fun bindPendingRetry-gfLNG5k (Lcom/letta/mobile/data/timeline/api/TimelinePendingRetryTarget;Ljava/lang/String;Lkotlin/jvm/functions/Function3;)V
 }
 
 public final class com/letta/mobile/data/timeline/headless/HeadlessReplayBisectResult {

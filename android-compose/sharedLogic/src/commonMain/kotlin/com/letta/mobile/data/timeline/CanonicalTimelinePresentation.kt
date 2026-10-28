@@ -322,13 +322,16 @@ class CanonicalTimelinePresentation private constructor(
         residents: List<TimelineResidentEvent>,
     ): ChatRenderItem {
         // The persisted user echo keeps the optimistic slot even without a streamed alias.
-        if (this is ChatRenderItem.Single && message.role == "user" && !message.clientMessageId.isNullOrBlank()) {
+        if (this is ChatRenderItem.Single && hasOptimisticUserIdentity()) {
             return copy(keyOverride = "msg-${message.clientMessageId}")
         }
         val adopted = adoptions.adopted(this, residents, ::liveSnapshot)
         if (adopted != null) return adopted
         return if (isRunItem) this else withKeyOverride(replacementKey(identity))
     }
+
+    private fun ChatRenderItem.Single.hasOptimisticUserIdentity(): Boolean =
+        message.role == "user" && !message.clientMessageId.isNullOrBlank()
 
     private fun liveSnapshot(): Pair<List<ChatRenderItem>, Map<String, TimelineMessageId>> =
         mutableLive.value to owner.session.live.value?.aliases.orEmpty()

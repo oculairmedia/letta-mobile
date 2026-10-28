@@ -104,7 +104,7 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
             val next = previous.map {
                 // A delayed terminal is not a persisted echo. Only an explicit Retry may move a
                 // failed record back to Sending, after which normal transport outcomes apply.
-                if (it.otid != otid || (it.delivery == Delivery.Failed && delivery == Delivery.Sent)) it
+                if (it.otid != otid || it.ignoresLateSent(delivery)) it
                 else it.copy(delivery = delivery)
             }
             if (next != previous) {
@@ -113,6 +113,9 @@ class CanonicalPendingLocalStore(private val store: TimelineBoundedStore) {
             }
         }
     }
+
+    private fun Record.ignoresLateSent(incoming: Delivery): Boolean =
+        delivery == Delivery.Failed && incoming == Delivery.Sent
 
     /**
      * Drop a send the user has given up on. An absent echo is never confirmation, so nothing else

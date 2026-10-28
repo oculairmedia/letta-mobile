@@ -8,6 +8,7 @@ import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageId
@@ -33,8 +34,8 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Instant
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -42,6 +43,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.test.fail
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /** The send queue, bridge, scoped writer, history adapter, reducer, pager and rendered row assembly. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -53,8 +56,8 @@ class PendingSendReconnectProjectionTest {
         f.sendQueued("original")
         assertFalse(first.dismiss(MessageId("cm-test-1")), "in-flight sends cannot be dismissed")
         f.dropAndReconnect()
-        f.failed(FIRST, "cm-extra", "keep this failure")
-        f.failed(SECOND, "cm-test-1", "same OTID in another conversation")
+        f.failed(FIRST, Prompt(MessageId("cm-extra"), "keep this failure"))
+        f.failed(SECOND, Prompt(MessageId("cm-test-1"), "same OTID in another conversation"))
         runCurrent()
         assertEquals(2, first.live.value.filterIsInstance<ChatRenderItem.Single>().count { it.message.isSendFailed })
         f.selected = SECOND
@@ -74,7 +77,7 @@ class PendingSendReconnectProjectionTest {
         val screen = f.screen(FIRST)
         f.sendQueued("dismiss from history")
         f.dropAndReconnect()
-        f.history[FIRST] = listOf(f.reply("newer", 30))
+        f.history[FIRST] = listOf(f.reply(MessageId("newer"), 30.seconds))
         f.reload(FIRST)
         val rows = f.render(screen)
         assertEquals(2, rows.size)
@@ -95,7 +98,10 @@ class PendingSendReconnectProjectionTest {
         val screen = f.screen(FIRST)
         assertTrue(screen.retry(MessageId("cm-test-1")), "Retry binding must cross any writer wrapper")
         runCurrent()
-        assertEquals(listOf<Pair<String, String?>>(FIRST to "cm-test-1", FIRST to "cm-test-1"), f.channel.accepted.toList())
+        assertEquals(
+            listOf(AcceptedSend(FIRST, MessageId("cm-test-1")), AcceptedSend(FIRST, MessageId("cm-test-1"))),
+            f.channel.accepted.toList(),
+        )
         assertEquals(1, f.minted)
         screen.close()
     }
@@ -108,7 +114,10 @@ class PendingSendReconnectProjectionTest {
         assertTrue(assertIs<ChatRenderItem.Single>(screen.live.value.single()).message.isPending)
         f.dropAndReconnect()
         // Same text from another client is deliberately NOT an echo of our send.
-        f.history[FIRST] = listOf(f.user("other", "hey", "cm-other", 20), f.reply("answer", 30))
+        f.history[FIRST] = listOf(
+            f.user(HistoryUser(MessageId("other"), Prompt(MessageId("cm-other"), "hey"), 20.seconds)),
+            f.reply(MessageId("answer"), 30.seconds),
+        )
         f.reload(FIRST)
         val rows = f.render(screen)
         val failed = rows.single { it.key == "msg-cm-test-1" }
@@ -137,9 +146,9 @@ class PendingSendReconnectProjectionTest {
         val optimisticKey = screen.live.value.single().key
         f.dropAndReconnect()
         f.history[FIRST] = listOf(
-            f.user("persisted", "hey", "cm-test-1", 10),
-            f.user("equal-text", "hey", "cm-other", 20),
-            f.reply("answer", 30),
+            f.user(HistoryUser(MessageId("persisted"), Prompt(MessageId("cm-test-1"), "hey"), 10.seconds)),
+            f.user(HistoryUser(MessageId("equal-text"), Prompt(MessageId("cm-other"), "hey"), 20.seconds)),
+            f.reply(MessageId("answer"), 30.seconds),
         )
         f.reload(FIRST)
         val rows = f.render(screen)
@@ -159,9 +168,11 @@ class PendingSendReconnectProjectionTest {
         val firstScreen = f.screen(FIRST)
         val secondScreen = f.screen(SECOND)
         f.sendQueued("hey", switchWhileQueued = true)
-        assertEquals(listOf(FIRST), f.channel.accepted.map { it.first })
+        assertEquals(listOf(FIRST), f.channel.accepted.map { it.conversation })
         f.dropAndReconnect()
-        f.history[SECOND] = listOf(f.user("foreign-echo", "hey", "cm-test-1", 10))
+        f.history[SECOND] = listOf(
+            f.user(HistoryUser(MessageId("foreign-echo"), Prompt(MessageId("cm-test-1"), "hey"), 10.seconds)),
+        )
         f.reload(SECOND)
         assertTrue(f.pending(FIRST).single().toRenderItem().message.isSendFailed)
         assertEquals(emptyList(), f.pending(SECOND))
@@ -171,8 +182,8 @@ class PendingSendReconnectProjectionTest {
         assertEquals(listOf("msg-cm-test-1"), f.render(firstScreen).map { it.key })
         assertTrue(firstScreen.retry(MessageId("cm-test-1")))
         runCurrent()
-        assertEquals(listOf(FIRST, FIRST), f.channel.accepted.map { it.first })
-        assertEquals(listOf("cm-test-1", "cm-test-1"), f.channel.accepted.map { it.second })
+        assertEquals(listOf(FIRST, FIRST), f.channel.accepted.map { it.conversation })
+        assertEquals(listOf("cm-test-1", "cm-test-1"), f.channel.accepted.map { it.otid?.value })
         assertEquals(1, f.minted, "Retry must never call the identity generator")
         assertEquals(SECOND, f.selected, "a background Retry must not switch the visible conversation")
         assertFalse(firstScreen.retry(MessageId("cm-test-1")), "two Retry clicks must not send twice")
@@ -191,7 +202,9 @@ class PendingSendReconnectProjectionTest {
         // Lose the send owner entirely: recovery cannot depend on its disconnect callback.
         val restarted = CanonicalTimelineCoordinator(f.store, f.transport)
         val owner = restarted.acquire(f.scope(FIRST))
-        f.history[FIRST] = listOf(f.user("persisted", "persisted", "cm-test-3", 10))
+        f.history[FIRST] = listOf(
+            f.user(HistoryUser(MessageId("persisted"), Prompt(MessageId("cm-test-3"), "persisted"), 10.seconds)),
+        )
         assertEquals(TimelineEnginePageOutcome.Applied, restarted.reconcileRecent(owner))
         val screen = CanonicalTimelinePresentation.open(restarted, owner, backgroundScope)
         val rows = f.render(screen)
@@ -204,26 +217,26 @@ class PendingSendReconnectProjectionTest {
 
     private class Fixture(private val test: TestScope) {
         val store = ScopedStore()
-        val history = mutableMapOf<String, List<LettaMessage>>()
+        val history = mutableMapOf<ConversationId, List<LettaMessage>>()
         val channel = Channel()
         var selected = FIRST
         var minted = 0
         private val baseMillis = timelineCurrentTimeMillis()
-        fun at(seconds: Int) = Instant.fromEpochMilliseconds(baseMillis + seconds * 1_000).toString()
-        fun scope(conversation: String) = TimelineScope("backend", conversation, "agent")
+        fun at(delay: Duration) = Instant.fromEpochMilliseconds(baseMillis + delay.inWholeMilliseconds).toString()
+        fun scope(conversation: ConversationId) = TimelineScope("backend", conversation.value, "agent")
         val transport = object : TimelineTransport by unexpectedTimelineTransport() {
             override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?) =
-                TimelineRemotePageAdapter.fromMessages(request, history[request.scope.conversationId].orEmpty(), hasMore = false)
+                TimelineRemotePageAdapter.fromMessages(request, history[ConversationId(request.scope.conversationId)].orEmpty(), hasMore = false)
         }
         private val coordinator = CanonicalTimelineCoordinator(store, transport)
         private val maintenance = IndexedCanonicalTimelineMaintenance(coordinator, test.backgroundScope, { _, _, _ -> }, { throw it })
         private val admitted = AdmittedTimelineExternalWriter(
-            CanonicalExternalTransportWriter(coordinator, { _, conversation -> scope(conversation) }, maintenance, { at(10) }),
+            CanonicalExternalTransportWriter(coordinator, { _, conversation -> scope(ConversationId(conversation)) }, maintenance, { at(10.seconds) }),
             TimelineLegacyAdmission(),
         )
         private val writer = object : TimelineExternalTransportWriter by admitted {
             private val pendingRetry = TimelinePendingRetryBinding()
-            override fun bindPendingRetry(agent: AgentId, sender: suspend (com.letta.mobile.data.model.ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
+            override fun bindPendingRetry(agent: AgentId, sender: suspend (ConversationId, CanonicalPendingLocalStore.Record) -> Unit) =
                 pendingRetry.bind(agent, sender)
             override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>) =
                 admitted.also(pendingRetry::resolved).appendExternalTransportLocal(agentId, conversationId, content, otid, attachments)
@@ -231,28 +244,28 @@ class PendingSendReconnectProjectionTest {
         val sender = ChatSendCoordinator(
             scope = test.backgroundScope, agentId = "agent",
             activeConfig = { LettaConfig("test", LettaConfig.Mode.SELF_HOSTED, "http://localhost:8291", "token") },
-            wsChatBridge = WsChatBridge(channel), timelineRepository = writer,
+            wsChatBridge = WsChatBridge(channel.transport), timelineRepository = writer,
             conversationRepository = object : IConversationRepository {
                 override fun getConversations(agentId: AgentId) = emptyFlow<List<Conversation>>()
                 override fun getCachedConversations(agentId: AgentId) = emptyList<Conversation>()
             },
-            ui = Sink(), clearComposerAfterSend = {}, activeConversationId = { selected },
-            setActiveConversationId = { selected = it }, startTimelineObserver = {},
+            ui = sink(), clearComposerAfterSend = {}, activeConversationId = { selected.value },
+            setActiveConversationId = { selected = ConversationId(it) }, startTimelineObserver = {},
             clientVersion = { "test" }, otidGenerator = { "cm-test-${++minted}" },
         )
 
-        suspend fun screen(conversation: String) =
+        suspend fun screen(conversation: ConversationId) =
             CanonicalTimelinePresentation.open(coordinator, coordinator.acquire(scope(conversation)), test.backgroundScope)
 
         suspend fun sendQueued(text: String, switchWhileQueued: Boolean = false) {
             channel.busy = true
             sender.send(text)
             test.runCurrent()
-            assertEquals(1, sender.sendQueue.state.value[QueueConversationId(FIRST)]?.items?.size)
+            assertEquals(1, sender.sendQueue.state.value[QueueConversationId(FIRST.value)]?.items?.size)
             assertEquals(emptyList(), pending(FIRST), "queued sends acquire a bubble only when dispatched")
             if (switchWhileQueued) selected = SECOND
             channel.busy = false
-            sender.sendQueue.resume(QueueConversationId(FIRST))
+            sender.sendQueue.resume(QueueConversationId(FIRST.value))
             test.runCurrent()
             assertEquals(listOf("cm-test-1"), pending(FIRST).map { it.otid })
         }
@@ -263,21 +276,23 @@ class PendingSendReconnectProjectionTest {
             channel.state.value = ChannelTransportState.Connected("server", "session-2", "device")
         }
 
-        suspend fun reload(conversation: String) {
+        suspend fun reload(conversation: ConversationId) {
             assertIs<RecentMessagesReconcileOutcome.Applied>(writer.reconcileRecentMessages(
-                "agent", conversation, "redial-recovery", forceRefresh = true, connectionGeneration = 2,
+                "agent", conversation.value, "redial-recovery", forceRefresh = true, connectionGeneration = 2,
             ))
         }
 
-        suspend fun failed(conversation: String, otid: String, content: String) {
-            writer.appendExternalTransportLocal("agent", conversation, content, otid, emptyList())
-            writer.markExternalTransportLocalFailed("agent", conversation, otid)
+        suspend fun failed(conversation: ConversationId, prompt: Prompt) {
+            writer.appendExternalTransportLocal("agent", conversation.value, prompt.content, prompt.otid.value, emptyList())
+            writer.markExternalTransportLocalFailed("agent", conversation.value, prompt.otid.value)
         }
 
-        suspend fun pending(conversation: String) = CanonicalPendingLocalStore(store).load(scope(conversation))
-        fun user(id: String, text: String, otid: String, second: Int) =
-            UserMessage(id, contentRaw = JsonPrimitive(text), otid = otid, date = at(second))
-        fun reply(id: String, second: Int) = AssistantMessage(id, contentRaw = JsonPrimitive(id), date = at(second))
+        suspend fun pending(conversation: ConversationId) = CanonicalPendingLocalStore(store).load(scope(conversation))
+        fun user(row: HistoryUser) = UserMessage(
+            row.id.value, contentRaw = JsonPrimitive(row.prompt.content), otid = row.prompt.otid.value, date = at(row.delay),
+        )
+        fun reply(id: MessageId, delay: Duration) =
+            AssistantMessage(id.value, contentRaw = JsonPrimitive(id.value), date = at(delay))
 
         fun render(screen: CanonicalTimelinePresentation): List<ChatRenderItem> {
             val presenter = RecordingPresenter<CanonicalTimelinePresentation.Row>(StandardTestDispatcher(test.testScheduler))
@@ -306,47 +321,57 @@ class PendingSendReconnectProjectionTest {
             store(scope).transaction(scope, block)
     }
 
-    private class Channel : IChannelTransport by unexpectedChannel() {
-        override val state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Connected("server", "session", "device"))
-        override val events = MutableSharedFlow<ServerFrame>()
-        override val frameEvents = MutableSharedFlow<TransportFrameEvent>()
-        override val hostCapabilities = emptySet<String>()
-        override val hostNodeId: String? = null
-        override val hasAnyActiveChatTurn: Boolean get() = busy
+    private data class Prompt(val otid: MessageId, val content: String)
+    private data class HistoryUser(val id: MessageId, val prompt: Prompt, val delay: Duration)
+    private data class AcceptedSend(val conversation: ConversationId, val otid: MessageId?)
+
+    private class Channel {
+        val state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Connected("server", "session", "device"))
+        private val events = MutableSharedFlow<ServerFrame>()
+        private val frameEvents = MutableSharedFlow<TransportFrameEvent>()
         var busy = false
-        val accepted = mutableListOf<Pair<String, String?>>()
-        override fun hasActiveChatTurn(conversationId: String) = busy
-        override fun send(
-            agentId: String, conversationId: String, text: String, otid: String?, contentParts: JsonArray?, startNewConversation: Boolean,
-        ): Boolean {
+        val accepted = mutableListOf<AcceptedSend>()
+        // Adapt the legacy wire call once; acceptance and assertions share typed send identities.
+        val transport = proxy<IChannelTransport>(::invoke)
+
+        private fun invoke(method: Method, args: Array<out Any?>): Any? = when (method.name) {
+            "send" -> accept(AcceptedSend(ConversationId(args[1] as String), (args[3] as String?)?.let(::MessageId)))
+            "hasActiveChatTurn", "getHasAnyActiveChatTurn" -> busy
+            else -> property(method)
+        }
+
+        private fun property(method: Method): Any? = when (method.name) {
+            "getState" -> state
+            "getEvents" -> events
+            "getFrameEvents" -> frameEvents
+            "getHostCapabilities" -> emptySet<String>()
+            "getHostNodeId" -> null
+            else -> fail("unexpected channel call: ${method.name}")
+        }
+
+        private fun accept(send: AcceptedSend): Boolean {
             if (busy) return false
-            accepted += conversationId to otid
+            accepted += send
             return true
         }
     }
 
-    private class Sink : ChatSendUiSink {
-        override fun currentError(): String? = null
-        override fun isStreaming() = false
-        override fun isAgentTyping() = false
-        override fun onSendDispatched(conversationId: String?) = Unit
-        override fun onSendQueued(conversationId: String) = Unit
-        override fun onSendFailed(message: String) = fail(message)
-        override fun onError(message: String?) = Unit
-        override fun onTurnStarted(conversationId: String) = Unit
-        override fun onMessageDelta(conversationId: String) = Unit
-        override fun onUsage(promptTokens: Int, completionTokens: Int, totalTokens: Int) = Unit
-        override fun onTurnFinished(error: String?) = Unit
-        override fun onTurnVisuallyComplete() = Unit
-        override fun onTransientDisconnect(hasActiveSend: Boolean) = Unit
-        override fun onDisconnectFailure(error: String) = Unit
-    }
-
     private companion object {
-        const val FIRST = "local-conv-95805990"
-        const val SECOND = "local-conv-95805992"
-        fun unexpectedChannel(): IChannelTransport = Proxy.newProxyInstance(
-            IChannelTransport::class.java.classLoader, arrayOf(IChannelTransport::class.java),
-        ) { _, method, _ -> fail("unexpected channel call: ${method.name}") } as IChannelTransport
+        val FIRST = ConversationId("local-conv-95805990")
+        val SECOND = ConversationId("local-conv-95805992")
+
+        fun sink(): ChatSendUiSink = proxy { method, args ->
+            when (method.name) {
+                "currentError" -> null
+                "isStreaming", "isAgentTyping" -> false
+                "onSendFailed" -> fail(args.single() as String)
+                else -> Unit
+            }
+        }
+
+        inline fun <reified T> proxy(crossinline invoke: (Method, Array<out Any?>) -> Any?): T =
+            Proxy.newProxyInstance(T::class.java.classLoader, arrayOf(T::class.java)) { _, method, args ->
+                invoke(method, args.orEmpty())
+            } as T
     }
 }

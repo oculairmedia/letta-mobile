@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -66,16 +67,7 @@ class PendingTimelineActionsUiTest {
         val scope = TimelineScope("backend", "bubble-conversation", "agent")
         val ui = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val store = UiFrameTimelineStore()
-        val history = if (inHistory) listOf(AssistantMessage(
-            "newer", contentRaw = JsonPrimitive("Newer history"), date = "2026-10-28T12:01:00Z",
-        )) else emptyList()
-        val unexpected = Proxy.newProxyInstance(TimelineTransport::class.java.classLoader, arrayOf(TimelineTransport::class.java)) {
-            _, method, _ -> fail("Unexpected transport call: ${method.name}")
-        } as TimelineTransport
-        val transport = object : TimelineTransport by unexpected {
-            override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?) =
-                TimelineRemotePageAdapter.fromMessages(request, history, hasMore = false)
-        }
+        val transport = historyTransport(inHistory)
         val coordinator = CanonicalTimelineCoordinator(store, transport)
         val owner = runBlocking { coordinator.acquire(scope) }
         val maintenance = IndexedCanonicalTimelineMaintenance(coordinator, ui, { _, _, _ -> }, { throw it })
@@ -96,40 +88,8 @@ class PendingTimelineActionsUiTest {
             CanonicalTimelinePresentation.open(coordinator, owner, ui)
         }
         try {
-            setContent {
-                MaterialTheme {
-                    Box(Modifier.size(width = 420.dp, height = 720.dp)) {
-                        val state = ChatUiState(conversationState = ConversationState.Ready(scope.conversationId), isLoadingMessages = false)
-                        if (docked) {
-                            DockedReplyCard(DockedReplyParams(
-                                state, presentation, RecordingChatActions(), ChatSurfaceCapabilities.Default,
-                                ChatSurfaceHost(), ChatSurfaceAppearance(), {},
-                            ))
-                        } else ChatTimeline(
-                            state = state,
-                            pagedTimeline = presentation,
-                            actions = RecordingChatActions(),
-                            capabilities = ChatSurfaceCapabilities.Default,
-                            host = ChatSurfaceHost(),
-                            appearance = ChatSurfaceAppearance(),
-                        )
-                    }
-                }
-            }
-            fun awaitRetry() = waitUntil(timeoutMillis = 10_000) {
-                main.drain()
-                onAllNodesWithText("Retry").fetchSemanticsNodes().size == 1
-            }
-            awaitRetry()
-            // The live bubble can draw before Paging has reported resident history. Wait for
-            // the intended path so this test cannot pass by clicking its transient overlay twin.
-            waitUntil(timeoutMillis = 10_000) {
-                main.drain()
-                presentation.live.value.any { it.key == "msg-own-otid" } == !inHistory
-            }
-            awaitRetry()
-            onNodeWithText("Dismiss").assertExists()
-            assertEquals(!inHistory, presentation.live.value.any { it.key == "msg-own-otid" }, "exercise the intended row path")
+            showTimeline(presentation, scope, docked)
+            assertFailedRow(presentation, inHistory)
             onNodeWithText("Retry").performClick()
             waitUntil(timeoutMillis = 10_000) { main.drain(); retryStarted.isCompleted }
             waitUntil(timeoutMillis = 10_000) { main.drain(); onAllNodesWithText("Retry").fetchSemanticsNodes().isEmpty() }
@@ -147,5 +107,63 @@ class PendingTimelineActionsUiTest {
             runBlocking { presentation.close() }
             ui.cancel()
         }
+    }
+
+    private fun historyTransport(inHistory: Boolean): TimelineTransport {
+        val history = if (inHistory) listOf(AssistantMessage(
+            "newer", contentRaw = JsonPrimitive("Newer history"), date = "2026-10-28T12:01:00Z",
+        )) else emptyList()
+        val unexpected = Proxy.newProxyInstance(TimelineTransport::class.java.classLoader, arrayOf(TimelineTransport::class.java)) {
+            _, method, _ -> fail("Unexpected transport call: ${method.name}")
+        } as TimelineTransport
+        return object : TimelineTransport by unexpected {
+            override suspend fun listConversationMessagePage(request: TimelineRemotePageRequest, progress: TimelinePageProgress?) =
+                TimelineRemotePageAdapter.fromMessages(request, history, hasMore = false)
+        }
+    }
+
+    private fun ComposeUiTest.showTimeline(
+        presentation: CanonicalTimelinePresentation,
+        scope: TimelineScope,
+        docked: Boolean,
+    ) {
+        setContent {
+            MaterialTheme {
+                Box(Modifier.size(width = 420.dp, height = 720.dp)) {
+                    val state = ChatUiState(conversationState = ConversationState.Ready(scope.conversationId), isLoadingMessages = false)
+                    if (docked) {
+                        DockedReplyCard(DockedReplyParams(
+                            state, presentation, RecordingChatActions(), ChatSurfaceCapabilities.Default,
+                            ChatSurfaceHost(), ChatSurfaceAppearance(), {},
+                        ))
+                    } else ChatTimeline(
+                        state = state,
+                        pagedTimeline = presentation,
+                        actions = RecordingChatActions(),
+                        capabilities = ChatSurfaceCapabilities.Default,
+                        host = ChatSurfaceHost(),
+                        appearance = ChatSurfaceAppearance(),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun ComposeUiTest.awaitRetry() = waitUntil(timeoutMillis = 10_000) {
+        main.drain()
+        onAllNodesWithText("Retry").fetchSemanticsNodes().size == 1
+    }
+
+    private fun ComposeUiTest.assertFailedRow(presentation: CanonicalTimelinePresentation, inHistory: Boolean) {
+        awaitRetry()
+        // The live bubble can draw before Paging has reported resident history. Wait for
+        // the intended path so this test cannot pass by clicking its transient overlay twin.
+        waitUntil(timeoutMillis = 10_000) {
+            main.drain()
+            presentation.live.value.any { it.key == "msg-own-otid" } == !inHistory
+        }
+        awaitRetry()
+        onNodeWithText("Dismiss").assertExists()
+        assertEquals(!inHistory, presentation.live.value.any { it.key == "msg-own-otid" }, "exercise the intended row path")
     }
 }

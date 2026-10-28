@@ -14,22 +14,42 @@ internal fun PagingData<CanonicalTimelinePresentation.Row>.insertPending(
     pending: List<CanonicalPendingLocalStore.Record>,
     scope: TimelineScope,
 ): PagingData<CanonicalTimelinePresentation.Row> {
-    val optimistic = pending.asReversed().sortedByDescending { parseTimestampEpochMillis(it.sentAt) ?: 0L }.map { record ->
+    val optimistic = pending.optimisticRows(scope)
+    if (optimistic.isEmpty()) return this
+    return map { listOf(it) }.insertSeparators(TerminalSeparatorType.SOURCE_COMPLETE) { newer, older ->
+        optimistic.filter { it.fitsPendingWindow(newer?.single(), older?.single()) }.takeIf { it.isNotEmpty() }
+    }.flatMap { it }
+}
+
+private fun List<CanonicalPendingLocalStore.Record>.optimisticRows(scope: TimelineScope) =
+    asReversed().sortedByDescending { parseTimestampEpochMillis(it.sentAt) ?: 0L }.map { record ->
         CanonicalTimelinePresentation.Row(
             TimelineMessageId("pending/${record.otid}"), 0, record.toRenderItem(scope.agentId), otid = record.otid,
         )
     }
-    if (optimistic.isEmpty()) return this
-    return map { listOf(it) }.insertSeparators(TerminalSeparatorType.SOURCE_COMPLETE) { newer, older ->
-        val upper = newer?.single()?.let { parseTimestampEpochMillis(it.item.boundaryTimestamp) ?: 0L }
-        val lower = older?.single()?.let { parseTimestampEpochMillis(it.item.boundaryTimestamp) ?: 0L }
-        optimistic.filter { row ->
-            val time = parseTimestampEpochMillis(row.item.boundaryTimestamp) ?: 0L
-            (upper == null || time < upper) && (lower == null || time >= lower) &&
-                row.otid != newer?.single()?.otid && row.otid != older?.single()?.otid
-        }.takeIf { it.isNotEmpty() }
-    }.flatMap { it }
+
+private fun CanonicalTimelinePresentation.Row.fitsPendingWindow(
+    newer: CanonicalTimelinePresentation.Row?,
+    older: CanonicalTimelinePresentation.Row?,
+): Boolean = isBetween(newer, older) && hasDistinctOtid(newer, older)
+
+private fun CanonicalTimelinePresentation.Row.isBetween(
+    newer: CanonicalTimelinePresentation.Row?,
+    older: CanonicalTimelinePresentation.Row?,
+): Boolean {
+    val time = boundaryMillis()
+    val upper = newer?.boundaryMillis()
+    val lower = older?.boundaryMillis()
+    return (upper == null || time < upper) && (lower == null || time >= lower)
 }
+
+private fun CanonicalTimelinePresentation.Row.hasDistinctOtid(
+    newer: CanonicalTimelinePresentation.Row?,
+    older: CanonicalTimelinePresentation.Row?,
+): Boolean = otid != newer?.otid && otid != older?.otid
+
+private fun CanonicalTimelinePresentation.Row.boundaryMillis(): Long =
+    parseTimestampEpochMillis(item.boundaryTimestamp) ?: 0L
 
 /** Position only local records by send time; the stream's established row order is authoritative. */
 internal fun positionPendingInLive(active: List<ChatRenderItem>, pending: List<ChatRenderItem>): List<ChatRenderItem> {
