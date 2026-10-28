@@ -6,6 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
@@ -86,6 +89,37 @@ private fun workspaceHost(
 /** letta-mobile-ckmub.17.4: the one workspace desktop and web mount, wide and compact. */
 class LettaShellWorkspaceTest {
     private fun sized(width: Dp) = Modifier.size(width = width, height = 800.dp)
+
+    @Test
+    fun idleCompactHoistedHeaderSettlesAcrossFrames() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        val header = mutableStateOf<ShellWorkspaceHeaderState?>(null)
+        val title = mutableStateOf("Window title")
+        var contentPasses = 0
+        setContent {
+            // The title-bar owner observes the hoisted header, as the desktop window did.
+            val hoistedTitle = header.value?.title.orEmpty()
+            SideEffect { contentPasses++ }
+            val host = remember { workspaceHost(chrome = ShellWindowChrome.Hoisted { header.value = it }) }
+            Text(hoistedTitle)
+            // Desktop builds a fresh frame and a sidebar callback on each content pass.
+            // Compact layout removes the sidebar; this must not create another header value.
+            val frame = Any()
+            val state = workspaceState(title = title.value, forceCompact = true).let {
+                it.copy(header = it.header.copy(sidebar = ShellSidebarControl(false, onToggle = { frame.hashCode() })))
+            }
+            LettaShellWorkspace(state, host, sized(400.dp))
+        }
+        repeat(10) { mainClock.advanceTimeByFrame() }
+        val settled = contentPasses
+        repeat(60) { mainClock.advanceTimeByFrame() }
+        println("compact header tracer: settle=$settled, after60=$contentPasses")
+        assertTrue(settled > 0 && header.value != null, "the tracer must compose the workspace and receive its header")
+        assertEquals(settled, contentPasses, "idle compact content must settle across 60 frames")
+        runOnIdle { title.value = "Renamed title" }
+        repeat(5) { mainClock.advanceTimeByFrame() }
+        assertEquals("Renamed title", header.value?.title, "a real header change is still hoisted")
+    }
 
     @Test
     fun wideWindowShowsRailPanelAndPageWithTheHeaderInline() = runComposeUiTest {

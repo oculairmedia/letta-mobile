@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -147,17 +148,21 @@ private fun WorkspaceFrame.agentPaneVisible(): Boolean = if (fit.compact) drawer
  * A compact window's header is the minimal one (every host, the desktop's small window too): the
  * focused agent's pill, the search and the drawer's menu, with no tabs or sidebar control.
  */
+@Composable
 private fun WorkspaceFrame.header(): ShellWorkspaceHeaderState {
     if (!fit.compact) return state.header
-    val openDrawer = { drawer.open = true }
-    return state.header.copy(
-        sidebar = null,
-        tabs = ShellConversationTabs(),
-        minimal = ShellMinimalHeader(
-            identity = state.navigation.focusedIdentity(host.actions.rail, onSwitch = openDrawer),
+    val navigation = state.navigation
+    val railActions = host.actions.rail
+    val currentDrawer = drawer
+    // Retain callbacks across frames with the same navigation instead of capturing WorkspaceFrame.
+    val minimal = remember(navigation, railActions, currentDrawer) {
+        val openDrawer = { currentDrawer.open = true }
+        ShellMinimalHeader(
+            identity = navigation.focusedIdentity(railActions, onSwitch = openDrawer),
             onOpenNavigation = openDrawer,
-        ),
-    )
+        )
+    }
+    return state.header.copy(sidebar = null, tabs = ShellConversationTabs(), minimal = minimal)
 }
 
 /**
