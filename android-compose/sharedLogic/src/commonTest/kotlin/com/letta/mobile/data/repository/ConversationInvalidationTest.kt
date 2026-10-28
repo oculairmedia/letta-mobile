@@ -109,7 +109,7 @@ class ConversationInvalidationTest {
         runCurrent()
         release.complete(Unit)
         runCurrent()
-        assertEquals(List(2) { mapOf(ConversationId("a") to a) }, batches)
+        assertEquals(List(2) { mapOf<ConversationId, AgentId?>(ConversationId("a") to a) }, batches)
     }
 
     @Test
@@ -126,7 +126,7 @@ class ConversationInvalidationTest {
         reads.clear()
         rows = listOf(row("new")) + rows
         val listed = fleet.refreshChanged(mapOf(ConversationId("new") to a))
-        assertEquals(listOf(a to null), reads)
+        assertEquals(listOf<Pair<AgentId, ConversationId?>>(a to null), reads)
         assertEquals(rows.map { it.id }.toSet(), listed?.map { it.id }?.toSet())
         assertEquals(false, fleet.hasMore)
     }

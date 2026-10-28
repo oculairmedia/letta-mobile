@@ -43,7 +43,7 @@ class TimelineConversationsIrohTest {
             put("conversation_id", "c1")
             put("agent_id", "agent-1")
         }
-        host.events.emit(AppServerReceivedFrame(AppServerChannel.Control, AppServerInboundFrame.Unknown(raw), raw))
+        host.events.emit(AppServerReceivedFrame(AppServerChannel.Control, AppServerInboundFrame.Unknown("conversation_updated", raw), raw))
         runCurrent()
         assertEquals(listOf("conversation.list"), host.calls.map { it.first })
         assertEquals(listOf("agent-1"), host.calls.map { it.second.text("agent_id") })
