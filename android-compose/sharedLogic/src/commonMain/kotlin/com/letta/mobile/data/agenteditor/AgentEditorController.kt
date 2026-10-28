@@ -11,6 +11,10 @@ import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.ui.chat.session.ChatModelOption
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,6 +46,7 @@ class AgentEditorController(
 
     /** The agent a new one starts from, once picked and loaded. */
     private var starterAgent: Agent? = null
+    private var loadJob: Job? = null
 
     init {
         combine(backend.agents, backend.models, backend.tools) { agents, models, tools ->
@@ -57,17 +62,24 @@ class AgentEditorController(
     }
 
     override fun pickStarter(starter: AgentStarter) {
-        _state.update { it.copy(starter = starter) }
+        loadJob?.cancel()
+        starterAgent = null
+        _state.update { it.copy(starter = starter, loading = false, loadError = null) }
         val copyOf = starter as? AgentStarter.CopyOf
-        if (copyOf == null) {
-            starterAgent = null
-            return
-        }
-        scope.launch {
-            guarded("Could not load ${copyOf.name}") {
+        if (copyOf == null) return
+        _state.update { it.copy(loading = true) }
+        loadJob = scope.launch {
+            try {
                 val source = loadAgent(copyOf.agentId)
                 starterAgent = source
-                _state.update { it.copy(form = AgentEditorParams.starterFormOf(source, it.form)) }
+                _state.update { it.copy(loading = false, form = AgentEditorParams.starterFormOf(source, it.form)) }
+            } catch (e: CancellationException) {
+                if (currentCoroutineContext().isActive) {
+                    _state.update { it.copy(loading = false, loadError = e.message ?: "Agent load cancelled. Try again.") }
+                }
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(loading = false, loadError = e.message ?: "Could not load ${copyOf.name}") }
             }
         }
     }
@@ -107,7 +119,9 @@ class AgentEditorController(
         }
     }
 
-    override fun retry() = load()
+    override fun retry() {
+        if (_state.value.creating) pickStarter(_state.value.starter) else load()
+    }
 
     override fun dismissError() = _state.update { it.copy(error = null) }
 
@@ -127,18 +141,32 @@ class AgentEditorController(
     }
 
     /** The agent, or a failure once [LOAD_TIMEOUT_MS] passes: a load that never answers must not spin forever. */
-    private suspend fun loadAgent(agentId: String): Agent =
-        withTimeoutOrNull(LOAD_TIMEOUT_MS) { backend.load(AgentId(agentId)) } ?: error(LOAD_TIMED_OUT)
+    private suspend fun loadAgent(agentId: String): Agent {
+        val agent = withTimeoutOrNull(LOAD_TIMEOUT_MS) { backend.load(AgentId(agentId)) } ?: error(LOAD_TIMED_OUT)
+        currentCoroutineContext().ensureActive()
+        return agent
+    }
 
     private fun load() {
         val agentId = _state.value.agentId ?: return
-        _state.update { it.copy(loading = true, loadError = null) }
-        scope.launch {
+        loadJob?.cancel()
+        val cached = _state.value.agent ?: backend.agents.value.firstOrNull { it.id == AgentId(agentId) }
+        _state.update {
+            val form = if (it.agent == null && cached != null) AgentEditorParams.formOf(cached) else it.form
+            it.copy(loading = true, loadError = null, agent = cached, form = form, original = null)
+        }
+        loadJob = scope.launch {
             try {
                 val agent = loadAgent(agentId)
                 val form = AgentEditorParams.formOf(agent)
-                _state.update { it.copy(loading = false, agent = agent, form = form, original = form) }
+                _state.update {
+                    val displayed = it.agent?.let(AgentEditorParams::formOf) ?: it.form
+                    it.copy(loading = false, agent = agent, form = AgentEditorParams.rebase(displayed, it.form, form), original = form)
+                }
             } catch (e: CancellationException) {
+                if (currentCoroutineContext().isActive) {
+                    _state.update { it.copy(loading = false, loadError = e.message ?: "Agent load cancelled. Try again.") }
+                }
                 throw e
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, loadError = e.message ?: "Could not load the agent") }

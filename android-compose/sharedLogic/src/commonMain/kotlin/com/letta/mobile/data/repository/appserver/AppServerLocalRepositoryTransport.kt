@@ -17,6 +17,9 @@ import kotlinx.serialization.json.put
 
 interface AppServerLocalRepositoryTransport {
     suspend fun listAgents(): JsonArray
+
+    /** Full agent detail for editing, independent of the roster projection. */
+    suspend fun getAgent(agentId: AgentId): JsonObject
     suspend fun getContext(agentId: String, conversationId: String?): JsonObject?
 
     /** `agent.context` with the client's streamed total to match. */
@@ -53,6 +56,15 @@ class DefaultAppServerLocalRepositoryTransport(
         check(response.success) { response.error ?: "Bundled App Server agent listing failed" }
         return response.agents ?: error("Bundled App Server agent listing returned no agents")
     }
+
+    override suspend fun getAgent(agentId: AgentId): JsonObject =
+        adminRpc(
+            LocalAdminCall(
+                operation = "agent-get",
+                method = "agent.get",
+                params = buildJsonObject { put("agent_id", agentId.value) },
+            ),
+        ) as? JsonObject ?: error("Bundled App Server agent detail returned no agent")
 
     override suspend fun getContext(agentId: String, conversationId: String?): JsonObject? =
         getContextBreakdown(ContextBreakdownRequest(AgentId(agentId), conversationId?.let(::ConversationId), reportedTotal = null))

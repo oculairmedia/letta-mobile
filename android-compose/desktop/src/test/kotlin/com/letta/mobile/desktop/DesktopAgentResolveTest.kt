@@ -60,6 +60,9 @@ private class FakeAgentRepository(
     override fun getCachedAgent(id: AgentId): Agent? = null
 
     /** Mirrors the real repository: a missing agent throws, it does not return null. */
+    override suspend fun getFreshAgent(id: AgentId, force: Boolean): Agent =
+        getCachedAgent(id) ?: error("No agent ${id.value}")
+
     override fun getAgent(id: AgentId): Flow<Agent> = flow {
         val name = known[id.value]
             ?: throw NoSuchElementException("Agent ${id.value} not found over iroh admin_rpc")

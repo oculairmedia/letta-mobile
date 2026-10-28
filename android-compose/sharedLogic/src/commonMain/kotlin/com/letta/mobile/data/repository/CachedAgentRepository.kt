@@ -64,6 +64,9 @@ open class CachedAgentRepository(
     private var lastRefreshAtMillis: Long? = null
     // Entries live only as long as the cached agents or their active requests.
     private val agentFetchedAt = mutableMapOf<AgentId, Long>()
+    // Detail provenance shares agentFetchedAt's TTL; a roster publication removes it.
+    private val detailedAgents = mutableSetOf<AgentId>()
+    private val detailRequests = mutableSetOf<AgentId>()
     private val agentRequests = mutableMapOf<AgentId, Deferred<Result<Agent>>>()
     private var refreshRequest: Deferred<Result<Unit>>? = null
     private val changedDuringRefresh = mutableSetOf<AgentId>()
@@ -168,6 +171,7 @@ open class CachedAgentRepository(
     private fun startRefreshLocked(): Deferred<Result<Unit>> {
         startedRefreshRevision += 1
         agentFetchedAt.clear()
+        detailedAgents.clear()
         changedDuringRefresh.clear()
         lateinit var request: Deferred<Result<Unit>>
         request = repositoryScope.async(start = CoroutineStart.LAZY) {
@@ -219,6 +223,7 @@ open class CachedAgentRepository(
         val current = _agents.value.filter { it.id in changedDuringRefresh }
         _agents.value = fresh.filterNot { it.id in changedDuringRefresh } + current
         cachePublicationRevision += 1
+        detailedAgents.retainAll(changedDuringRefresh)
         agentFetchedAt.keys.retainAll(_agents.value.map { it.id }.toSet())
         if (completed) {
             completedRefreshRevision = startedRefreshRevision
@@ -236,6 +241,8 @@ open class CachedAgentRepository(
             refreshRequest = null
             agentRequests.values.forEach { it.cancel() }
             agentRequests.clear()
+            detailRequests.clear()
+            detailedAgents.clear()
             agentFetchedAt.clear()
             changedDuringRefresh.clear()
             _agents.value = emptyList()
@@ -354,13 +361,24 @@ open class CachedAgentRepository(
             _agents.value.find { it.id == id } to isAgentFreshLocked(id)
         }
         if (cached != null) emit(cached)
-        if (!fresh) emit(getFreshAgent(id))
+        if (!fresh) emit(getAgentSnapshot(id))
     }
 
     private fun isAgentFreshLocked(id: AgentId): Boolean =
         agentFetchedAt[id]?.let { nowMillis() - it <= SINGLE_AGENT_FRESH_WINDOW_MS } == true
 
-    private suspend fun getFreshAgent(id: AgentId, force: Boolean = false): Agent {
+    override suspend fun getFreshAgent(id: AgentId, force: Boolean): Agent {
+        val request = refreshMutex.withLock {
+            if (!force && id in detailedAgents && isAgentFreshLocked(id)) {
+                _agents.value.find { it.id == id }?.let { return it }
+            }
+            detailRequests += id
+            agentRequests[id]?.takeUnless { it.isCompleted } ?: startAgentRequestLocked(id, persist = false)
+        }
+        return request.await().getOrThrow()
+    }
+
+    private suspend fun getAgentSnapshot(id: AgentId, force: Boolean = false): Agent {
         val request = refreshMutex.withLock {
             if (force) invalidateAgentLocked(id)
             if (isAgentFreshLocked(id)) _agents.value.find { it.id == id }?.let { return it }
@@ -382,11 +400,14 @@ open class CachedAgentRepository(
                         // A completed list requested after this ordinary read is authoritative.
                         // Keep the waiter alive, but do not restore its older response to the roster.
                         if (!persist && completedRefreshRevision > refreshRevisionAtStart) {
-                            return@withLock refreshedAgentOrThrow(id)
+                            val rosterAgent = refreshedAgentOrThrow(id)
+                            // An editor still needs the detail payload; it must not replace the newer roster.
+                            return@withLock if (id in detailRequests) fresh else rosterAgent
                         }
                         updateAgentInCache(fresh)
                         cachePublicationRevision += 1
                         agentFetchedAt[id] = nowMillis()
+                        detailedAgents += id
                         if (refreshRequest != null) changedDuringRefresh += id
                         if (persist) persistUpdatedAgent(fresh)
                         fresh
@@ -395,7 +416,10 @@ open class CachedAgentRepository(
             } finally {
                 withContext(NonCancellable) {
                     refreshMutex.withLock {
-                        if (agentRequests[id] === request) agentRequests.remove(id)
+                        if (agentRequests[id] === request) {
+                            agentRequests.remove(id)
+                            detailRequests.remove(id)
+                        }
                     }
                 }
             }
@@ -415,6 +439,8 @@ open class CachedAgentRepository(
 
     private fun invalidateAgentLocked(id: AgentId) {
         agentFetchedAt.remove(id)
+        detailedAgents.remove(id)
+        detailRequests.remove(id)
         agentRequests.remove(id)?.cancel()
         if (refreshRequest != null) changedDuringRefresh += id
     }
@@ -442,7 +468,7 @@ open class CachedAgentRepository(
         }
 
     private suspend fun refreshAgent(agentId: AgentId): Result<Agent> = runCatchingCancellable {
-        getFreshAgent(agentId, force = true)
+        getAgentSnapshot(agentId, force = true)
     }
 
     private suspend fun observeAgentUpdated(channelTransport: IChannelTransport) {

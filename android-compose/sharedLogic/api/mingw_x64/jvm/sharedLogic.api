@@ -38304,6 +38304,7 @@ public class com/letta/mobile/data/repository/CachedAgentRepository : com/letta/
 	public fun getContextBreakdown-a2BnSRI (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getContextWindow (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getContextWindow-ebarvJ8 (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getFreshAgent-mT_9V4Y (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getRefreshError ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getSupportsCreateAgent ()Z
 	public final fun hasFreshAgents (J)Z
@@ -39436,6 +39437,8 @@ public abstract interface class com/letta/mobile/data/repository/api/IAgentRepos
 	public static synthetic fun getContextWindow$default (Lcom/letta/mobile/data/repository/api/IAgentRepository;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public abstract fun getContextWindow-ebarvJ8 (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun getContextWindow-ebarvJ8$default (Lcom/letta/mobile/data/repository/api/IAgentRepository;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun getFreshAgent-mT_9V4Y (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun getFreshAgent-mT_9V4Y$default (Lcom/letta/mobile/data/repository/api/IAgentRepository;Ljava/lang/String;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public abstract fun getRefreshError ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getSupportsCreateAgent ()Z
 	public abstract fun importAgent (Lcom/letta/mobile/data/model/AgentImportParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -39459,6 +39462,7 @@ public final class com/letta/mobile/data/repository/api/IAgentRepository$Default
 	public static fun getContextWindow (Lcom/letta/mobile/data/repository/api/IAgentRepository;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun getContextWindow$default (Lcom/letta/mobile/data/repository/api/IAgentRepository;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static synthetic fun getContextWindow-ebarvJ8$default (Lcom/letta/mobile/data/repository/api/IAgentRepository;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun getFreshAgent-mT_9V4Y$default (Lcom/letta/mobile/data/repository/api/IAgentRepository;Ljava/lang/String;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static fun getSupportsCreateAgent (Lcom/letta/mobile/data/repository/api/IAgentRepository;)Z
 	public static fun listAgentSummaries (Lcom/letta/mobile/data/repository/api/IAgentRepository;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun updateAgent (Lcom/letta/mobile/data/repository/api/IAgentRepository;Ljava/lang/String;Lcom/letta/mobile/data/model/AgentUpdateParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -40336,6 +40340,7 @@ public final class com/letta/mobile/data/repository/appserver/AppServerAgentRepo
 	public fun getContextBreakdown-a2BnSRI (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getContextWindow (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getContextWindow-ebarvJ8 (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getFreshAgent-mT_9V4Y (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getRefreshError ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getSupportsCreateAgent ()Z
 	public fun importAgent (Lcom/letta/mobile/data/model/AgentImportParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -40385,6 +40390,7 @@ public final class com/letta/mobile/data/repository/appserver/AppServerLocalAdmi
 public abstract interface class com/letta/mobile/data/repository/appserver/AppServerLocalRepositoryTransport {
 	public abstract fun createAgentBlock (Lcom/letta/mobile/data/repository/api/AgentBlockTarget;Lcom/letta/mobile/data/model/BlockUpdateParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun deleteAgentBlock (Lcom/letta/mobile/data/repository/api/AgentBlockTarget;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getAgent-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun getContext (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getContextBreakdown (Lcom/letta/mobile/data/context/ContextBreakdownRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun listAgentBlocks (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -40400,6 +40406,7 @@ public final class com/letta/mobile/data/repository/appserver/DefaultAppServerLo
 	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
 	public fun createAgentBlock (Lcom/letta/mobile/data/repository/api/AgentBlockTarget;Lcom/letta/mobile/data/model/BlockUpdateParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun deleteAgentBlock (Lcom/letta/mobile/data/repository/api/AgentBlockTarget;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getAgent-gfLNG5k (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getContext (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getContextBreakdown (Lcom/letta/mobile/data/context/ContextBreakdownRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun listAgentBlocks (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -40626,6 +40633,7 @@ public final class com/letta/mobile/data/repository/iroh/IrohAgentRepository : c
 	public fun getContextBreakdown-a2BnSRI (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getContextWindow (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getContextWindow-ebarvJ8 (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getFreshAgent-mT_9V4Y (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getRefreshError ()Lkotlinx/coroutines/flow/StateFlow;
 	public fun getSupportsCreateAgent ()Z
 	public fun importAgent (Lcom/letta/mobile/data/model/AgentImportParams;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;

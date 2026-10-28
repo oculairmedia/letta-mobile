@@ -21,7 +21,7 @@ Agent-generated UI protocol models, data bindings, action dispatch and bounded s
 
 # Package com.letta.mobile.data.agenteditor
 
-Agent-editor state, validation and backend operations. The controller coordinates edits and exposes sections to the UI; hosts supply repositories and platform creation/presentation bindings. Keep platform navigation and widget state outside edit orchestration; supply resource operations through [AgentEditorBackend](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.agenteditor/-agent-editor-backend/index.html) and creation through [AgentCreator](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.agenteditor/-agent-creator/index.html).
+Agent-editor state, validation and backend operations. Cached agents supply immediate display; a bounded detail load supplies the save baseline, preserving content and showing a retry on failure. The controller coordinates edits and exposes sections to the UI; hosts supply repositories and platform creation/presentation bindings. Keep platform navigation and widget state outside edit orchestration; supply resource operations through [AgentEditorBackend](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.agenteditor/-agent-editor-backend/index.html) and creation through [AgentCreator](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.agenteditor/-agent-creator/index.html).
 
 # Package com.letta.mobile.data.agents
 
@@ -379,7 +379,7 @@ Cached repositories, change observers and channel/admin-RPC source adapters. Ref
 
 # Package com.letta.mobile.data.repository.api
 
-Repository interfaces and local/remote source ports for features and session graphs. Paging/older-message contracts expose bounded access independently of a platform cache implementation. Keep transport construction and process-wide singleton policy outside resource contracts; implement ports such as [IAgentRepository](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.repository.api/-i-agent-repository/index.html), [AgentRemoteSource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.repository.api/-agent-remote-source/index.html) and [AgentLocalCache](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.repository.api/-agent-local-cache/index.html) in adapters.
+Repository interfaces and local/remote source ports for features and session graphs. `IAgentRepository.getFreshAgent` returns one detail result or failure independently of session observation flows; `force` bypasses the detail TTL, and callers own cancellation and deadlines. List rows never satisfy this contract. Paging/older-message contracts expose bounded access independently of a platform cache implementation. Keep transport construction and process-wide singleton policy outside resource contracts; implement ports such as [IAgentRepository](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.repository.api/-i-agent-repository/index.html), [AgentRemoteSource](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.repository.api/-agent-remote-source/index.html) and [AgentLocalCache](https://oculairmedia.github.io/letta-mobile/api/sharedLogic/com.letta.mobile.data.repository.api/-agent-local-cache/index.html) in adapters.
 
 # Package com.letta.mobile.data.repository.appserver
 

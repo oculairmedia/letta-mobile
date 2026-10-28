@@ -159,6 +159,9 @@ private class FakeAgentRepository(
     override suspend fun countAgents(): Int = unsupported()
     override suspend fun refreshAgents() = unsupported()
     override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = unsupported()
+    override suspend fun getFreshAgent(id: AgentId, force: Boolean): Agent =
+        getCachedAgent(id) ?: error("No agent ${id.value}")
+
     override fun getAgent(id: AgentId): Flow<Agent> = emptyFlow()
     override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview = unsupported()
     override suspend fun checkpointAndRestoreConfig(agentId: AgentId, operation: suspend () -> Unit) = unsupported()

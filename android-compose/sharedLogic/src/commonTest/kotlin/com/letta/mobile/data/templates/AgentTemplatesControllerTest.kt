@@ -122,6 +122,9 @@ class AgentTemplatesControllerTest {
         override suspend fun listAgentSummaries(): List<AgentSummary> = emptyList()
         override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = false
         override fun getCachedAgent(id: AgentId): Agent? = null
+        override suspend fun getFreshAgent(id: AgentId, force: Boolean): Agent =
+            getCachedAgent(id) ?: error("No agent ${id.value}")
+
         override fun getAgent(id: AgentId): Flow<Agent> = error("unused")
         override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview = error("unused")
         override suspend fun checkpointAndRestoreConfig(agentId: AgentId, operation: suspend () -> Unit) = operation()

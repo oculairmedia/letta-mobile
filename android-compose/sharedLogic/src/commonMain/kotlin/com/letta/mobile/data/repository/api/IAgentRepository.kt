@@ -57,6 +57,15 @@ interface IAgentRepository {
     suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean
     fun getCachedAgent(id: AgentId): Agent?
     fun getCachedAgent(id: String): Agent? = getCachedAgent(AgentId(id))
+    /**
+     * One authoritative detail read, independent of the lifetime of [getAgent]'s observation flow.
+     * Never satisfies an edit/checkpoint from a list row or hides a fetch failure behind cached data.
+     * [force] bypasses the detail TTL; concurrent callers may share an in-flight detail request.
+     * Cancellation stops waiting without cancelling a request shared with another caller.
+     * Callers own their deadline (the editor bounds this operation to 20 seconds).
+     */
+    suspend fun getFreshAgent(id: AgentId, force: Boolean = false): Agent
+
     fun getAgent(id: AgentId): Flow<Agent>
     fun getAgent(id: String): Flow<Agent> = getAgent(AgentId(id))
     suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId? = null): ContextWindowOverview

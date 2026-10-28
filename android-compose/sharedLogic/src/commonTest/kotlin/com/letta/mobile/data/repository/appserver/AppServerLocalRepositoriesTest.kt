@@ -100,6 +100,24 @@ class AppServerLocalRepositoriesTest {
     }
 
     @Test
+    fun `fresh detail uses agent get without refreshing the roster`() = runTest {
+        val agent = Agent(id = AgentId("agent-1"), name = "Detail", system = "Full system")
+        val client = FakeClient {
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "agent-get", success = true,
+                result = AppServerProtocol.json.encodeToJsonElement(Agent.serializer(), agent),
+            )
+        }
+        val repository = AppServerAgentRepository(DefaultAppServerLocalRepositoryTransport({ client }) { it })
+
+        assertEquals(agent, repository.getFreshAgent(agent.id, force = true))
+        val request = client.adminRpcCalls.single()
+        assertEquals("agent.get", request.method)
+        assertEquals("agent-1", request.params?.get("agent_id")?.jsonPrimitive?.content)
+        assertEquals(agent, repository.getCachedAgent(agent.id))
+    }
+
+    @Test
     fun `default transport follows active client rotation`() = runTest {
         val first = FakeClient { okBlocks(emptyBlockPage) }
         val second = FakeClient { okBlocks(emptyBlockPage) }
@@ -214,6 +232,9 @@ class AppServerLocalRepositoriesTest {
     ) : AppServerLocalRepositoryTransport {
         var agentListCalls = 0
         var lastBlockAgentId: String? = null
+
+        override suspend fun getAgent(agentId: AgentId): JsonObject =
+            agents.first { it.jsonObject["id"]?.jsonPrimitive?.content == agentId.value }.jsonObject
 
         override suspend fun listAgents(): JsonArray {
             agentListCalls += 1

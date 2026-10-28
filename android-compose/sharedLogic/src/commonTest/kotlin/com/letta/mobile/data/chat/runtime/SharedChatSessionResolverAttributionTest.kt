@@ -222,6 +222,9 @@ class SharedChatSessionResolverAttributionTest {
         override val isRefreshing: StateFlow<Boolean> = MutableStateFlow(false)
         override val refreshError: StateFlow<Throwable?> = MutableStateFlow(null)
         override fun getCachedAgent(id: AgentId): Agent? = null
+        override suspend fun getFreshAgent(id: AgentId, force: Boolean): Agent =
+            getCachedAgent(id) ?: error("No agent ${id.value}")
+
         override fun getAgent(id: AgentId): Flow<Agent> = emptyFlow()
         override suspend fun countAgents(): Int = nope()
         override suspend fun refreshAgents() = nope()

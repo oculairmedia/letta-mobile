@@ -79,6 +79,13 @@ class AppServerAgentRepository(
 
     override fun getCachedAgent(id: AgentId): Agent? = agentsFlow.value.firstOrNull { it.id == id }
 
+    override suspend fun getFreshAgent(id: AgentId, force: Boolean): Agent = refreshMutex.withLock {
+        val agent = AppServerProtocol.json.decodeFromJsonElement(Agent.serializer(), transport.getAgent(id))
+        val cached = agentsFlow.value
+        agentsFlow.value = if (cached.any { it.id == id }) cached.map { if (it.id == id) agent else it } else cached + agent
+        agent
+    }
+
     override fun getAgent(id: AgentId): Flow<Agent> = flow {
         refreshAgentsIfStale(0L)
         emit(getCachedAgent(id) ?: throw NoSuchElementException("Local agent ${id.value} was not found"))

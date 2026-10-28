@@ -461,6 +461,9 @@ class ScheduleLibraryControllerTest {
         }
         override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = false
         override fun getCachedAgent(id: AgentId): Agent? = agents.value.firstOrNull { it.id == id }
+        override suspend fun getFreshAgent(id: AgentId, force: Boolean): Agent =
+            getCachedAgent(id) ?: error("No agent ${id.value}")
+
         override fun getAgent(id: AgentId): Flow<Agent> = flowOf(checkNotNull(getCachedAgent(id)))
         override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview =
             error("unused")
