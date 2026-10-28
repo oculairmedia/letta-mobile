@@ -1,23 +1,9 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.agenteditor.AgentEditorController
-import com.letta.mobile.data.agenteditor.AgentEditorMode
-import com.letta.mobile.data.agenteditor.AgentEditorRepositories
-import com.letta.mobile.data.agenteditor.RepositoryAgentEditorBackend
 import com.letta.mobile.data.backend.bound
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AgentImportParams
-import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
-import com.letta.mobile.data.model.ContextWindowOverview
-import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.ImportedAgentsResponse
-import com.letta.mobile.data.model.Tool
-import com.letta.mobile.data.model.ToolId
-import kotlinx.collections.immutable.persistentListOf
-import com.letta.mobile.data.repository.api.AgentRemoteSource
 import com.letta.mobile.data.repository.api.AgentLocalCache
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
@@ -42,203 +28,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlin.time.Clock
-import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CachedAgentRepositoryTest {
     @Test
-    fun editorShowsStaleCacheThenFreshDetailWithExactlyOneRequest() = runTest {
-        val remote = FakeAgentSource()
-        val repository = repository(remote)
-        repository.refreshAgents()
-        repository.setLastRefreshForTest(0)
-        val gate = CompletableDeferred<Unit>()
-        val fresh = agent(ID, "Fresh detail").copy(system = "Full system prompt")
-        remote.read = { gate.await(); fresh }
-        val editor = editor(repository)
-
-        assertEquals("Agent", editor.state.value.form.name)
-        runCurrent()
-        assertEquals(1, remote.getCalls.size)
-        assertTrue(editor.state.value.loading)
-        assertFalse(editor.state.value.canSave)
-        gate.complete(Unit)
-        runCurrent()
-
-        assertEquals("Fresh detail", editor.state.value.form.name)
-        assertEquals("Full system prompt", editor.state.value.form.systemPrompt)
-        assertFalse(editor.state.value.loading)
-        assertEquals(1, remote.getCalls.size)
-    }
-
-    @Test
-    fun editorFailurePreservesCachedContentAndCannotSaveAMissingSystemPrompt() = runTest {
-        val remote = FakeAgentSource().apply { roster = listOf(agent(ID).copy(model = "openai/gpt-5")) }
-        val repository = repository(remote)
-        repository.refreshAgents() // A fresh list row still cannot supply the system prompt.
-        remote.read = { error("Detail fetch failed") }
-        val editor = editor(repository)
-        runCurrent()
-
-        assertEquals("Agent", editor.state.value.form.name)
-        assertEquals("Detail fetch failed", editor.state.value.loadError)
-        assertFalse(editor.state.value.loading)
-        editor.update { copy(name = "Edited name", compactProfile = true) }
-        editor.dismissError()
-        var saved = false
-        editor.save { saved = true }
-        runCurrent()
-        assertFalse(saved)
-        assertFalse(editor.state.value.canSave)
-        assertEquals(0, remote.updates.size)
-        assertEquals(1, remote.getCalls.size)
-
-        remote.read = { agent(ID).copy(model = "openai/gpt-5", system = "Protected system prompt") }
-        editor.retry()
-        runCurrent()
-        assertEquals("Protected system prompt", editor.state.value.form.systemPrompt)
-        assertEquals("Edited name", editor.state.value.form.name)
-        editor.save { saved = true }
-        runCurrent()
-        assertTrue(saved)
-        assertEquals(null, remote.updates.single().system)
-        assertEquals(2, remote.getCalls.size)
-    }
-
-    @Test
-    fun editsDuringDetailLoadKeepFreshSystemAndPreviouslyUnlistedTools() = runTest {
-        val remote = FakeAgentSource()
-        val repository = repository(remote)
-        repository.refreshAgents()
-        val gate = CompletableDeferred<Unit>()
-        remote.read = {
-            gate.await()
-            agent(ID).copy(system = "Full prompt", tools = persistentListOf(Tool(id = ToolId("existing"), name = "Existing")))
-        }
-        val editor = editor(repository)
-        runCurrent()
-        editor.update { copy(name = "Renamed", toolIds = setOf("added")) }
-        gate.complete(Unit)
-        runCurrent()
-
-        assertEquals("Renamed", editor.state.value.form.name)
-        assertEquals("Full prompt", editor.state.value.form.systemPrompt)
-        assertEquals(setOf("existing", "added"), editor.state.value.form.toolIds)
-        assertEquals(1, remote.getCalls.size)
-    }
-
-    @Test
-    fun editorTimeoutPreservesCachedContentAndEndsTheSpinner() = runTest {
-        val remote = FakeAgentSource()
-        val repository = repository(remote)
-        repository.refreshAgents()
-        remote.read = { kotlinx.coroutines.awaitCancellation() }
-        val editor = editor(repository)
-        runCurrent()
-        advanceTimeBy(AgentEditorController.LOAD_TIMEOUT_MS + 1)
-        runCurrent()
-
-        assertEquals("Agent", editor.state.value.form.name)
-        assertEquals(AgentEditorController.LOAD_TIMED_OUT, editor.state.value.loadError)
-        assertFalse(editor.state.value.loading)
-        assertFalse(editor.state.value.canSave)
-        assertEquals(1, remote.getCalls.size)
-    }
-
-    @Test
-    fun invalidatingAnEditorRequestEndsLoadingWithoutAllowingSave() = runTest {
-        val remote = FakeAgentSource()
-        val repository = repository(remote)
-        repository.refreshAgents()
-        remote.read = { kotlinx.coroutines.awaitCancellation() }
-        val editor = editor(repository)
-        runCurrent()
-        repository.clearForBackendSwitch()
-        runCurrent()
-
-        assertEquals("Agent", editor.state.value.form.name)
-        assertFalse(editor.state.value.loading)
-        assertTrue(editor.state.value.loadError != null)
-        assertFalse(editor.state.value.canSave)
-    }
-
-    @Test
-    fun detailLoadsShareRequestsRespectTtlAndForceBypassesFreshness() = runTest {
-        val remote = FakeAgentSource()
-        val repository = repository(remote)
-        repository.refreshAgents()
-        val gate = CompletableDeferred<Unit>()
-        remote.read = { gate.await(); agent(ID).copy(system = "Detail") }
-        val first = async { repository.getFreshAgent(ID) }
-        val second = async { repository.getFreshAgent(ID, force = true) }
-        runCurrent()
-        assertEquals(1, remote.getCalls.size)
-        gate.complete(Unit)
-        assertEquals(first.await(), second.await())
-        assertEquals("Detail", repository.getFreshAgent(ID).system)
-        assertEquals(1, remote.getCalls.size)
-        repository.getFreshAgent(ID, force = true)
-        assertEquals(2, remote.getCalls.size)
-        repository.setLastRefreshForTest(0)
-        repository.getFreshAgent(ID)
-        assertEquals(3, remote.getCalls.size)
-    }
-
-    @Test
-    fun aDetailWaiterCannotBeSatisfiedByAnOverlappingListWithoutSystem() = runTest {
-        val remote = FakeAgentSource()
-        val repository = repository(remote)
-        val gate = CompletableDeferred<Unit>()
-        remote.read = { gate.await(); agent(ID, "Older detail").copy(system = "Detail system") }
-        val detail = async { repository.getFreshAgent(ID, force = true) }
-        runCurrent()
-        repository.refreshAgents()
-        gate.complete(Unit)
-
-        assertEquals("Detail system", detail.await().system)
-        assertEquals("Agent", repository.getCachedAgent(ID)?.name)
-        assertEquals(1, remote.getCalls.size)
-    }
-
-    @Test
-    fun configCheckpointReadsDetailEvenWhenTheListIsFreshAndOmitsSystem() = runTest {
-        val remote = FakeAgentSource()
-        val repository = repository(remote)
-        repository.refreshAgents()
-        remote.read = { agent(ID).copy(system = "Checkpoint system") }
-
-        repository.checkpointAndRestoreConfig(ID) { }
-
-        assertEquals(2, remote.getCalls.size) // Before and after the operation, both detail reads.
-        assertTrue(remote.updates.isEmpty())
-    }
-
-    @Test
-    fun cancellingOneDetailWaiterDoesNotCancelTheOther() = runTest {
-        val remote = FakeAgentSource()
-        val gate = CompletableDeferred<Unit>()
-        remote.read = { gate.await(); agent(ID) }
-        val repository = repository(remote)
-        val first = async { repository.getFreshAgent(ID, force = true) }
-        val second = async { repository.getFreshAgent(ID, force = true) }
-        runCurrent()
-        first.cancelAndJoin()
-        gate.complete(Unit)
-
-        assertEquals(agent(ID), second.await())
-        assertEquals(1, remote.getCalls.size)
-    }
-
-    private fun TestScope.editor(repository: CachedAgentRepository) = AgentEditorController(
-        RepositoryAgentEditorBackend(AgentEditorRepositories(repository, tools = null, models = null)),
-        backgroundScope,
-        AgentEditorMode.Edit(ID.value),
-    )
-
-    @Test
     fun completedReadMakesImmediateRecollectionFreshAfterBulkExpiry() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val repository = CachedAgentRepository(remote.bound(), repositoryScope = backgroundScope)
         repository.refreshAgents()
         repository.setLastRefreshForTest(0)
@@ -251,7 +46,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun concurrentCollectorsOfSameIdShareOneRequest() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.read = { id -> gate.await(); agent(id) }
         val repository = CachedAgentRepository(remote.bound(), repositoryScope = backgroundScope)
@@ -268,7 +63,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun targetedReadCompletingBeforeOverlappingBulkRefreshWinsItsOlderSnapshot() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val readGate = CompletableDeferred<Unit>()
         val listGate = CompletableDeferred<Unit>()
         remote.read = { id -> readGate.await(); agent(id, "Targeted") }
@@ -290,7 +85,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun bulkRefreshCompletingBeforeOverlappingTargetedReadKeepsItsNewerSnapshot() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val readGate = CompletableDeferred<Unit>()
         val listGate = CompletableDeferred<Unit>()
         remote.read = { id -> readGate.await(); agent(id, "Old targeted") }
@@ -313,7 +108,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun targetedReadStartedAfterBulkRequestKeepsItsNewerResult() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val readGate = CompletableDeferred<Unit>()
         val listGate = CompletableDeferred<Unit>()
         remote.read = { id -> readGate.await(); agent(id, "New targeted") }
@@ -333,7 +128,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun differentIdsFetchInParallel() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.read = { id -> gate.await(); agent(id) }
         val repository = repository(remote)
@@ -348,7 +143,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun expiryIsPerAgentAndMeasuredFromCompletedRead() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         remote.roster += agent(OTHER_ID)
         val repository = repository(remote)
         repository.getAgent(ID).toList()
@@ -365,7 +160,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun slowSuccessfulReadGetsAFullFreshnessWindowOnCompletion() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.read = { id -> gate.await(); agent(id) }
         val repository = repository(remote)
@@ -380,7 +175,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun firstCollectorLeavesRefreshedValueCachedBeforeReturning() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val repository = repository(remote)
         assertEquals(agent(ID), repository.getAgent(ID).first())
         assertEquals(listOf(agent(ID)), repository.agents.value)
@@ -390,7 +185,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun cacheOnlyCollectorDoesNotStartAnUnobservedRequest() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val repository = repository(remote)
         repository.refreshAgents()
         repository.setLastRefreshForTest(0)
@@ -403,7 +198,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun freshBulkSuppressesReadsButForcedRefreshStillFetches() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val repository = repository(remote)
         repository.refreshAgents()
         assertFalse(repository.refreshAgentsIfStale(60_000))
@@ -417,7 +212,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun concurrentStaleBulkCallersRecheckTheCompletedRefresh() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.listGate = gate
         val repository = repository(remote)
@@ -431,7 +226,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun failureRetainsCachedCopyAndRetryDoesNotTrustFailedRead() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val repository = repository(remote)
         repository.refreshAgents()
         repository.setLastRefreshForTest(0)
@@ -448,7 +243,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun concurrentFailureIsSharedAndNextCollectionRetries() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.read = { gate.await(); error("offline") }
         val repository = repository(remote)
@@ -464,7 +259,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun cancelingTheFirstWaiterDoesNotCancelSharedWork() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.read = { id -> gate.await(); agent(id) }
         val repository = repository(remote)
@@ -482,7 +277,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun repositoryCancellationCancelsTheRequestAndReleasesItsWaiters() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         var canceled = false
         remote.read = {
             try { CompletableDeferred<Agent>().await() } finally { canceled = true }
@@ -500,7 +295,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun clearDropsLateResponseAndOldCleanupCannotRemoveNewRequest() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val oldGate = CompletableDeferred<Unit>()
         val newGate = CompletableDeferred<Unit>()
         remote.read = { id -> withContext(NonCancellable) { oldGate.await() }; agent(id, "Old session") }
@@ -525,7 +320,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun clearInvalidatesAnAlreadyCompletedFreshnessStamp() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val repository = repository(remote)
         repository.getAgent(ID).toList()
         repository.clearForBackendSwitch()
@@ -536,7 +331,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun clearDuringBulkFetchCannotPublishOrPersistItsOldRoster() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.listGate = gate
         remote.ignoreListCancellation = true
@@ -559,7 +354,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun clearDuringInitialLocalReadCannotRestoreOldRows() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         val local = FakeAgentCache().apply { rows = listOf(agent(ID, "Old disk")); readGate = gate }
         val repository = repository(remote, local = local)
@@ -573,7 +368,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun emptyRemoteRefreshDuringInitialLocalReadDoesNotRestoreOldRows() = runTest {
-        val remote = FakeAgentSource().apply { roster = emptyList() }
+        val remote = AgentRepositoryTestSource().apply { roster = emptyList() }
         val gate = CompletableDeferred<Unit>()
         val local = FakeAgentCache().apply { rows = listOf(agent(ID, "Old disk")); readGate = gate }
         val repository = repository(remote, local = local)
@@ -590,7 +385,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun deleteDuringInitialLocalReadDoesNotRestoreDeletedRow() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         val local = FakeAgentCache().apply { rows = listOf(agent(ID, "Old disk")); readGate = gate }
         val repository = repository(remote, local = local)
@@ -605,7 +400,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun pushRefreshBypassesFreshnessAndStampsTheNewCopy() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val transport = PushingTransport()
         val local = FakeAgentCache()
         val repository = repository(remote, transport, local)
@@ -620,7 +415,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun failedPushInvalidatesFreshStampAndAllowsRetry() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val transport = PushingTransport()
         val repository = repository(remote, transport)
         repository.refreshAgents()
@@ -635,7 +430,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun pushSupersedesAnOlderReadWithoutItsCleanupRemovingTheNewRequest() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val transport = PushingTransport()
         val repository = repository(remote, transport)
         val oldGate = CompletableDeferred<Unit>()
@@ -658,7 +453,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun targetedPushAndDeleteWinOverAnOlderBulkSnapshot() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         remote.roster += agent(OTHER_ID)
         val transport = PushingTransport()
         val repository = repository(remote, transport)
@@ -681,7 +476,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun deleteInvalidatesPendingReadAndAFollowingReadMustReachRemote() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.read = { id -> withContext(NonCancellable) { gate.await() }; agent(id, "Deleted") }
         val repository = repository(remote)
@@ -699,7 +494,7 @@ class CachedAgentRepositoryTest {
 
     @Test
     fun updateInvalidatesPendingReadAndBulkRefreshesTheNewAgent() = runTest {
-        val remote = FakeAgentSource()
+        val remote = AgentRepositoryTestSource()
         val gate = CompletableDeferred<Unit>()
         remote.read = { id -> withContext(NonCancellable) { gate.await() }; agent(id, "Old") }
         val repository = repository(remote)
@@ -715,16 +510,10 @@ class CachedAgentRepositoryTest {
     }
 
     private fun TestScope.repository(
-        remote: FakeAgentSource,
+        remote: AgentRepositoryTestSource,
         transport: PushingTransport? = null,
         local: FakeAgentCache? = null,
-    ): CachedAgentRepository = CachedAgentRepository(
-        remote.bound(), localCache = local?.let { { it } }, repositoryScope = backgroundScope, transport = transport,
-    ).also { repository ->
-        repository.clock = object : Clock {
-            override fun now(): Instant = Instant.fromEpochMilliseconds(1_000_000 + testScheduler.currentTime)
-        }
-    }
+    ): CachedAgentRepository = cachedAgentRepository(remote, transport, local)
 
     private class PushingTransport : NoOpChannelTransport() {
         override val events = MutableSharedFlow<ServerFrame>(extraBufferCapacity = 8)
@@ -748,41 +537,6 @@ class CachedAgentRepositoryTest {
         override suspend fun deleteAll() { rows = emptyList() }
     }
 
-    private class FakeAgentSource : AgentRemoteSource {
-        val getCalls = mutableListOf<AgentId>()
-        val updates = mutableListOf<AgentUpdateParams>()
-        var roster = listOf(agent(ID))
-        var listCalls = 0
-        var listGate: CompletableDeferred<Unit>? = null
-        var ignoreListCancellation = false
-        var read: suspend (AgentId) -> Agent = { id -> roster.first { it.id == id } }
-        override suspend fun getAgent(agentId: AgentId): Agent {
-            getCalls += agentId
-            return read(agentId)
-        }
-        override suspend fun listAgents(limit: Int?, offset: Int?, tags: List<String>?): List<Agent> {
-            listCalls += 1
-            val snapshot = roster
-            val gate = listGate
-            if (ignoreListCancellation) withContext(NonCancellable) { gate?.await() } else gate?.await()
-            return snapshot
-        }
-        override suspend fun listAgentsSlim(limit: Int?, offset: Int?, tags: List<String>?) =
-            roster.map { AgentSummary(it.id, it.name, it.description) }
-        override suspend fun countAgents() = roster.size
-        override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?) = ContextWindowOverview()
-        override suspend fun updateAgent(agentId: AgentId, params: AgentUpdateParams): Agent =
-            agent(agentId, params.name ?: "Updated").also { updated ->
-                updates += params
-                roster = roster.map { if (it.id == agentId) updated else it }
-            }
-        override suspend fun deleteAgent(agentId: AgentId) { roster = roster.filterNot { it.id == agentId } }
-        override suspend fun createAgent(params: AgentCreateParams): Agent = error("unused")
-        override suspend fun exportAgent(agentId: AgentId): String = error("unused")
-        override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse = error("unused")
-        override suspend fun attachArchive(agentId: AgentId, archiveId: String) = Unit
-        override suspend fun detachArchive(agentId: AgentId, archiveId: String) = Unit
-    }
 
     private companion object {
         val ID = AgentId("agent-1")

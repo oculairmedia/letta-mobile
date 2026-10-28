@@ -15,7 +15,7 @@ import com.letta.mobile.data.model.ScheduleDefinition
 import com.letta.mobile.data.model.ScheduleMessage
 import com.letta.mobile.data.model.SchedulePayload
 import com.letta.mobile.data.model.ScheduledMessage
-import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.InMemoryAgentRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -438,7 +438,7 @@ class ScheduleLibraryControllerTest {
 
     private class RouteUnavailableException : RuntimeException("route unavailable")
 
-    private class FakeAgentRepository : IAgentRepository {
+    private class FakeAgentRepository : InMemoryAgentRepository() {
         private val agentsFlow = MutableStateFlow(
             listOf(
                 Agent(id = AgentId("a1"), name = "Agent One"),
@@ -461,9 +461,6 @@ class ScheduleLibraryControllerTest {
         }
         override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = false
         override fun getCachedAgent(id: AgentId): Agent? = agents.value.firstOrNull { it.id == id }
-        override suspend fun getFreshAgent(id: AgentId, force: Boolean): Agent =
-            getCachedAgent(id) ?: error("No agent ${id.value}")
-
         override fun getAgent(id: AgentId): Flow<Agent> = flowOf(checkNotNull(getCachedAgent(id)))
         override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview =
             error("unused")

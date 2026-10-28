@@ -369,7 +369,7 @@ open class CachedAgentRepository(
 
     override suspend fun getFreshAgent(id: AgentId, force: Boolean): Agent {
         val request = refreshMutex.withLock {
-            if (!force && id in detailedAgents && isAgentFreshLocked(id)) {
+            if (!force && hasFreshDetailLocked(id)) {
                 _agents.value.find { it.id == id }?.let { return it }
             }
             detailRequests += id
@@ -377,6 +377,8 @@ open class CachedAgentRepository(
         }
         return request.await().getOrThrow()
     }
+
+    private fun hasFreshDetailLocked(id: AgentId): Boolean = id in detailedAgents && isAgentFreshLocked(id)
 
     private suspend fun getAgentSnapshot(id: AgentId, force: Boolean = false): Agent {
         val request = refreshMutex.withLock {
@@ -397,20 +399,7 @@ open class CachedAgentRepository(
                     refreshMutex.withLock {
                         request.ensureActive()
                         if (agentRequests[id] !== request) throw CancellationException("Agent cache invalidated")
-                        // A completed list requested after this ordinary read is authoritative.
-                        // Keep the waiter alive, but do not restore its older response to the roster.
-                        if (!persist && completedRefreshRevision > refreshRevisionAtStart) {
-                            val rosterAgent = refreshedAgentOrThrow(id)
-                            // An editor still needs the detail payload; it must not replace the newer roster.
-                            return@withLock if (id in detailRequests) fresh else rosterAgent
-                        }
-                        updateAgentInCache(fresh)
-                        cachePublicationRevision += 1
-                        agentFetchedAt[id] = nowMillis()
-                        detailedAgents += id
-                        if (refreshRequest != null) changedDuringRefresh += id
-                        if (persist) persistUpdatedAgent(fresh)
-                        fresh
+                        publishAgentReadLocked(id, fresh, persist, refreshRevisionAtStart)
                     }
                 }
             } finally {
@@ -426,6 +415,28 @@ open class CachedAgentRepository(
         }
         agentRequests[id] = request
         return request
+    }
+
+    private suspend fun publishAgentReadLocked(
+        id: AgentId,
+        fresh: Agent,
+        persist: Boolean,
+        refreshRevisionAtStart: Long,
+    ): Agent {
+        // A completed list requested after this ordinary read is authoritative.
+        // Keep the waiter alive, but do not restore its older response to the roster.
+        if (!persist && completedRefreshRevision > refreshRevisionAtStart) {
+            val rosterAgent = refreshedAgentOrThrow(id)
+            // An editor still needs the detail payload; it must not replace the newer roster.
+            return if (id in detailRequests) fresh else rosterAgent
+        }
+        updateAgentInCache(fresh)
+        cachePublicationRevision += 1
+        agentFetchedAt[id] = nowMillis()
+        detailedAgents += id
+        if (refreshRequest != null) changedDuringRefresh += id
+        if (persist) persistUpdatedAgent(fresh)
+        return fresh
     }
 
     private fun refreshedAgentOrThrow(id: AgentId): Agent =

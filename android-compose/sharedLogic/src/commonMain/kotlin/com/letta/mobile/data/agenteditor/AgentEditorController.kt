@@ -150,28 +150,39 @@ class AgentEditorController(
     private fun load() {
         val agentId = _state.value.agentId ?: return
         loadJob?.cancel()
-        val cached = _state.value.agent ?: backend.agents.value.firstOrNull { it.id == AgentId(agentId) }
+        showCached(AgentId(agentId))
+        loadJob = scope.launch {
+            try {
+                showLoaded(loadAgent(agentId))
+            } catch (e: CancellationException) {
+                if (currentCoroutineContext().isActive) {
+                    showLoadFailure(e)
+                }
+                throw e
+            } catch (e: Exception) {
+                showLoadFailure(e)
+            }
+        }
+    }
+
+    private fun showCached(agentId: AgentId) {
+        val cached = _state.value.agent ?: backend.agents.value.firstOrNull { it.id == agentId }
         _state.update {
             val form = if (it.agent == null && cached != null) AgentEditorParams.formOf(cached) else it.form
             it.copy(loading = true, loadError = null, agent = cached, form = form, original = null)
         }
-        loadJob = scope.launch {
-            try {
-                val agent = loadAgent(agentId)
-                val form = AgentEditorParams.formOf(agent)
-                _state.update {
-                    val displayed = it.agent?.let(AgentEditorParams::formOf) ?: it.form
-                    it.copy(loading = false, agent = agent, form = AgentEditorParams.rebase(displayed, it.form, form), original = form)
-                }
-            } catch (e: CancellationException) {
-                if (currentCoroutineContext().isActive) {
-                    _state.update { it.copy(loading = false, loadError = e.message ?: "Agent load cancelled. Try again.") }
-                }
-                throw e
-            } catch (e: Exception) {
-                _state.update { it.copy(loading = false, loadError = e.message ?: "Could not load the agent") }
-            }
+    }
+
+    private fun showLoaded(agent: Agent) {
+        val form = AgentEditorParams.formOf(agent)
+        _state.update {
+            val displayed = it.agent?.let(AgentEditorParams::formOf) ?: it.form
+            it.copy(loading = false, agent = agent, form = AgentEditorParams.rebase(displayed, it.form, form), original = form)
         }
+    }
+
+    private fun showLoadFailure(failure: Exception) {
+        _state.update { it.copy(loading = false, loadError = failure.message ?: "Could not load the agent") }
     }
 
     /** Runs [block], reporting a failure as the page's error in [fallback]'s words when it has none. */

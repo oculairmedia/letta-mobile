@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.ProjectId
+import com.letta.mobile.data.repository.InMemoryAgentRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import kotlinx.coroutines.flow.Flow
@@ -149,7 +150,7 @@ class SharedChatSessionResolverTest {
 private class FakeAgentRepository(
     private val cached: Map<String, Agent> = emptyMap(),
     agentsFlow: MutableStateFlow<List<Agent>> = MutableStateFlow(emptyList()),
-) : IAgentRepository {
+) : InMemoryAgentRepository() {
     override val agents: StateFlow<List<Agent>> = agentsFlow
     override val isRefreshing: StateFlow<Boolean> = MutableStateFlow(false)
     override val refreshError: StateFlow<Throwable?> = MutableStateFlow(null)
@@ -159,9 +160,6 @@ private class FakeAgentRepository(
     override suspend fun countAgents(): Int = unsupported()
     override suspend fun refreshAgents() = unsupported()
     override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = unsupported()
-    override suspend fun getFreshAgent(id: AgentId, force: Boolean): Agent =
-        getCachedAgent(id) ?: error("No agent ${id.value}")
-
     override fun getAgent(id: AgentId): Flow<Agent> = emptyFlow()
     override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview = unsupported()
     override suspend fun checkpointAndRestoreConfig(agentId: AgentId, operation: suspend () -> Unit) = unsupported()

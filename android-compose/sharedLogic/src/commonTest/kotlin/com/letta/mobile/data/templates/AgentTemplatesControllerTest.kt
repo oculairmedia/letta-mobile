@@ -9,7 +9,7 @@ import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ImportedAgentsResponse
-import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.InMemoryAgentRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -111,7 +111,7 @@ class AgentTemplatesControllerTest {
         private val failure: Throwable? = null,
         private val gate: CompletableDeferred<Unit>? = null,
         private val canCreate: Boolean = true,
-    ) : IAgentRepository {
+    ) : InMemoryAgentRepository() {
         val created = mutableListOf<AgentCreateParams>()
         override val supportsCreateAgent: Boolean get() = canCreate
         override val agents: StateFlow<List<Agent>> = MutableStateFlow(emptyList())
@@ -122,9 +122,6 @@ class AgentTemplatesControllerTest {
         override suspend fun listAgentSummaries(): List<AgentSummary> = emptyList()
         override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = false
         override fun getCachedAgent(id: AgentId): Agent? = null
-        override suspend fun getFreshAgent(id: AgentId, force: Boolean): Agent =
-            getCachedAgent(id) ?: error("No agent ${id.value}")
-
         override fun getAgent(id: AgentId): Flow<Agent> = error("unused")
         override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview = error("unused")
         override suspend fun checkpointAndRestoreConfig(agentId: AgentId, operation: suspend () -> Unit) = operation()
