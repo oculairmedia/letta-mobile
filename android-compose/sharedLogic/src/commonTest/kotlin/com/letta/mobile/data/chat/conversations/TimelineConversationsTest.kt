@@ -19,6 +19,9 @@ import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.ui.chat.session.FakeChatSessionPort
 import com.letta.mobile.ui.chat.session.TimelineChatTarget
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -112,7 +115,8 @@ class TimelineConversationsTest {
                 }
             }
             val start = currentTime
-            val owner = TimelineConversations(this, delayed, roster)
+            val ownerScope = CoroutineScope(coroutineContext + SupervisorJob())
+            val owner = TimelineConversations(ownerScope, delayed, roster)
             runCurrent()
             assertTrue(owner.state.value.conversations.isEmpty())
             advanceUntilIdle()
@@ -135,6 +139,7 @@ class TimelineConversationsTest {
                 "fleet sample=$sample coldCalls=137 coldFirst=$cold coldComplete=$cold " +
                     "warmCalls=${calls - 137} warmFirst=0 warmComplete=${currentTime - warmStart} rows=883",
             )
+            ownerScope.cancel()
         }
     }
 

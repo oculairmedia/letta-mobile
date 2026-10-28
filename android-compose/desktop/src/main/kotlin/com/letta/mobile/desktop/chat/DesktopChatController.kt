@@ -1125,8 +1125,7 @@ class DesktopChatController(
      * path, because then there is no selection to preserve and the first conversation should open.
      */
     private suspend fun refreshConversationRoster(dirty: Map<ConversationId, AgentId?>? = null): Boolean {
-        if (closed) return false
-        val nextGateway = gateway ?: return false
+        val nextGateway = gateway?.takeUnless { closed } ?: return false
         val runtime = _state.value.runtimeState
         if (!runtime.isRemoteBacked || runtime.connectionState !in ROSTER_REFRESHABLE_STATES) return false
         val deleting = _deletingConversationIds.value

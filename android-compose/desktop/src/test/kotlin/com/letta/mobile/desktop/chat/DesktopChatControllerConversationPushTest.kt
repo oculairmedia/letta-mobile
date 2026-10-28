@@ -206,7 +206,10 @@ class DesktopChatControllerConversationPushTest {
         val afterPush = gateway.requests.toList()
         val stateAfterPush = controller.state.value
         val rosterAfterPush = rosterCalls
-        println("one-push dispatches target=${afterPush.count { it.value == "agent-0" }} unchanged=${afterPush.count { it.value == "agent-1" }} roster=${rosterAfterPush - rosterBefore}")
+        println(
+            "one-push dispatches target=${afterPush.count { it.value == "agent-0" }} " +
+                "unchanged=${afterPush.count { it.value == "agent-1" }} roster=${rosterAfterPush - rosterBefore}",
+        )
         gateway.requests.clear()
         repeat(10) { transport.pushes.tryEmit(push("target-$it")) }
         runCurrent()

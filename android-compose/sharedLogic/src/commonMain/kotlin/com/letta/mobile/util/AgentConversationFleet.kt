@@ -104,7 +104,9 @@ class AgentConversationFleet(
         val owners = changedOwners(dirty, resolve) ?: return@withLock null
         val read = readAll(owners.associateWith { AgentListing() }, paging.eagerPagesPerAgent)
         if (read.values.any { it.failure is UnsupportedOperationException }) return@withLock null
-        if (read.isNotEmpty() && read.values.all { it.failure != null }) throw read.values.first().failure ?: IllegalStateException(LIST_FAILED)
+        if (read.isNotEmpty() && read.values.all { it.failure != null }) {
+            throw read.values.first().failure ?: IllegalStateException(LIST_FAILED)
+        }
         listed = listed + read.mapValues { (agent, fresh) -> (listed[agent] ?: AgentListing()).refreshed(fresh) }
         listed.merged()
     }

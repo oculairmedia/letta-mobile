@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.mapNotNull
@@ -57,7 +58,7 @@ suspend fun observeConversationInvalidations(
             wake.close()
         }
     }
-    for (request in wake) {
+    wake.consumeEach {
         yield()
         val batch = mutex.withLock { dirty.toMap().also { dirty.clear() } }
         if (batch.isNotEmpty()) refresh(batch)

@@ -102,18 +102,20 @@ class TimelineConversations(
     init {
         scope.launch { refresh() }
         scope.launch {
-            observeConversationInvalidations(gateway.conversationChanges) { dirty -> refreshChanged(dirty) }
-        }
-    }
-
-    private suspend fun refreshChanged(dirty: Map<ConversationId, AgentId?>) {
-        runCatchingCancellable {
-            fleet.refreshForInvalidations(dirty, { roster }) { gateway.getConversation(it.value) }.first
-        }.onSuccess { listed ->
-            mutableState.update { current ->
-                current.copy(conversations = listed.keeping(current.conversations.filter { it.id == current.selected }), loaded = true, error = null)
+            observeConversationInvalidations(gateway.conversationChanges) { dirty ->
+                runCatchingCancellable {
+                    fleet.refreshForInvalidations(dirty, { roster }) { gateway.getConversation(it.value) }.first
+                }.onSuccess { listed ->
+                    mutableState.update { current ->
+                        current.copy(
+                            conversations = listed.keeping(current.conversations.filter { it.id == current.selected }),
+                            loaded = true,
+                            error = null,
+                        )
+                    }
+                }.onFailure { failure -> mutableState.update { it.copy(error = failure.message ?: LIST_FAILED) } }
             }
-        }.onFailure { failure -> mutableState.update { it.copy(error = failure.message ?: LIST_FAILED) } }
+        }
     }
 
     /**
