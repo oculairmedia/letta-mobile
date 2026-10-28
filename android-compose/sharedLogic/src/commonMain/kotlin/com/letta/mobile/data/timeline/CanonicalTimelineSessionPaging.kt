@@ -153,22 +153,23 @@ internal class TimelineHistoryMediator(
      * generations without a sticky prepend error.
      */
     private suspend fun reconcileRecentTail(): MediatorResult {
-        var retries = 0
-        while (true) {
-            if (session.publication.value.selection !== selection) {
-                return MediatorResult.Success(endOfPaginationReached = true)
-            }
-            val result = session.reconcileRecentDetailed(selection)
-            when (result.outcome) {
-                TimelineEnginePageOutcome.Applied -> return MediatorResult.Success(result.appended == 0)
-                TimelineEnginePageOutcome.NoProgress -> return MediatorResult.Success(endOfPaginationReached = true)
-                TimelineEnginePageOutcome.Stale -> {
-                    if (retries++ >= STALE_RECENT_RETRIES) {
-                        return MediatorResult.Error(IllegalStateException("Stale recent request"))
-                    }
-                    yield()
-                }
-            }
+        repeat(STALE_RECENT_RETRIES) {
+            reconcileRecentAttempt()?.let { return it }
+            yield()
+        }
+        return reconcileRecentAttempt()
+            ?: MediatorResult.Error(IllegalStateException("Stale recent request"))
+    }
+
+    private suspend fun reconcileRecentAttempt(): MediatorResult? {
+        if (session.publication.value.selection !== selection) {
+            return MediatorResult.Success(endOfPaginationReached = true)
+        }
+        val result = session.reconcileRecentDetailed(selection)
+        return when (result.outcome) {
+            TimelineEnginePageOutcome.Applied -> MediatorResult.Success(result.appended == 0)
+            TimelineEnginePageOutcome.NoProgress -> MediatorResult.Success(endOfPaginationReached = true)
+            TimelineEnginePageOutcome.Stale -> null
         }
     }
 
