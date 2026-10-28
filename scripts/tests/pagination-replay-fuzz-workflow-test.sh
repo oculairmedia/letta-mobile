@@ -15,11 +15,27 @@ fail() {
 [[ -f "$WORKFLOW" ]] || fail "missing workflow $WORKFLOW"
 [[ -f "$RESOLVER" ]] || fail "missing resolver $RESOLVER"
 
-if grep -qE '\$\{\{.*github\.event\.inputs' "$WORKFLOW"; then
-  if grep -qE 'run:.*\$\{\{.*inputs\.' "$WORKFLOW"; then
-    fail "workflow must not interpolate workflow_dispatch inputs into run: shell lines"
-  fi
-fi
+# Scan every run: block (single-line and multi-line `run: |`) for workflow_dispatch input
+# expansions; inputs may only reach the shell through env: variables.
+python3 - "$WORKFLOW" <<'PYCHECK' || fail "workflow must not interpolate workflow_dispatch inputs into run: blocks"
+import re, sys
+lines = open(sys.argv[1]).read().splitlines()
+bad = []
+i = 0
+while i < len(lines):
+    m = re.match(r"^(\s*)(?:-\s+)?run:\s*(.*)$", lines[i])
+    if not m:
+        i += 1
+        continue
+    indent = len(m.group(1))
+    body = [m.group(2)]
+    i += 1
+    while i < len(lines) and (not lines[i].strip() or len(lines[i]) - len(lines[i].lstrip()) > indent):
+        body.append(lines[i])
+        i += 1
+    bad += [line for line in body if re.search(r"\$\{\{[^}]*inputs\.", line)]
+sys.exit(1 if bad else 0)
+PYCHECK
 
 grep -q 'permissions:' "$WORKFLOW" && grep -A2 'permissions:' "$WORKFLOW" | grep -q 'contents: read' \
   || fail "workflow must use contents: read"

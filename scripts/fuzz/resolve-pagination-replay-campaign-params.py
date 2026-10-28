@@ -14,6 +14,8 @@ MIN_SEED_COUNT = 1
 MAX_SEED_COUNT = 256
 MIN_SCENARIOS = 1
 MAX_SCENARIOS = 1000
+MIN_SEED_BASE = -(2**63)
+MAX_SEED_BASE = 2**63 - 1
 
 DEFAULT_NIGHTLY_SEED_COUNT = 32
 DEFAULT_NIGHTLY_SCENARIOS = 200
@@ -32,12 +34,14 @@ def repo_root() -> Path:
 
 def campaign_output_paths() -> tuple[Path, Path]:
     root = repo_root()
-    campaign_dir = (root / "campaign").resolve()
+    unresolved = root / "campaign"
+    # Check the link itself: resolve() follows symlinks, so a later check would see the target.
+    if unresolved.is_symlink():
+        raise SystemExit(f"campaign directory must not be a symlink: {unresolved}")
+    campaign_dir = unresolved.resolve()
     root_resolved = root.resolve()
     if not campaign_dir.is_relative_to(root_resolved):
         raise SystemExit(f"campaign directory escapes repo root: {campaign_dir}")
-    if campaign_dir.is_symlink():
-        raise SystemExit(f"campaign directory must not be a symlink: {campaign_dir}")
     campaign_dir.mkdir(parents=True, exist_ok=True)
     env_path = (campaign_dir / ENV_FILENAME).resolve()
     json_path = (campaign_dir / JSON_FILENAME).resolve()
@@ -90,7 +94,12 @@ def parse_manual_input(
     scenarios_raw: str | None,
 ) -> ManualCampaignInput:
     return ManualCampaignInput(
-        seed_base=_parse_int("seed_base", _require_manual_field("seed_base", seed_base_raw)),
+        seed_base=_bounded(
+            "seed_base",
+            _parse_int("seed_base", _require_manual_field("seed_base", seed_base_raw)),
+            MIN_SEED_BASE,
+            MAX_SEED_BASE,
+        ),
         seed_count=_bounded(
             "seed_count",
             _parse_int("seed_count", _require_manual_field("seed_count", seed_count_raw)),

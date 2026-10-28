@@ -104,6 +104,16 @@ class PaginationReplayFuzzCampaignRunnerTest {
         appendLine("}")
     }
 
-    private fun jsonString(value: String): String =
-        "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+    private fun jsonString(value: String): String = buildString {
+        append('"')
+        value.forEach { char ->
+            when {
+                char == '\\' -> append("\\\\")
+                char == '"' -> append("\\\"")
+                char.code < 0x20 -> append("\\u").append(char.code.toString(16).padStart(4, '0'))
+                else -> append(char)
+            }
+        }
+        append('"')
+    }
 }

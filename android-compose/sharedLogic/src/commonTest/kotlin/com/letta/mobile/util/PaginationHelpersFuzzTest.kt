@@ -49,7 +49,7 @@ class PaginationHelpersFuzzTest {
             ExhaustFixtureParams(
                 pageSize = random.nextInt(1, 12),
                 itemCount = random.nextInt(0, 80),
-                faultAfterPage = random.nextInt(kind.faultPageRange.first, kind.faultPageRange.last),
+                faultAfterPage = random.nextInt(kind.faultPageRange.first, kind.faultPageRange.last + 1),
             )
 
         private suspend fun runExhaustCampaign(
