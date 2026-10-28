@@ -86,16 +86,18 @@ class AgentConversationFleetFuzzTest {
         ctx.check(condition = !fleet.hasMore) {
             "hasMore still true after budget=$maxLoadMore fetches=${backend.totalFetches}"
         }
-        assertFleetOutput(ctx, listed, visibleAgents, store, backend)
+        FleetRunResult(listed, visibleAgents, store, backend).assertMatchesOracle(ctx)
     }
 
-    private fun assertFleetOutput(
-        ctx: FuzzScenarioContext,
-        listed: List<Conversation>,
-        visibleAgents: List<Agent>,
-        store: Map<AgentId, List<Conversation>>,
-        backend: PagingBackend,
-    ) {
+    /** Everything one fleet scenario produced, checked against the independent oracle. */
+    private class FleetRunResult(
+        val listed: List<Conversation>,
+        val visibleAgents: List<Agent>,
+        val store: Map<AgentId, List<Conversation>>,
+        val backend: PagingBackend,
+    )
+
+    private fun FleetRunResult.assertMatchesOracle(ctx: FuzzScenarioContext) {
         val listedIds = listed.map { it.id }
         ctx.check(condition = listedIds.size == listedIds.distinct().size) {
             "duplicate conversation ids in fleet output: ${listedIds.groupingBy { it }.eachCount().filter { it.value > 1 }}"
