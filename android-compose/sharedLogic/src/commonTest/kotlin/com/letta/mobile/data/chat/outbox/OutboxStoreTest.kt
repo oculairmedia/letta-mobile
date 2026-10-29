@@ -7,6 +7,7 @@ import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -113,5 +114,40 @@ internal class OutboxStoreTest {
         assertEquals(revision, ledger.current.revision)
         assertEquals(emptyList(), outbox.load(scope))
         assertEquals(false, ledger.transaction(scope) { OutboxStore.confirmEcho(this, "otid-1", now) })
+    }
+
+    private fun stored(entries: String, version: Int = 2) =
+        ledger.putEvidence("outbox/v2", """{"version":$version,"entries":[$entries]}""".encodeToByteArray())
+
+    private fun row(otid: String, state: String = "Queued") =
+        """{"otid":"$otid","content":"hi","attachments":[],"createdAtMillis":1,"state":"$state",""" +
+            """"attempt":0,"stateSinceMillis":1}"""
+
+    @Test
+    fun aCorruptStoredOutboxFailsInsteadOfReadingAsEmpty() = runTest {
+        ledger.putEvidence("outbox/v2", "{not json".encodeToByteArray())
+        assertFails { outbox.load(scope) }
+        stored(row("otid-1"), version = 3)
+        assertFailsWith<IllegalArgumentException> { outbox.load(scope) }
+        stored(row("otid-1") + "," + row("otid-1"))
+        assertFailsWith<IllegalArgumentException> { outbox.load(scope) }
+        stored(row("otid-1", state = "Confirmed"))
+        assertFailsWith<IllegalArgumentException> { outbox.load(scope) }
+        stored(row("otid-1", state = "Failed"))
+        assertFailsWith<IllegalArgumentException> { outbox.load(scope) }
+        stored(row("otid-1"))
+        assertEquals(listOf("otid-1"), outbox.load(scope).map { it.otid })
+    }
+
+    @Test
+    fun aLegacyRecordKeepsItsAttachmentsAndAttemptThroughConversion() = runTest {
+        val image = MessageContentPart.Image("aGVsbG8=", "image/png")
+        val legacy = CanonicalPendingLocalStore(ledger)
+        legacy.save(scope, CanonicalPendingLocalStore.Record("with-image", "caption", listOf(image), "2026-01-01T00:00:00Z", attempt = 3))
+        outbox.recoverAfterRestart(scope)
+        val converted = OutboxStore(ledger) { now }.load(scope).single()
+        assertEquals(listOf(image), converted.attachments)
+        assertEquals(3, converted.attempt)
+        assertEquals(OutboxState.Unknown, converted.state)
     }
 }
