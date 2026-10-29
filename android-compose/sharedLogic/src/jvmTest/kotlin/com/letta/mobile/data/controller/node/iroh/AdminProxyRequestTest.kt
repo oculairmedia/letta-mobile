@@ -14,7 +14,6 @@ import kotlin.test.assertTrue
 class AdminProxyRequestTest {
     @Test
     fun runtimeOwnedMessageListDoesNotDialProxyWithoutNativeClient() = runTest {
-        NativeAdmin.resetCircuitForTest()
         val recording = installRecordingTransport()
         val router = AdminRpcRouter()
         ConversationAdminHandlers.register(router)
@@ -38,7 +37,6 @@ class AdminProxyRequestTest {
 
     @Test
     fun runtimeOwnedConversationListDoesNotDialProxyWithoutNativeClient() = runTest {
-        NativeAdmin.resetCircuitForTest()
         val recording = installRecordingTransport()
         val router = AdminRpcRouter()
         ConversationAdminHandlers.register(router)
@@ -102,7 +100,6 @@ class AdminProxyRequestTest {
 
     @Test
     fun runtimeOwnedArchiveDoesNotDialProxyWithoutNativeClient() = runTest {
-        NativeAdmin.resetCircuitForTest()
         val recording = installRecordingTransport()
         val router = AdminRpcRouter()
         ConversationAdminHandlers.register(router)

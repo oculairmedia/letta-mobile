@@ -4,7 +4,7 @@ import androidx.compose.runtime.BroadcastFrameClock
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.unit.IntSize
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.avatar.rive.RiveWriteSink
 import com.letta.mobile.ui.mascot.MascotPlatformFacts
 import com.letta.mobile.ui.mascot.MascotStillStore

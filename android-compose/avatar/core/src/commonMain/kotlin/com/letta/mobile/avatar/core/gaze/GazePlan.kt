@@ -1,4 +1,6 @@
-package com.letta.mobile.avatar.core
+package com.letta.mobile.avatar.core.gaze
+
+import com.letta.mobile.avatar.core.model.AvatarState
 
 /**
  * What the character can be looking at. Every look has one of these so a

@@ -1,4 +1,4 @@
-package com.letta.mobile.avatar.core
+package com.letta.mobile.avatar.core.model
 
 /**
  * The body a user picks for an agent's mascot. Order is the picker's grid order; the Rive asset

@@ -29,7 +29,6 @@ class ControlCapabilityHandlersTest {
 
     @BeforeTest
     fun pinUnreachableShim() {
-        NativeAdmin.resetCircuitForTest()
         // The shim base points at a discard port, but AdminProxyClient's shared
         // defaultTransportFactory is mutable process-wide and other tests in the
         // suite leave a fake installed. Pin a deterministic always-failing
@@ -42,7 +41,6 @@ class ControlCapabilityHandlersTest {
 
     @AfterTest
     fun restoreShimFactory() {
-        NativeAdmin.resetCircuitForTest()
         savedFactory?.let { AdminProxyClient.defaultTransportFactory = it }
     }
 

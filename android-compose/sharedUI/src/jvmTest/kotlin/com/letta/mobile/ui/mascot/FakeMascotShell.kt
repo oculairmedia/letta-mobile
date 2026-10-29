@@ -11,8 +11,8 @@ import androidx.compose.ui.node.PointerInputModifierNode
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.avatar.core.HeadlessAvatarRuntime
-import com.letta.mobile.avatar.core.MascotIdentity
-import com.letta.mobile.avatar.core.MascotShape
+import com.letta.mobile.avatar.core.model.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotShape
 
 /** A renderer that can draw every agent and paints a tagged empty box: no scene, no frame loop. */
 internal object FakeMascotHost : FakeMascotRenderer(observesPointer = false) {

@@ -5,7 +5,7 @@ import app.rive.Fit
 import app.rive.RenderBuffer
 import app.rive.RiveFile
 import app.rive.core.RiveWorker
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import kotlin.time.Duration.Companion.seconds
 
 /**

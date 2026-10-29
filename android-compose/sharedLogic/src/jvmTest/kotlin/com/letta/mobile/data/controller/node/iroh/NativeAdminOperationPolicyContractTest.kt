@@ -4,8 +4,6 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import java.nio.file.Files
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -21,12 +19,7 @@ import kotlinx.coroutines.test.runTest
  * letta-mobile-lgns8.21.5 — explicit [NativeAdminOperationPolicy] contract.
  */
 class NativeAdminOperationPolicyContractTest {
-
-    @BeforeTest
-    fun clearBreaker() = NativeAdmin.resetCircuitForTest()
-
-    @AfterTest
-    fun clearBreakerAfter() = NativeAdmin.resetCircuitForTest()
+    private val client = FakeClient()
 
     @Test
     fun everyNativeAdminOpHasUniqueMethodAndExplicitPolicy() {
@@ -88,14 +81,14 @@ class NativeAdminOperationPolicyContractTest {
     @Test
     fun conversationRestoreTimeoutDoesNotTripReadBreaker() = runTest {
         assertFailsWith<IllegalArgumentException> {
-            NativeAdmin.require(FakeClient, NativeAdminOp.ConversationRestore) {
+            NativeAdmin.require(client, NativeAdminOp.ConversationRestore) {
                 delay(95_000)
                 "late"
             }
         }
         // Mutation timeout must not open the breaker — a follow-up read/write still probes.
         var probed = false
-        val result = NativeAdmin.require(FakeClient, NativeAdminOp.ConversationGet) {
+        val result = NativeAdmin.require(client, NativeAdminOp.ConversationGet) {
             probed = true
             "ok"
         }
@@ -106,7 +99,7 @@ class NativeAdminOperationPolicyContractTest {
     @Test
     fun readTimeoutTripsBreakerButMutationTimeoutDoesNotAutoRetry() = runTest {
         assertFailsWith<IllegalArgumentException> {
-            NativeAdmin.require(FakeClient, NativeAdminOp.AgentGet) {
+            NativeAdmin.require(client, NativeAdminOp.AgentGet) {
                 delay(5_000)
                 "x"
             }
@@ -114,17 +107,17 @@ class NativeAdminOperationPolicyContractTest {
         // Read breaker open — next same-op require fails closed without probing.
         var readProbed = false
         assertFailsWith<IllegalArgumentException> {
-            NativeAdmin.require(FakeClient, NativeAdminOp.AgentGet) {
+            NativeAdmin.require(client, NativeAdminOp.AgentGet) {
                 readProbed = true
                 "y"
             }
         }
         assertFalse(readProbed, "read timeout must trip breaker; no automatic retry probe")
 
-        NativeAdmin.resetCircuitForTest()
+        val mutationClient = FakeClient()
         var mutationAttempts = 0
         assertFailsWith<IllegalArgumentException> {
-            NativeAdmin.require(FakeClient, NativeAdminOp.ConversationRestore) {
+            NativeAdmin.require(mutationClient, NativeAdminOp.ConversationRestore) {
                 mutationAttempts++
                 delay(95_000)
                 "late-success"
@@ -135,7 +128,7 @@ class NativeAdminOperationPolicyContractTest {
 
     @Test
     fun conversationListSucceedsOnThreeSecondReadsWithoutTimingOutOrTrippingCircuitOpen() = runTest {
-        val result = NativeAdmin.require(FakeClient, NativeAdminOp.ConversationList) {
+        val result = NativeAdmin.require(client, NativeAdminOp.ConversationList) {
             delay(3_000)
             "bulk-list-success"
         }
@@ -143,7 +136,7 @@ class NativeAdminOperationPolicyContractTest {
 
         // Circuit breaker should remain closed and subsequent reads succeed.
         var subsequentProbed = false
-        val result2 = NativeAdmin.require(FakeClient, NativeAdminOp.ConversationList) {
+        val result2 = NativeAdmin.require(client, NativeAdminOp.ConversationList) {
             subsequentProbed = true
             "subsequent-success"
         }
@@ -154,7 +147,7 @@ class NativeAdminOperationPolicyContractTest {
     @Test
     fun readScanTimeoutTripsBreakerIfExceeding15SecondBudget() = runTest {
         assertFailsWith<IllegalArgumentException> {
-            NativeAdmin.require(FakeClient, NativeAdminOp.ConversationList) {
+            NativeAdmin.require(client, NativeAdminOp.ConversationList) {
                 delay(16_000)
                 "too-slow"
             }
@@ -162,7 +155,7 @@ class NativeAdminOperationPolicyContractTest {
 
         var probed = false
         assertFailsWith<IllegalArgumentException> {
-            NativeAdmin.require(FakeClient, NativeAdminOp.ConversationList) {
+            NativeAdmin.require(client, NativeAdminOp.ConversationList) {
                 probed = true
                 "next"
             }
@@ -186,7 +179,7 @@ class NativeAdminOperationPolicyContractTest {
         error("could not locate iroh handler sources")
     }
 
-    private object FakeClient : AppServerClient {
+    private class FakeClient : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = emptyFlow()
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) = error("unused")
         override suspend fun input(command: AppServerCommand.Input) = error("unused")

@@ -132,7 +132,7 @@ class ChatSendCoordinator(
         }
         scope.launch {
             wsChatBridge.redialWhileTurnActive.collect { event ->
-                contained("RedialWhileTurnActive") { turnStateMutex.withLock { handleRedialWhileTurnActiveLocked(event) } }
+                contained("RedialWhileTurnActive") { handleRedialWhileTurnActive(event) }
             }
         }
     }
@@ -553,6 +553,7 @@ class ChatSendCoordinator(
     }
 
     private fun resumed(state: ConversationTurnState) {
+        state.resumptions++
         state.pendingRedialTimeout?.cancel()
         state.pendingRedialTimeout = null
     }
@@ -612,22 +613,43 @@ class ChatSendCoordinator(
         if (!incoming.error(event)) reportUnmatchedFrame(event, TurnTail(event.turnId, event.runId))
     }
 
-    private suspend fun handleRedialWhileTurnActiveLocked(event: RedialWhileTurnActive) {
-        if (event.agentId != agentId) return
-        // Redial recovery is conversation-scoped on the wire; only the named
-        // conversation's own turn state may be finalized by it.
-        val state = turnRegistry.peekState(ConversationId(event.conversationId)) ?: return
-        if (state.otid == null && !ui.isStreaming() && !ui.isAgentTyping()) return
-        awaitRedialProgress(state)
-        when (
-            val outcome = withTimeoutOrNull(30.seconds) { timelineRepository.reconcileRecentMessages(
+    /**
+     * Redial recovery reads history without holding [turnStateMutex]. The read can take up to 30
+     * seconds, and the stream frames that would resume the turn must not queue behind it; a turn
+     * they resume in the meantime is theirs to settle, so the read's outcome is then dropped.
+     */
+    private suspend fun handleRedialWhileTurnActive(event: RedialWhileTurnActive) {
+        val (state, resumptions) = turnStateMutex.withLock { redialRecoveryTarget(event) } ?: return
+        val outcome = withTimeoutOrNull(30.seconds) {
+            timelineRepository.reconcileRecentMessages(
                 agentId = agentId,
                 conversationId = event.conversationId,
                 reason = "redial-recovery",
                 forceRefresh = true,
                 connectionGeneration = event.connectionGeneration,
-            ) }
-        ) {
+            )
+        }
+        turnStateMutex.withLock {
+            if (state.resumptions == resumptions) applyRedialRecovery(event, state, outcome)
+        }
+    }
+
+    private fun redialRecoveryTarget(event: RedialWhileTurnActive): Pair<ConversationTurnState, Int>? {
+        if (event.agentId != agentId) return null
+        // Redial recovery is conversation-scoped on the wire; only the named
+        // conversation's own turn state may be finalized by it.
+        val state = turnRegistry.peekState(ConversationId(event.conversationId)) ?: return null
+        if (state.otid == null && !ui.isStreaming() && !ui.isAgentTyping()) return null
+        awaitRedialProgress(state)
+        return state to state.resumptions
+    }
+
+    private suspend fun applyRedialRecovery(
+        event: RedialWhileTurnActive,
+        state: ConversationTurnState,
+        outcome: RecentMessagesReconcileOutcome?,
+    ) {
+        when (outcome) {
             null -> { expirePendingRecovery(state); return }
             is RecentMessagesReconcileOutcome.Applied -> Unit
             is RecentMessagesReconcileOutcome.Skipped -> {

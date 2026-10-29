@@ -54,6 +54,9 @@ internal class ConversationTurnState(val conversationId: String) {
     @Volatile var pendingRecoveryExpired: Boolean = false
     var pendingRedialTimeout: kotlinx.coroutines.Job? = null
 
+    /** Counts stream frames that resumed this turn, so a slow redial history read can tell it was overtaken. */
+    @Volatile var resumptions: Int = 0
+
     /**
      * Run ids this conversation has already settled. The run-keyed analogue of
      * [TurnIdentityLifecycle]'s turn fence: it must SURVIVE a state clear, or a

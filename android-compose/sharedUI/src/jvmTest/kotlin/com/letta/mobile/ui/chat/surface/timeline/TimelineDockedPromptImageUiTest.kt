@@ -10,6 +10,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasAnyAncestor
@@ -17,6 +19,9 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -129,8 +134,12 @@ class TimelineDockedPromptImageUiTest {
 
     private fun ComposeUiTest.px(dp: Dp): Float = with(density) { dp.toPx() }
 
-    private fun ComposeUiTest.step(deltaPx: Float) {
-        runOnIdle { listState.dispatchRawDelta(deltaPx) }
+    private fun ComposeUiTest.step(deltaPx: Float, trace: ((String) -> Unit)? = null) {
+        runOnIdle {
+            val consumed = listState.dispatchRawDelta(deltaPx)
+            trace?.invoke("scroll requested=$deltaPx consumed=$consumed " +
+                "first=${listState.firstVisibleItemIndex} offset=${listState.firstVisibleItemScrollOffset}")
+        }
         waitForIdle()
     }
 
@@ -234,16 +243,29 @@ class TimelineDockedPromptImageUiTest {
     }
 
     /** The pinned copy's bubble, in root px. */
-    private fun ComposeUiTest.pinnedBubble(): Rect? = onAllNodes(
-        hasTestTag(ChatRowTestTags.USER_PROMPT) and inPinnedCopy,
-        useUnmergedTree = true,
-    ).fetchSemanticsNodes().firstOrNull()?.boundsInRoot
+    private fun ComposeUiTest.pinnedBubble(trace: ((String) -> Unit)? = null): Rect? {
+        val node = onAllNodes(
+            hasTestTag(ChatRowTestTags.USER_PROMPT) and inPinnedCopy,
+            useUnmergedTree = true,
+        ).fetchSemanticsNodes().firstOrNull()
+        val bounds = node?.boundsInRoot
+        trace?.invoke("pinned left=${bounds?.left} top=${bounds?.top} right=${bounds?.right} bottom=${bounds?.bottom} " +
+            "position=${node?.positionInRoot} size=${node?.size} semanticsId=${node?.id} " +
+            "text=${node?.config?.getOrNull(SemanticsProperties.Text)?.joinToString()?.take(100) ?: "unavailable (owner unknown)"}")
+        return bounds
+    }
 
-    /** The second prompt's row top, px from the list's top edge; null off screen. */
-    private fun ComposeUiTest.nextPromptTop(): Float? = runOnIdle {
-        val info = listState.layoutInfo
-        info.visibleItemsInfo.firstOrNull { it.key.toString().contains("q2") }
-            ?.let { (info.viewportEndOffset - it.offset - it.size).toFloat() }
+    /** The second prompt's real row top in root px, excluding its sticky copy. */
+    private fun ComposeUiTest.nextPromptTop(trace: ((String) -> Unit)? = null): Float {
+        val nodes = onAllNodes(
+            hasTestTag(ChatRowTestTags.USER_PROMPT) and !inPinnedCopy and
+                hasAnyDescendant(hasText(messages[2].content)),
+            useUnmergedTree = true,
+        ).fetchSemanticsNodes()
+        check(nodes.size == 1) { "expected one visible q2 row after semantic anchoring, found ${nodes.size}" }
+        val top = nodes.single().boundsInRoot.top
+        trace?.invoke("q2 row top=$top bounds=${nodes.single().boundsInRoot}")
+        return top
     }
 
     /**
@@ -253,6 +275,15 @@ class TimelineDockedPromptImageUiTest {
      */
     @Test
     fun aPushedOutDockedPromptDissolvesIntoTheHeaderBand() = runComposeUiTest {
+        assertPushedPromptDissolves()
+    }
+
+    @Test
+    fun aPushedOutDockedPromptDissolvesAfterTheNextPromptOwnedTheDock() = runComposeUiTest {
+        assertPushedPromptDissolves(forceHandoff = true)
+    }
+
+    private fun ComposeUiTest.assertPushedPromptDissolves(forceHandoff: Boolean = false) {
         listState = LazyListState()
         show(listState)
         // In root px, like the bubble bounds and the capture.
@@ -263,9 +294,24 @@ class TimelineDockedPromptImageUiTest {
         val held = pinnedBubble() ?: error("nothing docked")
         val bubbleColor = onRoot().captureToImage().toAwtImage()
             .getRGB((held.left + BUBBLE_EDGE_PX).toInt(), (held.top + held.height / 2).toInt())
-        pushIntoHeaderBand(gone - PUSHED_PAST_PX)
-        val pushed = pinnedBubble() ?: error("the docked prompt left before it was pushed into the header band")
-        assertTrue(pushed.top < gone - PUSHED_PAST_PX && pushed.bottom > line, "pushed across the line: $pushed (line $line)")
+        if (forceHandoff) {
+            step(-FAR_PX)
+            val owners = onAllNodes(hasText(messages[2].content) and inPinnedCopy, useUnmergedTree = true)
+                .fetchSemanticsNodes()
+            assertTrue(owners.size == 1, "the regression must first hand the dock to q2")
+        }
+        // Keep output bounded and attach it only to failures.
+        val recent = ArrayDeque<String>()
+        val trace: (String) -> Unit = { event ->
+            if (recent.size == 24) recent.removeFirst()
+            recent.addLast(event)
+        }
+        val summary = pushIntoHeaderBand(gone - PUSHED_PAST_PX, trace)
+        val pushed = pinnedBubble(trace)
+        val diagnostic = "$summary; held=$held line=$line gone=$gone target=${gone - PUSHED_PAST_PX}; " +
+            "semanticsId is not prompt identity; recent events:\n${recent.joinToString("\n")}"
+        if (pushed == null) error("the docked prompt left before it was pushed into the header band; $diagnostic")
+        assertTrue(pushed.top < gone - PUSHED_PAST_PX && pushed.bottom > line, "pushed across the line: $pushed (line $line); $diagnostic")
         val image = onRoot().captureToImage().toAwtImage()
         val bubblePixels = { ys: IntRange ->
             val xs = (pushed.left.toInt() + 1) until (pushed.right.toInt() - 1)
@@ -278,18 +324,32 @@ class TimelineDockedPromptImageUiTest {
         ImageIO.write(image, "png", out)
     }
 
-    /**
-     * Scrolls fast until the next prompt nears the docked copy, then finely until it has pushed the
-     * copy's top above [targetTop] (root px).
-     */
-    private fun ComposeUiTest.pushIntoHeaderBand(targetTop: Float) {
+    /** Re-establishes q1 ownership from either dock owner, then pushes it above [targetTop]. */
+    private fun ComposeUiTest.pushIntoHeaderBand(targetTop: Float, trace: (String) -> Unit): String {
+        val list = onNodeWithTag(ChatTimelineTags.LIST)
+        list.performScrollToNode(hasText(messages[2].content))
+        waitForIdle()
+        val viewport = list.fetchSemanticsNode().boundsInRoot
+        // Use root-space semantics on both sides, not reverse-layout offsets with content padding.
+        step(viewport.center.y - nextPromptTop(trace), trace)
+        val owners = onAllNodes(hasText(messages[0].content) and inPinnedCopy, useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        check(owners.size == 1) { "semantic q2 anchor did not restore q1 dock ownership" }
+        val held = pinnedBubble(trace) ?: error("q1 bubble missing after semantic q2 anchor")
+        step(held.bottom + NEAR_PX - nextPromptTop(trace), trace)
         var steps = 0
-        while ((nextPromptTop() ?: Float.MAX_VALUE) > (pinnedBubble()?.bottom ?: 0f) + NEAR_PX && steps++ < MAX_FAST_STEPS) {
-            step(-FAST_STEP_PX)
+        while (true) {
+            val bubble = pinnedBubble(trace) ?: error("q1 bubble vanished while positioning below $targetTop")
+            if (bubble.top < targetTop) break
+            check(steps++ < MAX_FAST_STEPS) { "q1 positioning exhausted $MAX_FAST_STEPS steps; bubble=$bubble target=$targetTop" }
+            val before = nextPromptTop(trace)
+            step(-STEP_PX, trace)
+            val after = nextPromptTop(trace)
+            check(after < before) { "q2 made no progress while pushing q1: $before -> $after; bubble=$bubble" }
         }
-        while ((pinnedBubble()?.top ?: Float.MAX_VALUE) > targetTop && steps++ < MAX_FAST_STEPS) {
-            step(-STEP_PX)
-        }
+        check(onAllNodes(hasText(messages[0].content) and inPinnedCopy, useUnmergedTree = true)
+            .fetchSemanticsNodes().size == 1) { "q1 lost dock ownership before the pixel oracle" }
+        return "semantic q2 anchor; q1 owner verified; fineScrolls=$steps/$MAX_FAST_STEPS"
     }
 
     private fun near(argb: Int, other: Int): Boolean {
@@ -313,7 +373,6 @@ class TimelineDockedPromptImageUiTest {
         const val SNAPSHOT_EXTRA_STEPS = 20
         const val BUBBLE_EDGE_PX = 4f
         const val NEAR_PX = 60f
-        const val FAST_STEP_PX = 30f
         const val MAX_FAST_STEPS = 1_000
         const val PUSHED_PAST_PX = 16f
         const val PIXEL_TOLERANCE = 6

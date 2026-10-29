@@ -1,10 +1,10 @@
 package com.letta.mobile.ui.mascot
 
 import androidx.compose.ui.geometry.Rect
-import com.letta.mobile.avatar.core.GazePoint
-import com.letta.mobile.avatar.core.GazeReach
-import com.letta.mobile.avatar.core.GazeTargetRects
-import com.letta.mobile.avatar.core.GazeWindow
+import com.letta.mobile.avatar.core.gaze.GazePoint
+import com.letta.mobile.avatar.core.gaze.GazeReach
+import com.letta.mobile.avatar.core.gaze.GazeTargetRects
+import com.letta.mobile.avatar.core.gaze.GazeWindow
 import com.letta.mobile.data.model.AgentId
 
 /**

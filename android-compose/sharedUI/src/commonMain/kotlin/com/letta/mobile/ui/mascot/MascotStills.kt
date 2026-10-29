@@ -2,7 +2,7 @@ package com.letta.mobile.ui.mascot
 
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.graphics.ImageBitmap
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.ui.image.decodeImageBitmap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex

@@ -25,6 +25,16 @@ renderer internals stay at those platform edges.
 | `MascotIdentity` | Shape + colour, persisted per agent. |
 | `HeadlessAvatarRuntime` | Renderer-less reference implementation: full state machine, clamped weights, subclass hooks (`loadCapabilities`, `onPlayGesture`, …) for adapters. |
 
+Packages under `com.letta.mobile.avatar.core`, each under the structure gate's
+default 50-type limit; no sub-package depends on the root, so they stay free of cycles:
+
+| Package | Holds | Depends on |
+|---|---|---|
+| `.model` | Shared vocabulary: `AvatarModel`, `AvatarState`, `AvatarReaction`, the command types, `MascotIdentity`, host input values | nothing |
+| `.gaze` | `GazeDirector` and the attention world/plan/math | `model` |
+| `.body` | `MascotBody` spring physics, entrance, gesture classifier | nothing |
+| (root) | Runtime, `AvatarDirector`, `MascotDirector`, signals, presence | `model`, `gaze` |
+
 ## Sibling modules
 
 - `:avatar:renderer-rive` — the mascot: the shared Rive contract + runtime

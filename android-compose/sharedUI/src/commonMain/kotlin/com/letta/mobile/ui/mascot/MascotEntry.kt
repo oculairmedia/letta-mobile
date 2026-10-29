@@ -1,11 +1,11 @@
 package com.letta.mobile.ui.mascot
 
 import com.letta.mobile.avatar.core.AvatarRuntime
-import com.letta.mobile.avatar.core.AvatarState
-import com.letta.mobile.avatar.core.GazePose
-import com.letta.mobile.avatar.core.GazeWorld
 import com.letta.mobile.avatar.core.MascotDirector
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.gaze.GazePose
+import com.letta.mobile.avatar.core.gaze.GazeWorld
+import com.letta.mobile.avatar.core.model.AvatarState
+import com.letta.mobile.avatar.core.model.MascotIdentity
 import com.letta.mobile.data.presence.AgentPresence
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit

@@ -12,7 +12,7 @@ import app.rive.RiveFile
 import app.rive.RivePointerInputMode
 import app.rive.ViewModelInstance
 import app.rive.ViewModelSource
-import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.model.MascotIdentity
 
 /**
  * One agent's mascot on Android: the loaded `.riv` (owned by whoever loaded it; shared by every
