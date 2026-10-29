@@ -15,7 +15,7 @@ import com.letta.mobile.data.model.ScheduleDefinition
 import com.letta.mobile.data.model.ScheduleMessage
 import com.letta.mobile.data.model.SchedulePayload
 import com.letta.mobile.data.model.ScheduledMessage
-import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.InMemoryAgentRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -438,7 +438,7 @@ class ScheduleLibraryControllerTest {
 
     private class RouteUnavailableException : RuntimeException("route unavailable")
 
-    private class FakeAgentRepository : IAgentRepository {
+    private class FakeAgentRepository : InMemoryAgentRepository() {
         private val agentsFlow = MutableStateFlow(
             listOf(
                 Agent(id = AgentId("a1"), name = "Agent One"),

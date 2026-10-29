@@ -127,7 +127,7 @@ private fun runDesktopApplication(
             // toggle), but the header itself renders in the custom title bar,
             // which is a composition sibling — not a descendant — of
             // LettaDesktopApp. See letta-mobile-3arhe.1.
-            var headerChrome by remember { mutableStateOf<com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState?>(null) }
+            val headerChrome = remember { mutableStateOf<com.letta.mobile.ui.shell.workspace.ShellWorkspaceHeaderState?>(null) }
             val mascots = remember { com.letta.mobile.ui.mascot.MascotIdentityRegistry() }
             // The transport verb: one mascot per agent, moved between the seats the surfaces declare.
             val mascotTransport = remember { com.letta.mobile.ui.mascot.MascotTransport() }
@@ -175,14 +175,11 @@ private fun runDesktopApplication(
                             // The minimised chat's mascot size, bar width and reply hold (letta-mobile-zxk2n.29).
                             CanvasBubbleLayoutHost(CanvasBubbleLayout.Desktop, DesktopPreferences.bubbleLayout) {
                             LettaDesktopApp(
-                                shell = DesktopAppShellBindings(
-                                    nucleusApplicationScope = nucleusScope,
-                                    window = window,
-                                    deepLinks = deepLinks,
-                                    quickQuery = quickQuery,
-                                ),
+                                shell = remember(nucleusScope, window, deepLinks, quickQuery) {
+                                    DesktopAppShellBindings(nucleusScope, window, deepLinks, quickQuery)
+                                },
                                 onActiveTitleChange = { windowTitle = it },
-                                onHeaderChromeChange = { headerChrome = it },
+                                onHeaderChromeChange = { headerChrome.value = it },
                             )
                             }
                             }

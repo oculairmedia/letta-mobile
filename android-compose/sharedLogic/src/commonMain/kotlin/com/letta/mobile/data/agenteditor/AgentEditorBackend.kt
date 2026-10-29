@@ -14,7 +14,6 @@ import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 
 /**
  * What the agent editor reads and writes. Agent CRUD goes through the session's App Server
@@ -30,7 +29,7 @@ interface AgentEditorBackend {
     /** Why the last model refresh failed; null when it succeeded or has not run. */
     val modelsUnavailable: StateFlow<String?>
 
-    /** The agent as the server has it now. */
+    /** One complete detail read; never a list row or a cached fallback on error. */
     suspend fun load(agentId: AgentId): Agent
 
     /** Refreshes the roster, models and tools the editor offers; a failure leaves what was there. */
@@ -88,9 +87,7 @@ class RepositoryAgentEditorBackend(
     private val modelsFailure = MutableStateFlow<String?>(null)
     override val modelsUnavailable: StateFlow<String?> = modelsFailure
 
-    // The first emission, never the last: Android's session-scoped repository flat-maps getAgent over
-    // the live session graph, so its flow never completes and waiting for its last value hangs.
-    override suspend fun load(agentId: AgentId): Agent = servedAgents().getAgent(agentId).first()
+    override suspend fun load(agentId: AgentId): Agent = servedAgents().getFreshAgent(agentId, force = true)
 
     override suspend fun refreshCatalogs() {
         agentRepository?.let { refreshQuietly { it.refreshAgentsIfStale(CATALOG_MAX_AGE_MS) } }

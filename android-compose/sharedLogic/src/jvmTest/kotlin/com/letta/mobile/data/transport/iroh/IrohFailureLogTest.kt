@@ -76,6 +76,7 @@ class IrohFailureLogTest {
             router = IrohAgentMessageRouter(ownAgentId = ""),
             conversationsFor = { emptyList() },
             onDeliver = { _, _ -> DeliveryOutcome(delivered = false) },
+            authenticate = { _, _ -> true },
         )
         fun host(withA2a: Boolean) = IrohNodeEndpoint(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),

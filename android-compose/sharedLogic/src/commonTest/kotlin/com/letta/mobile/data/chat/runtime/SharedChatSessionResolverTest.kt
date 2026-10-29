@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.ProjectId
+import com.letta.mobile.data.repository.InMemoryAgentRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import kotlinx.coroutines.flow.Flow
@@ -149,7 +150,7 @@ class SharedChatSessionResolverTest {
 private class FakeAgentRepository(
     private val cached: Map<String, Agent> = emptyMap(),
     agentsFlow: MutableStateFlow<List<Agent>> = MutableStateFlow(emptyList()),
-) : IAgentRepository {
+) : InMemoryAgentRepository() {
     override val agents: StateFlow<List<Agent>> = agentsFlow
     override val isRefreshing: StateFlow<Boolean> = MutableStateFlow(false)
     override val refreshError: StateFlow<Throwable?> = MutableStateFlow(null)

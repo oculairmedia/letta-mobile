@@ -8,7 +8,6 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -63,7 +62,7 @@ internal class IrohHost(vararg listed: HostConversation) : AppServerClient {
 
     fun stored(id: String): HostConversation? = conversations.firstOrNull { it.id == id }
 
-    override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow()
+    override val events = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 32)
 
     override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse {
         val params = command.params ?: JsonObject(emptyMap())

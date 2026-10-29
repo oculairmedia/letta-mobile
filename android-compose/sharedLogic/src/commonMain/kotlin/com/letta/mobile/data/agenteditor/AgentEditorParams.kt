@@ -43,6 +43,21 @@ object AgentEditorParams {
         compactProfile = CompactAgentProfile.isCompact(agent.tags),
     )
 
+    /** Keeps edits made while loading, rebasing untouched fields onto the fresh detail. */
+    internal fun rebase(displayed: AgentEditorForm, edited: AgentEditorForm, fresh: AgentEditorForm): AgentEditorForm = fresh.copy(
+        name = keepEdit(displayed.name, edited.name, fresh.name),
+        description = keepEdit(displayed.description, edited.description, fresh.description),
+        model = keepEdit(displayed.model, edited.model, fresh.model),
+        reasoningEffort = keepEdit(displayed.reasoningEffort, edited.reasoningEffort, fresh.reasoningEffort),
+        contextLimit = keepEdit(displayed.contextLimit, edited.contextLimit, fresh.contextLimit),
+        systemPrompt = keepEdit(displayed.systemPrompt, edited.systemPrompt, fresh.systemPrompt),
+        toolIds = (fresh.toolIds - (displayed.toolIds - edited.toolIds)) + (edited.toolIds - displayed.toolIds),
+        metadata = keepEdit(displayed.metadata, edited.metadata, fresh.metadata),
+        compactProfile = keepEdit(displayed.compactProfile, edited.compactProfile, fresh.compactProfile),
+    )
+
+    private fun <T> keepEdit(displayed: T, edited: T, fresh: T): T = if (edited != displayed) edited else fresh
+
     /** A new agent's form copied from [source]: everything but its name and identity. */
     fun starterFormOf(source: Agent, current: AgentEditorForm): AgentEditorForm = formOf(source).copy(
         name = current.name,

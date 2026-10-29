@@ -1,0 +1,155 @@
+name: Pagination Replay Fuzz Campaign
+
+# Bounded seeded campaign (letta-mobile-1nmpf.3): larger than PR jvmTest corpus, same generators.
+# Scheduled runs apply only on default branch after merge; PR path runs a 24-case smoke campaign.
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  pull_request:
+    paths:
+      - ".github/workflows/pagination-replay-fuzz.yml"
+      - "android-compose/sharedLogic/build.gradle.kts"
+      - "android-compose/sharedLogic/src/commonTest/kotlin/com/letta/mobile/util/*Fuzz*"
+      - "android-compose/sharedLogic/src/commonTest/kotlin/com/letta/mobile/util/FuzzCampaign.kt"
+      - "android-compose/sharedLogic/src/commonTest/kotlin/com/letta/mobile/util/DeterministicFuzzSupport.kt"
+      - "android-compose/sharedLogic/src/commonTest/kotlin/com/letta/mobile/data/timeline/TimelineStreamReplayFuzzTest.kt"
+      - "android-compose/sharedLogic/src/jvmTest/kotlin/com/letta/mobile/util/PaginationReplayFuzzCampaign*.kt"
+      - "scripts/fuzz/resolve-pagination-replay-campaign-params.py"
+      - "scripts/tests/pagination-replay-fuzz-workflow-test.sh"
+      - "docs/testing/pagination-replay-fuzz.md"
+  workflow_dispatch:
+    inputs:
+      seed_base:
+        description: "Manual seed base (decimal or 0x hex); required with manual mode"
+        required: false
+        type: string
+      seed_count:
+        description: "Manual seed count (1..256)"
+        required: false
+        type: string
+      scenarios_per_seed:
+        description: "Manual scenarios per seed (1..1000)"
+        required: false
+        type: string
+      manual_mode:
+        description: "When true, use workflow_dispatch seed fields (validated in Python)"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: pagination-replay-fuzz-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  campaign:
+    name: pagination-replay-fuzz-campaign
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: android-compose
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+
+      - name: Expose JDK 21 to Gradle daemon resolver
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.gradle"
+          echo "org.gradle.java.installations.fromEnv=JAVA_HOME_21_X64" >> "$HOME/.gradle/gradle.properties"
+
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Ensure Android SDK local.properties
+        run: |
+          set -euo pipefail
+          if [[ ! -f local.properties ]]; then
+            echo "sdk.dir=${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}" > local.properties
+          fi
+
+      - name: Workflow config regression
+        working-directory: ${{ github.workspace }}
+        run: bash scripts/tests/pagination-replay-fuzz-workflow-test.sh
+
+      - name: Resolve bounded campaign parameters
+        id: params
+        working-directory: ${{ github.workspace }}
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_MODE: ${{ github.event.inputs.manual_mode }}
+          INPUT_SEED_BASE: ${{ github.event.inputs.seed_base }}
+          INPUT_SEED_COUNT: ${{ github.event.inputs.seed_count }}
+          INPUT_SCENARIOS: ${{ github.event.inputs.scenarios_per_seed }}
+        run: |
+          set -euo pipefail
+          mkdir -p campaign
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            KIND=pr-smoke
+          elif [[ "$EVENT_NAME" == "schedule" ]]; then
+            KIND=nightly
+          elif [[ "$MANUAL_MODE" == "true" ]]; then
+            KIND=manual
+          else
+            KIND=nightly
+          fi
+          python3 scripts/fuzz/resolve-pagination-replay-campaign-params.py \
+            --kind "$KIND" \
+            --seed-base "${INPUT_SEED_BASE:-}" \
+            --seed-count "${INPUT_SEED_COUNT:-}" \
+            --scenarios-per-seed "${INPUT_SCENARIOS:-}"
+
+      - name: Run pagination replay fuzz campaign
+        id: gradle
+        run: |
+          set -euo pipefail
+          set -a
+          # shellcheck disable=SC1091
+          source ../campaign/fuzz-params.env
+          set +a
+          MANIFEST="${GITHUB_WORKSPACE}/campaign/fuzz-manifest.json"
+          ./gradlew --no-daemon --max-workers=2 :sharedLogic:paginationReplayFuzzCampaign \
+            -PfuzzCampaignSeedBase="$FUZZ_CAMPAIGN_SEED_BASE" \
+            -PfuzzCampaignSeedCount="$FUZZ_CAMPAIGN_SEED_COUNT" \
+            -PfuzzCampaignScenariosPerSeed="$FUZZ_CAMPAIGN_SCENARIOS_PER_SEED" \
+            -PfuzzCampaignManifestPath="$MANIFEST" \
+            -PfuzzCampaignGitSha="${{ github.sha }}" \
+            -PfuzzCampaignWorkflowRun="${{ github.run_id }}" \
+            -PfuzzCampaignKind="$FUZZ_CAMPAIGN_KIND"
+          test -s "$MANIFEST"
+
+      - name: Require campaign manifest
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          test -s campaign/fuzz-manifest.json
+
+      - name: Upload campaign artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pagination-replay-fuzz-${{ github.run_id }}
+          path: |
+            campaign/fuzz-manifest.json
+            campaign/fuzz-params.json
+            android-compose/sharedLogic/build/test-results/
+            android-compose/sharedLogic/build/reports/tests/
+          if-no-files-found: warn

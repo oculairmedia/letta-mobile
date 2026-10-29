@@ -19,7 +19,14 @@ import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.ui.chat.session.FakeChatSessionPort
 import com.letta.mobile.ui.chat.session.TimelineChatTarget
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -34,6 +41,34 @@ import kotlin.test.assertTrue
 class TimelineConversationsTest {
     private val nora = AgentId("agent-1")
     private val ivo = AgentId("agent-2")
+
+    @Test
+    fun pushedChangesUseTheSharedScopedPolicyAndKeepSelectionAndDraft() = runTest {
+        val changes = MutableSharedFlow<Pair<ConversationId, AgentId?>>(extraBufferCapacity = 16)
+        val base = IrohHost().chatGateway(backgroundScope)
+        var rows = listOf(Conversation(ConversationId("c1"), nora, summary = "Before"), Conversation(ConversationId("c2"), ivo))
+        val calls = mutableListOf<AgentId>()
+        val gateway = object : ChatGateway by base {
+            override val conversationChanges = changes
+            override suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> {
+                calls += page.agent
+                return rows.filter { it.agentId == page.agent }
+            }
+        }
+        val owner = TimelineConversations(backgroundScope, gateway, listOf(Agent(nora, name = "Nora"), Agent(ivo, name = "Ivo")))
+        runCurrent()
+        owner.selectConversation(ConversationId("c2"))
+        owner.stageComposerText("keep draft")
+        val drafts = owner.state.value.drafts
+        calls.clear()
+        rows = rows.map { if (it.id == ConversationId("c1")) it.copy(summary = "After") else it }
+        repeat(10) { changes.tryEmit(ConversationId("c1") to nora) }
+        runCurrent()
+        assertEquals(listOf(nora), calls)
+        assertEquals("After", owner.state.value.conversations.first { it.id == ConversationId("c1") }.summary)
+        assertEquals(ConversationId("c2"), owner.selectedConversation)
+        assertEquals(drafts, owner.state.value.drafts)
+    }
 
     @Test
     fun listsEveryAgentsConversationsAndRoutesToTheActiveOnes() = runTest {
@@ -56,6 +91,87 @@ class TimelineConversationsTest {
         )
         owner.selectConversation(ConversationId("c2"))
         assertEquals(TimelineChatTarget("agent-2", "Ivo", "c2"), owner.selectedTarget())
+    }
+
+    @Test
+    fun reorderedRosterKeeps883RowsWithoutAnother137AgentSweep() = runTest {
+        repeat(5) { sample ->
+            val roster = List(137) { Agent(id = AgentId("agent-$it"), name = "Agent $it") }
+            val rows = List(883) { index ->
+                Conversation(
+                    id = ConversationId("conversation-$index"),
+                    agentId = roster[index % roster.size].id,
+                    lastMessageAt = "2026-10-20T10:00:00Z",
+                    archived = index % 11 == 0,
+                )
+            }
+            var calls = 0
+            val base = IrohHost().chatGateway(backgroundScope)
+            val delayed = object : ChatGateway by base {
+                override suspend fun listAgentConversations(page: AgentConversationPage): List<Conversation> {
+                    calls++
+                    delay(100)
+                    return rows.filter { it.agentId == page.agent }.take(page.limit)
+                }
+            }
+            val start = currentTime
+            val ownerScope = CoroutineScope(coroutineContext + SupervisorJob())
+            val owner = TimelineConversations(ownerScope, delayed, roster)
+            runCurrent()
+            assertTrue(owner.state.value.conversations.isEmpty())
+            advanceUntilIdle()
+            assertEquals(883, owner.state.value.conversations.size)
+            assertEquals(137, calls)
+            val cold = currentTime - start
+            assertEquals(3_500, cold)
+
+            val before = owner.state.value.conversations
+            val warmStart = currentTime
+            owner.roster = roster.reversed().map { it.copy(name = "Renamed ${it.name}") }
+            runCurrent()
+            assertEquals(before, owner.state.value.conversations, "refresh must not blank content")
+            advanceUntilIdle()
+            assertEquals(137, calls, "roster ordering must not trigger another fleet sweep")
+            assertEquals(0, currentTime - warmStart)
+            owner.selectConversation(rows.first().id)
+            assertEquals("Renamed Agent 0", owner.selectedTarget()?.agentName)
+            println(
+                "fleet sample=$sample coldCalls=137 coldFirst=$cold coldComplete=$cold " +
+                    "warmCalls=${calls - 137} warmFirst=0 warmComplete=${currentTime - warmStart} rows=883",
+            )
+            ownerScope.cancel()
+        }
+    }
+
+    @Test
+    fun hiddenOnlyRosterArrivingAfterStartupSettlesToLoadedEmpty() = runTest {
+        val owner = TimelineConversations(
+            backgroundScope,
+            IrohHost().chatGateway(backgroundScope),
+            emptyList(),
+        )
+        runCurrent()
+        assertEquals(false, owner.state.value.loaded)
+
+        owner.roster = listOf(Agent(id = nora, name = "Nora", hidden = true))
+        runCurrent()
+
+        assertTrue(owner.state.value.loaded)
+        assertTrue(owner.state.value.conversations.isEmpty())
+        assertNull(owner.state.value.error)
+    }
+
+    @Test
+    fun changingVisibilityOfAnExistingAgentReloadsMembership() = runTest {
+        val host = IrohHost(HostConversation("c1", "agent-1"), HostConversation("c2", "agent-2"))
+        val owner = owner(host)
+        runCurrent()
+        owner.roster = owner.roster.map { if (it.id == ivo) it.copy(hidden = true) else it }
+        runCurrent()
+        assertEquals(listOf("c1"), owner.state.value.conversations.map { it.id.value })
+        owner.roster = owner.roster.map { it.copy(hidden = false) }
+        runCurrent()
+        assertEquals(setOf("c1", "c2"), owner.state.value.conversations.map { it.id.value }.toSet())
     }
 
     @Test

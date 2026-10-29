@@ -272,6 +272,14 @@ class AppServerServeIrohCommand : CliktCommand(
             "Default: ~/.letta/iroh/identities. Loaded lazily via IrohAgentIdentity.loadOrCreate.",
     )
 
+    private val a2aSenderAuth by option(
+        "--a2a-sender-auth",
+        envvar = "LETTA_A2A_SENDER_AUTH",
+        help = "letta-mobile-8h07i: `enforce` (default) refuses an a2a message unless the dialing node " +
+            "is the claimed sender's identity in the identity dir; `observe` delivers it anyway and " +
+            "logs a2a.sender_unverified_allowed (a rollout escape hatch).",
+    ).choice(A2A_SENDER_AUTH_ENFORCE, A2A_SENDER_AUTH_OBSERVE).default(A2A_SENDER_AUTH_ENFORCE)
+
     // letta-mobile-xmpqm: the previous `LETTA_A2A_PUBLISH_AGENTS` allowlist
     // (and its --a2a-publish-agents CLI option) is GONE. Reachability is now
     // gated by `LocalBackendAdminStore.agentExists` — the wrapper publishes
@@ -429,6 +437,7 @@ class AppServerServeIrohCommand : CliktCommand(
         return A2aWiringConfig(
             identityDir = a2aIdentityDir?.let { java.io.File(it) } ?: java.io.File(irohHome, "identities"),
             addressBook = a2aAddressBook?.let { java.io.File(it) } ?: java.io.File(irohHome, "agent-addresses.kv"),
+            enforceSenderAuth = a2aSenderAuth == A2A_SENDER_AUTH_ENFORCE,
         )
     }
 

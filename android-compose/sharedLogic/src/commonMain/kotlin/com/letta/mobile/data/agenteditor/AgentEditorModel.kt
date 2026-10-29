@@ -94,7 +94,8 @@ data class AgentEditorState(
     val creating: Boolean get() = mode == AgentEditorMode.Create
     val problems: Map<AgentEditorField, String> get() = AgentEditorValidation.problems(form, mode)
     val dirty: Boolean get() = creating || form != original
-    val canSave: Boolean get() = !loading && !saving && loadError == null && dirty && problems.isEmpty()
+    val canSave: Boolean get() = !loading && !saving && loadError == null &&
+        (creating || original != null) && dirty && problems.isEmpty()
 
     /**
      * Whether the selected model calls for the compact profile: a small listed model, or a small-model

@@ -35,9 +35,11 @@ import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
+import com.letta.mobile.data.transport.api.AppServerClientChannel
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerTransport
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
@@ -50,6 +52,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
@@ -67,6 +70,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.time.Instant
 import kotlin.test.Test
@@ -81,6 +85,38 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class WasmAppServerSessionTest {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `websocket conversation push lists only its agent`() = runTest {
+        val otherAgent = AgentId("agent-0000000000000000000000000000000000000002")
+        val otherConversation = DataConversationId("conv-0000000000000000000000000000000000000003")
+        val transport = ConversationListTransport(JsonArray(listOf(
+            conversationRow(CONVERSATION_ID_1, AGENT_ID, Instant.parse("2026-10-20T10:00:00Z")),
+            conversationRow(otherConversation, otherAgent, Instant.parse("2026-10-21T10:00:00Z")),
+        )))
+        val owner = TimelineConversations(
+            backgroundScope, backgroundScope.chatGateway(transport),
+            listOf(Agent(AGENT_ID, name = "Nora"), Agent(otherAgent, name = "Ivo")),
+        )
+        runCurrent()
+        val fullFleetBytes = transport.requestBytes.sum()
+        owner.selectConversation(otherConversation)
+        owner.stageComposerText("keep draft")
+        val drafts = owner.state.value.drafts
+        transport.requests.clear()
+        transport.requestBytes.clear()
+
+        transport.pushConversation(CONVERSATION_ID_1, AGENT_ID)
+        runCurrent()
+
+        assertEquals(listOf(AGENT_ID.value), transport.requests.map { it.query?.get("agent_id")?.jsonPrimitive?.content })
+        val scopedBytes = transport.requestBytes.sum()
+        assertTrue(scopedBytes in 1 until fullFleetBytes)
+        println("websocket N=2 full-fleet requests=2 bytes=$fullFleetBytes scoped requests=1 bytes=$scopedBytes")
+        assertEquals(otherConversation, owner.selectedConversation)
+        assertEquals(drafts, owner.state.value.drafts)
+    }
+
     @Test
     fun `transport disconnect unblocks router subscribers`() = runTest {
         val transport = FakeTransport()
@@ -347,7 +383,7 @@ class WasmAppServerSessionTest {
         var requestSequence = 0
         val client = DefaultAppServerClient(transport, parentScope = this)
         val admin = AppServerLocalAdminGateway(client) { operation -> "test-$operation-${++requestSequence}" }
-        return SessionChatGateway(admin, EmptyTimelineTransport)
+        return SessionChatGateway(admin, EmptyTimelineTransport, AppServerClientChannel(client, this))
     }
 
     private class ConversationListTransport(
@@ -356,14 +392,27 @@ class WasmAppServerSessionTest {
     ) : AppServerTransport {
         private val frames = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 1)
         val requests = mutableListOf<AppServerCommand.ConversationList>()
+        val requestBytes = mutableListOf<Int>()
 
         override val controlFrames: Flow<AppServerReceivedFrame> = frames
         override val streamFrames: Flow<AppServerReceivedFrame> = emptyFlow()
         override val isConnected: Flow<Boolean> = MutableStateFlow(true)
 
+        suspend fun pushConversation(conversation: DataConversationId, agent: AgentId) {
+            val raw = buildJsonObject {
+                put("type", "conversation_updated")
+                put("id", "push-${conversation.value}")
+                put("ts", "2026-10-28T00:00:00Z")
+                put("conversation_id", conversation.value)
+                put("agent_id", agent.value)
+            }
+            frames.emit(AppServerReceivedFrame(AppServerChannel.Control, AppServerInboundFrame.Unknown("conversation_updated", raw), raw))
+        }
+
         override suspend fun sendControl(command: AppServerCommand) {
             val list = command as? AppServerCommand.ConversationList ?: error("unexpected App Server command")
             requests += list
+            requestBytes += AppServerProtocol.encodeCommand(list).encodeToByteArray().size
             val success = !failLists
             val response = AppServerInboundFrame.ConversationListResponse(
                 requestId = list.requestId,
@@ -423,20 +472,20 @@ class WasmAppServerSessionTest {
         override fun setPinned(key: String, pinned: Boolean) = Unit
     }
 
-    private fun conversationRow(
-        id: DataConversationId,
-        agentId: AgentId,
-        lastMessageAt: Instant,
-    ) = buildJsonObject {
-        put("id", id.value)
-        put("agent_id", agentId.value)
-        put("archived", false)
-        put("last_message_at", lastMessageAt.toString())
-    }
-
     private companion object {
         val AGENT_ID = AgentId("agent-0000000000000000000000000000000000000001")
         val CONVERSATION_ID_1 = DataConversationId("conv-0000000000000000000000000000000000000001")
         val CONVERSATION_ID_2 = DataConversationId("conv-0000000000000000000000000000000000000002")
     }
+}
+
+private fun conversationRow(
+    id: DataConversationId,
+    agentId: AgentId,
+    lastMessageAt: Instant,
+) = buildJsonObject {
+    put("id", id.value)
+    put("agent_id", agentId.value)
+    put("archived", false)
+    put("last_message_at", lastMessageAt.toString())
 }

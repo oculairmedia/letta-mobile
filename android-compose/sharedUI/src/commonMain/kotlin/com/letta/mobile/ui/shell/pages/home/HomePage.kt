@@ -51,7 +51,7 @@ import com.letta.mobile.ui.theme.LettaDimens
  *
  * [HomePageOptions.document] is the Letta Code mod seam: a recognised A2UI document replaces the
  * native page.
- * Entering this page requests a refresh once per composition lifetime; Retry is shown for a backend error.
+ * Entering this page requests fresh aggregates once per composition lifetime; Retry is shown for a backend error.
  */
 @Composable
 fun HomePage(
@@ -60,8 +60,8 @@ fun HomePage(
     modifier: Modifier = Modifier,
     options: HomePageOptions = HomePageOptions(),
 ) {
-    // Re-entering this shared page refreshes every host; ordinary recomposition does not.
-    LaunchedEffect(callbacks.actions) { callbacks.actions.refresh() }
+    // Entry expresses demand without bypassing the aggregate TTL; pull and Retry still force refresh.
+    LaunchedEffect(callbacks.actions) { callbacks.actions.loadIfStale() }
     val documentSurface = remember(options.document) { options.document?.toA2uiSurfaceStateOrNull() }
     val base = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).testTag(HomePageTags.PAGE)
     if (documentSurface != null) {

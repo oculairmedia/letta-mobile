@@ -146,6 +146,7 @@ class IrohAgentMessageReceiveE2ETest {
                 }
                 DeliveryOutcome(delivered = decision is IrohAgentMessageRouter.RoutingDecision.Deliver)
             },
+            authenticate = { _, _ -> true },
         )
         val endpoint = startHost(receiver)
 
@@ -206,6 +207,7 @@ class IrohAgentMessageReceiveE2ETest {
                 }
                 DeliveryOutcome(delivered = decision is IrohAgentMessageRouter.RoutingDecision.Deliver)
             },
+            authenticate = { _, _ -> true },
         )
         val endpoint = startHost(receiver)
 
@@ -236,6 +238,7 @@ class IrohAgentMessageReceiveE2ETest {
             router = IrohAgentMessageRouter(ownAgentId = "agent-recv"),
             conversationsFor = { emptyList() },
             onDeliver = { _, _ -> DeliveryOutcome(delivered = false) },
+            authenticate = { _, _ -> true },
         )
         val endpoint = startHost(receiver)
         for (alpn in listOf(IrohNodeEndpoint.DEFAULT_ALPN, IrohAgentMessage.ALPN)) {

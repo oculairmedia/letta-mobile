@@ -133,6 +133,13 @@ class IrohAgentRepository(
 
     override fun getCachedAgent(id: AgentId): Agent? = agentsFlow.value.firstOrNull { it.id == id }
 
+    override suspend fun getFreshAgent(id: AgentId, force: Boolean): Agent = refreshMutex.withLock {
+        val agent = directory().getAgent(id)
+            ?: throw NoSuchElementException("Agent ${id.value} not found over iroh admin_rpc")
+        updateAgentInCache(agent)
+        agent
+    }
+
     override fun getAgent(id: AgentId): Flow<Agent> = flow {
         val agent = try {
             directory().getAgent(id)

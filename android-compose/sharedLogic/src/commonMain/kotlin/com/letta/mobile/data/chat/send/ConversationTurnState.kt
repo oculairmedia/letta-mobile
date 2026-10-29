@@ -51,6 +51,8 @@ internal class ConversationTurnState(val conversationId: String) {
 
     /** Set on the terminal path so a clear can tell "settled" from "evicted". */
     @Volatile var reachedTerminal: Boolean = false
+    @Volatile var pendingRecoveryExpired: Boolean = false
+    var pendingRedialTimeout: kotlinx.coroutines.Job? = null
 
     /**
      * Run ids this conversation has already settled. The run-keyed analogue of
@@ -70,6 +72,9 @@ internal class ConversationTurnState(val conversationId: String) {
             inFlightSend = pending
             localConversationId = pending.conversationId.value.takeIf { it.isNotBlank() }
             reachedTerminal = false
+            pendingRecoveryExpired = false
+            pendingRedialTimeout?.cancel()
+            pendingRedialTimeout = null
             onAccepted()
         }
 

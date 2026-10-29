@@ -42,7 +42,11 @@ interface ChatConversationStore {
 }
 
 /** A backend the chat runs over: its timeline and its conversation records. */
-interface ChatGateway : TimelineTransport, ChatConversationStore
+interface ChatGateway : TimelineTransport, ChatConversationStore {
+    /** Other clients' conversation writes; empty on backends without push support. */
+    val conversationChanges: kotlinx.coroutines.flow.Flow<Pair<ConversationId, AgentId?>>
+        get() = kotlinx.coroutines.flow.emptyFlow()
+}
 
 /** Which page of one agent's conversations to read: [limit] rows after the [after] cursor (none: the newest). */
 data class AgentConversationPage(

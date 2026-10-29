@@ -100,6 +100,58 @@ class AppServerLocalRepositoriesTest {
     }
 
     @Test
+    fun `fresh detail uses native agent retrieve without refreshing the roster`() = runTest {
+        val agent = Agent(id = AgentId("agent-1"), name = "Detail", system = "Full system")
+        val client = FakeClient { error("Unexpected admin RPC") }.apply {
+            agentDetail = AppServerProtocol.json.encodeToJsonElement(Agent.serializer(), agent).jsonObject
+        }
+        val repository = AppServerAgentRepository(DefaultAppServerLocalRepositoryTransport({ client }) { it })
+
+        assertEquals(agent, repository.getFreshAgent(agent.id, force = true))
+        val request = client.agentRetrieveCalls.single()
+        assertEquals("agent-1", request.agentId)
+        assertEquals(emptyList(), client.adminRpcCalls)
+        assertEquals(agent, repository.getCachedAgent(agent.id))
+    }
+
+    @Test
+    fun `fresh detail does not wait for a slow roster refresh`() = runTest {
+        val agent = Agent(id = AgentId("agent-1"), name = "Ada")
+        val release = CompletableDeferred<Unit>()
+        val transport = FakeTransport(
+            agents = JsonArray(listOf(AppServerProtocol.json.encodeToJsonElement(Agent.serializer(), agent))),
+            agentRelease = release,
+        )
+        val repository = AppServerAgentRepository(transport)
+        val roster = async { repository.refreshAgents() }
+        runCurrent()
+        assertEquals(1, transport.agentListCalls)
+
+        val detail = async { repository.getFreshAgent(agent.id, force = true) }
+        runCurrent()
+
+        assertEquals(true, detail.isCompleted, "detail read must not queue behind the roster mutex")
+        assertEquals(agent, detail.await())
+        release.complete(Unit)
+        roster.await()
+    }
+
+    @Test
+    fun `native detail failure preserves cache and propagates instead of returning it`() = runTest {
+        val agent = Agent(id = AgentId("agent-1"), name = "Detail", system = "Full system")
+        val client = FakeClient { error("Unexpected admin RPC") }.apply {
+            agentDetail = AppServerProtocol.json.encodeToJsonElement(Agent.serializer(), agent).jsonObject
+        }
+        val repository = AppServerAgentRepository(DefaultAppServerLocalRepositoryTransport({ client }) { it })
+        repository.getFreshAgent(agent.id, force = true)
+        client.agentDetail = null
+
+        assertFailsWith<IllegalStateException> { repository.getFreshAgent(agent.id, force = true) }
+        assertEquals(agent, repository.getCachedAgent(agent.id))
+        assertEquals(2, client.agentRetrieveCalls.size)
+    }
+
+    @Test
     fun `default transport follows active client rotation`() = runTest {
         val first = FakeClient { okBlocks(emptyBlockPage) }
         val second = FakeClient { okBlocks(emptyBlockPage) }
@@ -215,6 +267,9 @@ class AppServerLocalRepositoriesTest {
         var agentListCalls = 0
         var lastBlockAgentId: String? = null
 
+        override suspend fun getAgent(agentId: AgentId): JsonObject =
+            agents.first { it.jsonObject["id"]?.jsonPrimitive?.content == agentId.value }.jsonObject
+
         override suspend fun listAgents(): JsonArray {
             agentListCalls += 1
             agentRelease?.await()
@@ -263,6 +318,18 @@ class AppServerLocalRepositoriesTest {
     ) : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = emptyFlow()
         val adminRpcCalls = mutableListOf<AppServerCommand.AdminRpc>()
+        val agentRetrieveCalls = mutableListOf<AppServerCommand.AgentRetrieve>()
+        var agentDetail: JsonObject? = null
+
+        override suspend fun agentRetrieve(command: AppServerCommand.AgentRetrieve): AppServerInboundFrame.AgentRetrieveResponse {
+            agentRetrieveCalls += command
+            return AppServerInboundFrame.AgentRetrieveResponse(
+                requestId = command.requestId,
+                success = agentDetail != null,
+                agent = agentDetail,
+                error = "Agent not found".takeIf { agentDetail == null },
+            )
+        }
 
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) = unsupported()
         override suspend fun input(command: AppServerCommand.Input): Unit = unsupported()

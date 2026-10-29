@@ -25,6 +25,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.decodeConversationList
 import com.letta.mobile.data.repository.conversationListParams
+import com.letta.mobile.data.repository.conversationChanges
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.AppServerListModelsAdapter
@@ -103,6 +104,8 @@ class IrohAdminRpcChatGateway(
     ConversationEffortGateway {
 
     private val deviceLabel: IrohDeviceLabel = IrohDeviceLabel(deviceLabel)
+
+    override val conversationChanges: Flow<Pair<ConversationId, AgentId?>> get() = transport.conversationChanges()
 
     override val connectionState: kotlinx.coroutines.flow.StateFlow<com.letta.mobile.data.transport.ChannelTransportState>
         get() = transport.state

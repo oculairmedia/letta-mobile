@@ -152,7 +152,9 @@ class WasmAppServerClientGateway(
                 session.bindIrohChat(irohChatGateway())
             } else {
                 val admin = session.appServerAdmin
-                session.bindConversations(SessionChatGateway(admin, timelineTransport(session) { admin.getConversation(it).agentId }))
+                session.bindConversations(
+                    SessionChatGateway(admin, timelineTransport(session) { admin.getConversation(it).agentId }, graph.channelTransport),
+                )
             }
             bounded(REQUEST_TIMEOUT_MS, "Agent list timed out") { graph.agentRepository.refreshAgents() }
             mutableState.value = BackendConnectionStatus.Connected(session.label)

@@ -19,6 +19,7 @@ object TimelineRowKeyGuard {
      */
     fun duplicateRows(keys: List<String?>, sources: (Int) -> String = { "row" }): Map<Int, String> {
         val seen = HashMap<String, Int>(keys.size)
+        val occupied = keys.filterNotNullTo(HashSet(keys.size))
         var duplicates: MutableMap<Int, String>? = null
         keys.forEachIndexed { index, key ->
             if (key == null) return@forEachIndexed
@@ -38,7 +39,15 @@ object TimelineRowKeyGuard {
                 level = Telemetry.Level.WARN,
             )
             val map = duplicates ?: mutableMapOf<Int, String>().also { duplicates = it }
-            map[index] = "$key#duplicate-$index"
+            val fallback = "$key#duplicate-$index"
+            var replacement = fallback
+            var collision = 1
+            while (replacement in occupied) {
+                replacement = "$fallback-$collision"
+                collision++
+            }
+            occupied.add(replacement)
+            map[index] = replacement
         }
         return duplicates.orEmpty()
     }

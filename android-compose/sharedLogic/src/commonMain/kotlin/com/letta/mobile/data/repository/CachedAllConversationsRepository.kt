@@ -12,7 +12,6 @@ import com.letta.mobile.data.repository.api.AllConversationsLocalCache
 import com.letta.mobile.data.repository.api.ConversationRemoteSource
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.session.BackendScopedCache
-import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
 import kotlin.time.Clock
@@ -89,35 +88,37 @@ open class CachedAllConversationsRepository(
             }
         }
         transport?.let { channelTransport ->
-            repositoryScope.launch { observeConversationUpdates(channelTransport) { frame -> applyPush(frame) } }
+            repositoryScope.launch { observeConversationInvalidations(channelTransport.conversationChanges(), ::applyPush) }
             repositoryScope.launch { observeReconnectRefresh(channelTransport) { refreshAfterPush("reconnect") } }
         }
     }
 
-    /**
-     * A push names ONE conversation, so only that row is refetched and replaced in place (or added,
-     * when new): a full refresh would drop every page past the first and jump a scrolled list. Only
-     * when the targeted fetch is unavailable or fails does the whole list re-read.
-     */
-    private suspend fun applyPush(frame: ServerFrame.ConversationUpdated) {
+    /** A legacy push without an agent keeps its row refetch; scoped pushes list each owning agent once. */
+    private suspend fun applyPush(dirty: Map<ConversationId, AgentId?>) {
         if (!hasLoadedAtLeastOnce) return
-        val source = irohConversationListSource?.takeIf { it.shouldUseIroh() }
-        val fresh = source?.let {
-            try {
-                it.getConversation(ConversationId(frame.conversationId))
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (e: Exception) {
-                Telemetry.event(
-                    TAG,
-                    "conversation_updated.refetch_failed",
-                    "error" attr (e.message ?: e.toString()),
-                    level = Telemetry.Level.WARN,
-                )
-                null
-            }
+        try {
+            refreshPushedLocked(dirty)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: UnsupportedOperationException) {
+            refreshAfterPush("unsupported")
+        } catch (e: Exception) {
+            Telemetry.event(TAG, "conversation_updated.refetch_failed", "error" attr (e.message ?: e.toString()), level = Telemetry.Level.WARN)
         }
-        if (fresh != null) handleOptimisticUpdate(fresh) else refreshAfterPush("push")
+    }
+
+    private suspend fun refreshPushedLocked(dirty: Map<ConversationId, AgentId?>) = refreshMutex.withLock {
+        if (!hasLoadedAtLeastOnce) return@withLock
+        val source = irohConversationListSource?.takeIf { it.shouldUseIroh() }
+        val legacy = dirty.keys.singleOrNull()?.takeIf { dirty[it] == null }
+        if (legacy != null && source != null) {
+            val fresh = source.getConversation(legacy)
+            fleet.record(fresh)
+            handleOptimisticUpdate(fresh)
+        } else {
+            val (listed, _) = fleet.refreshForInvalidations(dirty, roster) { id -> source?.getConversation(id) }
+            publish(listed)
+        }
     }
 
     /** Only a list that has loaded is refreshed: an unopened list loads fresh when first shown. */

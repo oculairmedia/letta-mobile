@@ -40,7 +40,9 @@ import org.automerge.repo.storage.FileSystemStorage
  * When the store opens, before anything can be opened, a document whose history is over [budget]
  * is archived and its board moved to a new document (new id, same canvas metadata), and the old id
  * is retired: it is never opened, indexed or stored again, whichever peer offers it. Canvas lookups
- * go by canvas id or conversation, so they find the new document. See [NotebookHistoryArchive].
+ * go by canvas id or conversation, so they find the new document. Logical note and reference reads
+ * resolve a retired id through the successor's existing archive metadata, after caller authorization.
+ * The retired storage itself stays closed to repository and peer sync. See [NotebookHistoryArchive].
  */
 class NotebookLocalStore(
     directory: Path,
@@ -418,7 +420,8 @@ class NotebookLocalStore(
         }
     }
 
-    fun read(id: DocumentId): NotebookDocument? = open(id)?.withDocument { document ->
+    /** Keep the requested logical identity while reading the current storage generation. */
+    fun read(id: DocumentId): NotebookDocument? = resolveStorageId(id)?.let(::open)?.withDocument { document ->
         val title = (document.get(ObjectId.ROOT, "title").orElseThrow() as AmValue.Str).value
         val textId = (document.get(ObjectId.ROOT, "markdown").orElseThrow() as AmValue.Text).id
         val board = boardFrom(document)
@@ -429,6 +432,31 @@ class NotebookLocalStore(
         }
         NotebookDocument(NotebookDocumentId(id.stableKey()), title, document.text(textId).orElseThrow(), board, items)
     }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+
+    /** Resolve only known retired ids; an arbitrary id never becomes an index or access grant. */
+    internal fun resolveStorageId(id: DocumentId): DocumentId? {
+        health.awaitPrepared()
+        val key = id.stableKey()
+        if (!health.isRetired(key)) return id
+        // Each successor carries all earlier archive entries. Reading that existing metadata also
+        // resolves repositories written before this behavior, without changing their disk format.
+        return listDocuments().filter { candidate ->
+            runCatching {
+                open(candidate)?.withDocument { document ->
+                    val previous = (document.get(ObjectId.ROOT, NotebookHistoryArchive.PREVIOUS_DOCUMENT)
+                        .orElse(null) as? AmValue.Str)?.value
+                    if (previous == key) return@withDocument true
+                    val archives = (document.get(ObjectId.ROOT, NotebookHistoryArchive.HISTORY_ARCHIVE)
+                        .orElse(null) as? AmValue.List)?.id ?: return@withDocument false
+                    document.listItems(archives).orElse(null)?.any { item ->
+                        val raw = (item as? AmValue.Str)?.value ?: return@any false
+                        runCatching { Json.parseToJsonElement(raw).jsonObject["document"]?.jsonPrimitive?.content == key }
+                            .getOrDefault(false)
+                    } == true
+                }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS) == true
+            }.getOrDefault(false)
+        }.singleOrNull()
+    }
 
     fun insertMarkdown(id: DocumentId, index: Int, text: String) {
         require(index >= 0)

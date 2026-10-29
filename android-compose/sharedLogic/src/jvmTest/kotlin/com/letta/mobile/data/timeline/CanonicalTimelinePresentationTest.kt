@@ -24,6 +24,47 @@ import kotlin.test.assertTrue
 import kotlinx.serialization.json.JsonPrimitive
 
 class CanonicalTimelinePresentationTest {
+    @Test fun missingAndUnparsableStreamClocksNeverSinkBelowOlderPendingRecords() {
+        for (clock in listOf("", "unparsable")) {
+            fun item(id: String, timestamp: String, failed: Boolean = false) = ChatRenderItem.Single(
+                UiMessage(id, if (failed) "user" else "assistant", id, timestamp = timestamp, isSendFailed = failed), GroupPosition.None,
+            )
+            val active = listOf(item("streaming", clock), item("middle", "2026-01-01T00:00:30Z"), item("oldest", "2026-01-01T00:00:10Z"))
+            val pending = listOf(item("failed", "2026-01-01T00:00:15Z", failed = true), item("pending", "2026-01-01T00:00:40Z"))
+            val positioned = positionPendingInLive(active, pending)
+            assertEquals(listOf("streaming", "pending", "middle", "failed", "oldest"), contents(positioned))
+            assertEquals(active, positioned.filter { it in active }, "active row order is preserved for clock '$clock'")
+            assertEquals(active, positionPendingInLive(active, emptyList()))
+        }
+    }
+
+    @Test fun streamingTurnKeepsItsOrderEvenWhenItsServerDatesRegress() = runTest {
+        val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
+        val owner = coordinator.acquire(TimelineScope("backend", "conversation"))
+        val presentation = CanonicalTimelinePresentation.open(coordinator, owner, backgroundScope)
+        coordinator.appendPending(owner, CanonicalPendingLocalStore.Record("failed", "local failure", emptyList(), "2026-01-01T00:00:05Z"))
+        coordinator.markPending(owner, "failed", CanonicalPendingLocalStore.Delivery.Failed)
+        val fence = coordinator.beginLive(owner)
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(
+            assistant("earlier row", "earlier").copy(date = "2026-01-01T00:00:30Z"),
+        ))))
+        assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(
+            assistant("stream", "streaming").copy(date = "2026-01-01T00:00:10Z"),
+        ))))
+        runCurrent()
+        val keys = presentation.live.value.map { it.key }
+        assertEquals(listOf("stream", "earlier row", "local failure"), contents(presentation.live.value))
+        for (text in listOf("stream grows", "stream grows again")) {
+            assertTrue(coordinator.ingest(owner, fence, TimelineStreamFrame.Message(hostStamped(
+                assistant(text, "streaming").copy(date = "2026-01-01T00:00:10Z"),
+            ))))
+            runCurrent()
+            assertEquals(keys, presentation.live.value.map { it.key }, "stream updates must never reposition active rows")
+            assertEquals(listOf(text, "earlier row", "local failure"), contents(presentation.live.value))
+        }
+        presentation.close()
+    }
+
     @Test fun fourLiveToolCallsProjectAsOneRunBlock() = runTest {
         val coordinator = CanonicalTimelineCoordinator(EmptyStore(), NoTransport)
         val owner = coordinator.acquire(TimelineScope("backend", "conversation"))

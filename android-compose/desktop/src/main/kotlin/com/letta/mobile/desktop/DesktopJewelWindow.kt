@@ -6,6 +6,10 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -43,27 +47,16 @@ private val TitleBarHeight = 48.dp
 private const val TOUCH_HANDLE_SCALE = 2f
 
 /**
- * Main desktop window chrome.
- *
- * Uses Nucleus's `DecoratedWindow` to get a real native Windows frame —
- * Aero Snap, Win+Arrow snapping, DWM minimize/restore/maximize animations,
- * the standard drop shadow, and rounded corners — while still painting
- * custom content (sidebar toggle + agent identity block) into the title bar
- * area. The window control buttons (minimize/maximize/close) are supplied
- * by Nucleus's `TitleBar`; the close button calls `onCloseRequest`, which
- * Main.kt wires to `activationHandler.hideWindow()` for close-to-tray.
- *
- * Previously this used a plain `androidx.compose.ui.window.Window` with
- * `undecorated = true` plus a hand-drawn title bar, because decorated Jewel
- * chrome only works under the JetBrains Runtime and this app ships on
- * Temurin. That left the OS with no real window frame at all.
+ * Native desktop frame with the shared header in Nucleus's title bar. Nucleus supplies window
+ * controls, snapping and native dragging; Main binds close-to-tray through [onCloseRequest].
+ * [header] stays a state holder here so a title-only update cannot restart window content.
  */
 @Composable
 internal fun DesktopJewelWindow(
     title: String,
     state: WindowState,
     onCloseRequest: () -> Unit,
-    header: ShellWorkspaceHeaderState? = null,
+    header: State<ShellWorkspaceHeaderState?>,
     content: @Composable AwtDecoratedWindowScope.() -> Unit,
 ) {
     DesktopJewelTheme {
@@ -84,14 +77,7 @@ internal fun DesktopJewelWindow(
             com.letta.mobile.desktop.input.InstallTabletPen(window, penRegistry)
             DesktopMaterialTheme {
                 val colorScheme = MaterialTheme.colorScheme
-                // With a tab strip the active tab is painted in the page
-                // background and must run straight into the content beneath it,
-                // so the title bar's hairline is dropped — the tab-vs-strip
-                // contrast carries the separation instead (browser behaviour).
-                val tabbed = header?.tabs?.tabs?.isNotEmpty() == true
-                // Browser-thin with tabs; the phone bar's height for a small window's minimal header.
-                val barHeight = header?.barHeight(plain = TitleBarHeight) ?: TitleBarHeight
-                val titleBarStyle = remember(colorScheme, tabbed, barHeight) { titleBarStyle(colorScheme, tabbed, barHeight) }
+                val titleBarStyle = rememberDesktopTitleBarStyle(header)
                 val windowStyle = remember(colorScheme) { decoratedWindowStyle(colorScheme) }
                 NucleusDecoratedWindowTheme(
                     isDark = dark,
@@ -152,12 +138,26 @@ private val MinimumTitleBarDragWidth = 96.dp
  * stays the native drag lane; with tabs the strip reserves that lane itself ([MinimumTitleBarDragWidth]).
  */
 @Composable
-private fun DesktopTitleBarHeader(title: String, header: ShellWorkspaceHeaderState?, modifier: Modifier) {
+internal fun DesktopTitleBarHeader(title: String, header: State<ShellWorkspaceHeaderState?>, modifier: Modifier) {
     ShellWorkspaceHeader(
-        state = header ?: ShellWorkspaceHeaderState(title = title),
+        state = header.value ?: ShellWorkspaceHeaderState(title = title),
         modifier = modifier,
         dragLaneWidth = MinimumTitleBarDragWidth,
     )
+}
+
+/** Only geometry changes escape the title bar's observation scope. */
+@Composable
+internal fun rememberDesktopTitleBarStyle(header: State<ShellWorkspaceHeaderState?>): TitleBarStyle {
+    val colors = MaterialTheme.colorScheme
+    val geometry by remember(header) {
+        derivedStateOf(structuralEqualityPolicy()) {
+            val current = header.value
+            // Tabs join the page without a hairline; compact windows use the shared phone height.
+            (current?.tabs?.tabs?.isNotEmpty() == true) to (current?.barHeight(TitleBarHeight) ?: TitleBarHeight)
+        }
+    }
+    return remember(colors, geometry) { titleBarStyle(colors, geometry.first, geometry.second) }
 }
 
 private fun titleBarStyle(colorScheme: ColorScheme, tabbed: Boolean, height: Dp) = TitleBarStyle(

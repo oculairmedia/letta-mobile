@@ -23,6 +23,8 @@ import com.letta.mobile.data.transport.iroh.IrohAgentMessage
 import com.letta.mobile.data.transport.iroh.DeliveryOutcome
 import com.letta.mobile.data.transport.iroh.IrohAgentMessageReceiver
 import com.letta.mobile.data.transport.iroh.IrohDiagnostics
+import com.letta.mobile.data.transport.iroh.IrohFailureLog
+import com.letta.mobile.data.transport.iroh.isFromIdentityIn
 import com.letta.mobile.util.Telemetry
 import computer.iroh.EndpointAddr
 import kotlinx.coroutines.Dispatchers
@@ -73,7 +75,16 @@ data class A2aWiringConfig(
     val identityDir: File,
     /** Address-book kv file (parent dir must exist with mode 0700). */
     val addressBook: File,
+    /**
+     * Refuse an inbound message unless the dialing node is its claimed sender's identity in
+     * [identityDir]; false only logs the mismatch and delivers (a rollout escape hatch).
+     */
+    val enforceSenderAuth: Boolean = true,
 )
+
+/** `--a2a-sender-auth` values. */
+internal const val A2A_SENDER_AUTH_ENFORCE = "enforce"
+internal const val A2A_SENDER_AUTH_OBSERVE = "observe"
 
 /**
  * Build the production a2a wiring. The receiver's `onDeliver` lands a body as a
@@ -124,6 +135,7 @@ fun buildA2aWiring(
         router = router,
         conversationsFor = conversationsFor,
         onDeliver = { message, decision -> handleDecision(client(), message, decision) },
+        authenticate = { message, peer -> authenticateSender(config, message, peer) },
     )
     return A2aWiring(
         receiver = receiver,
@@ -131,6 +143,25 @@ fun buildA2aWiring(
         addressStore = store,
         identityDir = config.identityDir,
     )
+}
+
+// letta-mobile-8h07i: sender authentication for the a2a receiver.
+/**
+ * Whether [peer] may deliver [message]. A sender dials with its own identity, so
+ * the dialing node must be the identity this host holds for the claimed sender; without that check
+ * any node could speak as any agent. In observe mode a mismatch is logged and allowed.
+ */
+internal fun authenticateSender(config: A2aWiringConfig, message: IrohAgentMessage, peer: String): Boolean {
+    if (message.isFromIdentityIn(config.identityDir, peer)) return true
+    if (config.enforceSenderAuth) return false
+    Telemetry.event(
+        "A2aHost",
+        "a2a.sender_unverified_allowed",
+        "fromAgentId" to message.fromAgentId,
+        "msgId" to message.msgId,
+        "peer" to IrohFailureLog.remotePrefix(peer),
+    )
+    return true
 }
 
 /**

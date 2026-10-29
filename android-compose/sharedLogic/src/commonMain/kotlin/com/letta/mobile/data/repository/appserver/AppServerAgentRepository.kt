@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.builtins.ListSerializer
@@ -78,6 +79,15 @@ class AppServerAgentRepository(
     }
 
     override fun getCachedAgent(id: AgentId): Agent? = agentsFlow.value.firstOrNull { it.id == id }
+
+    // Not behind refreshMutex: a slow roster read must not stall the editor's detail read past its deadline.
+    override suspend fun getFreshAgent(id: AgentId, force: Boolean): Agent {
+        val agent = AppServerProtocol.json.decodeFromJsonElement(Agent.serializer(), transport.getAgent(id))
+        agentsFlow.update { cached ->
+            if (cached.any { it.id == id }) cached.map { if (it.id == id) agent else it } else cached + agent
+        }
+        return agent
+    }
 
     override fun getAgent(id: AgentId): Flow<Agent> = flow {
         refreshAgentsIfStale(0L)

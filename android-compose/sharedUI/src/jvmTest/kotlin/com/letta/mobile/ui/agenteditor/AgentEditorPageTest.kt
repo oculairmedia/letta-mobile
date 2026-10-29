@@ -48,6 +48,7 @@ import com.letta.mobile.ui.settings.SettingsSectionTags
 import com.letta.mobile.ui.shell.header.ShellHeaderTags
 import com.letta.mobile.ui.theme.SharedMaterialTheme
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -70,7 +71,8 @@ class AgentEditorPageTest {
         val attached = mutableListOf<String>()
         val deleted = mutableListOf<String>()
 
-        override suspend fun load(agentId: AgentId): Agent = byId.getValue(agentId.value)
+        var loadResult: CompletableDeferred<Agent>? = null
+        override suspend fun load(agentId: AgentId): Agent = loadResult?.await() ?: byId.getValue(agentId.value)
         override suspend fun refreshCatalogs() = Unit
         override suspend fun create(params: AgentCreateParams): AgentCreated {
             created += params
@@ -124,6 +126,24 @@ class AgentEditorPageTest {
 
     private fun ComposeUiTest.section(key: String) = onNodeWithTag(SettingsSectionTags.SECTION_PREFIX + key)
     private fun ComposeUiTest.row(key: String) = onNodeWithTag(SettingsSectionTags.ROW_PREFIX + key, useUnmergedTree = true)
+
+    @Test
+    fun cachedFormStaysVisibleWhileRefreshingAndAfterAFailure() = runComposeUiTest {
+        val result = CompletableDeferred<Agent>()
+        val backend = RecordingBackend(ada, listOf(search)).apply { loadResult = result }
+        editor(backend, AgentEditorMode.Edit("a-1"))
+        row("name").assertTextContains("Ada")
+        onNodeWithText("Refreshing agent").assertExists()
+        onNodeWithTag(AgentEditorPageTags.SAVE).assertIsNotEnabled()
+
+        result.completeExceptionally(IllegalStateException("Detail fetch failed"))
+        waitForIdle()
+        row("name").assertTextContains("Ada")
+        onNodeWithText("Detail fetch failed").assertExists()
+        onNodeWithText("Try again").assertExists()
+        onNodeWithText("Refreshing agent").assertDoesNotExist()
+        onNodeWithTag(AgentEditorPageTags.SAVE).assertIsNotEnabled()
+    }
 
     @Test
     fun anAgentsEditorDrawsEverySectionAndNothingIsSavedUntilItChanges() = runComposeUiTest {

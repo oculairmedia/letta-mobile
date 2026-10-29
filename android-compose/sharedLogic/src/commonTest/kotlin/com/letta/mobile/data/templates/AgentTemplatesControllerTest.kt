@@ -9,7 +9,7 @@ import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ImportedAgentsResponse
-import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.InMemoryAgentRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -111,7 +111,7 @@ class AgentTemplatesControllerTest {
         private val failure: Throwable? = null,
         private val gate: CompletableDeferred<Unit>? = null,
         private val canCreate: Boolean = true,
-    ) : IAgentRepository {
+    ) : InMemoryAgentRepository() {
         val created = mutableListOf<AgentCreateParams>()
         override val supportsCreateAgent: Boolean get() = canCreate
         override val agents: StateFlow<List<Agent>> = MutableStateFlow(emptyList())

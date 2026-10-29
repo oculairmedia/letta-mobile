@@ -8,6 +8,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertFailsWith
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -50,6 +51,19 @@ class IrohAgentRepositoryPushTest {
 
     private fun push(id: String, reason: String) =
         ServerFrame.AgentUpdated(id = "agent-updated-$id", ts = "2026-09-15T21:00:00Z", agentId = id, reason = reason)
+
+    @Test
+    fun aFailedDetailReadNeverFallsBackToTheCachedListRow() = runTest(UnconfinedTestDispatcher()) {
+        val transport = PushingTransport()
+        val repository = IrohAgentRepository(directoryProvider = { IrohAdminRpcAgentDirectory(transport) })
+        repository.refreshAgents()
+        transport.agents.remove("agent-1")
+        transport.calls.clear()
+
+        assertFailsWith<NoSuchElementException> { repository.getFreshAgent(AgentId("agent-1"), force = true) }
+        assertEquals("Old", repository.getCachedAgent(AgentId("agent-1"))?.name)
+        assertEquals(listOf("agent.get /v1/agents/agent-1"), transport.calls)
+    }
 
     @Test
     fun anUpdatePushRefetchesOnlyThatAgent() = runTest(UnconfinedTestDispatcher()) {
