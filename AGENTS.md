@@ -692,6 +692,10 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
   remote `git+https://github.com/oculairmedia/letta-mobile.git`; no separate `dolt` binary needed).
   Verify with `bd ping`. `bd dolt pull` / `bd dolt push` work against the DoltHub federation remote
   (`doltremoteapi.dolthub.com/oulair/letta_mobile`) using the existing GitHub/Dolt credentials.
+- Claude Code cloud sessions do this automatically: `.claude/hooks/session-start.sh` installs bd
+  (checksum-verified), writes the Dolt credentials from the `DOLT_CREDS_JWK_B64` environment secret
+  (setup scripts cannot read secrets; session hooks can), bootstraps once per container and runs
+  `bd prime`. It never migrates.
 - **Schema migrations**: the designated migrator (Emmanuel) runs `bd migrate`/`bd dolt push`; every
   other clone (Cursor included) only runs `bd bootstrap` to sync — never migrate here (it forks the
   shared schema). If `bd ping` warns the schema is behind and `bd bootstrap --yes` errors with
