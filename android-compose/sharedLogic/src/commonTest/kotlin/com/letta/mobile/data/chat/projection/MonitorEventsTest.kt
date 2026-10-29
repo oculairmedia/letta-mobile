@@ -88,6 +88,20 @@ class MonitorEventsTest {
     }
 
     @Test
+    fun `an older merge keeps its row even when it also reports passing checks`() {
+        val messages = listOf(
+            message("e1", event("monitor_a", "PR merged; checks passed")),
+            message("e2", event("monitor_a", "CI 2/2")),
+        )
+
+        val folded = collapseMonitorEvents(messages)
+
+        assertEquals(listOf("e1", "e2"), folded.map { it.id })
+        assertFalse(folded[0].subagentNotification!!.isMonitorWatcher())
+        assertTrue(folded[1].subagentNotification!!.isMonitorWatcher())
+    }
+
+    @Test
     fun `the watch's own end marks the chip and keeps its row`() {
         val messages = listOf(
             message("e1", event("monitor_a", "CI 1/2")),

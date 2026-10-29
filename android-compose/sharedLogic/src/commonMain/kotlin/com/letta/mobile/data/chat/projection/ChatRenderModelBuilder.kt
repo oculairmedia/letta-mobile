@@ -258,9 +258,11 @@ class IncrementalChatRenderItemsCache {
         }
 
         val tailStartIndex = activeTailStartIndex(normalizedMessages)
-        // letta-mobile-a7ir6: a Monitor event updates its watcher chip in place, possibly in the
-        // committed history this tick would otherwise reuse as it was.
-        val watchersChanged = monitorWatchers(normalizedMessages) != monitorWatchers(previousMessages)
+        // letta-mobile-a7ir6: a Monitor event updates its watcher chip in place. Only a chip in the
+        // committed history this tick would reuse as it was forces a full rebuild; one in the tail
+        // is rebuilt with it.
+        val watchersChanged =
+            committedWatchers(normalizedMessages, tailStartIndex) != committedWatchers(previousMessages, tailStartIndex)
         if (!watchersChanged && canReuseCommittedHistory(normalizedMessages, mode, change, tailStartIndex)) {
             val tailRenderItems = buildFoldedChatRenderModel(
                 messages = normalizedMessages.subList(tailStartIndex, normalizedMessages.size),
@@ -384,8 +386,8 @@ class IncrementalChatRenderItemsCache {
         return if (reusedAny) reconciled else rebuilt
     }
 
-    private fun monitorWatchers(messages: List<UiMessage>): List<UiMessage> =
-        messages.filter { it.subagentNotification?.isMonitorWatcher() == true }
+    private fun committedWatchers(messages: List<UiMessage>, tailStartIndex: Int): List<UiMessage> =
+        messages.take(tailStartIndex).filter { it.subagentNotification?.isMonitorWatcher() == true }
 
     private fun activeTailStartIndex(messages: List<UiMessage>): Int {
         val lastUserIndex = messages.indexOfLast { it.role == "user" }
