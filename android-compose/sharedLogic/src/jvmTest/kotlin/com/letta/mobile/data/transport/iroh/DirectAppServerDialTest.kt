@@ -1,6 +1,5 @@
 package com.letta.mobile.data.transport.iroh
 
-import com.letta.mobile.data.controller.node.iroh.NativeAdmin
 import com.letta.mobile.data.transport.appserver.AppServerReadinessExpectation
 import com.letta.mobile.data.transport.appserver.AppServerWebSocketDial
 import io.ktor.server.application.install
@@ -16,7 +15,6 @@ import io.ktor.websocket.readText
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -51,13 +49,8 @@ class DirectAppServerDialTest {
     private val authHeaders = Collections.synchronizedList(mutableListOf<String?>())
     private val sessions = AtomicInteger()
 
-    /** Native admin breakers are process-wide; another test's tripped `agent.list` must not leak in. */
-    @BeforeTest
-    fun resetBreakers() = NativeAdmin.resetCircuitForTest()
-
     @AfterTest
     fun tearDown() {
-        NativeAdmin.resetCircuitForTest()
         scope.cancel()
         server?.stop(0, 0)
     }

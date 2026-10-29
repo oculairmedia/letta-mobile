@@ -33,7 +33,6 @@ class AdminHandlerRefactorCharacterizationTest {
 
     @BeforeTest
     fun install() {
-        NativeAdmin.resetCircuitForTest()
         savedFactory = AdminProxyClient.defaultTransportFactory
     }
 

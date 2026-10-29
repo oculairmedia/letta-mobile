@@ -26,14 +26,12 @@ import kotlin.test.assertTrue
 class MessageGetPagingTest {
     @BeforeTest
     fun setPageLimit() {
-        NativeAdmin.resetCircuitForTest()
         ConversationAdminHandlers.messageGetPageLimitForTest = 3
     }
 
     @AfterTest
     fun clearPageLimit() {
         ConversationAdminHandlers.messageGetPageLimitForTest = null
-        NativeAdmin.resetCircuitForTest()
     }
 
     private class PagingClient(

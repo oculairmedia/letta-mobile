@@ -62,7 +62,6 @@ class ToolReturnGetAdminRpcTest {
 
     @Test
     fun toolReturnGetReturnsFullUnprojectedBody() = runTest {
-        NativeAdmin.resetCircuitForTest()
         val response = Json.parseToJsonElement(
             router(buildJsonArray { add(fullMessage()) }).dispatch(
                 requestId = "req-trg",
@@ -83,7 +82,6 @@ class ToolReturnGetAdminRpcTest {
 
     @Test
     fun toolReturnGetMissingParamsDispatchesAsFailureEnvelope() = runTest {
-        NativeAdmin.resetCircuitForTest()
         val response = Json.parseToJsonElement(
             router(JsonArray(emptyList())).dispatch(
                 requestId = "req-missing",
@@ -99,7 +97,6 @@ class ToolReturnGetAdminRpcTest {
 
     @Test
     fun messageListMissingConversationIdDispatchesAsFailureEnvelope() = runTest {
-        NativeAdmin.resetCircuitForTest()
         val response = Json.parseToJsonElement(
             router(JsonArray(emptyList())).dispatch(requestId = "req-ml", method = "message.list", params = null),
         ).jsonObject
@@ -110,7 +107,6 @@ class ToolReturnGetAdminRpcTest {
 
     @Test
     fun messageListDispatchProjectsHeavyToolReturnBodies() = runTest {
-        NativeAdmin.resetCircuitForTest()
         val page = buildJsonArray {
             add(fullMessage())
             add(buildJsonObject {

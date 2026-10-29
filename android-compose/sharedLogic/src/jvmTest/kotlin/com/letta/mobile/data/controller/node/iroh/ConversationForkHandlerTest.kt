@@ -8,7 +8,6 @@ import com.letta.mobile.data.transport.appserver.AppServerConversationFork
 import com.letta.mobile.data.transport.appserver.AppServerConversationForkResponse
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
-import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -27,9 +26,6 @@ import kotlinx.serialization.json.put
  * `conversation_fork` with the options in its body and answers with the full fork.
  */
 class ConversationForkHandlerTest {
-    @AfterTest
-    fun resetBreakers() = NativeAdmin.resetCircuitForTest()
-
     @Test
     fun forkRoutesToConversationForkAndReturnsTheForkedConversation() = runTest {
         val client = ForkingClient()

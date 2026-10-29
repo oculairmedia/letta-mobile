@@ -1,8 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.appserver.AppServerCommand
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -20,12 +18,6 @@ import kotlinx.serialization.json.put
 
 /** letta-mobile-w4q4p: model.update, model.list exposure filtering, model.exposure.*. */
 class ModelControlHandlersTest {
-    @BeforeTest
-    fun resetBreaker() = NativeAdmin.resetCircuitForTest()
-
-    @AfterTest
-    fun resetBreakerAfter() = NativeAdmin.resetCircuitForTest()
-
     @Test
     fun modelUpdateTargetsTheConversationScopeAndForwardsTheHandle() = runTest {
         val client = FakeProviderModelClient()

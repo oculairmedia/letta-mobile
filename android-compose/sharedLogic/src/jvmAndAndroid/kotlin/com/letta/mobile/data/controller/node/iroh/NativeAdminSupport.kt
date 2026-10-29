@@ -31,29 +31,36 @@ internal object NativeAdmin {
     private const val NATIVE_MUTATION_TIMEOUT_MS = 90_000L
     private val COOLDOWN = 60.seconds
     private val monotonic = kotlin.time.TimeSource.Monotonic
-    private val downSinceByOp =
-        java.util.concurrent.ConcurrentHashMap<String, kotlin.time.TimeSource.Monotonic.ValueTimeMark>()
+    private val downSinceByClient = java.util.concurrent.ConcurrentLinkedQueue<Pair<
+        java.lang.ref.WeakReference<AppServerClient>,
+        java.util.concurrent.ConcurrentHashMap<String, kotlin.time.TimeSource.Monotonic.ValueTimeMark>,
+    >>()
+
+    private fun breakers(client: AppServerClient) = synchronized(downSinceByClient) {
+        // Weak ownership avoids retaining disconnected clients; compare referents by identity,
+        // since AppServerClient implementations may define value equality.
+        downSinceByClient.removeAll { it.first.get() == null }
+        downSinceByClient.firstOrNull { it.first.get() === client }?.second
+            ?: java.util.concurrent.ConcurrentHashMap<String, kotlin.time.TimeSource.Monotonic.ValueTimeMark>()
+                .also { downSinceByClient.add(java.lang.ref.WeakReference(client) to it) }
+    }
 
     fun requestId(): String = "native-admin-${counter.incrementAndGet()}"
 
-    private fun circuitOpen(op: String): Boolean {
+    private fun circuitOpen(client: AppServerClient, op: String): Boolean {
+        val downSinceByOp = breakers(client)
         val down = downSinceByOp[op] ?: return false
         if (down.elapsedNow() < COOLDOWN) return true
         downSinceByOp.remove(op, down)
         return false
     }
 
-    private fun tripBreaker(op: String) {
-        downSinceByOp[op] = monotonic.markNow()
+    private fun tripBreaker(client: AppServerClient, op: String) {
+        breakers(client)[op] = monotonic.markNow()
     }
 
-    private fun clearBreaker(op: String) {
-        downSinceByOp.remove(op)
-    }
-
-    /** Test hook: clear all per-command breakers so cases don't leak state. */
-    internal fun resetCircuitForTest() {
-        downSinceByOp.clear()
+    private fun clearBreaker(client: AppServerClient, op: String) {
+        breakers(client).remove(op)
     }
 
     private fun markSelected(op: String, outcome: String, reason: String? = null) {
@@ -95,7 +102,7 @@ internal object NativeAdmin {
             markSelected(method, "unavailable", "no_client")
             adminError("capability_unavailable: $method requires App Server v2")
         }
-        if (circuitOpen(method)) {
+        if (circuitOpen(client, method)) {
             markSelected(method, "unavailable", "circuit_open")
             adminError("capability_unavailable: $method App Server v2 temporarily unavailable")
         }
@@ -122,27 +129,27 @@ internal object NativeAdmin {
         val method = op.method
         val timeoutMs = timeoutMsFor(op.policy)
         return try {
-            completeRequire(method, kotlinx.coroutines.withTimeout(timeoutMs.milliseconds) { block(client) })
+            completeRequire(client, method, kotlinx.coroutines.withTimeout(timeoutMs.milliseconds) { block(client) })
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            onRequireTimeout(method, op.policy)
+            onRequireTimeout(client, method, op.policy)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: IllegalArgumentException) {
             throw e
         } catch (e: Exception) {
-            tripBreaker(method)
+            tripBreaker(client, method)
             markSelected(method, "error", e.message ?: e::class.simpleName ?: "error")
             adminError("app_server_error: $method native command failed")
         }
     }
 
     @Suppress("NoAnyType")
-    private fun <T : Any> completeRequire(op: String, result: T?): T {
+    private fun <T : Any> completeRequire(client: AppServerClient, op: String, result: T?): T {
         if (result == null) {
             markSelected(op, "error", "native_unsuccessful")
             adminError("app_server_error: $op native command unsuccessful")
         }
-        clearBreaker(op)
+        clearBreaker(client, op)
         markSelected(op, "success")
         return result
     }
@@ -158,10 +165,10 @@ internal object NativeAdmin {
         adminError("app_server_error: ${op.method} failed: $detail")
     }
 
-    private fun onRequireTimeout(op: String, policy: NativeAdminOperationPolicy): Nothing {
+    private fun onRequireTimeout(client: AppServerClient, op: String, policy: NativeAdminOperationPolicy): Nothing {
         // Mutations: report timeout but do not trip the breaker — a late success
         // on the server must not black-hole subsequent reads/writes for 60s.
-        if (policy == NativeAdminOperationPolicy.Read || policy == NativeAdminOperationPolicy.ReadScan) tripBreaker(op)
+        if (policy == NativeAdminOperationPolicy.Read || policy == NativeAdminOperationPolicy.ReadScan) tripBreaker(client, op)
         markSelected(op, "unavailable", "native_timeout")
         adminError("capability_unavailable: $op App Server v2 timed out")
     }
@@ -177,27 +184,27 @@ internal object NativeAdmin {
         block: suspend (AppServerClient) -> T?,
     ): T? {
         if (client == null) return null
-        if (circuitOpen(op)) {
+        if (circuitOpen(client, op)) {
             markLegacyNull(op, "circuit_open")
             return null
         }
         return try {
             val result = kotlinx.coroutines.withTimeout(NATIVE_ATTEMPT_TIMEOUT_MS.milliseconds) { block(client) }
             if (result != null) {
-                clearBreaker(op)
+                clearBreaker(client, op)
                 markSelected(op, "success")
             } else {
                 markLegacyNull(op, "native_unsuccessful")
             }
             result
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            tripBreaker(op)
+            tripBreaker(client, op)
             markLegacyNull(op, "native_timeout")
             null
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            tripBreaker(op)
+            tripBreaker(client, op)
             markLegacyNull(op, e.message ?: e::class.simpleName ?: "error")
             null
         }
