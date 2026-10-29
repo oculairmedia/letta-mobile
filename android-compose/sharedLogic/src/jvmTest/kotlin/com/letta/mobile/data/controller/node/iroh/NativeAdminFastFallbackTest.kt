@@ -7,8 +7,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -26,18 +24,11 @@ import kotlin.test.assertTrue
  */
 class NativeAdminFastFallbackTest {
 
-    // Reset the process-wide circuit breaker both BEFORE (clean start) and AFTER
-    // (these tests deliberately TRIP it — leave no state for other classes sharing
-    // the JVM test process).
-    @BeforeTest
-    fun clearBreaker() = NativeAdmin.resetCircuitForTest()
-
-    @AfterTest
-    fun clearBreakerAfter() = NativeAdmin.resetCircuitForTest()
+    private val client = FakeClient()
 
     @Test
     fun aHangingNativeAttemptFallsBackFastInsteadOfBlockingForTheFullRequestTimeout() = runTest {
-        val result = NativeAdmin.attempt(FakeClient, "agent.list") {
+        val result = NativeAdmin.attempt(client, "agent.list") {
             delay(120_000) // the App Server never answers — the 120s hang this fixes
             "unreachable"
         }
@@ -52,7 +43,7 @@ class NativeAdminFastFallbackTest {
 
     @Test
     fun aSuccessfulNativeAttemptReturnsItsResult() = runTest {
-        assertEquals("ok", NativeAdmin.attempt(FakeClient, "agent.list") { "ok" })
+        assertEquals("ok", NativeAdmin.attempt(client, "agent.list") { "ok" })
     }
 
     @Test
@@ -65,14 +56,14 @@ class NativeAdminFastFallbackTest {
         // First op hangs → trips the breaker for agent.list only.
         var firstProbed = false
         assertNull(
-            NativeAdmin.attempt(FakeClient, "agent.list") { firstProbed = true; delay(120_000); "x" },
+            NativeAdmin.attempt(client, "agent.list") { firstProbed = true; delay(120_000); "x" },
         )
         assertTrue(firstProbed, "the first op probes native")
 
         // Same command must NOT probe while its breaker is open.
         var sameOpProbed = false
         assertNull(
-            NativeAdmin.attempt(FakeClient, "agent.list") { sameOpProbed = true; "y" },
+            NativeAdmin.attempt(client, "agent.list") { sameOpProbed = true; "y" },
             "breaker open for agent.list → skip native",
         )
         assertFalse(sameOpProbed, "native must be skipped for the tripped command")
@@ -81,9 +72,44 @@ class NativeAdminFastFallbackTest {
         var otherProbed = false
         assertEquals(
             "ok",
-            NativeAdmin.attempt(FakeClient, "conversation.list") { otherProbed = true; "ok" },
+            NativeAdmin.attempt(client, "conversation.list") { otherProbed = true; "ok" },
         )
         assertTrue(otherProbed, "unrelated commands must not inherit another op's breaker")
+    }
+
+    @Test
+    fun independentClientsDoNotShareLegacyBreakers() = runTest {
+        val failed = EqualClient()
+        val healthy = EqualClient()
+        assertNull(NativeAdmin.attempt<String>(failed, "agent.list") { error("offline") })
+        assertEquals("healthy", NativeAdmin.attempt(healthy, "agent.list") { "healthy" })
+        var probed = false
+        assertNull(NativeAdmin.attempt(failed, "agent.list") { probed = true; "unexpected" })
+        assertFalse(probed, "healthy client success must not clear the failed client's breaker")
+        assertEquals("other", NativeAdmin.attempt(failed, "agent.get") { "other" })
+    }
+
+    @Test
+    fun independentClientsDoNotShareRequiredBreakers() = runTest {
+        val failed = EqualClient()
+        val healthy = EqualClient()
+        val op = NativeAdminOp.byMethod("agent.list")!!
+        kotlin.test.assertFailsWith<IllegalArgumentException> {
+            NativeAdmin.require<String>(failed, op) { error("offline") }
+        }
+        assertEquals("healthy", NativeAdmin.require(healthy, op) { "healthy" })
+        var probed = false
+        val failure = kotlin.test.assertFailsWith<IllegalArgumentException> {
+            NativeAdmin.require(failed, op) { probed = true; "unexpected" }
+        }
+        assertFalse(probed)
+        assertTrue(failure.message.orEmpty().contains("temporarily unavailable"))
+        assertEquals("other", NativeAdmin.require(failed, NativeAdminOp.byMethod("agent.get")!!) { "other" })
+    }
+
+    private class EqualClient : AppServerClient by FakeClient() {
+        override fun equals(other: Any?): Boolean = other is EqualClient
+        override fun hashCode(): Int = 1
     }
 
     @Test
@@ -115,7 +141,7 @@ class NativeAdminFastFallbackTest {
         assertNull(NativeAdmin.policyForMethod("not.a.registered.op"))
     }
 
-    private object FakeClient : AppServerClient {
+    private class FakeClient : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = emptyFlow()
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) = error("unused")
         override suspend fun input(command: AppServerCommand.Input) = error("unused")

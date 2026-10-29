@@ -2,8 +2,6 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.transport.appserver.AppServerCommand
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -21,12 +19,6 @@ import kotlinx.serialization.json.put
 
 /** letta-mobile-w4q4p: provider.* over the live connect-provider commands. */
 class ProviderAdminHandlersTest {
-    @BeforeTest
-    fun resetBreaker() = NativeAdmin.resetCircuitForTest()
-
-    @AfterTest
-    fun resetBreakerAfter() = NativeAdmin.resetCircuitForTest()
-
     private val lenient = Json { ignoreUnknownKeys = true; explicitNulls = false; coerceInputValues = true }
 
     @Test

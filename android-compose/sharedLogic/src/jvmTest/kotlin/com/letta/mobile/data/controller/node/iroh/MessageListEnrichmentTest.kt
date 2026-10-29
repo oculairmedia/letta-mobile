@@ -21,20 +21,12 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 /** letta-mobile-r1xkl: a row served by the real `message.list` route carries the ledger's two ids. */
 class MessageListEnrichmentTest {
-    @BeforeTest
-    fun resetCircuit() = NativeAdmin.resetCircuitForTest()
-
-    @AfterTest
-    fun resetCircuitAfter() = NativeAdmin.resetCircuitForTest()
-
     private class ListClient(private val rows: List<JsonObject>) : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow()
 
