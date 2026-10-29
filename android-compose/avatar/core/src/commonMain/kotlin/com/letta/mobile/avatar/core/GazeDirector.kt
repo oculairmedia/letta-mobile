@@ -263,27 +263,31 @@ class GazeDirector(
         val base = aimBase(next, world)
         val free = pointerDemands(world.mode)
         val look = wantLook(base, free)
+        val fixation = Fixation(next, base, look, free)
         val snap = headSnapDue(next, free)
-        if (!snap && sameFixation(next, base, look, free)) return
-        applyFixation(next, base, look, free, snap)
+        if (!snap && isCurrent(fixation)) return
+        applyFixation(fixation, snap)
     }
+
+    /** One committed look: the target, its aim, the eye offset and whether a pointer demanded it. */
+    private data class Fixation(val target: GazeTarget, val base: GazePoint, val look: GazePoint, val free: Boolean)
 
     /** A pending cue's head snap fires with its own plan fixation, never with a pointer demand. */
     private fun headSnapDue(next: GazeTarget, free: Boolean): Boolean = snapHead && !free && next == desiredTarget
 
-    private fun applyFixation(next: GazeTarget, base: GazePoint, look: GazePoint, free: Boolean, snap: Boolean) {
-        target = next
-        fixationBase = base
-        fixationLook = look
-        fixationFree = free
-        if (!free) lastPlanAim = base
+    private fun applyFixation(fixation: Fixation, snap: Boolean) {
+        target = fixation.target
+        fixationBase = fixation.base
+        fixationLook = fixation.look
+        fixationFree = fixation.free
+        if (!fixation.free) lastPlanAim = fixation.base
         saccadeAge = 0f
         committedSnap = snap
         if (snap) snapHead = false
     }
 
-    private fun sameFixation(next: GazeTarget, base: GazePoint, look: GazePoint, free: Boolean): Boolean =
-        next == target && base == fixationBase && look == fixationLook && free == fixationFree
+    private fun isCurrent(fixation: Fixation): Boolean =
+        fixation == Fixation(target, fixationBase, fixationLook, fixationFree)
 
     /** One PICK -> DWELL -> GAP step of the plan. */
     private fun stepPhase(state: AvatarState, world: GazeWorld) {
