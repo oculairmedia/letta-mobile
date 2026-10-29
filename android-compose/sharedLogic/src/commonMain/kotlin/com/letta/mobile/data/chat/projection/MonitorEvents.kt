@@ -110,15 +110,16 @@ private class MonitorWatches {
 }
 
 /** Each watch's description, from the Monitor call that started it ("Monitor started (task monitor_…"). */
-private fun monitorLabels(messages: List<UiMessage?>): Map<String, String> {
-    val labels = HashMap<String, String>()
-    for (call in messages.asSequence().flatMap { it?.toolCalls.orEmpty() }) {
-        if (!call.name.equals(MONITOR_TOOL, ignoreCase = true)) continue
-        val taskId = call.result?.let(MONITOR_STARTED::find)?.groupValues?.get(1) ?: continue
-        ToolCallFacts(call.name, call.arguments, call.result).string("description")?.let { labels[taskId] = it }
-    }
-    return labels
-}
+private fun monitorLabels(messages: List<UiMessage?>): Map<String, String> =
+    messages.asSequence()
+        .flatMap { it?.toolCalls.orEmpty() }
+        .filter { it.name.equals(MONITOR_TOOL, ignoreCase = true) }
+        .mapNotNull { call ->
+            val taskId = call.result?.let(MONITOR_STARTED::find)?.groupValues?.get(1)
+            val label = ToolCallFacts(call.name, call.arguments, call.result).string("description")
+            if (taskId != null && label != null) taskId to label else null
+        }
+        .toMap()
 
 /** The event text of a notification that is one Monitor event, not yet folded into a chip. */
 private fun UiSubagentNotification.rawMonitorEvent(): String? =
